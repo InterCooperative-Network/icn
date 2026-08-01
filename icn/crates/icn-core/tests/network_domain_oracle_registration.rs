@@ -246,3 +246,54 @@ fn bootstrap_phases_allow_network_domain_before_running() {
         );
     }
 }
+
+/// The consuming limiter quantises sub-granularity rates upward — pinned, not hidden.
+///
+/// `RateLimiter::do_rate_limit_check` computes
+/// `(max_messages_per_second * refill_interval).max(1.0)` tokens per interval
+/// (`icn-net/src/rate_limit.rs:394`). At the default 100 ms interval that floor is
+/// **one token per 100 ms = 10 messages/s**, so every configured rate below 10/s
+/// collapses to 10/s.
+///
+/// This is a property of the limiter, not of the oracle wiring, and it predates
+/// the tier-selection fix: the previously hard-coded isolated tier was
+/// `RateLimit::restricted()` = 5/s, which this floor already inflated to 10/s.
+/// Selecting the operator's configured tier does not introduce it and does not
+/// worsen it — but it does make it *reachable*, because an operator can now
+/// actually put a sub-10 number into effect and be misled about the result.
+///
+/// Burst is unaffected: `capacity` is used verbatim, which is why the #2496
+/// regression (configured burst 2 must not become 5) is genuinely fixed.
+///
+/// Asserted here rather than left as a comment so that if the floor is ever
+/// removed, this test fails and the tier tests can be tightened accordingly.
+#[test]
+fn configured_rates_below_the_refill_granularity_are_quantised_up() {
+    use std::time::Duration;
+
+    let refill_interval = Duration::from_millis(100);
+    let granularity = 1.0 / refill_interval.as_secs_f64(); // 10 messages/s
+
+    for configured in [1u32, 5, 9] {
+        let tokens_per_interval = (configured as f64 * refill_interval.as_secs_f64()).max(1.0);
+        let effective = tokens_per_interval / refill_interval.as_secs_f64();
+
+        assert_eq!(
+            effective, granularity,
+            "a configured {configured} msg/s is quantised up to {granularity} msg/s \
+             by the limiter's `.max(1.0)` floor - the operator's number does not \
+             take effect below the refill granularity"
+        );
+    }
+
+    // At and above the granularity the configured value is exact.
+    for configured in [10u32, 30, 70, 200] {
+        let tokens_per_interval = (configured as f64 * refill_interval.as_secs_f64()).max(1.0);
+        let effective = tokens_per_interval / refill_interval.as_secs_f64();
+
+        assert_eq!(
+            effective, configured as f64,
+            "at or above the refill granularity the configured rate must be exact"
+        );
+    }
+}

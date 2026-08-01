@@ -290,22 +290,31 @@ mod tests {
 
     /// The four configured tiers, deliberately distinct from the trust oracle's
     /// hard-coded 5/20/100/unlimited so a passing test cannot be an accident.
+    ///
+    /// Every rate here is a whole multiple of the token bucket's refill
+    /// granularity (>= 1 / `refill_interval`, i.e. >= 10/s at the default 100 ms).
+    /// Sub-granularity rates are deliberately avoided: `RateLimiter` computes
+    /// `(rate * interval).max(1.0)` (`icn-net/src/rate_limit.rs:394`), so a
+    /// configured 1/s would be *quantised up* to 10/s by the consumer. Asserting
+    /// on such a value here would imply this layer can deliver a rate the limiter
+    /// cannot honour. See the floor test in
+    /// `tests/network_domain_oracle_registration.rs` and the tracking issue.
     fn configured_tiers() -> NetworkRateLimitTiers {
         NetworkRateLimitTiers {
             isolated: RateLimit {
-                messages_per_second: 1,
+                messages_per_second: 10,
                 burst_size: 2,
             },
             known: RateLimit {
-                messages_per_second: 7,
+                messages_per_second: 30,
                 burst_size: 9,
             },
             partner: RateLimit {
-                messages_per_second: 11,
+                messages_per_second: 70,
                 burst_size: 13,
             },
             federated: RateLimit {
-                messages_per_second: 17,
+                messages_per_second: 170,
                 burst_size: 19,
             },
         }
@@ -336,14 +345,14 @@ mod tests {
     fn each_configured_tier_is_honoured() {
         // (trust score, expected rate, expected burst) — one per class boundary.
         let cases = [
-            (0.0, 1, 2),    // Isolated
-            (0.05, 1, 2),   // Isolated, just below the Known threshold
-            (0.1, 7, 9),    // Known, exactly at the threshold
-            (0.39, 7, 9),   // Known
-            (0.4, 11, 13),  // Partner, exactly at the threshold
-            (0.69, 11, 13), // Partner
-            (0.7, 17, 19),  // Federated, exactly at the threshold
-            (1.0, 17, 19),  // Federated
+            (0.0, 10, 2),   // Isolated
+            (0.05, 10, 2),  // Isolated, just below the Known threshold
+            (0.1, 30, 9),   // Known, exactly at the threshold
+            (0.39, 30, 9),  // Known
+            (0.4, 70, 13),  // Partner, exactly at the threshold
+            (0.69, 70, 13), // Partner
+            (0.7, 170, 19), // Federated, exactly at the threshold
+            (1.0, 170, 19), // Federated
         ];
 
         for (score, expected_rate, expected_burst) in cases {
@@ -423,7 +432,7 @@ mod tests {
                 "the inner oracle's unlimited() must never survive"
             );
             assert!(
-                [1, 7, 11, 17].contains(&limit.messages_per_second),
+                [10, 30, 70, 170].contains(&limit.messages_per_second),
                 "the effective limit must come from the configured tier table, \
                  got {} msg/s",
                 limit.messages_per_second

@@ -1836,10 +1836,14 @@ mod core_oracle_registration_tests {
             max_messages_per_second: rate,
             burst_capacity: burst,
         };
+        // Rates are whole multiples of the refill granularity (>= 10/s at the
+        // default 100 ms interval). `RateLimiter` quantises with
+        // `(rate * interval).max(1.0)`, so asserting on a sub-granularity rate
+        // would imply a precision the limiter cannot deliver.
         crate::config::RateLimitingConfig {
-            isolated: tier(1, 2),
-            known: tier(7, 9),
-            partner: tier(11, 13),
+            isolated: tier(10, 2),
+            known: tier(30, 9),
+            partner: tier(70, 13),
             federated: tier(200, 50),
             ..Default::default()
         }
@@ -1963,9 +1967,9 @@ mod core_oracle_registration_tests {
     fn every_configured_network_tier_reaches_the_registry() {
         // (score, class, expected rate, expected burst)
         let cases = [
-            (0.0, "Isolated", 1, 2),
-            (0.2, "Known", 7, 9),
-            (0.5, "Partner", 11, 13),
+            (0.0, "Isolated", 10, 2),
+            (0.2, "Known", 30, 9),
+            (0.5, "Partner", 70, 13),
             (0.9, "Federated", 200, 50),
         ];
 
