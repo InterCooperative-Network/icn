@@ -27,3 +27,12 @@ monitoring/
 # Must come after `!icn/`: in .dockerignore the last matching rule wins.
 icn/target/
 **/target/
+
+# Exception: deploy/Dockerfile.icnd-fast copies these two host-built binaries
+# straight from the build context (see demo/RUNBOOK.md), so they must survive
+# the exclusion above. Only these two paths are re-included — the rest of
+# target/ (tens of GB of intermediate artifacts) stays out.
+# deploy/Dockerfile.icnd is unaffected either way: it uses COPY --from=builder,
+# which reads from the build stage rather than the context.
+!icn/target/release/icnd
+!icn/target/release/icnctl
