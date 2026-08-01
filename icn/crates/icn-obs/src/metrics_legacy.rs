@@ -2159,24 +2159,42 @@ pub mod gossip {
 
     /// How this node resolved one topic of a network subscription-control request (#2482).
     ///
-    /// Closed for the same reason as [`SubscriptionControlAction`].
+    /// Closed for the same reason as [`SubscriptionControlAction`]. The vocabulary is
+    /// deliberately conservative: these strings become a public operational surface the
+    /// moment they are scraped, so each one claims only what the code actually guarantees.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum SubscriptionControlOutcome {
-        /// The request was applied for that topic.
-        Accepted,
-        /// Refused because it claimed this node's own DID (#2471 guard).
+        /// The handler returned success for that topic.
+        ///
+        /// **Success does not imply the subscriber set changed**, which is why this is
+        /// `processed` and not `accepted`. `GossipActor::subscribe` skips the insert when
+        /// the DID is already subscribed, and `GossipActor::unsubscribe` returns `Ok(())`
+        /// having removed nothing when the DID was not subscribed. Both are counted here.
+        Processed,
+        /// Refused because the request claimed this node's own DID (the #2471 guard).
+        ///
+        /// The only non-success distinguished by a *type* rather than by message text:
+        /// it is matched via `GossipActor::is_subscription_control_spoof`.
         RejectedOwnDid,
-        /// Any other failure — ACL denial, unknown topic, capacity, storage.
-        Error,
+        /// Every other non-success — expected policy denials and operational failures alike.
+        ///
+        /// Covers topic-ACL denial, unknown topic, and per-topic capacity refusal as well
+        /// as genuine faults. These are deliberately **not** split: the denial paths in
+        /// `GossipActor::subscribe` use `anyhow::bail!` with format strings rather than
+        /// typed `GossipError` variants, so separating "policy said no" from "something
+        /// broke" would require matching on error text — brittle, and it would silently
+        /// reclassify on any rewording. If those paths are ever given typed variants, this
+        /// can be split then, with the cardinality cost paid deliberately.
+        RejectedOrError,
     }
 
     impl SubscriptionControlOutcome {
         /// Fixed label value for this outcome.
         pub fn as_label(self) -> &'static str {
             match self {
-                Self::Accepted => "accepted",
+                Self::Processed => "processed",
                 Self::RejectedOwnDid => "rejected_own_did",
-                Self::Error => "error",
+                Self::RejectedOrError => "rejected_or_error",
             }
         }
     }
@@ -2362,12 +2380,18 @@ pub mod gossip {
                 SubscriptionControlAction::Unsubscribe.as_label(),
                 "unsubscribe"
             );
-            assert_eq!(SubscriptionControlOutcome::Accepted.as_label(), "accepted");
+            assert_eq!(
+                SubscriptionControlOutcome::Processed.as_label(),
+                "processed"
+            );
             assert_eq!(
                 SubscriptionControlOutcome::RejectedOwnDid.as_label(),
                 "rejected_own_did"
             );
-            assert_eq!(SubscriptionControlOutcome::Error.as_label(), "error");
+            assert_eq!(
+                SubscriptionControlOutcome::RejectedOrError.as_label(),
+                "rejected_or_error"
+            );
         }
 
         /// Cardinality is bounded by construction: 2 actions x 3 outcomes = 6 series.
@@ -2379,9 +2403,9 @@ pub mod gossip {
                 SubscriptionControlAction::Unsubscribe,
             ];
             let outcomes = [
-                SubscriptionControlOutcome::Accepted,
+                SubscriptionControlOutcome::Processed,
                 SubscriptionControlOutcome::RejectedOwnDid,
-                SubscriptionControlOutcome::Error,
+                SubscriptionControlOutcome::RejectedOrError,
             ];
 
             let series: std::collections::HashSet<(&str, &str)> = actions
@@ -2400,9 +2424,9 @@ pub mod gossip {
             for label in [
                 SubscriptionControlAction::Subscribe.as_label(),
                 SubscriptionControlAction::Unsubscribe.as_label(),
-                SubscriptionControlOutcome::Accepted.as_label(),
+                SubscriptionControlOutcome::Processed.as_label(),
                 SubscriptionControlOutcome::RejectedOwnDid.as_label(),
-                SubscriptionControlOutcome::Error.as_label(),
+                SubscriptionControlOutcome::RejectedOrError.as_label(),
             ] {
                 assert!(!label.contains("did:"), "label leaked a DID: {label}");
                 assert!(!label.contains(':'), "label looks structured: {label}");

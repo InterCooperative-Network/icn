@@ -100,7 +100,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 acked_topics.push(topic.clone());
                                 record_subscription_control_outcome(
                                     SubscriptionControlAction::Subscribe,
-                                    SubscriptionControlOutcome::Accepted,
+                                    SubscriptionControlOutcome::Processed,
                                 );
                             }
                             Err(e)
@@ -123,7 +123,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 );
                                 record_subscription_control_outcome(
                                     SubscriptionControlAction::Subscribe,
-                                    SubscriptionControlOutcome::Error,
+                                    SubscriptionControlOutcome::RejectedOrError,
                                 );
                             }
                         }
@@ -164,7 +164,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 info!("Unsubscribed {} from topic: {}", sender_did, topic);
                                 record_subscription_control_outcome(
                                     SubscriptionControlAction::Unsubscribe,
-                                    SubscriptionControlOutcome::Accepted,
+                                    SubscriptionControlOutcome::Processed,
                                 );
                             }
                             Err(e)
@@ -185,7 +185,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 );
                                 record_subscription_control_outcome(
                                     SubscriptionControlAction::Unsubscribe,
-                                    SubscriptionControlOutcome::Error,
+                                    SubscriptionControlOutcome::RejectedOrError,
                                 );
                             }
                         }
