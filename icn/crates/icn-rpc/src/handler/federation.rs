@@ -305,10 +305,16 @@ pub async fn handle_federation_vouch_issue(
         params.trust_score,
     );
 
-    // Always signed: `own_keypair` is required at construction, so there is no
+    // Always signed: `own_signer` is required at construction, so there is no
     // unsigned fallback to fall through to. Before #2497 the `else` branch here
     // was the one always taken, emitting unsigned vouches while reporting success.
-    let signed_vouch = vouch.sign(state.own_keypair());
+    //
+    // A signing *failure* is now an error response, not a silent downgrade: a
+    // vouch that could not be signed must never reach the registry looking valid.
+    let signed_vouch = match vouch.sign(state.own_signer().as_ref()) {
+        Ok(v) => v,
+        Err(e) => return RpcResponse::error(id, -32000, e),
+    };
 
     match registry.add_vouch(&signed_vouch) {
         Ok(()) => {

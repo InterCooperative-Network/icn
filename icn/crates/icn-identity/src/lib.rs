@@ -515,6 +515,42 @@ impl Drop for KeyPair {
     }
 }
 
+/// A software `KeyPair` is a signing capability, so it can stand in wherever one
+/// is required.
+///
+/// This is the bridge that lets callers depend on [`DidSigner`] — which hardware
+/// backends can satisfy — without churning every existing software call site
+/// (#2501). `&KeyPair` and `Arc<KeyPair>` coerce to the trait object directly.
+///
+/// It does **not** make `KeyPair` the preferred dependency: holding one still
+/// means holding extractable private key material. New code that only needs to
+/// *use* a key should take `&dyn DidSigner` and let the composition root decide
+/// whether that is backed by software or an HSM.
+impl DidSigner for KeyPair {
+    fn did(&self) -> &Did {
+        &self.did
+    }
+
+    fn verifying_key(&self) -> &VerifyingKey {
+        &self.verifying_key
+    }
+
+    fn sign(&self, message: &[u8]) -> Result<ed25519_dalek::Signature> {
+        // Qualified to name the inherent method explicitly. Inherent methods
+        // already win over trait methods, so `self.sign(..)` would resolve the
+        // same way — but naming it leaves no doubt this is not self-recursive.
+        Ok(KeyPair::sign(self, message))
+    }
+
+    fn is_hardware_backed(&self) -> bool {
+        false
+    }
+
+    fn backend_type(&self) -> &str {
+        "software"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

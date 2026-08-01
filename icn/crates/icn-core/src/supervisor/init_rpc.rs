@@ -105,25 +105,30 @@ pub fn spawn_rpc_server(
     // installed afterwards (#2497).
     //
     // It used to be an `Option` filled by `RpcServer::set_own_keypair`, which had
-    // no caller anywhere in the workspace — so `own_keypair` stayed `None` for the
-    // daemon's whole lifetime. Trust and recovery RPC answered "Node keypair not
+    // no caller anywhere in the workspace — so it stayed `None` for the daemon's
+    // whole lifetime. Trust and recovery RPC answered "Node keypair not
     // available", and `handler/federation.rs` took the unsigned branch of
     // `if let Some(keypair)` and emitted vouches with no signature while still
     // reporting success.
     //
     // Passing it to the constructor removes the "unconfigured" state entirely, so
     // that class of omission cannot recur here: there is no server to misconfigure.
-    // Fail-closed: a node that cannot load its own keypair does not serve RPC.
-    let own_keypair = Arc::new(
-        deps.identity_bundle
-            .keypair()
-            .context("failed to load node keypair for RPC server")?,
-    );
+    // Fail-closed: a node that cannot obtain a signing capability does not serve RPC.
+    //
+    // What is required is the *capability*, not the key (#2501). The first fix
+    // asked for `IdentityBundle::keypair()`, which fails by design on a
+    // hardware-backed bundle — so fail-closed startup would have turned PKCS#11
+    // and TPM identities into a daemon that refuses to serve RPC. No handler ever
+    // needed the private bytes; they need a DID and a `sign()`.
+    let own_signer = deps
+        .identity_bundle
+        .signing_capability()
+        .context("failed to obtain node signing capability for RPC server")?;
 
     let mut rpc_server = if let Some(ref jwt_secret) = config.jwt_secret {
-        RpcServer::new_with_auth(config.addr, jwt_secret.clone(), own_keypair)
+        RpcServer::new_with_auth(config.addr, jwt_secret.clone(), own_signer)
     } else {
-        RpcServer::new(config.addr, own_keypair)
+        RpcServer::new(config.addr, own_signer)
     };
 
     // Install the store-backed auth manager so token revocation actually exists

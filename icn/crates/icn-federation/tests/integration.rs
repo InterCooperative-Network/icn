@@ -119,7 +119,8 @@ fn test_vouch_signature() {
         "target-coop".to_string(),
         0.9,
     )
-    .sign(&keypair);
+    .sign(&keypair)
+    .expect("signing with a software keypair must succeed");
 
     assert!(!vouch.signature.is_empty());
     assert!(vouch.verify_signature().is_ok());
