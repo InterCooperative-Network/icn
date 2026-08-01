@@ -17,6 +17,67 @@ export type DoctorReport = {
   suggested_repairs: string[];
 };
 
+/**
+ * A checkout on `main` that is behind its own `origin/main` is serving stale
+ * truth: every canonical doc it exposes (STATE.md, ARCHITECTURE.md, AGENTS.md,
+ * ops/state/truth/*) is that many commits out of date. Escalate to `error` past
+ * this many commits — at that point the tree is not "slightly behind", it is a
+ * different repository state than the one it claims to represent.
+ */
+export const MAIN_STALE_ERROR_COMMITS = 25;
+
+/**
+ * A feature branch is *expected* to sit behind main while work is in progress,
+ * so behind-ness is only worth mentioning once the branch base is old enough
+ * that a rebase is genuinely overdue.
+ */
+export const FEATURE_BASE_STALE_WARN_COMMITS = 50;
+
+/**
+ * Classify how stale a checkout is relative to origin/main.
+ *
+ * `behindCount` of NaN means origin/main could not be resolved (no remote ref,
+ * not a repo) — that is "unknown", never "fine".
+ */
+export function classifyTreeFreshness(
+  branch: string | null,
+  behindCount: number
+): { severity: DoctorCheck["severity"]; message: string; detail?: string; repair?: string } {
+  if (!Number.isFinite(behindCount)) {
+    return {
+      severity: "ok",
+      message: "origin/main not resolvable here; freshness check skipped.",
+    };
+  }
+  if (behindCount === 0) {
+    return { severity: "ok", message: "Checkout is level with origin/main." };
+  }
+  if (branch === "main") {
+    const stale = behindCount >= MAIN_STALE_ERROR_COMMITS;
+    return {
+      severity: stale ? "error" : "warn",
+      message: `Checkout is on main but ${behindCount} commit(s) behind origin/main — canonical docs and ops/state served from here are stale.`,
+      ...(stale
+        ? {
+            detail: `At or past ${MAIN_STALE_ERROR_COMMITS} commits this tree no longer represents main; treat anything read from it as unverified.`,
+          }
+        : {}),
+      repair: "git pull --ff-only  # re-sync the tree serving canonical docs",
+    };
+  }
+  if (behindCount >= FEATURE_BASE_STALE_WARN_COMMITS) {
+    return {
+      severity: "warn",
+      message: `Branch base is ${behindCount} commit(s) behind origin/main; a rebase is overdue.`,
+      repair: "git fetch origin && git rebase origin/main",
+    };
+  }
+  return {
+    severity: "ok",
+    message: `Feature branch ${behindCount} commit(s) behind origin/main (expected during active work).`,
+  };
+}
+
 function maxSeverity(
   a: DoctorReport["severity"],
   b: DoctorCheck["severity"]
@@ -189,6 +250,34 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
       message: "Worktree clean.",
     });
   }
+
+  // Tree freshness. `dirty_tree` above answers "are there uncommitted edits?",
+  // which is trivially "no" for a checkout nobody has touched in weeks — so a
+  // clean tree is, on its own, an inverted signal for the staleness we care
+  // about. This check asks the question that actually matters for a host that
+  // serves canonical docs: how far behind origin/main is this checkout?
+  //
+  // No fetch is performed (doctor is read-only diagnosis), so `origin/main` is
+  // whatever the local object store last saw. That makes this a LOWER BOUND on
+  // staleness, never an overestimate.
+  const behindProbe = await runCommand(
+    "git",
+    ["rev-list", "--count", "HEAD..origin/main"],
+    { cwd: repoRoot, timeoutMs: 5_000, maxStdoutBytes: 256 }
+  );
+  const behindCount = behindProbe.ok
+    ? Number.parseInt(behindProbe.stdout.trim(), 10)
+    : Number.NaN;
+
+  const freshness = classifyTreeFreshness(env.git.branch, behindCount);
+  checks.push({
+    id: "tree_freshness",
+    severity: freshness.severity,
+    message: freshness.message,
+    ...(freshness.detail ? { detail: freshness.detail } : {}),
+  });
+  if (freshness.repair) suggested.push(freshness.repair);
+  top = maxSeverity(top, freshness.severity);
 
   const runnerProbes: [string, Awaited<ReturnType<typeof runCommand>>][] = [
     ["git", await runCommand("git", ["--version"], { cwd: repoRoot, timeoutMs: 4000, maxStdoutBytes: 256 })],

@@ -28,8 +28,48 @@ export function resolveBranch(rawBranch: string): string {
   return branch === "" || branch === "HEAD" ? "main" : branch;
 }
 
+/**
+ * Enumerate worktree directories under `wtRoot`.
+ *
+ * Returns the failure instead of swallowing it: an unreadable worktree root
+ * previously collapsed to `[]`, which is indistinguishable from "no worktrees
+ * exist" and reads as success. That is how a misconfigured root stayed
+ * invisible while dozens of worktrees went unreported.
+ */
+export function readWorktreeDirs(
+  wtRoot: string,
+  readdir: (p: string) => string[]
+): { dirs: string[]; error: string | null } {
+  try {
+    return { dirs: readdir(wtRoot).filter((d) => !d.startsWith(".")), error: null };
+  } catch (e) {
+    return {
+      dirs: [],
+      error: `Worktree root unreadable at ${wtRoot}: ${
+        e instanceof Error ? e.message : String(e)
+      }. Set ICN_WT_ROOT or fix ops/state/config/repo-map.json#worktrees.root.`,
+    };
+  }
+}
+
 async function repoStatus(repoPath: string, name: string) {
   const branch = await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  // An unresolvable path yields "" here and 0 for every counter below, which
+  // renders as a clean, up-to-date repo. Report it as unresolved instead —
+  // a repo we cannot see is not a repo that is fine.
+  if (branch === "") {
+    return {
+      name,
+      resolved: false,
+      error: `Not a readable git repository at ${repoPath}`,
+      branch: null,
+      dirty: null,
+      dirtyFiles: null,
+      ahead: null,
+      behind: null,
+      lastCommit: null,
+    };
+  }
   const dirty = await gitLine(repoPath, ["status", "--porcelain"]);
   let ahead = await gitLine(repoPath, ["rev-list", "@{u}..HEAD", "--count"]);
   if (!ahead) ahead = "0";
@@ -40,6 +80,8 @@ async function repoStatus(repoPath: string, name: string) {
   const behindN = parseInt(behind, 10);
   return {
     name,
+    resolved: true,
+    error: null,
     branch,
     dirty: dirty !== "",
     dirtyFiles: dirty.split("\n").filter(Boolean).length,
@@ -80,13 +122,10 @@ export function registerRepoTools(
       const icnPath = join(ICN_ROOT, "icn");
       const mainHash = await gitLine(icnPath, ["rev-parse", "origin/main"]);
 
-      let dirs: string[] = [];
-      try {
-        const { readdirSync } = await import("fs");
-        dirs = readdirSync(wtRoot).filter((d) => !d.startsWith("."));
-      } catch {
-        dirs = [];
-      }
+      const { readdirSync } = await import("fs");
+      const { dirs, error: wtRootError } = readWorktreeDirs(wtRoot, (p) =>
+        readdirSync(p)
+      );
 
       const results = await Promise.all(
         dirs.map(async (dir) => {
@@ -126,10 +165,14 @@ export function registerRepoTools(
           {
             type: "text",
             text: JSON.stringify(
-              results.map((r) => ({
-                ...r,
-                claimedBy: sessionMap[r.name] ?? null,
-              })),
+              {
+                worktreeRoot: wtRoot,
+                error: wtRootError,
+                worktrees: results.map((r) => ({
+                  ...r,
+                  claimedBy: sessionMap[r.name] ?? null,
+                })),
+              },
               null,
               2
             ),
