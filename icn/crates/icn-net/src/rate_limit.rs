@@ -37,7 +37,16 @@ impl fmt::Display for HexDisplay<'_> {
 }
 
 const NETWORK_MESSAGE_ACTION: &str = "network_message";
-const NETWORK_DOMAIN: &str = "net";
+
+/// Policy domain under which the network layer requests per-peer constraints.
+///
+/// The composition root MUST register a `PolicyOracle` for this domain. Once the
+/// `OracleRegistry` reaches `BootstrapPhase::Running`, an unregistered domain is
+/// denied by default, and [`RateLimiter::check_rate_limit`] reports that denial
+/// the same way it reports a token-bucket rejection — so a missing registration
+/// silently drops every inbound message. Exported so the registration site and
+/// this query site share one symbol instead of two string literals that can drift.
+pub const NETWORK_DOMAIN: &str = "net";
 
 /// Configuration for rate limiting
 #[derive(Clone, Debug)]

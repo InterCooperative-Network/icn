@@ -262,6 +262,60 @@ pub async fn run_supervisor(
     Ok(())
 }
 
+/// Register every first-party oracle with the `OracleRegistry`.
+///
+/// This is the composition root's complete set of domain registrations. It is a
+/// standalone function so that the set can be asserted in tests: once the registry
+/// reaches [`BootstrapPhase::Running`], any domain that is *not* registered here is
+/// denied by default, so an omission silently disables a whole subsystem rather
+/// than failing loudly.
+///
+/// That is exactly how #2488 happened. Oracles were registered by
+/// `oracle.domain()`, which covered `trust` and `charter` but never `net` — the
+/// domain `icn-net`'s rate limiter queries. Every inbound network message was
+/// denied, reported as an ordinary rate-limit rejection, and no node could peer.
+///
+/// The network layer is a kernel component: it asks for a `ConstraintSet` and
+/// enforces it without knowing where the numbers came from. Choosing *which*
+/// oracle answers for the network domain is a composition-root decision, which is
+/// why it lives here and not in `icn-net`. Registering under
+/// [`icn_net::NETWORK_DOMAIN`] rather than a local string literal keeps this site
+/// and the query site bound to one symbol so they cannot drift apart again.
+fn register_core_oracles(
+    oracle_registry: &icn_kernel_api::OracleRegistry,
+    trust_oracle: Option<std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
+    charter_oracle: Option<std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
+) {
+    if let Some(trust_oracle) = trust_oracle {
+        let trust_domain = trust_oracle.domain();
+        oracle_registry.register(trust_domain.clone(), trust_oracle.clone());
+        info!(
+            "Registered TrustPolicyOracle with OracleRegistry for domain '{}'",
+            trust_domain
+        );
+
+        // Serve the network domain from the same oracle. The trust oracle reports
+        // its own domain as "trust", so registering by `domain()` alone leaves
+        // "net" unregistered — see this function's doc comment.
+        let network_domain = icn_kernel_api::authz::Domain::new(icn_net::NETWORK_DOMAIN);
+        oracle_registry.register(network_domain.clone(), trust_oracle);
+        info!(
+            "Registered network PolicyOracle with OracleRegistry for domain '{}'",
+            network_domain
+        );
+    }
+
+    // Register charter oracle with OracleRegistry if available (Phase 1 charter engine).
+    if let Some(charter_oracle) = charter_oracle {
+        let charter_domain = charter_oracle.domain();
+        oracle_registry.register(charter_domain.clone(), charter_oracle);
+        info!(
+            "Registered CharterPolicyOracle with OracleRegistry for domain '{}'",
+            charter_domain
+        );
+    }
+}
+
 /// Spawn all actors when identity bundle is available
 #[allow(clippy::too_many_arguments)]
 async fn spawn_actors_with_identity(
@@ -330,27 +384,13 @@ async fn spawn_actors_with_identity(
     // Get TrustService from ServiceRegistry for ReplicationManager and oracle registration.
     let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
 
-    // Register trust PolicyOracle with OracleRegistry if available.
-    // This replaces the direct PolicyOracle passing and provides phase-aware authorization.
-    if let Some(ref trust_service) = trust_service_from_registry {
-        let trust_oracle = trust_service.oracle();
-        let trust_domain = trust_oracle.domain();
-        oracle_registry.register(trust_domain.clone(), trust_oracle);
-        info!(
-            "Registered TrustPolicyOracle with OracleRegistry for domain '{}'",
-            trust_domain
-        );
-    }
-
-    // Register charter oracle with OracleRegistry if available (Phase 1 charter engine).
-    if let Some(charter_oracle) = service_registry.and_then(|r| r.charter_oracle().cloned()) {
-        let charter_domain = charter_oracle.domain();
-        oracle_registry.register(charter_domain.clone(), charter_oracle);
-        info!(
-            "Registered CharterPolicyOracle with OracleRegistry for domain '{}'",
-            charter_domain
-        );
-    }
+    register_core_oracles(
+        &oracle_registry,
+        trust_service_from_registry
+            .as_ref()
+            .map(|trust_service| trust_service.oracle()),
+        service_registry.and_then(|r| r.charter_oracle().cloned()),
+    );
 
     // Transition to CoreApps phase: first-party oracles are registered.
     oracle_registry.set_phase(icn_kernel_api::bootstrap::BootstrapPhase::CoreApps);
@@ -1672,5 +1712,118 @@ async fn spawn_background_tasks(
         }
     } else {
         info!("Resource access enforcer disabled by configuration");
+    }
+}
+
+#[cfg(test)]
+mod core_oracle_registration_tests {
+    use super::register_core_oracles;
+    use icn_kernel_api::authz::{
+        ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
+    };
+    use icn_kernel_api::bootstrap::BootstrapPhase;
+    use icn_kernel_api::OracleRegistry;
+    use std::sync::Arc;
+
+    /// Reports a domain that is NOT the network domain, exactly as the real trust
+    /// and charter oracles do. That mismatch is the whole bug (#2488): registering
+    /// oracles by `domain()` alone never covers `net`.
+    #[derive(Debug)]
+    struct FakeOracle(&'static str);
+
+    impl PolicyOracle for FakeOracle {
+        fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+            PolicyDecision::allow_with(
+                ConstraintSet::new().with_rate_limit(RateLimit::restricted()),
+            )
+        }
+
+        fn domain(&self) -> Domain {
+            Domain::new(self.0)
+        }
+    }
+
+    fn request_for(domain: &str) -> PolicyRequest {
+        PolicyRequest::new(
+            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK".to_string(),
+            ActionKind::Custom("network_message".to_string()),
+            Domain::new(domain),
+        )
+    }
+
+    /// The regression guard: the composition root MUST register the domain that
+    /// `icn-net` queries. If the `net` registration is ever removed from
+    /// `register_core_oracles`, this fails.
+    #[test]
+    fn registers_the_domain_icn_net_queries() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(&registry, Some(Arc::new(FakeOracle("trust"))), None);
+        registry.set_phase(BootstrapPhase::Running);
+
+        let decision = registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN));
+
+        assert!(
+            matches!(decision, PolicyDecision::Allow { .. }),
+            "the composition root must register an oracle for '{}' — without it the \
+             registry denies every inbound network message in Running phase and the \
+             node cannot peer (#2488); got {decision:?}",
+            icn_net::NETWORK_DOMAIN
+        );
+    }
+
+    /// The trust domain keeps working; the net registration is additive.
+    #[test]
+    fn still_registers_the_trust_and_charter_domains() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(
+            &registry,
+            Some(Arc::new(FakeOracle("trust"))),
+            Some(Arc::new(FakeOracle("charter"))),
+        );
+        registry.set_phase(BootstrapPhase::Running);
+
+        for domain in ["trust", "charter"] {
+            assert!(
+                matches!(
+                    registry.evaluate(&request_for(domain)),
+                    PolicyDecision::Allow { .. }
+                ),
+                "domain '{domain}' must remain registered"
+            );
+        }
+    }
+
+    /// Registration is scoped: unrelated domains still deny by default. Guards
+    /// against a "fix" that makes the registry permissive across the board.
+    #[test]
+    fn does_not_make_unrelated_domains_permissive() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(&registry, Some(Arc::new(FakeOracle("trust"))), None);
+        registry.set_phase(BootstrapPhase::Running);
+
+        let decision = registry.evaluate(&request_for("some-unregistered-domain"));
+
+        assert!(
+            matches!(decision, PolicyDecision::Deny { .. }),
+            "deny-by-default must still hold for domains nobody registered; got {decision:?}"
+        );
+    }
+
+    /// Without a trust service there is no network oracle, so the network domain
+    /// stays denied. Documents the residual exposure rather than hiding it: a node
+    /// with no trust service cannot peer, and that is fail-closed by construction.
+    #[test]
+    fn without_a_trust_oracle_the_network_domain_is_not_registered() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(&registry, None, None);
+        registry.set_phase(BootstrapPhase::Running);
+
+        let decision = registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN));
+
+        assert!(
+            matches!(decision, PolicyDecision::Deny { .. }),
+            "with no trust oracle the network domain has no provider and must \
+             fail closed; got {decision:?}"
+        );
     }
 }
