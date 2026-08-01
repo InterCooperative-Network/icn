@@ -285,6 +285,7 @@ fn register_core_oracles(
     oracle_registry: &icn_kernel_api::OracleRegistry,
     trust_oracle: Option<std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
     charter_oracle: Option<std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
+    network_rate_ceiling: &crate::config::TrustClassRateLimitConfig,
 ) {
     if let Some(trust_oracle) = trust_oracle {
         let trust_domain = trust_oracle.domain();
@@ -297,10 +298,26 @@ fn register_core_oracles(
         // Serve the network domain from the same oracle. The trust oracle reports
         // its own domain as "trust", so registering by `domain()` alone leaves
         // "net" unregistered — see this function's doc comment.
+        //
+        // Wrapped in a ceiling because the rate limiter keys on the *unauthenticated*
+        // `NetworkMessage.from`: the tier is chosen from a DID the sender merely
+        // claims, and the top trust tier is `RateLimit::unlimited()` (u32::MAX).
+        // Without the cap, naming a well-trusted DID buys an unbounded budget for
+        // pre-authentication work. The cap is the operator's configured maximum.
         let network_domain = icn_kernel_api::authz::Domain::new(icn_net::NETWORK_DOMAIN);
-        oracle_registry.register(network_domain.clone(), trust_oracle);
+        let network_oracle: std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle> =
+            std::sync::Arc::new(super::network_policy::CappedRateLimitOracle::new(
+                trust_oracle,
+                network_domain.clone(),
+                network_rate_ceiling.max_messages_per_second,
+                network_rate_ceiling.burst_capacity,
+            ));
+        oracle_registry.register(network_domain.clone(), network_oracle);
         info!(
-            "Registered network PolicyOracle with OracleRegistry for domain '{}'",
+            max_messages_per_second = network_rate_ceiling.max_messages_per_second,
+            burst_capacity = network_rate_ceiling.burst_capacity,
+            "Registered network PolicyOracle with OracleRegistry for domain '{}' \
+             (rate limits capped at the configured maximum)",
             network_domain
         );
     }
@@ -390,6 +407,8 @@ async fn spawn_actors_with_identity(
             .as_ref()
             .map(|trust_service| trust_service.oracle()),
         service_registry.and_then(|r| r.charter_oracle().cloned()),
+        // Highest configured tier: no peer may exceed what the operator allowed.
+        &config.rate_limiting.federated,
     );
 
     // Transition to CoreApps phase: first-party oracles are registered.
@@ -1743,6 +1762,29 @@ mod core_oracle_registration_tests {
         }
     }
 
+    /// Returns the unbounded top tier, as the real trust oracle does for a peer
+    /// scoring >= 0.7.
+    #[derive(Debug)]
+    struct UnlimitedOracle;
+
+    impl PolicyOracle for UnlimitedOracle {
+        fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+            PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(RateLimit::unlimited()))
+        }
+
+        fn domain(&self) -> Domain {
+            Domain::trust()
+        }
+    }
+
+    /// Mirrors the deployed `[rate_limiting.federated]` values.
+    fn ceiling() -> crate::config::TrustClassRateLimitConfig {
+        crate::config::TrustClassRateLimitConfig {
+            max_messages_per_second: 200,
+            burst_capacity: 50,
+        }
+    }
+
     fn request_for(domain: &str) -> PolicyRequest {
         PolicyRequest::new(
             "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK".to_string(),
@@ -1757,7 +1799,12 @@ mod core_oracle_registration_tests {
     #[test]
     fn registers_the_domain_icn_net_queries() {
         let registry = OracleRegistry::new();
-        register_core_oracles(&registry, Some(Arc::new(FakeOracle("trust"))), None);
+        register_core_oracles(
+            &registry,
+            Some(Arc::new(FakeOracle("trust"))),
+            None,
+            &ceiling(),
+        );
         registry.set_phase(BootstrapPhase::Running);
 
         let decision = registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN));
@@ -1779,6 +1826,7 @@ mod core_oracle_registration_tests {
             &registry,
             Some(Arc::new(FakeOracle("trust"))),
             Some(Arc::new(FakeOracle("charter"))),
+            &ceiling(),
         );
         registry.set_phase(BootstrapPhase::Running);
 
@@ -1793,12 +1841,72 @@ mod core_oracle_registration_tests {
         }
     }
 
+    /// The composition root must cap what it registers for the network domain.
+    ///
+    /// `icn-net` rate-limits on the *unauthenticated* `NetworkMessage.from`, so the
+    /// tier comes from a DID the sender merely claims. If the top tier reaches the
+    /// limiter as `u32::MAX`, naming a well-trusted DID buys an unbounded budget
+    /// for pre-authentication work. This asserts the wiring — not just the wrapper
+    /// in isolation — actually applies the operator's ceiling.
+    #[test]
+    fn network_domain_rate_limits_are_capped_at_the_configured_maximum() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(&registry, Some(Arc::new(UnlimitedOracle)), None, &ceiling());
+        registry.set_phase(BootstrapPhase::Running);
+
+        let decision = registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN));
+
+        let rate_limit = match decision {
+            PolicyDecision::Allow { constraints, .. } => {
+                constraints.rate_limit.clone().expect("rate limit present")
+            }
+            PolicyDecision::Deny { .. } => panic!("network domain must be registered"),
+        };
+
+        assert_eq!(
+            (rate_limit.messages_per_second, rate_limit.burst_size),
+            (200, 50),
+            "an unlimited trust tier must be clamped to the configured maximum before \
+             it reaches the rate limiter, not passed through as u32::MAX"
+        );
+    }
+
+    /// The trust domain itself is NOT capped — the ceiling is specific to the
+    /// network path, where the actor is unauthenticated.
+    #[test]
+    fn the_trust_domain_itself_is_not_capped() {
+        let registry = OracleRegistry::new();
+        register_core_oracles(&registry, Some(Arc::new(UnlimitedOracle)), None, &ceiling());
+        registry.set_phase(BootstrapPhase::Running);
+
+        let decision = registry.evaluate(&request_for("trust"));
+
+        let rate_limit = match decision {
+            PolicyDecision::Allow { constraints, .. } => {
+                constraints.rate_limit.clone().expect("rate limit present")
+            }
+            PolicyDecision::Deny { .. } => panic!("trust domain must be registered"),
+        };
+
+        assert_eq!(
+            rate_limit.messages_per_second,
+            u32::MAX,
+            "the cap must apply to the network registration only, leaving other \
+             consumers of the trust oracle unchanged"
+        );
+    }
+
     /// Registration is scoped: unrelated domains still deny by default. Guards
     /// against a "fix" that makes the registry permissive across the board.
     #[test]
     fn does_not_make_unrelated_domains_permissive() {
         let registry = OracleRegistry::new();
-        register_core_oracles(&registry, Some(Arc::new(FakeOracle("trust"))), None);
+        register_core_oracles(
+            &registry,
+            Some(Arc::new(FakeOracle("trust"))),
+            None,
+            &ceiling(),
+        );
         registry.set_phase(BootstrapPhase::Running);
 
         let decision = registry.evaluate(&request_for("some-unregistered-domain"));
@@ -1815,7 +1923,7 @@ mod core_oracle_registration_tests {
     #[test]
     fn without_a_trust_oracle_the_network_domain_is_not_registered() {
         let registry = OracleRegistry::new();
-        register_core_oracles(&registry, None, None);
+        register_core_oracles(&registry, None, None, &ceiling());
         registry.set_phase(BootstrapPhase::Running);
 
         let decision = registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN));
