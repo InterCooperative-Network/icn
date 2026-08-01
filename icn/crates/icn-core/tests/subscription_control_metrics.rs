@@ -4,8 +4,14 @@
 //! These drive the **production** handler
 //! (`icn_core::supervisor::init_network::create_incoming_handler`) against a real
 //! `GossipActor` and assert on what the metrics recorder actually observed. Asserting
-//! only that the label enums map to the right strings would not catch a counter call
-//! deleted, duplicated, or wired into the wrong match arm — which is the whole point.
+//! only that the enums map to the right label strings would not catch a counter call
+//! deleted, duplicated, or wired into the wrong match arm — which is the point.
+//!
+//! ## Exact-series assertions
+//!
+//! Every scenario asserts the **complete** set of emitted outcome series, not just that
+//! the expected one equals 1. A per-label assertion would pass even if a stray call
+//! landed under different labels; `assert_eq!` on the whole sorted vector cannot.
 //!
 //! ## Why a manually built current-thread runtime
 //!
@@ -15,7 +21,7 @@
 //! current-thread runtime polls spawned tasks on the calling thread, inside the
 //! `with_local_recorder` closure, so the recorder is in scope when the counter fires.
 //!
-//! The recorder is local, not global, so these tests do not interfere with each other.
+//! The recorder is local, not global, so tests do not interfere with each other.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,19 +41,23 @@ const UNSUBSCRIBES_RECEIVED: &str = "icn_gossip_unsubscribes_received_total";
 
 const TOPIC: &str = "coop:updates";
 /// Never created on the actor, so subscribing/unsubscribing to it fails for a
-/// non-spoof reason.
+/// non-spoof reason (`Topic not found`).
 const ABSENT_TOPIC: &str = "coop:does-not-exist";
+
+/// Bounded settle budget: the handler dispatches onto `tokio::spawn`, so the counter
+/// fires after the call returns. 200 * 5ms mirrors the `settle()` budget already used by
+/// `gossip_subscription_control.rs`, but unlike that helper this one exits as soon as the
+/// expected number of events is observed rather than always sleeping the full budget.
+const SETTLE_TICKS: u32 = 200;
+const SETTLE_TICK: Duration = Duration::from_millis(5);
 
 fn did() -> Did {
     KeyPair::generate().expect("keypair").did().clone()
 }
 
-/// Sum a counter restricted to one `(action, outcome)` label pair.
-///
-/// Label-aware on purpose: summing across all label sets (as the icn-ledger helper does)
-/// would let a call recorded under the wrong labels still satisfy the assertion.
-fn outcome_count(snapshotter: &Snapshotter, action: &str, outcome: &str) -> u64 {
-    snapshotter
+/// Every emitted series for the outcome metric, as sorted `(action, outcome, value)`.
+fn outcome_series(snapshotter: &Snapshotter) -> Vec<(String, String, u64)> {
+    let mut out: Vec<(String, String, u64)> = snapshotter
         .snapshot()
         .into_vec()
         .into_iter()
@@ -56,25 +66,28 @@ fn outcome_count(snapshotter: &Snapshotter, action: &str, outcome: &str) -> u64 
             if k.name() != OUTCOME_METRIC {
                 return None;
             }
-            let mut got_action = None;
-            let mut got_outcome = None;
+            let mut action = String::new();
+            let mut outcome = String::new();
             for label in k.labels() {
                 match label.key() {
-                    "action" => got_action = Some(label.value()),
-                    "outcome" => got_outcome = Some(label.value()),
+                    "action" => action = label.value().to_string(),
+                    "outcome" => outcome = label.value().to_string(),
                     _ => {}
                 }
             }
-            if got_action == Some(action) && got_outcome == Some(outcome) {
-                match value {
-                    DebugValue::Counter(v) => Some(v),
-                    _ => None,
-                }
-            } else {
-                None
+            match value {
+                DebugValue::Counter(v) => Some((action, outcome, v)),
+                _ => None,
             }
         })
-        .sum()
+        .collect();
+    out.sort();
+    out
+}
+
+/// Total outcome increments observed, across every label set.
+fn outcome_event_total(snapshotter: &Snapshotter) -> u64 {
+    outcome_series(snapshotter).iter().map(|(_, _, v)| v).sum()
 }
 
 /// Total for an unlabelled counter, across every label set.
@@ -96,37 +109,14 @@ fn plain_count(snapshotter: &Snapshotter, name: &str) -> u64 {
         .sum()
 }
 
-/// Every emitted series for the outcome metric, as `(action, outcome, value)`.
-///
-/// Used to assert that a scenario produced *nothing except* what was expected — a plain
-/// per-label assertion would pass even if a stray call landed under other labels.
-fn all_outcome_series(snapshotter: &Snapshotter) -> Vec<(String, String, u64)> {
-    let mut out: Vec<(String, String, u64)> = snapshotter
-        .snapshot()
-        .into_vec()
-        .into_iter()
-        .filter_map(|(key, _, _, value)| {
-            let k = key.key();
-            if k.name() != OUTCOME_METRIC {
-                return None;
-            }
-            let mut a = String::new();
-            let mut o = String::new();
-            for label in k.labels() {
-                match label.key() {
-                    "action" => a = label.value().to_string(),
-                    "outcome" => o = label.value().to_string(),
-                    _ => {}
-                }
-            }
-            match value {
-                DebugValue::Counter(v) => Some((a, o, v)),
-                _ => None,
-            }
-        })
+/// Convenience for building the expected exact-series vector.
+fn series(items: &[(&str, &str, u64)]) -> Vec<(String, String, u64)> {
+    let mut v: Vec<(String, String, u64)> = items
+        .iter()
+        .map(|(a, o, n)| (a.to_string(), o.to_string(), *n))
         .collect();
-    out.sort();
-    out
+    v.sort();
+    v
 }
 
 async fn harness(own: &Did) -> (Arc<RwLock<GossipActor>>, IncomingMessageHandler) {
@@ -146,15 +136,22 @@ async fn harness(own: &Did) -> (Arc<RwLock<GossipActor>>, IncomingMessageHandler
     (gossip, handler)
 }
 
-/// Run `body` with a thread-local recorder installed and a current-thread runtime, then
-/// hand back the snapshotter.
+/// Run `act` under a thread-local recorder on a current-thread runtime, waiting until
+/// `expected_events` outcome increments have been observed.
 ///
-/// `body` gets the handler and the actor. After it returns, the runtime is driven a
-/// little longer so the handler's spawned task reaches its counter call.
-fn with_recorder<F>(body: F) -> Snapshotter
-where
-    F: FnOnce(&Did, &Did, IncomingMessageHandler, Arc<RwLock<GossipActor>>),
-{
+/// `seed_subscribed` subscribes `peer` to `TOPIC` through the **actor API** rather than
+/// the network handler. That path records no outcome (the counter lives only in the
+/// supervisor handler), so a test needing pre-existing subscription state still observes
+/// exactly one series — its own. That is why unsubscribe tests do not have to assert a
+/// two-series vector containing an unrelated setup subscribe.
+///
+/// When `expected_events` is 0 the full budget is waited out, because "nothing happened"
+/// cannot be detected early.
+fn run_observed(
+    seed_subscribed: bool,
+    expected_events: u64,
+    act: impl FnOnce(&Did, &Did, &IncomingMessageHandler),
+) -> Snapshotter {
     let recorder = DebuggingRecorder::new();
     let snapshotter = recorder.snapshotter();
 
@@ -168,11 +165,35 @@ where
             let own = did();
             let peer = did();
             let (gossip, handler) = harness(&own).await;
-            body(&own, &peer, handler, gossip);
-            // Let the spawned task run to completion. 200 * 5ms mirrors the settle()
-            // budget in gossip_subscription_control.rs.
-            for _ in 0..200 {
-                tokio::time::sleep(Duration::from_millis(5)).await;
+
+            if seed_subscribed {
+                gossip
+                    .write()
+                    .await
+                    .subscribe(TOPIC, peer.clone())
+                    .await
+                    .expect("seed subscribe");
+                assert_eq!(
+                    outcome_event_total(&snapshotter),
+                    0,
+                    "seeding via the actor API must not emit an outcome series"
+                );
+            }
+
+            act(&own, &peer, &handler);
+
+            for _ in 0..SETTLE_TICKS {
+                if expected_events > 0 && outcome_event_total(&snapshotter) >= expected_events {
+                    return;
+                }
+                tokio::time::sleep(SETTLE_TICK).await;
+            }
+
+            if expected_events > 0 {
+                panic!(
+                    "timed out waiting for {expected_events} outcome event(s); observed {:?}",
+                    outcome_series(&snapshotter)
+                );
             }
         });
     });
@@ -181,12 +202,12 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Subscribe: all three outcomes
+// Subscribe: all three outcomes, each asserted as the COMPLETE emitted set
 // ---------------------------------------------------------------------------
 
 #[test]
-fn accepted_subscribe_emits_exactly_one_processed() {
-    let snap = with_recorder(|own, peer, handler, _g| {
+fn subscribe_success_emits_only_one_processed_series() {
+    let snap = run_observed(false, 1, |own, peer, handler| {
         handler(NetworkMessage::subscribe(
             peer.clone(),
             own.clone(),
@@ -194,17 +215,16 @@ fn accepted_subscribe_emits_exactly_one_processed() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "subscribe", "processed"), 1);
     assert_eq!(
-        all_outcome_series(&snap),
-        vec![("subscribe".into(), "processed".into(), 1)],
-        "a successful subscribe must emit exactly one series and nothing else"
+        outcome_series(&snap),
+        series(&[("subscribe", "processed", 1)])
     );
+    assert_eq!(plain_count(&snap, SPOOF_METRIC), 0);
 }
 
 #[test]
-fn forged_own_did_subscribe_emits_exactly_one_rejected_own_did() {
-    let snap = with_recorder(|own, _peer, handler, _g| {
+fn subscribe_forged_own_did_emits_only_one_rejected_own_did_series() {
+    let snap = run_observed(false, 1, |own, _peer, handler| {
         // `from` claims the receiving node's own DID — the #2471 attack.
         handler(NetworkMessage::subscribe(
             own.clone(),
@@ -213,8 +233,10 @@ fn forged_own_did_subscribe_emits_exactly_one_rejected_own_did() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "subscribe", "rejected_own_did"), 1);
-    assert_eq!(outcome_count(&snap, "subscribe", "processed"), 0);
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[("subscribe", "rejected_own_did", 1)])
+    );
     // The #2474 security counter must still fire, independently of this one.
     assert_eq!(
         plain_count(&snap, SPOOF_METRIC),
@@ -224,9 +246,8 @@ fn forged_own_did_subscribe_emits_exactly_one_rejected_own_did() {
 }
 
 #[test]
-fn non_spoof_subscribe_failure_emits_exactly_one_rejected_or_error() {
-    let snap = with_recorder(|own, peer, handler, _g| {
-        // Topic was never created on this actor: a genuine, non-spoof refusal.
+fn subscribe_non_spoof_failure_emits_only_one_rejected_or_error_series() {
+    let snap = run_observed(false, 1, |own, peer, handler| {
         handler(NetworkMessage::subscribe(
             peer.clone(),
             own.clone(),
@@ -234,8 +255,10 @@ fn non_spoof_subscribe_failure_emits_exactly_one_rejected_or_error() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "subscribe", "rejected_or_error"), 1);
-    assert_eq!(outcome_count(&snap, "subscribe", "rejected_own_did"), 0);
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[("subscribe", "rejected_or_error", 1)])
+    );
     assert_eq!(
         plain_count(&snap, SPOOF_METRIC),
         0,
@@ -244,17 +267,13 @@ fn non_spoof_subscribe_failure_emits_exactly_one_rejected_or_error() {
 }
 
 // ---------------------------------------------------------------------------
-// Unsubscribe: all three outcomes
+// Unsubscribe: all three outcomes, each asserted as the COMPLETE emitted set
 // ---------------------------------------------------------------------------
 
 #[test]
-fn accepted_unsubscribe_emits_exactly_one_processed() {
-    let snap = with_recorder(|own, peer, handler, _g| {
-        handler(NetworkMessage::subscribe(
-            peer.clone(),
-            own.clone(),
-            vec![TOPIC.to_string()],
-        ));
+fn unsubscribe_success_emits_only_one_processed_series() {
+    // Seeded through the actor API, so the recorder observes only the unsubscribe.
+    let snap = run_observed(true, 1, |own, peer, handler| {
         handler(NetworkMessage::unsubscribe(
             peer.clone(),
             own.clone(),
@@ -262,13 +281,16 @@ fn accepted_unsubscribe_emits_exactly_one_processed() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "unsubscribe", "processed"), 1);
-    assert_eq!(outcome_count(&snap, "subscribe", "processed"), 1);
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[("unsubscribe", "processed", 1)])
+    );
+    assert_eq!(plain_count(&snap, SPOOF_METRIC), 0);
 }
 
 #[test]
-fn forged_own_did_unsubscribe_emits_exactly_one_rejected_own_did() {
-    let snap = with_recorder(|own, _peer, handler, _g| {
+fn unsubscribe_forged_own_did_emits_only_one_rejected_own_did_series() {
+    let snap = run_observed(false, 1, |own, _peer, handler| {
         handler(NetworkMessage::unsubscribe(
             own.clone(),
             own.clone(),
@@ -276,15 +298,17 @@ fn forged_own_did_unsubscribe_emits_exactly_one_rejected_own_did() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "unsubscribe", "rejected_own_did"), 1);
-    assert_eq!(outcome_count(&snap, "unsubscribe", "processed"), 0);
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[("unsubscribe", "rejected_own_did", 1)])
+    );
     assert_eq!(plain_count(&snap, SPOOF_METRIC), 1);
 }
 
 #[test]
-fn non_spoof_unsubscribe_failure_emits_exactly_one_rejected_or_error() {
-    let snap = with_recorder(|own, peer, handler, _g| {
-        // `unsubscribe` errors with "Topic not found" for a topic that was never created.
+fn unsubscribe_non_spoof_failure_emits_only_one_rejected_or_error_series() {
+    let snap = run_observed(false, 1, |own, peer, handler| {
+        // `unsubscribe` errors with "Topic not found" for a topic never created.
         handler(NetworkMessage::unsubscribe(
             peer.clone(),
             own.clone(),
@@ -292,8 +316,10 @@ fn non_spoof_unsubscribe_failure_emits_exactly_one_rejected_or_error() {
         ));
     });
 
-    assert_eq!(outcome_count(&snap, "unsubscribe", "rejected_or_error"), 1);
-    assert_eq!(outcome_count(&snap, "unsubscribe", "rejected_own_did"), 0);
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[("unsubscribe", "rejected_or_error", 1)])
+    );
     assert_eq!(plain_count(&snap, SPOOF_METRIC), 0);
 }
 
@@ -303,7 +329,7 @@ fn non_spoof_unsubscribe_failure_emits_exactly_one_rejected_or_error() {
 
 #[test]
 fn multi_topic_request_increments_once_per_topic() {
-    let snap = with_recorder(|own, peer, handler, _g| {
+    let snap = run_observed(false, 3, |own, peer, handler| {
         // Three topics in ONE message: one that exists, two that do not.
         handler(NetworkMessage::subscribe(
             peer.clone(),
@@ -317,14 +343,12 @@ fn multi_topic_request_increments_once_per_topic() {
     });
 
     assert_eq!(
-        outcome_count(&snap, "subscribe", "processed"),
-        1,
-        "one existing topic -> exactly one processed"
-    );
-    assert_eq!(
-        outcome_count(&snap, "subscribe", "rejected_or_error"),
-        2,
-        "two absent topics -> exactly two refusals; the counter is per-topic, not per-message"
+        outcome_series(&snap),
+        series(&[
+            ("subscribe", "processed", 1),
+            ("subscribe", "rejected_or_error", 2),
+        ]),
+        "the outcome counter is per-topic, not per-message"
     );
     assert_eq!(
         plain_count(&snap, SUBSCRIBES_RECEIVED),
@@ -334,8 +358,8 @@ fn multi_topic_request_increments_once_per_topic() {
 }
 
 #[test]
-fn subscribe_ack_and_unrelated_payloads_do_not_touch_the_outcome_counter() {
-    let snap = with_recorder(|own, peer, handler, _g| {
+fn subscribe_ack_and_unrelated_payloads_emit_no_outcome_series() {
+    let snap = run_observed(false, 0, |own, peer, handler| {
         handler(NetworkMessage::subscribe_ack(
             peer.clone(),
             own.clone(),
@@ -344,16 +368,16 @@ fn subscribe_ack_and_unrelated_payloads_do_not_touch_the_outcome_counter() {
         handler(NetworkMessage::ping(peer.clone(), own.clone()));
     });
 
-    assert!(
-        all_outcome_series(&snap).is_empty(),
-        "SubscribeAck and Ping must emit no subscription-control outcome series, got {:?}",
-        all_outcome_series(&snap)
+    assert_eq!(
+        outcome_series(&snap),
+        Vec::new(),
+        "SubscribeAck and Ping must emit no subscription-control outcome series"
     );
 }
 
 #[test]
 fn arrival_counters_are_not_double_counted() {
-    let snap = with_recorder(|own, peer, handler, _g| {
+    let snap = run_observed(false, 2, |own, peer, handler| {
         handler(NetworkMessage::subscribe(
             peer.clone(),
             own.clone(),
@@ -366,10 +390,15 @@ fn arrival_counters_are_not_double_counted() {
         ));
     });
 
+    // Exactly the two expected series and nothing else.
+    assert_eq!(
+        outcome_series(&snap),
+        series(&[
+            ("subscribe", "processed", 1),
+            ("unsubscribe", "processed", 1),
+        ])
+    );
     // Each arrival counter fires exactly once per received message, unchanged by #2482.
     assert_eq!(plain_count(&snap, SUBSCRIBES_RECEIVED), 1);
     assert_eq!(plain_count(&snap, UNSUBSCRIBES_RECEIVED), 1);
-    // And the new counter is additional, not a replacement.
-    assert_eq!(outcome_count(&snap, "subscribe", "processed"), 1);
-    assert_eq!(outcome_count(&snap, "unsubscribe", "processed"), 1);
 }
