@@ -71,6 +71,9 @@ reqwest.workspace = true
 rand_core = { workspace = true }
 # Enable test-util for time mocking in integration tests
 tokio = { version = "1.49", features = ["test-util"] }
+# Test-only metrics recorder, matching the pattern already used by icn-ledger
+# (crates/icn-ledger/Cargo.toml) for asserting counter values in tests.
+metrics-util = { version = "0.19", features = ["debugging"] }
 
 [features]
 default = []

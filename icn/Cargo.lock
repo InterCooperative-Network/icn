@@ -3124,6 +3124,7 @@ dependencies = [
  "icn-trust",
  "icn-trust-app",
  "metrics",
+ "metrics-util 0.19.1",
  "portpicker",
  "rand 0.9.4",
  "rand_core 0.6.4",
