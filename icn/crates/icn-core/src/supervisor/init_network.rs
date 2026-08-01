@@ -4,9 +4,24 @@
 //! providing a cleaner separation of concerns for network message routing.
 
 use icn_identity::Did;
+use icn_obs::metrics::gossip::{SubscriptionControlAction, SubscriptionControlOutcome};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
+
+/// Record how one topic of a network subscription-control request resolved (#2482).
+///
+/// Deliberately a single choke point so the observe-only property is stated once and is
+/// obvious at every call site: this runs **after** the accept/reject decision has already
+/// been made, takes no locks, returns nothing, and cannot influence the outcome it
+/// describes. Both arguments are closed enums, so no DID, topic name, or error string can
+/// reach the metric.
+fn record_subscription_control_outcome(
+    action: SubscriptionControlAction,
+    outcome: SubscriptionControlOutcome,
+) {
+    icn_obs::metrics::gossip::subscription_control_outcome_inc(action, outcome);
+}
 
 /// Type alias for the gossip handle used in message routing
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
@@ -83,6 +98,10 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                             Ok(_) => {
                                 info!("Subscribed {} to topic: {}", sender_did, topic);
                                 acked_topics.push(topic.clone());
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Subscribe,
+                                    SubscriptionControlOutcome::Processed,
+                                );
                             }
                             Err(e)
                                 if icn_gossip::GossipActor::is_subscription_control_spoof(&e) =>
@@ -92,11 +111,19 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 // the operational warn! path; the durable signal is
                                 // icn_gossip_subscription_control_spoof_rejected_total.
                                 debug!("{}", e);
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Subscribe,
+                                    SubscriptionControlOutcome::RejectedOwnDid,
+                                );
                             }
                             Err(e) => {
                                 warn!(
                                     "Failed to subscribe {} to topic {}: {}",
                                     sender_did, topic, e
+                                );
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Subscribe,
+                                    SubscriptionControlOutcome::RejectedOrError,
                                 );
                             }
                         }
@@ -135,6 +162,10 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                         match gossip.unsubscribe_from_network(topic, &sender_did) {
                             Ok(_) => {
                                 info!("Unsubscribed {} from topic: {}", sender_did, topic);
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Unsubscribe,
+                                    SubscriptionControlOutcome::Processed,
+                                );
                             }
                             Err(e)
                                 if icn_gossip::GossipActor::is_subscription_control_spoof(&e) =>
@@ -142,11 +173,19 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                                 // See the Subscribe arm: remotely triggerable, so it must
                                 // not be able to drive warning-level log volume.
                                 debug!("{}", e);
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Unsubscribe,
+                                    SubscriptionControlOutcome::RejectedOwnDid,
+                                );
                             }
                             Err(e) => {
                                 warn!(
                                     "Failed to unsubscribe {} from topic {}: {}",
                                     sender_did, topic, e
+                                );
+                                record_subscription_control_outcome(
+                                    SubscriptionControlAction::Unsubscribe,
+                                    SubscriptionControlOutcome::RejectedOrError,
                                 );
                             }
                         }
