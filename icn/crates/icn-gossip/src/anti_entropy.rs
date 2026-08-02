@@ -165,7 +165,8 @@ impl GossipActor {
         let scope = topic_obj.scope;
 
         // M2 #484: Calculate adaptive fanout based on network size
-        let network_size = self.peer_sync.peer_count();
+        // Our own nonce-counter entry is not a peer (#2506).
+        let network_size = self.peer_sync.remote_peer_count(&self.own_did);
         let fanout = self
             .adaptive_fanout_config
             .calculate_fanout(network_size, &scope);

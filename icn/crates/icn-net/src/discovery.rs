@@ -99,6 +99,9 @@ impl Discovery {
 
         // Spawn background task to browse for peers
         let peers = self.peers.clone();
+        // We answer our own multicast advertisement, so the browse task needs to know which DID
+        // is ours in order to skip it (#2506).
+        let own_did = self.own_did.clone();
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         tokio::spawn(async move {
@@ -117,7 +120,7 @@ impl Discovery {
                     event = receiver.recv_async() => {
                         match event {
                             Ok(event) => {
-                                Self::handle_mdns_event(event, &peers).await;
+                                Self::handle_mdns_event(event, &peers, own_did.as_ref()).await;
                             }
                             Err(e) => {
                                 warn!("mDNS receiver error: {}", e);
@@ -144,6 +147,7 @@ impl Discovery {
     async fn handle_mdns_event(
         event: mdns_sd::ServiceEvent,
         peers: &Arc<RwLock<HashMap<String, PeerInfo>>>,
+        own_did: Option<&Did>,
     ) {
         use mdns_sd::ServiceEvent;
 
@@ -179,18 +183,7 @@ impl Discovery {
                         .unwrap_or("unknown")
                         .to_string();
 
-                    info!("Discovered peer: {} at {:?}", did.as_str(), addrs);
-
-                    let peer_info = PeerInfo {
-                        did: did.clone(),
-                        addrs,
-                        version,
-                    };
-
-                    peers
-                        .write()
-                        .await
-                        .insert(did.as_str().to_string(), peer_info);
+                    Self::admit_discovered_peer(peers, own_did, did, addrs, version).await;
                 }
             }
             ServiceEvent::ServiceRemoved(_type, instance) => {
@@ -205,6 +198,40 @@ impl Discovery {
             }
             _ => {}
         }
+    }
+
+    /// Record a resolved advertisement in the discovered-peer map.
+    ///
+    /// Split out from the mDNS event plumbing so the admission rule is testable without a live
+    /// multicast daemon (`mdns_sd::ResolvedService` is `#[non_exhaustive]` and cannot be built
+    /// outside its crate).
+    async fn admit_discovered_peer(
+        peers: &Arc<RwLock<HashMap<String, PeerInfo>>>,
+        own_did: Option<&Did>,
+        did: Did,
+        addrs: Vec<SocketAddr>,
+        version: String,
+    ) {
+        // We register our own service on the same multicast group we browse, so our own
+        // advertisement comes straight back to us. Recording it would make the local node a dial
+        // target, and the resulting self-connection pollutes our own replay and ban state (#2506).
+        if own_did.is_some_and(|own| *own == did) {
+            debug!("Skipping our own mDNS advertisement (#2506)");
+            return;
+        }
+
+        info!("Discovered peer: {} at {:?}", did.as_str(), addrs);
+
+        let peer_info = PeerInfo {
+            did: did.clone(),
+            addrs,
+            version,
+        };
+
+        peers
+            .write()
+            .await
+            .insert(did.as_str().to_string(), peer_info);
     }
 
     /// Get all discovered peers
@@ -300,6 +327,58 @@ mod tests {
 
         // Daemon should be cleared
         assert!(discovery.daemon.is_none());
+    }
+
+    /// The advertisement a resolved mDNS service turns into by the time it reaches admission.
+    fn advertised_addrs() -> Vec<SocketAddr> {
+        vec!["127.0.0.1:7827".parse().unwrap()]
+    }
+
+    /// Regression test for #2506.
+    ///
+    /// A node registers its own service on the same multicast group it browses, so it resolves
+    /// its own advertisement. Recording that makes the local node a dial target.
+    #[tokio::test]
+    async fn test_own_mdns_advertisement_is_not_recorded_as_a_peer() {
+        let own_did = KeyPair::generate().unwrap().did().clone();
+        let peers = Arc::new(RwLock::new(HashMap::new()));
+
+        Discovery::admit_discovered_peer(
+            &peers,
+            Some(&own_did),
+            own_did.clone(),
+            advertised_addrs(),
+            "0.1.0".to_string(),
+        )
+        .await;
+
+        assert!(
+            peers.read().await.is_empty(),
+            "#2506: our own mDNS advertisement must not enter the discovered-peer map"
+        );
+    }
+
+    /// The counterpart: a genuinely remote advertisement must still be recorded, so the filter
+    /// cannot be satisfied by simply dropping everything.
+    #[tokio::test]
+    async fn test_remote_mdns_advertisement_is_still_recorded() {
+        let own_did = KeyPair::generate().unwrap().did().clone();
+        let remote_did = KeyPair::generate().unwrap().did().clone();
+        let peers = Arc::new(RwLock::new(HashMap::new()));
+
+        Discovery::admit_discovered_peer(
+            &peers,
+            Some(&own_did),
+            remote_did.clone(),
+            advertised_addrs(),
+            "0.1.0".to_string(),
+        )
+        .await;
+
+        assert!(
+            peers.read().await.contains_key(remote_did.as_str()),
+            "a remote peer's advertisement must still be discovered"
+        );
     }
 
     #[test]

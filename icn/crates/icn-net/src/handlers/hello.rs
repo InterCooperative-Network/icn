@@ -207,6 +207,7 @@ impl ConnectionContext {
             let connections_arc = self.session_manager.read().await.connections_arc();
             crate::session::install_incoming_connection(
                 &connections_arc,
+                Some(self.own_did.as_str()),
                 from.to_string(),
                 connection.clone(),
             )

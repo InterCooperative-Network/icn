@@ -1450,7 +1450,7 @@ async fn configure_gossip_actor(
     gossip.set_send_callback(send_callback);
 
     // Create candidate cache for NAT traversal
-    let candidate_cache = Arc::new(icn_net::CandidateCache::new());
+    let candidate_cache = Arc::new(icn_net::CandidateCache::new(did.clone()));
     let candidate_cache_for_cleanup = candidate_cache.clone();
 
     // Create profile cache for peer capability discovery

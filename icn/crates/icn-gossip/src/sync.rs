@@ -269,8 +269,22 @@ impl PeerSyncManager {
     }
 
     /// Get number of tracked peers
+    ///
+    /// This counts every state entry, including the local node's own — `AntiEntropy` reuses a
+    /// state keyed by the local DID to hold its outbound digest nonce. Use
+    /// [`PeerSyncManager::remote_peer_count`] for anything that means "how many other nodes are
+    /// out there".
     pub fn peer_count(&self) -> usize {
         self.states.len()
+    }
+
+    /// Number of tracked peers that are not this node.
+    ///
+    /// The local node holds a state entry of its own purely as a nonce counter, which is
+    /// legitimate — but counting it as network size reports `1` for a node that has no peers at
+    /// all, and made an isolated node look like it had one (#2506).
+    pub fn remote_peer_count(&self, local_did: &Did) -> usize {
+        self.states.len() - usize::from(self.states.contains_key(local_did))
     }
 
     /// Update backoff settings for a specific peer (based on trust class changes)
@@ -396,6 +410,40 @@ mod tests {
         // Remove peer
         manager.remove(&did1);
         assert_eq!(manager.peer_count(), 1);
+    }
+
+    /// Regression test for #2506.
+    ///
+    /// `AntiEntropy` keeps a peer-sync state keyed by the *local* DID to hold its own outbound
+    /// digest nonce. That is legitimate local state, but counting it as network size reported
+    /// `icn_gossip_network_size_estimate = 1` for a node with no peers at all — which read as
+    /// "one peer" rather than "isolated" and cost real time during the #2504 investigation.
+    #[test]
+    fn test_remote_peer_count_excludes_the_local_node() {
+        let mut manager = PeerSyncManager::new(300, 5000);
+        let own_did = KeyPair::generate().unwrap().did().clone();
+        let peer_did = KeyPair::generate().unwrap().did().clone();
+
+        // The local node's own nonce-counter entry, exactly as `emit_digest` creates it.
+        manager.get_or_create(own_did.clone());
+
+        assert_eq!(
+            manager.remote_peer_count(&own_did),
+            0,
+            "#2506: a node whose only peer-sync entry is its own must report zero peers"
+        );
+
+        manager.get_or_create(peer_did.clone());
+        assert_eq!(
+            manager.remote_peer_count(&own_did),
+            1,
+            "#2506: a real peer must still be counted"
+        );
+        assert_eq!(
+            manager.peer_count(),
+            2,
+            "the raw count still includes the local nonce entry"
+        );
     }
 
     #[test]

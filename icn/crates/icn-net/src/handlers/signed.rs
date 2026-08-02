@@ -22,6 +22,25 @@ impl ConnectionContext {
     /// 4. Byzantine fault recording (on failure)
     /// 5. Forward to handler (on success)
     pub async fn handle_signed(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
+        // Our own DID is not a remote sender (#2506). `ReplayGuard` tracks per-*remote*-peer
+        // sequence high-water marks and `MisbehaviorDetector` scores *remote* peers, so admitting
+        // our own DID into either corrupts what both structures mean — and after a restart it is
+        // self-defeating: our resumed signing sequence sits below our own persisted replay floor,
+        // so we score our own traffic as replay at severity 1.0 and ban ourselves.
+        //
+        // This is deliberately not a blanket "skip security checks for our own DID": it drops the
+        // message rather than trusting it, and it is scoped to the network receive path, where a
+        // self-sourced envelope can only be a self-connection. The connection layer refuses to
+        // register the local DID as a peer, so reaching here means an earlier guard was bypassed.
+        if envelope.from == self.own_did {
+            warn!(
+                sequence = envelope.sequence,
+                "Dropping network message from our own DID without recording remote-peer state; \
+                 a self-connection reached the signed-message path (#2506)"
+            );
+            return;
+        }
+
         // Verify signature and age - use cached PQ key for hybrid envelopes
         let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
 
@@ -250,6 +269,15 @@ mod tests {
     fn create_test_context(
         misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
     ) -> (ConnectionContext, Arc<AtomicUsize>) {
+        let (ctx, _keypair, count) = create_test_context_with_own_keypair(misbehavior_detector);
+        (ctx, count)
+    }
+
+    /// Same as [`create_test_context`], but also hands back the keypair the context's own DID is
+    /// derived from, so a test can sign traffic *as the local node* (#2506).
+    fn create_test_context_with_own_keypair(
+        misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
+    ) -> (ConnectionContext, KeyPair, Arc<AtomicUsize>) {
         let keypair = KeyPair::generate().unwrap();
         let identity_bundle = IdentityBundle::from_keypair(keypair.clone()).unwrap();
         let own_did = keypair.did().clone();
@@ -281,7 +309,7 @@ mod tests {
             own_did,
         };
 
-        (ctx, forward_count)
+        (ctx, keypair, forward_count)
     }
 
     fn create_signed_envelope(keypair: &KeyPair, sequence: u64) -> SignedEnvelope {
@@ -374,6 +402,47 @@ mod tests {
             violations[0].violation,
             icn_security::Violation::ReplayAttack { sequence: 1, .. }
         ));
+    }
+
+    /// Regression test for #2506.
+    ///
+    /// A signed envelope whose sender is our *own* DID is not remote peer traffic, so it must not
+    /// create replay state or misbehaviour state keyed by the local DID. Live, a node dialed its
+    /// own advertised endpoint, and after a restart its resumed signing sequence sat below its own
+    /// persisted replay floor — so it scored its own messages as replays at severity 1.0,
+    /// quarantined and then banned its own DID, and stopped receiving federation gossip for 26
+    /// minutes until its counter climbed past its own floor.
+    #[tokio::test]
+    async fn test_own_did_envelope_creates_no_replay_or_misbehavior_state() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, own_keypair, forward_count) =
+            create_test_context_with_own_keypair(Some(detector.clone()));
+        let own_did = own_keypair.did().clone();
+
+        // Two envelopes signed by *us*, arriving over the network on a self-connection. The
+        // second reuses sequence 1, which is exactly what the replay guard exists to catch —
+        // but from our own DID it must not be treated as a remote peer misbehaving.
+        let envelope = create_signed_envelope(&own_keypair, 1);
+        let message = create_network_message(&envelope);
+        ctx.handle_signed(message.clone(), &envelope).await;
+        ctx.handle_signed(message.clone(), &envelope).await;
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "#2506: our own DID's traffic must not be forwarded as remote peer traffic"
+        );
+        assert_eq!(
+            ctx.replay_guard.read().await.peer_count(),
+            0,
+            "#2506: the replay guard must not hold a window keyed by the local DID"
+        );
+        assert!(
+            detector.read().await.get_violations(&own_did).is_empty(),
+            "#2506: the local DID must never accrue misbehaviour violations from a self-loop"
+        );
     }
 
     #[tokio::test]

@@ -119,6 +119,7 @@ Comprehensive architectural reviews and design decisions:
 - [CELLS_AND_SCOPES.md](architecture/CELLS_AND_SCOPES.md) - Cell-based federation model
 - [SCOPE_BOUNDED_TRUST.md](architecture/SCOPE_BOUNDED_TRUST.md) - Trust scope architecture
 - [KERNEL_APP_SEPARATION.md](architecture/KERNEL_APP_SEPARATION.md) - Kernel/app boundary design
+- [network-identity-self-exclusion.md](architecture/network-identity-self-exclusion.md) - The local node is never a remote peer: where self-exclusion is owned, and why it is identity-based not address-based (#2506)
 - [AUTHORITY_SPINE.md](architecture/AUTHORITY_SPINE.md) - Authority attenuation, expiration, revocation, and capability truth; gateway session-authority boundary (#2436/#2437) implemented, extension to other domains is analysis only
 - [PRIVATE_DATA_DISCLOSURE_BOUNDARY.md](architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md) - Private-data disclosure/access boundary: scoped vaults, opaque receipt storage, disclosure policies, and access/export receipts (#1792, design-only)
 - [ABUSE_CASE_HARDENING_STRATEGY.md](architecture/ABUSE_CASE_HARDENING_STRATEGY.md) - Institutional-failure-mode hardening doctrine

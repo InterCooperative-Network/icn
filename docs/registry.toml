@@ -818,6 +818,20 @@ depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/strategy/ADR-0
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/network-identity-self-exclusion.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "Network Identity: The Local Node Is Never a Remote Peer"
+description = "Normative rule (#2506) that a node's local identity may hold local state but must never be admitted into state whose semantics are \"remote network peer\" — connection map, discovered/gossip peer, replay window, or misbehaviour/ban subject. Names the connection layer as the canonical invariant owner because it is the only point where the remote DID is authenticated rather than claimed, records why self-exclusion is identity-based and never address-based, and documents the two deliberate non-guards (MisbehaviorDetector, AntiEntropy's own nonce entry)."
+last_updated = "2026-08-02"
+last_reviewed = "2026-08-02"
+owner = "matt"
+audiences = ["architects", "developers"]
+depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md"]
 category = "architecture"
 status = "draft"
