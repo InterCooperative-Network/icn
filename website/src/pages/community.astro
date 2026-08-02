@@ -11,9 +11,10 @@ import stats from '../data/stats.json';
         <span class="badge badge-purple">Community</span>
         <h1>Where the work is visible, discussable, and open to contribution.</h1>
         <p>
-          ICN is built in the open. This page collects the working surfaces: how to choose a contribution path,
-          where to discuss design and institutional questions, where to file issues, and where financial support
-          actually goes today. Repository counts below are generated from the repo at build time.
+          ICN is built in the open. This page separates realtime coordination from durable project work:
+          Matrix is where an invite-only contributor cohort talks, while GitHub issues, discussions, pull
+          requests, and project documents remain the durable record today. Repository counts below are
+          generated from the repo at build time.
         </p>
       </div>
 
@@ -72,10 +73,10 @@ import stats from '../data/stats.json';
           <p>The live financial-support rail today. Sponsor the organization-level work sustaining the substrate.</p>
         </a>
 
-        <a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener noreferrer" class="community-card">
+        <a href="https://chat.icn.zone" target="_blank" rel="noopener noreferrer" class="community-card">
           <div class="card-icon">09</div>
-          <h3>Discord</h3>
-          <p>The live real-time chat surface today. Join the ICN Discord server for coordination, contributor questions, and project discussion.</p>
+          <h3>Matrix community chat</h3>
+          <p>Invite-only realtime coordination for the first contributor and organizer cohort. Chat supports the work; it is not the governance or decision record.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener noreferrer" class="community-card">
@@ -89,6 +90,26 @@ import stats from '../data/stats.json';
           <h3>Announcements</h3>
           <p>Sprint summaries, release notes, and major milestones. Subscribe to the Announcements discussion category on GitHub.</p>
         </a>
+      </div>
+
+      <div class="community-boundary" role="note" aria-label="Community access status">
+        <h2>Community access is opening in a small cohort.</h2>
+        <p>
+          The Matrix service is live for existing invitees, but broad self-service registration is intentionally
+          closed while the service is rebuilt with tested recovery, monitoring, and published moderation
+          expectations. If you are not already invited, use
+          <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener noreferrer">GitHub Discussions</a>
+          to introduce yourself and the work you want to join. Do not post private contact details in a public thread.
+        </p>
+        <p>
+          Important decisions move out of chat and into issues, ADRs, RFCs, pull requests, or other durable
+          project records. A chat administrator cannot create institutional authority by changing a room role.
+        </p>
+        <p>
+          The project <a href="https://github.com/InterCooperative-Network/icn/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">Code of Conduct</a>
+          applies in community spaces. Its private reporting channel and backup responder must be finalized
+          before access opens beyond the initial cohort.
+        </p>
       </div>
     </div>
   </section>
@@ -165,5 +186,22 @@ import stats from '../data/stats.json';
     color: var(--text-secondary);
     font-size: 0.875rem;
     margin: 0;
+  }
+
+  .community-boundary {
+    margin-top: var(--space-2xl);
+    padding: var(--space-xl);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-xl);
+    background: var(--bg-surface);
+  }
+
+  .community-boundary h2 {
+    margin-bottom: var(--space-sm);
+    font-size: 1.25rem;
+  }
+
+  .community-boundary p:last-child {
+    margin-bottom: 0;
   }
 </style>

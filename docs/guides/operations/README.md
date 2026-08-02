@@ -9,6 +9,7 @@ This directory contains operational guides for running and maintaining ICN nodes
 - **operations-guide.md** - General operations guide
 - **replication-operations.md** - Storage replication operations
 - **pilot-smoke.md** - One-command pilot linkage smoke verification
+- **community-infrastructure.md** - Public-safe community service posture and authority boundaries
 
 ## Related Documentation
 
