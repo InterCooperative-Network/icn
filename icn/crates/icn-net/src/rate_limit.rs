@@ -37,7 +37,16 @@ impl fmt::Display for HexDisplay<'_> {
 }
 
 const NETWORK_MESSAGE_ACTION: &str = "network_message";
-const NETWORK_DOMAIN: &str = "net";
+
+/// Policy domain under which the network layer requests per-peer constraints.
+///
+/// The composition root MUST register a `PolicyOracle` for this domain. Once the
+/// `OracleRegistry` reaches `BootstrapPhase::Running`, an unregistered domain is
+/// denied by default, and [`RateLimiter::check_rate_limit`] reports that denial
+/// the same way it reports a token-bucket rejection — so a missing registration
+/// silently drops every inbound message. Exported so the registration site and
+/// this query site share one symbol instead of two string literals that can drift.
+pub const NETWORK_DOMAIN: &str = "net";
 
 /// Configuration for rate limiting
 #[derive(Clone, Debug)]
@@ -118,6 +127,39 @@ impl Default for AnchorRateLimitConfig {
             refill_interval: Duration::from_millis(100),
         }
     }
+}
+
+/// Tokens added per refill interval for a configured rate.
+///
+/// # Why this is not floored at one token (#2503)
+///
+/// This used to end in `.max(1.0)`, forcing at least one token per interval.
+/// With the default 100 ms interval that is 10 messages/s, so **every** configured
+/// rate below 10/s was silently raised to 10/s — including a configured `0`, which
+/// reads as "deny sustained traffic" and instead produced the floor. An operator
+/// tightening a pre-authentication DoS cap got 10x what they asked for, with no
+/// warning. That made #2496's guarantee — operator-configured limits control
+/// behaviour — untrue at the last hop, however correct the policy mapping was.
+///
+/// Fractional rates need no special handling: [`TokenBucket::tokens`] is `f64` and
+/// [`TokenBucket::refill`] adds `intervals * refill_rate` where `intervals` is
+/// itself fractional, so 0.1 tokens per 100 ms accumulates to one token per second.
+/// Removing the floor is therefore sufficient — the accumulation machinery was
+/// already correct, and the identity
+///
+/// ```text
+/// intervals * refill_rate
+///   == (elapsed / interval) * (rate * interval)
+///   == elapsed * rate
+/// ```
+///
+/// means the existing interval mechanism already computes exactly
+/// "elapsed time x configured rate", with no additional quantisation.
+///
+/// A configured rate of `0` now yields `0`, so the bucket never replenishes and
+/// burst is a one-time allowance. That is the honest reading of the number.
+fn refill_rate_per_interval(config: &RateLimitConfig) -> f64 {
+    config.max_messages_per_second as f64 * config.refill_interval.as_secs_f64()
 }
 
 /// Token bucket for a single peer
@@ -382,8 +424,7 @@ impl RateLimiter {
         config: &RateLimitConfig,
     ) -> bool {
         // Calculate refill rate: tokens per interval
-        let refill_rate =
-            (config.max_messages_per_second as f64 * config.refill_interval.as_secs_f64()).max(1.0);
+        let refill_rate = refill_rate_per_interval(config);
 
         let capacity = config.burst_capacity as f64;
         let refill_interval = config.refill_interval;
@@ -1197,5 +1238,218 @@ mod tests {
         );
         assert_eq!(EnforcementMode::parse("unknown"), EnforcementMode::Enforce);
         // Default
+    }
+}
+
+/// Refill semantics of the production token bucket (#2503).
+///
+/// # The contract
+///
+/// 1. `burst_capacity` is the immediately-available token count.
+/// 2. `max_messages_per_second` is the long-run replenishment rate, independent
+///    of burst.
+/// 3. A configured rate below `1 / refill_interval` is still representable — it
+///    refills fractionally rather than being rounded up.
+/// 4. Fractional refill accumulates; it is never discarded.
+/// 5. No configured rate is ever silently *increased*.
+/// 6. Capacity remains the upper bound, however long the gap.
+/// 7. A configured rate of zero means no replenishment: burst is a one-time
+///    allowance, not a floor.
+///
+/// # What was wrong
+///
+/// `refill_rate_per_interval` used to end in `.max(1.0)`, forcing at least one
+/// token per interval. At the default 100 ms interval that is 10 messages/s, so
+/// every configured rate below 10/s — including 0 — was silently raised to 10/s.
+///
+/// These tests drive `TokenBucket` itself and control time by rewinding
+/// `last_refill`, so they are deterministic: no `sleep`, no wall-clock races.
+#[cfg(test)]
+mod refill_semantics_tests {
+    use super::*;
+
+    /// Build a bucket the way production does, via the real refill-rate formula.
+    fn bucket(rate: u32, burst: u32, interval_ms: u64) -> TokenBucket {
+        let interval = Duration::from_millis(interval_ms);
+        let config = RateLimitConfig {
+            max_messages_per_second: rate,
+            burst_capacity: burst,
+            refill_interval: interval,
+        };
+        TokenBucket::new(burst as f64, refill_rate_per_interval(&config), interval)
+    }
+
+    /// Tolerance for token-count assertions.
+    ///
+    /// `refill()` reads `Instant::now()` itself, so rewinding `last_refill` gives
+    /// "at least `d` elapsed", not exactly `d` — a few microseconds of real time
+    /// leak in. At the highest rate under test (20 msg/s) a microsecond is 2e-5
+    /// tokens, so this bound is ~50x looser than the jitter and ~500x tighter
+    /// than the 0.5-token differences being distinguished.
+    const TOKEN_EPSILON: f64 = 1e-3;
+
+    /// Rewind `last_refill` so the bucket believes `d` has elapsed.
+    fn advance(b: &mut TokenBucket, d: Duration) {
+        b.last_refill = b
+            .last_refill
+            .checked_sub(d)
+            .expect("test durations stay within Instant range");
+    }
+
+    /// Drain every token so subsequent behaviour is pure refill.
+    fn drain(b: &mut TokenBucket) {
+        while b.try_consume() {}
+        assert!(!b.try_consume(), "bucket must be empty after draining");
+    }
+
+    /// A configured 1 msg/s must take ~1 s to yield a token, not 100 ms.
+    ///
+    /// This is the operator-visible defect: someone tightening a
+    /// pre-authentication DoS cap to 1/s was silently given 10/s.
+    #[test]
+    fn one_message_per_second_is_not_inflated_to_ten() {
+        let mut b = bucket(1, 1, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_millis(100));
+        assert!(
+            !b.try_consume(),
+            "at 1 msg/s, 100 ms must NOT yield a token - that would be 10 msg/s"
+        );
+
+        // 900 ms more brings the total to a full second.
+        advance(&mut b, Duration::from_millis(900));
+        assert!(
+            b.try_consume(),
+            "at 1 msg/s, one full second must yield exactly one token"
+        );
+    }
+
+    /// A configured 5 msg/s refills in ~200 ms, not ~100 ms.
+    #[test]
+    fn five_messages_per_second_needs_two_hundred_millis_per_token() {
+        let mut b = bucket(5, 1, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_millis(100));
+        assert!(
+            !b.try_consume(),
+            "at 5 msg/s, one 100 ms interval yields only 0.5 tokens"
+        );
+
+        advance(&mut b, Duration::from_millis(100));
+        assert!(
+            b.try_consume(),
+            "two 100 ms intervals accumulate 0.5 + 0.5 = 1 token"
+        );
+    }
+
+    /// Fractional refills accumulate rather than being discarded per interval.
+    ///
+    /// Stated separately from the timing tests because "0.5 tokens twice" is the
+    /// property a naive rounding implementation would break while still passing a
+    /// single-interval check.
+    #[test]
+    fn fractional_refills_accumulate_across_intervals() {
+        let mut b = bucket(5, 4, 100);
+        drain(&mut b);
+
+        for _ in 0..2 {
+            advance(&mut b, Duration::from_millis(100));
+            b.refill();
+        }
+
+        assert!(
+            (b.tokens - 1.0).abs() < TOKEN_EPSILON,
+            "two 0.5-token refills must accumulate to exactly 1.0, got {}",
+            b.tokens
+        );
+    }
+
+    /// At the granularity boundary the configured rate is exact.
+    #[test]
+    fn ten_messages_per_second_is_one_token_per_interval() {
+        let mut b = bucket(10, 5, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_millis(100));
+        b.refill();
+
+        assert!(
+            (b.tokens - 1.0).abs() < TOKEN_EPSILON,
+            "10 msg/s at a 100 ms interval is exactly 1 token per interval, got {}",
+            b.tokens
+        );
+    }
+
+    /// Above the granularity the rate scales linearly.
+    #[test]
+    fn twenty_messages_per_second_is_two_tokens_per_interval() {
+        let mut b = bucket(20, 5, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_millis(100));
+        b.refill();
+
+        assert!(
+            (b.tokens - 2.0).abs() < TOKEN_EPSILON,
+            "20 msg/s at a 100 ms interval is exactly 2 tokens per interval, got {}",
+            b.tokens
+        );
+    }
+
+    /// Burst capacity does not change the long-run rate.
+    ///
+    /// Burst and sustained rate are independent knobs; a bigger bucket must not
+    /// refill faster.
+    #[test]
+    fn burst_capacity_does_not_alter_the_configured_rate() {
+        for burst in [1u32, 2, 5, 50] {
+            let mut b = bucket(5, burst, 100);
+            drain(&mut b);
+
+            advance(&mut b, Duration::from_millis(100));
+            b.refill();
+
+            assert!(
+                (b.tokens - 0.5).abs() < TOKEN_EPSILON,
+                "burst {burst} must not change the 0.5 tokens/interval implied by \
+                 5 msg/s, got {}",
+                b.tokens
+            );
+        }
+    }
+
+    /// A long gap refills only up to capacity.
+    #[test]
+    fn a_long_gap_refills_only_to_capacity() {
+        let mut b = bucket(200, 5, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_secs(3600));
+        b.refill();
+
+        assert!(
+            (b.tokens - 5.0).abs() < TOKEN_EPSILON,
+            "an hour of accrual must clamp at the burst capacity of 5, got {}",
+            b.tokens
+        );
+    }
+
+    /// A configured rate of zero does not replenish.
+    ///
+    /// Previously `.max(1.0)` turned a configured 0 into 10 msg/s — the most
+    /// surprising case of the floor, since 0 reads as "deny sustained traffic".
+    #[test]
+    fn zero_rate_does_not_replenish() {
+        let mut b = bucket(0, 2, 100);
+        drain(&mut b);
+
+        advance(&mut b, Duration::from_secs(60));
+        assert!(
+            !b.try_consume(),
+            "a configured 0 msg/s must not replenish - burst is a one-time \
+             allowance, not a floor"
+        );
     }
 }
