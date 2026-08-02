@@ -84,6 +84,13 @@ pub struct SessionManager {
     /// connection candidates. Required in containerized environments (Docker/K8s) where
     /// the QUIC endpoint binds to `0.0.0.0` but must advertise the container/pod IP.
     advertised_addr: Option<SocketAddr>,
+
+    /// This node's own DID, populated by [`SessionManager::start`].
+    ///
+    /// `connections` maps *remote* peer DIDs to connections, so the local DID is never a valid
+    /// key in it (#2506). Holding the identity here is what lets both insertion paths enforce
+    /// that without each caller having to remember to.
+    local_did: Arc<RwLock<Option<String>>>,
 }
 
 impl SessionManager {
@@ -102,7 +109,25 @@ impl SessionManager {
             shutdown_tx: Some(shutdown_tx),
             _shutdown_rx: shutdown_rx,
             advertised_addr: None,
+            local_did: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Whether `peer_did` is this node's own DID.
+    ///
+    /// Identity, never address: two nodes legitimately share a source address behind NAT, a
+    /// proxy, or a shared pod IP, so an address-based test would partition real deployments.
+    pub(crate) async fn is_local_did(&self, peer_did: &str) -> bool {
+        self.local_did
+            .read()
+            .await
+            .as_deref()
+            .is_some_and(|own| own == peer_did)
+    }
+
+    /// This node's own DID, once [`SessionManager::start`] has run.
+    pub(crate) async fn local_did(&self) -> Option<String> {
+        self.local_did.read().await.clone()
     }
 
     /// Set an explicit advertised address for connection candidates.
@@ -136,7 +161,8 @@ impl SessionManager {
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
-        let _own_did = identity_bundle.did().clone();
+        // Remembered so the connection map can refuse to key on it (#2506).
+        *self.local_did.write().await = Some(identity_bundle.did().as_str().to_string());
 
         // Use TLS certificate from IdentityBundle (already bound to DID)
         // This ensures the cert hash matches what's in BindingInfo
@@ -284,6 +310,18 @@ impl SessionManager {
     ///
     /// Returns a QUIC connection to the peer.
     pub async fn dial(&self, addr: SocketAddr, peer_did: String) -> Result<quinn::Connection> {
+        // Never dial ourselves into our own remote-peer map (#2506). Discovery sources echo our
+        // own advertisement back to us — over `network:candidates`, peer exchange, or mDNS — and
+        // the resulting self-connection carries real signed traffic that trips our own replay
+        // guard. Refuse before spending a connection attempt on it.
+        if self.is_local_did(&peer_did).await {
+            debug!(
+                %addr,
+                "Refusing to dial our own DID as a remote peer (#2506)"
+            );
+            anyhow::bail!("refusing to dial the local DID as a remote peer");
+        }
+
         let endpoint = self
             .endpoint
             .read()
@@ -381,7 +419,14 @@ impl SessionManager {
     /// Replacing a connection that is already closed cannot displace a live session, so this
     /// preserves the anti-connection-confusion property above.
     pub async fn store_incoming_connection(&self, peer_did: String, connection: quinn::Connection) {
-        install_incoming_connection(&self.connections, peer_did, connection).await;
+        let local_did = self.local_did().await;
+        install_incoming_connection(
+            &self.connections,
+            local_did.as_deref(),
+            peer_did,
+            connection,
+        )
+        .await;
     }
 
     /// Get all active connections
@@ -672,6 +717,7 @@ impl SessionManager {
             shutdown_tx: None, // Test clones don't control shutdown
             _shutdown_rx: mpsc::channel(1).1,
             advertised_addr: self.advertised_addr,
+            local_did: self.local_did.clone(),
         }
     }
 }
@@ -734,12 +780,31 @@ fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
 /// Callers must have authenticated `peer_did` first. On the Hello path the DID-TLS binding is
 /// verified before this is reached, so a remote cannot claim another node's DID to displace its
 /// entry.
+/// `local_did` is `None` only before [`SessionManager::start`] has run, when there is no identity
+/// to compare against and therefore no connections either; both production callers pass `Some`.
+/// It is a required parameter rather than ambient state so that a future insertion path cannot
+/// install a connection without first stating which DID is ours (#2506).
 pub(crate) async fn install_incoming_connection(
     connections: &Arc<RwLock<HashMap<String, quinn::Connection>>>,
+    local_did: Option<&str>,
     peer_did: String,
     connection: quinn::Connection,
 ) {
     use std::collections::hash_map::Entry;
+
+    // `connections` is keyed by *remote* peer DID, so our own DID is not a valid key (#2506).
+    // Callers must have authenticated `peer_did` before reaching here, so an authenticated DID
+    // equal to ours means this connection really is a self-loop, not an impostor claiming our
+    // identity — the DID-TLS binding check on the Hello path already rejects the latter.
+    if local_did.is_some_and(|own| own == peer_did) {
+        warn!(
+            remote_addr = %connection.remote_address(),
+            "Refusing to register our own DID as a remote peer (#2506)"
+        );
+        connection.close(0u32.into(), b"self-connection");
+        return;
+    }
+
     let mut connections = connections.write().await;
     match connections.entry(peer_did) {
         Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
@@ -1009,7 +1074,7 @@ mod tests {
         let (mut peer_v1, _) = start_manager().await;
         let inbound_v1 = connect(&survivor, &peer_v1, survivor_addr).await;
         let v1_probe = inbound_v1.clone();
-        install_incoming_connection(&map, peer_did.clone(), inbound_v1).await;
+        install_incoming_connection(&map, None, peer_did.clone(), inbound_v1).await;
         assert!(can_reach(&survivor, &peer_did).await);
 
         peer_v1.stop().await.unwrap();
@@ -1019,7 +1084,7 @@ mod tests {
 
         let (mut peer_v2, _) = start_manager().await;
         let inbound_v2 = connect(&survivor, &peer_v2, survivor_addr).await;
-        install_incoming_connection(&map, peer_did.clone(), inbound_v2).await;
+        install_incoming_connection(&map, None, peer_did.clone(), inbound_v2).await;
 
         assert!(
             can_reach(&survivor, &peer_did).await,
@@ -1028,5 +1093,125 @@ mod tests {
 
         peer_v2.stop().await.unwrap();
         survivor.stop().await.unwrap();
+    }
+
+    /// Like `start_manager`, but also returns the identity the manager was started with.
+    async fn start_manager_with_identity() -> (SessionManager, SocketAddr, icn_identity::Did) {
+        let mut manager = SessionManager::new();
+        let identity = icn_identity::IdentityBundle::generate().unwrap();
+        let did = identity.did().clone();
+        manager
+            .start(&identity, "127.0.0.1:0".parse().unwrap(), None, None)
+            .await
+            .unwrap();
+        let addr = manager
+            .endpoint
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .local_addr()
+            .unwrap();
+        (manager, addr, did)
+    }
+
+    /// Regression test for #2506.
+    ///
+    /// A node must never dial itself into its own remote-connection map. Live, a node received
+    /// its own connection candidate back over gossip and dialed both of its own advertised
+    /// endpoints; the resulting self-connection carried signed traffic that tripped the node's
+    /// own replay guard and ended in it banning its own DID.
+    #[tokio::test]
+    async fn test_dial_refuses_local_did() {
+        setup();
+
+        let (mut manager, _addr, own_did) = start_manager_with_identity().await;
+        // A *reachable* target, so the dial cannot fail for transport reasons and the test is
+        // actually exercising the identity check. Live, the reachable target is the node's own
+        // Service/pod address, which hairpins back to its listener — the dial succeeds and the
+        // node registers itself as a remote peer.
+        let (mut target, target_addr) = start_manager().await;
+        let acceptor = target.clone_for_test();
+        let accept_task = tokio::spawn(async move { acceptor.accept().await });
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let result = manager
+            .dial(target_addr, own_did.as_str().to_string())
+            .await;
+        accept_task.abort();
+
+        assert!(
+            result.is_err(),
+            "#2506: a dial that would register our own DID must be refused before connecting"
+        );
+        assert!(
+            !manager
+                .connections()
+                .await
+                .iter()
+                .any(|(did, _)| did == own_did.as_str()),
+            "#2506: the local DID must never become a key in the remote connection map"
+        );
+
+        target.stop().await.unwrap();
+        manager.stop().await.unwrap();
+    }
+
+    /// The inbound counterpart: even an *authenticated* connection whose peer DID equals ours
+    /// must not be registered as a remote peer. On the Hello path the DID-TLS binding is verified
+    /// before installation, so reaching this point with our own DID means the connection really is
+    /// a self-loop rather than an impostor.
+    #[tokio::test]
+    async fn test_store_incoming_connection_refuses_local_did() {
+        setup();
+
+        let (mut manager, addr, own_did) = start_manager_with_identity().await;
+        let (mut other, _) = start_manager().await;
+        let inbound = connect(&manager, &other, addr).await;
+
+        manager
+            .store_incoming_connection(own_did.as_str().to_string(), inbound)
+            .await;
+
+        assert!(
+            !manager
+                .connections()
+                .await
+                .iter()
+                .any(|(did, _)| did == own_did.as_str()),
+            "#2506: an incoming connection claiming our own DID must not be installed"
+        );
+
+        other.stop().await.unwrap();
+        manager.stop().await.unwrap();
+    }
+
+    /// Negative control for #2506: self-exclusion must be *identity*-based, never address-based.
+    ///
+    /// Two nodes legitimately share a source address behind NAT, a proxy, or a shared pod IP.
+    /// Rejecting a peer because its address looks like ours would partition exactly those
+    /// deployments, so a distinct DID arriving from our own address must still be admitted.
+    #[tokio::test]
+    async fn test_remote_peer_from_local_address_is_still_admitted() {
+        setup();
+
+        let (mut manager, addr, _own_did) = start_manager_with_identity().await;
+        let (mut other, _) = start_manager().await;
+
+        // `other` dials over loopback, so the connection manager sees a source address in the
+        // same host as its own listener — the address-based "is this me?" heuristic would fire.
+        let inbound = connect(&manager, &other, addr).await;
+        let remote_did = "did:icn:zLegitimatePeerSharingOurAddress".to_string();
+        manager
+            .store_incoming_connection(remote_did.clone(), inbound)
+            .await;
+
+        assert!(
+            can_reach(&manager, &remote_did).await,
+            "#2506: a distinct DID must still be admitted even when it shares our address"
+        );
+
+        other.stop().await.unwrap();
+        manager.stop().await.unwrap();
     }
 }

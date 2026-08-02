@@ -24,7 +24,7 @@ async fn test_candidate_cache_flow() -> Result<()> {
     let did2 = keypair2.did().clone();
 
     // Create candidate cache (as supervisor does)
-    let cache = CandidateCache::new();
+    let cache = CandidateCache::new(KeyPair::generate().unwrap().did().clone());
 
     // Node 1 creates and publishes its candidate
     let candidate1 = ConnectionCandidate::new(
@@ -83,7 +83,7 @@ async fn test_stale_candidate_rejection() -> Result<()> {
     let did = keypair.did().clone();
 
     // Create cache with short TTL (1 second)
-    let cache = CandidateCache::with_ttl(1);
+    let cache = CandidateCache::with_ttl(KeyPair::generate().unwrap().did().clone(), 1);
 
     // Create fresh candidate
     let candidate = ConnectionCandidate::new(
@@ -116,7 +116,7 @@ async fn test_stale_candidate_rejection() -> Result<()> {
 async fn test_candidate_update_priority() -> Result<()> {
     let keypair = KeyPair::generate()?;
     let did = keypair.did().clone();
-    let cache = CandidateCache::new();
+    let cache = CandidateCache::new(KeyPair::generate().unwrap().did().clone());
 
     // Store initial candidate
     let candidate1 =
@@ -155,7 +155,7 @@ async fn test_candidate_update_priority() -> Result<()> {
 
 #[tokio::test]
 async fn test_multiple_peer_candidates() -> Result<()> {
-    let cache = CandidateCache::new();
+    let cache = CandidateCache::new(KeyPair::generate().unwrap().did().clone());
 
     // Simulate receiving candidates from multiple peers
     let mut candidates = Vec::new();

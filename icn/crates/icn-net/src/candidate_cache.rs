@@ -13,33 +13,53 @@ use tracing::{debug, info};
 /// Default TTL for cached candidates (5 minutes)
 pub const DEFAULT_CANDIDATE_TTL_SECS: u64 = 300;
 
-/// Cache for storing connection candidates from peers
+/// Cache for storing connection candidates from *remote* peers
+///
+/// Entries here are dial targets, so the local node's own candidate has no place in it (#2506):
+/// candidates travel over the `network:candidates` gossip topic, which echoes our own
+/// advertisement straight back to us. The owning DID is required at construction so that a cache
+/// which cannot recognise its own node is not a representable state.
 pub struct CandidateCache {
     /// Cached candidates by DID
     candidates: Arc<RwLock<HashMap<Did, ConnectionCandidate>>>,
 
     /// TTL for candidates in seconds
     ttl_secs: u64,
+
+    /// The DID of the node that owns this cache; never a valid key in `candidates`.
+    local_did: Did,
 }
 
 impl CandidateCache {
-    /// Create a new candidate cache with default TTL
-    pub fn new() -> Self {
-        Self::with_ttl(DEFAULT_CANDIDATE_TTL_SECS)
+    /// Create a new candidate cache with default TTL, owned by `local_did`
+    pub fn new(local_did: Did) -> Self {
+        Self::with_ttl(local_did, DEFAULT_CANDIDATE_TTL_SECS)
     }
 
-    /// Create a new candidate cache with custom TTL
-    pub fn with_ttl(ttl_secs: u64) -> Self {
+    /// Create a new candidate cache with custom TTL, owned by `local_did`
+    pub fn with_ttl(local_did: Did, ttl_secs: u64) -> Self {
         Self {
             candidates: Arc::new(RwLock::new(HashMap::new())),
             ttl_secs,
+            local_did,
         }
     }
 
     /// Store a candidate in the cache
     ///
-    /// Returns true if this is a new or updated candidate, false if ignored (stale)
+    /// Returns true if this is a new or updated candidate, false if ignored (our own, stale, or
+    /// older than what we already hold).
     pub async fn store(&self, candidate: ConnectionCandidate) -> bool {
+        // Our own candidate is not a dial target (#2506). Gossip delivers our own announcement
+        // back to us, and dialing it produces a self-connection that carries real signed traffic
+        // into our own replay guard and misbehaviour detector.
+        if candidate.did == self.local_did {
+            debug!(
+                "Ignoring our own connection candidate; the local node is not a dial target (#2506)"
+            );
+            return false;
+        }
+
         // Check freshness before storing
         if !candidate.is_fresh(self.ttl_secs) {
             debug!(
@@ -154,20 +174,51 @@ impl CandidateCache {
     }
 }
 
-impl Default for CandidateCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// No `Default`: a candidate cache is meaningless without knowing which DID owns it, since that is
+// what lets it refuse to hold the local node as a dial target (#2506).
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
 
+    /// A cache owned by a freshly generated DID, for tests that only care about remote candidates.
+    fn cache_owned_by_someone_else() -> CandidateCache {
+        CandidateCache::new(KeyPair::generate().unwrap().did().clone())
+    }
+
+    /// Regression test for #2506.
+    ///
+    /// The `network:candidates` topic delivers our own announcement back to us. Storing it makes
+    /// the local node a dial target, and the resulting self-connection carried enough signed
+    /// traffic to trip the node's own replay guard and ban its own DID.
+    #[tokio::test]
+    async fn test_own_candidate_is_not_stored_as_a_dial_target() {
+        let keypair = KeyPair::generate().unwrap();
+        let own_did = keypair.did().clone();
+        let cache = CandidateCache::new(own_did.clone());
+
+        let own_candidate = ConnectionCandidate::new(
+            own_did.clone(),
+            "10.42.2.204:7827".parse().unwrap(),
+            Some("203.0.113.5:39889".parse().unwrap()),
+            None,
+        );
+
+        assert!(
+            !cache.store(own_candidate).await,
+            "#2506: our own connection candidate must be refused"
+        );
+        assert!(
+            cache.get(&own_did).await.is_none(),
+            "#2506: the local DID must never be cached as a dial target"
+        );
+        assert!(cache.is_empty().await);
+    }
+
     #[tokio::test]
     async fn test_candidate_cache_store_and_get() {
-        let cache = CandidateCache::new();
+        let cache = cache_owned_by_someone_else();
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -193,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_cache_stale_rejected() {
-        let cache = CandidateCache::with_ttl(60); // 1 minute TTL
+        let cache = CandidateCache::with_ttl(KeyPair::generate().unwrap().did().clone(), 60); // 1 minute TTL
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -214,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_cache_update_fresher() {
-        let cache = CandidateCache::new();
+        let cache = cache_owned_by_someone_else();
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -246,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_cache_ignore_older() {
-        let cache = CandidateCache::new();
+        let cache = cache_owned_by_someone_else();
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -277,7 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_cache_cleanup() {
-        let cache = CandidateCache::with_ttl(60); // 1 minute TTL
+        let cache = CandidateCache::with_ttl(KeyPair::generate().unwrap().did().clone(), 60); // 1 minute TTL
         let keypair1 = KeyPair::generate().unwrap();
         let keypair2 = KeyPair::generate().unwrap();
         let did1 = keypair1.did().clone();
@@ -317,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_cache_remove() {
-        let cache = CandidateCache::new();
+        let cache = cache_owned_by_someone_else();
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 

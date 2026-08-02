@@ -268,6 +268,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                 handle_peer_exchange(
                     peer_msg,
                     &sender_did,
+                    &own_did,
                     federation_enabled,
                     network_handle_holder.clone(),
                 );
@@ -285,6 +286,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
 fn handle_peer_exchange(
     peer_msg: &icn_net::PeerExchangeMessage,
     sender_did: &Did,
+    own_did: &Did,
     federation_enabled: bool,
     network_handle_holder: NetworkHandleHolder,
 ) {
@@ -308,6 +310,9 @@ fn handle_peer_exchange(
                 // the first endpoint of any kind if no public endpoint is available.
                 let peers_to_dial: Vec<_> = peers
                     .iter()
+                    // Peer exchange can hand our own entry back to us; we are not a peer we
+                    // discovered (#2506).
+                    .filter(|p| p.did != own_did.as_str())
                     .filter_map(|p| {
                         use icn_net::candidate::EndpointKind;
                         let addr = p
@@ -361,6 +366,12 @@ fn handle_peer_exchange(
                 "Peer announced by {}: {} at {:?}",
                 sender_did, peer.did, peer.endpoints
             );
+
+            if peer.did == own_did.as_str() {
+                // A peer announcing *us* is not a dial target (#2506).
+                debug!("Ignoring announcement of our own DID as a peer");
+                return;
+            }
 
             if federation_enabled {
                 use icn_net::candidate::EndpointKind;

@@ -465,9 +465,10 @@ pub async fn handle_connection_candidate(
 
             let did = candidate.did.clone();
 
-            // Store the candidate
+            // Store the candidate. The cache refuses our own DID, so this is also what stops us
+            // dialing ourselves after gossip echoes our announcement back (#2506).
             if !candidate_cache.store(candidate.clone()).await {
-                debug!("Ignored stale/older candidate for {}", did);
+                debug!("Ignored candidate for {} (our own, stale, or older)", did);
                 return;
             }
 
