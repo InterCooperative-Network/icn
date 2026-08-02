@@ -310,7 +310,10 @@ fn register_core_oracles(
         // (defence in depth for #2491, which is a separate protocol change).
         let network_domain = icn_kernel_api::authz::Domain::new(icn_net::NETWORK_DOMAIN);
         let tiers = super::network_policy::NetworkRateLimitTiers::from_config(rate_limiting);
-        let ceiling = super::network_policy::rate_limit_from_config(&rate_limiting.federated);
+        // Maximum across all four tiers, not the federated tier: an operator may
+        // legitimately configure a burstier local `partner` tier than the WAN
+        // `federated` one, and a federated-derived ceiling would silently clamp it.
+        let ceiling = tiers.ceiling();
         let network_oracle: std::sync::Arc<dyn icn_kernel_api::authz::PolicyOracle> =
             std::sync::Arc::new(super::network_policy::NetworkRateLimitOracle::new(
                 trust_oracle,

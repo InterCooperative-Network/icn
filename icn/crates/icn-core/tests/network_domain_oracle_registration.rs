@@ -27,6 +27,7 @@
 use std::sync::Arc;
 
 use icn_identity::Did;
+use icn_kernel_api::authz::RateLimit;
 use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_kernel_api::bootstrap::BootstrapPhase;
 use icn_kernel_api::OracleRegistry;
@@ -92,6 +93,34 @@ fn registry_with_network_domain() -> Arc<OracleRegistry> {
     let oracle: Arc<dyn PolicyOracle> = Arc::new(TrustLikeOracle);
     registry.register(oracle.domain(), oracle.clone());
     registry.register(Domain::new(NETWORK_DOMAIN), oracle);
+    registry
+}
+
+/// The same, but serving the network domain with an explicit configured tier.
+///
+/// Mirrors what `register_core_oracles` produces after #2496: the `net` domain is
+/// answered with the operator's configured `RateLimit`, not the trust oracle's
+/// hard-coded ladder. Used to prove the limiter honours that number end to end.
+fn registry_with_network_domain_tier(tier: RateLimit) -> Arc<OracleRegistry> {
+    #[derive(Debug)]
+    struct ConfiguredTierOracle(RateLimit);
+
+    impl PolicyOracle for ConfiguredTierOracle {
+        fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+            use icn_kernel_api::authz::ConstraintSet;
+            PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(self.0.clone()))
+        }
+
+        fn domain(&self) -> Domain {
+            Domain::new(NETWORK_DOMAIN)
+        }
+    }
+
+    let registry = Arc::new(OracleRegistry::new());
+    let trust: Arc<dyn PolicyOracle> = Arc::new(TrustLikeOracle);
+    registry.register(trust.domain(), trust);
+    let net: Arc<dyn PolicyOracle> = Arc::new(ConfiguredTierOracle(tier));
+    registry.register(Domain::new(NETWORK_DOMAIN), net);
     registry
 }
 
@@ -247,53 +276,99 @@ fn bootstrap_phases_allow_network_domain_before_running() {
     }
 }
 
-/// The consuming limiter quantises sub-granularity rates upward — pinned, not hidden.
+/// An operator-configured rate below the refill granularity is actually enforced.
 ///
-/// `RateLimiter::do_rate_limit_check` computes
-/// `(max_messages_per_second * refill_interval).max(1.0)` tokens per interval
-/// (`icn-net/src/rate_limit.rs:394`). At the default 100 ms interval that floor is
-/// **one token per 100 ms = 10 messages/s**, so every configured rate below 10/s
-/// collapses to 10/s.
+/// This is the end-to-end form of #2503, driven through the real [`RateLimiter`].
 ///
-/// This is a property of the limiter, not of the oracle wiring, and it predates
-/// the tier-selection fix: the previously hard-coded isolated tier was
-/// `RateLimit::restricted()` = 5/s, which this floor already inflated to 10/s.
-/// Selecting the operator's configured tier does not introduce it and does not
-/// worsen it — but it does make it *reachable*, because an operator can now
-/// actually put a sub-10 number into effect and be misled about the result.
+/// The limiter used to compute `(rate * interval).max(1.0)` tokens per interval.
+/// At the default 100 ms interval that floor is 10 messages/s, so a configured
+/// 1 msg/s silently became 10 msg/s. #2496 made the operator's number reach the
+/// limiter; without this fix the limiter then ignored it, and the guarantee
+/// "configured limits control behaviour" was false at the last hop.
 ///
-/// Burst is unaffected: `capacity` is used verbatim, which is why the #2496
-/// regression (configured burst 2 must not become 5) is genuinely fixed.
+/// # Why this test sleeps
 ///
-/// Asserted here rather than left as a comment so that if the floor is ever
-/// removed, this test fails and the tier tests can be tightened accordingly.
-#[test]
-fn configured_rates_below_the_refill_granularity_are_quantised_up() {
+/// An earlier version hammered the limiter in a tight loop and asserted the
+/// admitted count. That version could not fail: the loop finishes inside one
+/// refill interval, so no replenishment happens with *or* without the floor, and
+/// only the burst gets through either way. Discriminating the defect requires
+/// real elapsed time, because the limiter reads `std::time::Instant` directly and
+/// so is not affected by `tokio::time::pause`.
+///
+/// The 150 ms probe is the discriminator: under the old floor one whole token had
+/// arrived by then (10 msg/s); at a correctly-enforced 1 msg/s only 0.15 tokens
+/// have.
+#[tokio::test]
+async fn a_configured_sub_granularity_rate_is_enforced_by_the_limiter() {
     use std::time::Duration;
 
-    let refill_interval = Duration::from_millis(100);
-    let granularity = 1.0 / refill_interval.as_secs_f64(); // 10 messages/s
+    // Isolated tier: 1 msg/s sustained, burst 2 — deliberately below the old
+    // 10 msg/s floor.
+    let registry = registry_with_network_domain_tier(RateLimit {
+        messages_per_second: 1,
+        burst_size: 2,
+    });
+    registry.set_phase(BootstrapPhase::Running);
 
-    for configured in [1u32, 5, 9] {
-        let tokens_per_interval = (configured as f64 * refill_interval.as_secs_f64()).max(1.0);
-        let effective = tokens_per_interval / refill_interval.as_secs_f64();
+    let limiter = RateLimiter::new_with_oracle(registry, generous_fallback());
+    let peer = peer();
 
-        assert_eq!(
-            effective, granularity,
-            "a configured {configured} msg/s is quantised up to {granularity} msg/s \
-             by the limiter's `.max(1.0)` floor - the operator's number does not \
-             take effect below the refill granularity"
+    // Spend the burst.
+    for n in 1..=2 {
+        assert!(
+            limiter.check_rate_limit(&peer).await,
+            "burst message {n} of 2 must be admitted"
         );
     }
+    assert!(
+        !limiter.check_rate_limit(&peer).await,
+        "the burst of 2 must be exhausted after two messages"
+    );
 
-    // At and above the granularity the configured value is exact.
-    for configured in [10u32, 30, 70, 200] {
-        let tokens_per_interval = (configured as f64 * refill_interval.as_secs_f64()).max(1.0);
-        let effective = tokens_per_interval / refill_interval.as_secs_f64();
+    // 150 ms is more than one refill interval but far less than the one second a
+    // correctly-enforced 1 msg/s needs.
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(
+        !limiter.check_rate_limit(&peer).await,
+        "after 150 ms a configured 1 msg/s has accrued only ~0.15 tokens, so no \
+         message may be admitted. Admitting one here means the limiter is still \
+         applying its old one-token-per-interval floor, i.e. 10 msg/s"
+    );
 
-        assert_eq!(
-            effective, configured as f64,
-            "at or above the refill granularity the configured rate must be exact"
-        );
+    // But the rate is a rate, not a ban: a full second must replenish one token.
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+    assert!(
+        limiter.check_rate_limit(&peer).await,
+        "after ~1.15 s at 1 msg/s at least one token must have accrued - the fix \
+         must enforce the configured rate, not suppress traffic entirely"
+    );
+}
+
+/// Burst is exact, independently of the sustained rate.
+///
+/// The #2496 headline regression: a configured burst of 2 must be 2, not the
+/// trust oracle's hard-coded `RateLimit::restricted()` burst of 5.
+#[tokio::test]
+async fn a_configured_burst_of_two_admits_two_not_five() {
+    let registry = registry_with_network_domain_tier(RateLimit {
+        messages_per_second: 1,
+        burst_size: 2,
+    });
+    registry.set_phase(BootstrapPhase::Running);
+
+    let limiter = RateLimiter::new_with_oracle(registry, generous_fallback());
+    let peer = peer();
+
+    let mut allowed = 0usize;
+    for _ in 0..5 {
+        if limiter.check_rate_limit(&peer).await {
+            allowed += 1;
+        }
     }
+
+    assert_eq!(
+        allowed, 2,
+        "five immediate attempts against a burst of 2 must admit exactly 2; \
+         5 would mean restricted()'s burst leaked through"
+    );
 }

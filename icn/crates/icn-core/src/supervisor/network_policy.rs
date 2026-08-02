@@ -83,6 +83,32 @@ pub struct NetworkRateLimitTiers {
 }
 
 impl NetworkRateLimitTiers {
+    /// The absolute ceiling implied by this configuration.
+    ///
+    /// The maximum over all four tiers — deliberately *not* the federated tier.
+    ///
+    /// Using `federated` as a global ceiling silently clamped any tier an operator
+    /// configured above it, which is a legitimate shape: a burstier local
+    /// `partner` tier alongside a tighter WAN `federated` tier. Config validation
+    /// imposes no monotonic ordering, so such a configuration is accepted and was
+    /// then quietly overridden.
+    ///
+    /// Taking the maximum keeps the ceiling's actual purpose — bounding anything
+    /// that is *not* an operator-configured tier, so no trust-derived value can
+    /// exceed what the operator allowed — while guaranteeing it can never clamp a
+    /// configured tier.
+    pub fn ceiling(&self) -> RateLimit {
+        let tiers = [&self.isolated, &self.known, &self.partner, &self.federated];
+        RateLimit {
+            messages_per_second: tiers
+                .iter()
+                .map(|t| t.messages_per_second)
+                .max()
+                .unwrap_or(0),
+            burst_size: tiers.iter().map(|t| t.burst_size).max().unwrap_or(0),
+        }
+    }
+
     /// The configured limit for a trust class.
     pub fn for_class(&self, class: TrustClass) -> &RateLimit {
         match class {
@@ -382,6 +408,78 @@ mod tests {
         assert_ne!(
             limit.burst_size, 5,
             "5 is `RateLimit::restricted()`'s burst - the value this bug shipped"
+        );
+    }
+
+    /// A tier configured above the federated tier is not clamped.
+    ///
+    /// Regression for the review finding that used `rate_limiting.federated` as a
+    /// global ceiling. A burstier local `partner` tier alongside a tighter WAN
+    /// `federated` tier is a legitimate configuration, config validation imposes
+    /// no monotonic ordering, and the ceiling silently overrode it.
+    #[test]
+    fn a_tier_configured_above_the_federated_tier_is_not_clamped() {
+        let tiers = NetworkRateLimitTiers {
+            // Partner is deliberately burstier and faster than federated.
+            partner: RateLimit {
+                messages_per_second: 500,
+                burst_size: 90,
+            },
+            federated: RateLimit {
+                messages_per_second: 200,
+                burst_size: 50,
+            },
+            ..configured_tiers()
+        };
+        let ceiling = tiers.ceiling();
+
+        let oracle = NetworkRateLimitOracle::new(
+            Arc::new(FixedOracle(Some(RateLimit::unlimited()))),
+            Arc::new(FixedScoreTrust(0.5)), // Partner
+            Domain::new("net"),
+            tiers,
+            ceiling,
+        );
+
+        let limit = rate_limit_of(&oracle.evaluate(&request())).expect("rate limit present");
+
+        assert_eq!(
+            (limit.messages_per_second, limit.burst_size),
+            (500, 90),
+            "a partner tier configured above the federated tier must be honoured, \
+             not clamped down to the federated values"
+        );
+    }
+
+    /// The derived ceiling is the maximum across all tiers.
+    #[test]
+    fn the_ceiling_is_the_maximum_across_all_tiers() {
+        let tiers = NetworkRateLimitTiers {
+            isolated: RateLimit {
+                messages_per_second: 10,
+                burst_size: 99,
+            },
+            known: RateLimit {
+                messages_per_second: 30,
+                burst_size: 9,
+            },
+            partner: RateLimit {
+                messages_per_second: 700,
+                burst_size: 13,
+            },
+            federated: RateLimit {
+                messages_per_second: 200,
+                burst_size: 50,
+            },
+        };
+
+        let ceiling = tiers.ceiling();
+
+        assert_eq!(
+            (ceiling.messages_per_second, ceiling.burst_size),
+            (700, 99),
+            "each field takes the maximum independently, so no configured tier can \
+             be clamped in either dimension"
         );
     }
 

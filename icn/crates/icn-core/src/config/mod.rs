@@ -348,8 +348,33 @@ impl Config {
         }
 
         // Rate limiting validation
-        if self.rate_limiting.enabled && self.rate_limiting.refill_interval_ms == 0 {
-            errors.push("rate_limiting.refill_interval_ms cannot be 0".to_string());
+        if self.rate_limiting.enabled {
+            if self.rate_limiting.refill_interval_ms == 0 {
+                errors.push("rate_limiting.refill_interval_ms cannot be 0".to_string());
+            }
+
+            // A burst capacity of 0 means the bucket can never hold a whole token,
+            // so every message is denied forever regardless of the configured rate
+            // — the node silently stops peering. Rejected explicitly rather than
+            // left as a silent brick.
+            //
+            // A configured *rate* of 0 is left valid: since #2503 it honestly means
+            // "no sustained replenishment, burst is a one-time allowance". It used
+            // to be inflated to the limiter's one-token-per-interval floor
+            // (10 msg/s at the default interval), which was the misleading case.
+            for (name, tier) in [
+                ("isolated", &self.rate_limiting.isolated),
+                ("known", &self.rate_limiting.known),
+                ("partner", &self.rate_limiting.partner),
+                ("federated", &self.rate_limiting.federated),
+                ("fallback", &self.rate_limiting.fallback),
+            ] {
+                if tier.burst_capacity == 0 {
+                    errors.push(format!(
+                        "rate_limiting.{name}.burst_capacity cannot be 0                          (a zero bucket denies every message permanently)"
+                    ));
+                }
+            }
         }
 
         // Topology validation
