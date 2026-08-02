@@ -24,6 +24,7 @@ pub mod relay_proxy;
 pub mod replay_guard;
 pub mod sequence_tracker;
 pub mod session;
+pub mod signing_sequence;
 pub mod stun;
 pub mod tls;
 pub mod topology;
@@ -55,6 +56,7 @@ pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::SessionManager;
+pub use signing_sequence::SigningSequenceCounter;
 pub use stun::StunClient;
 pub use topology::{
     FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NetworkMetrics, NodeRole,
