@@ -155,6 +155,45 @@ fn captured_traffic_from_a_previous_incarnation_is_still_rejected() {
     }
 }
 
+/// Demonstrates why "clear the peer's replay state when it reconnects" is NOT a safe
+/// fix for #2510, and must not be reintroduced as a simplification.
+///
+/// The tempting shortcut is to drop a peer's window on a fresh authenticated
+/// connection. This test shows the cost directly: the *same* message that is correctly
+/// refused while the window is held becomes acceptable once the window is dropped.
+///
+/// Note the residual exposure is bounded by the signed timestamp - `verify_age(300)`
+/// rejects anything older than the freshness window regardless. That bound is what
+/// makes the durable-counter fix sufficient without an incarnation field; it is *not*
+/// a licence to clear state on reconnect, because everything inside those 300 seconds
+/// becomes replayable.
+#[test]
+fn clearing_replay_state_on_reconnect_would_reopen_captured_traffic() {
+    let keypair = KeyPair::generate().unwrap();
+    let counter = SigningSequenceCounter::new(temp_store()).unwrap();
+
+    let captured = {
+        let mut guard = persistent_guard(temp_store());
+        let env = envelope(&keypair, counter.next_sequence().unwrap(), b"captured");
+        guard.check(&env).unwrap();
+        assert!(
+            guard.check(&env).is_err(),
+            "precondition: while the window is held, the duplicate must be refused"
+        );
+        env
+    };
+
+    // Model the naive fix: a reconnect drops this peer's replay state, leaving a guard
+    // with no memory of the DID. Everything else is unchanged.
+    let mut cleared = persistent_guard(temp_store());
+
+    assert!(
+        cleared.check(&captured).is_ok(),
+        "expected the cleared-state guard to accept previously-seen traffic; if this \
+         ever fails the demonstration is stale, not fixed"
+    );
+}
+
 /// Ordinary transport churn is not an incarnation boundary.
 ///
 /// The replay guard is keyed by DID alone and holds no connection state, so reconnects
