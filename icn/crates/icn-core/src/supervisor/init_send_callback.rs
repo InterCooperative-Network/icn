@@ -7,7 +7,6 @@
 //! - Encryption sequence tracking and cleanup
 //! - Metrics for message types and encryption status
 
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -60,7 +59,15 @@ pub async fn init_send_callback(
     deps: SendCallbackDeps,
     background_tasks: &mut JoinSet<()>,
 ) -> Result<SendCallbackServices> {
-    let sequence_counter = Arc::new(AtomicU64::new(0));
+    // Signing sequence: durable and monotonic across restarts (#2510).
+    // Peers persist their high-water mark for us and reject anything at or below it,
+    // so a counter that restarted at zero would make our own legitimate traffic look
+    // like a replay attack. This is a different sequence space from the encryption
+    // tracker below - see icn_net::signing_sequence.
+    let sequence_counter = Arc::new(
+        icn_net::SigningSequenceCounter::new(deps.gossip_store.clone())
+            .context("Failed to open durable signing sequence counter")?,
+    );
 
     // Create encryption sequence tracker
     let encryption_sequence_tracker = Arc::new(
@@ -118,7 +125,7 @@ fn create_send_callback(
     own_did: Did,
     keypair: KeyPair,
     x25519_secret_bytes: [u8; 32],
-    sequence_counter: Arc<AtomicU64>,
+    sequence_counter: Arc<icn_net::SigningSequenceCounter>,
     encryption_sequence_tracker: Arc<icn_net::OutgoingSequenceTracker>,
     encryption_enabled: bool,
 ) -> SendMessageCallback {
@@ -141,8 +148,16 @@ fn create_send_callback(
 
         // Spawn async task to send message
         tokio::spawn(async move {
-            // Get next sequence number for signed envelope
-            let sequence = sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            // Get next sequence number for signed envelope.
+            // Fail-closed: if the reservation cannot be persisted we drop the message
+            // rather than emit a sequence a later incarnation could reissue (#2510).
+            let sequence = match sequence_ctr.next_sequence() {
+                Ok(seq) => seq,
+                Err(e) => {
+                    error!("Failed to allocate signing sequence, dropping message: {e}");
+                    return;
+                }
+            };
 
             // Create inner signed envelope with gossip payload
             let inner_envelope = match icn_net::SignedEnvelope::from_payload(
