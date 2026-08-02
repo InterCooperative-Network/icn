@@ -86,8 +86,8 @@ struct State {
 ///
 /// Monotonic across process restarts when constructed with [`Self::new`]. Use
 /// [`Self::in_memory`] only for tests and genuinely ephemeral nodes: an in-memory
-/// counter restarts at zero, which is exactly the condition that peers score as a
-/// replay attack.
+/// counter restarts from the bottom of the sequence space, which is exactly the
+/// condition that peers score as a replay attack.
 pub struct SigningSequenceCounter {
     state: Mutex<State>,
     store: Option<Arc<dyn Store>>,
@@ -136,8 +136,9 @@ impl SigningSequenceCounter {
 
     /// Create a non-durable counter for tests and ephemeral nodes.
     ///
-    /// **Warning**: restarts reset this to zero, which surviving peers classify as a
-    /// replay attack (#2510). Never use on a node with persistent storage.
+    /// **Warning**: restarts reset this to [`FIRST_SEQUENCE`], far below any high-water
+    /// mark a peer is holding, which surviving peers classify as a replay attack
+    /// (#2510). Never use on a node with persistent storage.
     pub fn in_memory() -> Self {
         SigningSequenceCounter {
             state: Mutex::new(State {
@@ -153,6 +154,18 @@ impl SigningSequenceCounter {
     /// Returns an error if the reservation cannot be persisted. Callers must treat that
     /// as fatal for the message: issuing a sequence we failed to record would let a
     /// later incarnation reuse it.
+    ///
+    /// # Why this is synchronous
+    ///
+    /// The store write happens under the lock, on the caller's thread, rather than via
+    /// `spawn_blocking`. That is deliberate: correctness here depends on "persist, then
+    /// issue from the new block" being atomic. Releasing the lock to await a blocking
+    /// task would let two senders each observe an exhausted reservation and both extend
+    /// it, which is precisely the reuse this type exists to prevent.
+    ///
+    /// The cost is bounded by amortisation - one write per [`RESERVATION_BLOCK`]
+    /// messages, not one per message. The sibling `OutgoingSequenceTracker` already
+    /// persists synchronously from async on *every* encrypted message.
     pub fn next_sequence(&self) -> Result<u64> {
         let mut state = self
             .state
