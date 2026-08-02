@@ -284,7 +284,7 @@ impl PeerSyncManager {
     /// legitimate — but counting it as network size reports `1` for a node that has no peers at
     /// all, and made an isolated node look like it had one (#2506).
     pub fn remote_peer_count(&self, local_did: &Did) -> usize {
-        self.states.keys().filter(|did| *did != local_did).count()
+        self.states.len() - usize::from(self.states.contains_key(local_did))
     }
 
     /// Update backoff settings for a specific peer (based on trust class changes)

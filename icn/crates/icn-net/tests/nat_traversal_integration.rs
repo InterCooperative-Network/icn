@@ -23,8 +23,11 @@ async fn test_candidate_cache_flow() -> Result<()> {
     let did1 = keypair1.did().clone();
     let did2 = keypair2.did().clone();
 
-    // Create candidate cache (as supervisor does)
-    let cache = CandidateCache::new(KeyPair::generate().unwrap().did().clone());
+    // Create candidate cache (as supervisor does: owned by the DID of the node running it).
+    // Here that observing node is a third party watching node 1 and node 2 exchange candidates.
+    let local_keypair = KeyPair::generate()?;
+    let local_did = local_keypair.did().clone();
+    let cache = CandidateCache::new(local_did.clone());
 
     // Node 1 creates and publishes its candidate
     let candidate1 = ConnectionCandidate::new(
@@ -73,6 +76,26 @@ async fn test_candidate_cache_flow() -> Result<()> {
     let candidate2_retrieved = cache.get(&did2).await;
     assert!(candidate2_retrieved.is_some());
     assert!(candidate2_retrieved.unwrap().is_fresh(300));
+
+    // #2506: the same gossip flow also delivers the observing node its *own* candidate, because
+    // `network:candidates` echoes back to the publisher. That one is not a dial target, and it
+    // must not displace or join the two real peers above.
+    let own_candidate = ConnectionCandidate::new(
+        local_did.clone(),
+        "192.168.1.102:5002".parse()?,
+        Some("203.0.113.7:5002".parse()?),
+        None,
+    );
+    assert!(
+        !cache.store(own_candidate).await,
+        "#2506: the cache owner's own candidate must be refused"
+    );
+    assert!(cache.get(&local_did).await.is_none());
+    assert_eq!(
+        cache.len().await,
+        2,
+        "#2506: only the two real peers should be cached"
+    );
 
     Ok(())
 }

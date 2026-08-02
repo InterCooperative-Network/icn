@@ -1,6 +1,10 @@
 # Network identity: the local node is never a remote peer
 
-**Status**: active rule
+**Status:** living — active rule
+**Truth class:** normative
+**Canonical:** yes, for this rule; runtime truth lives in [docs/STATE.md](../STATE.md)
+**Last reviewed:** 2026-08-02
+**Source basis:** traced against `origin/main` @ `72dfed8e` on the live four-node rehearsal federation
 **Established**: 2026-08-02 (#2506)
 **Applies to**: `icn-net`, `icn-gossip`, and the supervisor wiring in `icn-core` that feeds them
 
