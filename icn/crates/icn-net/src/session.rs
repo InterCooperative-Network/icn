@@ -302,17 +302,31 @@ impl SessionManager {
 
         info!("Connected to peer at {}", addr);
 
-        // Store connection, or return existing one if we already have it
+        // Store connection, or return the existing one if we already have a *live* one.
+        //
+        // A closed entry must never win over a freshly dialed connection: after a peer restarts,
+        // our cached connection to it is dead, and preferring it would make every send fail
+        // until this process restarts (#2504).
         let mut connections = self.connections.write().await;
         if let Some(existing) = connections.get(&peer_did) {
-            info!(
-                "Connection already exists for {} (from incoming), returning existing connection and closing new one",
-                peer_did
-            );
-            let existing_conn = existing.clone();
-            drop(connections); // Release lock before closing
-            connection.close(0u32.into(), b"duplicate");
-            return Ok(existing_conn);
+            match existing.close_reason() {
+                None => {
+                    info!(
+                        "Connection already exists for {} (from incoming), returning existing connection and closing new one",
+                        peer_did
+                    );
+                    let existing_conn = existing.clone();
+                    drop(connections); // Release lock before closing
+                    connection.close(0u32.into(), b"duplicate");
+                    return Ok(existing_conn);
+                }
+                Some(reason) => {
+                    info!(
+                        "Replacing closed connection for {} ({}) with the connection we just dialed",
+                        peer_did, reason
+                    );
+                }
+            }
         }
         connections.insert(peer_did, connection.clone());
         drop(connections);
@@ -356,13 +370,28 @@ impl SessionManager {
     /// This is called when we receive a Hello message from a peer on an incoming
     /// connection, allowing us to send messages back on that connection.
     ///
-    /// Note: If a connection already exists for this peer (e.g., from a dial we made),
+    /// Note: If a *live* connection already exists for this peer (e.g., from a dial we made),
     /// we don't overwrite it to avoid connection confusion. Both connections will
     /// have handlers running, but we prefer the connection we dialed.
+    ///
+    /// A **closed** entry is replaced. Map occupancy is not proof of liveness: when a peer
+    /// restarts, our cached connection to it is dead, and the peer's reconnect is the only
+    /// signal we get. Keeping the dead entry made every subsequent send to that peer fail —
+    /// permanently and in one direction only — until this process itself restarted (#2504).
+    /// Replacing a connection that is already closed cannot displace a live session, so this
+    /// preserves the anti-connection-confusion property above.
     pub async fn store_incoming_connection(&self, peer_did: String, connection: quinn::Connection) {
         use std::collections::hash_map::Entry;
         let mut connections = self.connections.write().await;
         match connections.entry(peer_did) {
+            Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
+                info!(
+                    "Replacing closed connection for {} with incoming connection from {}",
+                    entry.key(),
+                    connection.remote_address()
+                );
+                entry.insert(connection);
+            }
             Entry::Occupied(entry) => {
                 info!("Connection already exists for {}, not overwriting with incoming connection from {}",
                       entry.key(), connection.remote_address());
@@ -787,5 +816,146 @@ mod tests {
         // Cleanup
         client_manager.stop().await.unwrap();
         server_manager.stop().await.unwrap();
+    }
+
+    /// Start a manager on an ephemeral loopback port and return it with its bound address.
+    async fn start_manager() -> (SessionManager, SocketAddr) {
+        let mut manager = SessionManager::new();
+        let identity = icn_identity::IdentityBundle::generate().unwrap();
+        manager
+            .start(&identity, "127.0.0.1:0".parse().unwrap(), None, None)
+            .await
+            .unwrap();
+        let addr = manager
+            .endpoint
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .local_addr()
+            .unwrap();
+        (manager, addr)
+    }
+
+    /// Have `dialer` connect to `listener`, returning the connection `listener` accepted.
+    async fn connect(
+        listener: &SessionManager,
+        dialer: &SessionManager,
+        addr: SocketAddr,
+    ) -> quinn::Connection {
+        let listener_clone = listener.clone_for_test();
+        let accept_task = tokio::spawn(async move { listener_clone.accept().await });
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        dialer.dial(addr, "listener".to_string()).await.unwrap();
+        accept_task.await.unwrap().unwrap().unwrap()
+    }
+
+    /// Whether `manager` can actually open a stream on the connection it holds for `peer_did`.
+    ///
+    /// This is the property that matters operationally: `send_message_to_peer` resolves peers by
+    /// DID lookup into this map and then calls `open_bi()`, so a dead entry means every send fails.
+    async fn can_reach(manager: &SessionManager, peer_did: &str) -> bool {
+        let Some((_, conn)) = manager
+            .connections()
+            .await
+            .into_iter()
+            .find(|(did, _)| did == peer_did)
+        else {
+            return false;
+        };
+        conn.open_bi().await.is_ok()
+    }
+
+    /// Regression test for #2504.
+    ///
+    /// When a peer restarts, the surviving node holds a dead `quinn::Connection` for that peer's
+    /// DID. The restarted peer reconnects with the same DID, but `store_incoming_connection`
+    /// treated map occupancy as proof of liveness and discarded the live connection — so every
+    /// subsequent send to that peer failed, permanently and one-way, until the survivor itself
+    /// restarted.
+    #[tokio::test]
+    async fn test_reconnect_after_peer_restart_replaces_dead_connection() {
+        setup();
+
+        let (survivor, survivor_addr) = start_manager().await;
+        let peer_did = "did:icn:zRestartingPeer".to_string();
+
+        // --- peer's first incarnation connects and is registered ---
+        let (mut peer_v1, _) = start_manager().await;
+        let inbound_v1 = connect(&survivor, &peer_v1, survivor_addr).await;
+        let v1_probe = inbound_v1.clone();
+        survivor
+            .store_incoming_connection(peer_did.clone(), inbound_v1)
+            .await;
+        assert!(
+            can_reach(&survivor, &peer_did).await,
+            "precondition: survivor should reach the peer's first incarnation"
+        );
+
+        // --- the peer restarts: its process goes away ---
+        peer_v1.stop().await.unwrap();
+        tokio::time::timeout(tokio::time::Duration::from_secs(5), v1_probe.closed())
+            .await
+            .expect("survivor's connection to the peer should observe closure");
+        assert!(
+            !can_reach(&survivor, &peer_did).await,
+            "precondition: the survivor's cached connection is now dead"
+        );
+
+        // --- the peer comes back with the SAME DID and reconnects ---
+        let (mut peer_v2, _) = start_manager().await;
+        let inbound_v2 = connect(&survivor, &peer_v2, survivor_addr).await;
+        survivor
+            .store_incoming_connection(peer_did.clone(), inbound_v2)
+            .await;
+
+        // The regression: the survivor must be able to send to the peer again, without
+        // restarting the survivor and without operator intervention.
+        assert!(
+            can_reach(&survivor, &peer_did).await,
+            "#2504: survivor still holds the dead connection after the peer reconnected, \
+             so every send to it will fail until the survivor restarts"
+        );
+
+        peer_v2.stop().await.unwrap();
+    }
+
+    /// A *live* connection must still win over a duplicate inbound one.
+    ///
+    /// This is the anti-connection-confusion property the original code was protecting; the
+    /// #2504 fix must not trade it away to make reconnection work.
+    #[tokio::test]
+    async fn test_live_connection_is_not_replaced_by_duplicate_inbound() {
+        setup();
+
+        let (survivor, survivor_addr) = start_manager().await;
+        let peer_did = "did:icn:zChattyPeer".to_string();
+
+        let (mut peer, _) = start_manager().await;
+        let first = connect(&survivor, &peer, survivor_addr).await;
+        let first_id = first.stable_id();
+        survivor
+            .store_incoming_connection(peer_did.clone(), first)
+            .await;
+
+        // A second, concurrent inbound connection from the same peer must not evict the first.
+        let second = connect(&survivor, &peer, survivor_addr).await;
+        survivor
+            .store_incoming_connection(peer_did.clone(), second)
+            .await;
+
+        let held = survivor
+            .connections()
+            .await
+            .into_iter()
+            .find(|(did, _)| *did == peer_did)
+            .map(|(_, c)| c.stable_id());
+        assert_eq!(
+            held,
+            Some(first_id),
+            "a live connection must not be displaced by a duplicate inbound connection"
+        );
+
+        peer.stop().await.unwrap();
     }
 }
