@@ -15,7 +15,6 @@ use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
 use anyhow::Context;
 use anyhow::Result;
 use icn_identity::Did;
-use std::collections::hash_map::Entry;
 use tracing::{debug, info, warn};
 
 impl ConnectionContext {
@@ -202,26 +201,16 @@ impl ConnectionContext {
 
         // Store the incoming QUIC connection in session_manager
         {
+            // Route through the canonical installer so the replace-if-closed rule cannot drift
+            // between this path and `SessionManager::store_incoming_connection` (#2504). The
+            // DID-TLS binding above has already been verified, so `from` is authenticated here.
             let connections_arc = self.session_manager.read().await.connections_arc();
-            let peer_did = from.to_string();
-            let mut connections = connections_arc.write().await;
-            match connections.entry(peer_did) {
-                Entry::Occupied(entry) => {
-                    info!(
-                        "Connection already exists for {}, not overwriting with incoming connection from {}",
-                        entry.key(),
-                        connection.remote_address()
-                    );
-                }
-                Entry::Vacant(entry) => {
-                    info!(
-                        "Storing incoming connection from {} at {}",
-                        entry.key(),
-                        connection.remote_address()
-                    );
-                    entry.insert(connection.clone());
-                }
-            }
+            crate::session::install_incoming_connection(
+                &connections_arc,
+                from.to_string(),
+                connection.clone(),
+            )
+            .await;
         }
 
         // Add peer to neighbor sets if topology is enabled

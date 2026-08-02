@@ -381,30 +381,7 @@ impl SessionManager {
     /// Replacing a connection that is already closed cannot displace a live session, so this
     /// preserves the anti-connection-confusion property above.
     pub async fn store_incoming_connection(&self, peer_did: String, connection: quinn::Connection) {
-        use std::collections::hash_map::Entry;
-        let mut connections = self.connections.write().await;
-        match connections.entry(peer_did) {
-            Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
-                info!(
-                    "Replacing closed connection for {} with incoming connection from {}",
-                    entry.key(),
-                    connection.remote_address()
-                );
-                entry.insert(connection);
-            }
-            Entry::Occupied(entry) => {
-                info!("Connection already exists for {}, not overwriting with incoming connection from {}",
-                      entry.key(), connection.remote_address());
-            }
-            Entry::Vacant(entry) => {
-                info!(
-                    "Storing incoming connection from {} at {}",
-                    entry.key(),
-                    connection.remote_address()
-                );
-                entry.insert(connection);
-            }
-        }
+        install_incoming_connection(&self.connections, peer_did, connection).await;
     }
 
     /// Get all active connections
@@ -735,6 +712,62 @@ fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
     None
 }
 
+/// Install an inbound connection for `peer_did`, replacing an entry that is already closed.
+///
+/// This is the single decision point for inbound connection installation. Both the
+/// `SessionManager::store_incoming_connection` helper and the Hello handler (which holds the
+/// connection map directly via `connections_arc`) route through here, so the replacement rule
+/// cannot drift between the two paths.
+///
+/// The rule is:
+///
+/// * a **live** existing connection wins — a duplicate inbound connection never displaces it,
+///   which is the anti-connection-confusion property;
+/// * a **closed** existing connection is treated as absent and replaced.
+///
+/// Map occupancy is not proof of liveness. When a peer restarts, our cached connection to it is
+/// dead and the peer's reconnect is the only signal we get; keeping the dead entry made every
+/// subsequent send to that peer fail — permanently, and in one direction only — until this
+/// process itself restarted (#2504). Replacing an already-closed connection cannot displace a
+/// live session, so recovery is bought without weakening duplicate suppression.
+///
+/// Callers must have authenticated `peer_did` first. On the Hello path the DID-TLS binding is
+/// verified before this is reached, so a remote cannot claim another node's DID to displace its
+/// entry.
+pub(crate) async fn install_incoming_connection(
+    connections: &Arc<RwLock<HashMap<String, quinn::Connection>>>,
+    peer_did: String,
+    connection: quinn::Connection,
+) {
+    use std::collections::hash_map::Entry;
+    let mut connections = connections.write().await;
+    match connections.entry(peer_did) {
+        Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
+            info!(
+                "Replacing closed connection for {} with incoming connection from {}",
+                entry.key(),
+                connection.remote_address()
+            );
+            entry.insert(connection);
+        }
+        Entry::Occupied(entry) => {
+            info!(
+                "Connection already exists for {}, not overwriting with incoming connection from {}",
+                entry.key(),
+                connection.remote_address()
+            );
+        }
+        Entry::Vacant(entry) => {
+            info!(
+                "Storing incoming connection from {} at {}",
+                entry.key(),
+                connection.remote_address()
+            );
+            entry.insert(connection);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,7 +910,7 @@ mod tests {
     async fn test_reconnect_after_peer_restart_replaces_dead_connection() {
         setup();
 
-        let (survivor, survivor_addr) = start_manager().await;
+        let (mut survivor, survivor_addr) = start_manager().await;
         let peer_did = "did:icn:zRestartingPeer".to_string();
 
         // --- peer's first incarnation connects and is registered ---
@@ -918,6 +951,7 @@ mod tests {
         );
 
         peer_v2.stop().await.unwrap();
+        survivor.stop().await.unwrap();
     }
 
     /// A *live* connection must still win over a duplicate inbound one.
@@ -928,7 +962,7 @@ mod tests {
     async fn test_live_connection_is_not_replaced_by_duplicate_inbound() {
         setup();
 
-        let (survivor, survivor_addr) = start_manager().await;
+        let (mut survivor, survivor_addr) = start_manager().await;
         let peer_did = "did:icn:zChattyPeer".to_string();
 
         let (mut peer, _) = start_manager().await;
@@ -957,5 +991,42 @@ mod tests {
         );
 
         peer.stop().await.unwrap();
+        survivor.stop().await.unwrap();
+    }
+
+    /// The Hello handler does not call `store_incoming_connection`; it holds the connection map
+    /// directly via `connections_arc()`. That is the path a real peer's reconnect takes, so it
+    /// gets its own coverage against the same invariant — a fix that only reached the helper
+    /// would have left production untouched (#2504).
+    #[tokio::test]
+    async fn test_hello_path_install_replaces_dead_connection() {
+        setup();
+
+        let (mut survivor, survivor_addr) = start_manager().await;
+        let peer_did = "did:icn:zHelloPathPeer".to_string();
+        let map = survivor.connections_arc();
+
+        let (mut peer_v1, _) = start_manager().await;
+        let inbound_v1 = connect(&survivor, &peer_v1, survivor_addr).await;
+        let v1_probe = inbound_v1.clone();
+        install_incoming_connection(&map, peer_did.clone(), inbound_v1).await;
+        assert!(can_reach(&survivor, &peer_did).await);
+
+        peer_v1.stop().await.unwrap();
+        tokio::time::timeout(tokio::time::Duration::from_secs(5), v1_probe.closed())
+            .await
+            .expect("cached connection should observe closure");
+
+        let (mut peer_v2, _) = start_manager().await;
+        let inbound_v2 = connect(&survivor, &peer_v2, survivor_addr).await;
+        install_incoming_connection(&map, peer_did.clone(), inbound_v2).await;
+
+        assert!(
+            can_reach(&survivor, &peer_did).await,
+            "#2504: the Hello-handler install path must also replace a dead cached connection"
+        );
+
+        peer_v2.stop().await.unwrap();
+        survivor.stop().await.unwrap();
     }
 }
