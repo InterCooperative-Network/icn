@@ -332,6 +332,12 @@ struct SequenceWindow {
 /// this binary has no name for. Waiting does not make an unknown meaning knowable,
 /// so there is deliberately nothing here that can expire: the safety property is
 /// structural rather than a matter of choosing a large enough constant.
+///
+/// `Copy` is derived deliberately: `check_replay_only` matches this out of a
+/// `&mut SequenceWindow` and then clears it, which is only sound while every field
+/// is `Copy`. Adding a non-`Copy` field is therefore a compile error at the derive
+/// rather than a silent change in how that match borrows.
+#[derive(Clone, Copy)]
 enum PeerHold {
     /// Durable state exists but could not be read, so no sequence can be proven
     /// new (#2514). Bounded by the envelope validity horizon.
@@ -646,6 +652,9 @@ impl ReplayGuard {
         // The unsupported-version arm has no expiry to reach. It is matched first
         // and returns unconditionally, so no reordering of this block can
         // accidentally give it one.
+        // One arm per variant: binding `until` and `from_version` together in a
+        // single pattern is what lets the expiry path be written once per hold kind
+        // without re-matching to recover the fields.
         match window.hold {
             Some(PeerHold::UnsupportedVersion { found_version }) => {
                 return Err(anyhow::Error::new(ReplayStateUnsupportedVersion {
@@ -655,28 +664,32 @@ impl ReplayGuard {
                     current_version: REPLAY_STATE_SEMANTIC_VERSION,
                 }));
             }
-            Some(PeerHold::Unreadable { until })
-            | Some(PeerHold::MigratingFromLegacy { until, .. }) => {
+
+            Some(PeerHold::Unreadable { until }) => {
                 let now = Instant::now();
                 if now <= until {
-                    let remaining_secs = until.duration_since(now).as_secs();
-                    let peer = envelope.from.as_str().to_string();
-                    return Err(match window.hold {
-                        Some(PeerHold::MigratingFromLegacy { from_version, .. }) => {
-                            anyhow::Error::new(ReplayStateLegacy {
-                                peer,
-                                sequence: envelope.sequence,
-                                found_version: from_version,
-                                current_version: REPLAY_STATE_SEMANTIC_VERSION,
-                                remaining_secs,
-                            })
-                        }
-                        _ => anyhow::Error::new(ReplayStateUnreadable {
-                            peer,
-                            sequence: envelope.sequence,
-                            remaining_secs,
-                        }),
-                    });
+                    return Err(anyhow::Error::new(ReplayStateUnreadable {
+                        peer: envelope.from.as_str().to_string(),
+                        sequence: envelope.sequence,
+                        remaining_secs: until.duration_since(now).as_secs(),
+                    }));
+                }
+                window.hold = None;
+            }
+
+            Some(PeerHold::MigratingFromLegacy {
+                until,
+                from_version,
+            }) => {
+                let now = Instant::now();
+                if now <= until {
+                    return Err(anyhow::Error::new(ReplayStateLegacy {
+                        peer: envelope.from.as_str().to_string(),
+                        sequence: envelope.sequence,
+                        found_version: from_version,
+                        current_version: REPLAY_STATE_SEMANTIC_VERSION,
+                        remaining_secs: until.duration_since(now).as_secs(),
+                    }));
                 }
 
                 // The hold has expired. Nothing written under the old regime can
@@ -685,16 +698,15 @@ impl ReplayGuard {
                 // Clearing the hold is what makes the migration one-way: the next
                 // accept persists a current-version entry, and subsequent restarts
                 // take the ordinary #2514 exact-restore path.
-                if let Some(PeerHold::MigratingFromLegacy { from_version, .. }) = window.hold {
-                    tracing::info!(
-                        peer = %envelope.from,
-                        from_version,
-                        to_version = REPLAY_STATE_SEMANTIC_VERSION,
-                        "Replay state migration complete; peer state is now current-semantic"
-                    );
-                }
+                tracing::info!(
+                    peer = %envelope.from,
+                    from_version,
+                    to_version = REPLAY_STATE_SEMANTIC_VERSION,
+                    "Replay state migration complete; peer state is now current-semantic"
+                );
                 window.hold = None;
             }
+
             None => {}
         }
 
@@ -3146,6 +3158,72 @@ mod migration_tests {
             guard.sequences.get(sender.did()).unwrap().floor_seq,
             0,
             "the downgraded value became a floor"
+        );
+    }
+
+    /// **The missing mixed-version case (#2517 follow-up).**
+    ///
+    /// `semantic_version` on a persisted entry describes the *receiver* that wrote it.
+    /// But what `max_seq` means depends on two regimes, not one: the receiver's replay
+    /// semantics **and the sender's sequence semantics**. A current receiver that
+    /// accepts traffic from a still-legacy ephemeral sender writes an entry stamped
+    /// `CURRENT` whose number belongs to the legacy sequence namespace.
+    ///
+    /// When that sender later upgrades and its durable counter starts far below the
+    /// recorded high-water, the receiver exact-restores a value it believes is current
+    /// and rejects legitimate traffic. #2517 returns, now mislabelled as current — and
+    /// the migration cannot fire, because nothing looks legacy any more.
+    ///
+    /// This is the test that decides whether "no upgrade order is required" is true.
+    #[test]
+    fn sender_upgrading_after_the_receiver_does_not_recreate_2517() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // A holds legacy state for B and migrates it correctly.
+        write_legacy_max_seq(&store, sender.did(), 100);
+        {
+            let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(
+                guard.check(&envelope(&sender, 500)).is_err(),
+                "expected hold"
+            );
+            std::thread::sleep(Duration::from_millis(2_100));
+
+            // B has NOT upgraded. It is still an ephemeral sender, and its
+            // process-local counter happens to be up around 500 after long uptime.
+            // A accepts this perfectly ordinary legacy-regime traffic.
+            for seq in 500..=510 {
+                assert!(
+                    guard.check(&envelope(&sender, seq)).is_ok(),
+                    "post-migration receiver rejected legitimate legacy-sender traffic"
+                );
+            }
+        }
+
+        // What did A persist? A number from the *legacy* sequence namespace, stamped
+        // with the current receiver regime.
+        let raw = store
+            .get(&ReplayGuard::make_max_seq_key(sender.did()))
+            .unwrap()
+            .expect("entry must exist");
+        let on_disk: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+        assert_eq!(on_disk["max_seq"].as_u64().unwrap(), 510);
+
+        // Now B restarts onto the durable sender implementation. Its fresh durable
+        // counter begins at FIRST_SEQUENCE = 1 — far below the 510 A recorded from
+        // B's previous, ephemeral incarnation.
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let result = guard.check(&envelope(&sender, 1));
+        assert!(
+            result.is_ok(),
+            "#2517 recreated: the receiver rejected the sender's first durable sequence \
+             because it had previously recorded a high-water from that sender's legacy \
+             ephemeral incarnation and labelled it current-semantic. error: {:?}",
+            result.map(|_| ()).unwrap_err().to_string()
         );
     }
 
