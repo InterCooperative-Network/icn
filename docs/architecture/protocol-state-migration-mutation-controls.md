@@ -54,3 +54,46 @@ of that.
 The general hazard: a mutation applied by text substitution can stop applying when the code is
 restructured, and reports success either way. A mutation that kills *fewer* tests than it did before
 is the signal, which is why the counts above are recorded rather than just the pass/fail.
+
+## Sender sequence regime (§§8–11 of the invariants)
+
+The second axis. Each defect below is applied alone to the merged branch, the suite is run, and the
+files are restored. **8 of 8 killed.**
+
+| # | defect introduced | outcome | tests killed |
+|---|---|---|---|
+| M1 | a missing `DURABLE_SIGNING_SEQUENCE` capability resolves to `DurableV1` | KILLED | `missing_durable_capability_resolves_to_unproven_not_durable`, `test_replay_attack_rejected`, `test_multiple_senders_independent`, `test_out_of_order_messages_forwarded` |
+| M2 | an accepted sequence is stamped `DurableV1` regardless of the window's established regime | KILLED | `legacy_sender_traffic_is_never_recorded_as_durable_v1`, `a_sender_that_stays_legacy_keeps_working_and_stays_tagged_legacy`, `cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed`, `crash_before_the_transition_marker_resumes_from_legacy_state` |
+| M3 | `LegacyOrUnproven → DurableV1` establishes directly, skipping the retirement hold | KILLED | `receiver_first_upgrade_migrates_the_sender_regime_end_to_end`, `a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace`, `established_regime_survives_replay_state_cleanup`, `re_entering_the_transition_is_idempotent_and_does_not_reset_the_hold` |
+| M4 | promotion no longer requires current authenticated `DurableV1` evidence | KILLED | `transition_does_not_promote_when_the_peer_returns_without_the_capability` |
+| M5 | a downgrade resets the peer to unproven and clears its high-water | KILLED | `a_stale_legacy_connection_cannot_downgrade_established_durable_state`, `receiver_first_upgrade_migrates_the_sender_regime_end_to_end` |
+| M6 | the transition is not written to the durable provenance record | KILLED | `the_transition_is_recorded_in_the_durable_provenance_record` |
+| M7 | an unrecognised provenance value is read as `LegacyOrUnproven` | KILLED | `unknown_provenance_value_fails_closed_and_never_expires` |
+| M8 | the Hello current-certificate check is removed, so capabilities are not bound to the connection | KILLED | `forged_hello_does_not_corrupt_established_peer_state`, `hello_replayed_onto_a_different_current_cert_is_rejected`, `weak_binding_verifier_is_confined_to_authorised_sites` |
+| — | control: all mutations reverted | — | none — 391 pass, 0 fail |
+
+### Three of these survived the first pass, and that is the useful part
+
+Recorded because the survivals located real gaps rather than proving the mutations wrong.
+
+**M1 survived** because every `ReplayGuard` unit test supplies the sender regime as a parameter, so
+none of them exercised the one place that *derives* it from `peer_capabilities`. The single point
+where a missing capability could be read as durable had no coverage at all. Closed by
+`missing_durable_capability_resolves_to_unproven_not_durable` and its positive twin — the twin
+matters, because without it the negative test would pass on a build that hardcoded
+`LegacyOrUnproven` and never read capabilities.
+
+**M7 survived** because the unknown-regime test wrote its unrecognised value into the *high-water
+entry*, which has its own catch-all. The provenance load path was untested. Closed by
+`unknown_provenance_value_fails_closed_and_never_expires`, plus
+`corrupt_provenance_quarantines_rather_than_reading_as_absent` for the adjacent case — an unreadable
+record must not be read as an absent one, since absent is permissive enough to establish a fresh
+durable namespace after a hold.
+
+**M6 survived twice.** The transition is recorded in two places, so removing either left a restart
+still entering a 600-second hold — and a *fresh* hold is behaviourally identical to a *resumed* one.
+The first replacement test asserted "restarting holds" and so passed with the provenance write
+deleted entirely. The property is only pinnable structurally: assert the record exists. The
+redundancy is deliberate — the high-water entry is the one `cleanup()` deletes — but redundancy is
+exactly what makes a behavioural mutation control vacuous, and that is worth remembering the next
+time two records carry the same fact.
