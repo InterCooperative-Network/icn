@@ -42,18 +42,63 @@ impl ConnectionContext {
         ml_kem_public: Option<Vec<u8>>,
         pq_binding_proof: Option<PqBindingProof>,
     ) -> Result<()> {
-        // Verify DID-TLS binding using TOFU model
+        // Bind the claimed DID to *this* connection, before anything derived from `from`
+        // is stored. Three facts together are what make `from` authenticated here, and
+        // all three are required:
+        //
+        //   1. the binding names the DID that sent this Hello  (`did == from`)
+        //   2. that DID's key signed the binding               (Ed25519 over the hash)
+        //   3. the hash is of the certificate this connection is actually using
+        //
+        // (1) and (2) alone only prove the DID authenticated *some* certificate at some
+        // point. Every node publishes its own BindingInfo in every Hello, so that pair is
+        // replayable by anyone who has ever exchanged a Hello with the peer. (3) is what
+        // ties the claim to the live TLS session and makes replay useless.
+        //
+        // Deliberately no misbehavior scoring on any failure below: the party on this
+        // connection is unauthenticated, so `from` is a name it chose. Recording a
+        // violation against `from` would let an attacker degrade the reputation of any
+        // peer it wants to name. The connection is refused; the claimed DID is untouched.
+        let Some(peer_cert) = crate::tls::current_peer_certificate(connection) else {
+            warn!(
+                claimed_did = %from,
+                remote_addr = %connection.remote_address(),
+                "Rejecting Hello: connection presented no peer certificate, so the claimed \
+                 DID cannot be bound to this session"
+            );
+            icn_obs::metrics::network::hello_binding_rejected_inc("no_peer_certificate");
+            return Err(anyhow::anyhow!(
+                "DID-TLS binding verification failed: no peer certificate on this connection"
+            ));
+        };
+
+        // (1) + (2): the binding is for `from`, and `from`'s key signed it.
         if let Err(e) = icn_identity::verify_did_matches_binding(from, binding_info) {
             warn!(
-                peer_did = %from,
+                claimed_did = %from,
                 "DID-TLS binding verification failed: {e}"
             );
+            icn_obs::metrics::network::hello_binding_rejected_inc("did_or_signature_mismatch");
             return Err(anyhow::anyhow!("DID-TLS binding verification failed: {e}"));
+        }
+
+        // (3): the signed hash is of the certificate presented by THIS connection.
+        if let Err(e) = icn_identity::verify_binding_info(binding_info, &peer_cert) {
+            warn!(
+                claimed_did = %from,
+                remote_addr = %connection.remote_address(),
+                "Rejecting Hello: BindingInfo is bound to a different certificate than this \
+                 connection presents (replayed binding): {e}"
+            );
+            icn_obs::metrics::network::hello_binding_rejected_inc("current_cert_mismatch");
+            return Err(anyhow::anyhow!(
+                "DID-TLS binding verification failed: binding does not match current peer certificate"
+            ));
         }
 
         debug!(
             peer_did = %from,
-            "DID-TLS binding verified successfully"
+            "DID-TLS binding verified against current connection certificate"
         );
 
         // Verify DID-PQ binding if proof is present

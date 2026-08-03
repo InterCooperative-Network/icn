@@ -253,6 +253,23 @@ pub fn generate_self_signed_cert(
     Ok((vec![cert_der], key_der))
 }
 
+/// Extract the end-entity certificate the peer presented on *this* QUIC connection.
+///
+/// Returns `None` when the peer presented no certificate. That is a reachable state,
+/// not a theoretical one: [`create_server_config`] requests client certificates but
+/// does not require them (`client_auth_mandatory() == false`), so an inbound peer may
+/// decline to present one and still complete the handshake. Callers that use this to
+/// authenticate a claimed identity MUST treat `None` as a failure — anything else lets
+/// a peer opt out of authentication simply by omitting its certificate.
+pub fn current_peer_certificate(connection: &quinn::Connection) -> Option<CertificateDer<'static>> {
+    connection
+        .peer_identity()?
+        .downcast::<Vec<CertificateDer<'static>>>()
+        .ok()?
+        .first()
+        .cloned()
+}
+
 /// Create a rustls server configuration for QUIC with TOFU trust model
 ///
 /// This uses self-signed certificates and defers identity verification to the application

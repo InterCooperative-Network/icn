@@ -956,14 +956,24 @@ impl NetworkMessage {
 
     /// Verify DID-TLS binding if this is a Hello message
     ///
+    /// `peer_cert` must be the certificate presented by the *current* connection
+    /// (see `icn_net::tls::current_peer_certificate`); passing a stored or expected
+    /// certificate instead re-opens the replay this check exists to close.
+    ///
     /// # Arguments
-    /// * `peer_cert` - The TLS certificate received from the peer
+    /// * `peer_cert` - The TLS certificate presented by the peer on this connection
     ///
     /// # Returns
     /// * `Ok(())` if verification succeeds or if not a Hello message
     /// * `Err` if Hello message but verification fails
     pub fn verify_hello(&self, peer_cert: &rustls::pki_types::CertificateDer) -> Result<()> {
         if let MessagePayload::Hello { binding_info, .. } = &self.payload {
+            // The binding must belong to the sender. `verify_binding_info` proves the
+            // binding is internally valid and matches `peer_cert`, but says nothing about
+            // *whose* binding it is — without this check a peer could present its own
+            // valid binding while claiming another DID in `from`.
+            icn_identity::verify_did_matches_binding(&self.from, binding_info)
+                .context("DID-TLS binding verification failed")?;
             icn_identity::verify_binding_info(binding_info, peer_cert)
                 .context("DID-TLS binding verification failed")?;
         }
