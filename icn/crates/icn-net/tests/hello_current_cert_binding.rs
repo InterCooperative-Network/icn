@@ -70,7 +70,7 @@ async fn send_hello_as(
     capabilities: CapabilityFlags,
     receiver_addr: SocketAddr,
     receiver_did: &Did,
-) -> Result<()> {
+) -> Result<HelloAttempt> {
     let rustls_client = match wire_identity {
         Some(bundle) => icn_net::tls::create_tofu_client_config(
             vec![bundle.tls_cert().clone()],
@@ -93,11 +93,34 @@ async fn send_hello_as(
         quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client)?,
     )));
 
-    let connection = tokio::time::timeout(
-        Duration::from_secs(10),
-        endpoint.connect(receiver_addr, "localhost")?,
-    )
-    .await??;
+    // Establishing the connection is a precondition, not the property under test, so it
+    // is retried: several of these tests run concurrently, each with its own receiver and
+    // client endpoint, and a contended runner can lose the first dial before the
+    // receiver's accept loop is ready. Only the setup retries — no assertion below does.
+    let mut last_err = None;
+    let mut connection = None;
+    for attempt in 0..5 {
+        match tokio::time::timeout(
+            Duration::from_secs(10),
+            endpoint.connect(receiver_addr, "localhost")?,
+        )
+        .await
+        {
+            Ok(Ok(conn)) => {
+                connection = Some(conn);
+                break;
+            }
+            Ok(Err(e)) => last_err = Some(e.to_string()),
+            Err(_) => last_err = Some("connect timed out".to_string()),
+        }
+        tokio::time::sleep(Duration::from_millis(150 * (attempt + 1))).await;
+    }
+    let connection = connection.ok_or_else(|| {
+        anyhow::anyhow!(
+            "could not establish the test connection after 5 attempts: {}",
+            last_err.unwrap_or_default()
+        )
+    })?;
 
     let mut version_info = VersionInfo::new("icnd-attacker".to_string());
     version_info.capabilities = capabilities;
@@ -117,10 +140,51 @@ async fn send_hello_as(
     icn_net::protocol::write_message(&mut send, &hello).await?;
     let _ = send.finish();
 
-    // Give the receiver's dispatch loop time to process the Hello before we tear down.
-    tokio::time::sleep(Duration::from_millis(600)).await;
-    drop(connection);
-    Ok(())
+    // Return the live connection. Callers synchronise on an observable outcome rather
+    // than a fixed delay: `wait_for_peer` for an accepted Hello, `wait_until_refused`
+    // for a rejected one. A sleep here would make every negative assertion vacuous on a
+    // slow runner, since "not yet processed" and "correctly rejected" both look like an
+    // absent peer entry.
+    Ok(HelloAttempt {
+        _endpoint: endpoint,
+        connection,
+    })
+}
+
+/// Keeps the sending endpoint and connection alive for the duration of an assertion.
+struct HelloAttempt {
+    _endpoint: Endpoint,
+    connection: quinn::Connection,
+}
+
+/// Poll until the receiver has installed `did`, or the deadline passes.
+async fn wait_for_peer(
+    handle: &NetworkHandle,
+    did: &Did,
+    timeout: Duration,
+) -> Option<icn_net::actor::PeerConnectionInfo> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        if let Some(info) = handle.get_peer_connection_info(did).await {
+            return Some(info);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return None;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+/// Wait for the receiver to tear the connection down.
+///
+/// A rejected Hello makes `handle_hello` return `Err`, which ends `handle_connection` and
+/// drops the receiver's `quinn::Connection`, so the sender observes a close. That close is
+/// the barrier proving the Hello was *processed and refused* — as opposed to merely not
+/// having been looked at yet, which is what a bare sleep would leave ambiguous.
+async fn wait_until_refused(attempt: &HelloAttempt, timeout: Duration) -> bool {
+    tokio::time::timeout(timeout, attempt.connection.closed())
+        .await
+        .is_ok()
 }
 
 #[derive(Debug)]
@@ -172,7 +236,7 @@ async fn hello_with_matching_current_cert_is_accepted() -> Result<()> {
     let (handle, addr, shutdown) = spawn_receiver(receiver).await?;
 
     // Presents peer's own cert AND peer's own binding: consistent.
-    send_hello_as(
+    let _attempt = send_hello_as(
         Some(&peer),
         &peer_did,
         peer.binding_info(),
@@ -183,7 +247,7 @@ async fn hello_with_matching_current_cert_is_accepted() -> Result<()> {
     )
     .await?;
 
-    let info = handle.get_peer_connection_info(&peer_did).await;
+    let info = wait_for_peer(&handle, &peer_did, Duration::from_secs(20)).await;
     assert!(
         info.is_some(),
         "a Hello whose BindingInfo matches the current connection's certificate must be accepted"
@@ -212,7 +276,7 @@ async fn hello_replayed_onto_a_different_current_cert_is_rejected() -> Result<()
     let (handle, addr, shutdown) = spawn_receiver(receiver).await?;
 
     // Wire cert = attacker's. Claimed DID + BindingInfo = B's authentic material.
-    send_hello_as(
+    let attempt = send_hello_as(
         Some(&attacker_x),
         &victim_b_did,
         victim_b.binding_info(),
@@ -223,6 +287,11 @@ async fn hello_replayed_onto_a_different_current_cert_is_rejected() -> Result<()
     )
     .await?;
 
+    assert!(
+        wait_until_refused(&attempt, Duration::from_secs(20)).await,
+        "the receiver must refuse the connection; without observing that, an absent peer \
+         entry below would only mean the Hello had not been processed yet"
+    );
     let info = handle.get_peer_connection_info(&victim_b_did).await;
     assert!(
         info.is_none(),
@@ -249,7 +318,7 @@ async fn hello_without_any_peer_certificate_is_rejected() -> Result<()> {
 
     let (handle, addr, shutdown) = spawn_receiver(receiver).await?;
 
-    send_hello_as(
+    let attempt = send_hello_as(
         None, // no client certificate at all
         &victim_b_did,
         victim_b.binding_info(),
@@ -260,6 +329,10 @@ async fn hello_without_any_peer_certificate_is_rejected() -> Result<()> {
     )
     .await?;
 
+    assert!(
+        wait_until_refused(&attempt, Duration::from_secs(20)).await,
+        "the receiver must refuse a connection with no peer certificate"
+    );
     let info = handle.get_peer_connection_info(&victim_b_did).await;
     assert!(
         info.is_none(),
@@ -288,7 +361,7 @@ async fn hello_claiming_another_did_with_own_valid_binding_is_rejected() -> Resu
 
     // Attacker presents their own cert and their OWN internally-valid binding,
     // but claims to be B.
-    send_hello_as(
+    let attempt = send_hello_as(
         Some(&attacker_x),
         &victim_b_did,
         attacker_x.binding_info(),
@@ -299,6 +372,10 @@ async fn hello_claiming_another_did_with_own_valid_binding_is_rejected() -> Resu
     )
     .await?;
 
+    assert!(
+        wait_until_refused(&attempt, Duration::from_secs(20)).await,
+        "the receiver must refuse a Hello whose binding belongs to a different DID"
+    );
     assert!(
         handle
             .get_peer_connection_info(&victim_b_did)
@@ -325,7 +402,7 @@ async fn hello_with_tampered_binding_signature_is_rejected() -> Result<()> {
     let mut binding = peer.binding_info();
     binding.tls_binding_sig[0] ^= 0xff;
 
-    send_hello_as(
+    let attempt = send_hello_as(
         Some(&peer),
         &peer_did,
         binding,
@@ -336,6 +413,10 @@ async fn hello_with_tampered_binding_signature_is_rejected() -> Result<()> {
     )
     .await?;
 
+    assert!(
+        wait_until_refused(&attempt, Duration::from_secs(20)).await,
+        "the receiver must refuse a Hello with a tampered binding signature"
+    );
     assert!(
         handle.get_peer_connection_info(&peer_did).await.is_none(),
         "tampered binding signature must be rejected"
@@ -362,7 +443,7 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     let (handle, addr, shutdown) = spawn_receiver(receiver).await?;
 
     // 1. B establishes itself legitimately.
-    send_hello_as(
+    let _legit = send_hello_as(
         Some(&victim_b),
         &victim_b_did,
         victim_b.binding_info(),
@@ -373,8 +454,7 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     )
     .await?;
 
-    let before = handle
-        .get_peer_connection_info(&victim_b_did)
+    let before = wait_for_peer(&handle, &victim_b_did, Duration::from_secs(20))
         .await
         .expect("B must be established by its legitimate Hello");
     assert_eq!(
@@ -384,7 +464,7 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     );
 
     // 2. Attacker replays B's binding on their own cert, with a substituted key.
-    send_hello_as(
+    let forged = send_hello_as(
         Some(&attacker_x),
         &victim_b_did,
         victim_b.binding_info(),
@@ -395,6 +475,10 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     )
     .await?;
 
+    assert!(
+        wait_until_refused(&forged, Duration::from_secs(20)).await,
+        "the forged connection must be refused"
+    );
     let after = handle
         .get_peer_connection_info(&victim_b_did)
         .await
