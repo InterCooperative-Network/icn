@@ -86,6 +86,11 @@ pub fn init_descriptions() {
         "icn_network_version_negotiation_success_total",
         "Total number of successful version negotiations"
     );
+    describe_counter!(
+        "icn_network_hello_binding_rejected_total",
+        "Total number of Hello messages refused because the claimed DID could not be bound \
+         to the current connection's certificate, by coarse reason (never labelled by DID)"
+    );
     describe_gauge!(
         "icn_network_replay_guard_peers",
         "Number of peers tracked in replay guard"
