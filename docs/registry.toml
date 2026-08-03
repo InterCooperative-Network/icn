@@ -860,6 +860,34 @@ depends_on = ["docs/architecture/restart-rejoin-investigation-2504.md"]
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/protocol-state-migration-mutation-controls.md"]
+category = "architecture"
+status = "living"
+truth_class = "descriptive"
+title = "Mutation Controls for the #2517 Migration Tests"
+description = "Records which deliberate defect each #2517 migration test actually catches, so a change that makes one vacuous shows up as a gap rather than a still-green suite. Includes the security control proving the fail-closed hold is load-bearing, the two downgrade-safety controls that show known-legacy and unknown-future are discriminated rather than merely both rejected, and a recorded instance of a text-substitution mutation silently becoming a no-op after the code was restructured."
+last_updated = "2026-08-03"
+last_reviewed = "2026-08-03"
+owner = "matt"
+audiences = ["architects", "developers"]
+depends_on = ["docs/architecture/protocol-state-migration-invariants.md"]
+recommended_action = "keep"
+freshness = "current"
+
+[docs."docs/architecture/protocol-state-migration-invariants.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "Protocol State Migration Invariants"
+description = "Invariants for changing the semantics of persisted protocol-security state (#2517). Distinguishes schema version (can this binary parse the bytes) from semantic version (can it believe them), and shows why a value that parses perfectly can still be meaningless. States that automatic migration is permitted only where an explicit migration from the identified source regime exists, and that unknown semantic versions fail closed with no deadline because time passing cannot make unknown state semantics safe to reinterpret. Records that the sender-side and receiver-side symptoms are one defect, fixed receiver-side; why local recovery, peer-assisted high-water discovery, a large constant offset, and explicit sequence epochs were each rejected; the bounded legacy-migration hold set by the envelope freshness horizon rather than by peer-window expiry; crash-safety and one-way idempotence; the mixed-version matrix including rollback under a newer store; and the explicit bound that a node still running legacy code cannot be reached by any shipped fix."
+last_updated = "2026-08-03"
+last_reviewed = "2026-08-03"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+depends_on = ["docs/architecture/replay-state-restart-invariants.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/network-identity-self-exclusion.md"]
 category = "architecture"
 status = "living"

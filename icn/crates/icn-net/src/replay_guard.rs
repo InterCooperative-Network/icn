@@ -97,6 +97,22 @@ const MAX_SEQ_PREFIX: &[u8] = b"replay_max_seq:";
 /// Key prefix for finalized sequence storage
 const FINALIZED_PREFIX: &[u8] = b"replay_finalized:";
 
+/// Semantic regime this binary writes and can interpret (#2517).
+///
+/// Bump this only when the *meaning* of a persisted field changes in a way a
+/// previous version would misread — not when a field is merely added. Every bump
+/// needs a corresponding arm in `load_persisted_state`, or the entry falls into the
+/// unknown-version branch and is fail-closed, which is the safe default but a poor
+/// migration.
+const REPLAY_STATE_SEMANTIC_VERSION: u32 = 1;
+
+/// The regime of any entry written before the version field existed.
+///
+/// Not a real version number that anything ever wrote: it is the `serde` default
+/// that an absent key deserializes to, which is exactly what makes legacy entries
+/// detectable without a schema change.
+const LEGACY_REPLAY_STATE_SEMANTIC_VERSION: u32 = 0;
+
 /// The replay high-water could not be made durable, so the message was not
 /// accepted.
 ///
@@ -135,13 +151,100 @@ pub struct ReplayStateUnreadable {
     pub remaining_secs: u64,
 }
 
+/// This receiver's durable replay state for the peer was written under an obsolete
+/// sequence/replay semantic regime, so its high-water cannot be trusted as a
+/// current-semantic bound. The peer is refused until nothing written under that
+/// regime could still be fresh (#2517).
+///
+/// Like [`ReplayStateUnreadable`], this is a **local** state-migration event, not
+/// peer misbehaviour: the peer is sending perfectly legitimate traffic and we are
+/// the ones holding a number we can no longer interpret. Callers must not score it
+/// against the sender's reputation — doing so is precisely the false-positive that
+/// produced thousands of severity-1.0 events and bans against legitimate traffic on
+/// the rehearsal federation.
+///
+/// Distinct from `ReplayStateUnreadable` so that a planned one-time migration is
+/// legible in logs and metrics as a migration, rather than indistinguishable from
+/// disk corruption.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "replay state for {peer} was written under semantic regime {found_version} \
+     (current is {current_version}); rejecting sequence {sequence} for {remaining_secs}s \
+     until no envelope from the old regime can still be fresh"
+)]
+pub struct ReplayStateLegacy {
+    /// The peer whose durable replay state predates the current regime.
+    pub peer: String,
+    /// The sequence number rejected while the migration completes.
+    pub sequence: u64,
+    /// The semantic regime the stored entry was written under.
+    pub found_version: u32,
+    /// The semantic regime this binary interprets.
+    pub current_version: u32,
+    /// Seconds remaining before the migration completes.
+    pub remaining_secs: u64,
+}
+
+/// This receiver's durable replay state for the peer was written under a semantic
+/// regime this binary has no migration for, so its meaning cannot be established at
+/// all. The peer is refused **indefinitely** (#2517).
+///
+/// Almost always: this node was rolled back onto a binary older than the one that
+/// wrote its store. It is not a countdown and will not clear itself — an operator
+/// must upgrade the binary or explicitly repair the state.
+///
+/// Distinct from [`ReplayStateLegacy`], which is the opposite situation: there the
+/// old meaning is known exactly, which is what licenses a bounded migration. Here
+/// nothing is known, and elapsed time cannot make an unknown regime interpretable.
+///
+/// Like the other state faults this is a **local** condition, not peer
+/// misbehaviour, and callers must not score it against the sender's reputation.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "replay state for {peer} was written under semantic regime {found_version}, which \
+     this binary (regime {current_version}) has no migration for; refusing {sequence} \
+     and all further traffic from this peer until the binary is upgraded or the state \
+     is repaired — this will not clear on its own"
+)]
+pub struct ReplayStateUnsupportedVersion {
+    /// The peer whose durable replay state cannot be interpreted.
+    pub peer: String,
+    /// The sequence number refused.
+    pub sequence: u64,
+    /// The semantic regime the stored entry claims.
+    pub found_version: u32,
+    /// The semantic regime this binary implements.
+    pub current_version: u32,
+}
+
 /// Persisted max sequence entry
+///
+/// # Semantics are versioned, not just the schema (#2517)
+///
+/// The schema has never changed: `max_seq` has always been a `u64` and always
+/// parsed. What changed is what the number *means*. Under the pre-#2510 regime the
+/// sender's signing sequence was a process-local `AtomicU64` that restarted from
+/// zero, so a peer's recorded high-water belonged to an incarnation that no longer
+/// exists. Under the pre-#2514 regime a restart inflated the stored value by a
+/// fixed gap. Both wrote entries that parse perfectly today and are still wrong.
+///
+/// `semantic_version` records which regime produced the entry. It is
+/// `#[serde(default)]`, so an entry written before this field existed reads back as
+/// [`LEGACY_REPLAY_STATE_SEMANTIC_VERSION`] — the absence of the key *is* the
+/// signal. Old binaries ignore the extra key, so the change is safe in both
+/// directions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MaxSeqEntry {
     /// Maximum sequence seen from this peer
     max_seq: u64,
     /// Timestamp of last update (for debugging/audit)
     updated_at_ms: u64,
+    /// Which sequence/replay semantic regime produced `max_seq`.
+    ///
+    /// Absent in entries written before #2517; see the type docs for why that
+    /// absence is load-bearing rather than incidental.
+    #[serde(default)]
+    semantic_version: u32,
 }
 
 /// Persisted finalized sequence entry
@@ -207,19 +310,50 @@ struct SequenceWindow {
     /// Last time we saw a message from this peer
     last_update: Instant,
 
-    /// Reject everything from this peer until this receiver-local instant.
+    /// Why this peer is currently refused, if it is.
     ///
-    /// Used only when durable replay state for a peer exists but cannot be read,
-    /// so the high-water is unknown and no sequence can be proven new. The
-    /// quarantine runs for the signed-message validity bound, after which any
-    /// envelope captured before the restart is too old to replay and normal
-    /// service resumes.
+    /// All variants are **local** conditions — our own state is unusable — never
+    /// peer misbehaviour. See [`PeerHold`] for why one of them has no deadline.
+    hold: Option<PeerHold>,
+}
+
+/// Why a peer's traffic is being refused because of *our* replay state.
+///
+/// # Two of these expire and one does not
+///
+/// The bounded variants are bounded because we know precisely what the state we
+/// are refusing to use meant, and can therefore reason about how long anything
+/// produced under it stays dangerous. Once no envelope from that regime can pass
+/// `verify_age`, discarding the state is safe and service resumes.
+///
+/// [`PeerHold::UnsupportedVersion`] carries no deadline, and that is the point.
+/// State written by a regime this binary has no migration for might have changed
+/// sequence interpretation, window semantics, freshness assumptions, or something
+/// this binary has no name for. Waiting does not make an unknown meaning knowable,
+/// so there is deliberately nothing here that can expire: the safety property is
+/// structural rather than a matter of choosing a large enough constant.
+enum PeerHold {
+    /// Durable state exists but could not be read, so no sequence can be proven
+    /// new (#2514). Bounded by the envelope validity horizon.
     ///
     /// This is a *receiver-local elapsed duration* on the monotonic clock. It
     /// deliberately does not compare a sender-supplied timestamp against a
     /// receiver-side instant: those are different clock domains and, under the
     /// skew ICN tolerates, cannot order events across machines.
-    quarantined_until: Option<Instant>,
+    Unreadable { until: Instant },
+
+    /// State was written under a known obsolete regime for which this binary has
+    /// an explicit migration (#2517). Bounded by the same horizon, after which the
+    /// legacy value is retired and current-semantic state is rebuilt from live
+    /// traffic.
+    MigratingFromLegacy { until: Instant, from_version: u32 },
+
+    /// State was written under a regime this binary has no migration for —
+    /// typically a rollback under a store a newer binary wrote. **No deadline.**
+    ///
+    /// Resolving this needs an operator: upgrade the binary, or explicitly repair
+    /// the state. It must never resolve itself by elapsed time.
+    UnsupportedVersion { found_version: u32 },
 }
 
 impl ReplayGuard {
@@ -311,7 +445,9 @@ impl ReplayGuard {
                         .sequences
                         .entry(did.clone())
                         .or_insert_with(SequenceWindow::new);
-                    window.quarantined_until = Some(quarantine_until);
+                    window.hold = Some(PeerHold::Unreadable {
+                        until: quarantine_until,
+                    });
                     tracing::error!(
                         peer = %did,
                         error = %e,
@@ -326,23 +462,83 @@ impl ReplayGuard {
                         .entry(did.clone())
                         .or_insert_with(SequenceWindow::new);
 
-                    // The floor is the durable high-water, which — because the
-                    // high-water is flushed before acceptance is returned — is
-                    // exactly the highest sequence ever accepted. Everything
-                    // accepted before the crash is at or below it and the
-                    // sender's next emission is above it, so this rejects all of
-                    // the former and none of the latter. The Bloom filter is
-                    // empty after restart, which is why the floor carries
-                    // pre-restart replay rejection.
-                    window.max_seq = entry.max_seq;
-                    window.floor_seq = entry.max_seq;
+                    // The entry parsed, but parsing is a statement about schema and
+                    // this decision is about semantics. Enumerated deliberately
+                    // rather than tested with `!= current`: "we know exactly what
+                    // this used to mean" and "we have no idea what this means" are
+                    // different facts and must not share a branch. A future regime
+                    // added here needs its own arm with an explicit migration; until
+                    // it has one it falls to the catch-all and fails closed, which is
+                    // the safe direction to forget something in.
+                    match entry.semantic_version {
+                        REPLAY_STATE_SEMANTIC_VERSION => {
+                            // The floor is the durable high-water, which — because
+                            // the high-water is flushed before acceptance is returned
+                            // — is exactly the highest sequence ever accepted.
+                            // Everything accepted before the crash is at or below it
+                            // and the sender's next emission is above it, so this
+                            // rejects all of the former and none of the latter. The
+                            // Bloom filter is empty after restart, which is why the
+                            // floor carries pre-restart replay rejection.
+                            window.max_seq = entry.max_seq;
+                            window.floor_seq = entry.max_seq;
 
-                    tracing::debug!(
-                        peer = %did,
-                        max_seq = entry.max_seq,
-                        floor_seq = entry.max_seq,
-                        "Loaded replay guard state"
-                    );
+                            tracing::debug!(
+                                peer = %did,
+                                max_seq = entry.max_seq,
+                                floor_seq = entry.max_seq,
+                                "Loaded replay guard state"
+                            );
+                        }
+
+                        LEGACY_REPLAY_STATE_SEMANTIC_VERSION => {
+                            // Known obsolete regime, and this binary has an explicit
+                            // migration for it: the old meaning is understood well
+                            // enough to bound how long anything produced under it
+                            // stays dangerous. That bound is what licenses retiring
+                            // the value rather than trusting it.
+                            window.hold = Some(PeerHold::MigratingFromLegacy {
+                                until: quarantine_until,
+                                from_version: entry.semantic_version,
+                            });
+
+                            // max_seq and floor_seq stay at their SequenceWindow::new
+                            // defaults of 0. Freshness, not the floor, carries replay
+                            // rejection for the duration of the hold.
+                            tracing::warn!(
+                                peer = %did,
+                                found_version = entry.semantic_version,
+                                current_version = REPLAY_STATE_SEMANTIC_VERSION,
+                                discarded_max_seq = entry.max_seq,
+                                hold_secs = self.envelope_validity_horizon().as_secs(),
+                                "Replay state predates semantic versioning; holding this \
+                                 peer until no envelope from that regime can still be \
+                                 fresh, then rebuilding from live traffic"
+                            );
+                        }
+
+                        found_version => {
+                            // No migration exists from this regime, so its meaning
+                            // cannot be established at all — it may have changed
+                            // sequence interpretation, window semantics, freshness
+                            // assumptions, or something this binary has no name for.
+                            // Held with no deadline: elapsed time cannot make an
+                            // unknown regime interpretable, and quietly adopting it
+                            // as current after a wait would be a silent downgrade.
+                            window.hold = Some(PeerHold::UnsupportedVersion { found_version });
+
+                            tracing::error!(
+                                peer = %did,
+                                found_version,
+                                current_version = REPLAY_STATE_SEMANTIC_VERSION,
+                                "Replay state was written under a semantic regime this binary \
+                                 has no migration for; refusing this peer indefinitely. This \
+                                 node is most likely running an older binary against a store a \
+                                 newer one wrote — upgrade it or repair the state. This will \
+                                 not clear on its own"
+                            );
+                        }
+                    }
 
                     count += 1;
                 }
@@ -438,25 +634,68 @@ impl ReplayGuard {
             .entry(envelope.from.clone())
             .or_insert_with(SequenceWindow::new);
 
-        // Quarantine (CRITICAL: durable state for this peer was unreadable, so
-        // no sequence can be proven new). Receiver-local elapsed time only.
+        // Holds on our own state (CRITICAL: no sequence can be proven new). All are
+        // typed so the signed-message handler does not score our local condition as
+        // peer misbehaviour.
         //
-        // Released strictly *after* the horizon, not at it: an envelope stamped
-        // at the positive-skew limit has age exactly `max_age` at the horizon,
-        // and `age > max_age` is false there — it is still valid for that
-        // instant. See `envelope_validity_horizon`.
-        if let Some(until) = window.quarantined_until {
-            let now = Instant::now();
-            if now <= until {
-                // Typed, so the signed-message handler does not score our own
-                // unreadable state as peer misbehaviour.
-                return Err(anyhow::Error::new(ReplayStateUnreadable {
+        // Bounded holds are released strictly *after* the horizon, not at it: an
+        // envelope stamped at the positive-skew limit has age exactly `max_age` at
+        // the horizon, and `age > max_age` is false there — it is still valid for
+        // that instant. See `envelope_validity_horizon`.
+        //
+        // The unsupported-version arm has no expiry to reach. It is matched first
+        // and returns unconditionally, so no reordering of this block can
+        // accidentally give it one.
+        match window.hold {
+            Some(PeerHold::UnsupportedVersion { found_version }) => {
+                return Err(anyhow::Error::new(ReplayStateUnsupportedVersion {
                     peer: envelope.from.as_str().to_string(),
                     sequence: envelope.sequence,
-                    remaining_secs: until.duration_since(now).as_secs(),
+                    found_version,
+                    current_version: REPLAY_STATE_SEMANTIC_VERSION,
                 }));
             }
-            window.quarantined_until = None;
+            Some(PeerHold::Unreadable { until })
+            | Some(PeerHold::MigratingFromLegacy { until, .. }) => {
+                let now = Instant::now();
+                if now <= until {
+                    let remaining_secs = until.duration_since(now).as_secs();
+                    let peer = envelope.from.as_str().to_string();
+                    return Err(match window.hold {
+                        Some(PeerHold::MigratingFromLegacy { from_version, .. }) => {
+                            anyhow::Error::new(ReplayStateLegacy {
+                                peer,
+                                sequence: envelope.sequence,
+                                found_version: from_version,
+                                current_version: REPLAY_STATE_SEMANTIC_VERSION,
+                                remaining_secs,
+                            })
+                        }
+                        _ => anyhow::Error::new(ReplayStateUnreadable {
+                            peer,
+                            sequence: envelope.sequence,
+                            remaining_secs,
+                        }),
+                    });
+                }
+
+                // The hold has expired. Nothing written under the old regime can
+                // still be fresh, so the empty window this peer now has is a
+                // *complete* current-semantic record rather than a gap in one.
+                // Clearing the hold is what makes the migration one-way: the next
+                // accept persists a current-version entry, and subsequent restarts
+                // take the ordinary #2514 exact-restore path.
+                if let Some(PeerHold::MigratingFromLegacy { from_version, .. }) = window.hold {
+                    tracing::info!(
+                        peer = %envelope.from,
+                        from_version,
+                        to_version = REPLAY_STATE_SEMANTIC_VERSION,
+                        "Replay state migration complete; peer state is now current-semantic"
+                    );
+                }
+                window.hold = None;
+            }
+            None => {}
         }
 
         // Check if sequence is finalized (CRITICAL: prevents replay after processing)
@@ -735,6 +974,10 @@ impl ReplayGuard {
         let entry = MaxSeqEntry {
             max_seq,
             updated_at_ms: Self::current_time_ms(),
+            // Stamped on every write, so a peer that completes migration is
+            // promoted to current semantics by the first ordinary acceptance —
+            // there is no separate promotion step to crash between.
+            semantic_version: REPLAY_STATE_SEMANTIC_VERSION,
         };
         let value = serde_json::to_vec(&entry).context("Failed to serialize max_seq entry")?;
 
@@ -830,7 +1073,7 @@ impl SequenceWindow {
             insertion_count: 0,
             finalized: HashMap::new(),
             last_update: Instant::now(),
-            quarantined_until: None,
+            hold: None,
         }
     }
 
@@ -1651,6 +1894,9 @@ mod tests {
         let entry = MaxSeqEntry {
             max_seq: durable,
             updated_at_ms: ReplayGuard::current_time_ms(),
+            // Current-semantic: these tests are about crash consistency, not
+            // migration, so the entry must take the ordinary #2514 restore path.
+            semantic_version: REPLAY_STATE_SEMANTIC_VERSION,
         };
         store
             .put(&key, &serde_json::to_vec(&entry).unwrap())
@@ -2475,6 +2721,458 @@ mod tests {
         assert!(
             result.unwrap_err().to_string().contains("too old"),
             "the rejecting boundary after cleanup must be envelope freshness"
+        );
+    }
+}
+
+/// Migration of replay state written under obsolete sequence semantics (#2517).
+///
+/// These tests write **real legacy bytes** — JSON with no `semantic_version` key,
+/// exactly as a pre-#2517 binary emitted — rather than constructing a struct with
+/// the field set to zero. A migration test that builds its input with the field it
+/// is meant to detect the absence of proves nothing.
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    use crate::envelope::PayloadType;
+    use icn_identity::KeyPair;
+
+    /// Byte-for-byte what a pre-#2517 receiver persisted: `max_seq` + `updated_at_ms`
+    /// and nothing else.
+    fn write_legacy_max_seq(store: &Arc<icn_store::SledStore>, did: &Did, max_seq: u64) {
+        let legacy = serde_json::json!({
+            "max_seq": max_seq,
+            "updated_at_ms": ReplayGuard::current_time_ms(),
+        });
+        store
+            .put(
+                &ReplayGuard::make_max_seq_key(did),
+                &serde_json::to_vec(&legacy).unwrap(),
+            )
+            .unwrap();
+    }
+
+    fn envelope(sender: &KeyPair, sequence: u64) -> SignedEnvelope {
+        SignedEnvelope::new(
+            sender.did(),
+            sender,
+            sequence,
+            PayloadType::Gossip,
+            b"m".to_vec(),
+        )
+        .unwrap()
+    }
+
+    /// Legacy bytes must be recognised as legacy. Guards the detector itself: if
+    /// `semantic_version` ever gains a non-zero `#[serde(default)]`, or the field is
+    /// renamed, every other test in this module would pass vacuously.
+    #[test]
+    fn legacy_bytes_deserialize_as_version_zero() {
+        let raw = serde_json::json!({ "max_seq": 15915u64, "updated_at_ms": 1u64 });
+        let parsed: MaxSeqEntry = serde_json::from_slice(&serde_json::to_vec(&raw).unwrap())
+            .expect("legacy entries must still parse; the schema is unchanged");
+
+        assert_eq!(parsed.max_seq, 15915);
+        assert_eq!(
+            parsed.semantic_version, LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            "an entry with no semantic_version key must read as the legacy regime"
+        );
+        assert_ne!(
+            LEGACY_REPLAY_STATE_SEMANTIC_VERSION, REPLAY_STATE_SEMANTIC_VERSION,
+            "legacy and current must be distinguishable or migration cannot trigger"
+        );
+    }
+
+    /// The #2517 reproducer. Receiver holds a legacy high-water of 15915 for a sender
+    /// whose durable counter now sits far below it. The legitimate current sequence
+    /// must not be scored as a replay against that legacy number.
+    #[test]
+    fn legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Gamma's real state: 15915 recorded from the sender's ephemeral incarnation.
+        write_legacy_max_seq(&store, sender.did(), 15_915);
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // Beta's real durable sequence at the time of the incident.
+        let legitimate = envelope(&sender, 12_901);
+        let err = guard
+            .check(&legitimate)
+            .expect_err("during migration the peer is fail-closed, not accepted");
+
+        assert!(
+            err.downcast_ref::<ReplayStateLegacy>().is_some(),
+            "rejection during migration must be typed as migration, not as a replay \
+             attack — otherwise it is scored as severity-1.0 misbehaviour. got: {err}"
+        );
+
+        // The legacy number must never have become the floor.
+        let window = guard.sequences.get(sender.did()).unwrap();
+        assert_eq!(
+            window.floor_seq, 0,
+            "a legacy high-water was installed as a current-semantic floor"
+        );
+        assert_eq!(
+            window.max_seq, 0,
+            "a legacy high-water was trusted as max_seq"
+        );
+    }
+
+    /// The migration must end deterministically, at the envelope validity horizon —
+    /// not at `max_peer_age_secs`, and not when the sender burns past a legacy value.
+    #[test]
+    fn migration_completes_at_the_envelope_validity_horizon() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        write_legacy_max_seq(&store, sender.did(), 15_915);
+
+        // 1s skew stands in for the production 300s; the property is that the bound
+        // is the freshness horizon (2 x skew), not the 3600s peer age.
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            guard.check(&envelope(&sender, 12_901)).is_err(),
+            "peer must be fail-closed while migrating"
+        );
+
+        // Outlive the horizon (2 x 1s), well short of max_peer_age_secs.
+        std::thread::sleep(Duration::from_millis(2_100));
+
+        assert!(
+            guard.check(&envelope(&sender, 12_902)).is_ok(),
+            "migration must complete at the validity horizon without waiting for \
+             cleanup() to age the window out"
+        );
+    }
+
+    /// The security cost of discarding a legacy high-water, pinned. A message captured
+    /// under the legacy regime must not become acceptable just because we stopped
+    /// trusting the number that used to block it.
+    #[test]
+    fn captured_legacy_envelope_stays_rejected_across_the_whole_migration() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        write_legacy_max_seq(&store, sender.did(), 15_915);
+
+        // Captured while the legacy regime was live, i.e. now.
+        let captured = envelope(&sender, 12_901);
+
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            guard.check(&captured).is_err(),
+            "captured envelope accepted during migration"
+        );
+
+        std::thread::sleep(Duration::from_millis(2_100));
+
+        let err = guard
+            .check(&captured)
+            .expect_err("captured legacy envelope became acceptable once migration ended");
+        assert!(
+            err.to_string().contains("too old"),
+            "after migration the captured envelope must be refused on freshness, \
+             which is what makes discarding the legacy high-water safe. got: {err}"
+        );
+    }
+
+    /// Migration is one-way and idempotent: restarting repeatedly must not re-enter it
+    /// once current-semantic state exists, or a crash-looping node never converges.
+    #[test]
+    fn migration_runs_once_and_does_not_re_trigger_on_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        write_legacy_max_seq(&store, sender.did(), 15_915);
+
+        {
+            let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&envelope(&sender, 12_901)).is_err());
+            std::thread::sleep(Duration::from_millis(2_100));
+            assert!(
+                guard.check(&envelope(&sender, 12_902)).is_ok(),
+                "migration should have completed"
+            );
+        }
+
+        // Restart. The peer's state is now current-semantic, so no quarantine.
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            guard.check(&envelope(&sender, 12_903)).is_ok(),
+            "a migrated peer re-entered migration on restart; migration must be one-way"
+        );
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            12_902,
+            "post-migration restart must restore the exact #2514 floor"
+        );
+    }
+
+    /// Crash during migration: the marker never reached disk. The next boot must
+    /// re-detect legacy and fail closed again, never fall through to trusting it.
+    #[test]
+    fn crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        write_legacy_max_seq(&store, sender.did(), 15_915);
+
+        // Boot, detect legacy, then die before any traffic is accepted.
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&envelope(&sender, 12_901)).is_err());
+        }
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let err = guard
+            .check(&envelope(&sender, 12_902))
+            .expect_err("legacy state was trusted after a crash mid-migration");
+        assert!(
+            err.downcast_ref::<ReplayStateLegacy>().is_some(),
+            "must re-enter migration, not fall through to the legacy floor. got: {err}"
+        );
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            0,
+            "legacy high-water leaked into the floor on the second boot"
+        );
+    }
+
+    /// Write replay state claiming a regime this binary has no migration for.
+    fn write_future_max_seq(store: &Arc<icn_store::SledStore>, did: &Did, max_seq: u64, bump: u32) {
+        let future = serde_json::json!({
+            "max_seq": max_seq,
+            "updated_at_ms": ReplayGuard::current_time_ms(),
+            "semantic_version": REPLAY_STATE_SEMANTIC_VERSION + bump,
+        });
+        store
+            .put(
+                &ReplayGuard::make_max_seq_key(did),
+                &serde_json::to_vec(&future).unwrap(),
+            )
+            .unwrap();
+    }
+
+    /// **Unknown-future is not a countdown.**
+    ///
+    /// The legacy hold is bounded because the old meaning is known well enough to
+    /// bound how long anything produced under it stays dangerous. Nothing of the kind
+    /// is known here, so waiting proves nothing — this test therefore outlives the
+    /// *entire* legacy migration horizon and demands the peer still be refused.
+    ///
+    /// A 1s skew is used so the horizon is 2s and the test is deterministic in ~5s
+    /// rather than 20 minutes; the property under test is "no elapsed time releases
+    /// this", not the size of the constant.
+    #[test]
+    fn unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        write_future_max_seq(&store, sender.did(), 500, 7);
+
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // (3) refused, and as a LOCAL fault rather than peer misbehaviour.
+        let err = guard
+            .check(&envelope(&sender, 501))
+            .expect_err("future-regime state was interpreted under current rules");
+        assert!(
+            err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                .is_some(),
+            "must be typed as an unsupported semantic regime, not scored as a replay \
+             attack. got: {err}"
+        );
+        assert!(
+            err.downcast_ref::<ReplayStateLegacy>().is_none(),
+            "unknown-future must not be reported as the bounded legacy migration"
+        );
+
+        // (6) the future max_seq never became a current-semantic floor.
+        assert_eq!(guard.sequences.get(sender.did()).unwrap().floor_seq, 0);
+        assert_eq!(guard.sequences.get(sender.did()).unwrap().max_seq, 0);
+
+        // (4) outlive the complete legacy migration horizon, several times over.
+        std::thread::sleep(Duration::from_millis(2_100));
+        assert!(
+            guard.check(&envelope(&sender, 502)).is_err(),
+            "unknown-future state graduated into current semantics by waiting"
+        );
+        std::thread::sleep(Duration::from_millis(2_100));
+
+        // (5) still refused, and still typed as unsupported.
+        let err = guard
+            .check(&envelope(&sender, 503))
+            .expect_err("unknown-future state was accepted after enough time passed");
+        assert!(
+            err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                .is_some(),
+            "the hold must not decay into any other outcome. got: {err}"
+        );
+
+        // (7) ordinary traffic must not have stamped it as current — that would be a
+        // silent downgrade of state a newer binary owns.
+        let raw = store
+            .get(&ReplayGuard::make_max_seq_key(sender.did()))
+            .unwrap()
+            .expect("the entry must still exist");
+        let on_disk: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+        assert_eq!(
+            on_disk["semantic_version"].as_u64().unwrap() as u32,
+            REPLAY_STATE_SEMANTIC_VERSION + 7,
+            "the future entry was overwritten or restamped by refused traffic"
+        );
+        assert_eq!(
+            on_disk["max_seq"].as_u64().unwrap(),
+            500,
+            "the future entry's max_seq was modified"
+        );
+
+        // (8, 9) restart: still fail-closed, with no accumulated progress toward
+        // acceptance.
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+        let err = guard
+            .check(&envelope(&sender, 504))
+            .expect_err("restarting cleared an unsupported-version hold");
+        assert!(
+            err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                .is_some(),
+            "must remain unsupported across restart. got: {err}"
+        );
+        assert_eq!(guard.sequences.get(sender.did()).unwrap().floor_seq, 0);
+    }
+
+    /// A version *below* current that this binary has no explicit migration for must
+    /// not fall through to the v0 migration. Only regimes with a written migration
+    /// get one; everything else fails closed.
+    ///
+    /// Guards the shape of the state machine rather than a value: today
+    /// `LEGACY + 1 == CURRENT`, so this constructs the case that will exist as soon
+    /// as a v2 is introduced and a v1-era binary meets it.
+    #[test]
+    fn a_known_version_without_a_migration_does_not_borrow_the_legacy_path() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Any regime that is neither LEGACY nor CURRENT.
+        write_future_max_seq(&store, sender.did(), 500, 1);
+
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        std::thread::sleep(Duration::from_millis(2_100));
+
+        let err = guard
+            .check(&envelope(&sender, 501))
+            .expect_err("a regime with no migration was migrated anyway");
+        assert!(
+            err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                .is_some(),
+            "an unmigrated regime must not silently reuse the v0 migration. got: {err}"
+        );
+    }
+
+    /// The *other* legacy instance named in #2517, and the one #2514 cannot fix on its
+    /// own: a value inflated by the pre-#2514 `+1000` restart gap. It is byte-identical
+    /// to a genuine high-water, so nothing about the number itself gives it away —
+    /// only the missing version does. Restoring it exactly, as #2514 correctly does,
+    /// preserves the inflation.
+    #[test]
+    fn pre_2514_inflated_floor_does_not_survive_migration() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Receiver genuinely accepted up to 42; the old code then persisted 1042 on
+        // restart. Both are plain integers; only the absent version distinguishes them.
+        write_legacy_max_seq(&store, sender.did(), 42 + 1_000);
+
+        let mut guard = ReplayGuard::new_persistent(1, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            0,
+            "the inflated legacy floor was carried forward"
+        );
+
+        std::thread::sleep(Duration::from_millis(2_100));
+
+        // The sender's real next sequence, far below the inflated 1042.
+        assert!(
+            guard.check(&envelope(&sender, 43)).is_ok(),
+            "a legitimate sequence below the pre-#2514 inflated floor was still rejected"
+        );
+    }
+
+    /// Downgrade: a current-semantic entry is overwritten by an old binary, which
+    /// writes no version. The new binary must treat the result as legacy rather than
+    /// assume its own earlier stamp still describes the bytes on disk.
+    #[test]
+    fn state_rewritten_by_an_older_binary_is_treated_as_legacy() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Current binary establishes current-semantic state.
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&envelope(&sender, 100)).is_ok());
+        }
+
+        // Rollback: an old binary runs and rewrites the entry with no version key.
+        write_legacy_max_seq(&store, sender.did(), 9_999);
+
+        // Roll forward again.
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let err = guard
+            .check(&envelope(&sender, 101))
+            .expect_err("downgraded state was trusted as current-semantic");
+        assert!(
+            err.downcast_ref::<ReplayStateLegacy>().is_some(),
+            "an entry rewritten without a version must re-enter migration. got: {err}"
+        );
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            0,
+            "the downgraded value became a floor"
+        );
+    }
+
+    /// Current-semantic state must be untouched by any of this: #2514's exact-restore
+    /// invariant stays green.
+    #[test]
+    fn current_semantic_state_is_restored_exactly_and_not_migrated() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&envelope(&sender, 42)).is_ok());
+        }
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            42,
+            "#2514: the floor must equal the durable high-water exactly"
+        );
+        assert!(
+            guard.check(&envelope(&sender, 43)).is_ok(),
+            "a current-semantic peer must not be quarantined"
         );
     }
 }

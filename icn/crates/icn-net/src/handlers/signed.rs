@@ -10,7 +10,7 @@
 use super::ConnectionContext;
 use crate::envelope::{PayloadType, SignedEnvelope};
 use crate::protocol::NetworkMessage;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 impl ConnectionContext {
     /// Handle a Signed message envelope
@@ -100,13 +100,48 @@ impl ConnectionContext {
                     .or_else(|| {
                         e.downcast_ref::<crate::replay_guard::ReplayStateUnreadable>()
                             .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // Migrating away from an obsolete semantic regime (#2517).
+                        // The peer is sending legitimate traffic; we are the ones
+                        // holding a number we can no longer interpret. Scoring this
+                        // is what produced thousands of false severity-1.0 events
+                        // and bans against legitimate traffic on the rehearsal
+                        // federation.
+                        e.downcast_ref::<crate::replay_guard::ReplayStateLegacy>()
+                            .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // Replay state from a regime with no migration (#2517),
+                        // i.e. this binary is older than the one that wrote its
+                        // store. Also not peer misbehaviour — and unlike the
+                        // others it will not clear on its own, so it is logged at
+                        // error rather than warn below.
+                        e.downcast_ref::<crate::replay_guard::ReplayStateUnsupportedVersion>()
+                            .map(|e| e.to_string())
                     });
                 if let Some(reason) = local_fault {
-                    warn!(
-                        peer = %envelope.from,
-                        seq = envelope.sequence,
-                        "Dropping message (local replay-state fault, not peer misbehaviour): {reason}"
-                    );
+                    // Unsupported-version is the one local fault that does not
+                    // resolve itself, so it is raised to error: everything else here
+                    // is a bounded condition an operator can wait out, while this one
+                    // needs them to act.
+                    if e.downcast_ref::<crate::replay_guard::ReplayStateUnsupportedVersion>()
+                        .is_some()
+                    {
+                        error!(
+                            peer = %envelope.from,
+                            seq = envelope.sequence,
+                            "Dropping message: replay state was written by a newer binary and \
+                             this one has no migration for it. Not peer misbehaviour, and this \
+                             will not clear on its own: {reason}"
+                        );
+                    } else {
+                        warn!(
+                            peer = %envelope.from,
+                            seq = envelope.sequence,
+                            "Dropping message (local replay-state fault, not peer misbehaviour): {reason}"
+                        );
+                    }
                     return;
                 }
 

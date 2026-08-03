@@ -299,6 +299,9 @@ remote peer (#2506 / #2513), so a node cannot create replay state for itself.
 ## Related
 
 - #2504 restart/rejoin umbrella · #2505 stale connection · #2510/#2511 durable sender sequence ·
-  #2506/#2513 self-peer · #2514 receiver restart floor
+  #2506/#2513 self-peer · #2514 receiver restart floor · #2517 semantic-regime migration
+- [protocol-state-migration-invariants.md](protocol-state-migration-invariants.md) — what to do when
+  the *meaning* of these persisted values changes. The invariants here govern state written under
+  the current regime; that document governs the transition into it.
 - [restart-rejoin-investigation-2504.md](restart-rejoin-investigation-2504.md) — forensic narrative
 - [../security/production-hardening.md](../security/production-hardening.md) — three-layer model

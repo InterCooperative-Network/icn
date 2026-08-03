@@ -64,6 +64,26 @@ const RESERVATION_BLOCK: u64 = 1_000;
 /// Storage key holding the exclusive upper bound of the current reservation.
 const SIGNING_SEQUENCE_KEY: &[u8] = b"outgoing_signing_seq_reserved_end";
 
+/// Storage key recording which semantic regime produced [`SIGNING_SEQUENCE_KEY`].
+///
+/// Deliberately a **separate key** rather than a version prefix on the watermark
+/// itself. The watermark is 8 raw big-endian bytes and a pre-#2517 binary parses it
+/// with a fixed-width `try_into`, so widening it in place would make a rollback fail
+/// to start on a store this binary had touched. Keeping the value's layout frozen
+/// means the version is additive in both directions: new binaries read both keys,
+/// old binaries read the watermark and never notice the other.
+const SIGNING_SEQUENCE_VERSION_KEY: &[u8] = b"outgoing_signing_seq_semantic_version";
+
+/// Semantic regime this binary writes and can interpret (#2517).
+///
+/// Bump only when the meaning of the persisted watermark changes such that a
+/// previous version would misread it. Unlike the receiver's replay state, there is
+/// no legacy value to migrate *from* here: the pre-#2510 counter persisted nothing
+/// at all, so an absent watermark is genuinely "never initialised" rather than
+/// "initialised under old rules". The version exists so the next change has a hook,
+/// and so an unknown future regime fails closed instead of being guessed at.
+const SIGNING_SEQUENCE_SEMANTIC_VERSION: u32 = 1;
+
 /// First sequence a fresh counter issues.
 ///
 /// Sequence 0 is unusable: `ReplayGuard` rejects `sequence <= floor_seq` and a fresh
@@ -101,6 +121,8 @@ impl SigningSequenceCounter {
     /// sequence issued after a restart is guaranteed to exceed every sequence issued by
     /// any prior incarnation.
     pub fn new(store: Arc<dyn Store>) -> Result<Self> {
+        let stamped_version = Self::reconcile_semantic_version(&store)?;
+
         let reserved_end = match store
             .get(SIGNING_SEQUENCE_KEY)
             .context("Failed to read persisted signing sequence watermark")?
@@ -120,6 +142,7 @@ impl SigningSequenceCounter {
         tracing::info!(
             resumed_at = reserved_end,
             block = RESERVATION_BLOCK,
+            semantic_version = stamped_version,
             "Loaded durable signing sequence counter"
         );
 
@@ -132,6 +155,77 @@ impl SigningSequenceCounter {
             }),
             store: Some(store),
         })
+    }
+
+    /// Establish which semantic regime this store's watermark belongs to, stamping
+    /// it if it predates versioning.
+    ///
+    /// Three cases, and only one of them is a migration:
+    ///
+    /// - **No version key.** Either a fresh store or one written between #2510 and
+    ///   #2517. Both are stamped with the current version and the watermark is left
+    ///   exactly as found — it is monotonic by construction under both, so there is
+    ///   nothing to repair. Resetting it here would recreate #2510.
+    /// - **Current version.** Nothing to do; reopening is idempotent.
+    /// - **Anything else.** Written by a binary that knows something this one does
+    ///   not. Refuse to open: a sender that guesses wrong reissues sequences its
+    ///   peers have already accepted, which is the exact failure the durable counter
+    ///   exists to prevent.
+    ///
+    /// The stamp is written before any sequence is issued, so a crash between the
+    /// stamp and the first send simply re-runs an idempotent write.
+    fn reconcile_semantic_version(store: &Arc<dyn Store>) -> Result<u32> {
+        let found = match store
+            .get(SIGNING_SEQUENCE_VERSION_KEY)
+            .context("Failed to read signing sequence semantic version")?
+        {
+            Some(bytes) => {
+                let raw: [u8; 4] = bytes.as_slice().try_into().map_err(|_| {
+                    anyhow!(
+                        "Corrupt signing sequence semantic version: expected 4 bytes, found {}",
+                        bytes.len()
+                    )
+                })?;
+                Some(u32::from_be_bytes(raw))
+            }
+            None => None,
+        };
+
+        match found {
+            Some(v) if v == SIGNING_SEQUENCE_SEMANTIC_VERSION => Ok(v),
+            Some(v) => Err(anyhow!(
+                "Signing sequence store has semantic version {v}, but this binary \
+                 understands only {SIGNING_SEQUENCE_SEMANTIC_VERSION}; refusing to \
+                 reinterpret it, because guessing here reissues sequences peers have \
+                 already accepted"
+            )),
+            None => {
+                let unversioned_watermark_exists = store
+                    .get(SIGNING_SEQUENCE_KEY)
+                    .context("Failed to read persisted signing sequence watermark")?
+                    .is_some();
+
+                store
+                    .put(
+                        SIGNING_SEQUENCE_VERSION_KEY,
+                        &SIGNING_SEQUENCE_SEMANTIC_VERSION.to_be_bytes(),
+                    )
+                    .context("Failed to persist signing sequence semantic version")?;
+                store
+                    .flush()
+                    .context("Failed to flush signing sequence semantic version")?;
+
+                if unversioned_watermark_exists {
+                    tracing::info!(
+                        version = SIGNING_SEQUENCE_SEMANTIC_VERSION,
+                        "Stamped an unversioned durable signing sequence; the watermark \
+                         is monotonic under the previous regime and is left unchanged"
+                    );
+                }
+
+                Ok(SIGNING_SEQUENCE_SEMANTIC_VERSION)
+            }
+        }
     }
 
     /// Create a non-durable counter for tests and ephemeral nodes.
@@ -319,6 +413,121 @@ mod tests {
         store.put(SIGNING_SEQUENCE_KEY, b"garbage").unwrap();
 
         // Silently restarting at zero here would recreate #2510 on a corrupt store.
+        assert!(SigningSequenceCounter::new(store).is_err());
+    }
+
+    /// A store that has never held a counter is stamped with the current regime, so
+    /// the *next* semantic change can tell this node's state apart from state
+    /// written before versioning existed.
+    #[test]
+    fn fresh_counter_records_the_current_semantic_regime() {
+        let store = temp_store();
+        SigningSequenceCounter::new(store.clone()).unwrap();
+
+        let raw = store
+            .get(SIGNING_SEQUENCE_VERSION_KEY)
+            .unwrap()
+            .expect("a fresh counter must record which regime it was created under");
+        assert_eq!(
+            u32::from_be_bytes(raw.as_slice().try_into().unwrap()),
+            SIGNING_SEQUENCE_SEMANTIC_VERSION
+        );
+    }
+
+    /// The #2517 sender-side upgrade path: a store holding a durable watermark but no
+    /// version key was written by a binary between #2510 and #2517. The watermark is
+    /// still trustworthy — it is monotonic by construction — so this is a stamp, not
+    /// a reset. Regressing to `FIRST_SEQUENCE` here would recreate #2510 exactly.
+    #[test]
+    fn unversioned_durable_watermark_is_stamped_without_disturbing_the_sequence() {
+        let store = temp_store();
+        store
+            .put(SIGNING_SEQUENCE_KEY, &10_001u64.to_be_bytes())
+            .unwrap();
+
+        let counter = SigningSequenceCounter::new(store.clone()).unwrap();
+
+        assert_eq!(
+            counter.next_sequence().unwrap(),
+            10_001,
+            "stamping a version must not move the durable sequence"
+        );
+        assert_eq!(
+            u32::from_be_bytes(
+                store
+                    .get(SIGNING_SEQUENCE_VERSION_KEY)
+                    .unwrap()
+                    .expect("the unversioned store must be stamped on open")
+                    .as_slice()
+                    .try_into()
+                    .unwrap()
+            ),
+            SIGNING_SEQUENCE_SEMANTIC_VERSION
+        );
+    }
+
+    /// State written by a newer binary must not be reinterpreted under today's rules.
+    /// Refusing to start is the correct outcome: a sender that guesses wrong here
+    /// reissues sequences its peers have already seen.
+    #[test]
+    fn unknown_future_semantic_version_refuses_to_start() {
+        let store = temp_store();
+        store
+            .put(SIGNING_SEQUENCE_KEY, &500u64.to_be_bytes())
+            .unwrap();
+        store
+            .put(
+                SIGNING_SEQUENCE_VERSION_KEY,
+                &(SIGNING_SEQUENCE_SEMANTIC_VERSION + 3).to_be_bytes(),
+            )
+            .unwrap();
+
+        // Matched rather than `expect_err`: the Ok variant holds an `Arc<dyn Store>`
+        // and so cannot be `Debug`.
+        let err = match SigningSequenceCounter::new(store) {
+            Ok(_) => panic!("a counter from an unknown future regime must not be opened"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("semantic version"),
+            "the error must name the version mismatch, not look like corruption: {err}"
+        );
+    }
+
+    /// Stamping is idempotent: reopening must not rewrite or disturb anything.
+    #[test]
+    fn reopening_a_versioned_store_is_idempotent() {
+        let store = temp_store();
+
+        let first = SigningSequenceCounter::new(store.clone()).unwrap();
+        let issued = first.next_sequence().unwrap();
+        drop(first);
+
+        let second = SigningSequenceCounter::new(store.clone()).unwrap();
+        assert!(
+            second.next_sequence().unwrap() > issued,
+            "reopening must preserve monotonicity"
+        );
+        assert_eq!(
+            u32::from_be_bytes(
+                store
+                    .get(SIGNING_SEQUENCE_VERSION_KEY)
+                    .unwrap()
+                    .unwrap()
+                    .as_slice()
+                    .try_into()
+                    .unwrap()
+            ),
+            SIGNING_SEQUENCE_SEMANTIC_VERSION
+        );
+    }
+
+    /// A corrupt version key must fail closed, exactly as a corrupt watermark does.
+    #[test]
+    fn corrupt_semantic_version_is_rejected() {
+        let store = temp_store();
+        store.put(SIGNING_SEQUENCE_VERSION_KEY, b"nope").unwrap();
+
         assert!(SigningSequenceCounter::new(store).is_err());
     }
 }
