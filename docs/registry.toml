@@ -860,6 +860,20 @@ depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md"]
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/network-session-identity-binding.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "Network Session Identity Binding"
+description = "Normative rule that a connection may be attributed to a remote DID only if that DID's key authenticated the certificate presented by that exact connection. Records the three jointly-required facts (binding names the sender, sender's key signed it, signed hash is of the current peer certificate) and why each is insufficient alone, the measured certificate-availability matrix showing an anonymous inbound peer completes the handshake with no certificate (hence the absent-certificate path must fail closed), the ordering requirement that no DID-keyed state is written before verification, and the rule that a failed unauthenticated claim must never be scored against the claimed DID. Names the composition root rather than the helper as the invariant owner."
+last_updated = "2026-08-03"
+last_reviewed = "2026-08-03"
+owner = "matt"
+audiences = ["architects", "developers"]
+depends_on = ["docs/architecture/network-identity-self-exclusion.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md"]
 category = "architecture"
 status = "draft"

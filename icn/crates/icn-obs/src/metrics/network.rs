@@ -86,6 +86,11 @@ pub fn init_descriptions() {
         "icn_network_version_negotiation_success_total",
         "Total number of successful version negotiations"
     );
+    describe_counter!(
+        "icn_network_hello_binding_rejected_total",
+        "Total number of Hello messages refused because the claimed DID could not be bound \
+         to the current connection's certificate, by coarse reason (never labelled by DID)"
+    );
     describe_gauge!(
         "icn_network_replay_guard_peers",
         "Number of peers tracked in replay guard"
@@ -267,6 +272,20 @@ pub fn messages_rate_limited_by_rate_inc(messages_per_second: u32) {
 pub fn version_negotiation_failure_inc(reason: &str) {
     counter!(
         "icn_network_version_negotiation_failures_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
+}
+
+/// A Hello was refused because the claimed DID could not be bound to the certificate
+/// presented by the current QUIC connection.
+///
+/// The label is a coarse failure class, never a DID: an unauthenticated party chooses
+/// the DID it claims, so labelling by DID would let anyone forge series for a peer they
+/// do not control.
+pub fn hello_binding_rejected_inc(reason: &str) {
+    counter!(
+        "icn_network_hello_binding_rejected_total",
         "reason" => reason.to_string()
     )
     .increment(1);
