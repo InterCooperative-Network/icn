@@ -88,6 +88,28 @@ impl ConnectionContext {
                 }
             }
             Err(e) => {
+                // A local storage fault is not peer misbehaviour. The guard
+                // fails closed when it cannot durably record an acceptance, and
+                // rejects everything from a peer whose durable state it cannot
+                // read. Scoring either against the sender would ban innocent
+                // peers for our own disk problem — the exact false-positive
+                // class #2514 was about.
+                let local_fault = e
+                    .downcast_ref::<crate::replay_guard::ReplayStateNotDurable>()
+                    .map(|e| e.to_string())
+                    .or_else(|| {
+                        e.downcast_ref::<crate::replay_guard::ReplayStateUnreadable>()
+                            .map(|e| e.to_string())
+                    });
+                if let Some(reason) = local_fault {
+                    warn!(
+                        peer = %envelope.from,
+                        seq = envelope.sequence,
+                        "Dropping message (local replay-state fault, not peer misbehaviour): {reason}"
+                    );
+                    return;
+                }
+
                 warn!("Replay attack detected from {}: {}", envelope.from, e);
 
                 // Record ReplayAttack violation

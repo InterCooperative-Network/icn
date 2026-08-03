@@ -59,15 +59,45 @@ it scored its own messages as replays and banned its own DID.
 
 Invariant and ownership: [network-identity-self-exclusion.md](network-identity-self-exclusion.md).
 
-### #2514 — receiver's restart safety gap (open)
+### #2514 — receiver's restart safety gap (fixed)
 
-`ReplayGuard::load_and_apply_safety_gap` sets `floor_seq = stored_max_seq + 1000` for every peer on
+`ReplayGuard::load_and_apply_safety_gap` set `floor_seq = stored_max_seq + 1000` for every peer on
 the **receiver's** restart. A sender that did not restart has no reason to jump forward by 1000, so
-the restarted receiver rejects up to a thousand legitimate messages and escalates each to a ban.
+the restarted receiver rejected up to a thousand legitimate messages and escalated each to a ban.
 
-The `floor_seq` mechanism itself is sound and must be preserved — the bloom filter is transient
-after restart, so a floor at the true high-water is the only thing rejecting pre-restart replays.
-It is the `+1000` that has no corresponding threat.
+The `floor_seq` mechanism itself is sound and was preserved — the bloom filter is transient after
+restart, so a floor at the true high-water is the only thing rejecting pre-restart replays. It was
+the `+1000` that had no corresponding threat.
+
+**Resolution (PR #2516).** Separate `A`, the highest sequence actually *accepted*, from `D`, the
+highest *durably recorded*; restart restores `floor = D`. Security requires `floor >= A` and
+liveness requires `floor <= A`, so `floor == A` exactly and *any* positive gap is a liveness bug.
+The gap only ever mattered because `D < A` was possible: `Store::put` is a buffered `sled` insert
+and `sled::open()` defaults to `flush_every_ms = Some(500)`.
+
+That interval is eliminated rather than compensated for — the high-water is flushed **before
+acceptance returns**, so `D == A` always. This is what the sender side already did (#2510); the
+receiver was the half that never got the flush.
+
+**A wall-clock barrier was tried first and disproved.** Rejecting envelopes whose signed timestamp
+predates the restart fails in *both* directions: liveness breaks at one second of negative sender
+skew, security breaks at positive skew (a crash-window replay is accepted). `envelope.timestamp` is
+the sender's clock and the restart instant is the receiver's — bounded clock difference is not the
+ability to order events across machines, and under tolerated skew the OLD and NEW cases produce
+overlapping observables. Worth keeping: the failure was found by writing the skew test, not by
+reasoning about it, after the argument for the barrier had already been written down and believed.
+
+Method note: the original `+1000` predates #2510's durable sender sequence by seven months
+(`60ad094ac`, PR #501, issue #468, 2026-01-05). #468 records that there was **no** replay
+persistence at all; the gap arrived with persistence as speculative conservatism ("even if
+persistence was delayed"), never derived from a measured race. Its "performance impact of
+persistence is measured" acceptance criterion was never checked off.
+
+The compounding behaviour (`+1000` per restart, encoded in
+`test_multiple_restart_compounds_safety_gap`) was an artefact of re-persisting the inflated value on
+each load. No incident, test, or comment justified a positive gap, the value 1000, or compounding.
+
+Full invariant statement: [replay-state-restart-invariants.md](replay-state-restart-invariants.md).
 
 ## Disproved hypotheses
 
