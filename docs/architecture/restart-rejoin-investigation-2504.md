@@ -37,7 +37,11 @@ upgraded sender can resume below the high-water its peers already recorded. The 
 the transition into it is not.
 
 > **Correct steady-state protocol semantics and safe migration from previously persisted or
-> distributed semantics are separate invariants.** Proving the first does not prove the second.
+> distributed semantics are separate invariants.** Establishing the first does not establish the
+> second, and a faithful restore of a legacy value is still wrong.
+
+That wording is owned by [replay-state-restart-invariants.md](replay-state-restart-invariants.md)
+and is quoted verbatim here; change it there first.
 
 This matters for #2514 specifically: its invariant is *restore exactly what was accepted*, which is
 faithful — including to a legacy value that was already wrong. A receiver holding a pre-fix inflated
@@ -119,8 +123,10 @@ Full invariant statement: [replay-state-restart-invariants.md](replay-state-rest
 **Live proof, 2026-08-03.** Merged `e3c14c4d`, image digest
 `sha256:c94f6535e4e6b4434f20b899d6c9d2baf51cbf13c38b2502fd5fc1e51966271d` from the cluster
 registry, deployed to alpha only. Beta ran continuously throughout (`restarts=0`, up since `00:17:15Z`);
-gamma and delta were not touched. Three alpha restarts — one migration deploy and two deliberate
-receiver-only restarts — with **zero** replay rejections in every case:
+gamma and delta were not touched. Three alpha restarts — the migration deploy that rolled the image,
+then two deliberate receiver-only restarts — with **zero** replay rejections in every case. The
+deploy restart is the one that crossed the code boundary and so has no comparable pre-fix timing
+line; the two deliberate restarts, both entirely on the fixed image, are timed below:
 
 ```
 restart #1  06:51:58.795  command
