@@ -397,7 +397,10 @@ impl SignedEnvelope {
     /// Canonical encoding for signature computation
     ///
     /// Format: sequence (8 bytes BE) || timestamp (8 bytes BE) || payload_type (1 byte) || payload
-    fn canonical_encoding(&self) -> Vec<u8> {
+    ///
+    /// Crate-visible so replay tests can mint envelopes carrying an explicit
+    /// sender-clock timestamp and model clock skew deterministically.
+    pub(crate) fn canonical_encoding(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(8 + 8 + 1 + self.payload.len());
         buf.extend_from_slice(&self.sequence.to_be_bytes());
         buf.extend_from_slice(&self.timestamp.to_be_bytes());

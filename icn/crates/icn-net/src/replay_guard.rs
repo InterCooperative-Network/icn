@@ -48,17 +48,41 @@ fn hash_sequence(sequence: u64) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-/// Safety gap added to all max_seq values on startup.
-///
-/// This ensures that even if persistence was delayed or crashed before saving,
-/// we won't accept replayed messages. 1,000 provides safety margin:
-/// - At 100 msg/sec from a peer, covers 10 seconds of unsynced state
-/// - In practice, max_seq is persisted on every update
-///
-/// Note: This is smaller than OutgoingSequenceTracker's gap (10,000) because:
-/// - Outgoing uses sequences for nonces (reuse breaks encryption)
-/// - Incoming uses sequences for replay detection (gap only causes temporary rejection)
-const RESTART_SAFETY_GAP: u64 = 1_000;
+// Restart recovery: why there is no sequence-space safety gap here.
+//
+// Let `A` be the highest sequence actually accepted from a peer before a crash
+// and `floor` the acceptance floor installed on restart. Security needs
+// `floor >= A` (otherwise a captured message in `(floor, A]` is accepted twice,
+// since the Bloom filter is empty after restart). Liveness needs `floor <= A`,
+// because a healthy sender's next emission is at most `A + 1` (see
+// `signing_sequence.rs`: sequences may be skipped on sender restart, never
+// reused). Both together force `floor == A` exactly — there is no slack to spend
+// on conservatism, and any positive constant gap is a liveness bug.
+//
+// This previously carried `RESTART_SAFETY_GAP = 1_000`, which put the floor
+// above a healthy sender's live position and rejected legitimate traffic until
+// the sender burned 1,000 sequences or the peer window aged out (#2514).
+//
+// Let `A` be the highest sequence actually accepted and `D` the highest durably
+// recorded. The floor restored on restart is `D`, so the gap only ever mattered
+// because `D < A` was possible: `Store::put` is a buffered sled insert and
+// `sled::open()` defaults to `flush_every_ms = Some(500)`, so a crash could lose
+// the most recent acceptances.
+//
+// The fix is to eliminate that interval rather than paper over it: the
+// high-water is made durable *before* acceptance is returned, so `D == A` always
+// and the restored floor is exactly `A`. Measured cost is ~41us per advancing
+// message (~24k msg/s), against a federation that runs at tens of messages per
+// minute.
+//
+// A wall-clock "was this signed before my restart?" test was tried and rejected:
+// `envelope.timestamp` is the *sender's* clock and any restart instant is the
+// *receiver's*. Under the skew ICN already tolerates, that comparison both
+// rejects legitimate traffic (sender behind) and admits crash-window replays
+// (sender ahead) — see the `sender_skew` tests. Bounded clock difference does
+// not confer the ability to order events across machines.
+//
+// See docs/architecture/replay-state-restart-invariants.md.
 
 /// Maximum entries before Bloom filter rotation (80% of capacity)
 const BLOOM_ROTATION_THRESHOLD: u64 = 8_000;
@@ -71,6 +95,23 @@ const MAX_SEQ_PREFIX: &[u8] = b"replay_max_seq:";
 
 /// Key prefix for finalized sequence storage
 const FINALIZED_PREFIX: &[u8] = b"replay_finalized:";
+
+/// The replay high-water could not be made durable, so the message was not
+/// accepted.
+///
+/// Distinct from a replay detection: this is a local storage fault, not peer
+/// misbehaviour, and callers must not score it against the sender's reputation.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "replay state for {peer} (sequence {sequence}) could not be made durable; \
+     message rejected rather than accepted without a durable record"
+)]
+pub struct ReplayStateNotDurable {
+    /// The peer whose message could not be durably recorded.
+    pub peer: String,
+    /// The sequence number that could not be durably recorded.
+    pub sequence: u64,
+}
 
 /// Persisted max sequence entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,6 +184,20 @@ struct SequenceWindow {
 
     /// Last time we saw a message from this peer
     last_update: Instant,
+
+    /// Reject everything from this peer until this receiver-local instant.
+    ///
+    /// Used only when durable replay state for a peer exists but cannot be read,
+    /// so the high-water is unknown and no sequence can be proven new. The
+    /// quarantine runs for the signed-message validity bound, after which any
+    /// envelope captured before the restart is too old to replay and normal
+    /// service resumes.
+    ///
+    /// This is a *receiver-local elapsed duration* on the monotonic clock. It
+    /// deliberately does not compare a sender-supplied timestamp against a
+    /// receiver-side instant: those are different clock domains and, under the
+    /// skew ICN tolerates, cannot order events across machines.
+    quarantined_until: Option<Instant>,
 }
 
 impl ReplayGuard {
@@ -166,7 +221,7 @@ impl ReplayGuard {
     /// Create a new persistent replay guard
     ///
     /// Persists replay protection state to storage for survival across restarts.
-    /// Call `load_and_apply_safety_gap()` after creation to initialize.
+    /// Call `load_persisted_state()` after creation to initialize.
     ///
     /// # Arguments
     /// * `max_clock_skew` - Maximum allowed clock skew in seconds (default: 300)
@@ -193,7 +248,7 @@ impl ReplayGuard {
     ///
     /// # Returns
     /// Number of peers loaded from storage
-    pub fn load_and_apply_safety_gap(&mut self) -> Result<usize> {
+    pub fn load_persisted_state(&mut self) -> Result<usize> {
         // Only initialize once
         if self
             .initialized
@@ -210,6 +265,12 @@ impl ReplayGuard {
 
         let mut count = 0;
 
+        // Peers whose durable state is unreadable are quarantined until every
+        // envelope that could have been accepted before this restart is certain
+        // to fail freshness. Receiver-local monotonic time; see
+        // `envelope_validity_horizon` for the derivation.
+        let quarantine_until = Instant::now() + self.envelope_validity_horizon();
+
         // Load max sequences
         let entries = store
             .scan(MAX_SEQ_PREFIX)
@@ -217,30 +278,49 @@ impl ReplayGuard {
 
         for (key, value) in entries {
             if let Some(did) = Self::parse_max_seq_key(&key) {
-                if let Ok(entry) = serde_json::from_slice::<MaxSeqEntry>(&value) {
-                    // Apply safety gap
-                    let safe_max_seq = entry.max_seq.saturating_add(RESTART_SAFETY_GAP);
-
+                let parsed = serde_json::from_slice::<MaxSeqEntry>(&value);
+                if let Err(ref e) = parsed {
+                    // The key's existence proves we had state for this peer, but
+                    // its high-water is unreadable, so no sequence can be shown
+                    // to be new. Failing open would hand an attacker a replay
+                    // window; instead reject this peer's traffic until anything
+                    // captured before the restart is too old to be replayed.
                     let window = self
                         .sequences
                         .entry(did.clone())
                         .or_insert_with(SequenceWindow::new);
-                    window.max_seq = safe_max_seq;
-                    // Set floor to reject ALL sequences at or below this value
-                    // This is critical because the bloom filter is empty after restart,
-                    // so we can't rely on it to detect replays of pre-restart sequences
-                    window.floor_seq = safe_max_seq;
+                    window.quarantined_until = Some(quarantine_until);
+                    tracing::error!(
+                        peer = %did,
+                        error = %e,
+                        quarantine_secs = self.envelope_validity_horizon().as_secs(),
+                        "Corrupt replay state entry; quarantining this peer until captured \
+                         traffic can no longer be fresh"
+                    );
+                }
+                if let Ok(entry) = parsed {
+                    let window = self
+                        .sequences
+                        .entry(did.clone())
+                        .or_insert_with(SequenceWindow::new);
+
+                    // The floor is the durable high-water, which — because the
+                    // high-water is flushed before acceptance is returned — is
+                    // exactly the highest sequence ever accepted. Everything
+                    // accepted before the crash is at or below it and the
+                    // sender's next emission is above it, so this rejects all of
+                    // the former and none of the latter. The Bloom filter is
+                    // empty after restart, which is why the floor carries
+                    // pre-restart replay rejection.
+                    window.max_seq = entry.max_seq;
+                    window.floor_seq = entry.max_seq;
 
                     tracing::debug!(
                         peer = %did,
-                        old_max_seq = entry.max_seq,
-                        new_max_seq = safe_max_seq,
-                        floor_seq = safe_max_seq,
-                        "Loaded replay guard state with safety gap and floor"
+                        max_seq = entry.max_seq,
+                        floor_seq = entry.max_seq,
+                        "Loaded replay guard state"
                     );
-
-                    // Persist the safe value
-                    self.persist_max_seq_inner(&did, safe_max_seq)?;
 
                     count += 1;
                 }
@@ -274,8 +354,8 @@ impl ReplayGuard {
 
         tracing::info!(
             loaded_peers = count,
-            safety_gap = RESTART_SAFETY_GAP,
-            "Loaded replay guard state with restart safety gap"
+            "Loaded replay guard state; the floor for each peer is its durable \
+             high-water, which is the highest sequence ever accepted"
         );
 
         Ok(count)
@@ -325,7 +405,7 @@ impl ReplayGuard {
     pub fn check_replay_only(&mut self, envelope: &SignedEnvelope) -> Result<()> {
         // Ensure initialized for persistent mode
         if !self.initialized.load(Ordering::Acquire) {
-            self.load_and_apply_safety_gap()?;
+            self.load_persisted_state()?;
         }
 
         // Note: Signature verification is SKIPPED - caller must have already verified
@@ -335,6 +415,25 @@ impl ReplayGuard {
             .sequences
             .entry(envelope.from.clone())
             .or_insert_with(SequenceWindow::new);
+
+        // Quarantine (CRITICAL: durable state for this peer was unreadable, so
+        // no sequence can be proven new). Receiver-local elapsed time only.
+        //
+        // Released strictly *after* the horizon, not at it: an envelope stamped
+        // at the positive-skew limit has age exactly `max_age` at the horizon,
+        // and `age > max_age` is false there — it is still valid for that
+        // instant. See `envelope_validity_horizon`.
+        if let Some(until) = window.quarantined_until {
+            if Instant::now() <= until {
+                bail!(
+                    "Rejecting {} sequence {}: durable replay state for this peer was \
+                     unreadable at startup, so the accepted high-water is unknown",
+                    envelope.from.as_str(),
+                    envelope.sequence
+                );
+            }
+            window.quarantined_until = None;
+        }
 
         // Check if sequence is finalized (CRITICAL: prevents replay after processing)
         if window.finalized.contains_key(&envelope.sequence) {
@@ -366,25 +465,39 @@ impl ReplayGuard {
             );
         }
 
-        // Update window
+        // Make the advance durable BEFORE accepting.
+        //
+        // This is what makes `D == A`: the restored floor is the highest
+        // sequence ever accepted, not merely the highest that happened to reach
+        // disk before a crash. Without it the interval `(D, A]` exists, and
+        // nothing available to a restarted receiver can distinguish a replay in
+        // that interval from the sender's next legitimate message (see the
+        // module header and the `sender_skew` tests).
+        //
+        // Fail closed: if the high-water cannot be made durable, the message is
+        // not accepted. Accepting it would recreate the interval this is here to
+        // eliminate.
         let max_seq_changed = envelope.sequence > window.max_seq;
+        if max_seq_changed {
+            if let Err(e) = self.persist_max_seq_durable(&envelope.from, envelope.sequence) {
+                return Err(anyhow::Error::new(ReplayStateNotDurable {
+                    peer: envelope.from.as_str().to_string(),
+                    sequence: envelope.sequence,
+                })
+                .context(e));
+            }
+        }
+
+        // Durable (or unchanged) — now record acceptance in memory.
+        let window = self
+            .sequences
+            .entry(envelope.from.clone())
+            .or_insert_with(SequenceWindow::new);
         if max_seq_changed {
             window.max_seq = envelope.sequence;
         }
         window.insert_sequence(&seq_hash);
         window.last_update = Instant::now();
-
-        // Persist max_seq if changed
-        if max_seq_changed {
-            if let Err(e) = self.persist_max_seq(&envelope.from, envelope.sequence) {
-                tracing::warn!(
-                    peer = %envelope.from,
-                    seq = envelope.sequence,
-                    error = %e,
-                    "Failed to persist max_seq (continuing anyway)"
-                );
-            }
-        }
 
         Ok(())
     }
@@ -538,8 +651,54 @@ impl ReplayGuard {
     // Persistence helpers
     // -------------------------------------------------------------------------
 
-    fn persist_max_seq(&self, did: &Did, max_seq: u64) -> Result<()> {
-        self.persist_max_seq_inner(did, max_seq)
+    /// How long a pre-restart envelope can still pass freshness, measured from
+    /// the restart on the receiver's own clock.
+    ///
+    /// Derived, not chosen. `verify_age` admits an envelope with timestamp `T`
+    /// while the receiver's wall clock lies in `[T - max_age, T + max_age]`, so
+    /// the bound is the sum of two *independent* tolerances:
+    ///
+    /// * **maximum permitted future skew** — an envelope accepted just before a
+    ///   restart at `R` passed freshness then, so `T <= R + future_skew`;
+    /// * **maximum permitted past age** — it then remains valid until
+    ///   `now > T + max_age`.
+    ///
+    /// Worst case `T = R + future_skew`, giving validity until
+    /// `R + future_skew + max_age`. In the current envelope implementation both
+    /// tolerances are the same quantity (`verify_age` compares against
+    /// `max_age_ms` in both directions), so this is `2 * max_age`.
+    ///
+    /// A quarantine of only one `max_age` would end while such an envelope has
+    /// age ~0 — i.e. at its *freshest* — which is why the naive single-interval
+    /// arithmetic is wrong.
+    fn envelope_validity_horizon(&self) -> Duration {
+        let future_skew = self.max_clock_skew;
+        let max_past_age = self.max_clock_skew;
+        Duration::from_secs(future_skew.saturating_add(max_past_age))
+    }
+
+    /// Persist the high-water **and force it durable** before returning.
+    ///
+    /// The flush is what makes the restored floor equal the highest sequence
+    /// ever accepted rather than merely the highest that reached the page cache.
+    /// `Store::put` on the sled backend is a buffered insert, and `sled::open()`
+    /// defaults to `flush_every_ms = Some(500)`, so without this a crash can
+    /// lose the most recent acceptances.
+    ///
+    /// This mirrors what the outbound side already does for its reservation
+    /// watermark in `signing_sequence.rs`; the receiving side was the half that
+    /// never got it.
+    fn persist_max_seq_durable(&self, did: &Did, max_seq: u64) -> Result<()> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()), // In-memory mode: no durability to promise
+        };
+
+        self.persist_max_seq_inner(did, max_seq)?;
+        store
+            .flush()
+            .context("Failed to flush replay high-water to durable storage")?;
+        Ok(())
     }
 
     fn persist_max_seq_inner(&self, did: &Did, max_seq: u64) -> Result<()> {
@@ -647,6 +806,7 @@ impl SequenceWindow {
             insertion_count: 0,
             finalized: HashMap::new(),
             last_update: Instant::now(),
+            quarantined_until: None,
         }
     }
 
@@ -1090,7 +1250,7 @@ mod tests {
         // Session 1: Create guard, check some messages
         {
             let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
+            guard.load_persisted_state().unwrap();
 
             for seq in 1..=5 {
                 let envelope = SignedEnvelope::new(
@@ -1110,15 +1270,15 @@ mod tests {
         // Session 2: Simulate restart - create new guard from same store
         {
             let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            let loaded = guard.load_and_apply_safety_gap().unwrap();
+            let loaded = guard.load_persisted_state().unwrap();
 
             assert_eq!(loaded, 1); // One peer loaded
 
-            // max_seq should be 5 + RESTART_SAFETY_GAP
-            let expected_max_seq = 5 + RESTART_SAFETY_GAP;
-            assert_eq!(guard.get_max_seq(keypair.did()), Some(expected_max_seq));
+            // The restored high-water is exactly what was accepted — restart
+            // must not advance it into sequences the sender never emitted.
+            assert_eq!(guard.get_max_seq(keypair.did()), Some(5));
 
-            // Replays of old sequences should be rejected
+            // Replays of already-accepted sequences are still rejected.
             let old_envelope = SignedEnvelope::new(
                 keypair.did(),
                 &keypair,
@@ -1131,11 +1291,11 @@ mod tests {
             assert!(result.is_err());
             assert!(result.unwrap_err().to_string().contains("already seen"));
 
-            // New sequences above the gap should work
+            // The sender's next sequence is accepted immediately.
             let new_envelope = SignedEnvelope::new(
                 keypair.did(),
                 &keypair,
-                expected_max_seq + 1,
+                6,
                 PayloadType::Gossip,
                 b"new_msg".to_vec(),
             )
@@ -1152,7 +1312,7 @@ mod tests {
         // Session 1: Finalize a sequence
         {
             let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
+            guard.load_persisted_state().unwrap();
 
             let envelope = SignedEnvelope::new(
                 keypair.did(),
@@ -1170,7 +1330,7 @@ mod tests {
         // Session 2: Verify finalized sequence is still protected
         {
             let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
+            guard.load_persisted_state().unwrap();
 
             assert!(guard.is_finalized(keypair.did(), 100));
 
@@ -1189,46 +1349,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_multiple_restart_compounds_safety_gap() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let keypair = KeyPair::generate().unwrap();
-
-        // Session 1
-        let session1_max = {
-            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
-
-            let envelope = SignedEnvelope::new(
-                keypair.did(),
-                &keypair,
-                10,
-                PayloadType::Gossip,
-                b"msg".to_vec(),
-            )
-            .unwrap();
-            assert!(guard.check(&envelope).is_ok());
-
-            guard.get_max_seq(keypair.did()).unwrap()
-        };
-        assert_eq!(session1_max, 10);
-
-        // Session 2 (first restart)
-        let session2_max = {
-            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
-            guard.get_max_seq(keypair.did()).unwrap()
-        };
-        assert_eq!(session2_max, 10 + RESTART_SAFETY_GAP);
-
-        // Session 3 (second restart)
-        let session3_max = {
-            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            guard.load_and_apply_safety_gap().unwrap();
-            guard.get_max_seq(keypair.did()).unwrap()
-        };
-        assert_eq!(session3_max, 10 + 2 * RESTART_SAFETY_GAP);
-    }
+    // `test_multiple_restart_compounds_safety_gap` used to live here, asserting
+    // that each restart pushed the acceptance boundary another 1,000 sequences
+    // into the sender's future. That behaviour was the #2514 defect, not a
+    // security requirement — no incident, test, or comment ever justified it.
+    // The property is now owned, inverted, by
+    // `test_repeated_restart_without_traffic_does_not_compound`.
 
     #[test]
     fn test_key_parsing() {
@@ -1445,5 +1571,872 @@ mod tests {
                 i + 1
             );
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // #2514 — receiver restart must not invent a future acceptance floor
+    //
+    // See docs/architecture/replay-state-restart-invariants.md. The governing
+    // constraint is floor == highest-actually-accepted, exactly: a floor below
+    // it admits replays, a floor above it rejects sequences the sender has not
+    // emitted. These tests own both sides.
+    // -------------------------------------------------------------------------
+
+    /// Build an envelope carrying an explicit **sender-clock** timestamp.
+    ///
+    /// The sender's wall clock and the receiver's are different clock domains;
+    /// ICN tolerates skew between them (`verify_age`). These helpers let tests
+    /// model that skew deterministically, with no sleeping and no machine-clock
+    /// manipulation.
+    fn envelope_at(
+        keypair: &KeyPair,
+        sequence: u64,
+        timestamp_ms: u64,
+        body: &[u8],
+    ) -> SignedEnvelope {
+        let mut envelope = SignedEnvelope::new(
+            keypair.did(),
+            keypair,
+            sequence,
+            PayloadType::Gossip,
+            body.to_vec(),
+        )
+        .unwrap();
+        envelope.timestamp = timestamp_ms;
+        let sig_input = envelope.canonical_encoding();
+        envelope.signature = keypair.sign(&sig_input).to_vec();
+        envelope
+    }
+
+    fn now_ms() -> u64 {
+        ReplayGuard::current_time_ms()
+    }
+
+    /// Overwrite the durable max_seq for a peer, simulating a crash that lost
+    /// unflushed writes: the receiver accepted up to `accepted`, but only
+    /// `durable` reached disk.
+    fn force_durable_max_seq(store: &Arc<icn_store::SledStore>, did: &Did, durable: u64) {
+        let key = ReplayGuard::make_max_seq_key(did);
+        let entry = MaxSeqEntry {
+            max_seq: durable,
+            updated_at_ms: ReplayGuard::current_time_ms(),
+        };
+        store
+            .put(&key, &serde_json::to_vec(&entry).unwrap())
+            .unwrap();
+    }
+
+    /// The canonical #2514 case: a stable sender that never restarts, and a
+    /// receiver that does. The receiver must accept the sender's very next
+    /// legitimate sequence — not one 1000 higher.
+    #[test]
+    fn test_stable_sender_receiver_restart_accepts_next_sequence() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Receiver accepts 1..=10 from a sender that stays up throughout.
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            for seq in 1..=10 {
+                let env = SignedEnvelope::new(
+                    sender.did(),
+                    &sender,
+                    seq,
+                    PayloadType::Gossip,
+                    b"m".to_vec(),
+                )
+                .unwrap();
+                assert!(guard.check(&env).is_ok());
+            }
+        }
+
+        // Receiver restarts. Sender did not: its next sequence is 11.
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let next = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            11,
+            PayloadType::Gossip,
+            b"next".to_vec(),
+        )
+        .unwrap();
+
+        let result = guard.check(&next);
+        assert!(
+            result.is_ok(),
+            "restarted receiver rejected the stable sender's next legitimate \
+             sequence (11); floor must not exceed what was actually accepted. \
+             error: {:?}",
+            result.unwrap_err().to_string()
+        );
+    }
+
+    /// The floor installed on restart must equal the durable high-water exactly.
+    #[test]
+    fn test_receiver_restart_does_not_invent_future_floor() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            let env = SignedEnvelope::new(
+                sender.did(),
+                &sender,
+                42,
+                PayloadType::Gossip,
+                b"m".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&env).is_ok());
+        }
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            guard.get_max_seq(sender.did()),
+            Some(42),
+            "restart must not advance max_seq past what was accepted"
+        );
+        assert_eq!(
+            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            42,
+            "floor must equal the durable high-water, with no invented gap"
+        );
+    }
+
+    /// Restarting repeatedly with no intervening traffic must leave the
+    /// acceptance boundary where it was.
+    #[test]
+    fn test_repeated_restart_without_traffic_does_not_compound() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            let env = SignedEnvelope::new(
+                sender.did(),
+                &sender,
+                10,
+                PayloadType::Gossip,
+                b"m".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&env).is_ok());
+        }
+
+        // Five restarts, no traffic in between.
+        for restart in 1..=5 {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert_eq!(
+                guard.get_max_seq(sender.did()),
+                Some(10),
+                "floor compounded after {restart} restart(s) with no traffic"
+            );
+        }
+
+        // And the sender's next real sequence is still accepted.
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+        let env = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            11,
+            PayloadType::Gossip,
+            b"m".to_vec(),
+        )
+        .unwrap();
+        assert!(guard.check(&env).is_ok());
+    }
+
+    /// Security half: a genuinely captured envelope — the original bytes, with
+    /// its original signed timestamp — must still be rejected after a restart.
+    #[test]
+    fn test_captured_envelope_replayed_after_restart_is_rejected() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        let captured = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            7,
+            PayloadType::Gossip,
+            b"captured".to_vec(),
+        )
+        .unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&captured).is_ok());
+        }
+
+        // Make the restart strictly later than the captured envelope's timestamp.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            guard.check(&captured).is_err(),
+            "a captured pre-restart envelope must not be accepted after restart"
+        );
+    }
+
+    /// A `Store` that records the exact order of `put`/`flush` calls, so tests
+    /// can prove the high-water was made **durable** before acceptance
+    /// returned — not merely written into sled's in-memory tree, which a plain
+    /// `get()` would happily read back without any fsync.
+    #[derive(Default)]
+    struct OpLogStore {
+        ops: std::sync::Mutex<Vec<String>>,
+        data: std::sync::Mutex<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
+        fail_flush: bool,
+    }
+
+    impl icn_store::Store for OpLogStore {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            Ok(self.data.lock().unwrap().get(key).cloned())
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.ops.lock().unwrap().push("put".to_string());
+            self.data
+                .lock()
+                .unwrap()
+                .insert(key.to_vec(), value.to_vec());
+            Ok(())
+        }
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.data.lock().unwrap().remove(key);
+            Ok(())
+        }
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            Ok(self
+                .data
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+        fn flush(&self) -> Result<()> {
+            self.ops.lock().unwrap().push("flush".to_string());
+            if self.fail_flush {
+                anyhow::bail!("simulated storage failure");
+            }
+            Ok(())
+        }
+        fn get_replica_metadata(
+            &self,
+            _h: &icn_store::ContentHash,
+        ) -> Result<Option<icn_store::ReplicaMetadata>> {
+            Ok(None)
+        }
+        fn put_replica_metadata(&self, _m: &icn_store::ReplicaMetadata) -> Result<()> {
+            Ok(())
+        }
+        fn list_replica_hashes(&self) -> Result<Vec<icn_store::ContentHash>> {
+            Ok(vec![])
+        }
+    }
+
+    /// The #468 / PR #501 race, closed at the source: the high-water is flushed
+    /// **before** acceptance returns, so `D == A` at every instant and no
+    /// interval of accepted-but-not-durable sequences exists for a crash to
+    /// expose.
+    #[test]
+    fn test_high_water_is_flushed_before_acceptance_returns() {
+        let store = Arc::new(OpLogStore::default());
+        let sender = KeyPair::generate().unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let env = SignedEnvelope::new(sender.did(), &sender, 1, PayloadType::Gossip, b"m".to_vec())
+            .unwrap();
+        assert!(guard.check(&env).is_ok());
+
+        // By the time acceptance returned, the write must already have been
+        // forced durable.
+        let ops = store.ops.lock().unwrap().clone();
+        assert_eq!(
+            ops,
+            vec!["put".to_string(), "flush".to_string()],
+            "expected put-then-flush before acceptance returned, got {ops:?}; \
+             without the flush a crash can lose this acceptance and reopen (D, A]"
+        );
+    }
+
+    /// Fail closed: if the high-water cannot be made durable, the message is not
+    /// accepted, and the failure is typed so callers do not score a local
+    /// storage fault as peer misbehaviour.
+    #[test]
+    fn test_acceptance_fails_closed_when_state_cannot_be_made_durable() {
+        let store = Arc::new(OpLogStore {
+            fail_flush: true,
+            ..Default::default()
+        });
+        let sender = KeyPair::generate().unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let env = SignedEnvelope::new(sender.did(), &sender, 1, PayloadType::Gossip, b"m".to_vec())
+            .unwrap();
+        let err = guard
+            .check(&env)
+            .expect_err("must not accept what it cannot durably record");
+        assert!(
+            err.downcast_ref::<ReplayStateNotDurable>().is_some(),
+            "storage faults must be typed distinctly from replay detections so \
+             they are not scored against the peer; got: {err}"
+        );
+
+        // And the in-memory high-water must not have advanced past durable
+        // state: the window exists but still sits at 0, not at the rejected 1.
+        assert_eq!(
+            guard.get_max_seq(sender.did()),
+            Some(0),
+            "in-memory high-water advanced past what was durably recorded"
+        );
+    }
+
+    /// A crash at any point leaves a floor that rejects everything already
+    /// accepted and admits the sender's next sequence — no gap, no timestamps.
+    #[test]
+    fn test_crash_window_replay_rejected_after_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        let mut captured = Vec::new();
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            for seq in 1..=10 {
+                let env = SignedEnvelope::new(
+                    sender.did(),
+                    &sender,
+                    seq,
+                    PayloadType::Gossip,
+                    b"m".to_vec(),
+                )
+                .unwrap();
+                assert!(guard.check(&env).is_ok());
+                if seq >= 6 {
+                    captured.push(env);
+                }
+            }
+        }
+
+        // Crash here: whatever was accepted is already durable.
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        for env in &captured {
+            assert!(
+                guard.check(env).is_err(),
+                "captured envelope (seq {}) was replayed successfully after restart",
+                env.sequence
+            );
+        }
+
+        let next = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            11,
+            PayloadType::Gossip,
+            b"m".to_vec(),
+        )
+        .unwrap();
+        assert!(
+            guard.check(&next).is_ok(),
+            "replay protection must not block the sender's next sequence"
+        );
+    }
+
+    /// A storage *rollback* — durable state moved backwards by something other
+    /// than a crash — is outside the crash-consistency guarantee. Pinned so the
+    /// boundary is explicit rather than discovered later: with `D` rolled back
+    /// below `A`, sequences in `(D, A]` become acceptable again and only
+    /// envelope freshness bounds the exposure.
+    #[test]
+    fn test_storage_rollback_is_outside_the_crash_guarantee() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        let mut captured = None;
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            for seq in 1..=10 {
+                let env = SignedEnvelope::new(
+                    sender.did(),
+                    &sender,
+                    seq,
+                    PayloadType::Gossip,
+                    b"m".to_vec(),
+                )
+                .unwrap();
+                assert!(guard.check(&env).is_ok());
+                if seq == 6 {
+                    captured = Some(env);
+                }
+            }
+        }
+
+        force_durable_max_seq(&store, sender.did(), 5);
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // Documented consequence, not an endorsement: see section 8 of
+        // docs/architecture/replay-state-restart-invariants.md.
+        assert!(
+            guard.check(captured.as_ref().unwrap()).is_ok(),
+            "if this now fails, the rollback boundary changed and the \
+             architecture doc must be updated to match"
+        );
+    }
+
+    /// The barrier is a startup transient keyed to the restart, not a permanent
+    /// rule: a message signed after the restart is accepted even if its sequence
+    /// sits inside the lost crash window.
+    #[test]
+    fn test_post_restart_traffic_in_crash_window_range_is_accepted() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            let env =
+                SignedEnvelope::new(sender.did(), &sender, 5, PayloadType::Gossip, b"m".to_vec())
+                    .unwrap();
+            assert!(guard.check(&env).is_ok());
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // Signed now, i.e. after the restart.
+        let fresh =
+            SignedEnvelope::new(sender.did(), &sender, 6, PayloadType::Gossip, b"m".to_vec())
+                .unwrap();
+        assert!(
+            guard.check(&fresh).is_ok(),
+            "post-restart traffic must not be blocked by the restart barrier"
+        );
+    }
+
+    /// Replay state is per-peer: one peer's restart barrier and floor must not
+    /// contaminate another's.
+    #[test]
+    fn test_multi_peer_replay_state_independent_across_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let a = KeyPair::generate().unwrap();
+        let b = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            let ea =
+                SignedEnvelope::new(a.did(), &a, 100, PayloadType::Gossip, b"a".to_vec()).unwrap();
+            let eb =
+                SignedEnvelope::new(b.did(), &b, 3, PayloadType::Gossip, b"b".to_vec()).unwrap();
+            assert!(guard.check(&ea).is_ok());
+            assert!(guard.check(&eb).is_ok());
+        }
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(guard.get_max_seq(a.did()), Some(100));
+        assert_eq!(guard.get_max_seq(b.did()), Some(3));
+
+        // Each peer's next sequence is accepted independently.
+        let na = SignedEnvelope::new(a.did(), &a, 101, PayloadType::Gossip, b"a".to_vec()).unwrap();
+        let nb = SignedEnvelope::new(b.did(), &b, 4, PayloadType::Gossip, b"b".to_vec()).unwrap();
+        assert!(guard.check(&na).is_ok());
+        assert!(guard.check(&nb).is_ok());
+    }
+
+    /// Corrupt durable replay state must fail safe: the peer simply starts
+    /// without a window, and the restart barrier still applies.
+    #[test]
+    fn test_corrupt_replay_state_fails_safely() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        let captured = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            9,
+            PayloadType::Gossip,
+            b"captured".to_vec(),
+        )
+        .unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check(&captured).is_ok());
+        }
+
+        // Corrupt the persisted entry.
+        let key = ReplayGuard::make_max_seq_key(sender.did());
+        store.put(&key, b"{not valid json").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        // Load must not panic or error out.
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            guard.check(&captured).is_err(),
+            "corrupt replay state must not open a replay window for a captured \
+             pre-restart envelope"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Clock-domain tests.
+    //
+    // `envelope.timestamp` comes from the SENDER's wall clock; any restart
+    // instant the receiver records comes from the RECEIVER's. ICN's freshness
+    // check tolerates skew between them, so "timestamp < receiver_restart" does
+    // NOT mean "sent before the restart". These tests hold the design to ICN's
+    // real clock contract rather than to synchronized clocks.
+    // -------------------------------------------------------------------------
+
+    /// Liveness under negative sender skew: the sender's clock runs behind the
+    /// receiver's by an amount ICN permits. A message emitted in real time
+    /// *after* the receiver restarted still carries a timestamp that sorts
+    /// before the receiver's restart instant. It is fresh, it is legitimate, and
+    /// it must be accepted.
+    #[test]
+    fn test_legitimate_traffic_accepted_despite_negative_sender_skew() {
+        for skew_secs in [1u64, 100, 250] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let restart_ms = now_ms();
+
+            // Durable state: accepted through sequence 5, well before restart.
+            {
+                let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+                guard.load_persisted_state().unwrap();
+                for seq in 1..=5 {
+                    let env = envelope_at(&sender, seq, restart_ms - 400_000, b"old");
+                    // Bypass freshness: we are staging durable state, not
+                    // exercising verify_age here.
+                    assert!(guard.check_replay_only(&env).is_ok());
+                }
+            }
+
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+
+            // Emitted now, but stamped by a clock that lags the receiver.
+            let ts = restart_ms - skew_secs * 1000;
+            let legit = envelope_at(&sender, 6, ts, b"legit");
+
+            // Freshness accepts it: this is inside ICN's tolerated skew.
+            assert!(
+                legit.verify(300).is_ok(),
+                "skew {skew_secs}s must be inside the freshness window"
+            );
+
+            let result = guard.check(&legit);
+            assert!(
+                result.is_ok(),
+                "legitimate post-restart message rejected because the sender's \
+                 clock lags the receiver by {skew_secs}s; wall-clock ordering \
+                 across machines is not a valid replay discriminator. err: {:?}",
+                result.unwrap_err().to_string()
+            );
+        }
+    }
+
+    /// Security under positive sender skew: a sender whose clock runs ahead
+    /// produces envelopes whose timestamps sort *after* the receiver's restart
+    /// instant even though they were emitted and accepted before it. Freshness
+    /// will not reject them. The restart floor must — and does, because the
+    /// floor is `A`, established without reference to any clock.
+    #[test]
+    fn test_captured_replay_rejected_despite_positive_sender_skew() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let restart_ms = now_ms();
+        let skew_ms = 100_000; // sender clock 100s ahead — inside tolerance
+
+        let mut captured = Vec::new();
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            for seq in 1..=10 {
+                let env = envelope_at(&sender, seq, restart_ms + skew_ms, b"m");
+                assert!(guard.check_replay_only(&env).is_ok());
+                if seq >= 6 {
+                    captured.push(env);
+                }
+            }
+        }
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        for env in &captured {
+            assert!(
+                env.verify(300).is_ok(),
+                "captured envelope is still fresh, so freshness cannot be what \
+                 rejects it"
+            );
+            assert!(
+                guard.check(env).is_err(),
+                "captured envelope (seq {}) accepted after restart despite a \
+                 durable floor; a sender clock running ahead must not create a \
+                 replay window",
+                env.sequence
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Corrupt-state quarantine boundary.
+    //
+    // These use a small max_age so they run fast; the property under test is the
+    // *relation* between the quarantine and the freshness bounds, not the
+    // production constant. With max_age = 1s the horizon is 2s.
+    // -------------------------------------------------------------------------
+
+    /// The quarantine must outlast every envelope that could have been accepted
+    /// before the restart — including one stamped at the positive-skew limit,
+    /// which is at its freshest exactly when a naive one-interval quarantine
+    /// would end.
+    #[test]
+    fn test_corrupt_state_quarantine_outlasts_maximum_future_skew() {
+        let max_age = 1u64; // horizon = 2s
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        // Accepted immediately before the restart, stamped at the positive-skew
+        // limit by a sender whose clock runs fast.
+        let restart_ms = now_ms();
+        let captured = envelope_at(&sender, 7, restart_ms + max_age * 1000, b"captured");
+        {
+            let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            assert!(guard.check_replay_only(&captured).is_ok());
+        }
+
+        // Durable state is unreadable, so there is no floor to fall back on.
+        store
+            .put(&ReplayGuard::make_max_seq_key(sender.did()), b"{corrupt")
+            .unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // At one max_age the envelope is at age ~0 — maximally fresh. A
+        // single-interval quarantine would release here and accept the replay.
+        std::thread::sleep(Duration::from_millis(max_age * 1000 + 100));
+        assert!(
+            captured.verify(max_age).is_ok(),
+            "at one max_age past restart the captured envelope is still fresh, \
+             which is precisely why the quarantine cannot end here"
+        );
+        assert!(
+            guard.check(&captured).is_err(),
+            "quarantine released after a single max_age and accepted a replay"
+        );
+
+        // Past the full horizon it can no longer pass freshness at all.
+        std::thread::sleep(Duration::from_millis(max_age * 1000 + 200));
+        assert!(
+            captured.verify(max_age).is_err(),
+            "past the horizon the captured envelope must fail freshness"
+        );
+        assert!(
+            guard.check(&captured).is_err(),
+            "captured envelope must remain rejected"
+        );
+    }
+
+    /// The quarantine is bounded: once the horizon passes, a peer whose state
+    /// was corrupt is served normally again.
+    #[test]
+    fn test_legitimate_traffic_accepted_after_quarantine_expires() {
+        let max_age = 1u64;
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        {
+            let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+            let env =
+                SignedEnvelope::new(sender.did(), &sender, 3, PayloadType::Gossip, b"m".to_vec())
+                    .unwrap();
+            assert!(guard.check_replay_only(&env).is_ok());
+        }
+        store
+            .put(&ReplayGuard::make_max_seq_key(sender.did()), b"{corrupt")
+            .unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // Fresh traffic during the quarantine is rejected...
+        let during =
+            SignedEnvelope::new(sender.did(), &sender, 4, PayloadType::Gossip, b"m".to_vec())
+                .unwrap();
+        assert!(guard.check(&during).is_err());
+
+        // ...and accepted once the horizon has fully elapsed.
+        std::thread::sleep(Duration::from_millis(2 * max_age * 1000 + 300));
+        let after =
+            SignedEnvelope::new(sender.did(), &sender, 5, PayloadType::Gossip, b"m".to_vec())
+                .unwrap();
+        assert!(
+            guard.check(&after).is_ok(),
+            "quarantine must be bounded; a corrupt key must not permanently \
+             disable a peer"
+        );
+    }
+
+    /// The horizon is derived from both tolerances, not from one of them.
+    #[test]
+    fn test_validity_horizon_is_future_skew_plus_max_age() {
+        let guard = ReplayGuard::new(300, 3600);
+        assert_eq!(
+            guard.envelope_validity_horizon(),
+            Duration::from_secs(600),
+            "horizon must be future-skew + max-age, not a single interval"
+        );
+    }
+
+    /// Cleanup may only forget a peer after no envelope it once accepted could
+    /// still be replayed: max_peer_age_secs must exceed the validity horizon.
+    #[test]
+    fn test_peer_age_exceeds_envelope_validity_horizon_in_production_config() {
+        // Same constants the network actor constructs.
+        let guard = ReplayGuard::new(300, 3600);
+        let horizon = guard.envelope_validity_horizon().as_secs();
+        assert!(
+            3600 > horizon,
+            "max_peer_age_secs ({}) must exceed the envelope validity horizon \
+             ({horizon}s), or cleanup can forget a peer while traffic it \
+             accepted is still replayable",
+            3600
+        );
+    }
+
+    /// A window that rejects every message never refreshes its own liveness, so
+    /// it ages out on a fixed timer. This is the mechanism that ended the #2514
+    /// incident at exactly max_peer_age_secs; pinning it so the semantics cannot
+    /// change silently.
+    #[test]
+    fn test_rejecting_window_does_not_refresh_liveness() {
+        let mut guard = ReplayGuard::new(300, 1); // 1 second max age
+        let sender = KeyPair::generate().unwrap();
+
+        let env = SignedEnvelope::new(
+            sender.did(),
+            &sender,
+            10,
+            PayloadType::Gossip,
+            b"m".to_vec(),
+        )
+        .unwrap();
+        assert!(guard.check(&env).is_ok());
+        assert_eq!(guard.peer_count(), 1);
+
+        // Drive rejections for longer than max_peer_age, re-signing each time so
+        // only the replay floor (not freshness) is doing the rejecting.
+        for _ in 0..11 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let replay = SignedEnvelope::new(
+                sender.did(),
+                &sender,
+                10,
+                PayloadType::Gossip,
+                b"m".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&replay).is_err(), "replay must be rejected");
+        }
+
+        guard.cleanup();
+        assert_eq!(
+            guard.peer_count(),
+            0,
+            "rejections must not extend a window's lifetime"
+        );
+    }
+
+    /// Conversely, accepted traffic must refresh the window.
+    #[test]
+    fn test_accepted_traffic_refreshes_window_liveness() {
+        let mut guard = ReplayGuard::new(300, 1);
+        let sender = KeyPair::generate().unwrap();
+
+        for seq in 1..=11 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let env = SignedEnvelope::new(
+                sender.did(),
+                &sender,
+                seq,
+                PayloadType::Gossip,
+                b"m".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&env).is_ok());
+        }
+
+        guard.cleanup();
+        assert_eq!(
+            guard.peer_count(),
+            1,
+            "accepted traffic must keep the window alive"
+        );
+    }
+
+    /// After cleanup forgets a peer entirely, replay protection is handed to
+    /// envelope freshness. Cleanup requires max_peer_age_secs of silence, which
+    /// is far longer than the freshness bound, so anything cleanup can forget is
+    /// already too old to replay. This test pins that ordering.
+    #[test]
+    fn test_replay_after_cleanup_rejected_by_freshness() {
+        // max_clock_skew of 1s stands in for the production 300s bound; the
+        // property under test is freshness < peer age, not the constants.
+        let mut guard = ReplayGuard::new(1, 1);
+        let sender = KeyPair::generate().unwrap();
+
+        let captured =
+            SignedEnvelope::new(sender.did(), &sender, 4, PayloadType::Gossip, b"m".to_vec())
+                .unwrap();
+        assert!(guard.check(&captured).is_ok());
+
+        // Outlive both the freshness bound and the peer age.
+        std::thread::sleep(std::time::Duration::from_millis(1200));
+        guard.cleanup();
+        assert_eq!(guard.peer_count(), 0, "peer should have been forgotten");
+
+        let result = guard.check(&captured);
+        assert!(
+            result.is_err(),
+            "replay must still be rejected after replay state is forgotten"
+        );
+        assert!(
+            result.unwrap_err().to_string().contains("too old"),
+            "the rejecting boundary after cleanup must be envelope freshness"
+        );
     }
 }

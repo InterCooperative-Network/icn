@@ -27,7 +27,7 @@ fn temp_store() -> Arc<dyn Store> {
 /// A receiver that persists replay state, as production does.
 fn persistent_guard(store: Arc<dyn Store>) -> ReplayGuard {
     let mut guard = ReplayGuard::new_persistent(300, 3600, store);
-    guard.load_and_apply_safety_gap().unwrap();
+    guard.load_persisted_state().unwrap();
     guard
 }
 

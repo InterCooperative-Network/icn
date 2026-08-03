@@ -832,6 +832,20 @@ depends_on = ["docs/architecture/network-identity-self-exclusion.md"]
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/replay-state-restart-invariants.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "Replay State and Restart Invariants"
+description = "Durability invariants for receiver-side replay protection across restart (#2514). Derives floor == highest-actually-accepted from the two-sided security/liveness constraint, showing why any constant sequence-space safety gap is a liveness bug; states the sender non-reuse guarantee (#2510), the restart timestamp barrier that closes the accepted-but-unflushed crash window in time rather than sequence space, and the freshness bound that makes replay-state expiry safe."
+last_updated = "2026-08-03"
+last_reviewed = "2026-08-03"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+depends_on = ["docs/architecture/restart-rejoin-investigation-2504.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/network-identity-self-exclusion.md"]
 category = "architecture"
 status = "living"

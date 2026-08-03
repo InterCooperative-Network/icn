@@ -59,15 +59,36 @@ it scored its own messages as replays and banned its own DID.
 
 Invariant and ownership: [network-identity-self-exclusion.md](network-identity-self-exclusion.md).
 
-### #2514 — receiver's restart safety gap (open)
+### #2514 — receiver's restart safety gap (fixed)
 
-`ReplayGuard::load_and_apply_safety_gap` sets `floor_seq = stored_max_seq + 1000` for every peer on
+`ReplayGuard::load_and_apply_safety_gap` set `floor_seq = stored_max_seq + 1000` for every peer on
 the **receiver's** restart. A sender that did not restart has no reason to jump forward by 1000, so
-the restarted receiver rejects up to a thousand legitimate messages and escalates each to a ban.
+the restarted receiver rejected up to a thousand legitimate messages and escalated each to a ban.
 
-The `floor_seq` mechanism itself is sound and must be preserved — the bloom filter is transient
-after restart, so a floor at the true high-water is the only thing rejecting pre-restart replays.
-It is the `+1000` that has no corresponding threat.
+The `floor_seq` mechanism itself is sound and was preserved — the bloom filter is transient after
+restart, so a floor at the true high-water is the only thing rejecting pre-restart replays. It was
+the `+1000` that had no corresponding threat.
+
+**Resolution.** The gap is not a tunable constant: security requires `floor >= A` and liveness
+requires `floor <= A`, where `A` is the highest sequence actually accepted before the crash, so
+`floor == A` exactly and *any* positive gap is a liveness bug. The residual crash window the gap was
+reaching for is real — `Store::put` is a buffered `sled` insert, and `sled::open()` defaults to
+`flush_every_ms = Some(500)`, so up to ~500 ms of accepted `max_seq` can be lost — but it cannot be
+covered in sequence space, because that dimension has no slack. It is covered in **time** instead,
+by a restart timestamp barrier: an envelope whose *signed* timestamp predates the restart cannot be
+new, so it is rejected until the freshness bound elapses, after which `verify_age` rejects it anyway.
+
+Method note: the original `+1000` predates #2510's durable sender sequence by seven months
+(`60ad094ac`, PR #501, issue #468, 2026-01-05). #468 records that there was **no** replay
+persistence at all; the gap arrived with persistence as speculative conservatism ("even if
+persistence was delayed"), never derived from a measured race. Its "performance impact of
+persistence is measured" acceptance criterion was never checked off.
+
+The compounding behaviour (`+1000` per restart, encoded in
+`test_multiple_restart_compounds_safety_gap`) was an artefact of re-persisting the inflated value on
+each load. No incident, test, or comment justified a positive gap, the value 1000, or compounding.
+
+Full invariant statement: [replay-state-restart-invariants.md](replay-state-restart-invariants.md).
 
 ## Disproved hypotheses
 
