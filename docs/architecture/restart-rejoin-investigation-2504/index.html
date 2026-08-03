@@ -84,13 +84,37 @@ self-connection carried real signed traffic into the node&#39;s own replay guard
 detector; after a restart its resumed signing sequence sat below its own persisted replay floor, so
 it scored its own messages as replays and banned its own DID.</p>
 <p>Invariant and ownership: <a href="https://github.com/InterCooperative-Network/icn/blob/main/network-identity-self-exclusion">network-identity-self-exclusion.md</a>.</p>
-<h3>#2514 — receiver&#39;s restart safety gap (open)</h3>
-<p><code>ReplayGuard::load_and_apply_safety_gap</code> sets <code>floor_seq = stored_max_seq + 1000</code> for every peer on
+<h3>#2514 — receiver&#39;s restart safety gap (fixed)</h3>
+<p><code>ReplayGuard::load_and_apply_safety_gap</code> set <code>floor_seq = stored_max_seq + 1000</code> for every peer on
 the <strong>receiver&#39;s</strong> restart. A sender that did not restart has no reason to jump forward by 1000, so
-the restarted receiver rejects up to a thousand legitimate messages and escalates each to a ban.</p>
-<p>The <code>floor_seq</code> mechanism itself is sound and must be preserved — the bloom filter is transient
-after restart, so a floor at the true high-water is the only thing rejecting pre-restart replays.
-It is the <code>+1000</code> that has no corresponding threat.</p>
+the restarted receiver rejected up to a thousand legitimate messages and escalated each to a ban.</p>
+<p>The <code>floor_seq</code> mechanism itself is sound and was preserved — the bloom filter is transient after
+restart, so a floor at the true high-water is the only thing rejecting pre-restart replays. It was
+the <code>+1000</code> that had no corresponding threat.</p>
+<p><strong>Resolution (PR #2516).</strong> Separate <code>A</code>, the highest sequence actually <em>accepted</em>, from <code>D</code>, the
+highest <em>durably recorded</em>; restart restores <code>floor = D</code>. Security requires <code>floor &gt;= A</code> and
+liveness requires <code>floor &lt;= A</code>, so <code>floor == A</code> exactly and <em>any</em> positive gap is a liveness bug.
+The gap only ever mattered because <code>D &lt; A</code> was possible: <code>Store::put</code> is a buffered <code>sled</code> insert
+and <code>sled::open()</code> defaults to <code>flush_every_ms = Some(500)</code>.</p>
+<p>That interval is eliminated rather than compensated for — the high-water is flushed <strong>before
+acceptance returns</strong>, so <code>D == A</code> always. This is what the sender side already did (#2510); the
+receiver was the half that never got the flush.</p>
+<p><strong>A wall-clock barrier was tried first and disproved.</strong> Rejecting envelopes whose signed timestamp
+predates the restart fails in <em>both</em> directions: liveness breaks at one second of negative sender
+skew, security breaks at positive skew (a crash-window replay is accepted). <code>envelope.timestamp</code> is
+the sender&#39;s clock and the restart instant is the receiver&#39;s — bounded clock difference is not the
+ability to order events across machines, and under tolerated skew the OLD and NEW cases produce
+overlapping observables. Worth keeping: the failure was found by writing the skew test, not by
+reasoning about it, after the argument for the barrier had already been written down and believed.</p>
+<p>Method note: the original <code>+1000</code> predates #2510&#39;s durable sender sequence by seven months
+(<code>60ad094ac</code>, PR #501, issue #468, 2026-01-05). #468 records that there was <strong>no</strong> replay
+persistence at all; the gap arrived with persistence as speculative conservatism (&quot;even if
+persistence was delayed&quot;), never derived from a measured race. Its &quot;performance impact of
+persistence is measured&quot; acceptance criterion was never checked off.</p>
+<p>The compounding behaviour (<code>+1000</code> per restart, encoded in
+<code>test_multiple_restart_compounds_safety_gap</code>) was an artefact of re-persisting the inflated value on
+each load. No incident, test, or comment justified a positive gap, the value 1000, or compounding.</p>
+<p>Full invariant statement: <a href="https://github.com/InterCooperative-Network/icn/blob/main/replay-state-restart-invariants">replay-state-restart-invariants.md</a>.</p>
 <h2>Disproved hypotheses</h2>
 <p>Recorded so they are not re-litigated. Each was plausible and is now ruled out by evidence.</p>
 <table>

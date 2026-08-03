@@ -1,0 +1,384 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Replay state and restart invariants | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>replay state restart invariants</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/replay-state-restart-invariants.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Replay state and restart invariants</h1>
+<p><strong>Status:</strong> current · <strong>Scope:</strong> <code>icn-net</code> — <code>ReplayGuard</code>, <code>SignedEnvelope</code>, <code>SigningSequenceCounter</code></p>
+<p>This document states the durability invariants that make replay protection survive a restart
+without rejecting traffic a legitimate sender is actually emitting. It is the design record for
+issue #2514 and the security half of the #2504 restart/rejoin chain. The narrative forensic history
+lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/restart-rejoin-investigation-2504">restart-rejoin-investigation-2504.md</a>; this file is
+the invariant statement.</p>
+<h2>1. Two quantities, not one</h2>
+<p>Per peer, distinguish:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>A</code></td>
+<td>highest sequence the receiver <strong>actually accepted</strong> before a crash</td>
+</tr>
+<tr>
+<td><code>D</code></td>
+<td>highest sequence <strong>durably recorded</strong> before that crash</td>
+</tr>
+<tr>
+<td><code>floor</code></td>
+<td>acceptance floor installed on restart — all sequences <code>&lt;= floor</code> rejected</td>
+</tr>
+</tbody></table>
+<p>On restart the receiver can only restore what it durably has, so <strong><code>floor = D</code></strong>. In general
+<code>D &lt;= A</code>, and the interval <code>(D, A]</code> is the set of sequences that were accepted but whose record did
+not survive.</p>
+<h2>2. The two-sided constraint</h2>
+<p><strong>Security</strong> requires <code>floor &gt;= A</code>. Otherwise a captured message with sequence in <code>(floor, A]</code> is
+accepted a second time: the Bloom filter is empty after restart, so nothing else rejects it.</p>
+<p><strong>Liveness</strong> requires <code>floor &lt;= A</code>. Per the sender invariant (§3) a healthy sender&#39;s next emission
+is the smallest sequence it has never emitted, which is at most <code>A + 1</code>. Any <code>floor &gt; A</code> therefore
+sits in sequence values the sender has not emitted and will only reach by burning through them.</p>
+<p>Therefore:</p>
+<pre><code>floor == A     — exactly. There is no slack in either direction.
+</code></pre>
+<p><strong>This is the whole of #2514.</strong> The pre-fix code set <code>floor = D + 1000</code>. The <code>+1000</code> is precisely
+the violation of the liveness half. A constant gap cannot be &quot;tuned&quot;: any positive value rejects
+legitimate traffic, and <code>0</code> is correct <strong>only if <code>D == A</code></strong>.</p>
+<p>So the real design question is not &quot;how big should the gap be&quot; but <strong>&quot;how do we guarantee
+<code>D == A</code>&quot;</strong> — or, failing that, what else can cover <code>(D, A]</code>.</p>
+<h2>3. The sender invariant (#2510 / #2511)</h2>
+<p><code>SigningSequenceCounter::next_sequence()</code> reserves a block of <code>RESERVATION_BLOCK = 1000</code> and
+persists <strong>and flushes</strong> the new <code>reserved_end</code> <em>before</em> issuing any sequence from that block
+(<code>signing_sequence.rs</code>). Formally: every emitted sequence <code>s</code> satisfies <code>s &lt; reserved_end</code> at
+emission, and <code>reserved_end</code> was durable before emission. A restarted incarnation resumes at the
+durable <code>reserved_end</code>, hence above every sequence that could have escaped.</p>
+<pre><code>sender crash  ⇒  sequences may be SKIPPED, never REUSED (monotonic, non-reusing)
+</code></pre>
+<p>This is what licenses the liveness half of §2. It does <strong>not</strong> eliminate receiver persistence lag —
+these are different crash-consistency problems and must not be conflated.</p>
+<h2>4. Wall clocks cannot close <code>(D, A]</code> — an ambiguity result</h2>
+<p>A tempting cheap fix is to reject envelopes &quot;signed before the restart&quot;, using the signed timestamp.
+<strong>This does not work, and the reason is worth recording so it is not retried.</strong></p>
+<p><code>envelope.timestamp</code> comes from the <strong>sender&#39;s</strong> wall clock. Any restart instant the receiver
+records comes from the <strong>receiver&#39;s</strong>. These are different clock domains, and ICN deliberately
+tolerates skew between them (§5).</p>
+<p>Consider a message with sequence in <code>(D, A]</code> and the receiver&#39;s observable inputs: authenticated
+DID, signed sequence, signed timestamp, payload, and a fresh transport session (the old connection
+died with the restart, so session freshness carries no information either).</p>
+<ul>
+<li><strong>Case OLD</strong> — accepted before the crash, lost from durable state, replayed by an attacker after
+restart. If the sender&#39;s clock runs <em>ahead</em> by <code>δ</code>, its timestamp can be <strong>greater</strong> than the
+receiver&#39;s restart instant.</li>
+<li><strong>Case NEW</strong> — the stable sender&#39;s next legitimate message, emitted after the restart. If the
+sender&#39;s clock runs <em>behind</em> by <code>δ</code>, its timestamp can be <strong>less</strong> than the receiver&#39;s restart
+instant.</li>
+</ul>
+<p>For any skew the freshness check tolerates, these two cases produce <strong>overlapping observables</strong>. A
+wall-clock timestamp therefore cannot distinguish OLD from NEW. Both failure directions are real and
+are pinned by tests (<code>test_legitimate_traffic_accepted_despite_negative_sender_skew</code>,
+<code>test_captured_replay_rejected_despite_positive_sender_skew</code>); the liveness failure appears at as
+little as <strong>one second</strong> of skew.</p>
+<p>The general form: <strong>bounded clock difference is not the ability to totally order events across
+machines.</strong> <code>verify_age</code> only ever asks &quot;is this timestamp inside a window around my current time&quot;,
+which bounded difference does support. &quot;Did this sender-side event happen before this receiver-side
+event&quot; is a strictly stronger question that ICN&#39;s time contract does not answer.</p>
+<p>Consequently the receiver must either <strong>durably know what it accepted</strong>, or use a cryptographic
+boundary that actually encodes the distinction. Envelope signatures cover
+<code>sequence || timestamp || payload_type || payload</code> — no session, epoch, or nonce — so no such
+boundary exists today without a wire-format and signature-input change.</p>
+<h2>5. Freshness: what it does and does not promise</h2>
+<p><code>SignedEnvelope::verify_age(max_age_secs)</code> enforces:</p>
+<ul>
+<li>reject if <code>now - timestamp &gt; max_age</code> (too old)</li>
+<li>reject if <code>timestamp &gt; now + max_age</code> (too far in the future — the tolerance is symmetric)</li>
+</ul>
+<p><code>timestamp</code> is milliseconds since the Unix epoch and <strong>is covered by the signature</strong>, so a replaying
+attacker cannot alter it.</p>
+<p><strong>Ordering in production:</strong> signature + age are verified <strong>first</strong>, and only then is <code>ReplayGuard</code>
+consulted, so a stale envelope never reaches the replay guard.</p>
+<pre><code>verify signature + verify_age   →   ReplayGuard::check_replay_only
+</code></pre>
+<p><strong>Three separate constants, currently all 300/3600, none derived from each other:</strong></p>
+<table>
+<thead>
+<tr>
+<th>quantity</th>
+<th>where</th>
+<th>value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>freshness bound actually used in production</td>
+<td><code>handlers/signed.rs</code> — literal argument</td>
+<td>300 s</td>
+</tr>
+<tr>
+<td><code>ReplayGuard::max_clock_skew</code></td>
+<td><code>actor/mod.rs</code> — constructor argument</td>
+<td>300 s</td>
+</tr>
+<tr>
+<td><code>ReplayGuard::max_peer_age_secs</code></td>
+<td><code>actor/mod.rs</code> — constructor argument</td>
+<td>3600 s</td>
+</tr>
+</tbody></table>
+<p>The first two coincide today but are independent literals; production calls <code>check_replay_only</code>,
+which never consults <code>max_clock_skew</code>. Do not treat one as a proxy for the other. The invariant that
+matters is stated in §7 and must be maintained deliberately if any of them changes.</p>
+<h2>6. The receiver invariant: durability before acceptance</h2>
+<blockquote>
+<p><strong>Invariant.</strong> The replay high-water is made durable <strong>before</strong> an acceptance is returned to the
+caller. Therefore <code>D == A</code> at every instant, and the floor restored on restart is exactly <code>A</code>.</p>
+</blockquote>
+<p>Implementation (<code>check_replay_only</code>): on a max-sequence advance, <code>put</code> <strong>and <code>flush</code></strong> the
+high-water, and only then update in-memory state and return <code>Ok</code>. This mirrors what the outbound
+side already does for its reservation watermark; the receiving side was the half that never got it.</p>
+<p><strong>Fail closed.</strong> If the high-water cannot be made durable the message is <em>not</em> accepted — accepting
+it would recreate <code>(D, A]</code>. This is surfaced as <code>ReplayStateNotDurable</code>, which the signed-message
+handler explicitly does <strong>not</strong> score as peer misbehaviour: it is a local storage fault, and banning
+a peer for our own disk problem is exactly the false-positive class #2514 was about.</p>
+<p><strong>Consequences:</strong></p>
+<ul>
+<li>No sequence-space gap. <code>floor = D = A</code>.</li>
+<li>Repeated restarts with no traffic leave the floor unchanged — no compounding.</li>
+<li><strong>No clock comparison anywhere in restart recovery.</strong> Correctness does not depend on clock
+synchronisation between sender and receiver.</li>
+</ul>
+<h3>6.1 Measured cost</h3>
+<p>Two very different storage profiles, and only the second is deployment evidence.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>dev VM, local SSD</th>
+<th><code>atlas-nfs</code> (the class backing every ICN data PVC)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>samples</td>
+<td>500</td>
+<td>500</td>
+</tr>
+<tr>
+<td>p50</td>
+<td>—</td>
+<td>4 984 µs</td>
+</tr>
+<tr>
+<td>p95</td>
+<td>—</td>
+<td>6 305 µs</td>
+</tr>
+<tr>
+<td>p99</td>
+<td>—</td>
+<td>18 882 µs</td>
+</tr>
+<tr>
+<td>max</td>
+<td>—</td>
+<td>26 333 µs</td>
+</tr>
+<tr>
+<td>mean</td>
+<td>41 µs (<code>put</code> alone 5.7 µs)</td>
+<td>5 288 µs</td>
+</tr>
+<tr>
+<td>sustainable</td>
+<td>~24 000 ops/s</td>
+<td><strong>~189 ops/s</strong></td>
+</tr>
+</tbody></table>
+<p>The rehearsal cluster&#39;s ICN PVCs are <strong>NFS-backed</strong>, not local disk, and an fsync there costs
+roughly <strong>130× more</strong> than on the dev VM. The dev-VM figure is not representative and should not be
+quoted. Against an observed federation rate of ~15 messages per <em>minute</em> per peer (~0.25/s), 189
+ops/s is still roughly <strong>750×</strong> headroom — comfortable, but three orders of magnitude less
+comfortable than local storage suggests, and the p99/max tail (19–26 ms) is not negligible under the
+guard&#39;s global write lock.</p>
+<p><strong><code>Store::flush()</code> is whole-database.</strong> <code>SledStore::flush</code> delegates to <code>sled::Db::flush</code>, which
+flushes <em>all</em> pending writes across every tree, not just the replay key. Operationally:</p>
+<ul>
+<li>concurrent peers&#39; replay writes amortise into a single sync rather than multiplying it;</li>
+<li>but a replay flush also forces unrelated pending writes (gossip, ledger, receipts) durable, so its
+cost scales with total outstanding write volume, not with the ~50-byte replay record. Under heavy
+unrelated write load the 5 ms p50 can grow.</li>
+</ul>
+<p><strong>Group commit is not justified by these measurements</strong> (750× headroom) and is deliberately not
+implemented. It remains the escape hatch if inbound rates approach the ceiling or if the storage
+class regresses, at the cost of holding delivery until the batch commits. Correctness is not
+negotiable in that trade: the invariant remains <em>durable replay fact before semantic acceptance</em>.</p>
+<h2>7. Forgetting replay state</h2>
+<p><code>ReplayGuard::cleanup()</code> runs periodically and, for any peer with no <strong>accepted</strong> traffic in
+<code>max_peer_age_secs</code>, removes the in-memory window <strong>and deletes the persisted
+<code>replay_max_seq:&lt;did&gt;</code> key</strong>.</p>
+<p>Two properties matter:</p>
+<ol>
+<li><strong>A window that rejects everything never refreshes its own liveness.</strong> <code>last_update</code> is written
+only on the accepted path and at window creation; the floor check returns before reaching it.
+This is why, in the #2514 incident, 566 consecutive rejections did not extend the window&#39;s life
+by a millisecond and it aged out on a fixed 3600 s timer.</li>
+<li><strong>Deleting the state is safe only because of freshness</strong> — and the margin is <em>not</em> one freshness
+interval. See the horizon derivation below.</li>
+</ol>
+<h3>7.1 The envelope validity horizon</h3>
+<p>How long can an envelope the receiver already accepted still pass <code>verify_age</code>, counting from the
+moment the receiver stops tracking it?</p>
+<p><code>verify_age</code> admits timestamp <code>T</code> while the receiver&#39;s wall clock lies in
+<code>[T - max_age, T + max_age]</code>. An envelope accepted at receiver time <code>X</code> passed freshness <em>then</em>, so</p>
+<pre><code>T &lt;= X + future_skew_tolerance
+</code></pre>
+<p>and it remains valid until <code>now &gt; T + max_past_age</code>. Worst case <code>T = X + future_skew_tolerance</code>:</p>
+<pre><code>horizon = future_skew_tolerance + max_past_age
+</code></pre>
+<p>In the current envelope implementation both tolerances are the same quantity — <code>verify_age</code>
+compares against <code>max_age_ms</code> in <em>both</em> directions — so the horizon is <code>2 × max_age</code>, i.e.
+<strong>600 s</strong> in production, not 300 s.</p>
+<p><strong>A one-interval margin is wrong, and wrong in the worst possible way:</strong> an envelope stamped at the
+positive-skew limit reaches age ≈ 0 — its <em>freshest</em> point — exactly when a single-<code>max_age</code>
+quarantine would expire. Pinned by <code>test_corrupt_state_quarantine_outlasts_maximum_future_skew</code>;
+reducing the horizon to one interval makes that test fail.</p>
+<blockquote>
+<p><strong>Invariant.</strong> <code>max_peer_age_secs &gt; future_skew_tolerance + max_past_age</code>.</p>
+</blockquote>
+<p>Today that is <code>3600 &gt; 600</code>, a 6× margin (not the 12× a single-interval reading suggests). The three
+constants are independent literals (§5), so this relation must be maintained deliberately. It is
+asserted by <code>test_peer_age_exceeds_envelope_validity_horizon_in_production_config</code>.</p>
+<h3>7.2 Clock-security contract</h3>
+<p>The horizon assumes the receiver&#39;s wall clock does not jump <strong>backwards</strong> after a restart. If it
+does, <code>verify_age</code> itself is compromised — an expired envelope becomes &quot;fresh&quot; again — and no
+amount of replay-state bookkeeping can repair that, because freshness is the boundary being
+subverted. For peers with intact durable state the sequence floor still rejects everything at or
+below <code>A</code>, so the exposure is confined to the corrupt-state case (§8), which has no floor.</p>
+<p>This is a property of ICN&#39;s time contract, not something <code>ReplayGuard</code> can solve. Recorded here so
+it is not mistaken for a replay-guard defect: <strong>bounded monotonic wall-clock progress on each node
+is a prerequisite for signed-envelope freshness</strong>, and therefore for replay-state expiry.</p>
+<h2>8. Storage rollback, corruption, and other degenerate states</h2>
+<ul>
+<li><strong>Corrupt / undeserialisable entry.</strong> The key&#39;s existence proves state existed, but its high-water
+is unreadable, so no sequence can be shown to be new. The peer is <strong>quarantined</strong> — all of its
+traffic rejected — for the full envelope validity horizon of §7.1 (<code>future_skew + max_age</code>, 600 s
+in production), after which nothing captured before the restart can still pass freshness and
+normal service resumes. Release happens <em>strictly after</em> the horizon, not at it: at the horizon
+exactly, a worst-case envelope&#39;s age equals <code>max_age</code> and <code>age &gt; max_age</code> is false, so it is still
+valid for that instant. This is a <em>receiver-local elapsed duration on the monotonic clock</em>, not a
+cross-machine timestamp comparison, so §4 does not apply to it. Failing open here would hand an
+attacker a replay window; failing closed forever would turn one corrupt key into a permanent
+peer-level outage.</li>
+<li><strong>Rollback to an older snapshot.</strong> Durable state moving backwards by means other than a crash is
+<strong>outside</strong> the crash-consistency guarantee. With <code>D</code> rolled back below <code>A</code>, sequences in <code>(D, A]</code>
+become acceptable again and only envelope freshness bounds the exposure. Pinned explicitly by
+<code>test_storage_rollback_is_outside_the_crash_guarantee</code> so the boundary is documented rather than
+discovered.</li>
+<li><strong>Failed <code>put</code> or <code>flush</code>.</strong> Fail closed, per §6.</li>
+</ul>
+<h2>9. Connection lifetime vs replay lifetime</h2>
+<p>Replay state is keyed by peer <strong>DID</strong>, not by connection. Reconnects, stale-connection replacement
+(#2505), and transport churn do not reset it. Conversely, the local identity is never admitted as a
+remote peer (#2506 / #2513), so a node cannot create replay state for itself.</p>
+<h2>Related</h2>
+<ul>
+<li>#2504 restart/rejoin umbrella · #2505 stale connection · #2510/#2511 durable sender sequence ·
+#2506/#2513 self-peer · #2514 receiver restart floor</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/restart-rejoin-investigation-2504">restart-rejoin-investigation-2504.md</a> — forensic narrative</li>
+<li><a href="/docs/security/production-hardening">../security/production-hardening.md</a> — three-layer model</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
