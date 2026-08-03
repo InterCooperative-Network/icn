@@ -16,18 +16,39 @@ at 4 and kept gossiping normally. Rollback did not recover it, because rollback 
 
 ## Causal decomposition
 
-Four independent defects, each masked by the one before it:
+Four independent defects, each masked by the one before it — plus a fifth of a different kind:
 
 ```
 peer restart
-  → stale QUIC connection cache        #2505  fixed  adb9d07d
-  → ephemeral outbound signing seq     #2510  fixed  72dfed8e (PR #2511)
-  → local identity admitted as remote  #2506  fixed  045fa9e9 (PR #2513)
-  → receiver restart replay floor      #2514  OPEN — current blocker
+  → stale QUIC connection cache        #2505  fixed   adb9d07d
+  → ephemeral outbound signing seq     #2510  fixed   72dfed8e (PR #2511)
+  → local identity admitted as remote  #2506  fixed   045fa9e9 (PR #2513)
+  → receiver restart replay floor      #2514  fixed   e3c14c4d (PR #2516)
+  → legacy sequence-state migration    #2517  ACTIVE  — not a steady-state defect
 ```
 
 **The masking is the important part.** Each fix made the next defect reachable for the first time,
 so a newly appearing blocker is evidence the previous fix worked, not that it was wrong.
+
+**#2517 is a different kind of finding and breaks the pattern.** The first four are steady-state
+protocol defects. #2517 is a *migration* defect: #2510's durable sender counter is correct going
+forward, but its first initialisation had no bridge from the ephemeral counter it replaced, so an
+upgraded sender can resume below the high-water its peers already recorded. The protocol is right;
+the transition into it is not.
+
+> **Correct steady-state protocol semantics and safe migration from previously persisted or
+> distributed semantics are separate invariants.** Establishing the first does not establish the
+> second, and a faithful restore of a legacy value is still wrong.
+
+That wording is owned by [replay-state-restart-invariants.md](replay-state-restart-invariants.md)
+and is quoted verbatim here; change it there first.
+
+This matters for #2514 specifically: its invariant is *restore exactly what was accepted*, which is
+faithful — including to a legacy value that was already wrong. A receiver holding a pre-fix inflated
+high-water, or a legacy ephemeral-regime high-water, restores it precisely and still rejects
+legitimate traffic. Both currently resolve only when the peer window ages out after
+`max_peer_age_secs` of no accepted traffic, i.e. **recovery by timeout** — the property this whole
+investigation exists to eliminate.
 
 - #2505 kept traffic from flowing at all, so nobody could observe #2510's sequence regression.
 - #2510 caused peers to reject 100 % of a restarted node's traffic, which hid #2506's inbound cost.
@@ -98,6 +119,31 @@ The compounding behaviour (`+1000` per restart, encoded in
 each load. No incident, test, or comment justified a positive gap, the value 1000, or compounding.
 
 Full invariant statement: [replay-state-restart-invariants.md](replay-state-restart-invariants.md).
+
+**Live proof, 2026-08-03.** Merged `e3c14c4d`, image digest
+`sha256:c94f6535e4e6b4434f20b899d6c9d2baf51cbf13c38b2502fd5fc1e51966271d` from the cluster
+registry, deployed to alpha only. Beta ran continuously throughout (`restarts=0`, up since `00:17:15Z`);
+gamma and delta were not touched. Three alpha restarts — the migration deploy that rolled the image,
+then two deliberate receiver-only restarts — with **zero** replay rejections in every case. The
+deploy restart is the one that crossed the code boundary and so has no comparable pre-fix timing
+line; the two deliberate restarts, both entirely on the fixed image, are timed below:
+
+```
+restart #1  06:51:58.795  command
+            06:52:13.206  replay state loaded (no safety_gap field — pre-fix code gone)
+            06:52:13.260  connected to beta            (+54 ms)
+            ~06:52:15     digests flowing              recovery < 25 s
+
+restart #2  06:56:59.582  command
+            06:57:12.333  replay state loaded
+            06:57:12.396  connected to beta            (+63 ms)
+            06:58:13      6 digests received           no compounding
+```
+
+Against the pre-fix behaviour on the same pair — 566 rejections, 566 severity-1.0 events, 566 bans,
+and zero digests for a full hour — recovery is now bounded by connection setup rather than by
+sender sequence burn or `cleanup()` timeout. The second restart is the compounding control: the old
+code added another `+1000` per restart, and here the boundary did not move at all.
 
 ## Disproved hypotheses
 
