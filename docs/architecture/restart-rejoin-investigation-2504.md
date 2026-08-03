@@ -83,7 +83,9 @@ Recorded so they are not re-litigated. Each was plausible and is now ruled out b
 | mDNS was the source of the self-connections | **disproved** | `icn_network_peers_discovered = 0` on all four nodes; no node ever logged `Discovered peer:`. The source is the `network:candidates` gossip echo |
 | #2506 regressed after `045fa9e9` | **disproved** | self-dial / self-connection / own-DID replay / self-ban all zero on alpha and beta |
 | #2510 regressed after `045fa9e9` | **disproved** | both nodes resumed on durable monotonic counters (`resumed_at=9001`, `10001`) |
-| ~63 minutes is the #2514 recovery time | **NOT ESTABLISHED** | single confounded observation; recovery is direction- and state-dependent — see below |
+| ~63 minutes is the #2514 recovery time | **disproved** | the number was near-right for the wrong reason. Recovery came from `cleanup()` aging the window out at exactly `max_peer_age_secs`, not from the sender climbing the floor — beta was still 97 sequences short. See below |
+| the sender climbing past the floor is what ends the outage | **disproved (receiver direction)** | true for beta at t+5m51s, false for alpha; `cleanup()` won by ~6 min. Both mechanisms occur, one per direction |
+| bans are what block the restarted node | **disproved** | `is_banned` has no production caller; `with_security()` is never invoked so `registry.security()` is always `None`. Bans are recorded, persisted and metered but never consulted — the `ReplayGuard` floor is the whole outage |
 
 ## Live evidence
 
