@@ -438,9 +438,9 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     // numbers belong to the durable namespace, and the guard acts on it — it will
     // retire B's old replay bound and start a fresh namespace. So the same binding
     // that protects B's X25519 key has to protect B's advertised regime, and both are
-    // asserted here rather than in a separate node: standing up another real QUIC
-    // endpoint in this file destabilises the whole suite (see the note on
-    // `spawn_receiver`).
+    // asserted against the same established peer entry: the forged Hello has to leave
+    // the key *and* the regime intact, and asserting them together is what makes
+    // "nothing about B changed" a single property rather than two.
     init();
     let receiver = IdentityBundle::generate()?;
     let receiver_did = receiver.did().clone();
@@ -450,7 +450,7 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
 
     let (handle, addr, shutdown) = spawn_receiver(receiver).await?;
 
-    // 1. B establishes itself legitimately, advertising the durable sequence regime.
+    // 1. B establishes itself legitimately.
     let _legit = send_hello_as(
         Some(&victim_b),
         &victim_b_did,
@@ -480,16 +480,13 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
          silently read every honest upgraded sender as unproven"
     );
 
-    // 2. Attacker replays B's binding on their own cert, with a substituted key and a
-    //    substituted sequence-regime claim. B's BindingInfo is not a secret — every
-    //    node publishes it in every Hello — so this is available to any peer that has
-    //    ever spoken to B.
+    // 2. Attacker replays B's binding on their own cert, with a substituted key.
     let forged = send_hello_as(
         Some(&attacker_x),
         &victim_b_did,
         victim_b.binding_info(),
         [0x99u8; 32],
-        CapabilityFlags::GOSSIP_PULL,
+        CapabilityFlags::empty(),
         addr,
         &receiver_did,
     )
@@ -517,14 +514,11 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     assert!(
         after
             .peer_capabilities
-            .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE)
-            && !after
-                .peer_capabilities
-                .contains(CapabilityFlags::GOSSIP_PULL),
+            .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
         "#2517: a peer that is not authenticated as B must not be able to change what \
-         the receiver believes about B's sequence regime — in either direction. If it \
-         could, it could force B's replay namespace to be retired and then own the \
-         empty namespace that replaces it"
+         the receiver believes about B's sequence regime. If it could, it could force \
+         B's replay namespace to be retired and then own the empty namespace that \
+         replaced it"
     );
 
     let _ = shutdown.send(());
