@@ -14,6 +14,21 @@ is in [restart-rejoin-investigation-2504.md](restart-rejoin-investigation-2504.m
 > distributed semantics are separate invariants.** Establishing the first does not establish the
 > second, and a faithful restore of a legacy value is still wrong.
 
+> **A persisted replay high-water is interpretable only together with BOTH the receiver replay
+> semantics and the authenticated sender sequence regime that produced it.** Neither alone is
+> enough. A current receiver that records a number learned from an unproven sender, and labels it
+> current because *it* is current, has laundered a legacy value into current state — and nothing
+> downstream can tell the difference afterwards.
+
+Formally the meaning of a stored `max_seq` is a pair, not a scalar:
+
+```text
+meaning(max_seq) = ReceiverReplayRegime  ×  SenderSequenceRegime
+```
+
+The first version of the #2517 fix recorded only the left-hand factor. §8 is the record of why that
+was insufficient and what closes it.
+
 #2514 established that a receiver restores exactly the highest sequence it accepted. That is
 correct and it is not sufficient. `15915` restored faithfully is still `15915` written by a regime
 that no longer exists.
@@ -188,18 +203,33 @@ sequences its peers have already accepted.
 
 ## 6. Mixed-version compatibility
 
-| sender | receiver | behaviour |
-|---|---|---|
-| legacy ephemeral | legacy replay | legacy behaviour; sender restarts to 0, receiver rejects until `cleanup()` |
-| durable (#2510) | legacy replay | **#2517** — receiver holds a legacy high-water, rejects until `cleanup()` |
-| legacy ephemeral | migrating (#2517) | receiver holds the peer for the freshness horizon, then rebuilds from live traffic |
-| durable | migrating | receiver holds for the freshness horizon, then accepts normally |
-| durable | migrated | correct steady state (#2514 exact restore) |
-| durable | returning legacy peer, later upgraded | migrates on its own next boot; no online-during-upgrade requirement |
-| any | node rolled **back** under a newer store | refused indefinitely per §1a; needs an operator, not a wait |
+Two axes, so the matrix is over both. "Established" means this receiver has durable provenance that
+the peer's previous namespace was retired (§9.3).
+
+| previous sender regime | receiver state | new authenticated sender regime | expected |
+|---|---|---|---|
+| legacy | legacy replay (v0) | durable-v1 | bounded migration, then a second bounded migration on the sender axis |
+| legacy | current receiver, legacy-tagged high-water | durable-v1 | bounded migration |
+| legacy | current receiver | remains legacy | continues, high-water stays legacy-tagged |
+| durable-v1 | established durable-v1 | durable-v1 | normal steady state (#2514 exact restore) |
+| durable-v1 | established durable-v1 | missing capability | **downgrade → fail closed**, state retained |
+| — | transition in progress | receiver restarts | full hold restarts; never shortened |
+| — | transition in progress | sender disconnects | no promotion |
+| — | transition in progress | sender returns legacy | no promotion |
+| unknown future | any | any | fail closed, no deadline |
+| none (clean install) | no history | durable-v1 | **one bounded hold**, then established — see §9 |
+| durable-v1 | established, high-water aged out by `cleanup()` | durable-v1 | resumes immediately; provenance survived (§9.3) |
 
 > **Supported upgrade order: none is required.** Each node migrates its own state at its own next
-> restart, independently of what any peer is running.
+> restart, independently of what any peer is running. What migration *does* cost is a bounded
+> transition — see the two-hold entry in row 1, and §9.2 on why clean installs are not exempt.
+
+**Why the sender-first order costs two holds.** After the receiver-state migration completes, the
+sender axis returns to unproven rather than shortcutting to durable. The shortcut is only valid if
+the sender upgraded *before* the first hold began; if it upgraded during, its last legacy envelope
+was created at some `X` after the hold started and stays valid until `X + skew + max_age`, past the
+hold's end. A receiver cannot date a peer's upgrade, so it assumes the worse case. Pinned by
+`sender_first_upgrade_costs_two_sequential_holds_and_no_sender_restart`.
 
 ### The bound this does not fix
 
@@ -221,3 +251,255 @@ healed." Cumulative counters showed thousands of events over the same window.
 For any historical claim about live behaviour, prefer cumulative/monotonic metrics and direct
 inspection of persisted state. Note also that a restart resets process-scoped counters: evidence
 held only in a running process is destroyed by the event most likely to be under investigation.
+
+## 8. The sender sequence regime (the second axis)
+
+### 8.1 Why receiver-only versioning was insufficient
+
+Receiver-side semantic versioning makes `max_seq` interpretable *with respect to our own code*. It
+says nothing about whose numbering the value came from. The gap is reachable in ordinary operation:
+
+1. receiver A upgrades and correctly migrates its legacy replay state;
+2. sender B has **not** upgraded and is still emitting ephemeral sequences;
+3. A accepts B's traffic — compatibility during a rolling upgrade requires it;
+4. A records a high-water and stamps it *current*, because A is current;
+5. B later upgrades; its durable counter starts near 1;
+6. A rejects B against a bound belonging to a process that no longer exists.
+
+Step 6 is #2517, recreated — and now **invisible to the migration built to catch it**, because
+nothing about the entry looks legacy any more. The canonical regression is
+`receiver_first_upgrade_migrates_the_sender_regime_end_to_end`.
+
+> **Invariant.** A receiver must never convert legacy ephemeral sequence history into a
+> durable-current replay boundary. The regime recorded with an accepted sequence is the regime the
+> *window is established in*, never the regime the receiving binary implements.
+
+### 8.2 The signal: an authenticated capability
+
+`CapabilityFlags::DURABLE_SIGNING_SEQUENCE` asserts four things about the sender, not one:
+
+1. the signing sequence is persisted per-DID, not process-local;
+2. it survives process restart, crash included;
+3. it is monotonically increasing;
+4. it never reuses a sequence that may already have been emitted.
+
+It is advertised unconditionally by every binary implementing #2510, is not operator-configurable,
+and is not feature-gated — a build that could advertise it selectively could claim a namespace
+property its own storage layer does not provide.
+
+**Nothing may be substituted for it.** Not the software version string (unverified, and release
+naming has no protocol meaning), not sequence magnitude (a long-lived ephemeral counter looks
+exactly like a durable one), not observed monotonicity (an ephemeral counter is monotonic too,
+right up until it restarts), not the Kubernetes image, not uptime, and not `GRACEFUL_RESTART`
+(which is about snapshots and was already advertised by binaries with the ephemeral counter).
+
+### 8.3 Missing capability means `LegacyOrUnproven`, never `DurableV1`
+
+> **Invariant.** Absence of the capability is treated as unproven. It is never treated as durable.
+
+Three different peers land in "missing", and only one is dangerous:
+
+- a genuinely pre-#2510 ephemeral sender;
+- a #2510-era durable sender built before the capability existed;
+- a peer whose capabilities we simply do not hold.
+
+They are treated identically because nothing available to the receiver distinguishes them. The
+middle case pays a bounded one-time hold it does not strictly need; that is the accepted cost, and
+it is documented rather than optimised away. In particular, entries written by the intermediate
+receiver-only-versioning build carry `semantic_version = 1` and no sender axis, so they read as
+unproven — which is correct, because that build recorded numbers from senders it never asked about.
+
+### 8.4 Attribution depends on #2520
+
+The capability is usable as regime evidence **only** because Hello claims are bound to the
+certificate on the live QUIC connection. Production Hello attribution requires all three of:
+
+1. `message.from == binding_info.did`;
+2. the DID's key validates the BindingInfo signature;
+3. the BindingInfo certificate hash equals the certificate on the **current** connection.
+
+(1) and (2) alone prove only that the DID authenticated *some* certificate at some point. Every node
+publishes its BindingInfo in every Hello, so that pair is replayable by anyone who has ever spoken
+to the peer. (3) ties the claim to the live session. Without it, an unrelated attacker could assert
+`DURABLE_SIGNING_SEQUENCE` on B's behalf, force B's replay namespace to be retired, and then own
+the empty namespace that replaced it.
+
+Pinned by `forged_hello_does_not_corrupt_established_peer_state`, which asserts in both directions:
+an authenticated peer's advertised regime **is** recorded, and an unauthenticated peer cannot change
+it either way.
+
+## 9. Absence of local history is not absence of a legacy namespace
+
+This is the design gate that a first draft of §8 failed, and it is the subtlest part of #2517.
+
+An early version established the durable regime immediately when the receiver held no replay
+history for the peer, reasoning that there was "no old namespace to retire". **That reasoning is
+unsound.** `NoHistory` proves exactly one thing:
+
+> *this receiver* currently holds no numeric high-water for this DID.
+
+It does **not** prove that the DID never emitted envelopes under the legacy ephemeral namespace.
+A receiver can lack history because it just joined, never spoke to the peer, had its replay store
+repaired, or had the window removed by ordinary inactive-peer `cleanup()`. In every one of those
+cases the sender may have switched namespaces seconds ago, and envelopes from its previous
+namespace remain valid for the full freshness horizon.
+
+### 9.1 A current capability cannot classify a historical envelope
+
+`DURABLE_SIGNING_SEQUENCE` proves the authenticated peer is **currently** using durable semantics.
+It does not prove that *this particular envelope* was created under them. A `SignedEnvelope` carries
+`from`, a signed sequence, a timestamp, and a signature — and **no sequence-regime marker**.
+
+During the validity window the observables genuinely overlap:
+
+| | captured, signed just **before** B upgraded | legitimate, signed just **after** |
+|---|---|---|
+| B's signature | valid | valid |
+| freshness | passes | passes |
+| sequence | arbitrary, incomparable | arbitrary, incomparable |
+| B's current connection | advertises `DurableV1` | advertises `DurableV1` |
+
+There is no observable that separates them. This is an information-theoretic limit of the current
+wire format, not a coding gap, and it is stated here so no future change assumes otherwise.
+
+> **Invariant.** Current connection capabilities describe the sender *now*. They must never
+> retroactively relabel historical signed envelopes.
+
+Left unaddressed the consequence is severe and *worse* than an ordinary first-contact replay window:
+a captured legacy sequence (say 15915) is unboundedly above the sender's fresh durable counter, so
+accepting it both delivers a replay **and** poisons the durable namespace with a bound the
+legitimate sender cannot reach for a very long time — while being tagged current on both axes, so
+no migration can ever fire to clear it. Pinned by
+`a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace`.
+
+By contrast a replayed *durable-namespace* envelope can only carry a sequence the sender actually
+emitted, so it sets a floor at or below the sender's live counter and self-corrects. **Only the
+cross-namespace case needs the hold.** That asymmetry is why the retirement hold is sufficient
+rather than merely helpful.
+
+### 9.2 Consequence: no unproven→durable transition is ever immediate
+
+`LegacyOrUnproven` therefore covers both "known legacy" and "never established", because the two are
+behaviourally identical: in neither case do we hold proof that the peer's legacy namespace was
+retired. There is deliberately no third, more permissive state.
+
+> **Invariant.** A receiver may establish `DurableV1` replay semantics for a peer only after the
+> current connection proves the durable regime, all still-valid traffic from the previous namespace
+> has been retired by the horizon, and that transition has been made durable and crash-safe.
+
+**Cost, stated plainly.** Every (receiver, sender) pair pays one retirement hold, once — including a
+brand-new federation in which no legacy namespace ever existed, because nothing lets a receiver
+prove that. This is not a zero-interruption upgrade and must not be described as one. Removing the
+cost would require the envelope itself to name its namespace (an authenticated sequence epoch),
+which is a wire change with mixed-version impact and is deliberately **not** taken here.
+
+### 9.3 Provenance outlives the numeric high-water
+
+`cleanup()` deletes an inactive peer's high-water after `max_peer_age_secs`. If the established
+regime lived only in that entry, routine garbage collection would manufacture the §9 precondition on
+a receiver that had already done the work — re-imposing the hold every quiet hour, and, if absence
+were ever read as permission, far worse.
+
+> **Invariant.** Established sender-regime provenance is persisted separately from the numeric
+> replay window and is **not** removed by inactive-peer cleanup. Forgetting a high-water must never
+> be laundered into "there was never a legacy namespace".
+
+`replay_sender_regime:<did>` is written only at state transitions, so the common path costs no extra
+write; it is a few bytes per DID ever seen, bounded by federation size. Pinned by
+`established_regime_survives_replay_state_cleanup` and
+`cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed`.
+
+### 9.4 SignedEnvelope is self-authenticating, not connection-bound
+
+Traced during the #2517 design gate and recorded because it constrains what any future fix may
+assume:
+
+- the `MessagePayload::Signed` dispatch does **not** require `message.from == envelope.from`;
+- it does **not** compare the TLS-authenticated connection identity to `envelope.from`;
+- consequently an authenticated peer can deliver a third-party envelope, and
+  `peer_connections[envelope.from]` is the **latest known direct connection for that DID**, not the
+  connection that delivered this envelope. It may not exist at all.
+
+No in-tree relay currently does this, so it is a latent structural property rather than an exercised
+feature. It does not weaken the capability's authenticity — #2520 still guarantees the recorded
+capability is genuinely B's — but it does mean connection metadata and envelope creation regime are
+explicitly different concepts, which is the same conclusion §9.1 reaches from the temporal side.
+
+## 10. The sender-regime state machine
+
+```text
+                    observed: LegacyOrUnproven        observed: DurableV1
+LegacyOrUnproven    steady; high-water tagged LEGACY  -> TransitionToDurableV1 (hold)
+TransitionToDurable no promotion; stay held           hold until horizon, then promote
+DurableV1           DOWNGRADE -> fail closed, keep    steady; #2514 exact restore
+Unknown(v)          fail closed, no deadline          fail closed, no deadline
+```
+
+**Promotion requires current evidence, not merely elapsed time.** At the end of the horizon the
+receiver still requires the message in hand to carry a durable-v1 attribution. Because attribution
+is derived per-message from the peer's authenticated connection, it is current by construction: a
+peer that disconnected, returned without the capability, or was rolled back supplies no evidence and
+is not promoted. Pinned by
+`transition_does_not_promote_when_the_peer_returns_without_the_capability`.
+
+**Downgrade fails closed and preserves state.** Once `DurableV1` is established, a later
+authenticated connection omitting the capability must not erase the durable high-water — that would
+make replay-state reset reachable by downgrade. The legitimate cause is an operator rolling a peer
+back onto a pre-capability binary after migration completed; the answer is to roll it forward, and
+the receiver deliberately cannot distinguish an honest rollback from an induced one. Pinned by
+`a_stale_legacy_connection_cannot_downgrade_established_durable_state`.
+
+**Unknown sender regimes fail closed indefinitely**, on the same principle as §1a and on both the
+high-water tag and the provenance record: a known regime can have a bounded migration because its
+meaning is known; an unknown one cannot be reinterpreted by waiting.
+
+### 10.1 The retirement horizon
+
+Derived, never a literal:
+
+```text
+horizon = maximum permitted future clock skew + maximum permitted past age
+        = max_clock_skew + max_clock_skew          (verify_age is symmetric)
+        = 300s + 300s = 600s                        at the production configuration
+```
+
+An envelope accepted just before time `R` passed freshness then, so its timestamp `T <= R + skew`;
+it remains valid until `now > T + max_age`, i.e. until `R + skew + max_age`. A hold of a single
+`max_age` would end while such an envelope is at its *freshest*, which is why the naive
+single-interval arithmetic is wrong. If the two tolerances are ever configured separately, this must
+be recomputed from both, not left at `2 * max_clock_skew`.
+
+### 10.2 Crash semantics
+
+The transition is persisted **without a deadline**, and a receiver restarting mid-transition
+restarts the **full** monotonic hold rather than resuming a remembered one.
+
+This is deliberate. A persisted deadline would have to be a wall-clock time, and a clock jump or
+rollback could then *shorten* a security hold. Restarting the full hold can only lengthen the
+migration — the safe direction in which to be wrong. Every deadline in the module is a
+receiver-local elapsed duration on a monotonic clock; none is derived from a sender timestamp or
+from `SystemTime`.
+
+Promotion writes the reset numeric namespace first and the provenance record — the authority — last,
+so a crash in between leaves provenance still saying "transition" and the restart repeats the hold
+rather than accepting under a namespace it never finished proving.
+
+## 11. Capability lying: the honest threat model
+
+A peer controls what it advertises about its own implementation. That is acceptable, and it is worth
+being precise about why rather than waving at it.
+
+- **A third party cannot lie about B.** #2520 binds Hello claims to the current connection
+  certificate, so capabilities recorded against B prove B authenticated *this* connection.
+- **B can lie about B.** A peer holding B's DID key can advertise `DURABLE_SIGNING_SEQUENCE` while
+  running an ephemeral counter.
+
+The additional security consequence of that lie is bounded and specific: it lets B cause a receiver
+to retire B's own legacy replay bound early and start a fresh namespace for B. It does **not** grant
+anything against a third party's state. And an adversary holding B's DID key can already sign
+arbitrary fresh envelopes as B — sequences of its choosing, passing every check — so the capability
+grants it nothing it did not already have.
+
+> The capability's role is to let **honest, protocol-conforming** peers distinguish sequence
+> namespaces, and to remove the captured-message ambiguity that arises during migration. It is not,
+> and is not relied upon as, a defence against a peer that already controls its own DID key.

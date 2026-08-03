@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use icn_identity::KeyPair;
 use icn_net::envelope::PayloadType;
-use icn_net::replay_guard::ReplayGuard;
+use icn_net::replay_guard::{ObservedSenderRegime, ReplayGuard};
 use icn_net::signing_sequence::SigningSequenceCounter;
 use icn_net::SignedEnvelope;
 use icn_store::Store;
@@ -23,6 +23,24 @@ const OVER_ONE_BLOCK: usize = 1_500;
 fn temp_store() -> Arc<dyn Store> {
     Arc::new(icn_store::SledStore::temporary().unwrap())
 }
+
+/// Every sender in this file is the real [`SigningSequenceCounter`], so every sender
+/// here genuinely *is* durable. The receiver, however, has not yet completed the
+/// #2517 first-establishment hold for it — and that is deliberately the state these
+/// tests run in.
+///
+/// "Durable sender, not yet proven to this receiver" is a real and long-lived
+/// condition: it is what every peer looks like for the first 600 seconds of contact,
+/// and what a rolling upgrade looks like throughout. Replay protection must be fully
+/// intact there — floor, Bloom filter, durable high-water, crash safety — and pinning
+/// these tests to that state is what proves it. The post-establishment path is covered
+/// by `replay_guard::sender_regime_tests`, which can drive the clock.
+///
+/// Spelling the attribution at each call site rather than defaulting it is deliberate:
+/// the receiver may only treat a high-water as durable-v1 state when the sender has
+/// proven that namespace, and a helper that hid the argument would let a future test
+/// model the wrong thing silently.
+const UNPROVEN: ObservedSenderRegime = ObservedSenderRegime::LegacyOrUnproven;
 
 /// A receiver that persists replay state, as production does.
 fn persistent_guard(store: Arc<dyn Store>) -> ReplayGuard {
@@ -57,7 +75,7 @@ fn restarted_sender_is_accepted_by_a_peer_that_remembers_it() {
         for _ in 0..OVER_ONE_BLOCK {
             let seq = counter.next_sequence().unwrap();
             guard
-                .check(&envelope(&keypair, seq, b"incarnation-a"))
+                .check(&envelope(&keypair, seq, b"incarnation-a"), UNPROVEN)
                 .expect("steady-state traffic must be accepted");
         }
     }
@@ -74,7 +92,7 @@ fn restarted_sender_is_accepted_by_a_peer_that_remembers_it() {
         "restarted sender issued {seq}, at or below the peer's high-water mark {high_water}"
     );
     guard
-        .check(&envelope(&keypair, seq, b"incarnation-b"))
+        .check(&envelope(&keypair, seq, b"incarnation-b"), UNPROVEN)
         .expect("a restarted peer's first message must not be scored as a replay attack");
 }
 
@@ -92,7 +110,9 @@ fn ephemeral_counter_reproduces_the_2510_defect() {
         let counter = SigningSequenceCounter::in_memory();
         for _ in 0..OVER_ONE_BLOCK {
             let seq = counter.next_sequence().unwrap();
-            guard.check(&envelope(&keypair, seq, b"incarnation-a")).ok();
+            guard
+                .check(&envelope(&keypair, seq, b"incarnation-a"), UNPROVEN)
+                .ok();
         }
     }
 
@@ -105,7 +125,7 @@ fn ephemeral_counter_reproduces_the_2510_defect() {
         "precondition: the restarted counter must regress below the peer's high-water mark"
     );
 
-    let result = guard.check(&envelope(&keypair, seq, b"incarnation-b"));
+    let result = guard.check(&envelope(&keypair, seq, b"incarnation-b"), UNPROVEN);
     assert!(
         result.is_err(),
         "an ephemeral counter must still be caught by replay protection - \
@@ -129,7 +149,7 @@ fn captured_traffic_from_a_previous_incarnation_is_still_rejected() {
         for i in 0..OVER_ONE_BLOCK {
             let seq = counter.next_sequence().unwrap();
             let env = envelope(&keypair, seq, b"incarnation-a");
-            guard.check(&env).unwrap();
+            guard.check(&env, UNPROVEN).unwrap();
             // Attacker records a sample of the traffic.
             if i % 500 == 0 {
                 captured.push(env);
@@ -142,13 +162,13 @@ fn captured_traffic_from_a_previous_incarnation_is_still_rejected() {
     let counter = SigningSequenceCounter::new(sender_store).unwrap();
     let seq = counter.next_sequence().unwrap();
     guard
-        .check(&envelope(&keypair, seq, b"incarnation-b"))
+        .check(&envelope(&keypair, seq, b"incarnation-b"), UNPROVEN)
         .unwrap();
 
     // Every captured message must still be refused.
     for env in &captured {
         assert!(
-            guard.check(env).is_err(),
+            guard.check(env, UNPROVEN).is_err(),
             "captured incarnation-A message at sequence {} was accepted after restart",
             env.sequence
         );
@@ -175,9 +195,9 @@ fn clearing_replay_state_on_reconnect_would_reopen_captured_traffic() {
     let captured = {
         let mut guard = persistent_guard(temp_store());
         let env = envelope(&keypair, counter.next_sequence().unwrap(), b"captured");
-        guard.check(&env).unwrap();
+        guard.check(&env, UNPROVEN).unwrap();
         assert!(
-            guard.check(&env).is_err(),
+            guard.check(&env, UNPROVEN).is_err(),
             "precondition: while the window is held, the duplicate must be refused"
         );
         env
@@ -188,7 +208,7 @@ fn clearing_replay_state_on_reconnect_would_reopen_captured_traffic() {
     let mut cleared = persistent_guard(temp_store());
 
     assert!(
-        cleared.check(&captured).is_ok(),
+        cleared.check(&captured, UNPROVEN).is_ok(),
         "expected the cleared-state guard to accept previously-seen traffic; if this \
          ever fails the demonstration is stale, not fixed"
     );
@@ -207,17 +227,17 @@ fn reconnect_churn_does_not_reset_replay_state() {
     let counter = SigningSequenceCounter::new(sender_store).unwrap();
 
     let first = envelope(&keypair, counter.next_sequence().unwrap(), b"first");
-    guard.check(&first).unwrap();
+    guard.check(&first, UNPROVEN).unwrap();
 
     // Ten "reconnects" within one incarnation: the sequence namespace is unchanged.
     for _ in 0..10 {
         let seq = counter.next_sequence().unwrap();
         guard
-            .check(&envelope(&keypair, seq, b"same-incarnation"))
+            .check(&envelope(&keypair, seq, b"same-incarnation"), UNPROVEN)
             .unwrap();
 
         assert!(
-            guard.check(&first).is_err(),
+            guard.check(&first, UNPROVEN).is_err(),
             "replay state was reset by connection churn"
         );
     }
@@ -239,10 +259,10 @@ fn receiver_restart_preserves_replay_protection() {
         // Send several: the guard only persists max_seq when it advances, so a lone
         // message at sequence 0 would leave nothing on disk to reload.
         let first = envelope(&keypair, counter.next_sequence().unwrap(), b"before");
-        guard.check(&first).unwrap();
+        guard.check(&first, UNPROVEN).unwrap();
         for _ in 0..4 {
             let env = envelope(&keypair, counter.next_sequence().unwrap(), b"before");
-            guard.check(&env).unwrap();
+            guard.check(&env, UNPROVEN).unwrap();
         }
         first
     };
@@ -250,7 +270,7 @@ fn receiver_restart_preserves_replay_protection() {
     // Receiver restarts, reloading persisted state.
     let mut guard = persistent_guard(guard_store);
     assert!(
-        guard.check(&old).is_err(),
+        guard.check(&old, UNPROVEN).is_err(),
         "a pre-restart sequence was accepted after the receiver restarted"
     );
 }
@@ -264,16 +284,18 @@ fn traffic_from_one_did_does_not_reset_another_dids_state() {
     let counter = SigningSequenceCounter::new(temp_store()).unwrap();
 
     let alice_msg = envelope(&alice, counter.next_sequence().unwrap(), b"alice");
-    guard.check(&alice_msg).unwrap();
+    guard.check(&alice_msg, UNPROVEN).unwrap();
 
     // Mallory floods low sequences under her own DID.
     // (From 1: sequence 0 is always rejected, floor_seq starts at 0.)
     for seq in 1..50 {
-        guard.check(&envelope(&mallory, seq, b"mallory")).unwrap();
+        guard
+            .check(&envelope(&mallory, seq, b"mallory"), UNPROVEN)
+            .unwrap();
     }
 
     assert!(
-        guard.check(&alice_msg).is_err(),
+        guard.check(&alice_msg, UNPROVEN).is_err(),
         "another DID's traffic reset Alice's replay window"
     );
 }

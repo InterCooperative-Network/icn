@@ -88,6 +88,50 @@ bitflags::bitflags! {
         /// Falls back to bincode for peers without this capability.
         const POSTCARD_ENCODING = 0b100000000000;
 
+        /// This sender's `SignedEnvelope` sequence is durable DID state (#2510/#2517).
+        ///
+        /// Advertising this asserts all four parts, not just the first:
+        ///
+        /// 1. the sequence is persisted per-DID, not process-local;
+        /// 2. it survives process restart, crash included;
+        /// 3. it is monotonically increasing;
+        /// 4. it never reuses a sequence that may already have been emitted.
+        ///
+        /// # Why this is not a version string
+        ///
+        /// A receiver uses this to decide whether a peer's sequence numbers belong to
+        /// the durable namespace or to a pre-#2510 process-local counter that restarted
+        /// from zero on every boot. Those two namespaces are *numerically
+        /// incomparable*: a high-water of 15915 learned from an ephemeral incarnation
+        /// says nothing about a durable counter that legitimately begins at 1.
+        ///
+        /// Nothing else may be substituted for it. Not the software version string
+        /// (unverified, and cosmetic release naming has no protocol meaning), not the
+        /// observed sequence magnitude (an ephemeral counter with long uptime looks
+        /// exactly like a durable one), not observed monotonicity (an ephemeral counter
+        /// is monotonic too, right up until the process restarts), and not
+        /// [`GRACEFUL_RESTART`](Self::GRACEFUL_RESTART), which is about state snapshots
+        /// and was already advertised by binaries that had the ephemeral counter.
+        ///
+        /// # Absence is not evidence of absence, and that is deliberate
+        ///
+        /// A receiver must read a missing flag as `LegacyOrUnproven`, never as
+        /// durable. Missing covers three different peers — a genuinely pre-#2510
+        /// sender, a #2510-era durable sender built before this flag existed, and a
+        /// peer whose capabilities we simply do not have — and only the first is
+        /// actually dangerous. Treating all three as unproven costs the middle one a
+        /// bounded one-time migration; treating any of them as durable risks accepting
+        /// a sequence from a namespace we cannot bound. See
+        /// `docs/architecture/protocol-state-migration-invariants.md`.
+        ///
+        /// # Attribution
+        ///
+        /// This is only meaningful because #2520 binds Hello claims to the certificate
+        /// on the current QUIC connection: a capability recorded against DID B proves B
+        /// authenticated *this* connection. Before that, any peer could have replayed
+        /// B's published BindingInfo and asserted B's capabilities.
+        const DURABLE_SIGNING_SEQUENCE = 0b1000000000000;
+
         // Future capabilities can be added here
         // Reserve high bits for future use
     }
@@ -126,7 +170,13 @@ impl CapabilityFlags {
             | Self::MULTI_DEVICE
             | Self::ECONOMIC_SAFETY
             | Self::MESSAGE_COMPRESSION
-            | Self::POSTCARD_ENCODING;
+            | Self::POSTCARD_ENCODING
+            // Unconditional, and deliberately not behind a feature or a config knob:
+            // `SigningSequenceCounter` is the only signing-sequence implementation this
+            // binary has, and it is durable. A build that could advertise this
+            // selectively could claim a namespace property its storage layer does not
+            // provide, which is the one lie the receiver has no way to detect.
+            | Self::DURABLE_SIGNING_SEQUENCE;
 
         // Add post-quantum capabilities if feature is enabled
         #[cfg(feature = "post-quantum")]
@@ -244,6 +294,52 @@ mod tests {
         assert!(info.has_capability(CapabilityFlags::E2E_ENCRYPTION));
         assert!(info.has_capability(CapabilityFlags::SIGNED_MESSAGES));
         assert!(info.has_capability(CapabilityFlags::GRACEFUL_RESTART));
+    }
+
+    /// Every binary that implements the #2510 durable signing sequence must say so,
+    /// unconditionally.
+    ///
+    /// This is what lets a receiver tell "sender's sequences are durable DID state"
+    /// from "sender's sequences are a process-local counter that restarts at zero".
+    /// Under #2517 a receiver treats the *absence* of this flag as
+    /// `LegacyOrUnproven`, so a build that implements the invariant but forgets to
+    /// advertise it inflicts a needless migration hold on every peer it talks to.
+    #[test]
+    fn durable_signing_sequence_is_always_advertised() {
+        assert!(
+            CapabilityFlags::current().contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+            "this binary persists its signing sequence (signing_sequence.rs), so it must \
+             advertise DURABLE_SIGNING_SEQUENCE; receivers read its absence as the legacy \
+             ephemeral regime and hold the peer through a migration"
+        );
+
+        // Not behind any cfg: the durable counter is unconditional in
+        // `SigningSequenceCounter::new`, so the advertisement must be too. A
+        // feature-gated or operator-toggleable flag would let a node claim a
+        // sequence-namespace property its own storage layer does not implement.
+        let info = VersionInfo::new("icnd-test".to_string());
+        assert!(
+            info.has_capability(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+            "VersionInfo::new must carry the capability; it is derived from \
+             CapabilityFlags::current() and is not configurable"
+        );
+    }
+
+    /// The flag must occupy a bit no other capability uses, or a peer advertising
+    /// some unrelated feature would be read as proving its sequence namespace.
+    #[test]
+    fn durable_signing_sequence_does_not_alias_another_capability() {
+        let bit = CapabilityFlags::DURABLE_SIGNING_SEQUENCE;
+        let others = CapabilityFlags::all() & !bit;
+        assert!(
+            (others & bit).is_empty(),
+            "DURABLE_SIGNING_SEQUENCE must not share a bit with another capability"
+        );
+        assert_eq!(
+            bit.bits().count_ones(),
+            1,
+            "the sender-regime signal must be exactly one bit"
+        );
     }
 
     #[test]
