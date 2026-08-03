@@ -311,7 +311,35 @@ become acceptable again and only envelope freshness bounds the exposure. Pinned 
 discovered.</li>
 <li><strong>Failed <code>put</code> or <code>flush</code>.</strong> Fail closed, per §6.</li>
 </ul>
-<h2>9. Connection lifetime vs replay lifetime</h2>
+<h2>9. Migration: these invariants describe state created under the corrected protocol</h2>
+<p>Every invariant above governs replay state <strong>created by this code</strong>. None of them repair state that
+was written, or is remembered by a peer, under earlier sequence semantics. That is a separate
+invariant and it is not yet satisfied.</p>
+<p>The distinction is sharp enough to be worth stating as a rule:</p>
+<blockquote>
+<p><strong>Correct steady-state protocol semantics and safe migration from previously persisted or
+distributed semantics are separate invariants.</strong> Establishing the first does not establish the
+second, and a faithful restore of a legacy value is still wrong.</p>
+</blockquote>
+<p>Two known instances, both live-observed:</p>
+<ul>
+<li><strong>Sender side (#2517).</strong> <code>SigningSequenceCounter</code> initialises its durable counter without any
+bridge from the ephemeral counter it replaced, so a first upgrade can resume <em>below</em> the
+high-water its peers already recorded. Observed: a sender resumed at <code>10001</code> while a long-lived
+peer still remembered <code>15915</code> for it, and rejected every legitimate sequence in between.</li>
+<li><strong>Receiver side (#2514).</strong> §6 restores the durable high-water <em>exactly</em>. If that value was
+written by the pre-fix loader — which persisted <code>stored + 1000</code> on every load — the exactness is
+faithful to a number that was already inflated. Nothing in §6 detects this.</li>
+</ul>
+<p>Both currently &quot;heal&quot; the same way: the peer window ages out under §7 after <code>max_peer_age_secs</code> of
+no <strong>accepted</strong> traffic, because rejections never refresh liveness. That is recovery by timeout,
+which is precisely what the restart/rejoin work exists to eliminate, and it costs thousands of false
+misbehaviour and ban events on the way.</p>
+<p>A bridge is <strong>not</strong> designed here. The shape of the problem — a persisted record whose meaning
+changed without its format changing — suggests versioning the records so a reader can tell
+old-regime data from new and treat old-regime entries as untrusted rather than authoritative, which
+would cover both instances with one mechanism. That is for #2517 to decide, not this document.</p>
+<h2>10. Connection lifetime vs replay lifetime</h2>
 <p>Replay state is keyed by peer <strong>DID</strong>, not by connection. Reconnects, stale-connection replacement
 (#2505), and transport churn do not reset it. Conversely, the local identity is never admitted as a
 remote peer (#2506 / #2513), so a node cannot create replay state for itself.</p>
