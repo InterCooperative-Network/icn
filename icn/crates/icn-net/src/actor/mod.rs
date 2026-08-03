@@ -1091,8 +1091,9 @@ impl NetworkActor {
         // Use persistent mode if store is provided (critical for replay protection across restarts)
         let replay_guard = if let Some(ref store) = store {
             let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
-            // Load persisted state: floor at the durable high-water, plus a
-            // restart barrier covering the accepted-but-unflushed window (#2514)
+            // Load persisted state. The floor is the durable high-water, which
+            // is exactly the highest sequence ever accepted because it is
+            // flushed before acceptance returns (#2514).
             if let Err(e) = guard.load_persisted_state() {
                 warn!("Failed to load replay guard state: {}. Starting fresh.", e);
             }

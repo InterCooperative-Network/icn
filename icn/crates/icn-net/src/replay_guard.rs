@@ -16,7 +16,8 @@
 //! With persistence:
 //! - `max_seq` per peer is persisted to storage
 //! - `finalized` sequences (processed transactions) are persisted
-//! - On restart, a safety gap is applied to prevent any edge cases
+//! - On restart, the floor is the durable high-water, which equals the highest
+//!   sequence ever accepted because it is flushed before acceptance returns
 //!
 //! # Architecture
 //!
@@ -26,7 +27,7 @@
 //!   ├── Persistent store (Sled via icn-store)
 //!   │   ├── replay_max_seq:<did> → max sequence number
 //!   │   └── replay_finalized:<did>:<seq> → finalization timestamp
-//!   └── Safety gap on restart (+1000)
+//!   └── Durable high-water as the restart floor (no sequence gap)
 //! ```
 
 use crate::envelope::SignedEnvelope;
@@ -111,6 +112,27 @@ pub struct ReplayStateNotDurable {
     pub peer: String,
     /// The sequence number that could not be durably recorded.
     pub sequence: u64,
+}
+
+/// This receiver's durable replay state for the peer could not be read, so the
+/// peer is quarantined until nothing it sent before the restart could still be
+/// fresh.
+///
+/// Like [`ReplayStateNotDurable`], this is a **local** storage fault, not peer
+/// misbehaviour: the peer did nothing wrong, we simply cannot prove any sequence
+/// is new. Callers must not score it against the sender's reputation.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "replay state for {peer} was unreadable at startup; rejecting sequence {sequence} \
+     until {remaining_secs}s have passed and no pre-restart envelope can still be fresh"
+)]
+pub struct ReplayStateUnreadable {
+    /// The peer whose durable replay state could not be read.
+    pub peer: String,
+    /// The sequence number rejected by the quarantine.
+    pub sequence: u64,
+    /// Seconds remaining before the quarantine lifts.
+    pub remaining_secs: u64,
 }
 
 /// Persisted max sequence entry
@@ -241,7 +263,7 @@ impl ReplayGuard {
         }
     }
 
-    /// Load persisted state and apply restart safety gap
+    /// Load persisted replay state
     ///
     /// Must be called during node startup for persistent guards.
     /// Safe to call multiple times (idempotent via atomic flag).
@@ -424,13 +446,15 @@ impl ReplayGuard {
         // and `age > max_age` is false there — it is still valid for that
         // instant. See `envelope_validity_horizon`.
         if let Some(until) = window.quarantined_until {
-            if Instant::now() <= until {
-                bail!(
-                    "Rejecting {} sequence {}: durable replay state for this peer was \
-                     unreadable at startup, so the accepted high-water is unknown",
-                    envelope.from.as_str(),
-                    envelope.sequence
-                );
+            let now = Instant::now();
+            if now <= until {
+                // Typed, so the signed-message handler does not score our own
+                // unreadable state as peer misbehaviour.
+                return Err(anyhow::Error::new(ReplayStateUnreadable {
+                    peer: envelope.from.as_str().to_string(),
+                    sequence: envelope.sequence,
+                    remaining_secs: until.duration_since(now).as_secs(),
+                }));
             }
             window.quarantined_until = None;
         }
@@ -1612,6 +1636,13 @@ mod tests {
         ReplayGuard::current_time_ms()
     }
 
+    /// Check an envelope expecting rejection, returning the error for typing.
+    fn during_err(guard: &mut ReplayGuard, env: &SignedEnvelope) -> anyhow::Error {
+        guard
+            .check(env)
+            .expect_err("expected the guard to reject this envelope")
+    }
+
     /// Overwrite the durable max_seq for a peer, simulating a crash that lost
     /// unflushed writes: the receiver accepted up to `accepted`, but only
     /// `durable` reached disk.
@@ -2293,11 +2324,18 @@ mod tests {
         let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
         guard.load_persisted_state().unwrap();
 
-        // Fresh traffic during the quarantine is rejected...
+        // Fresh traffic during the quarantine is rejected — and typed as a
+        // local fault, so the peer is not scored for our unreadable state.
         let during =
             SignedEnvelope::new(sender.did(), &sender, 4, PayloadType::Gossip, b"m".to_vec())
                 .unwrap();
-        assert!(guard.check(&during).is_err());
+        let err = during_err(&mut guard, &during);
+        assert!(
+            err.downcast_ref::<ReplayStateUnreadable>().is_some(),
+            "quarantine rejections must be typed distinctly from replay \
+             detections, or the handler bans an innocent peer for OUR corrupt \
+             state — the exact false-positive class #2514 was about; got: {err}"
+        );
 
         // ...and accepted once the horizon has fully elapsed.
         std::thread::sleep(Duration::from_millis(2 * max_age * 1000 + 300));

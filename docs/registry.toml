@@ -837,7 +837,7 @@ category = "architecture"
 status = "living"
 truth_class = "normative"
 title = "Replay State and Restart Invariants"
-description = "Durability invariants for receiver-side replay protection across restart (#2514). Derives floor == highest-actually-accepted from the two-sided security/liveness constraint, showing why any constant sequence-space safety gap is a liveness bug; states the sender non-reuse guarantee (#2510), the restart timestamp barrier that closes the accepted-but-unflushed crash window in time rather than sequence space, and the freshness bound that makes replay-state expiry safe."
+description = "Durability invariants for receiver-side replay protection across restart (#2514). Derives floor == highest-actually-accepted from the two-sided security/liveness constraint, showing why any constant sequence-space safety gap is a liveness bug; states the sender non-reuse guarantee (#2510), durability before acceptance (which removes the accepted-but-unflushed crash window entirely), why wall-clock timestamps cannot order events across machines, and the freshness horizon that makes replay-state expiry safe."
 last_updated = "2026-08-03"
 last_reviewed = "2026-08-03"
 owner = "matt"
@@ -4530,7 +4530,7 @@ last_updated = "2026-07-28"
 # hand-maintained and no script reads or enforces it, so it drifts by design —
 # it had fallen to 240 against 358 actual rows before this correction. Recount
 # rather than increment if it looks stale again.
-total_entries = 360
+total_entries = 363
 categories_covered = ["architecture", "design", "strategy", "guide", "reference", "operations", "security"]
 maintained_by = "matt"
 note = "Comprehensive registry of ICN documentation. Status indicates authority level: canonical (authoritative), living (actively maintained), draft (in development), archived (historical reference only)."
