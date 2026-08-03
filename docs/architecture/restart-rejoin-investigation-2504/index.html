@@ -1,0 +1,400 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Restart/rejoin investigation (#2504) — causal record | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>restart rejoin investigation 2504</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/restart-rejoin-investigation-2504.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Restart/rejoin investigation (#2504) — causal record</h1>
+<p><strong>Status:</strong> living — investigation record, updated as the chain resolves
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — issue threads are authoritative; this is the navigable summary
+<strong>Last reviewed:</strong> 2026-08-03
+<strong>Source basis:</strong> live four-node K3s rehearsal federation, <code>72dfed8e</code> → <code>045fa9e9</code>
+<strong>Related invariant:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/network-identity-self-exclusion">network-identity-self-exclusion.md</a></p>
+<h2>Original symptom</h2>
+<p>Restarting a node in a healthy federation left it unable to rejoin. The restarted node reported
+<code>icn_gossip_network_size_estimate = 1</code>, never incremented <code>icn_gossip_digests_received_total</code>, and
+the whole <code>bloom_*</code> / <code>pull_*</code> / <code>bytes_pulled</code> metric family was absent — while untouched nodes sat
+at 4 and kept gossiping normally. Rollback did not recover it, because rollback is itself a restart.</p>
+<h2>Causal decomposition</h2>
+<p>Four independent defects, each masked by the one before it:</p>
+<pre><code>peer restart
+  → stale QUIC connection cache        #2505  fixed  adb9d07d
+  → ephemeral outbound signing seq     #2510  fixed  72dfed8e (PR #2511)
+  → local identity admitted as remote  #2506  fixed  045fa9e9 (PR #2513)
+  → receiver restart replay floor      #2514  OPEN — current blocker
+</code></pre>
+<p><strong>The masking is the important part.</strong> Each fix made the next defect reachable for the first time,
+so a newly appearing blocker is evidence the previous fix worked, not that it was wrong.</p>
+<ul>
+<li>#2505 kept traffic from flowing at all, so nobody could observe #2510&#39;s sequence regression.</li>
+<li>#2510 caused peers to reject 100 % of a restarted node&#39;s traffic, which hid #2506&#39;s inbound cost.</li>
+<li>#2506&#39;s self-pollution meant a node barely received from its peers, so it never persisted a peer
+high-water mark — which is exactly what #2514 needs in order to bite.</li>
+</ul>
+<h3>#2505 — connection registry treated map occupancy as liveness</h3>
+<p><code>SessionManager.connections</code> never reaped dead entries and refused to replace them, so every
+surviving peer held a dead <code>quinn::Connection</code> for a restarted peer&#39;s DID until its own process
+restarted. The fix treats a connection whose <code>close_reason().is_some()</code> as absent. Both inbound
+paths were unified behind <code>install_incoming_connection</code> after the first commit was found to fix a
+helper that production did not call.</p>
+<h3>#2510 — two sequence spaces, only the wrong one durable</h3>
+<p>The encryption nonce sequence was persisted; the <strong>signing</strong> sequence — the one the peer&#39;s
+<code>ReplayGuard</code> actually checks — was <code>AtomicU64::new(0)</code>. A restarted sender therefore replayed from
+zero and accrued severity-1.0 violations for the crime of restarting. Fixed with a durable
+block-reserved counter whose watermark is flushed before any sequence in the block is emitted.</p>
+<h3>#2506 — local identity admitted as a remote peer</h3>
+<p>A node published its own <code>ConnectionCandidate</code>, gossip echoed it back over <code>network:candidates</code>, and
+the node cached it as a dial target and dialed both of its own advertised endpoints. The resulting
+self-connection carried real signed traffic into the node&#39;s own replay guard and misbehaviour
+detector; after a restart its resumed signing sequence sat below its own persisted replay floor, so
+it scored its own messages as replays and banned its own DID.</p>
+<p>Invariant and ownership: <a href="https://github.com/InterCooperative-Network/icn/blob/main/network-identity-self-exclusion">network-identity-self-exclusion.md</a>.</p>
+<h3>#2514 — receiver&#39;s restart safety gap (open)</h3>
+<p><code>ReplayGuard::load_and_apply_safety_gap</code> sets <code>floor_seq = stored_max_seq + 1000</code> for every peer on
+the <strong>receiver&#39;s</strong> restart. A sender that did not restart has no reason to jump forward by 1000, so
+the restarted receiver rejects up to a thousand legitimate messages and escalates each to a ban.</p>
+<p>The <code>floor_seq</code> mechanism itself is sound and must be preserved — the bloom filter is transient
+after restart, so a floor at the true high-water is the only thing rejecting pre-restart replays.
+It is the <code>+1000</code> that has no corresponding threat.</p>
+<h2>Disproved hypotheses</h2>
+<p>Recorded so they are not re-litigated. Each was plausible and is now ruled out by evidence.</p>
+<table>
+<thead>
+<tr>
+<th>hypothesis</th>
+<th>verdict</th>
+<th>what settled it</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#2490 rate-limit tier work caused it</td>
+<td><strong>disproved</strong></td>
+<td>the banning node ran the old image with old limits; peer banning predates the change</td>
+</tr>
+<tr>
+<td><code>burst=2</code> caused it</td>
+<td><strong>disproved / never testable at that stage</strong></td>
+<td>the canary never ran on a healthy node; confounded by #2504 itself</td>
+</tr>
+<tr>
+<td>it was simply lost transport connectivity</td>
+<td><strong>disproved</strong></td>
+<td>Hello/Ping/Pong healthy at 1 ms RTT throughout; failures are entirely above transport</td>
+</tr>
+<tr>
+<td>ban state alone explained it</td>
+<td><strong>disproved</strong></td>
+<td>clearing a ban restored packet flow without restoring gossip participation</td>
+</tr>
+<tr>
+<td>bans are in-memory and clear on restart</td>
+<td><strong>disproved</strong></td>
+<td>bans are persisted and reloaded; <code>Loaded misbehavior state: … 3 banned</code></td>
+</tr>
+<tr>
+<td>mDNS was the source of the self-connections</td>
+<td><strong>disproved</strong></td>
+<td><code>icn_network_peers_discovered = 0</code> on all four nodes; no node ever logged <code>Discovered peer:</code>. The source is the <code>network:candidates</code> gossip echo</td>
+</tr>
+<tr>
+<td>#2506 regressed after <code>045fa9e9</code></td>
+<td><strong>disproved</strong></td>
+<td>self-dial / self-connection / own-DID replay / self-ban all zero on alpha and beta</td>
+</tr>
+<tr>
+<td>#2510 regressed after <code>045fa9e9</code></td>
+<td><strong>disproved</strong></td>
+<td>both nodes resumed on durable monotonic counters (<code>resumed_at=9001</code>, <code>10001</code>)</td>
+</tr>
+<tr>
+<td>~63 minutes is the #2514 recovery time</td>
+<td><strong>disproved</strong></td>
+<td>the number was near-right for the wrong reason. Recovery came from <code>cleanup()</code> aging the window out at exactly <code>max_peer_age_secs</code>, not from the sender climbing the floor — beta was still 97 sequences short. See below</td>
+</tr>
+<tr>
+<td>the sender climbing past the floor is what ends the outage</td>
+<td><strong>disproved (receiver direction)</strong></td>
+<td>true for beta at t+5m51s, false for alpha; <code>cleanup()</code> won by ~6 min. Both mechanisms occur, one per direction</td>
+</tr>
+<tr>
+<td>bans are what block the restarted node</td>
+<td><strong>disproved</strong></td>
+<td><code>is_banned</code> has no production caller; <code>with_security()</code> is never invoked so <code>registry.security()</code> is always <code>None</code>. Bans are recorded, persisted and metered but never consulted — the <code>ReplayGuard</code> floor is the whole outage</td>
+</tr>
+</tbody></table>
+<h2>Live evidence</h2>
+<p>Four-node K3s federation. gamma and delta were never touched and remained on <code>828eb596</code> throughout,
+serving as controls.</p>
+<h3>#2506, before and after (alpha)</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pre-fix (6.3 h)</th>
+<th>post-fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>connection events from own pod IP</td>
+<td>5192 of 5451 (<strong>95.2 %</strong>)</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>self-dials</td>
+<td>111</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>own connection candidates received</td>
+<td>111</td>
+<td>3</td>
+</tr>
+<tr>
+<td>…of which stored as dial targets</td>
+<td><strong>111</strong></td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>self-replay / quarantine / ban</td>
+<td>167 / 167 / 167</td>
+<td><strong>0 / 0 / 0</strong></td>
+</tr>
+</tbody></table>
+<p>Pre-fix, <strong>all 111</strong> candidates alpha received in 6.3 hours were its own — it never received a
+remote peer&#39;s candidate at all.</p>
+<p>gamma is the natural control that isolates the mechanism: <strong>5014 self-connections, zero self-replays,
+zero self-bans</strong>, because it never restarted. Self-connection is always present and harmless alone;
+the restart is what weaponises it.</p>
+<h3>#2514, as observed</h3>
+<p>Beta restarted <code>00:17:19Z</code>; alpha restarted <code>00:18:46Z</code> — <strong>87 seconds apart</strong>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>alpha&#39;s persisted high-water for beta</td>
+<td>10011</td>
+</tr>
+<tr>
+<td>applied gap</td>
+<td>1000</td>
+</tr>
+<tr>
+<td>alpha&#39;s effective floor for beta</td>
+<td><strong>11011</strong></td>
+</tr>
+<tr>
+<td>beta&#39;s live sequence just after alpha&#39;s restart</td>
+<td>10017</td>
+</tr>
+<tr>
+<td>beta&#39;s observed rate</td>
+<td>15.0 seq/min (276 samples over 29 min)</td>
+</tr>
+</tbody></table>
+<p>Beta — the side that did <em>not</em> restart in that action — began accepting alpha&#39;s traffic at
+<strong>t+5m51s</strong>, by the sender-climb path: alpha&#39;s own restart burned a fresh sequence block, which
+cleared beta&#39;s floor quickly. Alpha, receiving from a peer that did not restart and therefore did
+not jump forward, got no such help.</p>
+<p><strong>Alpha recovered at t+60.0 min — and not by climbing the floor.</strong> Beta was still at sequence 10914,
+97 short of the 11011 floor, when <code>cleanup()</code> aged the window out at exactly
+<code>max_peer_age_secs = 3600</code>:</p>
+<pre><code>01:18:49  LAST beta rejection — sequence 10914, floor 11011
+01:18:51  Replay guard cleanup: 2 -&gt; 0 peers (2 removed)     &lt;- start + 3600s
+01:19:39  alpha digests_received &gt; 0
+</code></pre>
+<p><code>last_update</code> is written only on the <strong>accepted</strong>-message path (<code>replay_guard.rs:375</code>) and at window
+creation (<code>:649</code>); the floor check bails before reaching it. So a window rejecting everything never
+refreshes its own liveness and ages out on a fixed timer. 566 rejections did not extend it.</p>
+<p><strong>Corrected model:</strong></p>
+<pre><code>outage = min( time for sender to emit RESTART_SAFETY_GAP messages , max_peer_age_secs )
+</code></pre>
+<p>crossover at <code>1000/60 min</code> = <strong>16.7 msg/min</strong>. Beta sent at 15.0 msg/min — just below — so cleanup
+won by ~6 minutes over a ~66 min sender-climb ETA. Both mechanisms were observed in the same run,
+one per direction.</p>
+<p><strong>Do not carry forward the earlier &quot;~63 minutes&quot; figure.</strong> It was a rate extrapolation that happened
+to land near the right number for the wrong reason. Two candidate mechanisms agreeing within 10 % are
+not distinguishable by watching the clock — that near-tie is the methodological lesson here.</p>
+<p>Note the security interaction, undecided: aging the window out discards the restart floor with it, so
+after <code>max_peer_age_secs</code> of no accepted traffic the protection #468 added is gone for that peer.</p>
+<h2>Open lead — candidate freshness (unresolved, do not promote)</h2>
+<p>Post-fix alpha received 143 of beta&#39;s connection candidates and stored <strong>none</strong>. By elimination on
+<code>CandidateCache::store</code>, a DID not already cached can only be refused on the freshness check — but
+the announce cadence (150 s) is deliberately half the TTL (300 s), so candidates should arrive
+fresh. Cluster clock sync is failing (<code>Insufficient time server responses: got 0, need 3</code>), and
+<code>is_fresh</code> depends on wall clock.</p>
+<p>Two live hypotheses, insufficient evidence to choose. <strong>Not filed as a defect.</strong> Requires causal
+evidence before promotion.</p>
+<h2>Issue and PR index</h2>
+<table>
+<thead>
+<tr>
+<th>issue</th>
+<th>PR</th>
+<th>merge SHA</th>
+<th>state</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#2504 restart/rejoin (umbrella)</td>
+<td>—</td>
+<td>—</td>
+<td><strong>open</strong>, blocked on #2514</td>
+</tr>
+<tr>
+<td>#2505 stale connection replacement</td>
+<td>#2505</td>
+<td><code>adb9d07d</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td>#2510 durable signing sequence</td>
+<td>#2511</td>
+<td><code>72dfed8e</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td>#2506 self-peer exclusion</td>
+<td>#2513</td>
+<td><code>045fa9e9</code></td>
+<td>closed</td>
+</tr>
+<tr>
+<td>#2514 receiver restart replay floor</td>
+<td>—</td>
+<td>—</td>
+<td><strong>open</strong></td>
+</tr>
+<tr>
+<td>#2507 undeclared <code>network:profiles</code></td>
+<td>—</td>
+<td>—</td>
+<td>open</td>
+</tr>
+<tr>
+<td>#2508 bans persist, no TTL</td>
+<td>—</td>
+<td>—</td>
+<td>open, compounds #2514</td>
+</tr>
+<tr>
+<td>#2509 candidate re-announcement</td>
+<td>—</td>
+<td>—</td>
+<td>open</td>
+</tr>
+<tr>
+<td>#2512 <code>banned_peers</code> gauge only increments</td>
+<td>—</td>
+<td>—</td>
+<td>open — do not use as ban-state truth</td>
+</tr>
+</tbody></table>
+<h2>Method notes worth keeping</h2>
+<ul>
+<li><strong><code>icn_misbehavior_banned_peers</code> is not current state</strong> (#2512). Every ban figure in this record is
+log-derived.</li>
+<li><strong>A test can pass against unfixed code for the wrong reason.</strong> #2506&#39;s dial test was written three
+times; the first two passed because quinn cannot connect to its own endpoint, then because a dial
+with no acceptor timed out. Check that the failure message is the assertion you wrote, and that
+the runtime is plausible.</li>
+<li><strong>Never read an exit code through a pipe</strong> — <code>cmd | tail; echo $?</code> reports the tail&#39;s status.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
