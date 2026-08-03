@@ -818,6 +818,20 @@ depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/strategy/ADR-0
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/restart-rejoin-investigation-2504.md"]
+category = "architecture"
+status = "living"
+truth_class = "descriptive"
+title = "Restart/Rejoin Investigation (#2504) - Causal Record"
+description = "Navigable causal record for the #2504 restart/rejoin chain: four defects each masked by the one before it (#2505 stale connection cache, #2510 ephemeral signing sequence, #2506 local identity admitted as remote, #2514 receiver restart replay floor). Records live evidence from the four-node rehearsal federation, the disproved hypotheses so they are not re-litigated, the unresolved candidate-freshness lead, and method notes. Issue threads remain authoritative; this is the summary."
+last_updated = "2026-08-03"
+last_reviewed = "2026-08-03"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+depends_on = ["docs/architecture/network-identity-self-exclusion.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/network-identity-self-exclusion.md"]
 category = "architecture"
 status = "living"
