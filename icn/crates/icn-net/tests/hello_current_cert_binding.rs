@@ -414,3 +414,59 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     let _ = shutdown.send(());
     Ok(())
 }
+
+/// COMPOSITION GUARD: the weak verifier must not be reachable from a new production path.
+///
+/// `verify_did_matches_binding` proves the binding belongs to the sender, but says nothing
+/// about the current connection. It is only safe when paired with `verify_binding_info`
+/// against the live peer certificate. This test fails if a future path picks up the weak
+/// helper on its own — the failure mode that produced this vulnerability in the first place.
+#[test]
+fn weak_binding_verifier_is_confined_to_authorised_sites() {
+    const AUTHORISED: &[&str] = &["src/handlers/hello.rs", "src/protocol.rs"];
+
+    let crate_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut offenders = Vec::new();
+    let mut stack = vec![crate_root.join("src")];
+
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("readable src dir") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let body = std::fs::read_to_string(&path).expect("readable rust file");
+            if !body.contains("verify_did_matches_binding") {
+                continue;
+            }
+            let rel = path
+                .strip_prefix(crate_root)
+                .expect("path under crate root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            if !AUTHORISED.contains(&rel.as_str()) {
+                offenders.push(rel);
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "`verify_did_matches_binding` appears outside the authorised sites {AUTHORISED:?}: \
+         {offenders:?}. On its own it does not bind the claimed DID to the current \
+         connection; pair it with `verify_binding_info(binding, current_peer_certificate(conn))` \
+         or route through the existing Hello handler."
+    );
+
+    // And the authorised Hello path must still perform the current-connection check.
+    let hello = std::fs::read_to_string(crate_root.join("src/handlers/hello.rs"))
+        .expect("hello handler readable");
+    assert!(
+        hello.contains("current_peer_certificate") && hello.contains("verify_binding_info"),
+        "the Hello handler must verify the binding against the current peer certificate"
+    );
+}
