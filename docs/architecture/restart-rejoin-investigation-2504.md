@@ -120,14 +120,40 @@ Beta restarted `00:17:19Z`; alpha restarted `00:18:46Z` — **87 seconds apart**
 | beta's observed rate | 15.0 seq/min (276 samples over 29 min) |
 
 Beta — the side that did *not* restart in that action — began accepting alpha's traffic at
-**t+5m51s**, because alpha's own restart burned a fresh sequence block and cleared beta's floor
-quickly. Alpha, receiving from a peer that did not restart and therefore did not jump forward, got
-no such help.
+**t+5m51s**, by the sender-climb path: alpha's own restart burned a fresh sequence block, which
+cleared beta's floor quickly. Alpha, receiving from a peer that did not restart and therefore did
+not jump forward, got no such help.
 
-**Do not generalise a recovery duration from this run.** The two restarts were 87 seconds apart, so
-both nodes carried freshly-reset block-boundary counters and both directions blocked at once.
-Recovery time under #2514 is receiver-, direction- and state-dependent. The defect is real
-regardless — the floor is applied unconditionally on any receiver restart.
+**Alpha recovered at t+60.0 min — and not by climbing the floor.** Beta was still at sequence 10914,
+97 short of the 11011 floor, when `cleanup()` aged the window out at exactly
+`max_peer_age_secs = 3600`:
+
+```
+01:18:49  LAST beta rejection — sequence 10914, floor 11011
+01:18:51  Replay guard cleanup: 2 -> 0 peers (2 removed)     <- start + 3600s
+01:19:39  alpha digests_received > 0
+```
+
+`last_update` is written only on the **accepted**-message path (`replay_guard.rs:375`) and at window
+creation (`:649`); the floor check bails before reaching it. So a window rejecting everything never
+refreshes its own liveness and ages out on a fixed timer. 566 rejections did not extend it.
+
+**Corrected model:**
+
+```
+outage = min( time for sender to emit RESTART_SAFETY_GAP messages , max_peer_age_secs )
+```
+
+crossover at `1000/60 min` = **16.7 msg/min**. Beta sent at 15.0 msg/min — just below — so cleanup
+won by ~6 minutes over a ~66 min sender-climb ETA. Both mechanisms were observed in the same run,
+one per direction.
+
+**Do not carry forward the earlier "~63 minutes" figure.** It was a rate extrapolation that happened
+to land near the right number for the wrong reason. Two candidate mechanisms agreeing within 10 % are
+not distinguishable by watching the clock — that near-tie is the methodological lesson here.
+
+Note the security interaction, undecided: aging the window out discards the restart floor with it, so
+after `max_peer_age_secs` of no accepted traffic the protection #468 added is gone for that peer.
 
 ## Open lead — candidate freshness (unresolved, do not promote)
 
