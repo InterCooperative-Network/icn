@@ -832,6 +832,20 @@ depends_on = ["docs/architecture/network-identity-self-exclusion.md"]
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/inbound-handshake-cancellation-2521.md"]
+category = "architecture"
+status = "living"
+truth_class = "descriptive"
+title = "Inbound Handshake Cancellation (#2521) - Causal Record"
+description = "Causal record for #2521: the inbound accept loop's 100ms shutdown-polling timeout wrapped SessionManager::accept(), which fuses the cancel-safe wait for new work with the cancel-unsafe QUIC/TLS handshake, so the deadline became a hidden maximum handshake lifetime. Records why the shared, re-armed budget made it a ~50% flake rather than a clean threshold, why the polling was load-bearing for shutdown lock liveness, the deterministic one-poll reproducer, the 40-run before/after real-QUIC comparison, and the disproved hypotheses (20s test timeout, 30s dial timeout, mDNS ghost peers, #2517/#2519 regression). Issue thread remains authoritative; this is the summary."
+last_updated = "2026-08-04"
+last_reviewed = "2026-08-04"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+depends_on = ["docs/architecture/restart-rejoin-investigation-2504.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/replay-state-restart-invariants.md"]
 category = "architecture"
 status = "living"
