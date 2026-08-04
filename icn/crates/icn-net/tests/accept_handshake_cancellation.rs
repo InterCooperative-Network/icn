@@ -530,3 +530,65 @@ async fn more_peers_than_the_handshake_cap_can_all_connect() -> Result<()> {
     );
     Ok(())
 }
+
+/// A client whose ALPN cannot be negotiated, so the server-side handshake fails.
+fn failing_client_endpoint() -> Result<Endpoint> {
+    let bundle = IdentityBundle::generate()?;
+    let mut rustls_client =
+        icn_net::tls::create_tofu_client_config(vec![bundle.tls_cert().clone()], bundle.tls_key())?;
+    // The receiver only speaks "icn/1"; ALPN negotiation therefore fails and the server's
+    // `incoming.await` resolves to Err — the error path under test.
+    rustls_client.alpn_protocols = vec![b"not-icn/1".to_vec()];
+    let mut endpoint = Endpoint::client("127.0.0.1:0".parse()?)?;
+    endpoint.set_default_client_config(ClientConfig::new(Arc::new(
+        quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client)?,
+    )));
+    Ok(endpoint)
+}
+
+/// A *failed* handshake must return its slot too, not just a successful one.
+///
+/// Raised in review on #2525: the concern was that the early `return` on
+/// `incoming.await == Err` skips the explicit `drop(permit)` and therefore leaks the slot,
+/// wedging acceptance after enough failures. It does not — the permit is a local moved into
+/// the task, so RAII releases it on every exit path — but "it should be fine" is not
+/// evidence, so this drives more failures than the cap and then requires a legitimate peer
+/// to still get through.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn failed_handshakes_release_their_slot() -> Result<()> {
+    init();
+    let (_handle, addr, shutdown_tx) = spawn_receiver().await?;
+
+    // Comfortably more failures than MAX_CONCURRENT_INBOUND_HANDSHAKES (64): if the error
+    // path leaked, the pool would be exhausted well before this many.
+    const FAILURES: usize = 80;
+
+    let mut dials = Vec::with_capacity(FAILURES);
+    for _ in 0..FAILURES {
+        let endpoint = failing_client_endpoint()?;
+        dials.push(tokio::spawn(async move {
+            let r = tokio::time::timeout(
+                Duration::from_secs(10),
+                endpoint.connect(addr, "localhost")?,
+            )
+            .await;
+            Ok::<_, anyhow::Error>((r, endpoint))
+        }));
+    }
+    for dial in dials {
+        let _ = dial.await;
+    }
+
+    // The real assertion: after 80 failed handshakes, acceptance still works.
+    let good = client_endpoint()?;
+    let result =
+        tokio::time::timeout(Duration::from_secs(10), good.connect(addr, "localhost")?).await;
+
+    let _ = shutdown_tx.send(());
+    assert!(
+        matches!(result, Ok(Ok(_))),
+        "a legitimate peer must still be accepted after {FAILURES} failed handshakes; if \
+         not, the handshake slot is leaked on the error path"
+    );
+    Ok(())
+}
