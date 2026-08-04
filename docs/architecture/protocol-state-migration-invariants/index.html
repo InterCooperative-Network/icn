@@ -1,0 +1,633 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Protocol state migration invariants | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>protocol state migration invariants</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/protocol-state-migration-invariants.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Protocol state migration invariants</h1>
+<p><strong>Status:</strong> current · <strong>Scope:</strong> <code>icn-net</code> — persisted replay state, durable signing sequence</p>
+<p>Persisted protocol-security state has a schema <em>and</em> a semantics. This document states the
+invariants for changing the second one. It is the design record for issue #2517 and the migration
+half of the #2504 restart/rejoin chain; the steady-state invariants are in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/replay-state-restart-invariants">replay-state-restart-invariants.md</a> and the narrative history
+is in <a href="https://github.com/InterCooperative-Network/icn/blob/main/restart-rejoin-investigation-2504">restart-rejoin-investigation-2504.md</a>.</p>
+<h2>1. The governing invariant</h2>
+<blockquote>
+<p><strong>Correct steady-state protocol semantics and safe migration from previously persisted or
+distributed semantics are separate invariants.</strong> Establishing the first does not establish the
+second, and a faithful restore of a legacy value is still wrong.</p>
+</blockquote>
+<blockquote>
+<p><strong>A persisted replay high-water is interpretable only together with BOTH the receiver replay
+semantics and the authenticated sender sequence regime that produced it.</strong> Neither alone is
+enough. A current receiver that records a number learned from an unproven sender, and labels it
+current because <em>it</em> is current, has laundered a legacy value into current state — and nothing
+downstream can tell the difference afterwards.</p>
+</blockquote>
+<p>Formally the meaning of a stored <code>max_seq</code> is a pair, not a scalar:</p>
+<pre><code class="language-text">meaning(max_seq) = ReceiverReplayRegime  ×  SenderSequenceRegime
+</code></pre>
+<p>The first version of the #2517 fix recorded only the left-hand factor. §8 is the record of why that
+was insufficient and what closes it.</p>
+<p>#2514 established that a receiver restores exactly the highest sequence it accepted. That is
+correct and it is not sufficient. <code>15915</code> restored faithfully is still <code>15915</code> written by a regime
+that no longer exists.</p>
+<p>The distinction that matters:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>question</th>
+<th>detected by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Schema version</strong></td>
+<td>can this binary <em>parse</em> the bytes?</td>
+<td>deserialisation failing</td>
+</tr>
+<tr>
+<td><strong>Semantic version</strong></td>
+<td>can this binary <em>believe</em> the parsed value?</td>
+<td>nothing, unless recorded</td>
+</tr>
+</tbody></table>
+<p>A value can parse perfectly and mean nothing. Every replay-state entry written before #2517 is in
+exactly that position: <code>MaxSeqEntry</code> never changed shape, so no parse ever failed, while the
+meaning of <code>max_seq</code> changed twice — once at #2510 (the sender&#39;s counter became durable, so
+pre-#2510 high-waters belong to an incarnation that no longer exists) and once at #2514 (restart
+stopped inflating the stored value by a fixed gap).</p>
+<blockquote>
+<p><strong>Invariant.</strong> Persisted state must identify the semantic regime under which it was produced
+whenever a future version cannot safely interpret old values identically.</p>
+</blockquote>
+<h2>1a. Known old semantics and unknown semantics are not the same problem</h2>
+<p>Recording the regime is only half of it. What a reader does with a regime it is not currently
+implementing splits sharply in two, and collapsing them is the mistake this section exists to
+prevent.</p>
+<blockquote>
+<p><strong>Invariant.</strong> Automatic migration is permitted only when the implementation contains an explicit
+migration from the identified source regime.</p>
+</blockquote>
+<blockquote>
+<p><strong>Invariant.</strong> Unknown semantic versions fail closed, with no deadline. Time passing cannot make
+unknown state semantics safe to reinterpret.</p>
+</blockquote>
+<p>The asymmetry is not squeamishness, it is what the bounded hold is actually built on. Retiring a
+legacy high-water after <code>future_skew + max_past_age</code> is safe <strong>because we know what regime produced
+it</strong> and can therefore bound how long anything produced under it stays dangerous. That argument is
+unavailable for a regime we have no migration for: a newer binary may have changed sequence
+interpretation, replay-window semantics, epoch handling, what persistence means, or freshness
+assumptions themselves. Waiting out a horizon derived from <em>our</em> assumptions proves nothing about
+state written under <em>different</em> ones.</p>
+<p>Concretely, the receiver enumerates rather than testing <code>!= current</code>:</p>
+<pre><code class="language-text">version == LEGACY (0)      -&gt; known regime, explicit migration exists
+                           -&gt; bounded fail-closed hold (validity horizon)
+                           -&gt; retire legacy value, rebuild under current semantics
+
+version == CURRENT (1)     -&gt; exact #2514 restore
+
+anything else              -&gt; no migration exists; meaning cannot be established
+                           -&gt; fail closed INDEFINITELY, no deadline to reach
+                           -&gt; never auto-graduates into current semantics
+                           -&gt; never overwritten or restamped by refused traffic
+                           -&gt; resolved by upgrading the binary or repairing the state
+</code></pre>
+<p>A regime introduced later gets its own arm <strong>and its own migration</strong>. Until it has one it falls to
+the catch-all and fails closed, which is the safe direction in which to forget something.</p>
+<p>In the implementation the indefinite case carries no expiry <em>field</em> — <code>PeerHold::UnsupportedVersion</code>
+has no <code>until</code> — so the property is structural rather than a matter of picking a large enough
+constant. There is nothing that can expire, and a reordering of the check cannot accidentally give
+it a deadline.</p>
+<p>It is reported as a distinct typed error, <code>ReplayStateUnsupportedVersion</code>, classified with
+<code>ReplayStateNotDurable</code>, <code>ReplayStateUnreadable</code>, and <code>ReplayStateLegacy</code> as a <strong>local</strong> condition:
+never a replay attack, never severity 1.0, never a ban, never reputation damage. It is logged at
+<code>error</code> rather than <code>warn</code> because it is the one local fault that does not resolve itself — an
+operator has to act, and a countdown would be a lie.</p>
+<p><strong>Receiver and sender agree here.</strong> The sender already refuses to open a watermark whose regime it
+does not implement, for the same reason: a sender that guesses reissues sequences its peers have
+already accepted. Neither side waits out an unknown.</p>
+<h2>2. Why this is one problem, not two</h2>
+<p>#2517 presents as two defects — an upgraded <em>sender</em> resuming below what peers remember, and an
+upgraded <em>receiver</em> restoring an obsolete floor. They are one defect seen from two ends.</p>
+<p>The sender-side symptom exists <strong>only because a receiver treats a legacy number as a
+current-semantic high-water.</strong> A sender emitting sequence 12901 is doing nothing wrong; the fault
+is entirely in the receiver&#39;s willingness to compare it against 15915. Correct the receiver&#39;s
+interpretation and the sender needs no migration: no sequence jump, no epoch field, no peer
+polling, and no wire-format change.</p>
+<p>The fix is therefore applied entirely at the receiver — but <em>applied at the receiver</em> is not the
+same as <em>computed from local state alone</em>, and §§8–11 are the reason.</p>
+<p>Versioning the receiver&#39;s own persisted replay state (§§4–6) is genuinely local. Legacy detection
+reads this receiver&#39;s own bytes, so a peer that was offline for the entire migration still detects
+and migrates its own state whenever it next boots: no online-during-upgrade requirement, no window
+to miss.</p>
+<p>Deciding <em>which sender namespace an arriving sequence belongs to</em> is not local, because the local
+record cannot answer it. Absence of a high-water is a fact about this receiver&#39;s memory, not about
+the sender&#39;s history (§9). That decision needs authenticated evidence about the sender, which is
+why the second axis reads a capability out of the peer&#39;s Hello and depends on #2520 binding that
+Hello to the certificate of the current connection (§8.4).</p>
+<p>An earlier revision of this section claimed the fix required &quot;no handshake&quot; and that it disposed of
+the offline-peer problem outright. That was true of the first axis and false of the second. It is
+corrected here rather than left standing to contradict §§8–11.</p>
+<h2>3. Rejected alternatives</h2>
+<p>Recorded so they are not re-litigated.</p>
+<p><strong>Recover the sender&#39;s legacy high-water locally.</strong> Impossible. The pre-#2510 counter was
+<code>Arc::new(AtomicU64::new(0))</code> in <code>init_send_callback.rs</code>, process-local and never persisted. No
+durable artifact exists. The apparent exception is an accident of #2506: while nodes admitted their
+own DID as a remote peer they recorded <code>replay_max_seq:&lt;own-did&gt;</code> about themselves. That artifact
+is frozen now that #2506 is fixed, absent on clean nodes, and is a bug&#39;s side effect rather than a
+record anything undertook to keep.</p>
+<p><strong>Ask peers for the highest sequence they remember.</strong> A malicious or compromised peer reports
+<code>u64::MAX</code> and pins the sender out of the federation permanently. Bounding the damage needs a
+quorum model that does not exist, and it still fails for peers that were offline during the
+exchange and return later holding a higher legacy value.</p>
+<p><strong>Start the new counter at a large constant above plausible legacy usage.</strong> The old counter was
+<code>fetch_add(1)</code> per outbound message with no protocol-level bound on uptime or rate, so no constant
+provably dominates it. This is the invented-future-sequence-space reasoning that produced #2514;
+&quot;nobody could have sent that many&quot; is not a proof.</p>
+<p><strong>Introduce explicit sequence epochs — <code>(sender DID, epoch, sequence)</code>.</strong> This is the option most
+likely to look right, and it does not work. The only party with the problem is a receiver still
+running legacy code, and a legacy receiver cannot interpret an epoch field — it goes on comparing
+raw sequences exactly as before. Epochs therefore fix nothing that receiver-side migration does not,
+while costing a wire-format change, a downgrade-attack surface, and a mixed-version compatibility
+matrix. Rejected on the merits, not on effort.</p>
+<h2>4. The mechanism</h2>
+<p><code>MaxSeqEntry</code> gains <code>#[serde(default)] semantic_version: u32</code>. The absence of the key <em>is</em> the
+signal: an entry written before the field existed deserialises to <code>0</code>, the legacy regime. Old
+binaries ignore the unknown key, so the change is additive in both directions.</p>
+<p>On load, an entry carrying the <strong>legacy</strong> regime does <strong>not</strong> become the floor. It enters the
+fail-closed hold #2514 already built for unreadable state — bounded by
+<code>envelope_validity_horizon()</code> — reported as the typed <code>ReplayStateLegacy</code>, which callers must not
+score as misbehaviour. <code>max_seq</code> and <code>floor_seq</code> stay at zero; freshness, not the floor, carries
+replay rejection for the duration. An entry from any regime without an explicit migration takes the
+indefinite path in §1a instead.</p>
+<blockquote>
+<p><strong>Invariant.</strong> Discarding a legacy high-water is safe only for as long as the peer is refused.
+The hold is <code>future_skew + max_past_age</code> — the interval after which any envelope captured under
+the old regime fails <code>verify_age</code>.</p>
+</blockquote>
+<p>At 300 s clock skew that is <strong>600 s</strong>, deterministic, versus the ~3600 s <code>max_peer_age_secs</code> expiry
+that currently ends these incidents by luck. Migration completes when the hold expires; the first
+subsequent acceptance persists a current-version entry, and later restarts take the ordinary #2514
+exact-restore path.</p>
+<p><strong>Unknown-forward is emphatically not this path</strong> — see §1a. A regime with no explicit migration is
+held with no deadline, reported as <code>ReplayStateUnsupportedVersion</code>, and never graduates into current
+semantics however long it waits. The bounded hold here is licensed by knowing what the legacy regime
+meant; that licence does not extend to a regime we cannot name.</p>
+<h3>Crash safety and idempotence</h3>
+<p>There is no separate promotion step to crash between: the version is stamped by the ordinary
+<code>persist_max_seq</code> write that any acceptance already performs.</p>
+<ul>
+<li>Crash before the hold expires → next boot re-reads a legacy entry, re-enters the hold. Fail-closed
+and idempotent; repeated restarts never lower a floor or extend one cumulatively.</li>
+<li>Crash after the first post-migration acceptance → the entry is already current-version, so the
+next boot takes the #2514 path. Migration is one-way.</li>
+<li>An entry held as unsupported is never written to at all, because the hold returns before any
+acceptance can persist. A refused peer therefore cannot restamp state a newer binary owns —
+which would be a silent downgrade — and restarting accumulates no progress toward accepting it.</li>
+</ul>
+<h2>5. Sender-side versioning</h2>
+<p>The sender needs no migration, but its watermark is stamped anyway so the next semantic change has
+a hook and an unknown regime fails closed rather than being guessed at.</p>
+<p>The version lives at a <strong>separate key</strong> from the watermark. <code>outgoing_signing_seq_reserved_end</code> is
+eight raw big-endian bytes that a pre-#2517 binary parses with a fixed-width <code>try_into</code>, so
+widening it in place would make a rollback fail to start on a store this binary had touched. A
+separate key is additive in both directions.</p>
+<p>On open: no version key → stamp the current one and leave the watermark <strong>exactly as found</strong> (it is
+monotonic by construction under both regimes; resetting it would recreate #2510). Current version →
+nothing to do. Anything else → refuse to open, because a sender that guesses wrong reissues
+sequences its peers have already accepted.</p>
+<h2>6. Mixed-version compatibility</h2>
+<p>Two axes, so the matrix is over both. &quot;Established&quot; means this receiver has durable provenance that
+the peer&#39;s previous namespace was retired (§9.3).</p>
+<table>
+<thead>
+<tr>
+<th>previous sender regime</th>
+<th>receiver state</th>
+<th>new authenticated sender regime</th>
+<th>expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>legacy</td>
+<td>legacy replay (v0)</td>
+<td>durable-v1</td>
+<td>bounded migration, then a second bounded migration on the sender axis</td>
+</tr>
+<tr>
+<td>legacy</td>
+<td>current receiver, legacy-tagged high-water</td>
+<td>durable-v1</td>
+<td>bounded migration</td>
+</tr>
+<tr>
+<td>legacy</td>
+<td>current receiver</td>
+<td>remains legacy</td>
+<td>continues, high-water stays legacy-tagged</td>
+</tr>
+<tr>
+<td>durable-v1</td>
+<td>established durable-v1</td>
+<td>durable-v1</td>
+<td>normal steady state (#2514 exact restore)</td>
+</tr>
+<tr>
+<td>durable-v1</td>
+<td>established durable-v1</td>
+<td>missing capability</td>
+<td><strong>downgrade → fail closed</strong>, state retained</td>
+</tr>
+<tr>
+<td>—</td>
+<td>transition in progress</td>
+<td>receiver restarts</td>
+<td>full hold restarts; never shortened</td>
+</tr>
+<tr>
+<td>—</td>
+<td>transition in progress</td>
+<td>sender disconnects</td>
+<td>no promotion</td>
+</tr>
+<tr>
+<td>—</td>
+<td>transition in progress</td>
+<td>sender returns legacy</td>
+<td>no promotion</td>
+</tr>
+<tr>
+<td>unknown future</td>
+<td>any</td>
+<td>any</td>
+<td>fail closed, no deadline</td>
+</tr>
+<tr>
+<td>none (clean install)</td>
+<td>no history</td>
+<td>durable-v1</td>
+<td><strong>one bounded hold</strong>, then established — see §9</td>
+</tr>
+<tr>
+<td>durable-v1</td>
+<td>established, high-water aged out by <code>cleanup()</code></td>
+<td>durable-v1</td>
+<td>resumes immediately; provenance survived (§9.3)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>Supported upgrade order: none is required.</strong> Each node migrates its own state at its own next
+restart, independently of what any peer is running. What migration <em>does</em> cost is a bounded
+transition — see the two-hold entry in row 1, and §9.2 on why clean installs are not exempt.</p>
+</blockquote>
+<p><strong>Why the sender-first order costs two holds.</strong> After the receiver-state migration completes, the
+sender axis returns to unproven rather than shortcutting to durable. The shortcut is only valid if
+the sender upgraded <em>before</em> the first hold began; if it upgraded during, its last legacy envelope
+was created at some <code>X</code> after the hold started and stays valid until <code>X + skew + max_age</code>, past the
+hold&#39;s end. A receiver cannot date a peer&#39;s upgrade, so it assumes the worse case. Pinned by
+<code>sender_first_upgrade_costs_two_sequential_holds_and_no_sender_restart</code>.</p>
+<h3>The bound this does not fix</h3>
+<p>A node still running legacy code holds its legacy high-water <strong>in memory</strong> and runs no migration
+logic — no shipped code reaches it. Its behaviour is unchanged until it restarts onto a binary that
+has this fix, and its in-memory state still expires only at <code>max_peer_age_secs</code>.</p>
+<p>This is a mixed-version property, not a migration failure, and it is not closable from this side:
+fixing it would require either a wire change a legacy receiver cannot parse, or an unsound sender
+jump. <strong>Migration fixes each node at its own upgrade. It cannot fix a node that has not upgraded.</strong></p>
+<h2>7. Operational note: bounded logs cannot prove absence</h2>
+<p><code>kubectl logs --since=X</code> returns nothing — not an error — when the retained buffer does not cover
+<code>X</code>. During the #2517 investigation a node&#39;s buffer rotated roughly every eight minutes at the
+volume it was producing, so a four-hour query returned empty and briefly read as &quot;the defect
+healed.&quot; Cumulative counters showed thousands of events over the same window.</p>
+<p>For any historical claim about live behaviour, prefer cumulative/monotonic metrics and direct
+inspection of persisted state. Note also that a restart resets process-scoped counters: evidence
+held only in a running process is destroyed by the event most likely to be under investigation.</p>
+<h2>8. The sender sequence regime (the second axis)</h2>
+<h3>8.1 Why receiver-only versioning was insufficient</h3>
+<p>Receiver-side semantic versioning makes <code>max_seq</code> interpretable <em>with respect to our own code</em>. It
+says nothing about whose numbering the value came from. The gap is reachable in ordinary operation:</p>
+<ol>
+<li>receiver A upgrades and correctly migrates its legacy replay state;</li>
+<li>sender B has <strong>not</strong> upgraded and is still emitting ephemeral sequences;</li>
+<li>A accepts B&#39;s traffic — compatibility during a rolling upgrade requires it;</li>
+<li>A records a high-water and stamps it <em>current</em>, because A is current;</li>
+<li>B later upgrades; its durable counter starts near 1;</li>
+<li>A rejects B against a bound belonging to a process that no longer exists.</li>
+</ol>
+<p>Step 6 is #2517, recreated — and now <strong>invisible to the migration built to catch it</strong>, because
+nothing about the entry looks legacy any more. The canonical regression is
+<code>receiver_first_upgrade_migrates_the_sender_regime_end_to_end</code>.</p>
+<blockquote>
+<p><strong>Invariant.</strong> A receiver must never convert legacy ephemeral sequence history into a
+durable-current replay boundary. The regime recorded with an accepted sequence is the regime the
+<em>window is established in</em>, never the regime the receiving binary implements.</p>
+</blockquote>
+<h3>8.2 The signal: an authenticated capability</h3>
+<p><code>CapabilityFlags::DURABLE_SIGNING_SEQUENCE</code> asserts four things about the sender, not one:</p>
+<ol>
+<li>the signing sequence is persisted per-DID, not process-local;</li>
+<li>it survives process restart, crash included;</li>
+<li>it is monotonically increasing;</li>
+<li>it never reuses a sequence that may already have been emitted.</li>
+</ol>
+<p>It is advertised unconditionally by every binary implementing #2510, is not operator-configurable,
+and is not feature-gated — a build that could advertise it selectively could claim a namespace
+property its own storage layer does not provide.</p>
+<p><strong>Nothing may be substituted for it.</strong> Not the software version string (unverified, and release
+naming has no protocol meaning), not sequence magnitude (a long-lived ephemeral counter looks
+exactly like a durable one), not observed monotonicity (an ephemeral counter is monotonic too,
+right up until it restarts), not the Kubernetes image, not uptime, and not <code>GRACEFUL_RESTART</code>
+(which is about snapshots and was already advertised by binaries with the ephemeral counter).</p>
+<h3>8.3 Missing capability means <code>LegacyOrUnproven</code>, never <code>DurableV1</code></h3>
+<blockquote>
+<p><strong>Invariant.</strong> Absence of the capability is treated as unproven. It is never treated as durable.</p>
+</blockquote>
+<p>Three different peers land in &quot;missing&quot;, and only one is dangerous:</p>
+<ul>
+<li>a genuinely pre-#2510 ephemeral sender;</li>
+<li>a #2510-era durable sender built before the capability existed;</li>
+<li>a peer whose capabilities we simply do not hold.</li>
+</ul>
+<p>They are treated identically because nothing available to the receiver distinguishes them. The
+middle case pays a bounded one-time hold it does not strictly need; that is the accepted cost, and
+it is documented rather than optimised away. In particular, entries written by the intermediate
+receiver-only-versioning build carry <code>semantic_version = 1</code> and no sender axis, so they read as
+unproven — which is correct, because that build recorded numbers from senders it never asked about.</p>
+<h3>8.4 Attribution depends on #2520</h3>
+<p>The capability is usable as regime evidence <strong>only</strong> because Hello claims are bound to the
+certificate on the live QUIC connection. Production Hello attribution requires all three of:</p>
+<ol>
+<li><code>message.from == binding_info.did</code>;</li>
+<li>the DID&#39;s key validates the BindingInfo signature;</li>
+<li>the BindingInfo certificate hash equals the certificate on the <strong>current</strong> connection.</li>
+</ol>
+<p>(1) and (2) alone prove only that the DID authenticated <em>some</em> certificate at some point. Every node
+publishes its BindingInfo in every Hello, so that pair is replayable by anyone who has ever spoken
+to the peer. (3) ties the claim to the live session. Without it, an unrelated attacker could assert
+<code>DURABLE_SIGNING_SEQUENCE</code> on B&#39;s behalf, force B&#39;s replay namespace to be retired, and then own
+the empty namespace that replaced it.</p>
+<p>Pinned by <code>forged_hello_does_not_corrupt_established_peer_state</code>, which asserts in both directions:
+an authenticated peer&#39;s advertised regime <strong>is</strong> recorded, and an unauthenticated peer cannot change
+it either way.</p>
+<h2>9. Absence of local history is not absence of a legacy namespace</h2>
+<p>This is the design gate that a first draft of §8 failed, and it is the subtlest part of #2517.</p>
+<p>An early version established the durable regime immediately when the receiver held no replay
+history for the peer, reasoning that there was &quot;no old namespace to retire&quot;. <strong>That reasoning is
+unsound.</strong> <code>NoHistory</code> proves exactly one thing:</p>
+<blockquote>
+<p><em>this receiver</em> currently holds no numeric high-water for this DID.</p>
+</blockquote>
+<p>It does <strong>not</strong> prove that the DID never emitted envelopes under the legacy ephemeral namespace.
+A receiver can lack history because it just joined, never spoke to the peer, had its replay store
+repaired, or had the window removed by ordinary inactive-peer <code>cleanup()</code>. In every one of those
+cases the sender may have switched namespaces seconds ago, and envelopes from its previous
+namespace remain valid for the full freshness horizon.</p>
+<h3>9.1 A current capability cannot classify a historical envelope</h3>
+<p><code>DURABLE_SIGNING_SEQUENCE</code> proves the authenticated peer is <strong>currently</strong> using durable semantics.
+It does not prove that <em>this particular envelope</em> was created under them. A <code>SignedEnvelope</code> carries
+<code>from</code>, a signed sequence, a timestamp, and a signature — and <strong>no sequence-regime marker</strong>.</p>
+<p>During the validity window the observables genuinely overlap:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>captured, signed just <strong>before</strong> B upgraded</th>
+<th>legitimate, signed just <strong>after</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B&#39;s signature</td>
+<td>valid</td>
+<td>valid</td>
+</tr>
+<tr>
+<td>freshness</td>
+<td>passes</td>
+<td>passes</td>
+</tr>
+<tr>
+<td>sequence</td>
+<td>arbitrary, incomparable</td>
+<td>arbitrary, incomparable</td>
+</tr>
+<tr>
+<td>B&#39;s current connection</td>
+<td>advertises <code>DurableV1</code></td>
+<td>advertises <code>DurableV1</code></td>
+</tr>
+</tbody></table>
+<p>There is no observable that separates them. This is an information-theoretic limit of the current
+wire format, not a coding gap, and it is stated here so no future change assumes otherwise.</p>
+<blockquote>
+<p><strong>Invariant.</strong> Current connection capabilities describe the sender <em>now</em>. They must never
+retroactively relabel historical signed envelopes.</p>
+</blockquote>
+<p>Left unaddressed the consequence is severe and <em>worse</em> than an ordinary first-contact replay window:
+a captured legacy sequence (say 15915) is unboundedly above the sender&#39;s fresh durable counter, so
+accepting it both delivers a replay <strong>and</strong> poisons the durable namespace with a bound the
+legitimate sender cannot reach for a very long time — while being tagged current on both axes, so
+no migration can ever fire to clear it. Pinned by
+<code>a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace</code>.</p>
+<p>By contrast a replayed <em>durable-namespace</em> envelope can only carry a sequence the sender actually
+emitted, so it sets a floor at or below the sender&#39;s live counter and self-corrects. <strong>Only the
+cross-namespace case needs the hold.</strong> That asymmetry is why the retirement hold is sufficient
+rather than merely helpful.</p>
+<h3>9.2 Consequence: no unproven→durable transition is ever immediate</h3>
+<p><code>LegacyOrUnproven</code> therefore covers both &quot;known legacy&quot; and &quot;never established&quot;, because the two are
+behaviourally identical: in neither case do we hold proof that the peer&#39;s legacy namespace was
+retired. There is deliberately no third, more permissive state.</p>
+<blockquote>
+<p><strong>Invariant.</strong> A receiver may establish <code>DurableV1</code> replay semantics for a peer only after the
+current connection proves the durable regime, all still-valid traffic from the previous namespace
+has been retired by the horizon, and that transition has been made durable and crash-safe.</p>
+</blockquote>
+<p><strong>Cost, stated plainly.</strong> Every (receiver, sender) pair pays one retirement hold, once — including a
+brand-new federation in which no legacy namespace ever existed, because nothing lets a receiver
+prove that. This is not a zero-interruption upgrade and must not be described as one. Removing the
+cost would require the envelope itself to name its namespace (an authenticated sequence epoch),
+which is a wire change with mixed-version impact and is deliberately <strong>not</strong> taken here.</p>
+<h3>9.3 Provenance outlives the numeric high-water</h3>
+<p><code>cleanup()</code> deletes an inactive peer&#39;s high-water after <code>max_peer_age_secs</code>. If the established
+regime lived only in that entry, routine garbage collection would manufacture the §9 precondition on
+a receiver that had already done the work — re-imposing the hold every quiet hour, and, if absence
+were ever read as permission, far worse.</p>
+<blockquote>
+<p><strong>Invariant.</strong> Established sender-regime provenance is persisted separately from the numeric
+replay window and is <strong>not</strong> removed by inactive-peer cleanup. Forgetting a high-water must never
+be laundered into &quot;there was never a legacy namespace&quot;.</p>
+</blockquote>
+<p><code>replay_sender_regime:&lt;did&gt;</code> is written only at state transitions, so the common path costs no extra
+write; it is a few bytes per DID ever seen, bounded by federation size. Pinned by
+<code>established_regime_survives_replay_state_cleanup</code> and
+<code>cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed</code>.</p>
+<h3>9.4 SignedEnvelope is self-authenticating, not connection-bound</h3>
+<p>Traced during the #2517 design gate and recorded because it constrains what any future fix may
+assume:</p>
+<ul>
+<li>the <code>MessagePayload::Signed</code> dispatch does <strong>not</strong> require <code>message.from == envelope.from</code>;</li>
+<li>it does <strong>not</strong> compare the TLS-authenticated connection identity to <code>envelope.from</code>;</li>
+<li>consequently an authenticated peer can deliver a third-party envelope, and
+<code>peer_connections[envelope.from]</code> is the <strong>latest known direct connection for that DID</strong>, not the
+connection that delivered this envelope. It may not exist at all.</li>
+</ul>
+<p>No in-tree relay currently does this, so it is a latent structural property rather than an exercised
+feature. It does not weaken the capability&#39;s authenticity — #2520 still guarantees the recorded
+capability is genuinely B&#39;s — but it does mean connection metadata and envelope creation regime are
+explicitly different concepts, which is the same conclusion §9.1 reaches from the temporal side.</p>
+<h2>10. The sender-regime state machine</h2>
+<pre><code class="language-text">                    observed: LegacyOrUnproven        observed: DurableV1
+LegacyOrUnproven    steady; high-water tagged LEGACY  -&gt; TransitionToDurableV1 (hold)
+TransitionToDurable no promotion; stay held           hold until horizon, then promote
+DurableV1           DOWNGRADE -&gt; fail closed, keep    steady; #2514 exact restore
+Unknown(v)          fail closed, no deadline          fail closed, no deadline
+</code></pre>
+<p><strong>Promotion requires current evidence, not merely elapsed time.</strong> At the end of the horizon the
+receiver still requires the message in hand to carry a durable-v1 attribution. Because attribution
+is derived per-message from the peer&#39;s authenticated connection, it is current by construction: a
+peer that disconnected, returned without the capability, or was rolled back supplies no evidence and
+is not promoted. Pinned by
+<code>transition_does_not_promote_when_the_peer_returns_without_the_capability</code>.</p>
+<p><strong>Downgrade fails closed and preserves state.</strong> Once <code>DurableV1</code> is established, a later
+authenticated connection omitting the capability must not erase the durable high-water — that would
+make replay-state reset reachable by downgrade. The legitimate cause is an operator rolling a peer
+back onto a pre-capability binary after migration completed; the answer is to roll it forward, and
+the receiver deliberately cannot distinguish an honest rollback from an induced one. Pinned by
+<code>a_stale_legacy_connection_cannot_downgrade_established_durable_state</code>.</p>
+<p><strong>Unknown sender regimes fail closed indefinitely</strong>, on the same principle as §1a and on both the
+high-water tag and the provenance record: a known regime can have a bounded migration because its
+meaning is known; an unknown one cannot be reinterpreted by waiting.</p>
+<h3>10.1 The retirement horizon</h3>
+<p>Derived, never a literal:</p>
+<pre><code class="language-text">horizon = maximum permitted future clock skew + maximum permitted past age
+        = max_clock_skew + max_clock_skew          (verify_age is symmetric)
+        = 300s + 300s = 600s                        at the production configuration
+</code></pre>
+<p>An envelope accepted just before time <code>R</code> passed freshness then, so its timestamp <code>T &lt;= R + skew</code>;
+it remains valid until <code>now &gt; T + max_age</code>, i.e. until <code>R + skew + max_age</code>. A hold of a single
+<code>max_age</code> would end while such an envelope is at its <em>freshest</em>, which is why the naive
+single-interval arithmetic is wrong. If the two tolerances are ever configured separately, this must
+be recomputed from both, not left at <code>2 * max_clock_skew</code>.</p>
+<h3>10.2 Crash semantics</h3>
+<p>The transition is persisted <strong>without a deadline</strong>, and a receiver restarting mid-transition
+restarts the <strong>full</strong> monotonic hold rather than resuming a remembered one.</p>
+<p>This is deliberate. A persisted deadline would have to be a wall-clock time, and a clock jump or
+rollback could then <em>shorten</em> a security hold. Restarting the full hold can only lengthen the
+migration — the safe direction in which to be wrong. Every deadline in the module is a
+receiver-local elapsed duration on a monotonic clock; none is derived from a sender timestamp or
+from <code>SystemTime</code>.</p>
+<p>Promotion writes the reset numeric namespace first and the provenance record — the authority — last,
+so a crash in between leaves provenance still saying &quot;transition&quot; and the restart repeats the hold
+rather than accepting under a namespace it never finished proving.</p>
+<h2>11. Capability lying: the honest threat model</h2>
+<p>A peer controls what it advertises about its own implementation. That is acceptable, and it is worth
+being precise about why rather than waving at it.</p>
+<ul>
+<li><strong>A third party cannot lie about B.</strong> #2520 binds Hello claims to the current connection
+certificate, so capabilities recorded against B prove B authenticated <em>this</em> connection.</li>
+<li><strong>B can lie about B.</strong> A peer holding B&#39;s DID key can advertise <code>DURABLE_SIGNING_SEQUENCE</code> while
+running an ephemeral counter.</li>
+</ul>
+<p>The additional security consequence of that lie is bounded and specific: it lets B cause a receiver
+to retire B&#39;s own legacy replay bound early and start a fresh namespace for B. It does <strong>not</strong> grant
+anything against a third party&#39;s state. And an adversary holding B&#39;s DID key can already sign
+arbitrary fresh envelopes as B — sequences of its choosing, passing every check — so the capability
+grants it nothing it did not already have.</p>
+<blockquote>
+<p>The capability&#39;s role is to let <strong>honest, protocol-conforming</strong> peers distinguish sequence
+namespaces, and to remove the captured-message ambiguity that arises during migration. It is not,
+and is not relied upon as, a defence against a peer that already controls its own DID key.</p>
+</blockquote>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

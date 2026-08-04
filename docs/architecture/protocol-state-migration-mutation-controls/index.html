@@ -1,0 +1,345 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Mutation controls for the #2517 migration tests | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>protocol state migration mutation controls</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/protocol-state-migration-mutation-controls.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Mutation controls for the #2517 migration tests</h1>
+<p><strong>Status:</strong> current · <strong>Scope:</strong> <code>icn-net</code> — <code>replay_guard</code>, <code>signing_sequence</code></p>
+<p>A test that passes on broken code is worse than no test, because it reports safety it has not
+established. This file records which deliberate defect each #2517 test actually catches, so a later
+change that quietly makes one of them vacuous is visible as a gap in this table rather than as a
+still-green suite.</p>
+<p>Companion to <a href="https://github.com/InterCooperative-Network/icn/blob/main/protocol-state-migration-invariants">protocol-state-migration-invariants.md</a>.</p>
+<h2>Method</h2>
+<p>Apply one defect to <code>origin/main</code> + the #2517 change, run
+<code>cargo test -p icn-net --lib -- migration_tests signing_sequence::tests</code>, record which tests fail,
+revert. Every mutation must kill at least one <strong>named</strong> test; a mutation that kills nothing means
+the property is unguarded.</p>
+<p>The final row is the control: with every mutation reverted the suite is green, which is what makes
+the failures above it meaningful rather than a broken checkout.</p>
+<h2>Results</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>defect introduced</th>
+<th>tests killed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Legacy state treated as current — the version branch always selects the current arm</td>
+<td><strong>10 killed</strong>, re-measured post-rebase: <code>legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever</code>, <code>migration_completes_at_the_envelope_validity_horizon</code>, <code>migration_runs_once_and_does_not_re_trigger_on_restart</code>, <code>crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy</code>, <code>unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon</code>, <code>a_known_version_without_a_migration_does_not_borrow_the_legacy_path</code>, <code>pre_2514_inflated_floor_does_not_survive_migration</code>, <code>state_rewritten_by_an_older_binary_is_treated_as_legacy</code>, <code>receiver_first_upgrade_migrates_the_sender_regime_end_to_end</code>, <code>sender_first_upgrade_costs_two_sequential_holds_and_no_sender_restart</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Sender resets the watermark when stamping an unversioned store (recreates #2510)</td>
+<td><code>unversioned_durable_watermark_is_stamped_without_disturbing_the_sequence</code>, <code>corrupt_watermark_is_rejected_rather_than_silently_reset</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Legacy state dropped immediately, with no fail-closed hold</td>
+<td><code>captured_legacy_envelope_stays_rejected_across_the_whole_migration</code>, <code>legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever</code>, <code>migration_completes_at_the_envelope_validity_horizon</code>, <code>migration_runs_once_and_does_not_re_trigger_on_restart</code>, <code>crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy</code>, <code>state_rewritten_by_an_older_binary_is_treated_as_legacy</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Current version never stamped on write, so migration re-runs forever</td>
+<td><code>migration_runs_once_and_does_not_re_trigger_on_restart</code>, <code>current_semantic_state_is_restored_exactly_and_not_migrated</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Sender accepts an unknown future regime instead of refusing to open</td>
+<td><code>unknown_future_semantic_version_refuses_to_start</code>, <code>corrupt_semantic_version_is_rejected</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Receiver routes unknown-future through the bounded legacy migration</strong></td>
+<td><code>unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon</code>, <code>a_known_version_without_a_migration_does_not_borrow_the_legacy_path</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Receiver treats an unknown future regime as a current-semantic floor</strong></td>
+<td><code>unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon</code>, <code>a_known_version_without_a_migration_does_not_borrow_the_legacy_path</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td><em>(all reverted — control)</em></td>
+<td>none; 23 passed, 0 failed</td>
+</tr>
+</tbody></table>
+<p>Mutation 3 is the security control: it is what proves the fail-closed hold is load-bearing rather
+than decorative. Discarding a legacy high-water without holding the peer makes a captured legacy
+envelope acceptable again, and <code>captured_legacy_envelope_stays_rejected_across_the_whole_migration</code>
+is the test that notices.</p>
+<p>Mutations 6 and 7 are the downgrade-safety controls, and they are the reason known-legacy and
+unknown-future do not share a branch. Both express &quot;an unknown regime becomes current&quot; — one by
+countdown, one immediately — and both must be caught. They kill exactly the two unknown-future
+tests and nothing else, which is what shows those tests discriminate the unsupported path from the
+bounded one rather than merely observing that something was rejected.</p>
+<h2>Recorded gap</h2>
+<p>Mutation 5 originally carried a receiver-side half that edited a single
+<code>entry.semantic_version != REPLAY_STATE_SEMANTIC_VERSION</code> branch. When that branch was replaced by
+an enumerated match, the edit stopped matching any source text and the receiver half became a silent
+no-op — the mutation still &quot;passed&quot; because its sender half killed tests. Mutation 7 exists because
+of that.</p>
+<p>The general hazard: a mutation applied by text substitution can stop applying when the code is
+restructured, and reports success either way. A mutation that kills <em>fewer</em> tests than it did before
+is the signal, which is why the counts above are recorded rather than just the pass/fail.</p>
+<p><strong>A second instance, caught in review rather than by the harness.</strong> Row 1 named a test
+<code>unknown_future_semantic_version_fails_closed</code> that does not exist — the test had been renamed to
+<code>unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon</code> and the table was not
+updated. Nothing failed: a kill list is prose, so a stale name in it is invisible to every gate.
+The row was corrected by <em>re-running</em> the mutation rather than by guessing which test the old name
+referred to, which is how the true kill count turned out to be 10 rather than the 5 recorded. This
+is the same failure mode as the no-op above, one level up: the harness can drift from the code, and
+the record can drift from the harness.</p>
+<h2>Sender sequence regime (§§8–11 of the invariants)</h2>
+<p>The second axis. Each defect below is applied alone to the merged branch, the suite is run, and the
+files are restored. <strong>8 of 8 killed.</strong></p>
+<p>Re-run in full after the branch was rebased onto <code>3c430ccb</code> (#2521), because both the production and
+test code changed underneath the branch. Counts below are from that run.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>defect introduced</th>
+<th>outcome</th>
+<th>kills</th>
+<th>tests killed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M1</td>
+<td>a missing <code>DURABLE_SIGNING_SEQUENCE</code> capability resolves to <code>DurableV1</code></td>
+<td>KILLED</td>
+<td>6</td>
+<td><code>missing_durable_capability_resolves_to_unproven_not_durable</code>, <code>test_replay_attack_rejected</code>, <code>test_multiple_senders_independent</code>, <code>test_out_of_order_messages_forwarded</code>, <code>test_sequential_messages_forwarded</code>, <code>test_valid_signature_forwarded</code></td>
+</tr>
+<tr>
+<td>M2</td>
+<td>an accepted sequence is stamped <code>DurableV1</code> regardless of the window&#39;s established regime</td>
+<td>KILLED</td>
+<td>7</td>
+<td><code>legacy_sender_traffic_is_never_recorded_as_durable_v1</code>, <code>a_sender_that_stays_legacy_keeps_working_and_stays_tagged_legacy</code>, <code>cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed</code>, <code>crash_before_the_transition_marker_resumes_from_legacy_state</code>, <code>receiver_first_upgrade_migrates_the_sender_regime_end_to_end</code>, <code>current_semantic_state_is_restored_exactly_and_not_migrated</code>, <code>migration_runs_once_and_does_not_re_trigger_on_restart</code></td>
+</tr>
+<tr>
+<td>M3</td>
+<td><code>LegacyOrUnproven → DurableV1</code> establishes directly, skipping the retirement hold</td>
+<td>KILLED</td>
+<td>15</td>
+<td>all of <code>sender_regime_tests</code> that depend on the hold, incl. <code>receiver_first_upgrade_migrates_the_sender_regime_end_to_end</code>, <code>a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace</code>, <code>first_contact_with_a_durable_sender_costs_exactly_one_hold</code>, <code>established_regime_survives_replay_state_cleanup</code>, <code>repeated_restarts_during_transition_never_shorten_the_hold</code></td>
+</tr>
+<tr>
+<td>M4</td>
+<td>promotion no longer requires current authenticated <code>DurableV1</code> evidence</td>
+<td>KILLED</td>
+<td>1</td>
+<td><code>transition_does_not_promote_when_the_peer_returns_without_the_capability</code></td>
+</tr>
+<tr>
+<td>M5</td>
+<td>a downgrade resets the peer to unproven and clears its high-water</td>
+<td>KILLED</td>
+<td>2</td>
+<td><code>a_stale_legacy_connection_cannot_downgrade_established_durable_state</code>, <code>receiver_first_upgrade_migrates_the_sender_regime_end_to_end</code></td>
+</tr>
+<tr>
+<td>M6</td>
+<td>the transition is not written to the durable provenance record</td>
+<td>KILLED</td>
+<td>1</td>
+<td><code>the_transition_is_recorded_in_the_durable_provenance_record</code></td>
+</tr>
+<tr>
+<td>M7</td>
+<td>an unrecognised provenance value is read as <code>LegacyOrUnproven</code></td>
+<td>KILLED</td>
+<td>1</td>
+<td><code>unknown_provenance_value_fails_closed_and_never_expires</code></td>
+</tr>
+<tr>
+<td>M8</td>
+<td>the Hello current-certificate check is removed, so capabilities are not bound to the connection</td>
+<td>KILLED</td>
+<td>3</td>
+<td><code>forged_hello_does_not_corrupt_established_peer_state</code>, <code>hello_replayed_onto_a_different_current_cert_is_rejected</code>, <code>weak_binding_verifier_is_confined_to_authorised_sites</code></td>
+</tr>
+<tr>
+<td>M9</td>
+<td>the migration hold is no longer classified as a local fault, so held traffic is scored</td>
+<td>KILLED</td>
+<td>1</td>
+<td><code>a_peer_held_through_the_migration_is_never_scored_quarantined_or_banned</code></td>
+</tr>
+<tr>
+<td>M10</td>
+<td><code>DURABLE_SIGNING_SEQUENCE</code> is redefined to alias <code>POSTCARD_ENCODING</code>&#39;s bit</td>
+<td>KILLED</td>
+<td>1</td>
+<td><code>capability_bits_are_pairwise_disjoint</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td>control (pre and post)</td>
+<td>—</td>
+<td>0</td>
+<td>green: 339 lib + 7 Hello + 7 <code>signing_sequence_replay</code> + 7 <code>accept_handshake_cancellation</code></td>
+</tr>
+</tbody></table>
+<p><strong>10 of 10 killed, 0 survivors, 0 no-ops.</strong> M4–M10 kill exactly the property named and nothing else,
+which is what shows those tests discriminate rather than merely observing that something failed.</p>
+<p>M9 was added late, because the property had no test at all. The handler classified
+<code>SenderRegimeTransition</code> as a local fault and excluded it from scoring, and the reasoning for that
+was written down — but nothing asserted it, so no mutation could fail and the gap was invisible to
+the suite. This is the operational safety property of the whole migration: a hold refuses <em>every</em>
+message for a full retirement horizon, which is strictly more traffic than the #2514 defect refused,
+and #2514 turned 2060 violation series into 2333 bans against legitimate traffic. Had the hold
+scored, the migration would have been worse than the bug it fixes.</p>
+<p>The test carries its own non-vacuity control — a genuine replay from a second peer, on the same
+context and the same detector, must still score. Without it, &quot;no violations were recorded&quot; passes
+identically on a build that never consults the detector and on one that correctly classifies the
+hold, which are not the same build.</p>
+<p>M10 was added because review found the aliasing test asserting a tautology. It read
+<code>others = all() &amp; !bit; assert!((others &amp; bit).is_empty())</code> — but <code>&amp; !bit</code> removes <code>bit</code> from
+<code>others</code>, so the intersection is empty whether or not the flag aliases anything. The old assertion
+passes under M10 unchanged; it never tested the property in its own name.</p>
+<p>The replacement lists the capabilities explicitly and checks them pairwise, which is deliberate and
+not laziness avoided. <code>iter_names()</code> cannot be the oracle: if two constants shared a bit, the union
+would carry that bit once and the iterator would yield only the first-declared name, so the defect
+under test would hide itself from the test. A <code>union == all()</code> assertion keeps the hand-maintained
+list honest — adding a capability without listing it fails rather than silently narrowing coverage.</p>
+<p>The general lesson is narrower than &quot;write better assertions&quot;: an assertion built by <em>subtracting
+the thing under test from the set it is checked against</em> can only ever be true. That shape is worth
+recognising directly, because it reads as thorough.</p>
+<h3>Harness self-correction: a restore that preserves mtime does not rebuild</h3>
+<p>The post-run control came back RED on exactly M8&#39;s two integration kills, against a tree <code>git diff</code>
+confirmed was byte-identical to <code>HEAD</code>. The mutation results were not wrong; the control was.</p>
+<p>The harness restored its snapshot with <code>shutil.copy2</code>, which <strong>preserves mtime</strong>. Cargo fingerprints
+by mtime, so a file restored with its original — older — timestamp looks unchanged, and the crate is
+not recompiled. The control therefore ran M8&#39;s still-mutated binary against restored sources. It
+reproduced 10/10 at 41.95 s (two 20 s <code>wait_for_peer</code> timeouts); <code>touch</code>ing the three files with no
+content change recompiled and returned 7 passed in 1.96 s.</p>
+<p>M1–M8 are unaffected, and the reason is worth stating rather than assuming: <em>applying</em> a mutation
+writes new content with a current mtime, which forces a recompile of the whole <code>icn-net</code> crate from
+whatever is on disk at that moment — including the restored copies of the other two files. Only the
+final control, where nothing was written at all, could go stale.</p>
+<p>The general hazard generalises the one recorded above: a mutation harness can fail by not applying a
+mutation, and equally by not <em>un</em>-applying one. Both report success. Snapshot restore must either
+drop mtime (<code>shutil.copy</code> + <code>os.utime(path, None)</code>) or the control must be forced with an explicit
+<code>touch</code>, and a control that fails deserves a diagnosis before the kills above are trusted.</p>
+<h3>Three of these survived the first pass, and that is the useful part</h3>
+<p>Recorded because the survivals located real gaps rather than proving the mutations wrong.</p>
+<p><strong>M1 survived</strong> because every <code>ReplayGuard</code> unit test supplies the sender regime as a parameter, so
+none of them exercised the one place that <em>derives</em> it from <code>peer_capabilities</code>. The single point
+where a missing capability could be read as durable had no coverage at all. Closed by
+<code>missing_durable_capability_resolves_to_unproven_not_durable</code> and its positive twin — the twin
+matters, because without it the negative test would pass on a build that hardcoded
+<code>LegacyOrUnproven</code> and never read capabilities.</p>
+<p><strong>M7 survived</strong> because the unknown-regime test wrote its unrecognised value into the <em>high-water
+entry</em>, which has its own catch-all. The provenance load path was untested. Closed by
+<code>unknown_provenance_value_fails_closed_and_never_expires</code>, plus
+<code>corrupt_provenance_quarantines_rather_than_reading_as_absent</code> for the adjacent case — an unreadable
+record must not be read as an absent one, since absent is permissive enough to establish a fresh
+durable namespace after a hold.</p>
+<p><strong>M6 survived twice.</strong> The transition is recorded in two places, so removing either left a restart
+still entering a 600-second hold — and a <em>fresh</em> hold is behaviourally identical to a <em>resumed</em> one.
+The first replacement test asserted &quot;restarting holds&quot; and so passed with the provenance write
+deleted entirely. The property is only pinnable structurally: assert the record exists. The
+redundancy is deliberate — the high-water entry is the one <code>cleanup()</code> deletes — but redundancy is
+exactly what makes a behavioural mutation control vacuous, and that is worth remembering the next
+time two records carry the same fact.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
