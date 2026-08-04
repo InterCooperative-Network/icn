@@ -14,9 +14,11 @@
 //!    trace.
 //!
 //! Because the 100ms budget covers both phases and is re-armed each loop iteration, the
-//! time actually left for a handshake is whatever remains when the `Incoming` arrives —
-//! uniformly distributed over (0, 100ms], not a fixed 100ms. That is why the defect
-//! presented as an intermittent ~45% failure rather than a clean threshold.
+//! time actually left for a handshake is only whatever remains when the `Incoming`
+//! arrives — a remainder varying from nearly zero up to 100ms, not a fixed 100ms. Under
+//! arrivals that are not synchronised to the polling cycle this yields probabilistic
+//! rather than threshold failure, which is why the defect presented as an intermittent
+//! flake. (The arrival-phase distribution was not measured; no exact rate is claimed.)
 //!
 //! These tests pin the boundary deterministically, by construction rather than by
 //! shrinking a duration until failure becomes likely. `tokio::time::timeout` polls its
@@ -49,6 +51,7 @@
 use anyhow::Result;
 use icn_identity::IdentityBundle;
 use icn_net::session::SessionManager;
+use icn_net::{NetworkActor, NetworkMessage, VersionInfo};
 use quinn::{ClientConfig, Endpoint};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -246,6 +249,284 @@ async fn cancelling_the_accept_wait_does_not_destroy_an_inbound_handshake() -> R
         client_result.is_ok(),
         "the client must observe the same successful handshake the server completed: {:?}",
         client_result.err()
+    );
+    Ok(())
+}
+
+/// A client-side verifier that stalls the handshake by a controlled amount.
+///
+/// The delay is deliberately placed on the *client's* verification of the **server's**
+/// certificate. That step gates the client's Finished flight, which in turn gates the
+/// server's handshake completion — so it lengthens the server-side handshake without any
+/// production seam and without weakening the server's own TLS semantics.
+#[derive(Debug)]
+struct StallingServerCertVerifier {
+    delay: Duration,
+}
+
+impl rustls::client::danger::ServerCertVerifier for StallingServerCertVerifier {
+    fn verify_server_cert(
+        &self,
+        _e: &rustls::pki_types::CertificateDer<'_>,
+        _i: &[rustls::pki_types::CertificateDer<'_>],
+        _n: &rustls::pki_types::ServerName<'_>,
+        _o: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        // Synchronous by necessity: rustls verifiers are sync. This models a peer whose
+        // handshake is slow for any ordinary reason — loaded CPU, WAN latency, expensive
+        // certificate verification.
+        std::thread::sleep(self.delay);
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+    fn verify_tls12_signature(
+        &self,
+        _m: &[u8],
+        _c: &rustls::pki_types::CertificateDer<'_>,
+        _d: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+    fn verify_tls13_signature(
+        &self,
+        _m: &[u8],
+        _c: &rustls::pki_types::CertificateDer<'_>,
+        _d: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        vec![rustls::SignatureScheme::ED25519]
+    }
+}
+
+/// Comfortably longer than the 100ms shutdown-poll interval the accept loop used, so the
+/// server-side handshake is guaranteed to outlive that budget rather than merely likely to.
+const HANDSHAKE_STALL: Duration = Duration::from_millis(300);
+
+/// The regression property, exercised through the real production path: a `NetworkActor`,
+/// its real accept loop, a real Hello, and real peer installation as the oracle.
+///
+/// A legitimate peer whose handshake takes 300ms must still be admitted. On pristine
+/// `main` this fails deterministically, because the accept loop's 100ms shutdown poll
+/// cancels the handshake before it can complete; after #2521 it passes unchanged.
+///
+/// This is the fail-before / pass-after test. The two `SessionManager`-layer tests above
+/// are a deterministic *witness* of the defect — they assert the fused API is cancel-unsafe
+/// and therefore pass on both trees. Only this one changes verdict across the fix.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_slow_but_legitimate_peer_is_still_admitted() -> Result<()> {
+    init();
+
+    let receiver_bundle = IdentityBundle::generate()?;
+    let receiver_did = receiver_bundle.did().clone();
+    let port = portpicker::pick_unused_port().expect("no free port");
+    let receiver_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
+
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+    let handler: icn_net::IncomingMessageHandler = Arc::new(|_msg| {});
+    let handle = NetworkActor::spawn(
+        receiver_bundle,
+        receiver_addr,
+        shutdown_tx.clone(),
+        Some(handler),
+        None, // oracle
+        None, // fallback_config
+        None, // topology_config
+        None, // stun_servers
+        None, // turn_config
+        None, // misbehavior_detector
+        None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
+        None, // advertised_addr
+    )
+    .await?;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // A legitimate peer with a genuine certificate and a genuine binding. The only unusual
+    // thing about it is that its handshake is slow.
+    let sender = IdentityBundle::generate()?;
+    let sender_did = sender.did().clone();
+    let mut rustls_client = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(StallingServerCertVerifier {
+            delay: HANDSHAKE_STALL,
+        }))
+        .with_client_auth_cert(vec![sender.tls_cert().clone()], sender.tls_key())?;
+    rustls_client.alpn_protocols = vec![b"icn/1".to_vec()];
+
+    let mut endpoint = Endpoint::client("127.0.0.1:0".parse()?)?;
+    endpoint.set_default_client_config(ClientConfig::new(Arc::new(
+        quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client)?,
+    )));
+
+    let dialled = tokio::time::timeout(
+        Duration::from_secs(10),
+        endpoint.connect(receiver_addr, "localhost")?,
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("the client's own connect timed out"))?;
+
+    // A receiver that cancels the handshake aborts it mid-flight, which quinn surfaces
+    // here as "closed during the handshake". Naming it explicitly keeps the failure
+    // self-describing instead of an opaque `?` on a transport error.
+    let connection = match dialled {
+        Ok(connection) => connection,
+        Err(e) => panic!(
+            "a legitimate peer whose handshake takes {}ms was cut off mid-handshake by \
+             the receiver ({e}) — the accept loop cancelled a connection it had already \
+             accepted (#2521)",
+            HANDSHAKE_STALL.as_millis()
+        ),
+    };
+
+    let hello = NetworkMessage::hello(
+        sender_did.clone(),
+        receiver_did,
+        sender.binding_info(),
+        VersionInfo::new("icnd-slow-peer".to_string()),
+        None, // topology_info
+        [7u8; 32],
+        None, // ml_dsa_public
+        None, // ml_kem_public
+    );
+    // If the receiver has already discarded this connection, opening the stream is where
+    // the client finds out — but that is deliberately *not* the verdict. A receiver that
+    // cancels the handshake can still leave the client believing it connected, so a
+    // client-side error here is treated as a symptom to be confirmed, not as the result.
+    // The verdict is the server-side admission asserted below.
+    if let Ok((mut send, _recv)) = connection.open_bi().await {
+        let _ = icn_net::protocol::write_message(&mut send, &hello).await;
+        let _ = send.finish();
+    }
+
+    // The oracle is server-side peer installation, not the client's view: a handshake the
+    // server later discards can still look successful from the client.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let mut admitted = None;
+    while tokio::time::Instant::now() < deadline {
+        if let Some(info) = handle.get_peer_connection_info(&sender_did).await {
+            admitted = Some(info);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+
+    let _ = shutdown_tx.send(());
+    assert!(
+        admitted.is_some(),
+        "a legitimate peer whose handshake takes {}ms must still be admitted; if it is \
+         not, the accept loop cancelled a handshake it had already accepted (#2521)",
+        HANDSHAKE_STALL.as_millis()
+    );
+    Ok(())
+}
+
+/// Spawn a real receiver on the production stack, returning its handle, address and
+/// shutdown sender.
+async fn spawn_receiver() -> Result<(
+    icn_net::NetworkHandle,
+    SocketAddr,
+    tokio::sync::broadcast::Sender<()>,
+)> {
+    let bundle = IdentityBundle::generate()?;
+    let port = portpicker::pick_unused_port().expect("no free port");
+    let addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+    let handler: icn_net::IncomingMessageHandler = Arc::new(|_msg| {});
+    let handle = NetworkActor::spawn(
+        bundle,
+        addr,
+        shutdown_tx.clone(),
+        Some(handler),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    Ok((handle, addr, shutdown_tx))
+}
+
+/// Shutdown must actually reach the endpoint and close it.
+///
+/// The old loop noticed shutdown by polling every 100ms; the new one is woken by the
+/// signal directly. Either way the observable contract is the same and is asserted here
+/// rather than assumed from the fact that `stop()` is called somewhere: an established
+/// peer must see the connection closed promptly after shutdown is signalled.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn shutdown_closes_established_connections_promptly() -> Result<()> {
+    init();
+    let (_handle, addr, shutdown_tx) = spawn_receiver().await?;
+
+    let client = client_endpoint()?;
+    let connection = client.connect(addr, "localhost")?.await?;
+
+    let _ = shutdown_tx.send(());
+
+    // Generous relative to the ~100ms the old poll could add, tight enough that a shutdown
+    // hang (the failure mode a naive "just delete the timeout" fix would introduce) fails
+    // this rather than passing slowly.
+    tokio::time::timeout(Duration::from_secs(5), connection.closed())
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "the receiver did not close an established connection within 5s of \
+                 shutdown: the accept loop is not observing the shutdown signal"
+            )
+        })?;
+    Ok(())
+}
+
+/// The handshake slot must be released on every path, or the accept loop wedges forever.
+///
+/// This is the guard on the bounded-concurrency change itself. The permit is acquired
+/// *before* an `Incoming` is taken, so a permit that leaked on completion would stall the
+/// loop at `acquire_owned()` and it would never accept another connection. Driving more
+/// peers than the cap and requiring all of them through detects exactly that.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn more_peers_than_the_handshake_cap_can_all_connect() -> Result<()> {
+    init();
+    let (_handle, addr, shutdown_tx) = spawn_receiver().await?;
+
+    // Comfortably above MAX_CONCURRENT_INBOUND_HANDSHAKES (64): if permits were released
+    // only on some paths, the loop would stop accepting somewhere around the cap.
+    const PEERS: usize = 80;
+
+    let mut dials = Vec::with_capacity(PEERS);
+    for _ in 0..PEERS {
+        let endpoint = client_endpoint()?;
+        dials.push(tokio::spawn(async move {
+            let result = tokio::time::timeout(
+                Duration::from_secs(20),
+                endpoint.connect(addr, "localhost")?,
+            )
+            .await;
+            // Keep the endpoint alive until the connection resolves.
+            Ok::<_, anyhow::Error>((result.is_ok() && result.unwrap().is_ok(), endpoint))
+        }));
+    }
+
+    let mut connected = 0usize;
+    for dial in dials {
+        if let Ok(Ok((true, _endpoint))) = dial.await {
+            connected += 1;
+        }
+    }
+
+    let _ = shutdown_tx.send(());
+    assert_eq!(
+        connected, PEERS,
+        "all {PEERS} peers must complete their handshake; only {connected} did, which \
+         means handshake slots are not being released on every path"
     );
     Ok(())
 }
