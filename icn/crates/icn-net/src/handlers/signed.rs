@@ -1048,4 +1048,93 @@ mod tests {
             "a durable-advertising peer must be on the durable establishment path: {state}"
         );
     }
+
+    /// A peer held through the #2517 migration must not be scored, quarantined or banned.
+    ///
+    /// This is the property that makes the migration safe to run on a live federation, and
+    /// it is the exact failure #2514 produced from the other direction: a receiver that
+    /// reads a legitimate sequence against a bound that never applied to it records replay
+    /// at severity 1.0, and 2060 violation series became 2333 bans against traffic that was
+    /// never malicious. A migration hold refuses *more* traffic than that did — every
+    /// message for a full retirement horizon — so if it scored, it would be strictly worse.
+    ///
+    /// The peer here is doing nothing wrong. It authenticated, it advertises the durable
+    /// regime honestly, and its sequences are valid. The receiver refuses them only because
+    /// envelopes from the peer's *previous* namespace could still be inside their validity
+    /// window. That is local migration uncertainty, not misbehaviour, and the distinction
+    /// has to be observable rather than merely intended.
+    #[tokio::test]
+    async fn a_peer_held_through_the_migration_is_never_scored_quarantined_or_banned() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
+
+        let migrating = KeyPair::generate().unwrap();
+        let migrating_did = migrating.did().clone();
+        ctx.peer_connections.write().await.insert(
+            migrating_did.clone(),
+            crate::actor::PeerConnectionInfo {
+                did: migrating_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: crate::CapabilityFlags::E2E_ENCRYPTION
+                    | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
+                peer_software: "current".to_string(),
+                x25519_key: [0u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Sustained legitimate traffic for the whole hold, not one message. A hold that
+        // scored only after N refusals would pass a single-message test.
+        for seq in 1..=12 {
+            let envelope = create_signed_envelope(&migrating, seq);
+            ctx.handle_signed(create_network_message(&envelope), &envelope)
+                .await;
+        }
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "#2517: held traffic must not be delivered during the retirement horizon"
+        );
+        assert!(
+            detector
+                .read()
+                .await
+                .get_violations(&migrating_did)
+                .is_empty(),
+            "#2517: a peer held for local migration uncertainty must accrue no violations; \
+             scoring the hold would ban every peer that upgrades"
+        );
+        assert!(
+            !detector.read().await.is_quarantined(&migrating_did),
+            "#2517: a migration hold must not quarantine the peer"
+        );
+        assert!(
+            !detector.read().await.is_banned(&migrating_did),
+            "#2517: a migration hold must not ban the peer"
+        );
+
+        // Non-vacuity control. Without this the assertions above would pass on a build
+        // where the detector is never consulted at all — which is indistinguishable from
+        // one that correctly classifies the hold as a local fault. A genuine replay from a
+        // different peer must still score, on this same context and this same detector.
+        let attacker = KeyPair::generate().unwrap();
+        let attacker_did = attacker.did().clone();
+        let replayed = create_signed_envelope(&attacker, 1);
+        let message = create_network_message(&replayed);
+        ctx.handle_signed(message.clone(), &replayed).await;
+        ctx.handle_signed(message.clone(), &replayed).await;
+        assert!(
+            !detector
+                .read()
+                .await
+                .get_violations(&attacker_did)
+                .is_empty(),
+            "control: a real replay must still be scored, or the assertions above prove \
+             nothing about how the migration hold is classified"
+        );
+    }
 }

@@ -82,10 +82,24 @@ test code changed underneath the branch. Counts below are from that run.
 | M6 | the transition is not written to the durable provenance record | KILLED | 1 | `the_transition_is_recorded_in_the_durable_provenance_record` |
 | M7 | an unrecognised provenance value is read as `LegacyOrUnproven` | KILLED | 1 | `unknown_provenance_value_fails_closed_and_never_expires` |
 | M8 | the Hello current-certificate check is removed, so capabilities are not bound to the connection | KILLED | 3 | `forged_hello_does_not_corrupt_established_peer_state`, `hello_replayed_onto_a_different_current_cert_is_rejected`, `weak_binding_verifier_is_confined_to_authorised_sites` |
+| M9 | the migration hold is no longer classified as a local fault, so held traffic is scored | KILLED | 1 | `a_peer_held_through_the_migration_is_never_scored_quarantined_or_banned` |
 | — | control (pre and post) | — | 0 | green: 337 lib + 7 Hello + 7 `signing_sequence_replay` + 7 `accept_handshake_cancellation` |
 
-**8 of 8 killed, 0 survivors, 0 no-ops.** M4–M8 kill exactly the property named and nothing else,
+**9 of 9 killed, 0 survivors, 0 no-ops.** M4–M9 kill exactly the property named and nothing else,
 which is what shows those tests discriminate rather than merely observing that something failed.
+
+M9 was added late, because the property had no test at all. The handler classified
+`SenderRegimeTransition` as a local fault and excluded it from scoring, and the reasoning for that
+was written down — but nothing asserted it, so no mutation could fail and the gap was invisible to
+the suite. This is the operational safety property of the whole migration: a hold refuses *every*
+message for a full retirement horizon, which is strictly more traffic than the #2514 defect refused,
+and #2514 turned 2060 violation series into 2333 bans against legitimate traffic. Had the hold
+scored, the migration would have been worse than the bug it fixes.
+
+The test carries its own non-vacuity control — a genuine replay from a second peer, on the same
+context and the same detector, must still score. Without it, "no violations were recorded" passes
+identically on a build that never consults the detector and on one that correctly classifies the
+hold, which are not the same build.
 
 ### Harness self-correction: a restore that preserves mtime does not rebuild
 
