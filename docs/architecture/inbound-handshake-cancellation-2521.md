@@ -1,7 +1,8 @@
 # Inbound Handshake Cancellation (#2521) — Causal Record
 
-**Status:** fix under validation on the `fix/2521-quic-accept-handshake-cancellation`
-branch. Not merged. This is the summary; the issue thread remains authoritative.
+Causal record for #2521, landed via PR #2525. Written 2026-08-04, while the fix was still
+under validation on the branch; the evidence below is that validation. The issue thread
+remains authoritative.
 
 ## The invariant
 
@@ -191,9 +192,9 @@ the 22 s mode entirely. All 15 baseline failures were the same test,
 `wait_for_peer(..., 20s)` timeout, because the connection was destroyed before any Hello
 could be exchanged.
 
-CI runs exactly this way — `cargo test --workspace --test '*' -- --test-threads=1`
-(`.github/workflows/ci.yml:441`, "serial to avoid port conflicts") — which is why the gate
-behaved as a coin flip for any PR touching `icn-net`.
+CI runs exactly this way: the `Test` job in `.github/workflows/ci.yml` runs integration
+tests with `cargo test --workspace --test '*' -- --test-threads=1`, serially to avoid port
+conflicts. That is why the gate behaved as a coin flip for any PR touching `icn-net`.
 
 ### Lifecycle and shutdown
 
