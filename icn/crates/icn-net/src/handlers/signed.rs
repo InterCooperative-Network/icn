@@ -10,7 +10,7 @@
 use super::ConnectionContext;
 use crate::envelope::{PayloadType, SignedEnvelope};
 use crate::protocol::NetworkMessage;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 impl ConnectionContext {
     /// Handle a Signed message envelope
@@ -67,11 +67,43 @@ impl ConnectionContext {
             return;
         }
 
+        // Which sequence namespace does this envelope's number belong to? (#2517)
+        //
+        // Read from the capabilities recorded for `envelope.from`, which
+        // `handle_hello` writes only after binding the claimed DID to the certificate
+        // on the live QUIC connection (#2520). So a `DurableV1` answer here means the
+        // peer proved, on a connection it actually authenticated, that its signing
+        // sequence is durable DID state — not merely that some Hello somewhere once
+        // said so.
+        //
+        // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no
+        // recorded connection info, a peer that predates the capability, and a
+        // genuinely pre-#2510 ephemeral sender are indistinguishable from here, and
+        // the safe reading is the one that does not promise durability.
+        let observed_regime = {
+            let connections = self.peer_connections.read().await;
+            match connections.get(&envelope.from) {
+                Some(info)
+                    if info
+                        .peer_capabilities
+                        .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE) =>
+                {
+                    crate::replay_guard::ObservedSenderRegime::DurableV1
+                }
+                _ => crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            }
+        };
+
         // Signature valid, now check for replay attack
         // Use check_replay_only since we already verified the signature above
         // This avoids redundant signature verification and ensures immediate PQ
         // verification (via verify_with_cached_pq_key) is the only path used
-        match self.replay_guard.write().await.check_replay_only(envelope) {
+        match self
+            .replay_guard
+            .write()
+            .await
+            .check_replay_only(envelope, observed_regime)
+        {
             Ok(()) => {
                 debug!(
                     "Verified signed message from {} (seq={}, type={:?})",
@@ -100,13 +132,78 @@ impl ConnectionContext {
                     .or_else(|| {
                         e.downcast_ref::<crate::replay_guard::ReplayStateUnreadable>()
                             .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // Migrating away from an obsolete semantic regime (#2517).
+                        // The peer is sending legitimate traffic; we are the ones
+                        // holding a number we can no longer interpret. Scoring this
+                        // is what produced thousands of false severity-1.0 events
+                        // and bans against legitimate traffic on the rehearsal
+                        // federation.
+                        e.downcast_ref::<crate::replay_guard::ReplayStateLegacy>()
+                            .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // Replay state from a regime with no migration (#2517),
+                        // i.e. this binary is older than the one that wrote its
+                        // store. Also not peer misbehaviour — and unlike the
+                        // others it will not clear on its own, so it is logged at
+                        // error rather than warn below.
+                        e.downcast_ref::<crate::replay_guard::ReplayStateUnsupportedVersion>()
+                            .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // The sender changed sequence namespaces and we are retiring
+                        // the old one (#2517). The peer is sending legitimate traffic
+                        // under its new numbering; we are refusing it because
+                        // envelopes from the *previous* numbering could still be
+                        // fresh. Scoring this would ban every peer that upgrades.
+                        e.downcast_ref::<crate::replay_guard::SenderRegimeTransition>()
+                            .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // A peer that previously proved the durable regime no longer
+                        // advertises it (#2517) — typically an operator rollback. A
+                        // local incompatibility, and deliberately fail-closed: the
+                        // alternative, discarding durable replay state on downgrade,
+                        // would make replay-state reset reachable by downgrade.
+                        e.downcast_ref::<crate::replay_guard::SenderRegimeDowngrade>()
+                            .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // A persisted sender-regime tag with no meaning in this
+                        // binary (#2517). Like the receiver-side unsupported version,
+                        // this does not clear on its own.
+                        e.downcast_ref::<crate::replay_guard::UnsupportedSenderRegime>()
+                            .map(|e| e.to_string())
                     });
                 if let Some(reason) = local_fault {
-                    warn!(
-                        peer = %envelope.from,
-                        seq = envelope.sequence,
-                        "Dropping message (local replay-state fault, not peer misbehaviour): {reason}"
-                    );
+                    // Three of these local faults do not resolve themselves, so they
+                    // are raised to error: everything else here is a bounded
+                    // condition an operator can wait out, while these need them to
+                    // act — upgrade a binary, or roll a downgraded peer forward.
+                    let needs_operator = e
+                        .downcast_ref::<crate::replay_guard::ReplayStateUnsupportedVersion>()
+                        .is_some()
+                        || e.downcast_ref::<crate::replay_guard::UnsupportedSenderRegime>()
+                            .is_some()
+                        || e.downcast_ref::<crate::replay_guard::SenderRegimeDowngrade>()
+                            .is_some();
+                    if needs_operator {
+                        error!(
+                            peer = %envelope.from,
+                            seq = envelope.sequence,
+                            "Dropping message: a local protocol-state incompatibility that will \
+                             not clear on its own. Not peer misbehaviour — an operator must \
+                             upgrade a binary or roll a downgraded peer forward: {reason}"
+                        );
+                    } else {
+                        warn!(
+                            peer = %envelope.from,
+                            seq = envelope.sequence,
+                            "Dropping message (local replay-state fault, not peer misbehaviour): {reason}"
+                        );
+                    }
                     return;
                 }
 
@@ -840,6 +937,204 @@ mod tests {
                 icn_security::Violation::InvalidSignature { .. }
             ),
             "Violation should be InvalidSignature"
+        );
+    }
+
+    /// #2517 (mutation control M1): the capability→regime resolution in this handler.
+    ///
+    /// `ReplayGuard` takes the sender regime as a parameter, so every unit test of the
+    /// guard supplies it directly and none of them exercise the one place that
+    /// *derives* it. That left the derivation — the single point where a missing
+    /// capability could be read as durable — with no coverage at all.
+    ///
+    /// A peer with no recorded capabilities, or capabilities lacking
+    /// `DURABLE_SIGNING_SEQUENCE`, must resolve to `LegacyOrUnproven`. The observable
+    /// consequence is that its accepted high-water is *not* tagged durable-v1.
+    #[tokio::test]
+    async fn missing_durable_capability_resolves_to_unproven_not_durable() {
+        let (ctx, forward_count) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+
+        // A peer that is authenticated but advertises an unrelated capability set.
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            crate::actor::PeerConnectionInfo {
+                did: sender.did().clone(),
+                negotiated_version: 1,
+                peer_capabilities: crate::CapabilityFlags::E2E_ENCRYPTION,
+                peer_software: "old".to_string(),
+                x25519_key: [0u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        let envelope = create_signed_envelope(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            1,
+            "an unproven sender's traffic is still delivered; compatibility requires it"
+        );
+
+        // The observable proof of the attribution: a peer resolved as unproven cannot
+        // reach durable-v1 steady state, so a *durable* attribution for the same DID
+        // would now be a namespace change and be held. If the handler had resolved
+        // DurableV1 above, this would instead be ordinary steady-state traffic.
+        let held = ctx
+            .replay_guard
+            .write()
+            .await
+            .check_replay_only(
+                &create_signed_envelope(&sender, 2),
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+            )
+            .expect_err(
+                "the first message must have established this peer as UNPROVEN; if the \
+                 handler read a missing capability as durable, this would be steady state",
+            );
+        assert!(
+            held.downcast_ref::<crate::replay_guard::SenderRegimeTransition>()
+                .is_some(),
+            "expected a namespace-change hold, got: {held}"
+        );
+    }
+
+    /// The positive half: a peer that *does* advertise the capability resolves to
+    /// `DurableV1`.
+    ///
+    /// Without this, the test above would pass on a build that hardcoded
+    /// `LegacyOrUnproven` and never read capabilities at all.
+    #[tokio::test]
+    async fn advertised_durable_capability_resolves_to_durable() {
+        let (ctx, _forward_count) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            crate::actor::PeerConnectionInfo {
+                did: sender.did().clone(),
+                negotiated_version: 1,
+                peer_capabilities: crate::CapabilityFlags::E2E_ENCRYPTION
+                    | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
+                peer_software: "current".to_string(),
+                x25519_key: [0u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        let envelope = create_signed_envelope(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
+
+        // A durable attribution establishes the peer via the migration hold, so the
+        // first message is held rather than delivered — the observable difference from
+        // the unproven case above.
+        let state = ctx
+            .replay_guard
+            .write()
+            .await
+            .check_replay_only(
+                &create_signed_envelope(&sender, 2),
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("first establishment holds");
+        assert!(
+            state
+                .downcast_ref::<crate::replay_guard::SenderRegimeTransition>()
+                .is_some(),
+            "a durable-advertising peer must be on the durable establishment path: {state}"
+        );
+    }
+
+    /// A peer held through the #2517 migration must not be scored, quarantined or banned.
+    ///
+    /// This is the property that makes the migration safe to run on a live federation, and
+    /// it is the exact failure #2514 produced from the other direction: a receiver that
+    /// reads a legitimate sequence against a bound that never applied to it records replay
+    /// at severity 1.0, and 2060 violation series became 2333 bans against traffic that was
+    /// never malicious. A migration hold refuses *more* traffic than that did — every
+    /// message for a full retirement horizon — so if it scored, it would be strictly worse.
+    ///
+    /// The peer here is doing nothing wrong. It authenticated, it advertises the durable
+    /// regime honestly, and its sequences are valid. The receiver refuses them only because
+    /// envelopes from the peer's *previous* namespace could still be inside their validity
+    /// window. That is local migration uncertainty, not misbehaviour, and the distinction
+    /// has to be observable rather than merely intended.
+    #[tokio::test]
+    async fn a_peer_held_through_the_migration_is_never_scored_quarantined_or_banned() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
+
+        let migrating = KeyPair::generate().unwrap();
+        let migrating_did = migrating.did().clone();
+        ctx.peer_connections.write().await.insert(
+            migrating_did.clone(),
+            crate::actor::PeerConnectionInfo {
+                did: migrating_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: crate::CapabilityFlags::E2E_ENCRYPTION
+                    | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
+                peer_software: "current".to_string(),
+                x25519_key: [0u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Sustained legitimate traffic for the whole hold, not one message. A hold that
+        // scored only after N refusals would pass a single-message test.
+        for seq in 1..=12 {
+            let envelope = create_signed_envelope(&migrating, seq);
+            ctx.handle_signed(create_network_message(&envelope), &envelope)
+                .await;
+        }
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "#2517: held traffic must not be delivered during the retirement horizon"
+        );
+        assert!(
+            detector
+                .read()
+                .await
+                .get_violations(&migrating_did)
+                .is_empty(),
+            "#2517: a peer held for local migration uncertainty must accrue no violations; \
+             scoring the hold would ban every peer that upgrades"
+        );
+        assert!(
+            !detector.read().await.is_quarantined(&migrating_did),
+            "#2517: a migration hold must not quarantine the peer"
+        );
+        assert!(
+            !detector.read().await.is_banned(&migrating_did),
+            "#2517: a migration hold must not ban the peer"
+        );
+
+        // Non-vacuity control. Without this the assertions above would pass on a build
+        // where the detector is never consulted at all — which is indistinguishable from
+        // one that correctly classifies the hold as a local fault. A genuine replay from a
+        // different peer must still score, on this same context and this same detector.
+        let attacker = KeyPair::generate().unwrap();
+        let attacker_did = attacker.did().clone();
+        let replayed = create_signed_envelope(&attacker, 1);
+        let message = create_network_message(&replayed);
+        ctx.handle_signed(message.clone(), &replayed).await;
+        ctx.handle_signed(message.clone(), &replayed).await;
+        assert!(
+            !detector
+                .read()
+                .await
+                .get_violations(&attacker_did)
+                .is_empty(),
+            "control: a real replay must still be scored, or the assertions above prove \
+             nothing about how the migration hold is classified"
         );
     }
 }

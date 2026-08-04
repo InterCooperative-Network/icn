@@ -433,6 +433,14 @@ async fn hello_with_tampered_binding_signature_is_rejected() -> Result<()> {
 /// hand an unauthenticated party a way to corrupt a healthy peer entry.
 #[tokio::test]
 async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
+    // Extended for #2517: peer *capabilities* are now security state, not just
+    // metadata. `DURABLE_SIGNING_SEQUENCE` tells the replay guard that B's sequence
+    // numbers belong to the durable namespace, and the guard acts on it — it will
+    // retire B's old replay bound and start a fresh namespace. So the same binding
+    // that protects B's X25519 key has to protect B's advertised regime, and both are
+    // asserted against the same established peer entry: the forged Hello has to leave
+    // the key *and* the regime intact, and asserting them together is what makes
+    // "nothing about B changed" a single property rather than two.
     init();
     let receiver = IdentityBundle::generate()?;
     let receiver_did = receiver.did().clone();
@@ -448,7 +456,7 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
         &victim_b_did,
         victim_b.binding_info(),
         *victim_b.x25519_public_bytes(),
-        CapabilityFlags::E2E_ENCRYPTION,
+        CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
         addr,
         &receiver_did,
     )
@@ -461,6 +469,15 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
         before.x25519_key,
         *victim_b.x25519_public_bytes(),
         "control: B's own key must be stored"
+    );
+    assert!(
+        before
+            .peer_capabilities
+            .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+        "control (#2517): an authenticated peer advertising the durable sequence regime \
+         must have it recorded. Without this the negative assertion below would pass \
+         vacuously on a build that never records the capability at all — which would \
+         silently read every honest upgraded sender as unproven"
     );
 
     // 2. Attacker replays B's binding on their own cert, with a substituted key.
@@ -493,6 +510,15 @@ async fn forged_hello_does_not_corrupt_established_peer_state() -> Result<()> {
     assert_eq!(
         after.peer_capabilities, before.peer_capabilities,
         "forged Hello must not renegotiate B's capabilities"
+    );
+    assert!(
+        after
+            .peer_capabilities
+            .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+        "#2517: a peer that is not authenticated as B must not be able to change what \
+         the receiver believes about B's sequence regime. If it could, it could force \
+         B's replay namespace to be retired and then own the empty namespace that \
+         replaced it"
     );
 
     let _ = shutdown.send(());
