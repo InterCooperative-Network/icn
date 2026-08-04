@@ -16,15 +16,22 @@ use tracing::debug;
 pub enum BootstrapPeer {
     /// Full peer with known DID: `icn://did:icn:PUBKEY@HOST:PORT`
     KnownDid { did: Did, addr: SocketAddr },
-    /// Address-only hint — DID learned from handshake: `icn://HOST:PORT`
+    /// Address-only hint — no DID is known up front: `icn://HOST:PORT`.
+    /// Dialing one of these keys the connection by an address-derived
+    /// placeholder; the peer's authenticated DID is established separately by
+    /// the Hello handshake.
     AddrOnly { addr: SocketAddr },
 }
 
 /// Parse bootstrap peer URL.
 ///
 /// Supported formats:
-/// - `icn://did:icn:PUBKEY@HOST:PORT` — verified peer (DID known)
-/// - `icn://HOST:PORT` — bootstrap hint (DID learned from handshake)
+/// - `icn://did:icn:PUBKEY@HOST:PORT` — DID supplied by configuration
+/// - `icn://HOST:PORT` — address-only hint; no DID until the Hello handshake
+///
+/// Neither form authenticates the peer: parsing yields configuration, and the
+/// peer's identity is proven only by DID-TLS binding verification in the Hello
+/// handler.
 ///
 /// Supports both IP addresses and DNS hostnames.
 pub async fn parse_bootstrap_peer(url: &str) -> Result<BootstrapPeer> {

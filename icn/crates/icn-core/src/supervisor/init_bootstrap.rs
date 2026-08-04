@@ -52,7 +52,11 @@ impl BootstrapConfig {
 
 /// Dial bootstrap peers and optionally request peer exchange
 ///
-/// Returns the list of successfully connected peer DIDs.
+/// Returns the list of connection keys for peers we reached. For `KnownDid`
+/// bootstrap entries (`icn://did:icn:PUBKEY@HOST:PORT`) these are the
+/// configured DIDs. For `AddrOnly` entries (`icn://HOST:PORT`) they are
+/// address-derived **placeholders**, not authenticated peer identities — see
+/// [`icn_net::NetworkHandle::dial_addr`] and #2530.
 pub async fn dial_bootstrap_peers(
     config: &BootstrapConfig,
     network_handle: &NetworkHandle,
@@ -86,14 +90,18 @@ pub async fn dial_bootstrap_peers(
             }
             Ok(super::bridge::BootstrapPeer::AddrOnly { addr: peer_addr }) => {
                 info!("Connecting to bootstrap peer (addr-only): {}", peer_addr);
-                // Dial without known DID — DID will be learned from QUIC/TLS handshake
+                // Dial without a known DID. The value returned here is a
+                // placeholder derived from the address, NOT the peer's
+                // identity; the peer's authenticated DID is established
+                // separately by the Hello handshake.
                 match network_handle.dial_addr(peer_addr).await {
-                    Ok(peer_did) => {
+                    Ok(placeholder_did) => {
                         info!(
-                            "✓ Connected to bootstrap peer: {} (learned from handshake)",
-                            peer_did
+                            "✓ Connected to bootstrap peer at {} (placeholder key {}; \
+                             peer identity not yet authenticated — awaiting Hello)",
+                            peer_addr, placeholder_did
                         );
-                        connected_peers.push(peer_did);
+                        connected_peers.push(placeholder_did);
                     }
                     Err(e) => {
                         warn!(
