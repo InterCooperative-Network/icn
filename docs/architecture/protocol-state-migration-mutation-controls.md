@@ -60,17 +60,44 @@ is the signal, which is why the counts above are recorded rather than just the p
 The second axis. Each defect below is applied alone to the merged branch, the suite is run, and the
 files are restored. **8 of 8 killed.**
 
-| # | defect introduced | outcome | tests killed |
-|---|---|---|---|
-| M1 | a missing `DURABLE_SIGNING_SEQUENCE` capability resolves to `DurableV1` | KILLED | `missing_durable_capability_resolves_to_unproven_not_durable`, `test_replay_attack_rejected`, `test_multiple_senders_independent`, `test_out_of_order_messages_forwarded` |
-| M2 | an accepted sequence is stamped `DurableV1` regardless of the window's established regime | KILLED | `legacy_sender_traffic_is_never_recorded_as_durable_v1`, `a_sender_that_stays_legacy_keeps_working_and_stays_tagged_legacy`, `cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed`, `crash_before_the_transition_marker_resumes_from_legacy_state` |
-| M3 | `LegacyOrUnproven → DurableV1` establishes directly, skipping the retirement hold | KILLED | `receiver_first_upgrade_migrates_the_sender_regime_end_to_end`, `a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace`, `established_regime_survives_replay_state_cleanup`, `re_entering_the_transition_is_idempotent_and_does_not_reset_the_hold` |
-| M4 | promotion no longer requires current authenticated `DurableV1` evidence | KILLED | `transition_does_not_promote_when_the_peer_returns_without_the_capability` |
-| M5 | a downgrade resets the peer to unproven and clears its high-water | KILLED | `a_stale_legacy_connection_cannot_downgrade_established_durable_state`, `receiver_first_upgrade_migrates_the_sender_regime_end_to_end` |
-| M6 | the transition is not written to the durable provenance record | KILLED | `the_transition_is_recorded_in_the_durable_provenance_record` |
-| M7 | an unrecognised provenance value is read as `LegacyOrUnproven` | KILLED | `unknown_provenance_value_fails_closed_and_never_expires` |
-| M8 | the Hello current-certificate check is removed, so capabilities are not bound to the connection | KILLED | `forged_hello_does_not_corrupt_established_peer_state`, `hello_replayed_onto_a_different_current_cert_is_rejected`, `weak_binding_verifier_is_confined_to_authorised_sites` |
-| — | control: all mutations reverted | — | none — 391 pass, 0 fail |
+Re-run in full after the branch was rebased onto `3c430ccb` (#2521), because both the production and
+test code changed underneath the branch. Counts below are from that run.
+
+| # | defect introduced | outcome | kills | tests killed |
+|---|---|---|---|---|
+| M1 | a missing `DURABLE_SIGNING_SEQUENCE` capability resolves to `DurableV1` | KILLED | 6 | `missing_durable_capability_resolves_to_unproven_not_durable`, `test_replay_attack_rejected`, `test_multiple_senders_independent`, `test_out_of_order_messages_forwarded`, `test_sequential_messages_forwarded`, `test_valid_signature_forwarded` |
+| M2 | an accepted sequence is stamped `DurableV1` regardless of the window's established regime | KILLED | 7 | `legacy_sender_traffic_is_never_recorded_as_durable_v1`, `a_sender_that_stays_legacy_keeps_working_and_stays_tagged_legacy`, `cleanup_of_an_inactive_peer_does_not_prove_the_legacy_namespace_never_existed`, `crash_before_the_transition_marker_resumes_from_legacy_state`, `receiver_first_upgrade_migrates_the_sender_regime_end_to_end`, `current_semantic_state_is_restored_exactly_and_not_migrated`, `migration_runs_once_and_does_not_re_trigger_on_restart` |
+| M3 | `LegacyOrUnproven → DurableV1` establishes directly, skipping the retirement hold | KILLED | 15 | all of `sender_regime_tests` that depend on the hold, incl. `receiver_first_upgrade_migrates_the_sender_regime_end_to_end`, `a_captured_legacy_envelope_must_not_poison_a_fresh_durable_namespace`, `first_contact_with_a_durable_sender_costs_exactly_one_hold`, `established_regime_survives_replay_state_cleanup`, `repeated_restarts_during_transition_never_shorten_the_hold` |
+| M4 | promotion no longer requires current authenticated `DurableV1` evidence | KILLED | 1 | `transition_does_not_promote_when_the_peer_returns_without_the_capability` |
+| M5 | a downgrade resets the peer to unproven and clears its high-water | KILLED | 2 | `a_stale_legacy_connection_cannot_downgrade_established_durable_state`, `receiver_first_upgrade_migrates_the_sender_regime_end_to_end` |
+| M6 | the transition is not written to the durable provenance record | KILLED | 1 | `the_transition_is_recorded_in_the_durable_provenance_record` |
+| M7 | an unrecognised provenance value is read as `LegacyOrUnproven` | KILLED | 1 | `unknown_provenance_value_fails_closed_and_never_expires` |
+| M8 | the Hello current-certificate check is removed, so capabilities are not bound to the connection | KILLED | 3 | `forged_hello_does_not_corrupt_established_peer_state`, `hello_replayed_onto_a_different_current_cert_is_rejected`, `weak_binding_verifier_is_confined_to_authorised_sites` |
+| — | control (pre and post) | — | 0 | green: 337 lib + 7 Hello + 7 `signing_sequence_replay` + 7 `accept_handshake_cancellation` |
+
+**8 of 8 killed, 0 survivors, 0 no-ops.** M4–M8 kill exactly the property named and nothing else,
+which is what shows those tests discriminate rather than merely observing that something failed.
+
+### Harness self-correction: a restore that preserves mtime does not rebuild
+
+The post-run control came back RED on exactly M8's two integration kills, against a tree `git diff`
+confirmed was byte-identical to `HEAD`. The mutation results were not wrong; the control was.
+
+The harness restored its snapshot with `shutil.copy2`, which **preserves mtime**. Cargo fingerprints
+by mtime, so a file restored with its original — older — timestamp looks unchanged, and the crate is
+not recompiled. The control therefore ran M8's still-mutated binary against restored sources. It
+reproduced 10/10 at 41.95 s (two 20 s `wait_for_peer` timeouts); `touch`ing the three files with no
+content change recompiled and returned 7 passed in 1.96 s.
+
+M1–M8 are unaffected, and the reason is worth stating rather than assuming: *applying* a mutation
+writes new content with a current mtime, which forces a recompile of the whole `icn-net` crate from
+whatever is on disk at that moment — including the restored copies of the other two files. Only the
+final control, where nothing was written at all, could go stale.
+
+The general hazard generalises the one recorded above: a mutation harness can fail by not applying a
+mutation, and equally by not *un*-applying one. Both report success. Snapshot restore must either
+drop mtime (`shutil.copy` + `os.utime(path, None)`) or the control must be forced with an explicit
+`touch`, and a control that fails deserves a diagnosis before the kills above are trusted.
 
 ### Three of these survived the first pass, and that is the useful part
 

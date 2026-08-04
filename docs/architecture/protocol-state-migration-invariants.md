@@ -111,12 +111,26 @@ upgraded *receiver* restoring an obsolete floor. They are one defect seen from t
 The sender-side symptom exists **only because a receiver treats a legacy number as a
 current-semantic high-water.** A sender emitting sequence 12901 is doing nothing wrong; the fault
 is entirely in the receiver's willingness to compare it against 15915. Correct the receiver's
-interpretation and the sender needs no migration: no jump, no handshake, no peer polling, no epoch.
+interpretation and the sender needs no migration: no sequence jump, no epoch field, no peer
+polling, and no wire-format change.
 
-This is why the fix is receiver-side. It also disposes of the offline-peer problem: legacy
-detection reads the receiver's *own* persisted state, so a peer that was offline for the entire
-migration still detects and migrates its own state whenever it next boots. There is no
-online-during-upgrade requirement and no window to miss.
+The fix is therefore applied entirely at the receiver — but *applied at the receiver* is not the
+same as *computed from local state alone*, and §§8–11 are the reason.
+
+Versioning the receiver's own persisted replay state (§§4–6) is genuinely local. Legacy detection
+reads this receiver's own bytes, so a peer that was offline for the entire migration still detects
+and migrates its own state whenever it next boots: no online-during-upgrade requirement, no window
+to miss.
+
+Deciding *which sender namespace an arriving sequence belongs to* is not local, because the local
+record cannot answer it. Absence of a high-water is a fact about this receiver's memory, not about
+the sender's history (§9). That decision needs authenticated evidence about the sender, which is
+why the second axis reads a capability out of the peer's Hello and depends on #2520 binding that
+Hello to the certificate of the current connection (§8.4).
+
+An earlier revision of this section claimed the fix required "no handshake" and that it disposed of
+the offline-peer problem outright. That was true of the first axis and false of the second. It is
+corrected here rather than left standing to contradict §§8–11.
 
 ## 3. Rejected alternatives
 
