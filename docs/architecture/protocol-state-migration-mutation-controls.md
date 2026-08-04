@@ -83,9 +83,10 @@ test code changed underneath the branch. Counts below are from that run.
 | M7 | an unrecognised provenance value is read as `LegacyOrUnproven` | KILLED | 1 | `unknown_provenance_value_fails_closed_and_never_expires` |
 | M8 | the Hello current-certificate check is removed, so capabilities are not bound to the connection | KILLED | 3 | `forged_hello_does_not_corrupt_established_peer_state`, `hello_replayed_onto_a_different_current_cert_is_rejected`, `weak_binding_verifier_is_confined_to_authorised_sites` |
 | M9 | the migration hold is no longer classified as a local fault, so held traffic is scored | KILLED | 1 | `a_peer_held_through_the_migration_is_never_scored_quarantined_or_banned` |
-| — | control (pre and post) | — | 0 | green: 337 lib + 7 Hello + 7 `signing_sequence_replay` + 7 `accept_handshake_cancellation` |
+| M10 | `DURABLE_SIGNING_SEQUENCE` is redefined to alias `POSTCARD_ENCODING`'s bit | KILLED | 1 | `capability_bits_are_pairwise_disjoint` |
+| — | control (pre and post) | — | 0 | green: 339 lib + 7 Hello + 7 `signing_sequence_replay` + 7 `accept_handshake_cancellation` |
 
-**9 of 9 killed, 0 survivors, 0 no-ops.** M4–M9 kill exactly the property named and nothing else,
+**10 of 10 killed, 0 survivors, 0 no-ops.** M4–M10 kill exactly the property named and nothing else,
 which is what shows those tests discriminate rather than merely observing that something failed.
 
 M9 was added late, because the property had no test at all. The handler classified
@@ -100,6 +101,21 @@ The test carries its own non-vacuity control — a genuine replay from a second 
 context and the same detector, must still score. Without it, "no violations were recorded" passes
 identically on a build that never consults the detector and on one that correctly classifies the
 hold, which are not the same build.
+
+M10 was added because review found the aliasing test asserting a tautology. It read
+`others = all() & !bit; assert!((others & bit).is_empty())` — but `& !bit` removes `bit` from
+`others`, so the intersection is empty whether or not the flag aliases anything. The old assertion
+passes under M10 unchanged; it never tested the property in its own name.
+
+The replacement lists the capabilities explicitly and checks them pairwise, which is deliberate and
+not laziness avoided. `iter_names()` cannot be the oracle: if two constants shared a bit, the union
+would carry that bit once and the iterator would yield only the first-declared name, so the defect
+under test would hide itself from the test. A `union == all()` assertion keeps the hand-maintained
+list honest — adding a capability without listing it fails rather than silently narrowing coverage.
+
+The general lesson is narrower than "write better assertions": an assertion built by *subtracting
+the thing under test from the set it is checked against* can only ever be true. That shape is worth
+recognising directly, because it reads as thorough.
 
 ### Harness self-correction: a restore that preserves mtime does not rebuild
 

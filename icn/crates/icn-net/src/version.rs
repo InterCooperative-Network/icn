@@ -327,18 +327,77 @@ mod tests {
 
     /// The flag must occupy a bit no other capability uses, or a peer advertising
     /// some unrelated feature would be read as proving its sequence namespace.
+    ///
+    /// # Why this is written the long way
+    ///
+    /// The obvious formulation is vacuous, and was here until review caught it:
+    ///
+    /// ```ignore
+    /// let others = CapabilityFlags::all() & !bit;
+    /// assert!((others & bit).is_empty());   // true by construction, always
+    /// ```
+    ///
+    /// `& !bit` removes `bit` from `others`, so the intersection is empty whether or not
+    /// the flag aliases anything. It asserts a tautology.
+    ///
+    /// `iter_names()` is not a usable oracle either: if two constants shared a bit, the
+    /// union would carry that bit once and the iterator would yield only the
+    /// first-declared name — the defect under test would hide itself from the test.
+    ///
+    /// So the capabilities are listed explicitly and checked pairwise. The list being
+    /// hand-maintained is the point: `union == all()` fails if a capability is added
+    /// without being added here, so the check cannot silently stop covering new flags.
     #[test]
-    fn durable_signing_sequence_does_not_alias_another_capability() {
-        let bit = CapabilityFlags::DURABLE_SIGNING_SEQUENCE;
-        let others = CapabilityFlags::all() & !bit;
-        assert!(
-            (others & bit).is_empty(),
-            "DURABLE_SIGNING_SEQUENCE must not share a bit with another capability"
+    fn capability_bits_are_pairwise_disjoint() {
+        let declared: &[(&str, CapabilityFlags)] = &[
+            ("E2E_ENCRYPTION", CapabilityFlags::E2E_ENCRYPTION),
+            ("SIGNED_MESSAGES", CapabilityFlags::SIGNED_MESSAGES),
+            ("GRACEFUL_RESTART", CapabilityFlags::GRACEFUL_RESTART),
+            ("TOPOLOGY_AWARE", CapabilityFlags::TOPOLOGY_AWARE),
+            ("TRUST_RATE_LIMITING", CapabilityFlags::TRUST_RATE_LIMITING),
+            ("GOSSIP_PULL", CapabilityFlags::GOSSIP_PULL),
+            ("MULTI_DEVICE", CapabilityFlags::MULTI_DEVICE),
+            ("ECONOMIC_SAFETY", CapabilityFlags::ECONOMIC_SAFETY),
+            ("MESSAGE_COMPRESSION", CapabilityFlags::MESSAGE_COMPRESSION),
+            ("HYBRID_SIGNATURES", CapabilityFlags::HYBRID_SIGNATURES),
+            ("HYBRID_KEM", CapabilityFlags::HYBRID_KEM),
+            ("POSTCARD_ENCODING", CapabilityFlags::POSTCARD_ENCODING),
+            (
+                "DURABLE_SIGNING_SEQUENCE",
+                CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
+            ),
+        ];
+
+        for (i, (name_a, a)) in declared.iter().enumerate() {
+            assert_eq!(
+                a.bits().count_ones(),
+                1,
+                "{name_a} must be exactly one bit; a multi-bit capability cannot be \
+                 tested for aliasing this way"
+            );
+            for (name_b, b) in declared.iter().skip(i + 1) {
+                assert!(
+                    (*a & *b).is_empty(),
+                    "{name_a} and {name_b} share a bit: a peer advertising one would be \
+                     read as advertising the other. For DURABLE_SIGNING_SEQUENCE that \
+                     means an unrelated feature would prove the sender's sequence namespace"
+                );
+            }
+        }
+
+        let union = declared
+            .iter()
+            .fold(CapabilityFlags::empty(), |acc, (_, f)| acc | *f);
+        assert_eq!(
+            union,
+            CapabilityFlags::all(),
+            "a capability exists that this test does not list, so it is not covered by the \
+             pairwise check above; add it to `declared`"
         );
         assert_eq!(
-            bit.bits().count_ones(),
-            1,
-            "the sender-regime signal must be exactly one bit"
+            union.bits().count_ones() as usize,
+            declared.len(),
+            "the declared capabilities do not occupy one distinct bit each"
         );
     }
 
