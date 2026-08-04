@@ -231,9 +231,13 @@ impl NetworkHandle {
     /// cryptographic attribution. It is derived deterministically from `addr`
     /// alone by `derive_placeholder_did`, and is needed because the session
     /// manager's connection map is keyed by DID string while the peer's real
-    /// DID is unknown until the Hello handshake completes. It is computable by
-    /// anyone from the address alone, has no corresponding private key, and is
-    /// produced even when the dial never reaches a peer at all.
+    /// DID is unknown until the Hello handshake completes. It has no
+    /// corresponding private key, and is computed from the address *before* the
+    /// dial is attempted, so it is derivable offline by anyone who knows the
+    /// address and carries no evidence that a peer answered.
+    ///
+    /// (`dial_addr` itself still returns `Err` when the dial fails; the point is
+    /// that the value's derivation is independent of the dial's outcome.)
     ///
     /// The peer's authenticated DID is recorded separately by the Hello
     /// handler, into `peer_connections`, after DID-TLS binding verification.

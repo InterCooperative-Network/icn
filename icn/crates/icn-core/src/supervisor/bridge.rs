@@ -10,8 +10,9 @@ use icn_identity::Did;
 use std::net::SocketAddr;
 use tracing::debug;
 
-/// Parsed bootstrap peer — either with a known DID or address-only
-/// (DID learned from QUIC/DID-TLS handshake).
+/// Parsed bootstrap peer — either with a DID supplied by configuration or
+/// address-only. Neither form authenticates the peer; identity is proven only
+/// by DID-TLS binding verification during the Hello handshake.
 #[derive(Debug, Clone)]
 pub enum BootstrapPeer {
     /// Full peer with known DID: `icn://did:icn:PUBKEY@HOST:PORT`
