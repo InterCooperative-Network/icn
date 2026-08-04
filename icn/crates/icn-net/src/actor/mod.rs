@@ -225,11 +225,27 @@ impl NetworkHandle {
         );
     }
 
-    /// Dial a peer by address only (DID learned from Hello handshake).
+    /// Dial a peer by address only, returning a **placeholder connection key**.
     ///
-    /// Uses a deterministic placeholder DID derived from the address as a
-    /// temporary connection key. The peer's actual DID is learned during
-    /// the Hello handshake and the connection map is updated accordingly.
+    /// The returned value is not the peer's identity and carries no
+    /// cryptographic attribution. It is derived deterministically from `addr`
+    /// alone by `derive_placeholder_did`, and is needed because the session
+    /// manager's connection map is keyed by DID string while the peer's real
+    /// DID is unknown until the Hello handshake completes. It has no
+    /// corresponding private key, and is computed from the address *before* the
+    /// dial is attempted, so it is derivable offline by anyone who knows the
+    /// address and carries no evidence that a peer answered.
+    ///
+    /// (`dial_addr` itself still returns `Err` when the dial fails; the point is
+    /// that the value's derivation is independent of the dial's outcome.)
+    ///
+    /// The peer's authenticated DID is recorded separately by the Hello
+    /// handler, into `peer_connections`, after DID-TLS binding verification.
+    /// The placeholder entry in the session manager's connection map is
+    /// **not** re-keyed or evicted — see #2530.
+    ///
+    /// Callers must not treat the returned `Did` as an authenticated peer
+    /// identity, and must not report it as one.
     pub async fn dial_addr(&self, addr: SocketAddr) -> Result<Did> {
         let temp_did = derive_placeholder_did(addr)?;
         self.dial(addr, temp_did.clone()).await?;
@@ -924,8 +940,12 @@ impl NetworkHandle {
 fn derive_placeholder_did(addr: SocketAddr) -> Result<Did> {
     // Derive a deterministic placeholder key from the address using SHA-256.
     // The resulting 32 bytes are used as an Ed25519 "public key" for connection
-    // tracking only — this is NOT a real key and will be replaced by the peer's
-    // actual DID after the Hello handshake.
+    // tracking only. This is NOT a real key: it is a function of the address
+    // alone, so it is identical for every node that dials the same address and
+    // is produced even when nothing is listening there.
+    //
+    // The peer's authenticated DID is recorded separately by the Hello handler.
+    // This placeholder is not currently replaced or evicted — see #2530.
     use sha2::{Digest, Sha256};
     let addr_hash = Sha256::digest(format!("bootstrap:{addr}").as_bytes());
     let hash_bytes: [u8; 32] = addr_hash.into();
@@ -1440,6 +1460,59 @@ mod tests {
             did, did_again,
             "fallback mapping should remain deterministic"
         );
+    }
+
+    /// Characterization test for #2529: the placeholder is scoped to the
+    /// *address*, not to the peer, so one host reached by several routes
+    /// yields several unrelated placeholders — none of which is its identity.
+    ///
+    /// This is what made #2529 look like an identity anomaly: a node dialed
+    /// gamma's ClusterIP and logged a DID that was not gamma's. If a future
+    /// change makes this value look peer-scoped (host-keyed, or sourced from
+    /// the peer's certificate) without also making it authenticated, this test
+    /// fails and forces that decision to be explicit.
+    #[test]
+    fn test_placeholder_did_is_address_scoped_not_peer_scoped() {
+        // Three routes to one hypothetical peer: pod IP, service IP, node port.
+        // The node address uses RFC 5737 documentation space; the cluster-internal
+        // ones are the shapes a pod and a ClusterIP actually take.
+        let pod_ip: SocketAddr = "10.42.1.208:7825".parse().unwrap();
+        let service_ip: SocketAddr = "10.43.12.70:7825".parse().unwrap();
+        let node_port: SocketAddr = "192.0.2.10:30825".parse().unwrap();
+
+        let via_pod = derive_placeholder_did(pod_ip).unwrap();
+        let via_service = derive_placeholder_did(service_ip).unwrap();
+        let via_node_port = derive_placeholder_did(node_port).unwrap();
+
+        assert_ne!(
+            via_pod, via_service,
+            "same peer via a different address must not be assumed to be the same peer"
+        );
+        assert_ne!(via_service, via_node_port);
+        assert_ne!(via_pod, via_node_port);
+
+        // Even the port alone changes it, so this cannot stand in for a host,
+        // let alone an identity.
+        let other_port: SocketAddr = "10.43.12.70:7826".parse().unwrap();
+        assert_ne!(via_service, derive_placeholder_did(other_port).unwrap());
+    }
+
+    /// The placeholder requires no peer, no connection, and no handshake — it
+    /// is a pure function of the address. This is the concrete reason the old
+    /// "learned from handshake" log line was false: nodes emitted this value
+    /// for addresses whose dial timed out without any peer ever responding.
+    #[test]
+    fn test_placeholder_did_needs_no_peer_or_handshake() {
+        // Reserved-for-documentation address (RFC 5737); nothing can answer.
+        let unreachable: SocketAddr = "192.0.2.1:7825".parse().unwrap();
+
+        let did = derive_placeholder_did(unreachable).unwrap();
+        assert!(did.as_str().starts_with("did:icn:"));
+
+        // Any party can recompute it offline from the address alone, which is
+        // precisely why it must never be reported as an authenticated identity.
+        let recomputed = derive_placeholder_did(unreachable).unwrap();
+        assert_eq!(did, recomputed);
     }
 
     #[tokio::test]
