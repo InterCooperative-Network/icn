@@ -1,0 +1,457 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Inbound Handshake Cancellation (#2521) — Causal Record | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>inbound handshake cancellation 2521</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/inbound-handshake-cancellation-2521.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Inbound Handshake Cancellation (#2521) — Causal Record</h1>
+<p>Causal record for #2521, landed via PR #2525. Written 2026-08-04, while the fix was still
+under validation on the branch; the evidence below is that validation. The issue thread
+remains authoritative.</p>
+<h2>The invariant</h2>
+<blockquote>
+<p>A shutdown polling deadline may cancel the wait for new inbound work. It must not
+silently become a maximum lifetime for a QUIC/TLS handshake that has already arrived.
+Once an <code>Incoming</code> is owned, its handshake lifecycle must be handled explicitly, with
+bounded concurrency and shutdown semantics, rather than by accidental future
+cancellation.</p>
+</blockquote>
+<h2>What was wrong</h2>
+<p><code>NetworkActor::handle_incoming_connections</code> polled for shutdown by wrapping the accept
+step in a 100ms timeout:</p>
+<pre><code class="language-rust">let guard = session_manager.read().await;
+tokio::time::timeout(Duration::from_millis(100), guard.accept()).await.ok()
+</code></pre>
+<p><code>SessionManager::accept()</code> fuses two operations with opposite cancellation properties:</p>
+<table>
+<thead>
+<tr>
+<th>phase</th>
+<th>call</th>
+<th>cancel-safe?</th>
+<th>why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>wait for new work</td>
+<td><code>Endpoint::accept()</code></td>
+<td><strong>yes</strong></td>
+<td>a pending <code>Incoming</code> stays queued on the endpoint; <code>Accept&lt;&#39;_&gt;</code> only parks on a <code>Notify</code></td>
+</tr>
+<tr>
+<td>complete the handshake</td>
+<td><code>incoming.await</code></td>
+<td><strong>no</strong></td>
+<td><code>Incoming::into_future</code> consumes the <code>Incoming</code> into a <code>Connecting</code>; dropping it drops the last <code>ConnectionRef</code>, and quinn calls <code>implicit_close</code></td>
+</tr>
+</tbody></table>
+<p>So the 100ms deadline was a hidden maximum lifetime for every inbound QUIC/TLS handshake.</p>
+<h3>Why it presented as a ~50% flake rather than a clean threshold</h3>
+<p>The budget is <em>shared between both phases and re-armed each loop iteration</em>. If the
+<code>Incoming</code> arrives <code>t</code> ms into the window, the handshake gets only <code>100 - t</code> ms. The
+effective handshake deadline is therefore not a fixed 100 ms but a remainder that varies
+from nearly zero up to 100 ms depending on where in the polling cycle the connection
+arrives.</p>
+<p>Under arrivals that are not synchronised to the polling cycle — which is the normal case,
+since peers dial independently of the receiver&#39;s loop — this produces probabilistic rather
+than threshold failure, at a rate that rises as handshake latency grows and as anything
+(CPU load, scheduler contention, slower hardware, WAN latency) lengthens it.</p>
+<p>The precise arrival-phase distribution was <strong>not</strong> measured, so no exact failure-rate
+formula is claimed here. What was measured is the end-to-end rate on this machine
+(37.5%, see below) and the fact that changing only this timeout removes the failure mode
+entirely.</p>
+<h3>Why the polling existed at all</h3>
+<p>It was load-bearing, not incidental. The loop held <code>session_manager.read()</code> <em>across</em> the
+accept await, and <code>NetworkActor::run</code> shuts down via
+<code>self.session_manager.write().await.stop()</code>. An unbounded accept would have pinned the
+read guard forever and deadlocked shutdown. The timeout bounded the guard&#39;s hold time.</p>
+<p>This is why &quot;just remove the timeout&quot; is not the fix: it trades a handshake bug for a
+shutdown hang.</p>
+<h2>The fix</h2>
+<p><code>SessionManager::endpoint_handle()</code> hands out a cheap clone of the <code>quinn::Endpoint</code>
+(internally reference-counted), so the accept loop can wait <strong>without holding any
+<code>SessionManager</code> lock</strong>. With the lock no longer pinned, polling is unnecessary and the
+loop waits on <code>tokio::select!</code> against the shutdown receiver instead:</p>
+<ol>
+<li>reserve a handshake slot (bounded concurrency, cancel-safe);</li>
+<li>clone the endpoint handle, releasing the manager lock immediately;</li>
+<li><code>select!</code> shutdown against <code>endpoint.accept()</code> — the only cancellable phase;</li>
+<li>move the owned <code>Incoming</code> into its own task and drive <code>incoming.await</code> there, outside
+every cancellation scope in the loop.</li>
+</ol>
+<p><code>SessionManager::accept()</code> is retained for tests that spawn it and never cancel it, and now
+carries a <code># Cancel safety</code> warning documenting that it must never be wrapped in a timeout.</p>
+<h3>Properties this changes</h3>
+<ul>
+<li><strong>Shutdown got faster, not slower.</strong> It is now signal-driven rather than polled, so the
+worst-case shutdown latency for the accept loop drops from ~100ms to immediate.</li>
+<li><strong>Head-of-line blocking removed.</strong> The old loop completed one handshake before accepting
+another. A slow peer now cannot stall acceptance, because handshakes run in their own
+tasks.</li>
+<li><strong>Concurrency is bounded.</strong> <code>MAX_CONCURRENT_INBOUND_HANDSHAKES = 64</code> slots are reserved
+<em>before</em> an <code>Incoming</code> is taken, so bursts back up in quinn&#39;s own accept queue — where
+they are subject to endpoint limits and refused cleanly — rather than accumulating
+unbounded tasks. The slot is released when the handshake completes, not when the
+connection closes, so it bounds handshakes rather than connection lifetimes.</li>
+<li><strong>In-flight handshakes at shutdown are deliberately detached.</strong> <code>SessionManager::stop</code>
+closes the endpoint, which fails them promptly; the loop does not block shutdown waiting
+on a peer that may never finish. See &quot;Lifecycle and shutdown&quot; below for which parts of
+this are tested and which are argued.</li>
+</ul>
+<h2>Evidence</h2>
+<p>Four distinct kinds of evidence support this fix. They are not interchangeable, and
+conflating them overstates the case, so they are labelled explicitly.</p>
+<h3>1. Regression property (fail-before / pass-after)</h3>
+<p><code>a_slow_but_legitimate_peer_is_still_admitted</code> is the only test whose <strong>verdict changes</strong>
+across the fix. It runs the real production path — a <code>NetworkActor</code>, its real accept loop,
+a real Hello — and asserts that a legitimate peer whose handshake takes 300 ms is still
+admitted, with server-side peer installation as the oracle.</p>
+<p>The 300 ms stall is introduced entirely at the test layer, by a client-side
+<code>ServerCertVerifier</code> that sleeps. That step gates the client&#39;s Finished flight, which gates
+the server&#39;s handshake completion, so it lengthens the server-side handshake without any
+production seam and without weakening the server&#39;s TLS semantics.</p>
+<table>
+<thead>
+<tr>
+<th>tree</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>pristine <code>connection.rs</code></td>
+<td><strong>0 pass / 6 fail</strong> — fails on its own assertion, naming #2521</td>
+</tr>
+<tr>
+<td>fixed <code>connection.rs</code></td>
+<td><strong>6 pass / 0 fail</strong></td>
+</tr>
+</tbody></table>
+<p>Same test source, unchanged between runs; only <code>connection.rs</code> differs. (<code>session.rs</code> is
+additive and the old loop never calls it, so it was held constant.)</p>
+<h3>2. Deterministic defect witness (passes on <em>both</em> trees)</h3>
+<p><code>a_fused_accept_cancelled_after_one_poll_destroys_the_handshake</code> and its control assert a
+<em>negative property of the fused API</em> — that <code>SessionManager::accept()</code> is cancel-unsafe.
+That is true before and after the fix, so this test does <strong>not</strong> change verdict and is not
+a RED in the test-driven sense. It is a witness: it demonstrates the mechanism
+deterministically and stands as the standing reason the accept loop may not call <code>accept()</code>
+inside a cancellation scope.</p>
+<p>It pins the boundary by construction rather than by racing the clock.
+<code>tokio::time::timeout</code> polls its inner future <em>before</em> checking the deadline, so a
+<code>Duration::ZERO</code> budget grants exactly one poll — and one poll separates the phases:</p>
+<ul>
+<li><code>Endpoint::accept()</code> pops an already-queued <code>Incoming</code> on its first poll, so the
+cancel-safe phase always survives a zero budget;</li>
+<li><code>Connecting::poll</code> reads a oneshot the freshly-spawned connection driver cannot yet have
+signalled, so the handshake phase never survives one.</li>
+</ul>
+<p>Measured 20/20 on pristine <code>main</code>. That figure is a determinism measurement of the witness,
+<strong>not</strong> a RED.</p>
+<p>Two earlier drafts of this test produced false confidence and are recorded so they are not
+repeated:</p>
+<ul>
+<li><em>&quot;1 ms is shorter than any handshake&quot;</em> — it is not. A warm loopback handshake can
+complete in well under a millisecond, and the test then passes for the wrong reason.</li>
+<li><em>Asserting the client&#39;s <code>connect()</code> failed</em> — flaky, because the server can complete the
+handshake, let the client&#39;s <code>connect()</code> resolve <code>Ok</code>, and only then discard the
+connection. This is not a test artifact: it is exactly the production symptom, where the
+dialling peer logs a successful certificate exchange and the receiver shows no trace of
+the connection at all. All assertions are made on the server side.</li>
+</ul>
+<h3>3. Mutation kills</h3>
+<p>Run with a snapshot-based harness that verifies the input tree contains the #2521 fix
+before starting, restores only the file each mutation touched, and asserts on exit that the
+tree it hands back is byte-identical (sha256) to the tree it was handed.</p>
+<table>
+<thead>
+<tr>
+<th>id</th>
+<th>mutation</th>
+<th>killed by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M1</td>
+<td>skip the current-cert hash comparison</td>
+<td>3 tests incl. <code>hello_replayed_onto_a_different_current_cert_is_rejected</code></td>
+</tr>
+<tr>
+<td>M2</td>
+<td>fail open when the peer certificate is absent</td>
+<td><code>hello_without_any_peer_certificate_is_rejected</code></td>
+</tr>
+<tr>
+<td>M3</td>
+<td>verify against a stored cert, not this connection&#39;s</td>
+<td><code>forged_hello_does_not_corrupt_established_peer_state</code>, <code>hello_with_matching_current_cert_is_accepted</code></td>
+</tr>
+<tr>
+<td>M4</td>
+<td>omit <code>message.from == binding_info.did</code></td>
+<td><code>hello_claiming_another_did_with_own_valid_binding_is_rejected</code></td>
+</tr>
+<tr>
+<td>M5</td>
+<td>put the handshake back inside a cancellation scope</td>
+<td><code>forged_hello_does_not_corrupt_established_peer_state</code>, <code>hello_with_matching_current_cert_is_accepted</code></td>
+</tr>
+</tbody></table>
+<p><strong>5/5 killed, 0 survivors, 0 no-ops</strong>, integrity assertion PASS.</p>
+<p>Two further mutations check that the new lifecycle tests are not vacuous:</p>
+<table>
+<thead>
+<tr>
+<th>id</th>
+<th>mutation</th>
+<th>outcome</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M6</td>
+<td>leak the handshake slot instead of releasing it</td>
+<td>KILLED by <code>more_peers_than_the_handshake_cap_can_all_connect</code></td>
+</tr>
+<tr>
+<td>M7</td>
+<td>hold the read guard across the accept, keeping the shutdown <code>select!</code></td>
+<td><strong>SURVIVED — correctly.</strong> The <code>select!</code> wakes the loop and drops the guard, so holding it is not sufficient to deadlock. Informative, not a coverage gap.</td>
+</tr>
+<tr>
+<td>M7b</td>
+<td>the actual naive fix: uninterruptible accept <em>and</em> held guard</td>
+<td>KILLED by <code>shutdown_closes_established_connections_promptly</code></td>
+</tr>
+</tbody></table>
+<p>M7b is the important one: it is the shutdown deadlock a careless &quot;just delete the timeout&quot;
+fix would introduce, and it is caught.</p>
+<h3>4. Bounded A/B on the real-QUIC production path</h3>
+<p><code>cargo test -p icn-net --test hello_current_cert_binding -- --test-threads=1</code>, 40 serial
+runs each (sample size fixed before running):</p>
+<table>
+<thead>
+<tr>
+<th>tree</th>
+<th>result</th>
+<th>pass-run elapsed</th>
+<th>fail-run elapsed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>pristine <code>8f0159db</code></td>
+<td>25 pass / <strong>15 fail</strong> (37.5% failure)</td>
+<td>1.95–2.11 s</td>
+<td>21.93–21.96 s</td>
+</tr>
+<tr>
+<td><code>8f0159db</code> + this fix</td>
+<td><strong>40 pass / 0 fail</strong></td>
+<td>1.95–1.98 s</td>
+<td>— none</td>
+</tr>
+</tbody></table>
+<p>The distribution is sharply bimodal — ~2 s or ~22 s, nothing between — and the fix removes
+the 22 s mode entirely. All 15 baseline failures were the same test,
+<code>hello_with_matching_current_cert_is_accepted</code>, and all died the same way: a
+<code>wait_for_peer(..., 20s)</code> timeout, because the connection was destroyed before any Hello
+could be exchanged.</p>
+<p>CI runs exactly this way: the <code>Test</code> job in <code>.github/workflows/ci.yml</code> runs integration
+tests with <code>cargo test --workspace --test &#39;*&#39; -- --test-threads=1</code>, serially to avoid port
+conflicts. That is why the gate behaved as a coin flip for any PR touching <code>icn-net</code>.</p>
+<h3>Lifecycle and shutdown</h3>
+<p>The fix spawns each owned <code>Incoming</code> into a detached task and bounds concurrent handshakes
+with a 64-slot semaphore. Those properties are asserted by test and mutation rather than by
+comment:</p>
+<table>
+<thead>
+<tr>
+<th>property</th>
+<th>how it is established</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>the wait for new work is cancel-safe</td>
+<td>quinn source: <code>Accept&lt;&#39;_&gt;</code> parks on a <code>Notify</code> and pops from the endpoint&#39;s queue, losing nothing on drop. Exercised by <code>cancelling_the_accept_wait_does_not_destroy_an_inbound_handshake</code>, which abandons the wait repeatedly on a one-poll budget.</td>
+</tr>
+<tr>
+<td>an in-flight handshake is not bounded by the poll interval</td>
+<td><code>a_slow_but_legitimate_peer_is_still_admitted</code> (300 ms handshake vs the old 100 ms budget), RED on pristine, GREEN on the fix.</td>
+</tr>
+<tr>
+<td>a completed handshake still reaches the long-lived connection handler</td>
+<td>the same test&#39;s oracle is peer installation, which only happens inside <code>handle_connection</code>.</td>
+</tr>
+<tr>
+<td>the handshake slot is released on every path</td>
+<td><code>more_peers_than_the_handshake_cap_can_all_connect</code> drives 80 peers past the cap of 64; M6 (leak the permit) kills it.</td>
+</tr>
+<tr>
+<td>shutdown reaches the endpoint and closes it</td>
+<td><code>shutdown_closes_established_connections_promptly</code>; M7b (uninterruptible accept holding the read guard) kills it.</td>
+</tr>
+<tr>
+<td>no shutdown deadlock is introduced</td>
+<td>same test plus M7b — this is the failure mode a naive fix would create.</td>
+</tr>
+</tbody></table>
+<p>One property is <strong>reasoned, not directly tested</strong>: that no in-flight handshake task leaks
+indefinitely. The argument is that <code>SessionManager::stop</code> closes the endpoint, which fails
+any outstanding <code>Connecting</code>, so each task terminates on its own next poll; and that the
+number of such tasks is bounded by the semaphore in the first place. There is no task-count
+assertion backing this, and it is recorded here as an argument rather than a proof. Note
+also that detached connection-handler tasks are pre-existing behaviour — the fix adds a
+bounded handshake stage in front of them, not a new class of unbounded task.</p>
+<h2>A note on the validation machinery</h2>
+<p>The first version of the mutation harness restored every mutation target with
+<code>git checkout -- &lt;file&gt;</code>. One of those targets, <code>connection.rs</code>, held the #2521 fix, which
+was still uncommitted at the time. The harness therefore silently replaced the
+implementation under test with pristine <code>HEAD</code> before the first mutation ran, and M1–M4
+were evaluated against the wrong tree. M5 surfaced this as <code>NO-OP (pattern not found)</code> —
+the expected <code>incoming.await</code> was gone because the harness itself had removed it — rather
+than as a false kill.</p>
+<p>The source was recovered and verified byte-identical (sha256) to the stash object that had
+produced the A/B result, so no design drift was introduced. The harness was then rewritten
+to snapshot the exact input contents, restore from those snapshots rather than from Git,
+refuse to start unless the fix is present, and assert on exit that the tree it returns is
+byte-identical to the tree it received. All mutations were re-run against the real fixed
+implementation.</p>
+<p>The lesson is worth keeping: <strong>validation machinery is part of the proof.</strong> A mutation
+harness that can silently substitute <code>HEAD</code> for the implementation under test invalidates
+its own results even when the individual tests fail in the desired direction. And a NO-OP
+is never a kill.</p>
+<h2>Hypotheses that were disproved</h2>
+<p>Recorded so they are not re-litigated:</p>
+<ul>
+<li><strong>&quot;The 20 s test timeout is too short.&quot;</strong> No. The failure occurs <em>before</em> the Hello
+security property is exercised at all — no server-side client-cert acceptance, no
+&quot;Accepted connection&quot;, no connection handler. The connection is already gone; extending
+the deadline only makes the test wait longer for something that will never arrive.</li>
+<li><strong>&quot;A 30-second direct-dial timeout.&quot;</strong> There is no dial deadline in the production path;
+<code>SessionManager::connect</code> dials un-timed. The three <code>from_secs(30)</code> values in <code>icn-net</code>
+are the TURN refresh interval, the QUIC keep-alive interval, and the mDNS scan interval —
+none is a dial deadline.</li>
+<li><strong>&quot;mDNS ghost peers / cross-test state accumulation.&quot;</strong> This was the original framing of
+#2521, and it is an <em>amplifier</em>, not the cause. Accumulated <code>ServiceDaemon</code> threads add
+scheduling contention, which lengthens the handshake and so raises the probability of
+crossing the shared 100ms budget — which is why the flake was serial-mode specific. But
+the fix touches no mDNS code and takes the suite to 40/40, and the earlier diagnostic
+that changed <em>only</em> the accept timeout from 100ms to 5000ms already took it to 20/20.
+mDNS was never load-bearing.</li>
+<li><strong>&quot;A #2517/#2519 regression.&quot;</strong> No: the defect reproduces on pristine <code>main</code> at
+<code>8f0159db</code>, and predates both.</li>
+<li><strong>&quot;Actor mailbox blockage / incomplete actor teardown.&quot;</strong> Not implicated: the accept loop
+never reaches the mailbox, and the reproducer needs no actor at all.</li>
+</ul>
+<h2>Production impact</h2>
+<p>Conservatively: this is a <strong>reliability/availability</strong> defect, not a security one.</p>
+<p>Inbound federation connection attempts could be silently dropped whenever the QUIC/TLS
+handshake outlived the remaining share of the accept loop&#39;s 100ms budget — more likely
+under CPU load, scheduler contention, slower hardware, WAN latency, or slow certificate
+verification. Because the budget is a random share of 100ms rather than a fixed 100ms, some
+proportion of inbound connections was being lost even on fast paths. The expected
+presentation is intermittent connection/rejoin failure, which would amplify restart and
+rejoin instability.</p>
+<p>It is <strong>not</strong> an authentication bypass, a confidentiality compromise, or a permanent
+outage, and none of those is claimed. The #2520 Hello identity-binding invariant is
+unaffected: the failure happens strictly below it, and all four of its mutations remain
+killed under this change.</p>
+<h2>Follow-ups deliberately not bundled here</h2>
+<ul>
+<li>mDNS service advertisement can outlive <code>Discovery::stop()</code> until TTL expiry unless
+explicitly unregistered.</li>
+<li>Test teardown signals <code>NetworkActor</code> shutdown without awaiting a complete unwind.</li>
+</ul>
+<p>Both are real, both are separable, and neither is load-bearing for this defect — the suite
+reaches 40/40 without touching either.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
