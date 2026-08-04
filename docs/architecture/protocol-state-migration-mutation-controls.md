@@ -23,7 +23,7 @@ the failures above it meaningful rather than a broken checkout.
 
 | # | defect introduced | tests killed |
 |---|---|---|
-| 1 | Legacy state treated as current — remove the version branch entirely | `legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever`, `migration_completes_at_the_envelope_validity_horizon`, `migration_runs_once_and_does_not_re_trigger_on_restart`, `crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy`, `unknown_future_semantic_version_fails_closed` |
+| 1 | Legacy state treated as current — the version branch always selects the current arm | **10 killed**, re-measured post-rebase: `legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever`, `migration_completes_at_the_envelope_validity_horizon`, `migration_runs_once_and_does_not_re_trigger_on_restart`, `crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy`, `unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon`, `a_known_version_without_a_migration_does_not_borrow_the_legacy_path`, `pre_2514_inflated_floor_does_not_survive_migration`, `state_rewritten_by_an_older_binary_is_treated_as_legacy`, `receiver_first_upgrade_migrates_the_sender_regime_end_to_end`, `sender_first_upgrade_costs_two_sequential_holds_and_no_sender_restart` |
 | 2 | Sender resets the watermark when stamping an unversioned store (recreates #2510) | `unversioned_durable_watermark_is_stamped_without_disturbing_the_sequence`, `corrupt_watermark_is_rejected_rather_than_silently_reset` |
 | 3 | Legacy state dropped immediately, with no fail-closed hold | `captured_legacy_envelope_stays_rejected_across_the_whole_migration`, `legacy_high_water_does_not_reject_a_legitimate_lower_sequence_forever`, `migration_completes_at_the_envelope_validity_horizon`, `migration_runs_once_and_does_not_re_trigger_on_restart`, `crash_before_migration_completes_re_quarantines_rather_than_trusting_legacy`, `state_rewritten_by_an_older_binary_is_treated_as_legacy` |
 | 4 | Current version never stamped on write, so migration re-runs forever | `migration_runs_once_and_does_not_re_trigger_on_restart`, `current_semantic_state_is_restored_exactly_and_not_migrated` |
@@ -54,6 +54,15 @@ of that.
 The general hazard: a mutation applied by text substitution can stop applying when the code is
 restructured, and reports success either way. A mutation that kills *fewer* tests than it did before
 is the signal, which is why the counts above are recorded rather than just the pass/fail.
+
+**A second instance, caught in review rather than by the harness.** Row 1 named a test
+`unknown_future_semantic_version_fails_closed` that does not exist — the test had been renamed to
+`unknown_future_version_stays_fail_closed_past_the_legacy_migration_horizon` and the table was not
+updated. Nothing failed: a kill list is prose, so a stale name in it is invisible to every gate.
+The row was corrected by *re-running* the mutation rather than by guessing which test the old name
+referred to, which is how the true kill count turned out to be 10 rather than the 5 recorded. This
+is the same failure mode as the no-op above, one level up: the harness can drift from the code, and
+the record can drift from the harness.
 
 ## Sender sequence regime (§§8–11 of the invariants)
 
