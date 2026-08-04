@@ -184,3 +184,68 @@ async fn a_fused_accept_cancelled_after_one_poll_destroys_the_handshake() -> Res
     dial.abort();
     Ok(())
 }
+
+/// The regression guard. With the wait and the handshake separated, the wait may be
+/// cancelled as aggressively as a caller likes — here on the same one-poll budget that
+/// destroys the fused API above, which is far more hostile than the production shutdown
+/// check — and a legitimate inbound handshake still completes.
+///
+/// This is the property that makes the accept loop's shutdown responsiveness free: it can
+/// abandon the wait whenever it wants without ever putting a connection at risk.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn cancelling_the_accept_wait_does_not_destroy_an_inbound_handshake() -> Result<()> {
+    init();
+    let (server, addr) = start_server().await?;
+    let client = client_endpoint()?;
+
+    let dial = tokio::spawn(async move {
+        let result = client.connect(addr, "localhost")?.await;
+        Ok::<_, anyhow::Error>((result, client))
+    });
+
+    let endpoint = server
+        .endpoint_handle()
+        .await
+        .expect("the server endpoint is started");
+
+    // Phase 1, cancelled repeatedly on a one-poll budget. Cancel-safe: a queued `Incoming`
+    // survives every one of these abandonments.
+    let deadline = tokio::time::Instant::now() + ACCEPT_WINDOW;
+    let mut arrived = None;
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(ONE_POLL, endpoint.accept()).await {
+            Err(_elapsed) => {
+                tokio::time::sleep(POLL_GAP).await;
+            }
+            Ok(Some(incoming)) => {
+                arrived = Some(incoming);
+                break;
+            }
+            Ok(None) => break,
+        }
+    }
+    let incoming = arrived.expect(
+        "the cancel-safe wait must eventually hand over an Incoming no matter how often \
+         it is abandoned",
+    );
+
+    // Phase 2, driven outside any cancellation scope. The timeout here is a test hang
+    // guard on a deadline three orders of magnitude larger than a loopback handshake, not
+    // a budget the handshake is expected to strain against.
+    let connection = tokio::time::timeout(ACCEPT_WINDOW, incoming)
+        .await
+        .expect("an uncancelled handshake must not hang")?;
+
+    assert!(
+        connection.remote_address().ip().is_loopback(),
+        "the completed handshake must be the loopback client we dialled with"
+    );
+
+    let (client_result, _client) = dial.await??;
+    assert!(
+        client_result.is_ok(),
+        "the client must observe the same successful handshake the server completed: {:?}",
+        client_result.err()
+    );
+    Ok(())
+}

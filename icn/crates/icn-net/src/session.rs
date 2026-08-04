@@ -372,9 +372,42 @@ impl SessionManager {
         Ok(connection)
     }
 
+    /// Clone the live QUIC endpoint, if the manager has been started.
+    ///
+    /// `quinn::Endpoint` is internally reference-counted, so this is a cheap handle and
+    /// **not** a borrow of the session manager. That matters: it lets a caller wait for
+    /// inbound connections without holding a `SessionManager` lock across the await.
+    /// [`Self::stop`] needs the write side of that lock, so a long-lived read guard here
+    /// would deadlock shutdown — which is what forced the accept loop to poll on a short
+    /// timeout in the first place, and hence caused #2521.
+    pub async fn endpoint_handle(&self) -> Option<Endpoint> {
+        self.endpoint.read().await.clone()
+    }
+
     /// Accept an incoming connection
     ///
     /// Blocks until a new connection arrives or the endpoint is shut down.
+    ///
+    /// # Cancel safety
+    ///
+    /// **This future is not cancel-safe, and must never be wrapped in a timeout or raced
+    /// in a `select!` against anything that can win.** It fuses two phases with opposite
+    /// cancellation properties:
+    ///
+    /// 1. waiting for a new connection ([`Endpoint::accept`]) — cancel-safe; a pending
+    ///    `Incoming` stays queued on the endpoint;
+    /// 2. driving that connection's QUIC/TLS handshake (`incoming.await`) — cancel-*unsafe*;
+    ///    the `Incoming` has already been consumed into a `Connecting`, and dropping it
+    ///    drops the last `ConnectionRef`, which quinn turns into an implicit close.
+    ///
+    /// Cancelling anywhere in phase 2 therefore destroys a legitimate connection attempt
+    /// silently — no error, no application-level trace, and the dialing peer may still
+    /// observe a *successful* handshake. See #2521 and
+    /// `tests/accept_handshake_cancellation.rs`.
+    ///
+    /// Callers that need to remain interruptible (the inbound accept loop) must instead
+    /// use [`Self::endpoint_handle`], cancel only the `Endpoint::accept()` wait, and drive
+    /// the handshake to completion outside any cancellation scope.
     pub async fn accept(&self) -> Result<Option<quinn::Connection>> {
         let endpoint = self
             .endpoint

@@ -10,11 +10,28 @@
 //!
 //! Each connection spawns a dedicated handler task that processes messages until
 //! the peer disconnects or a shutdown signal is received.
+//!
+//! # Acceptance is two phases, not one
+//!
+//! Waiting for a new inbound connection and completing that connection's QUIC/TLS
+//! handshake have opposite cancellation properties, and the accept loop keeps them
+//! strictly apart (#2521):
+//!
+//! - **Waiting** ([`quinn::Endpoint::accept`]) is cancel-safe — a pending `Incoming` stays
+//!   queued on the endpoint — so it is raced against shutdown and may be abandoned freely.
+//! - **Handshaking** (`incoming.await`) is *not*. Once an `Incoming` is owned it must be
+//!   driven to completion; dropping it mid-handshake makes quinn implicitly close the
+//!   connection, destroying a legitimate peer's connection attempt with no error and no
+//!   application-level trace.
+//!
+//! So a shutdown deadline may cancel the wait for new work, but must never become a
+//! maximum lifetime for a handshake that has already arrived.
 
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::time::Duration;
+use tokio::sync::{RwLock, Semaphore};
 use tracing::{debug, info, instrument, warn};
 
 use crate::{
@@ -28,6 +45,18 @@ use crate::{
 use super::PeerConnectionInfo;
 
 use super::NetworkActor;
+
+/// Maximum number of inbound QUIC/TLS handshakes driven concurrently.
+///
+/// Each handshake runs in its own task so that one slow or unresponsive peer cannot stall
+/// acceptance for everyone else. The slot is reserved *before* a new `Incoming` is taken,
+/// so a burst backs up inside quinn's own accept queue — where it is subject to the
+/// endpoint's limits and can be refused cleanly — rather than accumulating unbounded tasks
+/// here.
+const MAX_CONCURRENT_INBOUND_HANDSHAKES: usize = 64;
+
+/// Backoff before re-checking for an endpoint that has not been started yet.
+const ENDPOINT_RETRY_INTERVAL: Duration = Duration::from_millis(100);
 
 impl NetworkActor {
     /// Handle incoming QUIC connections
@@ -48,74 +77,116 @@ impl NetworkActor {
     ) -> Result<()> {
         info!("Starting incoming connection handler");
 
+        let handshake_slots = Arc::new(Semaphore::new(MAX_CONCURRENT_INBOUND_HANDSHAKES));
+
         loop {
-            // Check for shutdown signal first (non-blocking)
-            match shutdown_rx.try_recv() {
-                Ok(_) | Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
+            // Reserve a handshake slot before taking on new work. Acquiring is cancel-safe,
+            // so losing this race to shutdown costs nothing.
+            let permit = tokio::select! {
+                biased;
+                _ = shutdown_rx.recv() => {
                     info!("Incoming connection handler received shutdown signal");
                     break;
                 }
-                Err(tokio::sync::broadcast::error::TryRecvError::Empty)
-                | Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
-                    // Continue to accept connections
-                }
-            }
-
-            // Accept with timeout to periodically check shutdown
-            let conn_result = {
-                let guard = session_manager.read().await;
-                tokio::time::timeout(tokio::time::Duration::from_millis(100), guard.accept())
-                    .await
-                    .ok() // Convert timeout error to None
+                permit = handshake_slots.clone().acquire_owned() => match permit {
+                    Ok(permit) => permit,
+                    Err(_closed) => break,
+                },
             };
 
-            if let Some(conn_result) = conn_result {
-                match conn_result {
-                    Ok(Some(connection)) => {
-                        // Spawn handler for this connection
-                        let handler_clone = handler.clone();
-                        let rate_limiter_clone = rate_limiter.clone();
-                        let replay_guard_clone = replay_guard.clone();
-                        let neighbor_sets_clone = neighbor_sets.clone();
-                        let topology_config_clone = topology_config.clone();
-                        let session_mgr_clone = session_manager.clone();
-                        let peer_connections_clone = peer_connections.clone();
-                        let blob_registry_clone = blob_registry.clone();
-                        let misbehavior_detector_clone = misbehavior_detector.clone();
-                        let identity_bundle_clone = identity_bundle.clone();
-                        let own_did_clone = own_did.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = Self::handle_connection(
-                                connection,
-                                handler_clone,
-                                rate_limiter_clone,
-                                replay_guard_clone,
-                                neighbor_sets_clone,
-                                topology_config_clone,
-                                session_mgr_clone,
-                                peer_connections_clone,
-                                blob_registry_clone,
-                                misbehavior_detector_clone,
-                                identity_bundle_clone,
-                                own_did_clone,
-                            )
-                            .await
-                            {
-                                warn!("Connection handler error: {}", e);
-                            }
-                        });
+            // Take a cheap clone of the endpoint and release the session manager lock
+            // right away. `SessionManager::stop` needs the write side of this lock, so a
+            // read guard held across the wait below would deadlock shutdown — the reason
+            // this loop previously polled on a short timeout at all.
+            let endpoint = {
+                let manager = session_manager.read().await;
+                manager.endpoint_handle().await
+            };
+            let endpoint = match endpoint {
+                Some(endpoint) => endpoint,
+                None => {
+                    // Not started yet, or already stopped: back off instead of spinning.
+                    tokio::select! {
+                        biased;
+                        _ = shutdown_rx.recv() => break,
+                        _ = tokio::time::sleep(ENDPOINT_RETRY_INTERVAL) => {}
                     }
-                    Ok(None) => {
-                        info!("Session manager shut down");
+                    continue;
+                }
+            };
+
+            // Phase 1: wait for a *new* inbound connection. This is the only part of
+            // acceptance that may be cancelled. `Endpoint::accept()` is cancel-safe, so if
+            // shutdown wins this race any already-queued `Incoming` stays on the endpoint
+            // and is refused cleanly when the endpoint closes.
+            let incoming = tokio::select! {
+                biased;
+                _ = shutdown_rx.recv() => {
+                    info!("Incoming connection handler received shutdown signal");
+                    break;
+                }
+                incoming = endpoint.accept() => match incoming {
+                    Some(incoming) => incoming,
+                    None => {
+                        info!("QUIC endpoint closed; stopping incoming connection handler");
                         break;
                     }
+                },
+            };
+
+            // Phase 2: the `Incoming` is now owned, so its handshake runs to completion in
+            // its own task, outside every cancellation scope in this loop. #2521: this step
+            // used to sit inside the loop's shutdown-polling timeout, which silently
+            // destroyed legitimate connections whose handshake outlived the poll interval.
+            let handler_clone = handler.clone();
+            let rate_limiter_clone = rate_limiter.clone();
+            let replay_guard_clone = replay_guard.clone();
+            let neighbor_sets_clone = neighbor_sets.clone();
+            let topology_config_clone = topology_config.clone();
+            let session_mgr_clone = session_manager.clone();
+            let peer_connections_clone = peer_connections.clone();
+            let blob_registry_clone = blob_registry.clone();
+            let misbehavior_detector_clone = misbehavior_detector.clone();
+            let identity_bundle_clone = identity_bundle.clone();
+            let own_did_clone = own_did.clone();
+            tokio::spawn(async move {
+                let connection = match incoming.await {
+                    Ok(connection) => connection,
                     Err(e) => {
-                        warn!("Failed to accept connection: {}", e);
+                        warn!("Inbound QUIC handshake failed: {}", e);
+                        return;
                     }
+                };
+                // The slot bounds concurrent handshakes, not connection lifetimes: release
+                // it as soon as the handshake is done, before the long-lived stream loop.
+                drop(permit);
+
+                info!("Accepted connection from {}", connection.remote_address());
+
+                if let Err(e) = Self::handle_connection(
+                    connection,
+                    handler_clone,
+                    rate_limiter_clone,
+                    replay_guard_clone,
+                    neighbor_sets_clone,
+                    topology_config_clone,
+                    session_mgr_clone,
+                    peer_connections_clone,
+                    blob_registry_clone,
+                    misbehavior_detector_clone,
+                    identity_bundle_clone,
+                    own_did_clone,
+                )
+                .await
+                {
+                    warn!("Connection handler error: {}", e);
                 }
-            }
+            });
         }
 
+        // In-flight handshake tasks are intentionally left detached: `SessionManager::stop`
+        // closes the endpoint, which fails them promptly, and the accept loop must not block
+        // shutdown waiting on a peer that may never finish its handshake.
         info!("Incoming connection handler stopped");
         Ok(())
     }
