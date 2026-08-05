@@ -113,8 +113,8 @@ pub struct SessionManager {
 pub enum DialOutcome {
     /// A new QUIC connection was established, and nothing is reading from it yet.
     ///
-    /// The caller owns it and must install a connection handler; dropping it closes the
-    /// connection, because nothing else holds it.
+    /// The caller receives the sole handle and must install a connection handler; dropping it
+    /// closes the connection, because nothing else holds it.
     Established(quinn::Connection),
 
     /// A live authenticated session already existed for this peer, and this is that
@@ -125,6 +125,11 @@ pub enum DialOutcome {
     /// again would spawn a second `handle_connection` loop over it — two loops then race for
     /// each inbound stream, so per-connection handler state becomes ambiguous — and would
     /// write a redundant Hello onto an already-handshaken session.
+    ///
+    /// This hands the caller a *borrowed* view of that session rather than custody of it. The
+    /// connection map entry it was cloned from — and the session's own handler task — still
+    /// hold handles, so dropping this one decrements the reference count without closing
+    /// anything. There is nothing here for the caller to install, own, or release.
     AlreadyConnected(quinn::Connection),
 }
 
@@ -357,12 +362,27 @@ impl SessionManager {
     /// we already hold a live session with, and it is what the outgoing Hello is addressed
     /// to. It just never becomes an entry in the connection map (#2530).
     ///
-    /// **The caller owns the returned connection.** Dropping it closes the QUIC connection,
-    /// because nothing else holds it: registering the dial in the connection map used to
-    /// keep it alive as a side effect, and that is exactly the pre-authentication entry this
-    /// no longer creates. In production `NetworkActor::handle_dial` hands it to
-    /// `wire_new_connection`, which moves it into the spawned connection handler — the task
-    /// that reads from it — and that task is its owner until Hello registers it or it closes.
+    /// **Ownership of the reported connection differs per variant**, and a caller that treats
+    /// the two alike is wrong in one of them. `quinn::Connection` is a handle onto a
+    /// reference-counted connection, so dropping one closes the QUIC connection only when it
+    /// was the *last* handle. Which case applies is precisely what [`DialOutcome`] encodes.
+    ///
+    /// [`DialOutcome::Established`] transfers sole ownership. Nothing else holds that
+    /// connection — registering the dial in the connection map used to keep it alive as a side
+    /// effect, and that is exactly the pre-authentication entry this no longer creates — so
+    /// dropping it does close the connection. In production `NetworkActor::handle_dial` hands
+    /// it to `wire_new_connection`, which passes it to the spawned connection handler — the
+    /// task that reads from it — and that task is its owner until Hello registers it or it
+    /// closes.
+    ///
+    /// [`DialOutcome::AlreadyConnected`] transfers no ownership at all. It is a handle cloned
+    /// out of the connection map, and the live session owns itself: the map entry it was
+    /// cloned from still holds the connection, as does that session's running
+    /// `handle_connection` task. Dropping this handle therefore only decrements the reference
+    /// count — the existing session is unaffected and stays live. The caller has nothing to
+    /// install and nothing to release, so discarding the value is the correct response, which
+    /// is what `handle_dial` does. Note that the connection this call actually opened is *not*
+    /// the one reported: it was closed as a duplicate before returning.
     pub async fn dial(&self, addr: SocketAddr, peer_did: String) -> Result<DialOutcome> {
         // Never dial ourselves into our own remote-peer map (#2506). Discovery sources echo our
         // own advertisement back to us — over `network:candidates`, peer exchange, or mDNS — and
@@ -1064,10 +1084,11 @@ mod tests {
     /// Have `dialer` connect to `listener`, returning the connection `listener` accepted.
     /// Dialer-side connections, kept alive for the lifetime of the test binary.
     ///
-    /// `SessionManager::dial` transfers ownership of the connection to its caller, so
-    /// dropping it closes the QUIC connection and tears down the listener side these tests
-    /// are about to assert on. Production keeps it alive by moving it into the spawned
-    /// connection handler; there is no such handler here, so the test binary holds it.
+    /// `SessionManager::dial` transfers sole ownership on [`DialOutcome::Established`] — the
+    /// only outcome this helper accepts — so dropping it closes the QUIC connection and tears
+    /// down the listener side these tests are about to assert on. Production keeps it alive by
+    /// moving it into the spawned connection handler; there is no such handler here, so the
+    /// test binary holds it.
     static DIALER_SIDE: std::sync::Mutex<Vec<quinn::Connection>> =
         std::sync::Mutex::new(Vec::new());
 
