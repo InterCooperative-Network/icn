@@ -144,14 +144,16 @@ async fn wait_until_authenticated(observer: &NetworkHandle, did: &Did, timeout: 
 /// waiting for the *violating* value rather than sleeping a fixed span means a build that
 /// double-wires fails as soon as the second install lands, and a correct build pays the
 /// timeout only once per assertion.
+///
+/// A failed `get_stats` panics rather than counting as zero. It means the actor is gone, which
+/// is not a smaller install count — it is the loss of the oracle, and reporting it as `0` would
+/// blame the fix under test for an actor that died.
 async fn wait_for_installs(node: &NetworkHandle, want: u64, timeout: Duration) -> u64 {
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
-        let seen = node
-            .get_stats()
-            .await
-            .map(|s| s.connections_total)
-            .unwrap_or(0);
+        let seen = node.get_stats().await.map(|s| s.connections_total).expect(
+            "network actor stopped answering get_stats, so the handler-install count is unreadable",
+        );
         if seen >= want {
             return seen;
         }
