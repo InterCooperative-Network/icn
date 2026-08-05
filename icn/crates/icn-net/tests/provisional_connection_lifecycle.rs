@@ -345,9 +345,9 @@ async fn peer_exchange_must_not_advertise_address_derived_placeholders() -> Resu
     // Reading the advertised set requires being a peer, not merely a socket (#2535).
     client.authenticate(&dialer_did).await?;
     assert!(
-        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20))
-            .await,
-        "precondition: the interrogator must authenticate before it can read the          advertised peer set"
+        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20)).await,
+        "precondition: the interrogator must authenticate before it can read the \
+         advertised peer set"
     );
     let advertised = client
         .request_peer_exchange(&interrogator_did, &dialer_did, Duration::from_secs(20))
@@ -426,9 +426,9 @@ async fn only_the_authenticated_did_becomes_canonical_when_the_supplied_did_diff
     // Reading the advertised set requires being a peer, not merely a socket (#2535).
     client.authenticate(&dialer_did).await?;
     assert!(
-        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20))
-            .await,
-        "precondition: the interrogator must authenticate before it can read the          advertised peer set"
+        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20)).await,
+        "precondition: the interrogator must authenticate before it can read the \
+         advertised peer set"
     );
     let advertised = client
         .request_peer_exchange(&interrogator_did, &dialer_did, Duration::from_secs(20))
