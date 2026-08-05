@@ -418,18 +418,13 @@ async fn broadcast_writes_once_per_physical_connection() -> Result<()> {
         "precondition: the dialer never authenticated the peer"
     );
 
-    // Let the handshake settle before broadcasting.
+    // Broadcast immediately — no settling delay.
     //
-    // Two nodes currently reflect Hellos at each other until the receiver's per-DID rate
-    // limiter starts dropping them — `handle_hello` answers every Hello with a Hello, and a
-    // Hello response is indistinguishable on the wire from an initial one. That burst
-    // exhausts the sender's rate-limit budget, so a broadcast issued immediately after
-    // authentication is dropped before dispatch and this test would read 0 for a reason
-    // that has nothing to do with connection aliasing. The reflection is pre-existing on
-    // `main` and out of scope here; waiting for the limiter's window to refill sidesteps it
-    // without hiding it.
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    received.store(0, Ordering::SeqCst);
+    // This used to wait out the per-DID rate-limit window, because the Hello exchange
+    // reflected until the limiter denied one and left no budget for real traffic (#2532).
+    // The handshake now terminates on protocol state, so the budget is intact and a
+    // broadcast issued the moment authentication lands is delivered. If #2532 ever
+    // regresses, this reads 0 rather than 1.
 
     dialer_handle
         .broadcast(NetworkMessage::subscribe(

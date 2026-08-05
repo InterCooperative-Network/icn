@@ -37,6 +37,35 @@ pub struct ConnectionContext {
     pub misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
     pub identity_bundle: IdentityBundle,
     pub own_did: Did,
+    /// Which end of this connection we are.
+    ///
+    /// The Hello exchange has an initiator and a responder, but both run the same
+    /// `handle_hello`, and a Hello *response* is not distinguishable in kind from an initial
+    /// Hello — same payload variant, same fields. Without knowing our role we answered every
+    /// Hello including responses, so each side answered the other's answer until the rate
+    /// limiter denied one (#2532). Role is per *connection*, not per peer: simultaneous
+    /// cross-dialling gives two connections on which the same pair holds opposite roles, so
+    /// global peer state cannot answer this question.
+    pub direction: ConnectionDirection,
+    /// Whether this connection has already sent its one Hello response.
+    ///
+    /// Direction alone bounds the exchange, since an initiator never replies. This
+    /// additionally makes the responder's obligation exactly once, so a repeated Hello
+    /// cannot restart a response chain.
+    pub hello_responded: std::sync::atomic::AtomicBool,
+}
+
+/// Which end of a QUIC connection this node is.
+///
+/// Established at the two places a connection handler is spawned — the inbound accept loop
+/// and `wire_new_connection` for a dial — and carried for the connection's lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionDirection {
+    /// We accepted this connection. We answer the peer's Hello; we never send the first one.
+    Inbound,
+    /// We dialled this connection. We send the first Hello, and the response we get back
+    /// completes our handshake rather than asking us a new question.
+    Outbound,
 }
 
 impl ConnectionContext {
@@ -54,6 +83,7 @@ impl ConnectionContext {
         misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
+        direction: ConnectionDirection,
     ) -> Self {
         Self {
             handler,
@@ -67,6 +97,8 @@ impl ConnectionContext {
             misbehavior_detector,
             identity_bundle,
             own_did,
+            direction,
+            hello_responded: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

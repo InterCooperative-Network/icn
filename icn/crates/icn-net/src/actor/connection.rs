@@ -176,6 +176,7 @@ impl NetworkActor {
                     misbehavior_detector_clone,
                     identity_bundle_clone,
                     own_did_clone,
+                    crate::handlers::ConnectionDirection::Inbound,
                 )
                 .await
                 {
@@ -207,6 +208,7 @@ impl NetworkActor {
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
+        direction: crate::handlers::ConnectionDirection,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -223,6 +225,7 @@ impl NetworkActor {
             misbehavior_detector.clone(),
             identity_bundle.clone(),
             own_did.clone(),
+            direction,
         );
 
         loop {

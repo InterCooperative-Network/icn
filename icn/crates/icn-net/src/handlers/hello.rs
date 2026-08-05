@@ -7,7 +7,7 @@
 //! - X25519 key exchange for E2E encryption
 //! - Post-quantum key binding verification (DID-PQ binding)
 
-use super::ConnectionContext;
+use super::{ConnectionContext, ConnectionDirection};
 use crate::actor::PeerConnectionInfo;
 use crate::protocol::{NetworkMessage, PqBindingProof};
 use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
@@ -295,8 +295,44 @@ impl ConnectionContext {
             }
         }
 
-        // Send Hello response
-        self.send_hello_response(connection, from).await?;
+        // Answer only if we are the responder, and only once.
+        //
+        // Everything above ran unconditionally and still does: this Hello was verified against
+        // this connection's certificate and its peer state installed, whichever end we are.
+        // What is conditional is whether it *demands an answer*. A Hello response is byte-for-
+        // byte the same kind of message as an initial Hello, so a node that answers every
+        // Hello answers responses too, and the two ends sustain the exchange until the rate
+        // limiter denies one — roughly forty messages, and the peer's application-message
+        // budget with them (#2532).
+        //
+        // The exchange is therefore bounded by the protocol: the initiator owes one Hello, the
+        // responder owes one answer, and receiving that answer completes the initiator's
+        // handshake rather than obliging it to speak again. Rate limiting stays defence in
+        // depth; it is no longer what stops a *successful* handshake.
+        //
+        // A repeated Hello on an already-answered connection is still verified above — so any
+        // state it carries is refreshed — but is not answered, so it cannot restart a chain.
+        match self.direction {
+            ConnectionDirection::Outbound => {
+                debug!(
+                    peer_did = %from,
+                    "Hello response completes our handshake; not replying (#2532)"
+                );
+            }
+            ConnectionDirection::Inbound => {
+                if self
+                    .hello_responded
+                    .swap(true, std::sync::atomic::Ordering::SeqCst)
+                {
+                    debug!(
+                        peer_did = %from,
+                        "Already answered this connection's Hello; not replying again (#2532)"
+                    );
+                } else {
+                    self.send_hello_response(connection, from).await?;
+                }
+            }
+        }
 
         info!("Processed Hello from {}", from);
         Ok(())
