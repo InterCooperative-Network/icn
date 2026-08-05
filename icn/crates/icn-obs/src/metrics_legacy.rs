@@ -2019,6 +2019,21 @@ pub mod peer_exchange {
         counter!("icn_peer_exchange_responses_sent_total").increment(1);
     }
 
+    /// A peer-exchange request this node refused to answer.
+    ///
+    /// `reason` distinguishes *why* the node declined, because the two cases are
+    /// operationally unalike: `unauthenticated_requester` means someone asked before
+    /// proving who they were, while `peer_exchange_disabled` means this node is not
+    /// participating and the requester did nothing wrong. Neither is peer misbehaviour, so
+    /// neither is scored against a DID — a denial counter is the whole record.
+    pub fn requests_denied_inc(reason: &str) {
+        counter!(
+            "icn_peer_exchange_requests_denied_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
     pub fn responses_received_inc() {
         counter!("icn_peer_exchange_responses_received_total").increment(1);
     }

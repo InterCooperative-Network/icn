@@ -230,6 +230,8 @@ mod tests {
             own_did,
             direction: crate::handlers::ConnectionDirection::Inbound,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
+            authenticated_peer: tokio::sync::RwLock::new(None),
+            peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         (ctx, forward_count)
@@ -378,6 +380,8 @@ mod tests {
             own_did: own_did.clone(),
             direction: crate::handlers::ConnectionDirection::Inbound,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
+            authenticated_peer: tokio::sync::RwLock::new(None),
+            peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Create encrypted message

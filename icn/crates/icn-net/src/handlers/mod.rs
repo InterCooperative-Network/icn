@@ -53,6 +53,28 @@ pub struct ConnectionContext {
     /// additionally makes the responder's obligation exactly once, so a repeated Hello
     /// cannot restart a response chain.
     pub hello_responded: std::sync::atomic::AtomicBool,
+    /// The peer identity proven for *this* connection, once Hello has authenticated one.
+    ///
+    /// `None` until [`ConnectionContext::record_authenticated_peer`] is called, which
+    /// happens only after the three DID-TLS facts in `handle_hello` all hold: the binding
+    /// names the claimed DID, that DID's key signed it, and it is a binding of the
+    /// certificate *this* connection is actually using (#2520).
+    ///
+    /// This exists because a `NetworkMessage`'s `from` field cannot answer "who is asking".
+    /// It is chosen by the sender and verified by nobody — the same confusion that makes
+    /// the pre-authentication rate-limit tier forgeable (#2491). Handlers that disclose
+    /// something about this node must consult *this* field, which is bound to the
+    /// connection's certificate, and never `message.from`.
+    ///
+    /// Per connection, not per peer: a peer that opens two connections authenticates on
+    /// each one separately, and one connection's Hello says nothing about the other.
+    authenticated_peer: RwLock<Option<Did>>,
+    /// Whether this node answers peer-exchange requests at all.
+    ///
+    /// Shared with the actor, so an operator posture set once at startup applies to every
+    /// connection without re-plumbing. Distinct from authentication: this says whether
+    /// *this node* is participating, not who is asking (#2535).
+    peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Which end of a QUIC connection this node is.
@@ -84,6 +106,7 @@ impl ConnectionContext {
         identity_bundle: IdentityBundle,
         own_did: Did,
         direction: ConnectionDirection,
+        peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Self {
         Self {
             handler,
@@ -99,7 +122,34 @@ impl ConnectionContext {
             own_did,
             direction,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
+            authenticated_peer: RwLock::new(None),
+            peer_exchange_enabled,
         }
+    }
+
+    /// Whether this node participates in peer exchange.
+    pub(crate) fn peer_exchange_enabled(&self) -> bool {
+        self.peer_exchange_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Record that `peer` has authenticated on this connection.
+    ///
+    /// Call this only from the Hello path, and only after the DID-TLS binding has been
+    /// verified against this connection's current certificate. Calling it anywhere else
+    /// would make an unproven DID indistinguishable from a proven one, which is the whole
+    /// property this state exists to carry.
+    pub(crate) async fn record_authenticated_peer(&self, peer: &Did) {
+        *self.authenticated_peer.write().await = Some(peer.clone());
+    }
+
+    /// The peer identity proven for this connection, if any.
+    ///
+    /// `None` means no Hello has authenticated on this connection *yet*. It is not a
+    /// statement about the peer — it is a statement about what this node can currently
+    /// prove, and the only safe reading of it is "we do not know who this is".
+    pub(crate) async fn authenticated_peer(&self) -> Option<Did> {
+        self.authenticated_peer.read().await.clone()
     }
 
     /// Forward message to external handler

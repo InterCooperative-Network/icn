@@ -101,6 +101,12 @@ impl ConnectionContext {
             "DID-TLS binding verified against current connection certificate"
         );
 
+        // This is the moment `from` stops being a claim and becomes an identity: all three
+        // DID-TLS facts hold, against the certificate *this* connection is presenting. Bind
+        // it to the connection so handlers that disclose something about this node can ask
+        // who they are talking to without trusting a sender-chosen field (#2535, #2491).
+        self.record_authenticated_peer(from).await;
+
         // Verify DID-PQ binding if proof is present
         // Returns: Ok(true) = verified, Ok(false) = no PQ key or legacy (no proof), Err = invalid proof
         let pq_binding_result =

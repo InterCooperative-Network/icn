@@ -241,6 +241,8 @@ mod tests {
             own_did,
             direction: crate::handlers::ConnectionDirection::Inbound,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
+            authenticated_peer: tokio::sync::RwLock::new(None),
+            peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         (ctx, neighbor_sets)
@@ -272,6 +274,8 @@ mod tests {
             own_did,
             direction: crate::handlers::ConnectionDirection::Inbound,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
+            authenticated_peer: tokio::sync::RwLock::new(None),
+            peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 

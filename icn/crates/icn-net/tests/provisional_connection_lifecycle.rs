@@ -114,6 +114,10 @@ async fn spawn_node_counting(
         .await
         {
             Ok(handle) => {
+                // These tests are about *what* a node advertises, so it has to be a node
+                // that advertises at all. Peer exchange is off by default (#2535), which is
+                // a separate policy question from the one under test here.
+                handle.set_peer_exchange_enabled(true);
                 // Let the endpoint bind before anyone dials it.
                 tokio::time::sleep(Duration::from_millis(300)).await;
                 return Ok((handle, addr, Guard(shutdown_tx)));
@@ -162,6 +166,7 @@ async fn wait_until_authenticated(observer: &NetworkHandle, did: &Did, timeout: 
 struct WireClient {
     _endpoint: Endpoint,
     connection: quinn::Connection,
+    identity: IdentityBundle,
 }
 
 impl WireClient {
@@ -189,6 +194,7 @@ impl WireClient {
                     return Ok(Self {
                         _endpoint: endpoint,
                         connection,
+                        identity: identity.clone(),
                     })
                 }
                 Ok(Err(e)) => last_err = Some(e.to_string()),
@@ -200,6 +206,29 @@ impl WireClient {
             "could not establish the test connection after 5 attempts: {}",
             last_err.unwrap_or_default()
         )
+    }
+
+    /// Complete an authenticated Hello, so the responder knows who is asking.
+    ///
+    /// Peer exchange does not answer an unauthenticated connection (#2535), so an
+    /// interrogator that wants to read the advertised peer set has to be a peer first.
+    /// This uses the client's own binding and its own certificate, which is exactly what
+    /// the #2520 check requires.
+    async fn authenticate(&self, to: &Did) -> Result<()> {
+        let hello = NetworkMessage::hello(
+            self.identity.did().clone(),
+            to.clone(),
+            self.identity.binding_info(),
+            icn_net::VersionInfo::new("icnd-interrogator".to_string()),
+            None,
+            *self.identity.x25519_public_bytes(),
+            None,
+            None,
+        );
+        let (mut send, _recv) = self.connection.open_bi().await?;
+        icn_net::protocol::write_message(&mut send, &hello).await?;
+        send.finish().context("finish hello")?;
+        Ok(())
     }
 
     /// Ask the peer for its known peers and return the DIDs it advertises.
@@ -217,21 +246,31 @@ impl WireClient {
         icn_net::protocol::write_message(&mut send, &request).await?;
         send.finish().context("finish peer exchange request")?;
 
-        let (_send, mut recv) = tokio::time::timeout(timeout, self.connection.accept_bi())
-            .await
-            .context("timed out waiting for the peer exchange response stream")?
-            .context("peer exchange response stream failed")?;
-        let (message, _len) =
-            tokio::time::timeout(timeout, icn_net::protocol::read_message(&mut recv))
+        // An authenticated interrogator is answered with the responder's own Hello too, on
+        // its own stream and first (#2537), so skip anything that is not the answer.
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            anyhow::ensure!(
+                !remaining.is_zero(),
+                "timed out waiting for the peer exchange response"
+            );
+            let (_send, mut recv) = tokio::time::timeout(remaining, self.connection.accept_bi())
                 .await
-                .context("timed out reading the peer exchange response")?
-                .context("failed to read the peer exchange response")?;
+                .context("timed out waiting for the peer exchange response stream")?
+                .context("peer exchange response stream failed")?;
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            let (message, _len) =
+                tokio::time::timeout(remaining, icn_net::protocol::read_message(&mut recv))
+                    .await
+                    .context("timed out reading the peer exchange response")?
+                    .context("failed to read the peer exchange response")?;
 
-        match message.payload {
-            MessagePayload::PeerExchange(PeerExchangeMessage::Response { peers, .. }) => {
-                Ok(peers.into_iter().map(|peer| peer.did).collect())
+            if let MessagePayload::PeerExchange(PeerExchangeMessage::Response { peers, .. }) =
+                message.payload
+            {
+                return Ok(peers.into_iter().map(|peer| peer.did).collect());
             }
-            other => anyhow::bail!("expected a PeerExchange::Response, got {other:?}"),
         }
     }
 }
@@ -303,6 +342,13 @@ async fn peer_exchange_must_not_advertise_address_derived_placeholders() -> Resu
     );
 
     let client = WireClient::connect(&interrogator, dialer_addr).await?;
+    // Reading the advertised set requires being a peer, not merely a socket (#2535).
+    client.authenticate(&dialer_did).await?;
+    assert!(
+        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20))
+            .await,
+        "precondition: the interrogator must authenticate before it can read the          advertised peer set"
+    );
     let advertised = client
         .request_peer_exchange(&interrogator_did, &dialer_did, Duration::from_secs(20))
         .await?;
@@ -377,6 +423,13 @@ async fn only_the_authenticated_did_becomes_canonical_when_the_supplied_did_diff
     );
 
     let client = WireClient::connect(&interrogator, dialer_addr).await?;
+    // Reading the advertised set requires being a peer, not merely a socket (#2535).
+    client.authenticate(&dialer_did).await?;
+    assert!(
+        wait_until_authenticated(&dialer_handle, &interrogator_did, Duration::from_secs(20))
+            .await,
+        "precondition: the interrogator must authenticate before it can read the          advertised peer set"
+    );
     let advertised = client
         .request_peer_exchange(&interrogator_did, &dialer_did, Duration::from_secs(20))
         .await?;

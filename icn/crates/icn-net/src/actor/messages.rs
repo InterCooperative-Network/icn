@@ -304,6 +304,7 @@ impl NetworkActor {
             let identity_bundle = self.identity_bundle.clone();
             let own_did = self.own_did.clone();
             let handler_connection = connection.clone();
+            let peer_exchange_enabled = self.peer_exchange_enabled.clone();
 
             tokio::spawn(async move {
                 if let Err(e) = Self::handle_connection(
@@ -320,6 +321,7 @@ impl NetworkActor {
                     identity_bundle,
                     own_did,
                     crate::handlers::ConnectionDirection::Outbound,
+                    peer_exchange_enabled,
                 )
                 .await
                 {

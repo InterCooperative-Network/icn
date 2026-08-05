@@ -1408,6 +1408,18 @@ async fn spawn_network_actor(
     )
     .await?;
 
+    // Translate the operator's federation posture into the network layer's participation
+    // policy (#2535). `icn-net` cannot read `FederationConfig` — `icn-core` depends on it,
+    // not the other way round — so this call is the only thing that turns peer exchange
+    // on. It defaults to off, which is why a node with no `[federation]` section (every
+    // current coop config) does not answer peer-exchange requests at all.
+    //
+    // `federation.enabled` already governs the rest of peer exchange in both directions:
+    // requesting (`init_bootstrap::request_peer_exchange`), federation topic subscriptions
+    // (`init_gossip`), and acting on an inbound Response or Announce (`init_network`).
+    // Answering a Request is now governed by the same switch.
+    network_handle.set_peer_exchange_enabled(federation_enabled);
+
     // Initialize network handle for incoming message handler
     *network_handle_for_handler.write().await = Some(network_handle.clone());
 
