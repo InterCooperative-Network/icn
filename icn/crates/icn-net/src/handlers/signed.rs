@@ -426,6 +426,8 @@ mod tests {
             misbehavior_detector,
             identity_bundle,
             own_did,
+            direction: crate::handlers::ConnectionDirection::Inbound,
+            hello_responded: std::sync::atomic::AtomicBool::new(false),
         };
 
         (ctx, keypair, forward_count)

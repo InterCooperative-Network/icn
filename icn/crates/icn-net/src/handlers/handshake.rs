@@ -239,6 +239,8 @@ mod tests {
             misbehavior_detector: None,
             identity_bundle,
             own_did,
+            direction: crate::handlers::ConnectionDirection::Inbound,
+            hello_responded: std::sync::atomic::AtomicBool::new(false),
         };
 
         (ctx, neighbor_sets)
@@ -268,6 +270,8 @@ mod tests {
             misbehavior_detector: None,
             identity_bundle,
             own_did,
+            direction: crate::handlers::ConnectionDirection::Inbound,
+            hello_responded: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

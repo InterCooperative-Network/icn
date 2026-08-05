@@ -307,6 +307,7 @@ impl NetworkActor {
                     misbehavior_detector,
                     identity_bundle,
                     own_did,
+                    crate::handlers::ConnectionDirection::Outbound,
                 )
                 .await
                 {
