@@ -10,6 +10,7 @@ use super::ConnectionContext;
 use crate::candidate::{EndpointCandidate, EndpointKind};
 use crate::protocol::{KnownPeer, NetworkMessage, PeerExchangeMessage};
 use icn_identity::Did;
+use icn_obs::metrics::peer_exchange::PeerExchangeDenialReason as DenialReason;
 use std::net::{IpAddr, SocketAddr};
 use tracing::{debug, info, warn};
 
@@ -77,28 +78,40 @@ impl ConnectionContext {
                 remote_addr = %connection.remote_address(),
                 "Declining peer exchange: this node does not participate in peer exchange"
             );
-            icn_obs::metrics::peer_exchange::requests_denied_inc("peer_exchange_disabled");
+            icn_obs::metrics::peer_exchange::requests_denied_inc(DenialReason::Disabled);
             return;
         }
 
         // Identity next: until Hello has authenticated this connection there is no
         // requester, only a socket that sent bytes. Disclosing topology to it would hand a
         // node's neighbourhood to anyone able to complete a QUIC handshake.
-        let Some(from) = self.authenticated_peer().await else {
-            warn!(
+        //
+        // Logged at `debug!`, not `warn!`: reaching here needs nothing but a completed QUIC
+        // handshake, so a remote can emit this line as fast as it can open streams. A
+        // warning per attempt would let an unauthenticated caller drive this node's log
+        // volume — and the event may be entirely benign, since a request can arrive before
+        // its own Hello on a separate stream. The denial counter is the durable record;
+        // `icn_peer_exchange_requests_denied_total{reason="unauthenticated_requester"}` is
+        // what an operator alerts on, and it costs one increment rather than a log line.
+        let Some(authenticated_from) = self.authenticated_peer().await else {
+            debug!(
                 claimed_did = %claimed_from,
                 remote_addr = %connection.remote_address(),
                 "Refusing peer exchange: this connection has not authenticated a peer, so \
                  the requester's identity is unproven"
             );
-            icn_obs::metrics::peer_exchange::requests_denied_inc("unauthenticated_requester");
+            icn_obs::metrics::peer_exchange::requests_denied_inc(
+                DenialReason::UnauthenticatedRequester,
+            );
             return;
         };
-        let from = &from;
 
+        // From here on `authenticated_from` is the requester. `claimed_from` is not consulted
+        // again: it named nothing that was checked, and the two are deliberately distinct
+        // identifiers so that reaching for the wrong one has to be deliberate.
         info!(
             "Received peer exchange request from {} (max={}, filter={:?})",
-            from, max_peers, network_filter
+            authenticated_from, max_peers, network_filter
         );
 
         // Gather known peers from session manager
@@ -114,8 +127,9 @@ impl ConnectionContext {
         let mut known_peers: Vec<KnownPeer> = Vec::new();
 
         for (did_str, conn) in connections {
-            // Skip the requesting peer
-            if did_str == from.as_str() {
+            // Skip the requesting peer — identified by the DID this connection *proved*, so
+            // a requester cannot steer what it is excluded from by choosing a `from`.
+            if did_str == authenticated_from.as_str() {
                 continue;
             }
 
@@ -141,13 +155,13 @@ impl ConnectionContext {
         // Send response
         let response = NetworkMessage::peer_exchange_response(
             self.own_did.clone(),
-            from.clone(),
+            authenticated_from.clone(),
             known_peers,
             total_known,
         );
 
         let connection_clone = connection.clone();
-        let from_did = from.clone();
+        let from_did = authenticated_from;
         tokio::spawn(async move {
             match connection_clone.open_bi().await {
                 Ok((mut send_stream, _recv)) => {

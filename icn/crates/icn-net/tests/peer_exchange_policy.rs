@@ -334,6 +334,37 @@ async fn responder_holding_a_sentinel_peer(peer_exchange_enabled: bool) -> Resul
     })
 }
 
+/// Prove that a refusal was a decision, not a collapse.
+///
+/// Every negative test here asserts that something did *not* cross the connection. That is
+/// only worth asserting if the responder was in a position to disclose it and simply chose
+/// not to — a node that fell over mid-request produces the identical observation. Two facts
+/// establish that, and they fail in different ways, so both are checked:
+///
+/// 1. **The actor is still servicing requests.** `get_peers` is a round trip through the
+///    network actor's mailbox — it sends on the channel and awaits a `oneshot` — so it
+///    returns `Err` if that task has died. A shared-map read like
+///    `get_peer_connection_info` cannot detect this: the map outlives the actor that
+///    maintains it, so it would keep answering happily from a corpse.
+/// 2. **The sentinel is still in peer state**, so there really was something to withhold.
+async fn assert_responder_still_serving(fx: &Fixture) {
+    assert!(
+        fx.responder.get_peers().await.is_ok(),
+        "post-condition: the responder's network actor stopped servicing requests, so the \
+         absent peer-exchange response says nothing about policy — it is what a dead node \
+         looks like too"
+    );
+    assert!(
+        fx.responder
+            .get_peer_connection_info(&fx.sentinel_did)
+            .await
+            .is_some(),
+        "post-condition: the responder no longer holds the sentinel peer {}, so it had \
+         nothing left to disclose and the negative assertion above is vacuous",
+        fx.sentinel_did
+    );
+}
+
 /// A requester that has not authenticated must not learn the neighbourhood.
 ///
 /// The interrogator completes QUIC/TLS and nothing else — no Hello, so the responder has
@@ -369,16 +400,7 @@ async fn unauthenticated_requester_learns_no_peer_topology() -> Result<()> {
          `from` field is the caller's own claim (#2535). Disclosed: {disclosure:?}"
     );
 
-    // The responder must still be alive and holding the sentinel — otherwise the assertion
-    // above could have passed because the node fell over, not because policy held.
-    assert!(
-        fx.responder
-            .get_peer_connection_info(sentinel_did)
-            .await
-            .is_some(),
-        "post-condition: the responder must still hold the sentinel peer, otherwise the \
-         non-disclosure above proves nothing about policy"
-    );
+    assert_responder_still_serving(&fx).await;
 
     Ok(())
 }
@@ -486,6 +508,10 @@ async fn authenticated_requester_learns_nothing_when_peer_exchange_is_disabled()
          requester. The operator's configuration says this node is not participating \
          (#2535). Disclosed: {disclosure:?}"
     );
+
+    // The requester authenticated, so the only remaining explanations for silence are local
+    // policy or a responder that stopped working. Rule out the second.
+    assert_responder_still_serving(&fx).await;
 
     Ok(())
 }

@@ -2019,17 +2019,50 @@ pub mod peer_exchange {
         counter!("icn_peer_exchange_responses_sent_total").increment(1);
     }
 
+    /// Why this node refused to answer a peer-exchange request (#2535).
+    ///
+    /// A closed vocabulary, not a string: the label is chosen by the compiler from these
+    /// variants, so no caller — and in particular nothing derived from a request — can
+    /// widen it.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum PeerExchangeDenialReason {
+        /// This node does not participate in peer exchange (`federation.enabled = false`).
+        ///
+        /// The requester did nothing wrong; this is the operator's posture.
+        Disabled,
+        /// The connection has not authenticated a peer, so the requester is unproven.
+        ///
+        /// May be benign — a request can simply race ahead of its own Hello.
+        UnauthenticatedRequester,
+    }
+
+    impl PeerExchangeDenialReason {
+        /// Fixed label value for this reason.
+        pub fn as_label(self) -> &'static str {
+            match self {
+                Self::Disabled => "peer_exchange_disabled",
+                Self::UnauthenticatedRequester => "unauthenticated_requester",
+            }
+        }
+    }
+
     /// A peer-exchange request this node refused to answer.
     ///
-    /// `reason` distinguishes *why* the node declined, because the two cases are
-    /// operationally unalike: `unauthenticated_requester` means someone asked before
-    /// proving who they were, while `peer_exchange_disabled` means this node is not
-    /// participating and the requester did nothing wrong. Neither is peer misbehaviour, so
-    /// neither is scored against a DID — a denial counter is the whole record.
-    pub fn requests_denied_inc(reason: &str) {
+    /// The two reasons are operationally unalike and worth separating:
+    /// `unauthenticated_requester` means someone asked before proving who they were, while
+    /// `peer_exchange_disabled` means this node is not participating. Neither is peer
+    /// misbehaviour, so neither is scored against a DID — this counter is the whole record.
+    ///
+    /// # Privacy budget
+    ///
+    /// The label is a `&'static str` drawn from a closed enum. No DID, peer address,
+    /// certificate, or message field is ever recorded — in particular not the request's
+    /// claimed `from`, which is chosen by the sender and would hand a remote caller control
+    /// of this series' cardinality. Maximum cardinality is 2 series.
+    pub fn requests_denied_inc(reason: PeerExchangeDenialReason) {
         counter!(
             "icn_peer_exchange_requests_denied_total",
-            "reason" => reason.to_string()
+            "reason" => reason.as_label()
         )
         .increment(1);
     }
