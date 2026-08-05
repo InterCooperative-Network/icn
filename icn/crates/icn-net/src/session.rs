@@ -306,6 +306,40 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Open a QUIC connection to `addr` **without** registering it as a peer.
+    ///
+    /// This is the transport half of dialling: it establishes the connection and hands it
+    /// back, leaving the caller to drive the handshake. Nothing is written to
+    /// [`Self::connections`], because at this point nothing is known about who is on the
+    /// other end — only that something at `addr` completed a QUIC/TLS handshake.
+    ///
+    /// Address-only bootstrap dials use this directly. Their only available key would be a
+    /// placeholder derived from the address, which no peer can ever authenticate as and
+    /// which therefore could never be reconciled, replaced or evicted; registering one made
+    /// a single physical connection appear as two peers and published a synthetic identity
+    /// through peer exchange (#2530). The connection becomes addressable when — and only
+    /// when — Hello proves who is on it.
+    pub async fn connect_unregistered(&self, addr: SocketAddr) -> Result<quinn::Connection> {
+        let endpoint = self
+            .endpoint
+            .read()
+            .await
+            .as_ref()
+            .context("Session manager not started")?
+            .clone();
+
+        info!("Dialing peer at {} (identity not yet known)", addr);
+
+        let connection = endpoint
+            .connect(addr, "localhost")?
+            .await
+            .context("Failed to connect to peer")?;
+
+        info!("Connected to peer at {} (awaiting Hello)", addr);
+
+        Ok(connection)
+    }
+
     /// Dial a peer at the given address
     ///
     /// Returns a QUIC connection to the peer.
@@ -817,6 +851,10 @@ fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
 /// to compare against and therefore no connections either; both production callers pass `Some`.
 /// It is a required parameter rather than ambient state so that a future insertion path cannot
 /// install a connection without first stating which DID is ours (#2506).
+///
+/// On return, no key other than `peer_did` maps to `connection`: this is the point at which a
+/// connection acquires its single canonical identity, so any provisional key that was standing in
+/// for it beforehand is dropped here (#2530).
 pub(crate) async fn install_incoming_connection(
     connections: &Arc<RwLock<HashMap<String, quinn::Connection>>>,
     local_did: Option<&str>,
@@ -839,6 +877,33 @@ pub(crate) async fn install_incoming_connection(
     }
 
     let mut connections = connections.write().await;
+
+    // One physical connection, one identity. Any *other* key mapping to this same
+    // connection is an alias left over from before the peer authenticated — a placeholder
+    // from an address-only dial, or a DID that was configured for this address but turned
+    // out not to be who answered. Consumers read this map as authenticated peer topology:
+    // peer exchange publishes its keys to other nodes, broadcast opens a stream per entry,
+    // and `connections_active` counts entries as peers. So an alias is not a duplicate
+    // record, it is a phantom peer (#2530).
+    //
+    // Matching on `stable_id` compares connection *identity*, not address or key, so this
+    // can only ever drop an alias of the connection in hand — never a different, newer
+    // connection to the same peer. Done under the same write guard as the insert below, so
+    // no reader observes both keys.
+    let alias_id = connection.stable_id();
+    connections.retain(|key, existing| {
+        let is_alias = key != &peer_did && existing.stable_id() == alias_id;
+        if is_alias {
+            info!(
+                evicted_key = %key,
+                authenticated_did = %peer_did,
+                remote_addr = %connection.remote_address(),
+                "Evicting provisional connection key superseded by the authenticated DID (#2530)"
+            );
+        }
+        !is_alias
+    });
+
     match connections.entry(peer_did) {
         Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
             info!(

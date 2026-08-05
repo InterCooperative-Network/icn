@@ -52,11 +52,12 @@ impl BootstrapConfig {
 
 /// Dial bootstrap peers and optionally request peer exchange
 ///
-/// Returns the list of connection keys for peers we reached. For `KnownDid`
-/// bootstrap entries (`icn://did:icn:PUBKEY@HOST:PORT`) these are the
-/// configured DIDs. For `AddrOnly` entries (`icn://HOST:PORT`) they are
-/// address-derived **placeholders**, not authenticated peer identities — see
-/// [`icn_net::NetworkHandle::dial_addr`] and #2530.
+/// Returns the DIDs we can address peers by. Only `KnownDid` bootstrap entries
+/// (`icn://did:icn:PUBKEY@HOST:PORT`) contribute: for `AddrOnly` entries
+/// (`icn://HOST:PORT`) the peer's identity is not known until Hello completes, and the
+/// address-derived placeholder is not a peer identity and not a usable send target — see
+/// [`icn_net::NetworkHandle::dial_addr`] and #2530. Those peers are picked up from
+/// [`icn_net::NetworkHandle::connected_peers`] once they authenticate.
 pub async fn dial_bootstrap_peers(
     config: &BootstrapConfig,
     network_handle: &NetworkHandle,
@@ -96,12 +97,14 @@ pub async fn dial_bootstrap_peers(
                 // separately by the Hello handshake.
                 match network_handle.dial_addr(peer_addr).await {
                     Ok(placeholder_did) => {
+                        // Deliberately not added to `connected_peers`: the placeholder
+                        // names no peer and addresses nothing. This peer becomes
+                        // addressable once Hello authenticates it (#2530).
                         info!(
                             "✓ Connected to bootstrap peer at {} (placeholder key {}; \
                              peer identity not yet authenticated — awaiting Hello)",
                             peer_addr, placeholder_did
                         );
-                        connected_peers.push(placeholder_did);
                     }
                     Err(e) => {
                         warn!(
@@ -129,14 +132,9 @@ pub async fn request_peer_exchange(
     network_handle: &NetworkHandle,
     connected_peers: Vec<Did>,
 ) {
-    if !config.federation_enabled || connected_peers.is_empty() {
+    if !config.federation_enabled {
         return;
     }
-
-    info!(
-        "Federation enabled - requesting peer exchange from {} bootstrap peers",
-        connected_peers.len()
-    );
 
     let network_filter = if config.network_name != "icn-mainnet" {
         Some(config.network_name.clone())
@@ -146,10 +144,31 @@ pub async fn request_peer_exchange(
 
     let peer_exchange_delay = Duration::from_millis(config.peer_exchange_delay_ms);
 
-    for peer_did in connected_peers {
-        // Small delay to allow Hello handshake to complete
-        tokio::time::sleep(peer_exchange_delay).await;
+    // Wait out the handshake window before choosing targets. Address-only bootstrap peers
+    // have no addressable identity until Hello completes, so they can only be named after
+    // authenticating — asking the network handle afterwards is what picks them up (#2530).
+    tokio::time::sleep(peer_exchange_delay).await;
 
+    let mut targets = connected_peers;
+    for authenticated in network_handle.connected_peers().await {
+        if !targets.contains(&authenticated) {
+            targets.push(authenticated);
+        }
+    }
+
+    if targets.is_empty() {
+        info!(
+            "Federation enabled - no authenticated bootstrap peers to request peer exchange from"
+        );
+        return;
+    }
+
+    info!(
+        "Federation enabled - requesting peer exchange from {} bootstrap peers",
+        targets.len()
+    );
+
+    for peer_did in targets {
         match network_handle
             .request_peer_exchange(
                 &peer_did,

@@ -19,12 +19,11 @@
 use anyhow::{Context, Result};
 use icn_identity::Did;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, instrument, warn};
 
 use crate::{
     protocol::{write_message, write_message_negotiated, NetworkMessage},
-    NetworkMsg, NetworkStats, SessionManager, TraversalMode,
+    NetworkMsg, NetworkStats, TraversalMode,
 };
 
 use super::NetworkActor;
@@ -45,6 +44,15 @@ impl NetworkActor {
                 response,
             } => {
                 let result = self.handle_dial(addr, did, peer_relay_addr).await;
+                let _ = response.send(result);
+            }
+
+            NetworkMsg::DialProvisional {
+                addr,
+                placeholder,
+                response,
+            } => {
+                let result = self.handle_dial_provisional(addr, placeholder).await;
                 let _ = response.send(result);
             }
 
@@ -92,6 +100,47 @@ impl NetworkActor {
                 let _ = tx.send(status);
             }
         }
+    }
+
+    /// Dial an address whose peer identity is not yet known.
+    ///
+    /// The connection is established and wired for traffic, but is **not** registered in
+    /// the session manager's connection map. That map's readers treat every key as an
+    /// authenticated peer — peer exchange republishes them to other nodes, broadcast opens
+    /// a stream per entry, `connections_active` counts them — and the only key available
+    /// here is derived from the address, so no peer could ever authenticate as it and
+    /// nothing would ever evict it (#2530).
+    ///
+    /// The connection becomes addressable when Hello proves who is on it.
+    ///
+    /// No relay fallback: an address-only dial has no peer relay candidate to fall back to,
+    /// which is why the previous implementation passed `None` for it.
+    async fn handle_dial_provisional(
+        &mut self,
+        addr: std::net::SocketAddr,
+        placeholder: Did,
+    ) -> Result<()> {
+        let dial_timeout = std::time::Duration::from_millis(
+            self.dial_timeout_ms
+                .load(std::sync::atomic::Ordering::Relaxed),
+        );
+
+        let connection = tokio::time::timeout(dial_timeout, {
+            let sm = self.session_manager.clone();
+            async move { sm.read().await.connect_unregistered(addr).await }
+        })
+        .await
+        .context("Timeout dialing peer (provisional)")
+        .and_then(|r| r)?;
+
+        {
+            let mut ns = self.nat_status.write().await;
+            ns.last_traversal_mode = TraversalMode::Direct;
+            ns.last_direct_error = None;
+        }
+
+        self.wire_new_connection(connection, &placeholder);
+        Ok(())
     }
 
     /// Handle a dial request with direct-then-relay fallback.
@@ -260,7 +309,15 @@ impl NetworkActor {
 
     /// Wire up a newly-established connection: stats, connection handler, Hello message.
     ///
-    /// This is called for both direct and relayed connections.
+    /// This is called for both direct and relayed connections, and for provisional
+    /// address-only dials that have no authenticated peer identity yet.
+    ///
+    /// `did` addresses the outgoing Hello and labels logs. It is **not** required to be
+    /// an authenticated identity and is never used to look the connection up: the Hello
+    /// is written straight to `connection`. That is what lets a provisional dial stay out
+    /// of the session manager's authenticated connection map entirely (#2530) — the map
+    /// lookup this used to perform was the only thing that forced an unauthenticated key
+    /// to be registered before the handshake could run.
     fn wire_new_connection(&self, connection: quinn::Connection, did: &Did) {
         // Increment connection counter
         let stats = self.stats.clone();
@@ -283,10 +340,11 @@ impl NetworkActor {
             let misbehavior_detector = self.misbehavior_detector.clone();
             let identity_bundle = self.identity_bundle.clone();
             let own_did = self.own_did.clone();
+            let handler_connection = connection.clone();
 
             tokio::spawn(async move {
                 if let Err(e) = Self::handle_connection(
-                    connection.clone(),
+                    handler_connection,
                     handler,
                     rate_limiter,
                     replay_guard,
@@ -363,12 +421,14 @@ impl NetworkActor {
 
         match hello_msg_result {
             Ok(hello_msg) => {
-                let session_mgr = self.session_manager.clone();
+                // Write the Hello to the connection we were just handed, rather than
+                // looking it up by DID. On an address-only dial there is no authenticated
+                // DID to look up, and inventing a placeholder key for the map is what
+                // created the phantom peer entries in #2530.
+                let hello_connection = connection.clone();
                 let did_clone = did.clone();
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        send_handshake_internal(session_mgr, &did_clone, hello_msg).await
-                    {
+                    if let Err(e) = send_handshake_on(&hello_connection, hello_msg).await {
                         warn!("Failed to send Hello to {}: {}", did_clone, e);
                     }
                 });
@@ -527,19 +587,17 @@ impl NetworkActor {
     }
 }
 
-/// Send handshake message to a peer
-pub(super) async fn send_handshake_internal(
-    session_manager: Arc<RwLock<SessionManager>>,
-    peer_did: &Did,
+/// Send a handshake message directly on an established connection.
+///
+/// Deliberately takes the connection rather than a DID. The Hello handshake is what
+/// *establishes* the peer's identity, so requiring an identity to address it inverted the
+/// dependency: an address-only dial had to register a synthetic, address-derived key in
+/// the authenticated connection map just so this lookup could succeed, and that key then
+/// outlived the handshake and leaked into peer-facing topology (#2530).
+pub(super) async fn send_handshake_on(
+    connection: &quinn::Connection,
     handshake_msg: NetworkMessage,
 ) -> Result<()> {
-    let connections = session_manager.read().await.connections().await;
-    let connection = connections
-        .iter()
-        .find(|(did, _)| did == peer_did.as_str())
-        .map(|(_, conn)| conn.clone())
-        .context("No connection to peer")?;
-
     let (mut send, _recv) = connection
         .open_bi()
         .await
@@ -547,6 +605,9 @@ pub(super) async fn send_handshake_internal(
     write_message(&mut send, &handshake_msg).await?;
     send.finish().context("Failed to finish stream")?;
 
-    info!("Sent handshake to {}", peer_did);
+    info!(
+        remote_addr = %connection.remote_address(),
+        "Sent handshake"
+    );
     Ok(())
 }
