@@ -10,8 +10,9 @@ use super::ConnectionContext;
 use crate::candidate::{EndpointCandidate, EndpointKind};
 use crate::protocol::{KnownPeer, NetworkMessage, PeerExchangeMessage};
 use icn_identity::Did;
+use icn_obs::metrics::peer_exchange::PeerExchangeDenialReason as DenialReason;
 use std::net::{IpAddr, SocketAddr};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 impl ConnectionContext {
     /// Handle a PeerExchange message
@@ -27,6 +28,8 @@ impl ConnectionContext {
                 max_peers,
                 network_filter,
             } => {
+                // `from` is passed on only so a refusal can name what the sender *claimed*
+                // to be; it is not used to authorise anything. See the handler.
                 self.handle_peer_exchange_request(connection, from, *max_peers, network_filter)
                     .await;
             }
@@ -43,18 +46,73 @@ impl ConnectionContext {
     }
 
     /// Handle peer exchange request - respond with known peers
+    ///
+    /// Answering enumerates this node's authenticated neighbourhood — peer DIDs and
+    /// reachable endpoints — so *who is asking* is part of the decision, not a detail
+    /// (#2535). The claimed `from` on the request cannot answer that: the sender chose it
+    /// and nobody verified it. The requester's identity is instead taken from the
+    /// connection, where Hello bound it to the certificate in use (#2520).
+    ///
+    /// A refusal here is not an accusation. An unauthenticated request may simply have
+    /// raced ahead of its own Hello, and a disabled local policy is this node's own
+    /// posture, not the peer's fault — so nothing is scored against anyone. Compare the
+    /// same reasoning in `handle_hello`: attributing a violation to an unproven DID would
+    /// let an attacker degrade the reputation of any peer it cared to name.
     async fn handle_peer_exchange_request(
         &self,
         connection: &quinn::Connection,
-        from: &Did,
+        claimed_from: &Did,
         max_peers: usize,
         network_filter: &Option<String>,
     ) {
+        icn_obs::metrics::peer_exchange::requests_received_inc();
+
+        // Participation before identity. Whether this node hands out its neighbourhood at
+        // all is its own posture, decided by the operator and independent of who is
+        // asking, so a node that is not participating need not evaluate the requester at
+        // all. `federation.enabled` already governs the rest of peer exchange in both
+        // directions; answering a request was the one behaviour it did not reach (#2535).
+        if !self.peer_exchange_enabled() {
+            debug!(
+                claimed_did = %claimed_from,
+                remote_addr = %connection.remote_address(),
+                "Declining peer exchange: this node does not participate in peer exchange"
+            );
+            icn_obs::metrics::peer_exchange::requests_denied_inc(DenialReason::Disabled);
+            return;
+        }
+
+        // Identity next: until Hello has authenticated this connection there is no
+        // requester, only a socket that sent bytes. Disclosing topology to it would hand a
+        // node's neighbourhood to anyone able to complete a QUIC handshake.
+        //
+        // Logged at `debug!`, not `warn!`: reaching here needs nothing but a completed QUIC
+        // handshake, so a remote can emit this line as fast as it can open streams. A
+        // warning per attempt would let an unauthenticated caller drive this node's log
+        // volume — and the event may be entirely benign, since a request can arrive before
+        // its own Hello on a separate stream. The denial counter is the durable record;
+        // `icn_peer_exchange_requests_denied_total{reason="unauthenticated_requester"}` is
+        // what an operator alerts on, and it costs one increment rather than a log line.
+        let Some(authenticated_from) = self.authenticated_peer().await else {
+            debug!(
+                claimed_did = %claimed_from,
+                remote_addr = %connection.remote_address(),
+                "Refusing peer exchange: this connection has not authenticated a peer, so \
+                 the requester's identity is unproven"
+            );
+            icn_obs::metrics::peer_exchange::requests_denied_inc(
+                DenialReason::UnauthenticatedRequester,
+            );
+            return;
+        };
+
+        // From here on `authenticated_from` is the requester. `claimed_from` is not consulted
+        // again: it named nothing that was checked, and the two are deliberately distinct
+        // identifiers so that reaching for the wrong one has to be deliberate.
         info!(
             "Received peer exchange request from {} (max={}, filter={:?})",
-            from, max_peers, network_filter
+            authenticated_from, max_peers, network_filter
         );
-        icn_obs::metrics::peer_exchange::requests_received_inc();
 
         // Gather known peers from session manager
         let sm = self.session_manager.read().await;
@@ -69,8 +127,9 @@ impl ConnectionContext {
         let mut known_peers: Vec<KnownPeer> = Vec::new();
 
         for (did_str, conn) in connections {
-            // Skip the requesting peer
-            if did_str == from.as_str() {
+            // Skip the requesting peer — identified by the DID this connection *proved*, so
+            // a requester cannot steer what it is excluded from by choosing a `from`.
+            if did_str == authenticated_from.as_str() {
                 continue;
             }
 
@@ -96,13 +155,13 @@ impl ConnectionContext {
         // Send response
         let response = NetworkMessage::peer_exchange_response(
             self.own_did.clone(),
-            from.clone(),
+            authenticated_from.clone(),
             known_peers,
             total_known,
         );
 
         let connection_clone = connection.clone();
-        let from_did = from.clone();
+        let from_did = authenticated_from;
         tokio::spawn(async move {
             match connection_clone.open_bi().await {
                 Ok((mut send_stream, _recv)) => {

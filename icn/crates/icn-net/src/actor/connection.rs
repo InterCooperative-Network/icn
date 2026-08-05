@@ -73,6 +73,7 @@ impl NetworkActor {
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
         own_did: Did,
+        peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<()> {
         info!("Starting incoming connection handler");
@@ -149,6 +150,7 @@ impl NetworkActor {
             let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = own_did.clone();
+            let peer_exchange_enabled = peer_exchange_enabled.clone();
             tokio::spawn(async move {
                 let connection = match incoming.await {
                     Ok(connection) => connection,
@@ -177,6 +179,7 @@ impl NetworkActor {
                     identity_bundle_clone,
                     own_did_clone,
                     crate::handlers::ConnectionDirection::Inbound,
+                    peer_exchange_enabled,
                 )
                 .await
                 {
@@ -209,6 +212,7 @@ impl NetworkActor {
         identity_bundle: IdentityBundle,
         own_did: Did,
         direction: crate::handlers::ConnectionDirection,
+        peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -226,6 +230,7 @@ impl NetworkActor {
             identity_bundle.clone(),
             own_did.clone(),
             direction,
+            peer_exchange_enabled,
         );
 
         loop {

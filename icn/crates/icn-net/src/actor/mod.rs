@@ -173,6 +173,8 @@ pub struct NetworkHandle {
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
     /// Direct dial timeout in milliseconds (shared with actor via atomic)
     dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
+    /// Whether this node answers peer-exchange requests (shared with actor via atomic)
+    peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl NetworkHandle {
@@ -223,6 +225,32 @@ impl NetworkHandle {
             timeout.as_millis() as u64,
             std::sync::atomic::Ordering::Relaxed,
         );
+    }
+
+    /// Declare whether this node participates in peer exchange.
+    ///
+    /// When disabled — the default — the node does not answer `PeerExchangeMessage::Request`
+    /// from anyone, however well authenticated. Enumerating the neighbourhood is
+    /// participation in federation, and whether to participate is the operator's decision,
+    /// expressed as `federation.enabled` (#2535).
+    ///
+    /// This crate deliberately does not read that configuration itself. `FederationConfig`
+    /// lives in `icn-core`, which depends on this crate, so the dependency only runs one
+    /// way; the composition root translates the operator's posture into this call, the
+    /// same way it turns `TopologyConfig` into a spawn argument.
+    ///
+    /// Defaulting to off means the window between `spawn` and this call is closed, not
+    /// open, and a composition root that forgets to call it breaks peer discovery rather
+    /// than leaking topology.
+    pub fn set_peer_exchange_enabled(&self, enabled: bool) {
+        self.peer_exchange_enabled
+            .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether this node currently answers peer-exchange requests.
+    pub fn peer_exchange_enabled(&self) -> bool {
+        self.peer_exchange_enabled
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Dial a peer by address only, returning a **placeholder connection key**.
@@ -1037,6 +1065,8 @@ pub struct NetworkActor {
     relay_proxies: Arc<RwLock<std::collections::HashMap<Did, crate::relay_proxy::ProxyHandle>>>,
     /// Direct dial timeout in milliseconds (shared with handle via atomic)
     dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
+    /// Whether this node answers peer-exchange requests (shared with handle via atomic)
+    peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl NetworkActor {
@@ -1202,6 +1232,12 @@ impl NetworkActor {
         });
         info!("Byzantine fault detection enabled");
 
+        // Peer exchange is off until a composition root turns it on (#2535). Defaulting to
+        // off is deliberate: this crate cannot see `federation.enabled`, and the failure
+        // mode of a forgotten wiring should be "federation does not discover peers", which
+        // is loud, rather than "the node hands its neighbourhood to anyone", which is not.
+        let peer_exchange_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
         // Spawn incoming connection handler if handler is provided
         if let Some(handler) = incoming_handler.clone() {
             let session_manager_clone = session_manager.clone();
@@ -1214,6 +1250,7 @@ impl NetworkActor {
             let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = did.clone();
+            let peer_exchange_enabled_clone = peer_exchange_enabled.clone();
             let shutdown_rx = shutdown_tx.subscribe();
             tokio::spawn(async move {
                 if let Err(e) = Self::handle_incoming_connections(
@@ -1228,6 +1265,7 @@ impl NetworkActor {
                     misbehavior_detector_clone,
                     identity_bundle_clone,
                     own_did_clone,
+                    peer_exchange_enabled_clone,
                     shutdown_rx,
                 )
                 .await
@@ -1329,6 +1367,7 @@ impl NetworkActor {
             })),
             relay_proxies: Arc::new(RwLock::new(std::collections::HashMap::new())),
             dial_timeout_ms: dial_timeout_ms.clone(),
+            peer_exchange_enabled: peer_exchange_enabled.clone(),
         };
 
         // Spawn actor task
@@ -1347,6 +1386,7 @@ impl NetworkActor {
             own_did: did,
             blob_registry: blob_registry.clone(),
             dial_timeout_ms,
+            peer_exchange_enabled,
         })
     }
 
@@ -1613,6 +1653,7 @@ mod tests {
             own_did: own_did.clone(),
             blob_registry: None,
             dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Alice supports E2E encryption
@@ -1718,6 +1759,7 @@ mod tests {
             own_did: test_did,
             blob_registry: None,
             dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
@@ -1796,6 +1838,7 @@ mod tests {
             own_did: test_did,
             blob_registry: None,
             dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Get versions
@@ -1841,6 +1884,7 @@ mod tests {
             own_did: test_did,
             blob_registry: None,
             dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Get full connection info
@@ -1880,6 +1924,7 @@ mod tests {
             own_did: own_did.clone(),
             blob_registry: Some(blob_registry.clone()),
             dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         // Spawn task to handle response channel (prevents hanging)
