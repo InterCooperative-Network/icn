@@ -469,6 +469,32 @@ async fn test_relay_fallback_establishes_connection() {
                     nat_status.active_relay_count >= 1,
                     "Should have at least one active relay proxy"
                 );
+
+                // Reaching a peer through a relay is still only transport (#2530).
+                //
+                // `did_b` here is the identity Node A *expected* to find; Node B never
+                // completed a Hello over this relayed connection, so nothing has proven who
+                // is on the other end. The relay branch used to call the authenticated
+                // installer with that expected DID the moment TURN framing came up, which
+                // both violated that installer's stated precondition and made
+                // `connections_active` count an unauthenticated peer.
+                let stats = handle_a
+                    .get_stats()
+                    .await
+                    .expect("failed to get stats from Node A");
+                assert_eq!(
+                    stats.connections_active, 0,
+                    "a relayed connection must not become an authenticated peer before Hello; \
+                     found {} active connections, so the expected DID {} was registered on \
+                     relay transport success alone (#2530)",
+                    stats.connections_active, did_b
+                );
+                assert!(
+                    handle_a.connected_peers().await.is_empty(),
+                    "connected_peers() reports authenticated peers, so a relayed connection \
+                     with no completed Hello must not appear in it (#2530)"
+                );
+
                 info!("PASS: Relay fallback established QUIC connection successfully");
             }
             Ok(Err(ref e)) => {

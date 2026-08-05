@@ -240,16 +240,23 @@ impl NetworkHandle {
     /// that the value's derivation is independent of the dial's outcome.)
     ///
     /// The peer's authenticated DID is recorded separately by the Hello
-    /// handler, into `peer_connections`, after DID-TLS binding verification.
-    /// The placeholder entry in the session manager's connection map is
-    /// **not** re-keyed or evicted — see #2530.
+    /// handler, after DID-TLS binding verification, and *that* is the identity
+    /// the connection is registered under.
+    ///
+    /// The placeholder is never registered as a peer. Nor is the DID passed to
+    /// an ordinary [`Self::dial`]: no outbound path writes to the connection map,
+    /// because transport success says nothing about who answered. Until Hello
+    /// proves an identity the connection is deliberately not addressable by DID,
+    /// so a peer that answers on the wire but never authenticates leaves nothing
+    /// behind (#2530).
     ///
     /// Callers must not treat the returned `Did` as an authenticated peer
-    /// identity, and must not report it as one.
+    /// identity, must not report it as one, and must not use it as a send
+    /// target — sending to it will fail, because no such peer exists.
     pub async fn dial_addr(&self, addr: SocketAddr) -> Result<Did> {
-        let temp_did = derive_placeholder_did(addr)?;
-        self.dial(addr, temp_did.clone()).await?;
-        Ok(temp_did)
+        let placeholder = derive_placeholder_did(addr)?;
+        self.dial(addr, placeholder.clone()).await?;
+        Ok(placeholder)
     }
 
     /// Send a network message to a specific peer
@@ -391,6 +398,42 @@ impl NetworkHandle {
             .await
             .get(did)
             .map(|info| info.x25519_key)
+    }
+
+    /// Peers we currently hold a live, authenticated session with, and the address each is
+    /// reachable at.
+    ///
+    /// Every key in the session manager's connection map is an authenticated peer DID.
+    /// That is true because `install_incoming_connection` is the map's only insertion path
+    /// and it runs after Hello has bound the DID to this connection's certificate (#2520);
+    /// no outbound dial registers anything, since neither an address nor a caller-supplied
+    /// DID is proof of who answered (#2530). If a future writer inserts before
+    /// authentication, this method silently starts reporting unauthenticated identities —
+    /// so that invariant belongs to the map, not to this accessor.
+    ///
+    /// Closed connections are filtered out: map occupancy is not proof of liveness, since a
+    /// peer's restart leaves a dead entry behind until something replaces it (#2504).
+    pub async fn connected_peer_endpoints(&self) -> Vec<(Did, SocketAddr)> {
+        self.session_manager
+            .read()
+            .await
+            .connections()
+            .await
+            .into_iter()
+            .filter(|(_, conn)| conn.close_reason().is_none())
+            .filter_map(|(did, conn)| Some((did.parse::<Did>().ok()?, conn.remote_address())))
+            .collect()
+    }
+
+    /// DIDs of peers we currently hold a live, authenticated session with.
+    ///
+    /// See [`Self::connected_peer_endpoints`] for why these are authenticated.
+    pub async fn connected_peers(&self) -> Vec<Did> {
+        self.connected_peer_endpoints()
+            .await
+            .into_iter()
+            .map(|(did, _)| did)
+            .collect()
     }
 
     /// Get this node's connection candidate for NAT traversal

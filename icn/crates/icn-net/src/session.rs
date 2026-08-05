@@ -306,9 +306,26 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Dial a peer at the given address
+    /// Dial `addr`, expecting to reach `peer_did`.
     ///
-    /// Returns a QUIC connection to the peer.
+    /// Returns a QUIC connection to the peer. The connection is **not** registered as a
+    /// peer: `peer_did` is what the caller *expects* to find there, and expectation is not
+    /// proof. It comes from operator configuration, from a DID another node advertised over
+    /// peer exchange, or from a discovery candidate — none of which is a cryptographic
+    /// statement about who will answer. Registration happens in
+    /// [`install_incoming_connection`], once Hello has bound a DID to this connection's
+    /// certificate (#2520).
+    ///
+    /// `peer_did` is still load-bearing here: it suppresses duplicate connections to a peer
+    /// we already hold a live session with, and it is what the outgoing Hello is addressed
+    /// to. It just never becomes an entry in the connection map (#2530).
+    ///
+    /// **The caller owns the returned connection.** Dropping it closes the QUIC connection,
+    /// because nothing else holds it: registering the dial in the connection map used to
+    /// keep it alive as a side effect, and that is exactly the pre-authentication entry this
+    /// no longer creates. In production `NetworkActor::handle_dial` hands it to
+    /// `wire_new_connection`, which moves it into the spawned connection handler — the task
+    /// that reads from it — and that task is its owner until Hello registers it or it closes.
     pub async fn dial(&self, addr: SocketAddr, peer_did: String) -> Result<quinn::Connection> {
         // Never dial ourselves into our own remote-peer map (#2506). Discovery sources echo our
         // own advertisement back to us — over `network:candidates`, peer exchange, or mDNS — and
@@ -340,34 +357,42 @@ impl SessionManager {
 
         info!("Connected to peer at {}", addr);
 
-        // Store connection, or return the existing one if we already have a *live* one.
+        // Return the existing connection instead if we already hold a *live, authenticated*
+        // session with the peer we expected to reach, so a redundant dial does not displace
+        // a working session with a second one.
         //
         // A closed entry must never win over a freshly dialed connection: after a peer restarts,
         // our cached connection to it is dead, and preferring it would make every send fail
-        // until this process restarts (#2504).
-        let mut connections = self.connections.write().await;
-        if let Some(existing) = connections.get(&peer_did) {
-            match existing.close_reason() {
-                None => {
-                    info!(
-                        "Connection already exists for {} (from incoming), returning existing connection and closing new one",
-                        peer_did
-                    );
-                    let existing_conn = existing.clone();
-                    drop(connections); // Release lock before closing
-                    connection.close(0u32.into(), b"duplicate");
-                    return Ok(existing_conn);
+        // until this process restarts (#2504). So a closed entry is simply passed over here —
+        // the peer's Hello on the new connection replaces it.
+        //
+        // This only *reads* the map. Nothing is inserted: `peer_did` is the caller's
+        // expectation, and a connection becomes a peer when Hello proves an identity for it,
+        // not when the transport comes up (#2530).
+        let existing_live = {
+            let connections = self.connections.read().await;
+            match connections.get(&peer_did) {
+                Some(existing) if existing.close_reason().is_none() => Some(existing.clone()),
+                Some(existing) => {
+                    if let Some(reason) = existing.close_reason() {
+                        info!(
+                            "Existing connection for {} is closed ({}); using the connection we just dialed",
+                            peer_did, reason
+                        );
+                    }
+                    None
                 }
-                Some(reason) => {
-                    info!(
-                        "Replacing closed connection for {} ({}) with the connection we just dialed",
-                        peer_did, reason
-                    );
-                }
+                None => None,
             }
+        };
+        if let Some(existing_conn) = existing_live {
+            info!(
+                "Live session already exists for {}, returning it and closing the connection we just dialed",
+                peer_did
+            );
+            connection.close(0u32.into(), b"duplicate");
+            return Ok(existing_conn);
         }
-        connections.insert(peer_did, connection.clone());
-        drop(connections);
 
         Ok(connection)
     }
@@ -817,6 +842,10 @@ fn resolve_local_addr(port: u16) -> Option<SocketAddr> {
 /// to compare against and therefore no connections either; both production callers pass `Some`.
 /// It is a required parameter rather than ambient state so that a future insertion path cannot
 /// install a connection without first stating which DID is ours (#2506).
+///
+/// On return, no key other than `peer_did` maps to `connection`: this is the point at which a
+/// connection acquires its single canonical identity, so any provisional key that was standing in
+/// for it beforehand is dropped here (#2530).
 pub(crate) async fn install_incoming_connection(
     connections: &Arc<RwLock<HashMap<String, quinn::Connection>>>,
     local_did: Option<&str>,
@@ -839,6 +868,33 @@ pub(crate) async fn install_incoming_connection(
     }
 
     let mut connections = connections.write().await;
+
+    // One physical connection, one identity. Any *other* key mapping to this same
+    // connection is an alias left over from before the peer authenticated — a placeholder
+    // from an address-only dial, or a DID that was configured for this address but turned
+    // out not to be who answered. Consumers read this map as authenticated peer topology:
+    // peer exchange publishes its keys to other nodes, broadcast opens a stream per entry,
+    // and `connections_active` counts entries as peers. So an alias is not a duplicate
+    // record, it is a phantom peer (#2530).
+    //
+    // Matching on `stable_id` compares connection *identity*, not address or key, so this
+    // can only ever drop an alias of the connection in hand — never a different, newer
+    // connection to the same peer. Done under the same write guard as the insert below, so
+    // no reader observes both keys.
+    let alias_id = connection.stable_id();
+    connections.retain(|key, existing| {
+        let is_alias = key != &peer_did && existing.stable_id() == alias_id;
+        if is_alias {
+            info!(
+                evicted_key = %key,
+                authenticated_did = %peer_did,
+                remote_addr = %connection.remote_address(),
+                "Evicting provisional connection key superseded by the authenticated DID (#2530)"
+            );
+        }
+        !is_alias
+    });
+
     match connections.entry(peer_did) {
         Entry::Occupied(mut entry) if entry.get().close_reason().is_some() => {
             info!(
@@ -969,6 +1025,15 @@ mod tests {
     }
 
     /// Have `dialer` connect to `listener`, returning the connection `listener` accepted.
+    /// Dialer-side connections, kept alive for the lifetime of the test binary.
+    ///
+    /// `SessionManager::dial` transfers ownership of the connection to its caller, so
+    /// dropping it closes the QUIC connection and tears down the listener side these tests
+    /// are about to assert on. Production keeps it alive by moving it into the spawned
+    /// connection handler; there is no such handler here, so the test binary holds it.
+    static DIALER_SIDE: std::sync::Mutex<Vec<quinn::Connection>> =
+        std::sync::Mutex::new(Vec::new());
+
     async fn connect(
         listener: &SessionManager,
         dialer: &SessionManager,
@@ -977,7 +1042,11 @@ mod tests {
         let listener_clone = listener.clone_for_test();
         let accept_task = tokio::spawn(async move { listener_clone.accept().await });
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        dialer.dial(addr, "listener".to_string()).await.unwrap();
+        let dialer_side = dialer.dial(addr, "listener".to_string()).await.unwrap();
+        DIALER_SIDE
+            .lock()
+            .expect("dialer-side lock poisoned")
+            .push(dialer_side);
         accept_task.await.unwrap().unwrap().unwrap()
     }
 
@@ -995,6 +1064,86 @@ mod tests {
             return false;
         };
         conn.open_bi().await.is_ok()
+    }
+
+    /// Regression test for #2530: installing an authenticated DID collapses any other key
+    /// standing for the same physical connection.
+    ///
+    /// No outbound path registers a connection any more, so nothing in production *should*
+    /// be able to create such an alias. This asserts the installer's own invariant directly
+    /// rather than through a path that happens to produce one, so the guarantee survives a
+    /// future writer that reintroduces a pre-authentication key — which is exactly how the
+    /// placeholder got in.
+    #[tokio::test]
+    async fn test_install_evicts_other_keys_for_the_same_connection() {
+        setup();
+
+        let (survivor, survivor_addr) = start_manager().await;
+        let (peer, _) = start_manager().await;
+        let inbound = connect(&survivor, &peer, survivor_addr).await;
+
+        // A key standing in for the peer before it authenticated: an address-derived
+        // placeholder, a configured DID, a DID some other node advertised — the installer
+        // does not care which, only that it is not the DID that just authenticated.
+        let provisional = "did:icn:zProvisionalStandIn".to_string();
+        let authenticated = "did:icn:zAuthenticatedPeer".to_string();
+        survivor
+            .connections
+            .write()
+            .await
+            .insert(provisional.clone(), inbound.clone());
+
+        install_incoming_connection(
+            &survivor.connections,
+            survivor.local_did().await.as_deref(),
+            authenticated.clone(),
+            inbound.clone(),
+        )
+        .await;
+
+        let keys: Vec<String> = survivor.connections.read().await.keys().cloned().collect();
+        assert_eq!(
+            keys,
+            vec![authenticated],
+            "one physical connection must end up under exactly one identity; {provisional} \
+             survived alongside it (#2530)"
+        );
+    }
+
+    /// A key for a *different* connection must survive the alias collapse.
+    ///
+    /// The eviction matches on connection identity, not on the key, so it must never be
+    /// able to unregister a peer that simply happens to be in the map at the time — the
+    /// "removal of the wrong connection" hazard.
+    #[tokio::test]
+    async fn test_install_does_not_evict_keys_for_other_connections() {
+        setup();
+
+        let (survivor, survivor_addr) = start_manager().await;
+        let (peer_a, _) = start_manager().await;
+        let (peer_b, _) = start_manager().await;
+        let conn_a = connect(&survivor, &peer_a, survivor_addr).await;
+        let conn_b = connect(&survivor, &peer_b, survivor_addr).await;
+
+        let unrelated = "did:icn:zUnrelatedLivePeer".to_string();
+        survivor
+            .connections
+            .write()
+            .await
+            .insert(unrelated.clone(), conn_a);
+
+        install_incoming_connection(
+            &survivor.connections,
+            survivor.local_did().await.as_deref(),
+            "did:icn:zNewlyAuthenticated".to_string(),
+            conn_b,
+        )
+        .await;
+
+        assert!(
+            survivor.connections.read().await.contains_key(&unrelated),
+            "installing one connection must not unregister a different, live connection"
+        );
     }
 
     /// Regression test for #2504.
