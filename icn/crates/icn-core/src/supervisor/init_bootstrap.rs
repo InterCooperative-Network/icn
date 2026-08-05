@@ -6,6 +6,7 @@
 //! - Announcing connection candidates for NAT traversal
 //! - Publishing node profile for peer capability discovery
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -50,24 +51,26 @@ impl BootstrapConfig {
     }
 }
 
-/// Dial bootstrap peers and optionally request peer exchange
+/// Dial bootstrap peers.
 ///
-/// Returns the DIDs we can address peers by. Only `KnownDid` bootstrap entries
-/// (`icn://did:icn:PUBKEY@HOST:PORT`) contribute: for `AddrOnly` entries
-/// (`icn://HOST:PORT`) the peer's identity is not known until Hello completes, and the
-/// address-derived placeholder is not a peer identity and not a usable send target — see
-/// [`icn_net::NetworkHandle::dial_addr`] and #2530. Those peers are picked up from
-/// [`icn_net::NetworkHandle::connected_peers`] once they authenticate.
+/// Returns the **addresses** transport was established to, not peer identities. Neither
+/// bootstrap form authenticates anyone: `parse_bootstrap_peer` yields configuration, and a
+/// peer's identity is proven only by DID-TLS binding verification in the Hello handler. A
+/// configured `KnownDid` is therefore an expectation, and the `AddrOnly` placeholder is not
+/// even that — see [`icn_net::NetworkHandle::dial_addr`] and #2530.
+///
+/// The addresses are what lets [`request_peer_exchange`] find *these* peers once they
+/// authenticate, without widening to every peer the node happens to be connected to.
 pub async fn dial_bootstrap_peers(
     config: &BootstrapConfig,
     network_handle: &NetworkHandle,
-) -> Vec<Did> {
+) -> Vec<SocketAddr> {
     if config.bootstrap_peers.is_empty() {
         return Vec::new();
     }
 
     info!("Dialing {} bootstrap peers", config.bootstrap_peers.len());
-    let mut connected_peers = Vec::new();
+    let mut dialed_endpoints = Vec::new();
 
     for peer_url in &config.bootstrap_peers {
         match super::bridge::parse_bootstrap_peer(peer_url).await {
@@ -81,8 +84,14 @@ pub async fn dial_bootstrap_peers(
                 );
                 match network_handle.dial(peer_addr, peer_did.clone()).await {
                     Ok(_) => {
-                        info!("✓ Connected to bootstrap peer: {}", peer_did);
-                        connected_peers.push(peer_did);
+                        // The configured DID is an expectation, not a result: this records
+                        // that transport came up, and the peer is named only once Hello
+                        // authenticates it (#2530).
+                        info!(
+                            "✓ Reached bootstrap peer at {} (expected {}; awaiting Hello)",
+                            peer_addr, peer_did
+                        );
+                        dialed_endpoints.push(peer_addr);
                     }
                     Err(e) => {
                         warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e)
@@ -97,14 +106,12 @@ pub async fn dial_bootstrap_peers(
                 // separately by the Hello handshake.
                 match network_handle.dial_addr(peer_addr).await {
                     Ok(placeholder_did) => {
-                        // Deliberately not added to `connected_peers`: the placeholder
-                        // names no peer and addresses nothing. This peer becomes
-                        // addressable once Hello authenticates it (#2530).
                         info!(
                             "✓ Connected to bootstrap peer at {} (placeholder key {}; \
                              peer identity not yet authenticated — awaiting Hello)",
                             peer_addr, placeholder_did
                         );
+                        dialed_endpoints.push(peer_addr);
                     }
                     Err(e) => {
                         warn!(
@@ -123,16 +130,55 @@ pub async fn dial_bootstrap_peers(
         }
     }
 
-    connected_peers
+    dialed_endpoints
 }
 
-/// Request peer exchange from connected bootstrap peers
+/// Which peers this bootstrap operation may request peer exchange from.
+///
+/// A target must satisfy both halves: it authenticated (so it came from
+/// `connected_peer_endpoints`, whose entries exist only after Hello proved a DID against the
+/// connection's certificate), **and** it is reachable at an endpoint this bootstrap
+/// operation actually dialed. Either half alone is wrong — a configured DID that never
+/// authenticated is not a peer, and an authenticated peer we never dialed is not a bootstrap
+/// peer.
+///
+/// Matching on the dialed address is sound here because bootstrap dialing is direct-only:
+/// `NetworkHandle::dial` passes `peer_relay_addr: None`, so `handle_dial` cannot take the
+/// TURN branch, and the connection's remote address is the address we dialed. (Under
+/// Kubernetes DNAT the client still observes the service address it sent to, because
+/// conntrack rewrites the reply source back.) If bootstrap ever gains relay fallback, a
+/// relayed connection's remote address is the local proxy's, and this correlation would need
+/// revisiting.
+fn select_peer_exchange_targets(
+    dialed_endpoints: &[SocketAddr],
+    authenticated_peers: Vec<(Did, SocketAddr)>,
+) -> Vec<Did> {
+    let mut targets: Vec<Did> = Vec::new();
+    for (did, addr) in authenticated_peers {
+        if dialed_endpoints.contains(&addr) && !targets.contains(&did) {
+            targets.push(did);
+        }
+    }
+    targets
+}
+
+/// Request peer exchange from the bootstrap peers that authenticated.
+///
+/// Targets are resolved *after* the handshake window, by matching live authenticated
+/// sessions against the addresses we actually dialed. A bootstrap entry names an endpoint
+/// and, at most, an expectation about who is there; only Hello says who is really there, so
+/// a configured DID must not become a peer-exchange target on its own (#2530, and the
+/// "configuration is not verification" principle settled in #2529).
+///
+/// Matching on the dialed address keeps this scoped to bootstrap peers. Asking only for
+/// "every connected peer" would quietly turn this into a request to the whole neighbourhood
+/// — including inbound peers this node never chose to bootstrap from.
 pub async fn request_peer_exchange(
     config: &BootstrapConfig,
     network_handle: &NetworkHandle,
-    connected_peers: Vec<Did>,
+    dialed_endpoints: Vec<SocketAddr>,
 ) {
-    if !config.federation_enabled {
+    if !config.federation_enabled || dialed_endpoints.is_empty() {
         return;
     }
 
@@ -143,28 +189,24 @@ pub async fn request_peer_exchange(
     };
 
     let peer_exchange_delay = Duration::from_millis(config.peer_exchange_delay_ms);
-
-    // Wait out the handshake window before choosing targets. Address-only bootstrap peers
-    // have no addressable identity until Hello completes, so they can only be named after
-    // authenticating — asking the network handle afterwards is what picks them up (#2530).
     tokio::time::sleep(peer_exchange_delay).await;
 
-    let mut targets = connected_peers;
-    for authenticated in network_handle.connected_peers().await {
-        if !targets.contains(&authenticated) {
-            targets.push(authenticated);
-        }
-    }
+    let targets = select_peer_exchange_targets(
+        &dialed_endpoints,
+        network_handle.connected_peer_endpoints().await,
+    );
 
     if targets.is_empty() {
         info!(
-            "Federation enabled - no authenticated bootstrap peers to request peer exchange from"
+            "Federation enabled - none of the {} bootstrap endpoints has an authenticated peer yet; \
+             not requesting peer exchange",
+            dialed_endpoints.len()
         );
         return;
     }
 
     info!(
-        "Federation enabled - requesting peer exchange from {} bootstrap peers",
+        "Federation enabled - requesting peer exchange from {} authenticated bootstrap peers",
         targets.len()
     );
 
@@ -291,4 +333,87 @@ pub async fn run_bootstrap(
 
     // Announce node profile
     announce_node_profile(gossip_handle, did, node_profile).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn did(s: &str) -> Did {
+        // Real Ed25519-derived DIDs: the selection rule compares identities, so seeding
+        // from distinct keys keeps the fixtures distinct the same way production ones are.
+        let seed = {
+            let mut bytes = [0u8; 32];
+            for (i, b) in s.bytes().enumerate().take(32) {
+                bytes[i] = b;
+            }
+            bytes
+        };
+        Did::from_public_key(&ed25519_dalek::SigningKey::from_bytes(&seed).verifying_key())
+    }
+
+    fn addr(port: u16) -> SocketAddr {
+        format!("10.0.0.1:{port}").parse().expect("valid addr")
+    }
+
+    /// Peer exchange goes only to peers that both authenticated **and** sit at an endpoint
+    /// this bootstrap operation dialed.
+    ///
+    /// The two exclusions are the ones that matter. An endpoint we dialed but that never
+    /// authenticated contributes nothing: transport success is not identity, so there is no
+    /// DID to address (#2530). And an authenticated peer at some other endpoint is a peer of
+    /// this node but not a *bootstrap* peer — including it would silently turn a bootstrap
+    /// step into a request to the whole neighbourhood, including inbound peers this node
+    /// never chose.
+    #[test]
+    fn targets_are_authenticated_peers_at_endpoints_we_dialed() {
+        let bootstrap_a = addr(7001);
+        let bootstrap_b = addr(7002);
+        let unrelated_c = addr(7003);
+
+        let targets = select_peer_exchange_targets(
+            &[bootstrap_a, bootstrap_b],
+            vec![
+                (did("PeerA"), bootstrap_a),
+                // C authenticated, but we never dialed it as a bootstrap peer.
+                (did("PeerC"), unrelated_c),
+            ],
+        );
+
+        assert_eq!(
+            targets,
+            vec![did("PeerA")],
+            "only the authenticated peer at a dialed bootstrap endpoint may be a target"
+        );
+        // B was dialed but nobody authenticated there, so it contributes no DID at all.
+        assert!(!targets.iter().any(|t| t.as_str().contains("PeerB")));
+    }
+
+    /// A DID reachable at two dialed endpoints is requested from once.
+    ///
+    /// Bootstrap lists legitimately name the same node twice — a service address and a
+    /// direct one, or an IPv4 and IPv6 entry — and the peer that answers both is one peer.
+    #[test]
+    fn targets_are_deduplicated_across_endpoints() {
+        let first = addr(7001);
+        let second = addr(7002);
+
+        let targets = select_peer_exchange_targets(
+            &[first, second, first],
+            vec![(did("SamePeer"), first), (did("SamePeer"), second)],
+        );
+
+        assert_eq!(targets, vec![did("SamePeer")]);
+    }
+
+    /// With nothing dialed, nothing is a bootstrap target — not even a live peer.
+    #[test]
+    fn no_dialed_endpoints_means_no_targets() {
+        let targets =
+            select_peer_exchange_targets(&[], vec![(did("SomeConnectedPeer"), addr(7009))]);
+        assert!(
+            targets.is_empty(),
+            "an authenticated peer we did not dial is not a bootstrap peer"
+        );
+    }
 }

@@ -94,19 +94,6 @@ pub enum NetworkMsg {
         response: oneshot::Sender<Result<()>>,
     },
 
-    /// Dial an address whose peer identity is not yet known.
-    ///
-    /// Distinct from [`NetworkMsg::Dial`] because the connection must **not** be
-    /// registered as a peer until Hello authenticates one: there is no identity to
-    /// register it under, and a stand-in derived from the address is not one (#2530).
-    DialProvisional {
-        addr: SocketAddr,
-        /// Address-derived key used to address the outgoing Hello and label logs.
-        /// Local bookkeeping only — never an authenticated identity.
-        placeholder: Did,
-        response: oneshot::Sender<Result<()>>,
-    },
-
     /// Send a network message to a specific peer
     SendMessage {
         did: Did,
@@ -256,27 +243,19 @@ impl NetworkHandle {
     /// handler, after DID-TLS binding verification, and *that* is the identity
     /// the connection is registered under.
     ///
-    /// The placeholder is never registered as a peer: it addresses the outgoing
-    /// Hello and labels logs, and then it is done. Until the handshake proves an
-    /// identity the connection is deliberately not addressable by DID, so a peer
-    /// that answers on the wire but never authenticates leaves nothing behind
-    /// (#2530).
+    /// The placeholder is never registered as a peer. Nor is the DID passed to
+    /// an ordinary [`Self::dial`]: no outbound path writes to the connection map,
+    /// because transport success says nothing about who answered. Until Hello
+    /// proves an identity the connection is deliberately not addressable by DID,
+    /// so a peer that answers on the wire but never authenticates leaves nothing
+    /// behind (#2530).
     ///
     /// Callers must not treat the returned `Did` as an authenticated peer
     /// identity, must not report it as one, and must not use it as a send
     /// target — sending to it will fail, because no such peer exists.
     pub async fn dial_addr(&self, addr: SocketAddr) -> Result<Did> {
         let placeholder = derive_placeholder_did(addr)?;
-        let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(NetworkMsg::DialProvisional {
-                addr,
-                placeholder: placeholder.clone(),
-                response: tx,
-            })
-            .await
-            .context("Network actor closed")?;
-        rx.await.context("Response channel closed")??;
+        self.dial(addr, placeholder.clone()).await?;
         Ok(placeholder)
     }
 
@@ -421,17 +400,20 @@ impl NetworkHandle {
             .map(|info| info.x25519_key)
     }
 
-    /// DIDs of peers we currently hold a live, authenticated session with.
+    /// Peers we currently hold a live, authenticated session with, and the address each is
+    /// reachable at.
     ///
-    /// Every key in the session manager's connection map is an authenticated peer DID:
-    /// entries are installed only after Hello verifies the DID-TLS binding (#2520), and a
-    /// provisional address-only dial is deliberately not registered until then (#2530). So
-    /// this is the authenticated view, and it is the right source for anything that needs
-    /// to *name* a peer.
+    /// Every key in the session manager's connection map is an authenticated peer DID.
+    /// That is true because `install_incoming_connection` is the map's only insertion path
+    /// and it runs after Hello has bound the DID to this connection's certificate (#2520);
+    /// no outbound dial registers anything, since neither an address nor a caller-supplied
+    /// DID is proof of who answered (#2530). If a future writer inserts before
+    /// authentication, this method silently starts reporting unauthenticated identities —
+    /// so that invariant belongs to the map, not to this accessor.
     ///
     /// Closed connections are filtered out: map occupancy is not proof of liveness, since a
     /// peer's restart leaves a dead entry behind until something replaces it (#2504).
-    pub async fn connected_peers(&self) -> Vec<Did> {
+    pub async fn connected_peer_endpoints(&self) -> Vec<(Did, SocketAddr)> {
         self.session_manager
             .read()
             .await
@@ -439,7 +421,18 @@ impl NetworkHandle {
             .await
             .into_iter()
             .filter(|(_, conn)| conn.close_reason().is_none())
-            .filter_map(|(did, _)| did.parse::<Did>().ok())
+            .filter_map(|(did, conn)| Some((did.parse::<Did>().ok()?, conn.remote_address())))
+            .collect()
+    }
+
+    /// DIDs of peers we currently hold a live, authenticated session with.
+    ///
+    /// See [`Self::connected_peer_endpoints`] for why these are authenticated.
+    pub async fn connected_peers(&self) -> Vec<Did> {
+        self.connected_peer_endpoints()
+            .await
+            .into_iter()
+            .map(|(did, _)| did)
             .collect()
     }
 

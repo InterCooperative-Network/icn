@@ -47,15 +47,6 @@ impl NetworkActor {
                 let _ = response.send(result);
             }
 
-            NetworkMsg::DialProvisional {
-                addr,
-                placeholder,
-                response,
-            } => {
-                let result = self.handle_dial_provisional(addr, placeholder).await;
-                let _ = response.send(result);
-            }
-
             NetworkMsg::SendMessage {
                 did,
                 message,
@@ -100,47 +91,6 @@ impl NetworkActor {
                 let _ = tx.send(status);
             }
         }
-    }
-
-    /// Dial an address whose peer identity is not yet known.
-    ///
-    /// The connection is established and wired for traffic, but is **not** registered in
-    /// the session manager's connection map. That map's readers treat every key as an
-    /// authenticated peer — peer exchange republishes them to other nodes, broadcast opens
-    /// a stream per entry, `connections_active` counts them — and the only key available
-    /// here is derived from the address, so no peer could ever authenticate as it and
-    /// nothing would ever evict it (#2530).
-    ///
-    /// The connection becomes addressable when Hello proves who is on it.
-    ///
-    /// No relay fallback: an address-only dial has no peer relay candidate to fall back to,
-    /// which is why the previous implementation passed `None` for it.
-    async fn handle_dial_provisional(
-        &mut self,
-        addr: std::net::SocketAddr,
-        placeholder: Did,
-    ) -> Result<()> {
-        let dial_timeout = std::time::Duration::from_millis(
-            self.dial_timeout_ms
-                .load(std::sync::atomic::Ordering::Relaxed),
-        );
-
-        let connection = tokio::time::timeout(dial_timeout, {
-            let sm = self.session_manager.clone();
-            async move { sm.read().await.connect_unregistered(addr).await }
-        })
-        .await
-        .context("Timeout dialing peer (provisional)")
-        .and_then(|r| r)?;
-
-        {
-            let mut ns = self.nat_status.write().await;
-            ns.last_traversal_mode = TraversalMode::Direct;
-            ns.last_direct_error = None;
-        }
-
-        self.wire_new_connection(connection, &placeholder);
-        Ok(())
     }
 
     /// Handle a dial request with direct-then-relay fallback.
@@ -261,12 +211,13 @@ impl NetworkActor {
 
                 match relay_result {
                     Ok(connection) => {
-                        // Store the connection in session manager so send_message works
-                        self.session_manager
-                            .read()
-                            .await
-                            .store_incoming_connection(did.as_str().to_string(), connection.clone())
-                            .await;
+                        // Not registered as a peer here. Reaching a peer through a relay is
+                        // still only transport: `did` is the identity we expected to find,
+                        // and the relayed connection earns its place in the connection map
+                        // the same way a direct one does — when Hello binds a DID to this
+                        // connection's certificate. Registering it here called the
+                        // *authenticated* installer with an unauthenticated DID, which is
+                        // precisely the precondition that installer documents (#2530).
 
                         // Store proxy handle so it stays alive
                         self.relay_proxies.write().await.insert(did.clone(), proxy);

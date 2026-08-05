@@ -34,8 +34,25 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
 
+/// Ports already handed out in this process.
+///
+/// `pick_unused_port` binds, closes, and returns the port, so two tests running
+/// concurrently can be handed the same one — the port is genuinely free at each moment it
+/// is checked. Remembering what we issued removes that race within the process; callers
+/// still retry, because nothing can rule out another process taking it in between.
+static ISSUED_PORTS: std::sync::Mutex<Option<std::collections::HashSet<u16>>> =
+    std::sync::Mutex::new(None);
+
 fn pick_port() -> u16 {
-    portpicker::pick_unused_port().expect("no free port")
+    let mut guard = ISSUED_PORTS.lock().expect("issued-port lock poisoned");
+    let issued = guard.get_or_insert_with(std::collections::HashSet::new);
+    for _ in 0..200 {
+        let port = portpicker::pick_unused_port().expect("no free port");
+        if issued.insert(port) {
+            return port;
+        }
+    }
+    panic!("could not find an unissued free port");
 }
 
 fn init() {
@@ -66,33 +83,45 @@ async fn spawn_node_counting(
     counter: Arc<AtomicUsize>,
     variant: &'static str,
 ) -> Result<(NetworkHandle, SocketAddr, Guard)> {
-    let addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let (shutdown_tx, _) = broadcast::channel(1);
     let handler: IncomingMessageHandler = Arc::new(move |msg: NetworkMessage| {
         if !variant.is_empty() && msg.payload.variant_name() == variant {
             counter.fetch_add(1, Ordering::SeqCst);
         }
     });
-    let handle = NetworkActor::spawn(
-        bundle,
-        addr,
-        shutdown_tx.clone(),
-        Some(handler),
-        None, // oracle
-        None, // fallback_config
-        None, // topology_config
-        None, // stun_servers
-        None, // turn_config
-        None, // misbehavior_detector
-        None, // store
-        None, // personhood_store
-        None, // anchor_rate_config
-        None, // advertised_addr
-    )
-    .await?;
-    // Let the endpoint bind before anyone dials it.
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    Ok((handle, addr, Guard(shutdown_tx)))
+
+    // Binding is setup, not the property under test, so it retries: a port reported free can
+    // still be taken by another process before we bind it.
+    let mut last_err = None;
+    for _ in 0..8 {
+        let addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
+        match NetworkActor::spawn(
+            bundle.clone(),
+            addr,
+            shutdown_tx.clone(),
+            Some(handler.clone()),
+            None, // oracle
+            None, // fallback_config
+            None, // topology_config
+            None, // stun_servers
+            None, // turn_config
+            None, // misbehavior_detector
+            None, // store
+            None, // personhood_store
+            None, // anchor_rate_config
+            None, // advertised_addr
+        )
+        .await
+        {
+            Ok(handle) => {
+                // Let the endpoint bind before anyone dials it.
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                return Ok((handle, addr, Guard(shutdown_tx)));
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("could not bind a node")))
 }
 
 /// Keeps a node's shutdown sender alive for the duration of a test.
@@ -294,17 +323,24 @@ async fn peer_exchange_must_not_advertise_address_derived_placeholders() -> Resu
     Ok(())
 }
 
-/// A dial keyed on a DID that turns out not to be who answered must not leave that DID
-/// behind as a peer.
+/// When the supplied DID is not who answered, only the DID that authenticated becomes
+/// canonical — and the supplied one is never exposed as a peer.
 ///
-/// `SessionManager::dial` registers the caller's *claimed* key before any handshake has
-/// happened, so a bootstrap entry carrying a stale or wrong DID for an address registers a
-/// peer that does not exist. Hello then authenticates whoever actually answered and
-/// registers them too, leaving one connection under two identities — the same aliasing the
-/// address-only path produces, reached by a different route. This is what the eviction in
-/// `install_incoming_connection` covers, independently of where the stale key came from.
+/// This pins the **hint** semantics, which is what ICN actually implements: per
+/// `parse_bootstrap_peer`, a supplied DID "yields configuration", and identity "is proven
+/// only by DID-TLS binding verification in the Hello handler". Nothing anywhere compares
+/// the supplied DID against the authenticated one, so a supplied DID is *not* a
+/// cryptographic pin, and this test deliberately does not assert that a mismatch is
+/// rejected.
+///
+/// What it does assert is the part that is a trust boundary either way: the unproven DID
+/// must never appear as authenticated topology, and one physical connection must end up
+/// under exactly one identity. Making a supplied DID an enforced pin is a separate design
+/// decision with real operational consequences — a stale bootstrap entry would become a
+/// hard connectivity failure rather than a degraded one — tracked in #2533.
 #[tokio::test]
-async fn dial_keyed_on_the_wrong_did_does_not_leave_a_phantom_peer() -> Result<()> {
+async fn only_the_authenticated_did_becomes_canonical_when_the_supplied_did_differs() -> Result<()>
+{
     init();
     let dialer = IdentityBundle::generate()?;
     let dialer_did = dialer.did().clone();
@@ -331,6 +367,13 @@ async fn dial_keyed_on_the_wrong_did_does_not_leave_a_phantom_peer() -> Result<(
         "the connection must be held under the DID that authenticated, not also under the \
          DID we guessed; found {} entries, so {wrong_did} survived as a phantom peer (#2530)",
         stats.connections_active
+    );
+
+    let authenticated = dialer_handle.connected_peers().await;
+    assert_eq!(
+        authenticated,
+        vec![listener_did.clone()],
+        "only the DID proven by Hello may be reported as an authenticated peer (#2530)"
     );
 
     let client = WireClient::connect(&interrogator, dialer_addr).await?;
@@ -429,38 +472,9 @@ async fn addr_only_dial_that_never_authenticates_leaves_no_peer_identity() -> Re
     let silent = IdentityBundle::generate()?;
 
     let (dialer_handle, _dialer_addr, _dialer_guard) = spawn_node(dialer).await?;
+    let silent = SilentPeer::spawn(&silent)?;
 
-    // A bare QUIC listener: completes the handshake, accepts the connection, and then
-    // says nothing. No Hello, so the dialer never learns an authenticated identity.
-    let silent_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
-    let server_config =
-        icn_net::tls::create_server_config(vec![silent.tls_cert().clone()], silent.tls_key())?;
-    let mut quic_server = quinn::ServerConfig::with_crypto(Arc::new(
-        quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
-    ));
-    quic_server.transport_config(Arc::new({
-        let mut t = quinn::TransportConfig::default();
-        t.max_idle_timeout(Some(Duration::from_secs(60).try_into()?));
-        t
-    }));
-    let silent_endpoint = Endpoint::server(quic_server, silent_addr)?;
-    let accepted = tokio::spawn({
-        let endpoint = silent_endpoint.clone();
-        async move {
-            // Hold the accepted connection open; dropping it would close the connection
-            // and let the dialer clean up for the wrong reason.
-            let mut held = Vec::new();
-            while let Some(incoming) = endpoint.accept().await {
-                if let Ok(conn) = incoming.await {
-                    held.push(conn);
-                }
-            }
-            held
-        }
-    });
-    tokio::time::sleep(Duration::from_millis(300)).await;
-
-    let placeholder = dialer_handle.dial_addr(silent_addr).await?;
+    let placeholder = dialer_handle.dial_addr(silent.addr).await?;
 
     // Give the dialer ample opportunity to have registered something. There is no
     // observable "authentication finished" event here — that is the point — so this
@@ -476,6 +490,224 @@ async fn addr_only_dial_that_never_authenticates_leaves_no_peer_identity() -> Re
         stats.connections_active
     );
 
-    accepted.abort();
     Ok(())
+}
+
+/// A **DID-supplied** dial whose peer never authenticates must leave nothing behind either.
+///
+/// This is the same rule as the address-only case, reached through the ordinary
+/// `dial(addr, did)` path. A supplied DID is configuration or, worse, a claim relayed by
+/// another node through peer exchange — `init_network`'s auto-dial feeds
+/// `KnownPeer.did` straight into this path. `parse_bootstrap_peer` is explicit that
+/// neither bootstrap form authenticates anything: "parsing yields configuration, and the
+/// peer's identity is proven only by DID-TLS binding verification in the Hello handler."
+///
+/// So transport success must not promote the supplied DID into authenticated peer state.
+/// Otherwise any node can name an arbitrary DID at a reachable address and have every
+/// receiver adopt it as a peer, then re-advertise it — the placeholder was one instance of
+/// this, not the whole of it (#2530).
+#[tokio::test]
+async fn did_supplied_dial_that_never_authenticates_leaves_no_peer_identity() -> Result<()> {
+    init();
+    let dialer = IdentityBundle::generate()?;
+    let silent_identity = IdentityBundle::generate()?;
+
+    // The DID a caller claims lives at that address. Nothing has proven it.
+    let claimed_did = IdentityBundle::generate()?.did().clone();
+
+    let (dialer_handle, _dialer_addr, _dialer_guard) = spawn_node(dialer).await?;
+    let silent = SilentPeer::spawn(&silent_identity)?;
+
+    dialer_handle.dial(silent.addr, claimed_did.clone()).await?;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let stats = dialer_handle.get_stats().await?;
+    assert_eq!(
+        stats.connections_active, 0,
+        "QUIC success is not authentication: the claimed DID {claimed_did} must not become \
+         an active peer without an authenticated Hello; found {} entries (#2530)",
+        stats.connections_active
+    );
+
+    let authenticated = dialer_handle.connected_peers().await;
+    assert!(
+        authenticated.is_empty(),
+        "connected_peers() reports authenticated peers, so an unauthenticated claimed DID \
+         must never appear in it; got {authenticated:?} (#2530)"
+    );
+
+    Ok(())
+}
+
+/// A peer whose Hello fails the #2520 binding checks must not become authenticated state.
+///
+/// The dial supplies a DID and the peer answers with a Hello, so both of the inputs that
+/// could tempt an implementation into registering something are present — but the Hello is
+/// bound to a different certificate than the one on this connection, so it proves nothing.
+/// Neither the supplied DID nor the DID the Hello claims may end up as a peer, and #2530
+/// must not have opened a path that installs before verification.
+#[tokio::test]
+async fn peer_whose_hello_fails_binding_verification_becomes_no_ones_peer() -> Result<()> {
+    init();
+    let dialer = IdentityBundle::generate()?;
+    // Presents this identity's certificate on the wire...
+    let wire_identity = IdentityBundle::generate()?;
+    // ...but claims to be this one, with that one's own (valid, but wrong-cert) binding.
+    let impersonated = IdentityBundle::generate()?;
+    let impersonated_did = impersonated.did().clone();
+    let claimed_did = IdentityBundle::generate()?.did().clone();
+
+    let (dialer_handle, _dialer_addr, _dialer_guard) = spawn_node(dialer).await?;
+    let liar = SilentPeer::spawn_replying_with_hello(
+        &wire_identity,
+        NetworkMessage::hello(
+            impersonated_did.clone(),
+            claimed_did.clone(),
+            impersonated.binding_info(),
+            icn_net::VersionInfo::new("icnd-liar".to_string()),
+            None,
+            *impersonated.x25519_public_bytes(),
+            None,
+            None,
+        ),
+    )?;
+
+    dialer_handle.dial(liar.addr, claimed_did.clone()).await?;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let stats = dialer_handle.get_stats().await?;
+    assert_eq!(
+        stats.connections_active, 0,
+        "a Hello bound to a different certificate proves nothing, so neither the supplied \
+         DID {claimed_did} nor the claimed DID {impersonated_did} may become a peer; found \
+         {} entries (#2520, #2530)",
+        stats.connections_active
+    );
+    assert!(
+        dialer_handle
+            .get_peer_connection_info(&impersonated_did)
+            .await
+            .is_none(),
+        "a rejected Hello must not populate authenticated peer info (#2520)"
+    );
+
+    Ok(())
+}
+
+/// Positive control for the test above: the same scripted-peer harness, with a Hello whose
+/// binding *does* match the certificate it is presenting, must authenticate.
+///
+/// Without this, `peer_whose_hello_fails_binding_verification_becomes_no_ones_peer` would
+/// pass for free if the harness silently failed to deliver a Hello at all — the assertion
+/// there is an absence, and an absence proves nothing unless presence is reachable.
+#[tokio::test]
+async fn scripted_peer_with_a_matching_binding_does_authenticate() -> Result<()> {
+    init();
+    let dialer = IdentityBundle::generate()?;
+    let honest = IdentityBundle::generate()?;
+    let honest_did = honest.did().clone();
+    let claimed_did = IdentityBundle::generate()?.did().clone();
+
+    let (dialer_handle, _dialer_addr, _dialer_guard) = spawn_node(dialer).await?;
+    let peer = SilentPeer::spawn_replying_with_hello(
+        &honest,
+        NetworkMessage::hello(
+            honest_did.clone(),
+            claimed_did.clone(),
+            honest.binding_info(),
+            icn_net::VersionInfo::new("icnd-honest".to_string()),
+            None,
+            *honest.x25519_public_bytes(),
+            None,
+            None,
+        ),
+    )?;
+
+    dialer_handle.dial(peer.addr, claimed_did.clone()).await?;
+
+    assert!(
+        wait_until_authenticated(&dialer_handle, &honest_did, Duration::from_secs(20)).await,
+        "the harness must be able to deliver an acceptable Hello, otherwise the rejection \
+         test above proves nothing"
+    );
+    assert_eq!(
+        dialer_handle.connected_peers().await,
+        vec![honest_did],
+        "only the authenticated DID becomes a peer — not the DID we dialed with"
+    );
+
+    Ok(())
+}
+
+/// A bare QUIC listener that completes the handshake and then says nothing.
+///
+/// No Hello, so a dialer never learns an authenticated identity from it. It holds accepted
+/// connections open: dropping them would close the connection and let the dialer clean up
+/// for the wrong reason, which would make the assertions pass vacuously.
+struct SilentPeer {
+    addr: SocketAddr,
+    accept_task: tokio::task::JoinHandle<Vec<quinn::Connection>>,
+}
+
+impl SilentPeer {
+    fn spawn(identity: &IdentityBundle) -> Result<Self> {
+        Self::spawn_inner(identity, None)
+    }
+
+    /// Same, but answers each accepted connection with `hello` on a fresh stream.
+    fn spawn_replying_with_hello(identity: &IdentityBundle, hello: NetworkMessage) -> Result<Self> {
+        Self::spawn_inner(identity, Some(hello))
+    }
+
+    fn spawn_inner(identity: &IdentityBundle, hello: Option<NetworkMessage>) -> Result<Self> {
+        let addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
+        let server_config = icn_net::tls::create_server_config(
+            vec![identity.tls_cert().clone()],
+            identity.tls_key(),
+        )?;
+        let mut quic_server = quinn::ServerConfig::with_crypto(Arc::new(
+            quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
+        ));
+        quic_server.transport_config(Arc::new({
+            let mut t = quinn::TransportConfig::default();
+            t.max_idle_timeout(Some(Duration::from_secs(60).try_into()?));
+            t
+        }));
+        // Same retry rationale as `spawn_node_counting`.
+        let mut endpoint = None;
+        let mut addr = addr;
+        for _ in 0..8 {
+            match Endpoint::server(quic_server.clone(), addr) {
+                Ok(ep) => {
+                    endpoint = Some(ep);
+                    break;
+                }
+                Err(_) => addr = format!("127.0.0.1:{}", pick_port()).parse()?,
+            }
+        }
+        let endpoint = endpoint.context("could not bind the scripted peer")?;
+        let accept_task = tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Some(incoming) = endpoint.accept().await {
+                if let Ok(conn) = incoming.await {
+                    if let Some(ref hello) = hello {
+                        if let Ok((mut send, _recv)) = conn.open_bi().await {
+                            let _ = icn_net::protocol::write_message(&mut send, hello).await;
+                            let _ = send.finish();
+                        }
+                    }
+                    held.push(conn);
+                }
+            }
+            held
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        Ok(Self { addr, accept_task })
+    }
+}
+
+impl Drop for SilentPeer {
+    fn drop(&mut self) {
+        self.accept_task.abort();
+    }
 }
