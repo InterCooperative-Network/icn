@@ -55,7 +55,7 @@ pub use rate_limit::{RateLimitConfig, RateLimiter, NETWORK_DOMAIN};
 pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;
-pub use session::SessionManager;
+pub use session::{DialOutcome, SessionManager};
 pub use signing_sequence::SigningSequenceCounter;
 pub use stun::StunClient;
 pub use topology::{

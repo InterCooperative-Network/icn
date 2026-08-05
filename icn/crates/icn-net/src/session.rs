@@ -93,6 +93,41 @@ pub struct SessionManager {
     local_did: Arc<RwLock<Option<String>>>,
 }
 
+/// What a successful [`SessionManager::dial`] actually did.
+///
+/// Dial success does not necessarily mean a new connection was created. Asking to dial a peer
+/// we already hold a live authenticated session with succeeds — we *are* connected to it — but
+/// that session is already wired, and treating it as new work is a defect rather than a
+/// no-op: connection setup would run a second time on a connection that has already had it.
+///
+/// The two cases are returned as distinct variants because the caller must behave differently,
+/// and a bare `quinn::Connection` gave it no way to tell them apart. There is deliberately no
+/// accessor that yields the connection without choosing a variant: erasing the distinction at
+/// the point of use is precisely the bug this type exists to prevent (#2536).
+///
+/// This says nothing about connection *uniqueness*. Two nodes dialling each other
+/// simultaneously, or a second dial that lands during the pre-authentication handshake window,
+/// can still produce two physical connections — the session map is populated only by an
+/// authenticated Hello (#2530), so before that there is no live session for this check to find.
+#[derive(Debug, Clone)]
+pub enum DialOutcome {
+    /// A new QUIC connection was established, and nothing is reading from it yet.
+    ///
+    /// The caller owns it and must install a connection handler; dropping it closes the
+    /// connection, because nothing else holds it.
+    Established(quinn::Connection),
+
+    /// A live authenticated session already existed for this peer, and this is that
+    /// connection.
+    ///
+    /// It already has a handler loop and has completed its Hello handshake. The connection
+    /// opened by this dial attempt has been closed as a duplicate. Wiring this connection
+    /// again would spawn a second `handle_connection` loop over it — two loops then race for
+    /// each inbound stream, so per-connection handler state becomes ambiguous — and would
+    /// write a redundant Hello onto an already-handshaken session.
+    AlreadyConnected(quinn::Connection),
+}
+
 impl SessionManager {
     /// Create a new session manager
     pub fn new() -> Self {
@@ -308,7 +343,9 @@ impl SessionManager {
 
     /// Dial `addr`, expecting to reach `peer_did`.
     ///
-    /// Returns a QUIC connection to the peer. The connection is **not** registered as a
+    /// A successful dial does **not** mean a connection was created — see [`DialOutcome`].
+    ///
+    /// The connection it reports is **not** registered as a
     /// peer: `peer_did` is what the caller *expects* to find there, and expectation is not
     /// proof. It comes from operator configuration, from a DID another node advertised over
     /// peer exchange, or from a discovery candidate — none of which is a cryptographic
@@ -326,7 +363,7 @@ impl SessionManager {
     /// no longer creates. In production `NetworkActor::handle_dial` hands it to
     /// `wire_new_connection`, which moves it into the spawned connection handler — the task
     /// that reads from it — and that task is its owner until Hello registers it or it closes.
-    pub async fn dial(&self, addr: SocketAddr, peer_did: String) -> Result<quinn::Connection> {
+    pub async fn dial(&self, addr: SocketAddr, peer_did: String) -> Result<DialOutcome> {
         // Never dial ourselves into our own remote-peer map (#2506). Discovery sources echo our
         // own advertisement back to us — over `network:candidates`, peer exchange, or mDNS — and
         // the resulting self-connection carries real signed traffic that trips our own replay
@@ -391,10 +428,10 @@ impl SessionManager {
                 peer_did
             );
             connection.close(0u32.into(), b"duplicate");
-            return Ok(existing_conn);
+            return Ok(DialOutcome::AlreadyConnected(existing_conn));
         }
 
-        Ok(connection)
+        Ok(DialOutcome::Established(connection))
     }
 
     /// Clone the live QUIC endpoint, if the manager has been started.
@@ -1042,7 +1079,12 @@ mod tests {
         let listener_clone = listener.clone_for_test();
         let accept_task = tokio::spawn(async move { listener_clone.accept().await });
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        let dialer_side = dialer.dial(addr, "listener".to_string()).await.unwrap();
+        let dialer_side = match dialer.dial(addr, "listener".to_string()).await.unwrap() {
+            DialOutcome::Established(conn) => conn,
+            DialOutcome::AlreadyConnected(_) => {
+                panic!("helper dialled a peer it already held a live session with")
+            }
+        };
         DIALER_SIDE
             .lock()
             .expect("dialer-side lock poisoned")

@@ -19,7 +19,7 @@
 use anyhow::{Context, Result};
 use icn_identity::Did;
 use std::sync::Arc;
-use tracing::{info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::{
     protocol::{write_message, write_message_negotiated, NetworkMessage},
@@ -123,9 +123,21 @@ impl NetworkActor {
         .and_then(|r| r);
 
         match direct_result {
-            Ok(connection) => {
-                // Direct connection succeeded
-                self.wire_new_connection(connection, &did);
+            Ok(outcome) => {
+                // Direct connection succeeded. Whether that means we *made* a connection is a
+                // separate question: dialling a peer we already hold a live session with
+                // succeeds without creating anything, and that session is already wired.
+                match outcome {
+                    crate::session::DialOutcome::Established(connection) => {
+                        self.wire_new_connection(connection, &did);
+                    }
+                    crate::session::DialOutcome::AlreadyConnected(_) => {
+                        debug!(
+                            peer = %did,
+                            "Dial found a live session; leaving its existing connection handler in place"
+                        );
+                    }
+                }
 
                 let mut ns = self.nat_status.write().await;
                 ns.last_traversal_mode = TraversalMode::Direct;
