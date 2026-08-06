@@ -104,6 +104,45 @@ equality, not by freshness. Signing or validating `created_at` would only be nee
 support binding *expiry* independent of certificate lifetime, which is a separate design
 question.
 
+## What the authenticated identity is checked against
+
+The invariant above says who a connection may be attributed to. It does not say whether that
+party is who the operator *meant* to reach. Those are separate questions, and a bootstrap
+entry of the form `icn://did:icn:X@HOST:PORT` raises the second one.
+
+**A configured DID is an operator expectation, not a cryptographic pin.** When X is
+configured and B authenticates, B is the peer — for the session map, for peer exchange, for
+trust, for addressing. The connection is kept. What changed in #2533 is only that the
+divergence is no longer silent: it is logged once per connection at `warn!`, with both DIDs
+and the remote address, and counted by `icn_network_bootstrap_did_expectation_mismatch_total`.
+
+Three properties make that comparison safe, and each is load-bearing:
+
+| Property | Why |
+|---|---|
+| Compared only *after* the three checks above | Before them `from` is a name the sender picked. Comparing against a claim would let whoever answers the address decide what this node reports about its own configuration — and would report a divergence at the one moment the node cannot say who it is talking to. A connection that never authenticates produces no observation. |
+| Held per physical connection, keyed by nothing | The expectation belongs to one dial. Concurrent dials to one address can carry different expectations, an address can be reused by a different node, and the expected DID is precisely the value that is wrong in the case being detected — so neither address nor DID is a sound key. It lives in `ConnectionContext` and dies with the connection. |
+| Stated by the caller, never inferred from the dial argument | `dial_addr` synthesises a placeholder DID from the socket address and dials with it, so an address-only bootstrap is type-identical to a `KnownDid` one by the time the actor sees it. Inferring an expectation from "the DID we dialled with" would report every `icn://HOST:PORT` entry as misconfigured. `NetworkHandle::dial_expecting` is the only entry point that states one, and `dial_bootstrap_peers`' `KnownDid` arm is its only production caller. |
+
+**A divergence is not misbehaviour.** Nothing is scored, nobody is banned, and neither DID is
+penalised — for the same reason a failed binding does not penalise the claimed DID, and one
+more besides: the peer did nothing wrong by being itself. A mismatch means configuration and
+reality disagree, which is the operator's to resolve.
+
+**Why not enforce the pin.** Refusing the connection would turn a bootstrap entry left stale
+by a key rotation, a redeploy, or a copy-paste into a hard connectivity failure with no
+in-band way to recover. It would also buy less than it appears to: under the invariant above,
+an authenticated B *cannot* be impersonating X, so a mismatch is never impersonation — it is
+"you reached a different real node than you named". Refusing is a federation-membership
+policy, not an authentication fix, and no in-repo document has ever promised it. #2533 records
+the full option analysis; the metric exists so that a future decision to enforce can be made
+against evidence rather than intuition.
+
+Regression coverage: `crates/icn-net/tests/bootstrap_did_expectation.rs` (the policy itself,
+including a test that a strict-pin implementation would fail) and
+`crates/icn-core/tests/bootstrap_did_expectation_wiring.rs` (that the bootstrap path actually
+states the expectation).
+
 ## Enforcement point
 
 One check, in `ConnectionContext::handle_hello`. Both connection directions —

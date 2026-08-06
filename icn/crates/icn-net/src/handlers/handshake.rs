@@ -240,6 +240,9 @@ mod tests {
             identity_bundle,
             own_did,
             direction: crate::handlers::ConnectionDirection::Inbound,
+            // Inbound: we did not choose this peer, so we expected nobody (#2533).
+            expected_peer: None,
+            expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -273,6 +276,9 @@ mod tests {
             identity_bundle,
             own_did,
             direction: crate::handlers::ConnectionDirection::Inbound,
+            // Inbound: we did not choose this peer, so we expected nobody (#2533).
+            expected_peer: None,
+            expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),

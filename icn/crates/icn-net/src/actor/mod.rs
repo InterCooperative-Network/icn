@@ -91,6 +91,14 @@ pub enum NetworkMsg {
         did: Did,
         /// Peer's TURN relay address for fallback (None = direct only)
         peer_relay_addr: Option<SocketAddr>,
+        /// The DID an operator configured for this endpoint, if any.
+        ///
+        /// Distinct from `did`, which is only how the dial is addressed and keyed. `did`
+        /// may be an address-derived placeholder, or a DID some *peer* advertised; neither
+        /// is anybody's expectation. `Some` here means an operator wrote this DID into a
+        /// bootstrap entry, which is the one case where a divergence says something about
+        /// configuration rather than about the network (#2533).
+        expected_peer: Option<Did>,
         response: oneshot::Sender<Result<()>>,
     },
 
@@ -189,8 +197,30 @@ impl NetworkHandle {
     }
 
     /// Dial a peer (direct only, no relay fallback)
+    ///
+    /// `did` addresses the dial; it is not asserted to be who will answer, and no
+    /// expectation is attached. Callers that dial a DID an operator *configured* — as
+    /// opposed to one a peer advertised or one derived from an address — want
+    /// [`Self::dial_expecting`] instead.
     pub async fn dial(&self, addr: SocketAddr, did: Did) -> Result<()> {
         self.dial_with_relay(addr, did, None).await
+    }
+
+    /// Dial an endpoint an operator configured, naming the DID they expect to find there.
+    ///
+    /// The expectation travels with the connection and is weighed against the identity that
+    /// authenticates on it (#2533). It changes nothing about the dial itself: the connection
+    /// is established, and whoever passes the Hello binding checks is the peer, exactly as
+    /// with [`Self::dial`]. A divergence is recorded, not enforced — see
+    /// `ConnectionContext::resolve_peer_expectation` for why, and for what it deliberately
+    /// does *not* do.
+    ///
+    /// Only operator configuration may call this. A DID learned over peer exchange is a
+    /// claim by some other node, and passing it here would report that node's inaccuracy as
+    /// this operator's misconfiguration.
+    pub async fn dial_expecting(&self, addr: SocketAddr, expected: Did) -> Result<()> {
+        self.dial_inner(addr, expected.clone(), None, Some(expected))
+            .await
     }
 
     /// Dial a peer with optional TURN relay fallback
@@ -203,12 +233,23 @@ impl NetworkHandle {
         did: Did,
         peer_relay_addr: Option<SocketAddr>,
     ) -> Result<()> {
+        self.dial_inner(addr, did, peer_relay_addr, None).await
+    }
+
+    async fn dial_inner(
+        &self,
+        addr: SocketAddr,
+        did: Did,
+        peer_relay_addr: Option<SocketAddr>,
+        expected_peer: Option<Did>,
+    ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(NetworkMsg::Dial {
                 addr,
                 did,
                 peer_relay_addr,
+                expected_peer,
                 response: tx,
             })
             .await
@@ -2127,6 +2168,7 @@ mod tests {
             addr,
             did,
             peer_relay_addr: Some(relay),
+            expected_peer: None,
             response: tx,
         };
         match msg {
@@ -2148,6 +2190,7 @@ mod tests {
             addr,
             did,
             peer_relay_addr: None,
+            expected_peer: None,
             response: tx,
         };
         match msg {

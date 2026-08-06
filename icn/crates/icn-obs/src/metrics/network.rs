@@ -187,6 +187,10 @@ pub fn init_descriptions() {
         "icn_personhood_store_failures_total",
         "Total number of personhood store lookup failures (Sybil protection degraded)"
     );
+    describe_counter!(
+        "icn_network_bootstrap_did_expectation_mismatch_total",
+        "Total number of connections where a bootstrap entry's configured DID differed from the DID that authenticated"
+    );
 }
 
 // Simple counters
@@ -582,4 +586,21 @@ pub fn personhood_anchors_active_set(count: usize) {
 /// Operators should alert on this metric to detect storage issues.
 pub fn personhood_store_failures_inc() {
     counter!("icn_personhood_store_failures_total").increment(1);
+}
+
+/// A bootstrap entry named a DID, and a different DID authenticated on that connection.
+///
+/// Counts *connections*, not Hellos: a peer may repeat its Hello, and the rate of a signal
+/// about local configuration must not be settable by the remote end.
+///
+/// Deliberately unlabelled. The two values this is about — the configured DID and the
+/// authenticated one — are unbounded, so as labels they would let bootstrap configuration
+/// and whoever answers the address drive metric cardinality between them. They are recorded
+/// in the accompanying `warn!`, which is a diagnostic record rather than a time series.
+///
+/// This is not a misbehaviour signal. A divergence means the operator's configuration and
+/// the network disagree — a rotated key, a redeployed node, a copy-pasted address — and
+/// says nothing bad about either DID.
+pub fn bootstrap_did_expectation_mismatch_inc() {
+    counter!("icn_network_bootstrap_did_expectation_mismatch_total").increment(1);
 }

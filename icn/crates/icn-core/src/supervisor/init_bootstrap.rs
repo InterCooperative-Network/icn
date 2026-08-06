@@ -59,6 +59,14 @@ impl BootstrapConfig {
 /// configured `KnownDid` is therefore an expectation, and the `AddrOnly` placeholder is not
 /// even that — see [`icn_net::NetworkHandle::dial_addr`] and #2530.
 ///
+/// The two forms therefore reach the network by different entry points, and the difference
+/// is load-bearing. A `KnownDid` entry goes through [`icn_net::NetworkHandle::dial_expecting`],
+/// which carries the operator's expectation to the connection so a divergence from the
+/// authenticated identity can be reported. An `AddrOnly` entry names nobody, so it must not
+/// acquire an expectation on the way down: `dial_addr` synthesises a placeholder DID that
+/// *looks* like one, and treating it as such would report every address-only entry as
+/// misconfigured (#2533).
+///
 /// The addresses are what lets [`request_peer_exchange`] find *these* peers once they
 /// authenticate, without widening to every peer the node happens to be connected to.
 pub async fn dial_bootstrap_peers(
@@ -82,7 +90,16 @@ pub async fn dial_bootstrap_peers(
                     "Connecting to bootstrap peer: {} at {}",
                     peer_did, peer_addr
                 );
-                match network_handle.dial(peer_addr, peer_did.clone()).await {
+                // `dial_expecting`, not `dial`: this is the one dial in the daemon whose DID
+                // came from operator configuration rather than from an address or another
+                // node's claim, so it is the one dial where a divergence from the
+                // authenticated identity says something about *this* node's configuration.
+                // The expectation still does not gate the connection — it is carried so the
+                // divergence can be seen rather than enforced (#2533).
+                match network_handle
+                    .dial_expecting(peer_addr, peer_did.clone())
+                    .await
+                {
                     Ok(_) => {
                         // The configured DID is an expectation, not a result: this records
                         // that transport came up, and the peer is named only once Hello
