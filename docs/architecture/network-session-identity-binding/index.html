@@ -146,6 +146,52 @@ this invariant that is not load-bearing: replay is defeated by current-certifica
 equality, not by freshness. Signing or validating <code>created_at</code> would only be needed to
 support binding <em>expiry</em> independent of certificate lifetime, which is a separate design
 question.</p>
+<h2>What the authenticated identity is checked against</h2>
+<p>The invariant above says who a connection may be attributed to. It does not say whether that
+party is who the operator <em>meant</em> to reach. Those are separate questions, and a bootstrap
+entry of the form <code>icn://did:icn:X@HOST:PORT</code> raises the second one.</p>
+<p><strong>A configured DID is an operator expectation, not a cryptographic pin.</strong> When X is
+configured and B authenticates, B is the peer — for the session map, for peer exchange, for
+trust, for addressing. The connection is kept. What changed in #2533 is only that the
+divergence is no longer silent: it is logged once per connection at <code>warn!</code>, with both DIDs
+and the remote address, and counted by <code>icn_network_bootstrap_did_expectation_mismatch_total</code>.</p>
+<p>Three properties make that comparison safe, and each is load-bearing:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compared only <em>after</em> the three checks above</td>
+<td>Before them <code>from</code> is a name the sender picked. Comparing against a claim would let whoever answers the address decide what this node reports about its own configuration — and would report a divergence at the one moment the node cannot say who it is talking to. A connection that never authenticates produces no observation.</td>
+</tr>
+<tr>
+<td>Held per physical connection, keyed by nothing</td>
+<td>The expectation belongs to one dial. Concurrent dials to one address can carry different expectations, an address can be reused by a different node, and the expected DID is precisely the value that is wrong in the case being detected — so neither address nor DID is a sound key. It lives in <code>ConnectionContext</code> and dies with the connection.</td>
+</tr>
+<tr>
+<td>Stated by the caller, never inferred from the dial argument</td>
+<td><code>dial_addr</code> synthesises a placeholder DID from the socket address and dials with it, so an address-only bootstrap is type-identical to a <code>KnownDid</code> one by the time the actor sees it. Inferring an expectation from &quot;the DID we dialled with&quot; would report every <code>icn://HOST:PORT</code> entry as misconfigured. <code>NetworkHandle::dial_expecting</code> is the only entry point that states one, and <code>dial_bootstrap_peers</code>&#39; <code>KnownDid</code> arm is its only production caller.</td>
+</tr>
+</tbody></table>
+<p><strong>A divergence is not misbehaviour.</strong> Nothing is scored, nobody is banned, and neither DID is
+penalised — for the same reason a failed binding does not penalise the claimed DID, and one
+more besides: the peer did nothing wrong by being itself. A mismatch means configuration and
+reality disagree, which is the operator&#39;s to resolve.</p>
+<p><strong>Why not enforce the pin.</strong> Refusing the connection would turn a bootstrap entry left stale
+by a key rotation, a redeploy, or a copy-paste into a hard connectivity failure with no
+in-band way to recover. It would also buy less than it appears to: under the invariant above,
+an authenticated B <em>cannot</em> be impersonating X, so a mismatch is never impersonation — it is
+&quot;you reached a different real node than you named&quot;. Refusing is a federation-membership
+policy, not an authentication fix, and no in-repo document has ever promised it. #2533 records
+the full option analysis; the metric exists so that a future decision to enforce can be made
+against evidence rather than intuition.</p>
+<p>Regression coverage: <code>crates/icn-net/tests/bootstrap_did_expectation.rs</code> (the policy itself,
+including a test that a strict-pin implementation would fail) and
+<code>crates/icn-core/tests/bootstrap_did_expectation_wiring.rs</code> (that the bootstrap path actually
+states the expectation).</p>
 <h2>Enforcement point</h2>
 <p>One check, in <code>ConnectionContext::handle_hello</code>. Both connection directions —
 inbound accept (<code>actor/connection.rs</code>) and outbound dial (<code>actor/messages.rs</code>) — funnel
