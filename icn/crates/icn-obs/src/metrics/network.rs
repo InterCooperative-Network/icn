@@ -38,6 +38,11 @@ pub fn init_descriptions() {
         "icn_network_messages_rate_limited_total",
         "Total number of messages dropped due to rate limiting"
     );
+    // Two-phase inbound rate limiting (Issue #2491)
+    describe_counter!(
+        "icn_network_messages_rate_limited_pre_auth_total",
+        "Total number of messages denied by a connection's anonymous pre-authentication budget, before any peer identity was bound to it"
+    );
     describe_counter!(
         "icn_network_messages_rate_limited_by_rate_total",
         "Total number of messages rate limited, bucketed by rate limit (0-10, 11-50, 51-100, 100+)"
