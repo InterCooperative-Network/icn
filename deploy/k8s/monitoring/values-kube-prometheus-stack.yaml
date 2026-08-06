@@ -1,48 +1,64 @@
 # Helm values for kube-prometheus-stack on the ICN homelab K3s cluster.
 #
-# Purpose: replace the default `emptyDir: {}` storage for Prometheus with a
-# durable PVC backed by the cluster's `atlas-nfs` StorageClass (Atlas NFS at
-# 10.8.10.25, csi-driver-nfs v4.9.0).
+# Chart is PINNED: kube-prometheus-stack 82.4.3 (appVersion v0.89.0).
+# Always pass `--version 82.4.3` explicitly -- see README.md.
 #
-# Context:
-#   - Prior incident (see docs/development/sessions/2026-04/2026-04-08-zenith-ops-recovery.md):
-#     Prometheus CrashLoopBackOff with `panic: series ID exceeds 5 bytes`.
-#     TSDB head chunk reference overflow on long-running instance. Pod was using
-#     emptyDir so a pod delete was the entire recovery — every reschedule
-#     silently wipes metric history.
-#   - Issue: #1596
-#   - StorageClass `atlas-nfs` is already in use by ICN workload PVCs
-#     (see deploy/k8s/pvc.yaml, deploy/k8s/multi-node/scripts/deploy-coop.sh).
+# ---------------------------------------------------------------------------
+# Prometheus TSDB storage: LOCAL disk on k3s-worker-1, deliberately not NFS.
+# ---------------------------------------------------------------------------
 #
-# Apply (from a host with kubectl + helm access to the cluster):
+# History:
+#   - Originally `emptyDir: {}`. The 2026-04-08 incident (`panic: series ID
+#     exceeds 5 bytes`) was "recovered" by deleting the pod -- which meant every
+#     reschedule silently wiped all metric history. Issue #1596 moved the TSDB
+#     onto the `atlas-nfs` StorageClass to gain durability.
+#   - NFS bought durability but Prometheus does not support it. On 2026-08-06
+#     the running server logged:
+#         "This filesystem is not supported and may lead to data corruption and
+#          data loss ... fs_type=NFS_SUPER_MAGIC"
+#     and had in fact corrupted its own write-ahead log:
+#         "corruption in segment /prometheus/wal/00000007 at 26443776:
+#          unexpected checksum"
+#     after the container terminated with `fatal error: bad ts`. The automatic
+#     repair deleted every WAL segment newer than the corrupt one.
+#   - The TSDB therefore now lives on a static local PV
+#     (`prometheus-tsdb-worker1`) -- ext4 on /mnt/prometheus, a dedicated 32G
+#     disk backed by `hyperion-local-lvm`.
 #
-#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-#   helm repo update
-#   helm upgrade --install kube-prometheus-stack \
-#     prometheus-community/kube-prometheus-stack \
-#     --namespace monitoring --create-namespace \
-#     -f deploy/k8s/monitoring/values-kube-prometheus-stack.yaml
+# Why a static local PV and not `local-path`:
+#   `local-path` provisions into the node root filesystem, reintroducing the
+#   "storage is incidental and disposable" fragility that #1596 fixed. A static
+#   PV bound by an explicit label selector targets a dedicated disk and survives
+#   pod restarts. Metric history is lost only if that one node is lost, which is
+#   an accepted trade-off for monitoring data.
 #
-# Rollout notes:
-#   - The existing Prometheus pod uses emptyDir; its in-memory TSDB history is
-#     disposable. The upgrade will cause a one-time data loss equivalent to a
-#     pod reschedule, which already happened routinely under the prior config.
-#   - After upgrade, verify: the Prometheus pod has a PVC mounted at /prometheus
-#     (not emptyDir) and `kubectl -n monitoring get pvc` shows a Bound claim on
-#     `atlas-nfs`.
+# Consequence: Prometheus is pinned to k3s-worker-1 by nodeSelector, because a
+# local PV is not reachable from any other node.
+#
+# Alertmanager deliberately stays on atlas-nfs -- one storage migration at a
+# time. Moving it is a separate, later decision.
 
 prometheus:
   prometheusSpec:
     retention: 30d
-    retentionSize: 18GB
+    # ~20GiB of samples inside a 30Gi volume, leaving WAL/compaction headroom.
+    retentionSize: 20GB
+    # A local PV is node-bound, so the server must land on the node with the disk.
+    nodeSelector:
+      kubernetes.io/hostname: k3s-worker-1
     storageSpec:
       volumeClaimTemplate:
         spec:
           accessModes: ["ReadWriteOnce"]
-          storageClassName: atlas-nfs
+          storageClassName: prometheus-local
           resources:
             requests:
-              storage: 20Gi
+              storage: 30Gi
+          # Bind deterministically to prometheus-tsdb-worker1 instead of relying
+          # on StorageClass + capacity matching alone.
+          selector:
+            matchLabels:
+              storage.faherty.network/tier: local-disposable
 
 alertmanager:
   alertmanagerSpec:
