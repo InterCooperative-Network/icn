@@ -232,6 +232,7 @@ mod tests {
             // Inbound: we did not choose this peer, so we expected nobody (#2533).
             expected_peer: None,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
+            pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -385,6 +386,7 @@ mod tests {
             // Inbound: we did not choose this peer, so we expected nobody (#2533).
             expected_peer: None,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
+            pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
