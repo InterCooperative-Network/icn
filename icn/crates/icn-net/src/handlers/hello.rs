@@ -107,6 +107,12 @@ impl ConnectionContext {
         // who they are talking to without trusting a sender-chosen field (#2535, #2491).
         self.record_authenticated_peer(from).await;
 
+        // Now — and only now — is there an identity to weigh the operator's expectation
+        // against. Before the three checks above, `from` is a name the sender chose; after
+        // them it is a DID proven against this connection's certificate. A configured DID is
+        // still not a pin, so this records a divergence and changes nothing else (#2533).
+        self.resolve_peer_expectation(from, connection.remote_address());
+
         // Verify DID-PQ binding if proof is present
         // Returns: Ok(true) = verified, Ok(false) = no PQ key or legacy (no proof), Err = invalid proof
         let pq_binding_result =

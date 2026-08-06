@@ -41,9 +41,12 @@ impl NetworkActor {
                 addr,
                 did,
                 peer_relay_addr,
+                expected_peer,
                 response,
             } => {
-                let result = self.handle_dial(addr, did, peer_relay_addr).await;
+                let result = self
+                    .handle_dial(addr, did, peer_relay_addr, expected_peer)
+                    .await;
                 let _ = response.send(result);
             }
 
@@ -103,6 +106,7 @@ impl NetworkActor {
         addr: std::net::SocketAddr,
         did: Did,
         peer_relay_addr: Option<std::net::SocketAddr>,
+        expected_peer: Option<Did>,
     ) -> Result<()> {
         // Read configurable dial timeout (default 30s, overridable via NetworkHandle::set_dial_timeout)
         let dial_timeout_ms = self
@@ -129,7 +133,7 @@ impl NetworkActor {
                 // succeeds without creating anything, and that session is already wired.
                 match outcome {
                     crate::session::DialOutcome::Established(connection) => {
-                        self.wire_new_connection(connection, &did);
+                        self.wire_new_connection(connection, &did, expected_peer);
                     }
                     crate::session::DialOutcome::AlreadyConnected(_) => {
                         debug!(
@@ -235,7 +239,7 @@ impl NetworkActor {
                         self.relay_proxies.write().await.insert(did.clone(), proxy);
 
                         // Wire up connection handler + Hello
-                        self.wire_new_connection(connection, &did);
+                        self.wire_new_connection(connection, &did, expected_peer);
 
                         let mut ns = self.nat_status.write().await;
                         ns.last_traversal_mode = TraversalMode::Relayed;
@@ -281,7 +285,12 @@ impl NetworkActor {
     /// of the session manager's authenticated connection map entirely (#2530) — the map
     /// lookup this used to perform was the only thing that forced an unauthenticated key
     /// to be registered before the handshake could run.
-    fn wire_new_connection(&self, connection: quinn::Connection, did: &Did) {
+    fn wire_new_connection(
+        &self,
+        connection: quinn::Connection,
+        did: &Did,
+        expected_peer: Option<Did>,
+    ) {
         // Increment connection counter
         let stats = self.stats.clone();
         tokio::spawn(async move {
@@ -322,6 +331,7 @@ impl NetworkActor {
                     own_did,
                     crate::handlers::ConnectionDirection::Outbound,
                     peer_exchange_enabled,
+                    expected_peer,
                 )
                 .await
                 {

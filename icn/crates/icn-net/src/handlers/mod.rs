@@ -17,8 +17,10 @@ use crate::topology::{NeighborSets, TopologyConfig};
 use crate::{BlobLocationRegistry, RateLimiter, SessionManager};
 use icn_identity::{Did, IdentityBundle};
 use icn_security::MisbehaviorDetector;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::warn;
 
 /// Context for handling incoming connections
 ///
@@ -75,6 +77,36 @@ pub struct ConnectionContext {
     /// connection without re-plumbing. Distinct from authentication: this says whether
     /// *this node* is participating, not who is asking (#2535).
     peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
+    /// The DID an operator configured for the endpoint this connection was dialled to.
+    ///
+    /// `Some` only for a bootstrap entry that named a DID — `icn://did:icn:X@HOST:PORT`.
+    /// `None` everywhere else, and the everywhere-else cases are the point:
+    ///
+    /// - **inbound** — we did not choose this peer, so we expected nobody;
+    /// - **address-only bootstrap** — `dial_addr` derives a placeholder `Did` from the
+    ///   socket address and dials with it, so the dial argument *looks* like an expectation
+    ///   while naming nobody. Reading one off it would report a divergence on every
+    ///   `icn://HOST:PORT` entry;
+    /// - **a DID learned over peer exchange or discovery** — a claim by another node, whose
+    ///   inaccuracy is not this operator's misconfiguration.
+    ///
+    /// Per connection, and owned by it: an expectation belongs to one dial. Two concurrent
+    /// dials to one address can carry different ones, an address can be reused by a
+    /// different node, and the expected DID is precisely the value that is wrong in the case
+    /// this exists to detect — so neither the address nor the DID is a sound key for holding
+    /// this anywhere global (#2533).
+    expected_peer: Option<Did>,
+    /// Whether a divergence has already been reported for this connection.
+    ///
+    /// Named for what it records, because the distinction is load-bearing: it is set *only*
+    /// when a mismatch is reported, never when an expectation is met. A Hello that matches
+    /// returns before touching it, so a connection that first authenticates the configured
+    /// DID and later authenticates a different one can still report that — a successful match
+    /// must not permanently spend the ability to notice a later rebinding.
+    ///
+    /// It exists because a Hello is verified every time one arrives, so without it a peer
+    /// that repeats its Hello would set the rate of a signal about *local* configuration.
+    expectation_mismatch_reported: std::sync::atomic::AtomicBool,
 }
 
 /// Which end of a QUIC connection this node is.
@@ -107,6 +139,7 @@ impl ConnectionContext {
         own_did: Did,
         direction: ConnectionDirection,
         peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
+        expected_peer: Option<Did>,
     ) -> Self {
         Self {
             handler,
@@ -124,6 +157,8 @@ impl ConnectionContext {
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: RwLock::new(None),
             peer_exchange_enabled,
+            expected_peer,
+            expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -150,6 +185,66 @@ impl ConnectionContext {
     /// prove, and the only safe reading of it is "we do not know who this is".
     pub(crate) async fn authenticated_peer(&self) -> Option<Did> {
         self.authenticated_peer.read().await.clone()
+    }
+
+    /// Weigh the operator's expectation for this connection against the identity that just
+    /// authenticated on it.
+    ///
+    /// **Call this only from the Hello path, and only after the DID-TLS binding checks have
+    /// passed.** `authenticated` has to be a DID proven against *this* connection's
+    /// certificate, never `message.from`, never the address, never a session-map key.
+    /// Comparing against a claim would hand the far end control of what this node reports
+    /// about its own configuration, and would report a divergence at the one moment the node
+    /// cannot say who it is talking to at all. A connection that never authenticates
+    /// produces no observation: "we do not know who this is" is not evidence that the
+    /// operator was wrong.
+    ///
+    /// ## What a divergence is, and what it is not
+    ///
+    /// `icn://did:icn:X@HOST:PORT` states an expectation. It is not a cryptographic pin, and
+    /// this does not make it one: the connection is kept and `authenticated` remains the
+    /// canonical peer — for peer exchange, for trust, for addressing, for everything. Only
+    /// the *silence* changes.
+    ///
+    /// That is a deliberate policy choice, not an oversight. Refusing the connection would
+    /// turn a bootstrap entry left stale by a key rotation, a redeploy, or a copy-paste into
+    /// a hard connectivity failure with no in-band way to recover — and it would buy less
+    /// than it appears to, because an authenticated peer cannot be impersonating the
+    /// configured DID (#2520). A divergence means configuration and reality disagree, which
+    /// is the operator's to resolve. So nothing is scored, nobody is banned, and neither DID
+    /// is penalised: the peer did nothing wrong by being itself. #2533 records the reasoning;
+    /// `crates/icn-net/tests/bootstrap_did_expectation.rs` pins the policy so that changing
+    /// it has to be deliberate.
+    ///
+    /// At most once per connection — see [`Self::expectation_mismatch_reported`].
+    pub(crate) fn resolve_peer_expectation(&self, authenticated: &Did, remote_addr: SocketAddr) {
+        let Some(expected) = self.expected_peer.as_ref() else {
+            return;
+        };
+        if expected == authenticated {
+            return;
+        }
+        // Only a divergence consumes the guard: a connection whose first Hello matched must
+        // still be able to report a later one that does not.
+        if self
+            .expectation_mismatch_reported
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return;
+        }
+
+        // `warn!`, not `info!`: this is unusual and the operator is the only one who can act
+        // on it. Bounded to once per connection, so a reconnect loop against a misconfigured
+        // entry produces one line per connection rather than one per Hello.
+        warn!(
+            expected_did = %expected,
+            authenticated_did = %authenticated,
+            remote_addr = %remote_addr,
+            "Bootstrap entry named a different DID than the peer that authenticated; keeping \
+             the authenticated peer. Update the bootstrap entry if this endpoint's identity \
+             changed (#2533)"
+        );
+        icn_obs::metrics::network::bootstrap_did_expectation_mismatch_inc();
     }
 
     /// Forward message to external handler

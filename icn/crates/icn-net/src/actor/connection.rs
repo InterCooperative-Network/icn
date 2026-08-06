@@ -180,6 +180,8 @@ impl NetworkActor {
                     own_did_clone,
                     crate::handlers::ConnectionDirection::Inbound,
                     peer_exchange_enabled,
+                    // We did not choose this peer, so there is nobody we expected (#2533).
+                    None,
                 )
                 .await
                 {
@@ -213,6 +215,7 @@ impl NetworkActor {
         own_did: Did,
         direction: crate::handlers::ConnectionDirection,
         peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
+        expected_peer: Option<Did>,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -231,6 +234,7 @@ impl NetworkActor {
             own_did.clone(),
             direction,
             peer_exchange_enabled,
+            expected_peer,
         );
 
         loop {

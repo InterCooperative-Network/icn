@@ -3644,6 +3644,8 @@ dependencies = [
  "icn-store",
  "icn-time",
  "mdns-sd",
+ "metrics",
+ "metrics-util 0.19.1",
  "portpicker",
  "quinn",
  "rand 0.9.4",
