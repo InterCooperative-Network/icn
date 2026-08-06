@@ -270,16 +270,59 @@ impl Drop for ScriptedPeer {
 /// Passing a `binding` other than `speaker`'s own is how a Hello is made to fail the #2520
 /// checks while still being a well-formed message.
 fn hello_from(speaker: &IdentityBundle, to: &Did, binding: &IdentityBundle) -> NetworkMessage {
+    hello_with_binding(speaker, to, binding.binding_info())
+}
+
+/// Build a Hello from `speaker` carrying an arbitrary `binding`.
+///
+/// Split out from [`hello_from`] because one test needs a binding that no `IdentityBundle`
+/// produces on its own — see [`binding_over_foreign_cert`].
+fn hello_with_binding(
+    speaker: &IdentityBundle,
+    to: &Did,
+    binding: icn_identity::BindingInfo,
+) -> NetworkMessage {
     NetworkMessage::hello(
         speaker.did().clone(),
         to.clone(),
-        binding.binding_info(),
+        binding,
         icn_net::VersionInfo::new("icnd-scripted".to_string()),
         None,
         *speaker.x25519_public_bytes(),
         None,
         None,
     )
+}
+
+/// A binding by which `speaker` authenticates over a certificate belonging to `cert_owner`.
+///
+/// This is not a forgery and it is not an attack — it passes all three #2520 checks honestly.
+/// The binding names `speaker`, `speaker`'s own key signs it, and the hash is of the
+/// certificate the connection really presents. What it needs that `IdentityBundle` cannot
+/// give is a binding over *someone else's* certificate, because `binding_info()` only ever
+/// hashes the bundle's own.
+///
+/// The situation it models is a single endpoint that holds two identities: the TLS material
+/// for `cert_owner` and the DID key for `speaker`. A node that rotates its DID without
+/// reissuing its certificate is exactly this, and it is the only way one physical connection
+/// can authenticate two different DIDs — check (3) pins every Hello on a connection to the
+/// one certificate that connection is using.
+fn binding_over_foreign_cert(
+    speaker: &IdentityBundle,
+    cert_owner: &IdentityBundle,
+) -> Result<icn_identity::BindingInfo> {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(cert_owner.tls_cert().as_ref());
+    let cert_hash: [u8; 32] = hasher.finalize().into();
+
+    // Keep `did` and `created_at` from the speaker's real binding; only the certificate this
+    // binding is *about* changes.
+    let mut binding = speaker.binding_info();
+    binding.tls_binding_sig = speaker.sign(&cert_hash)?.to_bytes().to_vec();
+    binding.tls_cert_hash = cert_hash;
+    Ok(binding)
 }
 
 /// Positive control: when the peer that answers is the peer the operator named, nothing is
@@ -623,6 +666,95 @@ fn repeated_hellos_on_one_connection_record_the_mismatch_once() -> Result<()> {
         1,
         "three Hellos arrived on one connection whose expectation was unmet; the connection \
          diverged once. Recorded series: {:?}",
+        mismatch_series(&snapshotter)
+    );
+    Ok(())
+}
+
+/// A met expectation must not spend the ability to notice a later unmet one.
+///
+/// The once-per-connection guard is the only thing standing between this signal and a remote
+/// peer setting its rate, so it is worth being exact about *when* it is spent: only a reported
+/// divergence consumes it, never a satisfied expectation. Written the other way — `swap`ping
+/// the flag before comparing, which is the tidier-looking order — a connection whose first
+/// Hello matched would go permanently deaf, and every other test in this file would still
+/// pass, because none of them has a connection that matches first.
+///
+/// The sequence is one physical connection that authenticates the configured DID and then
+/// authenticates a different one. Check (3) of #2520 ties every Hello on a connection to the
+/// certificate that connection presents, so this is only reachable for an endpoint holding
+/// both the certificate for X and the DID key for B — a node that rotated its DID without
+/// reissuing its certificate. Rare, real, and precisely the case where the operator's
+/// bootstrap entry has just gone stale and they most need to hear about it.
+#[test]
+fn a_first_hello_that_matches_does_not_suppress_a_later_rebinding() -> Result<()> {
+    init();
+    let snapshotter = run_with_local_metrics(async {
+        let dialer = IdentityBundle::generate()?;
+        let dialer_did = dialer.did().clone();
+        // Owns the certificate this connection presents, and is what the operator configured.
+        let expected = IdentityBundle::generate()?;
+        let expected_did = expected.did().clone();
+        // Rebinds the same connection to a different identity.
+        let rebound = IdentityBundle::generate()?;
+        let rebound_did = rebound.did().clone();
+
+        let (dialer_handle, _dialer_addr, _dialer_guard) = spawn_node(dialer).await?;
+        let peer = ScriptedPeer::spawn(
+            &expected,
+            vec![
+                // 1. The expectation is met. Nothing is recorded, and — the property under
+                //    test — nothing is spent.
+                hello_from(&expected, &dialer_did, &expected),
+                // 2. A different DID authenticates on the same connection, honestly: its own
+                //    key, over the certificate this connection is really using.
+                hello_with_binding(
+                    &rebound,
+                    &dialer_did,
+                    binding_over_foreign_cert(&rebound, &expected)?,
+                ),
+            ],
+        )
+        .await?;
+
+        dialer_handle
+            .dial_expecting(peer.addr, expected_did.clone())
+            .await?;
+        assert!(
+            wait_until_authenticated(&dialer_handle, &expected_did, Duration::from_secs(20)).await,
+            "precondition: the configured DID never authenticated, so the expectation was \
+             never met and this test is not about a rebinding at all"
+        );
+        // Let the second Hello land after the first has been processed.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Both halves matter, and neither is racy once the connection has settled: the peer
+        // info for the configured DID survives, so Hello 1 demonstrably authenticated it,
+        // while the session map has moved to the DID that authenticated last. Together they
+        // are the positive control that *two* Hellos were processed on one connection — the
+        // premise the mismatch count below is only meaningful against.
+        assert!(
+            dialer_handle
+                .get_peer_connection_info(&expected_did)
+                .await
+                .is_some(),
+            "precondition: the configured DID must have authenticated first"
+        );
+        assert_eq!(
+            dialer_handle.connected_peers().await,
+            vec![rebound_did.clone()],
+            "the DID that authenticated last is canonical, and the earlier one is not left \
+             alongside it as a phantom peer (#2530)"
+        );
+        Ok(())
+    })?;
+
+    assert_eq!(
+        mismatch_total(&snapshotter),
+        1,
+        "the connection first authenticated the configured DID and then a different one; a \
+         satisfied expectation must not retire the guard that reports the divergence. \
+         Recorded series: {:?}",
         mismatch_series(&snapshotter)
     );
     Ok(())
