@@ -310,11 +310,24 @@ impl NetworkActor {
                             };
 
                             if !did_allowed {
-                                warn!(
-                                    claimed_from = %message.from,
-                                    authenticated = ?authenticated,
-                                    "Rate limited message (per-DID limit exceeded)"
-                                );
+                                // Two different limits reach this branch, and the message says
+                                // which. "Per-DID limit" is not true of a phase that has no
+                                // DID, and the distinction is the operational one: a throttled
+                                // authenticated peer is a tier that may want raising, while an
+                                // exhausted anonymous budget is load from a connection that
+                                // never got as far as saying who it was.
+                                match &authenticated {
+                                    Some(authenticated) => warn!(
+                                        claimed_from = %message.from,
+                                        authenticated = %authenticated,
+                                        "Rate limited message (per-DID limit exceeded)"
+                                    ),
+                                    None => warn!(
+                                        claimed_from = %message.from,
+                                        "Rate limited message (pre-authentication connection \
+                                         budget exhausted)"
+                                    ),
+                                }
 
                                 // Track rate limiting metric
                                 icn_obs::metrics::network::messages_rate_limited_inc();

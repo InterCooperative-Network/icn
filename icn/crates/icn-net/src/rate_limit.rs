@@ -277,6 +277,17 @@ impl TokenBucket {
 ///   `isolated`'s rate. It is not zero: a handshake that is retrying must still make
 ///   progress.
 ///
+/// The burst is worth one more note, because at 20 it is *larger* than the default
+/// `isolated` (2) and `known` (10) bursts and equal to `partner`'s. That is not a better
+/// deal for staying anonymous, because nothing ever obliged an attacker to authenticate:
+/// the comparison that matters is against what an unauthenticated connection could spend
+/// *before* this change, which was the tier of whatever DID it cared to name — up to
+/// `federated`'s 200/s and burst 50, and before #2490's ceiling, `unlimited`. What the
+/// extra burst buys is at most twenty deserializations on a connection that still cannot
+/// reach peer exchange (#2535), a personhood budget, or anything else DID-gated. Sizing it
+/// down to `isolated`'s 2 would buy nothing against that and would risk a silent bootstrap
+/// failure, which is the one outcome this must not have.
+///
 /// # What this does not do
 ///
 /// It bounds one connection. An attacker who opens *N* connections gets *N* of these
