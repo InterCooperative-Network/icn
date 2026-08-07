@@ -293,9 +293,15 @@ impl NetworkActor {
                             // public, so keying on `from` let any sender name a well-trusted
                             // peer and be charged as one.
                             //
-                            // Read per message rather than cached: a later valid Hello can
-                            // re-authenticate this connection (#2537), and the limit must
-                            // follow the identity in force *now*.
+                            // Read per message rather than cached, because the connection's
+                            // identity is genuinely mutable. `handlers::hello` records an
+                            // authenticated peer on *every* valid Hello — the `hello_responded`
+                            // guard bounds the reply (#2537), not the binding — and #2520's
+                            // checks tie a DID to this connection's certificate without tying
+                            // that certificate to the DID's key. A second Hello can therefore
+                            // move this connection from A to B, and the limit must follow the
+                            // identity in force *now*. Caching the first one would keep
+                            // charging a peer that is no longer the one on this session.
                             let authenticated = ctx.authenticated_peer().await;
                             let (did_allowed, anchor_allowed) = match &authenticated {
                                 Some(authenticated) => {
@@ -306,6 +312,16 @@ impl NetworkActor {
                                 // No DID, so nothing DID-keyed runs: not the trust tier and
                                 // not the anchor lookup. Inventing an anchor from the claim
                                 // would let a sender spend somebody else's per-person budget.
+                                //
+                                // The `true` is the anchor verdict, and it does change what
+                                // `EnforcementMode::RequirePersonhood` covers: that mode no
+                                // longer denies pre-authentication traffic. It never usefully
+                                // did. The anchor was looked up for `message.from`, so naming
+                                // any anchored DID satisfied it, while the peers it actually
+                                // turned away were honest un-anchored ones — whose Hello it
+                                // dropped before they could ever authenticate. Personhood is
+                                // now enforced where it can mean something: on the branch
+                                // above, against the DID this connection has proven.
                                 None => (ctx.check_pre_auth_rate_limit().await, true),
                             };
 

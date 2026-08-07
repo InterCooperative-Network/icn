@@ -265,8 +265,18 @@ impl TokenBucket {
 /// # Where the numbers come from
 ///
 /// This budget exists to fund *one thing*: reaching authentication. That is a property of
-/// the Hello protocol, not of an operator's trust posture, which is why it is derived here
-/// rather than configured.
+/// the Hello protocol, not of an operator's trust posture, which is why it lives here
+/// rather than in configuration.
+///
+/// What the protocol fixes, though, is a *range* rather than a pair of values. It says the
+/// budget must be nonzero, because a node that cannot afford a Hello cannot join; that it
+/// can be small, because an unauthenticated connection has nothing legitimate to do besides
+/// authenticate; and that it needs deterministic headroom above the one-Hello floor, because
+/// the cost of being wrong in that direction is a silent bootstrap failure. The two
+/// constants below are a conservative default chosen inside that range, deliberately
+/// generous against the floor. They are **not** uniquely derived, and no invariant here
+/// depends on their exact values — only on their being small, positive, and unrelated to
+/// anything the sender said.
 ///
 /// - **burst 20** — a handshake costs one Hello. Twenty leaves room for a peer that
 ///   interleaves other traffic before its Hello lands, for version renegotiation, and for
