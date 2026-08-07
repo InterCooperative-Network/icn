@@ -2,17 +2,23 @@
 //!
 //! # Why this exists
 //!
-//! `icn-net`'s rate limiter is keyed on `NetworkMessage.from`, which is
+//! `icn-net`'s rate limiter used to be keyed on `NetworkMessage.from`, which is
 //! **self-asserted and not yet authenticated** when the check runs — the Hello
 //! binding proof and `SignedEnvelope` verification both happen after dispatch
-//! (`icn-net/src/actor/connection.rs`). DIDs are public, so a sender can name any
-//! DID it likes and receive whatever tier that DID's trust score maps to.
+//! (`icn-net/src/actor/connection.rs`). DIDs are public, so a sender could name
+//! any DID it liked and receive whatever tier that DID's trust score mapped to.
 //!
-//! On its own that is a pre-existing weakness bounded by whatever the tier
-//! allows. It stops being bounded when the tier is `RateLimit::unlimited()`,
-//! which is `u32::MAX` for both rate and burst: a sender that claims a
-//! well-trusted DID gets no effective limit at all, and can force repeated
-//! deserialization, binding checks, and signature verification for free.
+//! On its own that was a weakness bounded by whatever the tier allows. It stopped
+//! being bounded when the tier was `RateLimit::unlimited()`, which is `u32::MAX`
+//! for both rate and burst: a sender that claimed a well-trusted DID got no
+//! effective limit at all, and could force repeated deserialization, binding
+//! checks, and signature verification for free.
+//!
+//! #2491 since fixed the ordering: a connection spends an anonymous per-connection
+//! budget until an authenticated Hello binds a DID to its certificate, and only
+//! then does a tier apply — selected from that bound DID. So the actor this oracle
+//! is asked about is now an *authenticated* one. The ceiling below is retained
+//! anyway; see "The absolute ceiling".
 //!
 //! # What this does
 //!
@@ -44,12 +50,18 @@
 //!
 //! ## The absolute ceiling
 //!
-//! Tier selection does not replace the ceiling — both apply. The ceiling is
-//! defence in depth for #2491: since the tier is chosen from an unauthenticated
-//! DID, a misconfigured or overly generous tier must not become an unbounded
-//! pre-authentication budget. #2491 itself (binding the tier to a *verified*
-//! identity) is a protocol change tracked separately and deliberately not solved
-//! here.
+//! Tier selection does not replace the ceiling — both apply. The ceiling began as
+//! defence in depth for #2491, when the tier was chosen from an unauthenticated
+//! DID and a misconfigured tier could become an unbounded pre-authentication
+//! budget. #2491 has since bound tier selection to an authenticated identity, so
+//! that specific exposure is closed.
+//!
+//! The ceiling stays because it was never only about that. It bounds anything
+//! reaching this oracle that is *not* an operator-configured tier — an inner
+//! oracle returning `RateLimit::unlimited()`, a future oracle with its own ladder
+//! — so no trust-derived value can exceed what the operator allowed. Removing it
+//! would restore an unbounded path for an *authenticated* peer, which is a
+//! smaller blast radius than before but not zero.
 //!
 //! ## Cost
 //!

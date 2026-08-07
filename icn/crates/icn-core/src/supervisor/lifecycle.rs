@@ -303,11 +303,14 @@ fn register_core_oracles(
         // It is not registered raw. `NetworkRateLimitOracle` replaces the trust
         // oracle's hard-coded 5/20/100/unlimited ladder with the operator's
         // configured per-tier limits (#2496), and clamps the result to the
-        // highest configured tier as an absolute ceiling. The ceiling matters
-        // because the rate limiter keys on the *unauthenticated*
-        // `NetworkMessage.from`: the tier is chosen from a DID the sender merely
-        // claims, so no tier may be an unbounded pre-authentication budget
-        // (defence in depth for #2491, which is a separate protocol change).
+        // highest configured tier as an absolute ceiling.
+        //
+        // The actor this oracle is asked about is a DID bound to the connection
+        // carrying the message (#2491): before that binding exists, `icn-net`
+        // charges an anonymous per-connection budget and never reaches here. The
+        // ceiling is retained regardless — it bounds any trust-derived value that
+        // is not an operator-configured tier, so nothing can exceed what the
+        // operator allowed.
         let network_domain = icn_kernel_api::authz::Domain::new(icn_net::NETWORK_DOMAIN);
         let tiers = super::network_policy::NetworkRateLimitTiers::from_config(rate_limiting);
         // Maximum across all four tiers, not the federated tier: an operator may

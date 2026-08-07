@@ -245,11 +245,137 @@ impl TokenBucket {
     }
 }
 
+/// What a connection may spend before it has authenticated anybody (#2491).
+///
+/// # Why this is a constant and not a trust tier
+///
+/// Every other limit in this module is selected by trust class, from operator
+/// configuration. This one cannot be, and the reason is the whole of #2491: selecting a
+/// tier requires knowing *who* the peer is, and before the Hello binding runs
+/// (`handlers::hello`) nobody knows. The only DID available is `NetworkMessage.from`,
+/// which the sender chose. Consulting trust for it is exactly the defect.
+///
+/// Nor is it any of the four configured tiers. `isolated` is the tempting one — it is the
+/// smallest — but it means "a peer we have classified and found unconnected", which is a
+/// statement about a known identity. "We do not know who this is" is a different claim, and
+/// giving it a trust class would assert something the node cannot support. The tiers are
+/// also not required to be ordered (see [`NetworkRateLimitTiers::ceiling`] in
+/// `icn-core`), so `min` over them is not a policy either.
+///
+/// # Where the numbers come from
+///
+/// This budget exists to fund *one thing*: reaching authentication. That is a property of
+/// the Hello protocol, not of an operator's trust posture, which is why it lives here
+/// rather than in configuration.
+///
+/// What the protocol fixes, though, is a *range* rather than a pair of values. It says the
+/// budget must be nonzero, because a node that cannot afford a Hello cannot join; that it
+/// can be small, because an unauthenticated connection has nothing legitimate to do besides
+/// authenticate; and that it needs deterministic headroom above the one-Hello floor, because
+/// the cost of being wrong in that direction is a silent bootstrap failure. The two
+/// constants below are a conservative default chosen inside that range, deliberately
+/// generous against the floor. They are **not** uniquely derived, and no invariant here
+/// depends on their exact values — only on their being small, positive, and unrelated to
+/// anything the sender said.
+///
+/// - **burst 20** — a handshake costs one Hello. Twenty leaves room for a peer that
+///   interleaves other traffic before its Hello lands, for version renegotiation, and for
+///   retries. Sizing this near the true cost would fail closed on the one path a node needs
+///   in order to join at all, and would do it silently.
+/// - **10 messages/second** — a connection that has not authenticated has no legitimate
+///   sustained traffic, so this is deliberately far below every default tier except
+///   `isolated`'s rate. It is not zero: a handshake that is retrying must still make
+///   progress.
+///
+/// The burst is worth one more note, because at 20 it is *larger* than the default
+/// `isolated` (2) and `known` (10) bursts and equal to `partner`'s. That is not a better
+/// deal for staying anonymous, because nothing ever obliged an attacker to authenticate:
+/// the comparison that matters is against what an unauthenticated connection could spend
+/// *before* this change, which was the tier of whatever DID it cared to name — up to
+/// `federated`'s 200/s and burst 50, and before #2490's ceiling, `unlimited`. What the
+/// extra burst buys is at most twenty deserializations on a connection that still cannot
+/// reach peer exchange (#2535), a personhood budget, or anything else DID-gated. Sizing it
+/// down to `isolated`'s 2 would buy nothing against that and would risk a silent bootstrap
+/// failure, which is the one outcome this must not have.
+///
+/// # What this does not do
+///
+/// It bounds one connection. An attacker who opens *N* connections gets *N* of these
+/// budgets, because each is scoped to a `ConnectionContext`. That is connection admission /
+/// source aggregation, a separate problem this deliberately does not claim to solve — see
+/// the module note on [`PreAuthRateLimiter`].
+pub const PRE_AUTH_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
+    max_messages_per_second: 10,
+    burst_capacity: 20,
+    refill_interval: Duration::from_millis(100),
+};
+
+/// The budget an unauthenticated connection spends, scoped to that connection.
+///
+/// # Why the connection is the key
+///
+/// The key has to be something the remote end cannot choose, and on an inbound stream
+/// almost nothing qualifies. `NetworkMessage.from` is chosen by the sender outright. The
+/// remote address is transport-derived but is *not* stable per attacker: a new source port
+/// is a new key, so reconnecting mints a fresh budget, and QUIC connection migration can
+/// change it mid-connection. The remote IP is stable but shared — one bucket per IP charges
+/// every peer behind a NAT for its noisiest neighbour, and needs a global map with its own
+/// eviction policy.
+///
+/// The connection itself has none of those problems. It is created by *this* node when a
+/// handshake completes; nothing in any message influences which one a byte lands on. It
+/// lives and dies with the peer's session, so there is no map to grow and nothing to evict.
+/// And it is the resource actually being consumed: the question a transport limiter answers
+/// is "whose traffic is this connection carrying", not "who wrote this payload".
+///
+/// Rotating the claimed DID therefore buys nothing — every message on one connection meets
+/// the same bucket, whatever name it carries.
+///
+/// # Scope
+///
+/// One connection, one budget. *N* connections is *N* budgets; bounding that is connection
+/// admission, which this does not address and does not claim to.
+#[derive(Debug)]
+pub struct PreAuthRateLimiter {
+    bucket: RwLock<TokenBucket>,
+}
+
+impl PreAuthRateLimiter {
+    /// A fresh budget for a newly established connection.
+    pub fn new() -> Self {
+        Self {
+            bucket: RwLock::new(TokenBucket::new(
+                PRE_AUTH_RATE_LIMIT.burst_capacity as f64,
+                refill_rate_per_interval(&PRE_AUTH_RATE_LIMIT),
+                PRE_AUTH_RATE_LIMIT.refill_interval,
+            )),
+        }
+    }
+
+    /// Spend one message's worth of the connection's anonymous budget.
+    ///
+    /// Takes no DID, and that is the point: there is nothing to pass. A signature here
+    /// would be an invitation to key this on a claim.
+    pub async fn check(&self) -> bool {
+        self.bucket.write().await.try_consume()
+    }
+}
+
+impl Default for PreAuthRateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Per-peer rate limiter using token bucket algorithm
 ///
 /// Supports two layers of rate limiting:
 /// 1. Per-DID: Policy-based rate limiting via PolicyOracle
 /// 2. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
+///
+/// Both layers key on a DID, so both are usable **only after** that DID has been
+/// authenticated against the connection carrying the message (#2491). Before that, see
+/// [`PreAuthRateLimiter`].
 pub struct RateLimiter {
     /// Policy oracle for determining rate limits (optional)
     oracle: Option<Arc<dyn PolicyOracle>>,

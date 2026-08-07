@@ -38,6 +38,11 @@ pub fn init_descriptions() {
         "icn_network_messages_rate_limited_total",
         "Total number of messages dropped due to rate limiting"
     );
+    // Two-phase inbound rate limiting (Issue #2491)
+    describe_counter!(
+        "icn_network_messages_rate_limited_pre_auth_total",
+        "Total number of messages denied by a connection's anonymous pre-authentication budget, before any peer identity was bound to it"
+    );
     describe_counter!(
         "icn_network_messages_rate_limited_by_rate_total",
         "Total number of messages rate limited, bucketed by rate limit (0-10, 11-50, 51-100, 100+)"
@@ -208,6 +213,21 @@ pub fn messages_received_inc() {
 
 pub fn messages_rate_limited_inc() {
     counter!("icn_network_messages_rate_limited_total").increment(1);
+}
+
+/// A message denied against a connection's pre-authentication budget (#2491).
+///
+/// A subset of `messages_rate_limited_total`, separated because the two mean opposite
+/// things operationally. A throttled *authenticated* peer is a tier that may need raising;
+/// this counter is anonymous traffic that never got as far as saying who it was, and a
+/// sustained rise in it is a load signal rather than a configuration one.
+///
+/// Deliberately unlabelled. The tempting labels here — the claimed DID, the remote address
+/// — are unbounded and attacker-chosen, which is the same mistake at the metrics layer that
+/// #2491 fixes at the policy layer. (Distinguishing denial *causes* more finely is #2499's
+/// subject, not this one's.)
+pub fn messages_rate_limited_pre_auth_inc() {
+    counter!("icn_network_messages_rate_limited_pre_auth_total").increment(1);
 }
 
 /// Increment rate limit configuration change counter

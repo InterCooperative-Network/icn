@@ -4,7 +4,8 @@
 //!
 //! - **Connection acceptance**: Listens for new connections via the session manager
 //! - **Stream processing**: Handles bidirectional streams for message exchange
-//! - **Rate limiting**: Enforces per-DID and per-personhood-anchor limits for Sybil resistance
+//! - **Rate limiting**: Two-phase — an anonymous per-connection budget until the peer
+//!   authenticates, then per-DID and per-personhood-anchor limits for Sybil resistance
 //! - **Byzantine detection**: Reports misbehavior to the misbehavior detector
 //! - **Blob announcements**: Extracts and registers blob availability from incoming messages
 //!
@@ -26,6 +27,30 @@
 //!
 //! So a shutdown deadline may cancel the wait for new work, but must never become a
 //! maximum lifetime for a handshake that has already arrived.
+//!
+//! # Rate limiting is two phases, not one
+//!
+//! The limit check runs immediately after `read_message`, before any dispatch — which means
+//! before anything has verified who sent the message. So the check cannot ask the message
+//! who to charge (#2491):
+//!
+//! ```text
+//! before authentication:
+//!     charge the connection's own anonymous budget.
+//!     No DID input: no trust tier, no personhood anchor.
+//!
+//! after an authenticated Hello:
+//!     charge the DID cryptographically bound to THIS connection's certificate (#2520),
+//!     which selects the operator-configured tier (#2490).
+//! ```
+//!
+//! `NetworkMessage.from` selects rate-limit authority in neither phase. It remains a claim
+//! about origin, useful for diagnostics and nothing else here. Content authorship and relay
+//! semantics are a separate question, tracked by #2480; a transport limiter only needs to
+//! know whose traffic this connection is carrying.
+//!
+//! Scope: this bounds what one connection can spend. Bounding how many connections one
+//! source may open is connection admission, and is not addressed here.
 
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};
@@ -249,20 +274,82 @@ impl NetworkActor {
                                 bytes_read as u64,
                             );
 
-                            // Check rate limit BEFORE processing message
-                            // Uses dual-path rate limiting: per-DID and per-anchor (if Sybil resistance enabled)
-                            let (did_allowed, anchor_allowed) = rate_limiter
-                                .check_rate_limit_with_personhood(&message.from)
-                                .await;
+                            // Check rate limit BEFORE processing message.
+                            //
+                            // Which identity may select this message's limit is decided by
+                            // what *this connection* has proven, never by what the message
+                            // claims (#2491):
+                            //
+                            //   PRE-AUTH   the transport source is known, the peer's DID is
+                            //              not. Trust cannot select a tier, and there is no
+                            //              DID to derive a personhood anchor from either.
+                            //   POST-AUTH  this connection has a DID bound to the
+                            //              certificate it is actually using (#2520). That
+                            //              DID selects the tier.
+                            //
+                            // `message.from` describes a claimed origin and is kept for
+                            // diagnostics below. It never selects transport rate-limit
+                            // authority in either phase — that is the whole defect: DIDs are
+                            // public, so keying on `from` let any sender name a well-trusted
+                            // peer and be charged as one.
+                            //
+                            // Read per message rather than cached, because the connection's
+                            // identity is genuinely mutable. `handlers::hello` records an
+                            // authenticated peer on *every* valid Hello — the `hello_responded`
+                            // guard bounds the reply (#2537), not the binding — and #2520's
+                            // checks tie a DID to this connection's certificate without tying
+                            // that certificate to the DID's key. A second Hello can therefore
+                            // move this connection from A to B, and the limit must follow the
+                            // identity in force *now*. Caching the first one would keep
+                            // charging a peer that is no longer the one on this session.
+                            let authenticated = ctx.authenticated_peer().await;
+                            let (did_allowed, anchor_allowed) = match &authenticated {
+                                Some(authenticated) => {
+                                    rate_limiter
+                                        .check_rate_limit_with_personhood(authenticated)
+                                        .await
+                                }
+                                // No DID, so nothing DID-keyed runs: not the trust tier and
+                                // not the anchor lookup. Inventing an anchor from the claim
+                                // would let a sender spend somebody else's per-person budget.
+                                //
+                                // The `true` is the anchor verdict, and it does change what
+                                // `EnforcementMode::RequirePersonhood` covers: that mode no
+                                // longer denies pre-authentication traffic. It never usefully
+                                // did. The anchor was looked up for `message.from`, so naming
+                                // any anchored DID satisfied it, while the peers it actually
+                                // turned away were honest un-anchored ones — whose Hello it
+                                // dropped before they could ever authenticate. Personhood is
+                                // now enforced where it can mean something: on the branch
+                                // above, against the DID this connection has proven.
+                                None => (ctx.check_pre_auth_rate_limit().await, true),
+                            };
 
                             if !did_allowed {
-                                warn!(
-                                    "Rate limited message from {} (per-DID limit exceeded)",
-                                    message.from
-                                );
+                                // Two different limits reach this branch, and the message says
+                                // which. "Per-DID limit" is not true of a phase that has no
+                                // DID, and the distinction is the operational one: a throttled
+                                // authenticated peer is a tier that may want raising, while an
+                                // exhausted anonymous budget is load from a connection that
+                                // never got as far as saying who it was.
+                                match &authenticated {
+                                    Some(authenticated) => warn!(
+                                        claimed_from = %message.from,
+                                        authenticated = %authenticated,
+                                        "Rate limited message (per-DID limit exceeded)"
+                                    ),
+                                    None => warn!(
+                                        claimed_from = %message.from,
+                                        "Rate limited message (pre-authentication connection \
+                                         budget exhausted)"
+                                    ),
+                                }
 
                                 // Track rate limiting metric
                                 icn_obs::metrics::network::messages_rate_limited_inc();
+                                if authenticated.is_none() {
+                                    icn_obs::metrics::network::messages_rate_limited_pre_auth_inc();
+                                }
 
                                 // Close stream before continuing to avoid resource leak
                                 if let Err(e) = send.finish() {
@@ -275,8 +362,8 @@ impl NetworkActor {
 
                             if !anchor_allowed {
                                 warn!(
-                                    "Rate limited message from {} (per-person limit exceeded - Sybil mitigation)",
-                                    message.from
+                                    claimed_from = %message.from,
+                                    "Rate limited message (per-person limit exceeded - Sybil mitigation)"
                                 );
 
                                 // Track Sybil-specific rate limiting metric

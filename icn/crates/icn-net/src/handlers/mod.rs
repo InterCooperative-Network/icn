@@ -63,14 +63,28 @@ pub struct ConnectionContext {
     /// certificate *this* connection is actually using (#2520).
     ///
     /// This exists because a `NetworkMessage`'s `from` field cannot answer "who is asking".
-    /// It is chosen by the sender and verified by nobody — the same confusion that makes
-    /// the pre-authentication rate-limit tier forgeable (#2491). Handlers that disclose
-    /// something about this node must consult *this* field, which is bound to the
-    /// connection's certificate, and never `message.from`.
+    /// It is chosen by the sender and verified by nobody — the same confusion that once made
+    /// the rate-limit tier forgeable, until #2491 made the limiter ask this field too.
+    /// Handlers that disclose something about this node, or that spend a resource on its
+    /// behalf, must consult *this* field, which is bound to the connection's certificate,
+    /// and never `message.from`.
+    ///
+    /// `None` is a statement about what this node can prove, not about the peer, and its
+    /// only safe reading is "we do not know who this is" — which is why the rate limiter
+    /// treats it as a phase, not as a peer with a default tier.
     ///
     /// Per connection, not per peer: a peer that opens two connections authenticates on
     /// each one separately, and one connection's Hello says nothing about the other.
     authenticated_peer: RwLock<Option<Did>>,
+    /// What this connection may spend while [`Self::authenticated_peer`] is still `None`.
+    ///
+    /// The other half of the same idea. `authenticated_peer` answers "may this connection
+    /// have a trust-derived limit at all"; this is what it gets while the answer is no.
+    ///
+    /// It lives here rather than in the shared [`RateLimiter`] because its key *is* this
+    /// struct: one connection, one budget, no map, no eviction, and nothing the sender can
+    /// say to be issued a different one (#2491).
+    pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter,
     /// Whether this node answers peer-exchange requests at all.
     ///
     /// Shared with the actor, so an operator posture set once at startup applies to every
@@ -156,6 +170,7 @@ impl ConnectionContext {
             direction,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: RwLock::new(None),
+            pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
             peer_exchange_enabled,
             expected_peer,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
@@ -185,6 +200,15 @@ impl ConnectionContext {
     /// prove, and the only safe reading of it is "we do not know who this is".
     pub(crate) async fn authenticated_peer(&self) -> Option<Did> {
         self.authenticated_peer.read().await.clone()
+    }
+
+    /// Spend one message against this connection's anonymous budget.
+    ///
+    /// Call this only on the branch where [`Self::authenticated_peer`] is `None`. It takes
+    /// no identity because at that point there is none — see
+    /// [`crate::rate_limit::PreAuthRateLimiter`].
+    pub(crate) async fn check_pre_auth_rate_limit(&self) -> bool {
+        self.pre_auth_limiter.check().await
     }
 
     /// Weigh the operator's expectation for this connection against the identity that just
