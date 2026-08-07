@@ -332,6 +332,10 @@ impl NetworkActor {
                     crate::handlers::ConnectionDirection::Outbound,
                     peer_exchange_enabled,
                     expected_peer,
+                    // We chose to dial this peer, so it does not spend the inbound
+                    // pre-authentication allowance, which exists to bound connections
+                    // somebody else chose to open at us (#2547).
+                    None,
                 )
                 .await
                 {
