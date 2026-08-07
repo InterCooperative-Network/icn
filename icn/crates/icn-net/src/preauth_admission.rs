@@ -47,6 +47,15 @@
 //! `NetworkMessage.from` lacked in #2491, and it is why keying on it here is sound while
 //! keying on a claimed DID was not.
 //!
+//! **QUIC migration does not multiply reservations.** The key is read once, at admission, and
+//! the resulting [`AdmissionGuard`] carries it for the connection's whole life. A connection
+//! that later migrates to a new address therefore stays charged to the source that was
+//! return-routable when it was admitted; it cannot acquire a second slot, because a second
+//! slot is only ever issued by a second admission, and admission happens once per connection.
+//! Charging a migrated connection to its original source is the conservative direction: the
+//! alternative — re-keying on migration — would let a peer release a contended allowance by
+//! moving, which is the amplification this exists to prevent.
+//!
 //! The alternatives aggregate nothing or cost too much:
 //!
 //! - **remote `SocketAddr`** — a new source port is a new key, so reconnecting mints a fresh
@@ -62,9 +71,15 @@
 //! - QUIC/TLS handshake work *below* this hook — that is the existing concurrent-handshake
 //!   semaphore's job, and it bounds concurrency rather than rate.
 //! - Connection *rate*. A source that opens, spends its anonymous burst, and closes stays
-//!   within every bound here. Churn is throttled only indirectly, by handshake concurrency
-//!   divided by handshake latency.
+//!   within every bound here, because concurrency never rises. Churn is throttled only
+//!   indirectly, by handshake concurrency divided by handshake latency. Tracked by #2549,
+//!   which is separate because a rate bound needs entries that *outlive* their connections —
+//!   the opposite of what makes this table's cardinality provable.
+//! - How many connections one source may hold once they are *authenticated*: the slot is
+//!   released at the Hello, and DIDs are free to mint. Tracked by #2550.
 //! - Authenticated application traffic, which is #2490's and #2491's subject.
+//!
+//! None of this is general DoS prevention.
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -94,11 +109,23 @@ pub const MAX_PREAUTH_CONNECTIONS_PER_SOURCE: usize = 8;
 
 /// The unit a pre-authentication allowance is charged to.
 ///
-/// IPv4 is keyed on the exact address. IPv6 is keyed on the **/64**, because a single host is
-/// routinely assigned an entire /64 and exact-address keying would be defeated by rotating
-/// inside it at no cost — the v6 equivalent of picking a new source port. Treating v6
-/// structurally rather than as an opaque address matches what this crate already does when
-/// it classifies addresses (`handlers::peer_exchange`).
+/// IPv4 is keyed on the exact address. IPv6 is keyed on the **/64**.
+///
+/// The v6 argument is narrower than "every host owns a /64", which is not true in general.
+/// It is only this: an IPv6 client can often change its source address *cheaply* — SLAAC and
+/// privacy extensions rotate within a prefix by design, and delegations of a /64 or shorter
+/// are common — so keying on the exact address would frequently aggregate nothing, the same
+/// way keying on a source port does. /64 is the smallest unit that is not routinely cheap to
+/// rotate within. It is a heuristic about cost, not a claim about allocation.
+///
+/// That heuristic has a real price, stated rather than buried: hosts sharing a /64 share an
+/// allowance, so a v6 network that puts many distinct peers in one /64 is charged as one
+/// source. The same is true of IPv4 behind a NAT. What keeps that cost small is *when* the
+/// allowance is released — at authentication, not at close — so peers only contend while
+/// they are still anonymous. See [`PreAuthAdmission`].
+///
+/// Treating v6 structurally rather than as an opaque address matches what this crate already
+/// does when it classifies addresses (`handlers::peer_exchange`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceKey {
     /// An exact IPv4 address.
