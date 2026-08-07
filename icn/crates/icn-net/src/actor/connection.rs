@@ -228,10 +228,6 @@ impl NetworkActor {
                         return;
                     }
                 };
-                icn_obs::metrics::network::preauth_connections_live_set(admission_ctl.live_total());
-                icn_obs::metrics::network::preauth_sources_tracked_set(
-                    admission_ctl.tracked_sources(),
-                );
 
                 info!("Accepted connection from {}", connection.remote_address());
 
@@ -259,13 +255,11 @@ impl NetworkActor {
                     warn!("Connection handler error: {}", e);
                 }
 
-                // The guard travelled into the context, so it is released here whatever
-                // happened above: authenticated (released early), errored, or ran to
-                // completion. Refresh the gauge against the table rather than assuming.
-                icn_obs::metrics::network::preauth_connections_live_set(admission_ctl.live_total());
-                icn_obs::metrics::network::preauth_sources_tracked_set(
-                    admission_ctl.tracked_sources(),
-                );
+                // The guard travelled into the context, so whatever happened above —
+                // authenticated (released early), errored, or ran to completion — the slot
+                // is given back by its destructor, which republishes the gauges itself. No
+                // refresh here: doing it at the call site is what left them stale for every
+                // connection that authenticated and stayed open.
             });
         }
 

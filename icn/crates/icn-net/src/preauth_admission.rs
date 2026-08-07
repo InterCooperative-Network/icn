@@ -171,6 +171,32 @@ impl AdmissionRefusal {
     }
 }
 
+/// The table's live cardinality — exactly what the two gauges report.
+///
+/// Captured while the state lock is held and published *after* it is released. Both halves
+/// matter: reading under the lock is what makes the pair consistent rather than two
+/// independently-sampled numbers, and publishing outside it keeps foreign metrics code —
+/// which may allocate — out of a critical section that serialises every inbound admission.
+#[derive(Debug, Clone, Copy)]
+struct Cardinality {
+    total: usize,
+    sources: usize,
+}
+
+impl Cardinality {
+    fn of(state: &AdmissionState) -> Self {
+        Self {
+            total: state.total,
+            sources: state.per_source.len(),
+        }
+    }
+
+    fn publish(self) {
+        icn_obs::metrics::network::preauth_connections_live_set(self.total);
+        icn_obs::metrics::network::preauth_sources_tracked_set(self.sources);
+    }
+}
+
 #[derive(Debug, Default)]
 struct AdmissionState {
     /// Live pre-authentication connections per source.
@@ -235,22 +261,27 @@ impl PreAuthAdmission {
         addr: SocketAddr,
     ) -> Result<AdmissionGuard, AdmissionRefusal> {
         let key = SourceKey::from_addr(addr);
-        let mut state = self.lock_state();
+        let cardinality = {
+            let mut state = self.lock_state();
 
-        if state.total >= self.max_total {
-            return Err(AdmissionRefusal::GlobalLimit);
-        }
-        let source_count = state.per_source.entry(key).or_insert(0);
-        if *source_count >= self.max_per_source {
-            // Leave no zero-valued entry behind: a refused admission must not be able to
-            // grow the map, or refusing would itself become the amplification.
-            if *source_count == 0 {
-                state.per_source.remove(&key);
+            if state.total >= self.max_total {
+                return Err(AdmissionRefusal::GlobalLimit);
             }
-            return Err(AdmissionRefusal::SourceLimit);
-        }
-        *source_count += 1;
-        state.total += 1;
+            let source_count = state.per_source.entry(key).or_insert(0);
+            if *source_count >= self.max_per_source {
+                // Leave no zero-valued entry behind: a refused admission must not be able to
+                // grow the map, or refusing would itself become the amplification.
+                if *source_count == 0 {
+                    state.per_source.remove(&key);
+                }
+                return Err(AdmissionRefusal::SourceLimit);
+            }
+            *source_count += 1;
+            state.total += 1;
+
+            Cardinality::of(&state)
+        };
+        cardinality.publish();
 
         Ok(AdmissionGuard {
             admission: Arc::clone(self),
@@ -289,17 +320,29 @@ impl PreAuthAdmission {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// Give back one slot charged to `key`, and republish the gauges.
+    ///
+    /// The gauges are refreshed *here*, at the mutation, rather than by whoever happened to
+    /// cause it. There are two release paths — the connection authenticates, or its handler
+    /// task ends — and only the second passes through the accept loop. Refreshing at the
+    /// call sites therefore left the gauges stale for the whole life of every connection
+    /// that authenticated and stayed open, which is the ordinary case and precisely the one
+    /// an operator reads these gauges to understand.
     fn release(&self, key: SourceKey) {
-        let mut state = self.lock_state();
-        state.total = state.total.saturating_sub(1);
-        if let Some(count) = state.per_source.get_mut(&key) {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                // The entry's whole purpose was to carry a non-zero count. Removing it here
-                // is what bounds the map's cardinality by the global limit.
-                state.per_source.remove(&key);
+        let cardinality = {
+            let mut state = self.lock_state();
+            state.total = state.total.saturating_sub(1);
+            if let Some(count) = state.per_source.get_mut(&key) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    // The entry's whole purpose was to carry a non-zero count. Removing it
+                    // here is what bounds the map's cardinality by the global limit.
+                    state.per_source.remove(&key);
+                }
             }
-        }
+            Cardinality::of(&state)
+        };
+        cardinality.publish();
     }
 }
 
