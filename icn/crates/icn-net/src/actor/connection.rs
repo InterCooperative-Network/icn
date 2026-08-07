@@ -80,6 +80,14 @@ use super::NetworkActor;
 /// here.
 const MAX_CONCURRENT_INBOUND_HANDSHAKES: usize = 64;
 
+/// QUIC application close code for a connection refused a pre-authentication slot (#2547).
+///
+/// Distinct from a silent drop so the peer learns it was refused rather than timing out, and
+/// distinct from a protocol error because it is not one: a refused connection may be a
+/// perfectly well-behaved peer that arrived while its source's allowance was spent, and
+/// retrying later is the correct response.
+const PREAUTH_ADMISSION_REFUSED_CODE: u32 = 0x1c4b;
+
 /// Backoff before re-checking for an endpoint that has not been started yet.
 const ENDPOINT_RETRY_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -104,6 +112,11 @@ impl NetworkActor {
         info!("Starting incoming connection handler");
 
         let handshake_slots = Arc::new(Semaphore::new(MAX_CONCURRENT_INBOUND_HANDSHAKES));
+
+        // One admission table for this endpoint's whole lifetime. It is the only state here
+        // that aggregates across connections, which is exactly the point: every other bound
+        // on this path is per-connection and so cannot see a source opening many (#2547).
+        let admission_ctl = Arc::new(crate::preauth_admission::PreAuthAdmission::new());
 
         loop {
             // Reserve a handshake slot before taking on new work. Acquiring is cancel-safe,
@@ -176,6 +189,7 @@ impl NetworkActor {
             let identity_bundle_clone = identity_bundle.clone();
             let own_did_clone = own_did.clone();
             let peer_exchange_enabled = peer_exchange_enabled.clone();
+            let admission_ctl = admission_ctl.clone();
             tokio::spawn(async move {
                 let connection = match incoming.await {
                     Ok(connection) => connection,
@@ -187,6 +201,33 @@ impl NetworkActor {
                 // The slot bounds concurrent handshakes, not connection lifetimes: release
                 // it as soon as the handshake is done, before the long-lived stream loop.
                 drop(permit);
+
+                // Take this connection's share of its source's pre-authentication allowance
+                // (#2547). This is the first moment it can be taken and the last moment it is
+                // useful: only now is the remote address meaningful, because completing a QUIC
+                // handshake proves the peer receives traffic there (RFC 9000 §8), and a
+                // spoofed address never gets this far. Any earlier and the key would be a
+                // claim; any later and the connection would already own a handler task, a
+                // context and a budget — the things being bounded.
+                let admission = match admission_ctl.try_admit(connection.remote_address()) {
+                    Ok(guard) => guard,
+                    Err(refusal) => {
+                        // Deliberately logged, not counted by address: the label set stays
+                        // closed while the diagnostic detail stays available.
+                        warn!(
+                            remote_addr = %connection.remote_address(),
+                            bound = refusal.as_str(),
+                            "Refusing inbound connection: pre-authentication admission limit \
+                             reached"
+                        );
+                        icn_obs::metrics::network::preauth_admission_refused_inc(refusal.as_str());
+                        connection.close(
+                            PREAUTH_ADMISSION_REFUSED_CODE.into(),
+                            b"pre-authentication admission limit",
+                        );
+                        return;
+                    }
+                };
 
                 info!("Accepted connection from {}", connection.remote_address());
 
@@ -207,11 +248,18 @@ impl NetworkActor {
                     peer_exchange_enabled,
                     // We did not choose this peer, so there is nobody we expected (#2533).
                     None,
+                    Some(admission),
                 )
                 .await
                 {
                     warn!("Connection handler error: {}", e);
                 }
+
+                // The guard travelled into the context, so whatever happened above —
+                // authenticated (released early), errored, or ran to completion — the slot
+                // is given back by its destructor, which republishes the gauges itself. No
+                // refresh here: doing it at the call site is what left them stale for every
+                // connection that authenticated and stayed open.
             });
         }
 
@@ -241,6 +289,10 @@ impl NetworkActor {
         direction: crate::handlers::ConnectionDirection,
         peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
         expected_peer: Option<Did>,
+        // This connection's pre-authentication slot, for inbound connections (#2547).
+        // `None` for outbound: we chose to dial that peer, so it is not consuming an
+        // allowance meant to bound connections chosen by somebody else.
+        admission: Option<crate::preauth_admission::AdmissionGuard>,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -260,6 +312,7 @@ impl NetworkActor {
             direction,
             peer_exchange_enabled,
             expected_peer,
+            admission,
         );
 
         loop {

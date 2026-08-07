@@ -85,6 +85,19 @@ pub struct ConnectionContext {
     /// struct: one connection, one budget, no map, no eviction, and nothing the sender can
     /// say to be issued a different one (#2491).
     pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter,
+    /// This connection's share of its source's pre-authentication allowance (#2547).
+    ///
+    /// The third member of the same idea. `authenticated_peer` says whether this connection
+    /// may have a trust-derived limit; `pre_auth_limiter` is what it spends while the answer
+    /// is no; this is what stops one source from holding an unbounded number of the other
+    /// two.
+    ///
+    /// `None` for connections that never took a slot — outbound dials, which this node
+    /// chose, and the handler unit tests. Taken (and so released) by
+    /// [`Self::record_authenticated_peer`], because a peer that has said who it is no longer
+    /// spends *anonymous* admission; otherwise released when the context is dropped with its
+    /// handler task. Both are the guard's destructor, so no exit path leaks a slot.
+    admission_guard: std::sync::Mutex<Option<crate::preauth_admission::AdmissionGuard>>,
     /// Whether this node answers peer-exchange requests at all.
     ///
     /// Shared with the actor, so an operator posture set once at startup applies to every
@@ -154,6 +167,7 @@ impl ConnectionContext {
         direction: ConnectionDirection,
         peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
         expected_peer: Option<Did>,
+        admission_guard: Option<crate::preauth_admission::AdmissionGuard>,
     ) -> Self {
         Self {
             handler,
@@ -171,6 +185,7 @@ impl ConnectionContext {
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: RwLock::new(None),
             pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
+            admission_guard: std::sync::Mutex::new(admission_guard),
             peer_exchange_enabled,
             expected_peer,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
@@ -191,6 +206,21 @@ impl ConnectionContext {
     /// property this state exists to carry.
     pub(crate) async fn record_authenticated_peer(&self, peer: &Did) {
         *self.authenticated_peer.write().await = Some(peer.clone());
+
+        // This connection has stopped being anonymous, so it stops charging its source's
+        // anonymous allowance (#2547). Releasing here rather than at close is what keeps the
+        // bound off legitimate peers: a source is limited in how many connections it may
+        // hold *while refusing to identify itself*, not in how many it may hold. Dropping
+        // the guard is the release; taking it is idempotent, so the eventual context drop
+        // has nothing left to do.
+        let released = self
+            .admission_guard
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        if released.is_some() {
+            icn_obs::metrics::network::preauth_admission_released_inc();
+        }
     }
 
     /// The peer identity proven for this connection, if any.

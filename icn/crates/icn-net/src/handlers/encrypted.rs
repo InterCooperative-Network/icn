@@ -233,6 +233,9 @@ mod tests {
             expected_peer: None,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
             pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
+            // No inbound admission slot: these contexts are built directly, not by the
+            // accept loop (#2547).
+            admission_guard: std::sync::Mutex::new(None),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -387,6 +390,9 @@ mod tests {
             expected_peer: None,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
             pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
+            // No inbound admission slot: these contexts are built directly, not by the
+            // accept loop (#2547).
+            admission_guard: std::sync::Mutex::new(None),
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: tokio::sync::RwLock::new(None),
             peer_exchange_enabled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),

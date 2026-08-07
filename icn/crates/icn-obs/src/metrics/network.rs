@@ -47,6 +47,23 @@ pub fn init_descriptions() {
         "icn_network_messages_rate_limited_by_rate_total",
         "Total number of messages rate limited, bucketed by rate limit (0-10, 11-50, 51-100, 100+)"
     );
+    // Pre-authentication connection admission (Issue #2547)
+    describe_counter!(
+        "icn_network_preauth_admission_refused_total",
+        "Total inbound connections refused a pre-authentication slot, by which bound was hit (global_limit or source_limit)"
+    );
+    describe_counter!(
+        "icn_network_preauth_admission_released_total",
+        "Total pre-authentication slots released because the connection authenticated"
+    );
+    describe_gauge!(
+        "icn_network_preauth_connections_live",
+        "Established inbound connections that have not yet authenticated a peer identity"
+    );
+    describe_gauge!(
+        "icn_network_preauth_sources_tracked",
+        "Distinct sources currently holding at least one pre-authentication slot (bounded by the global admission limit)"
+    );
     describe_counter!(
         "icn_network_rate_limit_config_changes_total",
         "Total number of peer rate limit configuration changes"
@@ -228,6 +245,43 @@ pub fn messages_rate_limited_inc() {
 /// subject, not this one's.)
 pub fn messages_rate_limited_pre_auth_inc() {
     counter!("icn_network_messages_rate_limited_pre_auth_total").increment(1);
+}
+
+/// An inbound connection was refused a pre-authentication slot (#2547).
+///
+/// `bound` says which limit was hit, and is the **only** label here on purpose: it comes
+/// from a closed two-value set in the code (`AdmissionRefusal::as_str`), so nothing a remote
+/// peer sends can add a series. The labels this deliberately does not carry — remote
+/// address, source key, connection id — are attacker-chosen and unbounded, which is the same
+/// cardinality mistake at the metrics layer that #2491 fixed at the policy layer.
+///
+/// The refused address belongs in logs, where a bounded-cardinality store is not the
+/// constraint, and it is logged there.
+pub fn preauth_admission_refused_inc(bound: &'static str) {
+    counter!("icn_network_preauth_admission_refused_total", "bound" => bound).increment(1);
+}
+
+/// A pre-authentication slot was released because its connection authenticated (#2547).
+///
+/// Rising alongside `preauth_connections_live` staying flat is the healthy shape: peers are
+/// arriving and identifying themselves. Refusals rising while this stays flat is the attack
+/// shape — connections arriving that never say who they are.
+pub fn preauth_admission_released_inc() {
+    counter!("icn_network_preauth_admission_released_total").increment(1);
+}
+
+/// Established inbound connections that have not yet authenticated (#2547).
+pub fn preauth_connections_live_set(count: usize) {
+    gauge!("icn_network_preauth_connections_live").set(count as f64);
+}
+
+/// Distinct sources holding at least one pre-authentication slot (#2547).
+///
+/// This is the admission table's cardinality. It is bounded by the global admission limit by
+/// construction, so an operator seeing it climb toward that limit is seeing the bound work,
+/// not a leak.
+pub fn preauth_sources_tracked_set(count: usize) {
+    gauge!("icn_network_preauth_sources_tracked").set(count as f64);
 }
 
 /// Increment rate limit configuration change counter
