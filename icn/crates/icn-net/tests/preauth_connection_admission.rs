@@ -156,6 +156,13 @@ async fn spawn_node(
     Err(last_err.unwrap_or_else(|| anyhow::anyhow!("could not bind a node")))
 }
 
+/// How long to wait for the node's answer to a Hello before calling it a failure.
+///
+/// Generous on purpose: this is a liveness backstop so a broken node fails the test instead
+/// of hanging it, not a timing assumption the property depends on. The property is carried by
+/// the response arriving at all.
+const HELLO_RESPONSE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// A raw QUIC client that authenticates only when asked to.
 struct WireClient {
     _endpoint: Endpoint,
@@ -220,6 +227,19 @@ impl WireClient {
         self.send(&message).await
     }
 
+    /// Authenticate, and do not return until the node has processed the Hello.
+    ///
+    /// The node answers a valid Hello on a stream it opens back, and it opens that stream
+    /// strictly after binding the identity to the connection — `record_authenticated_peer`
+    /// runs early in `handle_hello`, the response is sent at the end of it. So the answer
+    /// arriving *is* the synchronisation: the slot was released before it was written.
+    /// Waiting on the delivery log instead would synchronise on nothing at all — a Hello is
+    /// answered by the node itself and never reaches the external handler, so it never moves
+    /// that log.
+    ///
+    /// That distinction is the whole point of this helper: without it the next connection
+    /// could ask for a slot before this one had given its back, and the test would be
+    /// measuring a race rather than the release-at-authentication property.
     async fn authenticate(&self, to: &Did) -> Result<()> {
         let message = NetworkMessage::new(
             self.identity.did().clone(),
@@ -234,7 +254,21 @@ impl WireClient {
                 pq_binding_proof: None,
             },
         );
-        self.send(&message).await
+
+        self.send(&message).await?;
+
+        // The node answers on a stream *it* opens, not on the one the Hello arrived on, so
+        // accept one rather than reading the Hello's own `recv`.
+        let (_send, mut recv) =
+            tokio::time::timeout(HELLO_RESPONSE_TIMEOUT, self.connection.accept_bi())
+                .await
+                .context("timed out waiting for the node to answer the Hello")?
+                .context("accepting the node's Hello response stream")?;
+        tokio::time::timeout(HELLO_RESPONSE_TIMEOUT, icn_net::read_message(&mut recv))
+            .await
+            .context("timed out reading the node's Hello response")?
+            .context("reading the node's Hello response")?;
+        Ok(())
     }
 
     async fn send(&self, message: &NetworkMessage) -> Result<()> {
@@ -369,10 +403,10 @@ async fn authenticating_releases_the_sources_slot() -> Result<()> {
         let client = WireClient::connect(&identity, addr)
             .await
             .context("an authenticated peer was refused admission")?;
+        // Returns only once the node has answered the Hello, so this connection has
+        // provably released its slot before the next one asks for one. If the slot were
+        // held past authentication, the ninth connection here would be refused.
         client.authenticate(node.did()).await?;
-        // Let the Hello land, so this connection has released its slot before the next one
-        // asks for one.
-        settle(&delivered).await;
         client.tag(node.did()).await?;
         clients.push(client);
     }
