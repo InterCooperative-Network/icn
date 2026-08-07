@@ -50,7 +50,32 @@
 //! know whose traffic this connection is carrying.
 //!
 //! Scope: this bounds what one connection can spend. Bounding how many connections one
-//! source may open is connection admission, and is not addressed here.
+//! source may open is connection admission, below.
+//!
+//! # The anonymous phase is bounded in size and in time
+//!
+//! Admission (#2547) reserves a slot per established-but-unauthenticated inbound connection and
+//! releases it at the authenticated Hello. That bounds how many anonymous connections exist at
+//! an instant. It does not, on its own, make any of them ever *stop* being anonymous — and a
+//! silent connection is durable here, because the handshake permit is already released, this
+//! node's own keepalives hold the transport open, and nothing maps or evicts an unauthenticated
+//! peer. So the reservation had a ceiling but no expiry (#2552).
+//!
+//! The deadline that fixes it is enforced in [`NetworkActor::handle_connection`], and it races
+//! only the *wait* for the next stream — never the handling of one:
+//!
+//! ```text
+//! anonymous:      select { accept_bi , deadline -> close + release }
+//! authenticated:  accept_bi
+//! ```
+//!
+//! This is the same rule the accept loop follows for shutdown, for the same reason. Cancelling
+//! a wait is free; cancelling work in progress destroys it. `accept_bi` is cancel-safe, so a
+//! losing arm cannot swallow a Hello, and because the loop is a single sequential task, "has
+//! this connection authenticated" is answered by program order rather than by synchronisation:
+//! the Hello is verified inside the loop body, the deadline is consulted at the top of the next
+//! iteration, and the two never run concurrently. There is no timer task to outlive the phase
+//! it belongs to.
 
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};
@@ -87,6 +112,8 @@ const MAX_CONCURRENT_INBOUND_HANDSHAKES: usize = 64;
 /// perfectly well-behaved peer that arrived while its source's allowance was spent, and
 /// retrying later is the correct response.
 const PREAUTH_ADMISSION_REFUSED_CODE: u32 = 0x1c4b;
+
+use crate::preauth_admission::PREAUTH_AUTHENTICATION_TIMEOUT_CODE;
 
 /// Backoff before re-checking for an endpoint that has not been started yet.
 const ENDPOINT_RETRY_INTERVAL: Duration = Duration::from_millis(100);
@@ -296,6 +323,19 @@ impl NetworkActor {
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
+        // When this connection must have authenticated by, while it still holds a
+        // pre-authentication slot (#2552).
+        //
+        // `None` for a connection that took no slot — an outbound dial, which this node chose.
+        // The deadline exists to bound a reservation somebody else's connection is spending, so
+        // a connection that spends none is not its subject.
+        //
+        // Read off the guard rather than computed here, so the clock starts when the *slot* was
+        // taken. Set below to `None` the moment this connection authenticates: the slot is gone
+        // by then, and an expiry that outlived the resource it bounds is exactly the state that
+        // would let this close a peer that had already identified itself.
+        let mut authenticate_by = admission.as_ref().map(|guard| guard.authenticate_by());
+
         // Create connection context for handlers (clone shared state)
         let ctx = ConnectionContext::new(
             handler.clone(),
@@ -316,8 +356,64 @@ impl NetworkActor {
         );
 
         loop {
-            // Accept incoming bidirectional stream
-            match connection.accept_bi().await {
+            // A connection stops being anonymous exactly once and never goes back, so this only
+            // ever clears the deadline — and it is read here, in the same sequential task that
+            // writes it, so "has it authenticated yet" needs no synchronisation beyond program
+            // order. `handle_hello` runs inside this loop's body; this runs at the top of the
+            // next iteration, strictly after it.
+            if authenticate_by.is_some() && ctx.authenticated_peer().await.is_some() {
+                authenticate_by = None;
+            }
+
+            // Accept incoming bidirectional stream.
+            //
+            // While the connection is still anonymous, the deadline races the *wait* — never
+            // the handling. That is the same rule the accept loop above follows for shutdown,
+            // and it is what makes the expiry safe:
+            //
+            // - `accept_bi` is cancel-safe. quinn removes a stream from the connection's queue
+            //   only on the poll that returns it (`poll_accept`), so a losing arm here cannot
+            //   swallow a peer's Hello — it stays queued for the next call.
+            // - the deadline can only fire while nothing is being processed. If a Hello has
+            //   arrived, `accept_bi` has already returned and this future is dropped; if the
+            //   deadline fires, no Hello has been read, so none can have authenticated. There
+            //   is no interleaving in which a verified Hello is discarded by a timeout.
+            // - `biased` gives a simultaneous readiness to the peer. A stream that arrives in
+            //   the same instant the timer expires is served, and the deadline — an absolute
+            //   instant, already past — fires on the very next wait. So the tie buys exactly
+            //   one more message, which the anonymous budget already bounds, and never a
+            //   renewed lease.
+            //
+            // Absolute, not per-iteration: a `timeout` around each wait would restart on every
+            // message, and "send something every T-1 seconds" would hold the slot forever
+            // again. The property is *authenticate* within T, not *speak* within T.
+            let accepted = match authenticate_by {
+                None => connection.accept_bi().await,
+                Some(deadline) => tokio::select! {
+                    biased;
+                    accepted = connection.accept_bi() => accepted,
+                    _ = tokio::time::sleep_until(deadline.into()) => {
+                        warn!(
+                            remote_addr = %connection.remote_address(),
+                            "Closing inbound connection: it held a pre-authentication slot \
+                             without ever authenticating"
+                        );
+                        icn_obs::metrics::network::preauth_authentication_timeout_inc();
+                        // Close the transport, then leave the loop. Releasing the slot while
+                        // letting the anonymous connection live on would satisfy the admission
+                        // table and let the thing it bounds escape the bound. The release
+                        // itself is the guard's destructor, reached by dropping `ctx` when
+                        // this function returns.
+                        connection.close(
+                            PREAUTH_AUTHENTICATION_TIMEOUT_CODE.into(),
+                            b"pre-authentication deadline",
+                        );
+                        break;
+                    }
+                },
+            };
+
+            match accepted {
                 Ok((mut send, mut recv)) => {
                     // Read network message
                     match read_message(&mut recv).await {
