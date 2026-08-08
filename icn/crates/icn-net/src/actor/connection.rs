@@ -61,21 +61,37 @@
 //! node's own keepalives hold the transport open, and nothing maps or evicts an unauthenticated
 //! peer. So the reservation had a ceiling but no expiry (#2552).
 //!
-//! The deadline that fixes it is enforced in [`NetworkActor::handle_connection`], and it races
-//! only the *wait* for the next stream — never the handling of one:
+//! The deadline that fixes it is enforced in [`NetworkActor::handle_connection`]. It bounds
+//! everything the peer can make this task wait on, and stops at the point where the node starts
+//! deciding things:
 //!
 //! ```text
-//! anonymous:      select { accept_bi , deadline -> close + release }
-//! authenticated:  accept_bi
+//! anonymous:      check expiry -> select { accept_bi , deadline } -> read within deadline -> dispatch
+//! authenticated:  accept_bi -> read -> dispatch
 //! ```
 //!
-//! This is the same rule the accept loop follows for shutdown, for the same reason. Cancelling
-//! a wait is free; cancelling work in progress destroys it. `accept_bi` is cancel-safe, so a
-//! losing arm cannot swallow a Hello, and because the loop is a single sequential task, "has
-//! this connection authenticated" is answered by program order rather than by synchronisation:
-//! the Hello is verified inside the loop body, the deadline is consulted at the top of the next
-//! iteration, and the two never run concurrently. There is no timer task to outlive the phase
-//! it belongs to.
+//! The boundary between the last two columns is the whole design. Cancelling a wait is free and
+//! cancelling an unread message costs nothing anybody has looked at, so both are bounded;
+//! cancelling *dispatch* could abandon a peer mid-verification, or after
+//! `record_authenticated_peer` had already released its slot, so dispatch is not. `accept_bi` is
+//! cancel-safe, so a losing arm cannot swallow a Hello.
+//!
+//! Bounding the read is not belt-and-braces. `read_message` has no timeout of its own, and
+//! `read_exact` on a length prefix whose remaining bytes never arrive never returns — so a peer
+//! that sends three bytes of a four-byte header parks this task inside the loop body, past every
+//! deadline, holding the slot exactly as if it had sent nothing at all. A deadline that guards
+//! only the wait is defeated by anything that keeps the task out of the wait.
+//!
+//! The expiry is also *checked* at the loop boundary rather than left to the `select!`, because
+//! `biased` returns on the first ready arm without polling the rest and a tokio `Sleep` completes
+//! only when polled. Empirically a maximal stream flood does not starve it — stream credit costs
+//! a round trip to return, so the accept queue drains to empty constantly — but that is
+//! `max_concurrent_bidi_streams` underwriting the property, not this loop.
+//!
+//! Because the loop is a single sequential task, "has this connection authenticated" is answered
+//! by program order rather than by synchronisation: the Hello is verified inside the loop body,
+//! the deadline is consulted at the top of the next iteration, and the two never run
+//! concurrently. There is no timer task to outlive the phase it belongs to.
 
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};
