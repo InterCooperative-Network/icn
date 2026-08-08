@@ -886,6 +886,99 @@ mod binding_before_authentication {
         Ok(())
     }
 
+    /// COMPOSITION GUARD: nothing but the Hello handler may establish this state.
+    ///
+    /// Everything above pins the ordering *inside* `handle_hello`, and none of it can see a
+    /// caller that binds an identity before dispatching to one. The masking is the same, one
+    /// frame up: `ctx.record_authenticated_peer(&message.from)` placed above
+    /// `ctx.handle_hello(...)` in `actor::connection` binds a sender-chosen name to every
+    /// connection that sends a Hello, and leaves all six tests above green — along with
+    /// `hello_current_cert_binding`, `preauth_authentication_deadline`,
+    /// `authenticated_rate_limit_identity`, `peer_exchange_policy` and
+    /// `preauth_connection_admission`. The rejected Hello still returns `Err`, the transport
+    /// still dies, and every assertion any of them makes still holds.
+    ///
+    /// What makes the in-function ordering sufficient is that there is nowhere else the state
+    /// can be established. That is a whole-crate property rather than a property of one
+    /// function, so it is asserted the way this crate already asserts one — by refusing a
+    /// second site (compare `weak_binding_verifier_is_confined_to_authorised_sites` in
+    /// `tests/hello_current_cert_binding.rs`).
+    #[test]
+    fn authenticated_state_is_established_only_by_the_hello_handler() {
+        // The setter, and the field it writes. `field_write` is composed rather than spelled
+        // out so this file does not match its own needle and report itself; `call_site` needs
+        // no such care, because this file is the one authorised to contain it.
+        const RECORD: &str = "record_authenticated_peer";
+        const FIELD: &str = "authenticated_peer";
+        let call_site = format!(".{RECORD}(");
+        let field_write = format!("{FIELD}.write()");
+
+        let crate_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut extra_callers = Vec::new();
+        let mut extra_writers = Vec::new();
+        let mut stack = vec![crate_root.join("src")];
+
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("readable src dir") {
+                let path = entry.expect("dir entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                    continue;
+                }
+                let body = std::fs::read_to_string(&path).expect("readable rust file");
+                let rel = path
+                    .strip_prefix(crate_root)
+                    .expect("path under crate root")
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                if body.contains(&call_site) && rel != "src/handlers/hello.rs" {
+                    extra_callers.push(rel.clone());
+                }
+                if body.contains(&field_write) && rel != "src/handlers/mod.rs" {
+                    extra_writers.push(rel);
+                }
+            }
+        }
+
+        assert!(
+            extra_callers.is_empty(),
+            "`{RECORD}` is called outside the Hello handler: {extra_callers:?}. The tests in \
+             this module constrain only `handle_hello`, so a second caller can bind a claimed \
+             DID before any DID-TLS check has run and none of them would object. Authenticate \
+             through `handle_hello`, or extend this module to cover the new site."
+        );
+        assert!(
+            extra_writers.is_empty(),
+            "`{FIELD}` is written outside `{RECORD}`: {extra_writers:?}. That setter is also \
+             what drops the pre-authentication admission guard, so a direct write can bind an \
+             identity — and unbind it again before returning — without moving either \
+             observable this module reads."
+        );
+
+        // And the authorised sites must still be the sites. A guard that scans for a name
+        // nothing uses any more passes for the same reason an empty room is quiet, so the
+        // rename that would hollow it out has to fail here rather than go unnoticed.
+        //
+        // Matched on the production receiver rather than `call_site`, because the doc comment
+        // above quotes the foreign call it is describing — and a guard whose own prose
+        // satisfies it is exactly the hollowing-out this is here to prevent.
+        let hello = std::fs::read_to_string(crate_root.join("src/handlers/hello.rs"))
+            .expect("hello handler readable");
+        assert!(
+            hello.contains(&format!("self.{RECORD}(")),
+            "the Hello handler no longer calls `{RECORD}`, so this guard now proves nothing"
+        );
+        let context = std::fs::read_to_string(crate_root.join("src/handlers/mod.rs"))
+            .expect("connection context readable");
+        assert!(
+            context.contains(&field_write),
+            "`{RECORD}` no longer writes `{FIELD}`, so this guard now proves nothing"
+        );
+    }
+
     /// Accepts the node's self-signed certificate, for the no-client-certificate case only.
     #[derive(Debug)]
     struct AcceptAnyServerCert;
