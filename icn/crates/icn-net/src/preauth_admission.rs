@@ -20,20 +20,41 @@
 //! nothing tracks or evicts it.
 //!
 //! Established-but-unauthenticated connections were therefore unbounded in count and
-//! effectively immortal. This module bounds them.
+//! effectively immortal. This module bounds them on both axes.
 //!
-//! # The invariant
+//! # The invariants
+//!
+//! **Count** (#2547):
 //!
 //! > At any instant, the number of established-but-unauthenticated inbound connections is
 //! > bounded, both server-wide and per source.
 //!
-//! **Concurrency, not rate.** This says nothing about how fast connections may be opened and
-//! closed; see the module's "what this does not bound" note below.
+//! **Duration** (#2552):
+//!
+//! > A connection holding a pre-authentication slot must authenticate within
+//! > [`PREAUTH_AUTHENTICATION_DEADLINE`] of taking it, or its transport is closed and the slot
+//! > released.
+//!
+//! Neither is sufficient alone, and the second is why the first is worth having. A count bound
+//! on its own describes an instant: an adversary that reaches the ceiling and never moves holds
+//! it indefinitely, and since every new peer starts anonymous, a full table refuses *all* new
+//! inbound connections rather than only anonymous ones. Silence is the cheapest way to do it —
+//! cheaper than traffic, because this node's own keepalives maintain the connection and the
+//! peer's QUIC stack answers at the transport layer. The duration bound converts "hold forever"
+//! into "hold for `T`", which is what makes the count bound mean something over time.
+//!
+//! A duration bound alone would be equally useless: it bounds one connection and aggregates
+//! nothing.
+//!
+//! **Neither is a rate bound.** Together they say how much anonymous concurrency may exist and
+//! for how long, and nothing about how fast a source may open and close connections underneath
+//! them; see "what this does not bound" below.
 //!
 //! **Pre-authentication only.** The reservation is released the moment a connection
 //! authenticates, so this never constrains established authenticated peers — a peer that
 //! says who it is stops consuming source admission immediately, and is thereafter governed
-//! by the per-DID and per-anchor limits (#2490, #2491).
+//! by the per-DID and per-anchor limits (#2490, #2491). The deadline ends at the same instant
+//! and for the same reason: it is the slot's expiry, not the connection's maximum lifetime.
 //!
 //! # Why the post-handshake remote IP can be trusted as a key
 //!
@@ -75,8 +96,19 @@
 //!   indirectly, by handshake concurrency divided by handshake latency. Tracked by #2549,
 //!   which is separate because a rate bound needs entries that *outlive* their connections —
 //!   the opposite of what makes this table's cardinality provable.
+//!
+//!   The deadline does not change this, and it is worth being exact about why, because
+//!   "connections now expire" sounds like it should. Expiry bounds how long one connection may
+//!   squat; it places no floor on how quickly the next may arrive. A source that connects,
+//!   waits, is closed, and immediately reconnects stays inside every bound here forever — it
+//!   simply pays a handshake each time instead of nothing. So the deadline converts a *free*
+//!   permanent hold into a *recurring* cost, which is a real change in the attacker's economics
+//!   and not a rate limit. #2549 remains exactly as necessary as it was.
 //! - How many connections one source may hold once they are *authenticated*: the slot is
-//!   released at the Hello, and DIDs are free to mint. Tracked by #2550.
+//!   released at the Hello, and DIDs are free to mint. Tracked by #2550. The deadline stops at
+//!   the same boundary deliberately — extending it past authentication would make it a maximum
+//!   connection lifetime, which is a different bound with different victims, and belongs to
+//!   #2550 if it is wanted at all.
 //! - Authenticated application traffic, which is #2490's and #2491's subject.
 //!
 //! None of this is general DoS prevention.
@@ -84,6 +116,54 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// How long an admitted connection may stay unauthenticated before it is closed (#2552).
+///
+/// # Why a duration bound exists at all
+///
+/// The two count bounds below are instantaneous: they say how many anonymous connections may
+/// exist *now*. On their own that is a ceiling an adversary can reach and simply stay at, because
+/// nothing here made a connection ever finish becoming a peer. Silence was free — cheaper than
+/// traffic, since the node's own `keep_alive_interval` maintains the connection and the peer's
+/// QUIC stack answers at the transport layer. Converting "forever" into a finite `T` is what
+/// makes a count bound mean anything over time rather than only at an instant.
+///
+/// # Why thirty seconds
+///
+/// The value is policy, and deliberately generous, because no security property here depends on
+/// it — every value converts an unbounded hold into a bounded one, and the choice only trades
+/// how long an adversary may squat against how much slack an honest peer gets.
+///
+/// A healthy exchange needs about one round trip. An ICN dialer sends its Hello immediately and
+/// unconditionally on connecting (`actor::messages::wire_new_connection`); there is no lazy or
+/// deferred path in which an honest peer legitimately holds an inbound connection anonymous and
+/// waits. So the accepting side expects a Hello roughly one RTT after the handshake, plus this
+/// node's own Ed25519 binding checks, which are sub-millisecond.
+///
+/// Thirty seconds is therefore some thirty times the *pathological* healthy case — a WAN RTT of
+/// a second, retransmits, a badly overloaded node's scheduling delay, a peer whose path changed
+/// mid-connection. Two further properties pin it rather than leaving it a round number:
+///
+/// - it equals `keep_alive_interval`, so the node spends at most one keepalive cycle on a peer
+///   that will not identify itself — a direct answer to the mechanism that caused the defect;
+/// - it is strictly below `max_idle_timeout` (60 s), so for a silent connection *this* is the
+///   binding constraint rather than a race with the idle timer, which keeps the behaviour
+///   attributable to one cause.
+///
+/// Like the two counts, this is a protocol constant rather than operator configuration. That is
+/// consistency with the bound it completes, and a conservative starting point — not a claim that
+/// no deployment will want to tune it.
+pub const PREAUTH_AUTHENTICATION_DEADLINE: Duration = Duration::from_secs(30);
+
+/// QUIC application close code for a connection that never authenticated in time (#2552).
+///
+/// Distinct from a silent drop so the peer learns *why*, and distinct from the admission refusal
+/// code next to it (`0x1c4b`) because the two are different events an operator needs to tell
+/// apart: refused means "the table was full when you arrived", timed out means "you were given a
+/// slot and never used it". Neither is a protocol error — a peer that is slow, or that connected
+/// speculatively, is not misbehaving, and retrying later is the correct response.
+pub const PREAUTH_AUTHENTICATION_TIMEOUT_CODE: u32 = 0x1c4c;
 
 /// Maximum established-but-unauthenticated inbound connections, server-wide.
 ///
@@ -230,6 +310,7 @@ pub struct PreAuthAdmission {
     state: Mutex<AdmissionState>,
     max_total: usize,
     max_per_source: usize,
+    authentication_deadline: Duration,
 }
 
 impl PreAuthAdmission {
@@ -241,14 +322,29 @@ impl PreAuthAdmission {
         )
     }
 
-    /// An admission table with explicit bounds.
+    /// An admission table with explicit count bounds and the default deadline.
     ///
     /// Exists so tests can drive the boundary without opening hundreds of real connections.
     pub fn with_limits(max_total: usize, max_per_source: usize) -> Self {
+        Self::with_policy(max_total, max_per_source, PREAUTH_AUTHENTICATION_DEADLINE)
+    }
+
+    /// An admission table with every bound stated explicitly.
+    ///
+    /// The whole pre-authentication policy — how many anonymous connections, and for how long —
+    /// lives on one object because the two halves are the same bound. A count without a duration
+    /// is a ceiling an adversary can park at; a duration without a count bounds one connection
+    /// and no aggregate.
+    pub fn with_policy(
+        max_total: usize,
+        max_per_source: usize,
+        authentication_deadline: Duration,
+    ) -> Self {
         Self {
             state: Mutex::new(AdmissionState::default()),
             max_total,
             max_per_source,
+            authentication_deadline,
         }
     }
 
@@ -261,6 +357,10 @@ impl PreAuthAdmission {
         addr: SocketAddr,
     ) -> Result<AdmissionGuard, AdmissionRefusal> {
         let key = SourceKey::from_addr(addr);
+        // Read before the slot is taken, so the deadline can only ever be *shorter* than the
+        // slot's real life, never longer. The two are created by one operation, which is what
+        // lets the guard state its own expiry rather than the caller guessing when it started.
+        let authenticate_by = Instant::now() + self.authentication_deadline;
         let cardinality = {
             let mut state = self.lock_state();
 
@@ -286,6 +386,7 @@ impl PreAuthAdmission {
         Ok(AdmissionGuard {
             admission: Arc::clone(self),
             key,
+            authenticate_by,
         })
     }
 
@@ -363,6 +464,24 @@ impl Default for PreAuthAdmission {
 pub struct AdmissionGuard {
     admission: Arc<PreAuthAdmission>,
     key: SourceKey,
+    /// When this reservation stops being justified — see [`Self::authenticate_by`].
+    authenticate_by: Instant,
+}
+
+impl AdmissionGuard {
+    /// The instant by which the connection holding this slot must have authenticated.
+    ///
+    /// Stamped by [`PreAuthAdmission::try_admit`], so the answer to "when did the clock start"
+    /// is "when the resource was taken" — not "when some handler got around to noticing". The
+    /// guard carries it for its whole life, so nothing downstream has to reconstruct a start
+    /// time, and a connection cannot be given a fresh deadline by being passed around.
+    ///
+    /// Enforcing it is the connection handler's job (`actor::connection`), because expiry has to
+    /// close a transport and this type deliberately knows nothing about transports. What lives
+    /// here is the *when*; what lives there is the *what happens*.
+    pub fn authenticate_by(&self) -> Instant {
+        self.authenticate_by
+    }
 }
 
 impl Drop for AdmissionGuard {
@@ -493,6 +612,69 @@ mod tests {
             0,
             "releasing every slot must leave no residue in the table"
         );
+    }
+
+    /// The expiry is born with the slot, not with whoever later looks at it.
+    ///
+    /// This is the "when does the clock start" answer made checkable: a guard handed around,
+    /// stored, or read late still reports the instant its *reservation* was taken.
+    #[test]
+    fn a_slot_carries_the_deadline_it_was_admitted_with() {
+        let deadline = Duration::from_millis(250);
+        let admission = Arc::new(PreAuthAdmission::with_policy(10, 10, deadline));
+
+        let before = Instant::now();
+        let guard = admission.try_admit(v4("203.0.113.7")).expect("admitted");
+        let after = Instant::now();
+
+        assert!(
+            guard.authenticate_by() >= before + deadline
+                && guard.authenticate_by() <= after + deadline,
+            "the deadline was not stamped from the moment the slot was taken"
+        );
+    }
+
+    /// Slots admitted at different moments expire at different moments.
+    ///
+    /// Guards against a deadline shared by the table rather than owned by the reservation — a
+    /// shape in which one long-lived squatter's expiry would silently become everybody's.
+    #[test]
+    fn each_slot_expires_on_its_own_clock() {
+        let admission = Arc::new(PreAuthAdmission::with_policy(
+            10,
+            10,
+            Duration::from_millis(250),
+        ));
+
+        let first = admission.try_admit(v4("203.0.113.1")).expect("admitted");
+        std::thread::sleep(Duration::from_millis(20));
+        let second = admission.try_admit(v4("203.0.113.2")).expect("admitted");
+
+        assert!(
+            second.authenticate_by() > first.authenticate_by(),
+            "two slots taken at different times were given the same expiry"
+        );
+    }
+
+    /// The production constructors carry the production deadline.
+    ///
+    /// Without this, `with_policy` could drift into being the only path that sets a deadline at
+    /// all and every real connection would quietly get whatever `Default` produced — the failure
+    /// mode where the tests exercise a policy the node never uses.
+    #[test]
+    fn the_default_table_uses_the_protocol_deadline() {
+        for admission in [
+            Arc::new(PreAuthAdmission::new()),
+            Arc::new(PreAuthAdmission::with_limits(10, 10)),
+        ] {
+            let before = Instant::now();
+            let guard = admission.try_admit(v4("203.0.113.7")).expect("admitted");
+
+            assert!(
+                guard.authenticate_by() >= before + PREAUTH_AUTHENTICATION_DEADLINE,
+                "a table built for production did not use PREAUTH_AUTHENTICATION_DEADLINE"
+            );
+        }
     }
 
     /// A refusal must not itself grow the map — otherwise attacking the limiter would be

@@ -64,6 +64,11 @@ pub fn init_descriptions() {
         "icn_network_preauth_sources_tracked",
         "Distinct sources currently holding at least one pre-authentication slot (bounded by the global admission limit)"
     );
+    // Pre-authentication deadline (Issue #2552)
+    describe_counter!(
+        "icn_network_preauth_authentication_timeout_total",
+        "Total inbound connections closed for holding a pre-authentication slot without ever authenticating"
+    );
     describe_counter!(
         "icn_network_rate_limit_config_changes_total",
         "Total number of peer rate limit configuration changes"
@@ -282,6 +287,21 @@ pub fn preauth_connections_live_set(count: usize) {
 /// not a leak.
 pub fn preauth_sources_tracked_set(count: usize) {
     gauge!("icn_network_preauth_sources_tracked").set(count as f64);
+}
+
+/// A connection was closed for never authenticating within its deadline (#2552).
+///
+/// Unlabelled on purpose. There is exactly one reason to reach here, so a `reason` dimension
+/// would carry no information, and every dimension worth attributing this to — source address,
+/// /64, claimed DID — is chosen by the party being counted. Attaching any of them would let an
+/// unauthenticated peer mint metric series, which is the same unbounded-cardinality mistake
+/// `preauth_admission_refused_inc` avoids for the same reason. The address is in the log line.
+///
+/// Read together with `preauth_connections_live`: this rising while that gauge stays flat means
+/// the deadline is turning squatters over as fast as they arrive, which is the bound working.
+/// This flat while the gauge sits at its ceiling would mean the deadline is not firing at all.
+pub fn preauth_authentication_timeout_inc() {
+    counter!("icn_network_preauth_authentication_timeout_total").increment(1);
 }
 
 /// Increment rate limit configuration change counter

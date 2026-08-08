@@ -49,7 +49,8 @@ pub use global_rate_limit::GlobalRateLimiter;
 pub use nat::{NatConfig, NatTraversal, NatType, PublicAddress, TurnServerConfig};
 pub use preauth_admission::{
     AdmissionGuard, AdmissionRefusal, PreAuthAdmission, MAX_PREAUTH_CONNECTIONS_PER_SOURCE,
-    MAX_PREAUTH_CONNECTIONS_TOTAL,
+    MAX_PREAUTH_CONNECTIONS_TOTAL, PREAUTH_AUTHENTICATION_DEADLINE,
+    PREAUTH_AUTHENTICATION_TIMEOUT_CODE,
 };
 pub use protocol::{
     read_message, read_message_compressed, read_message_negotiated, write_message,
