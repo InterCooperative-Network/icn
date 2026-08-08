@@ -910,42 +910,109 @@ mod binding_before_authentication {
     /// check runs. The same holds for a second direct writer added beside the setter in
     /// `handlers/mod.rs`, which additionally never drops the admission guard, so neither
     /// observable the tests above read would move. Both survive a location-only guard. So the
-    /// assertion is a cardinality: **zero** sites fail, **one** passes, **two** fail, wherever
-    /// the second one lives.
+    /// call assertion is a cardinality: **zero** sites fail, **one** passes, **two** fail,
+    /// wherever the second one lives.
     ///
-    /// Comments are stripped before counting, which is what makes counting safe — the prose
-    /// documenting a guard is precisely where the token it forbids gets written down, and the
-    /// paragraph above is itself a second textual occurrence of the call.
+    /// **Enumerated, not allow-listed.** Counting a hand-written list of mutating accessors —
+    /// `write`, `blocking_write`, `get_mut` — fails *open* the moment the list is incomplete,
+    /// and it was: `try_write` was missing, so a second direct writer spelled that way left
+    /// the tally reading one. No such list could be trusted closed either, because the lock
+    /// offers more ways in than are obvious (`write_owned`, `try_write_owned`, `into_inner`),
+    /// and a later version may offer more still.
+    ///
+    /// So the field is not scanned for *dangerous* accessors. Every occurrence of its name in
+    /// the crate is classified by the token that follows it, and the complete table is
+    /// asserted:
+    ///
+    /// ```text
+    /// field:<accessor>  the name, then `.` — a direct access to the lock itself
+    /// call              the name, then `(` — the pub(crate) reader, which clones
+    /// binding           the name, then `:` — the declaration, or a struct-literal field
+    /// unknown:<char>    anything else, including a bare borrow that hands the lock onward
+    /// ```
+    ///
+    /// An accessor nobody anticipated does not have to be recognised as dangerous. It only
+    /// has to be *new* — which makes the table differ, and the test fail. The same holds for
+    /// a borrow that passes the lock to another expression, and for the name appearing in a
+    /// shape this classification does not model. The bias is a loud failure awaiting
+    /// classification rather than a silent pass, which is the entire point: the list this
+    /// replaces was silent.
+    ///
+    /// The field's name is assembled at run time rather than written, so this test
+    /// contributes no occurrence of its own to the table it asserts.
+    ///
+    /// **Comments.** Only whole comment lines are dropped. Truncating each line at the first
+    /// `//` — the previous behaviour — treats the `//` inside a string literal as a comment
+    /// marker and deletes the rest of that line with it, so an access sharing a line with any
+    /// URL-shaped literal vanishes from the scan. Dropping whole lines cannot do that. It
+    /// leaves trailing comments in, where a mention can only ever *add* a row and fail
+    /// loudly. Stripping remains load-bearing: the prose documenting a guard is precisely
+    /// where the token it forbids gets written down, and the paragraphs above are themselves
+    /// occurrences of the call this counts.
     #[test]
     fn authenticated_state_has_exactly_one_establishing_site() {
         const RECORD: &str = "record_authenticated_peer";
-        const FIELD: &str = "authenticated_peer";
         const CALLER: &str = "src/handlers/hello.rs";
-        const WRITER: &str = "src/handlers/mod.rs";
-        // Every accessor on the field's lock that can yield a mutable reference to it.
-        const MUTATORS: [&str; 3] = ["write()", "blocking_write()", "get_mut()"];
 
-        // Composed at run time, so none of these literals is itself a match.
+        // Composed rather than written: a literal would be an occurrence like any other, and
+        // would have to be excused in the table below.
+        let field = ["authenticated", "peer"].join("_");
         let calls = [format!(".{RECORD}("), format!("::{RECORD}(")];
-        let writes: Vec<String> = MUTATORS.iter().map(|m| format!("{FIELD}.{m}")).collect();
 
-        /// Line comments and doc comments are prose, not sites.
+        fn is_ident(c: char) -> bool {
+            c.is_ascii_alphanumeric() || c == '_'
+        }
+
+        /// Whole comment lines are prose, not sites.
         fn code_only(src: &str) -> String {
             src.lines()
-                .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+                .filter(|line| !line.trim_start().starts_with("//"))
                 .collect::<Vec<_>>()
                 .join("\n")
         }
-        fn tally(code: &str, needles: &[String]) -> usize {
-            needles
-                .iter()
-                .map(|n| code.matches(n.as_str()).count())
-                .sum()
+
+        /// Classify one occurrence by the first non-space token that follows it.
+        fn role(rest: &str) -> String {
+            let rest = rest.trim_start();
+            match rest.chars().next() {
+                Some('.') => {
+                    let accessor: String = rest[1..]
+                        .trim_start()
+                        .chars()
+                        .take_while(|c| is_ident(*c))
+                        .collect();
+                    format!("field:{accessor}")
+                }
+                Some('(') => "call".to_owned(),
+                Some(':') if !rest.starts_with("::") => "binding".to_owned(),
+                Some(c) => format!("unknown:{c}"),
+                None => "unknown:eof".to_owned(),
+            }
+        }
+
+        /// Every whole-word occurrence of `field`, classified. An occurrence inside a longer
+        /// identifier is skipped: the setter's own name contains the field's.
+        fn classify(code: &str, field: &str) -> Vec<String> {
+            let mut found = Vec::new();
+            let mut at = 0;
+            while let Some(offset) = code[at..].find(field) {
+                let start = at + offset;
+                let end = start + field.len();
+                at = end;
+                let before = code[..start].chars().next_back();
+                let after = code[end..].chars().next();
+                if before.is_some_and(is_ident) || after.is_some_and(is_ident) {
+                    continue;
+                }
+                found.push(role(&code[end..]));
+            }
+            found
         }
 
         let crate_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut table: std::collections::BTreeMap<(String, String), usize> =
+            std::collections::BTreeMap::new();
         let mut call_sites: Vec<(String, usize)> = Vec::new();
-        let mut write_sites: Vec<(String, usize)> = Vec::new();
         let mut stack = vec![crate_root.join("src")];
 
         while let Some(dir) = stack.pop() {
@@ -964,38 +1031,60 @@ mod binding_before_authentication {
                     .expect("path under crate root")
                     .to_string_lossy()
                     .replace('\\', "/");
-                match tally(&code, &calls) {
-                    0 => {}
-                    n => call_sites.push((rel.clone(), n)),
+                for occurrence in classify(&code, &field) {
+                    *table.entry((rel.clone(), occurrence)).or_default() += 1;
                 }
-                match tally(&code, &writes) {
+                match calls.iter().map(|c| code.matches(c.as_str()).count()).sum() {
                     0 => {}
-                    n => write_sites.push((rel, n)),
+                    n => call_sites.push((rel, n)),
                 }
             }
         }
         call_sites.sort();
-        write_sites.sort();
 
+        let observed: Vec<(String, String, usize)> = table
+            .into_iter()
+            .map(|((file, occurrence), n)| (file, occurrence, n))
+            .collect();
+        let expected: Vec<(String, String, usize)> = [
+            ("src/actor/connection.rs", "call", 2),
+            ("src/handlers/encrypted.rs", "binding", 2),
+            ("src/handlers/handshake.rs", "binding", 2),
+            ("src/handlers/hello.rs", "call", 1),
+            ("src/handlers/mod.rs", "binding", 2),
+            ("src/handlers/mod.rs", "call", 1),
+            ("src/handlers/mod.rs", "field:read", 1),
+            ("src/handlers/mod.rs", "field:write", 1),
+            ("src/handlers/peer_exchange.rs", "call", 1),
+            ("src/handlers/signed.rs", "binding", 1),
+        ]
+        .into_iter()
+        .map(|(file, occurrence, n)| (file.to_owned(), occurrence.to_owned(), n))
+        .collect();
+
+        assert_eq!(
+            observed, expected,
+            "every mention of `{field}` in this crate must be one of the classified shapes, \
+                 in exactly these places. A new row is not necessarily a defect, but it is \
+                 necessarily unreviewed — and this is the only thing standing between an \
+                 unreviewed one and a connection that is authenticated before it is verified. \
+                 `field:*` is the row that matters: it is a direct access to the lock, and the \
+                 only one permitted to mutate is the single `field:write` inside the setter. An \
+                 `unknown:*` row means the name is being used in a shape this test cannot reason \
+                 about — most importantly a bare borrow, which hands the lock to an expression \
+                 this scan never sees. Classify the new row and add it here, or route the access \
+                 through `{RECORD}`."
+        );
         assert_eq!(
             call_sites,
             vec![(CALLER.to_owned(), 1)],
             "`{RECORD}` must be called exactly once, from `{CALLER}`; found {call_sites:?}. \
-             None is a guard that proves nothing, because the identity is no longer bound \
-             there. More than one is a path the ordering tests in this module cannot see: they \
-             enter at `handle_hello`, so a second site — even in this same file — can bind a \
-             claimed DID before a single DID-TLS check has run and leave every one of them \
-             green. Authenticate through `handle_hello`, or extend this module to cover the \
-             new site."
-        );
-        assert_eq!(
-            write_sites,
-            vec![(WRITER.to_owned(), 1)],
-            "`{FIELD}` must be written exactly once, from `{WRITER}`; found {write_sites:?}. \
-             `{RECORD}` is also what drops the pre-authentication admission guard, so a write \
-             that bypasses it can bind an identity — and unbind it again before returning — \
-             without moving either observable this module reads. Neither the identity nor the \
-             slot would object; only this count does."
+                 None is a guard that proves nothing, because the identity is no longer bound \
+                 there. More than one is a path the ordering tests in this module cannot see: they \
+                 enter at `handle_hello`, so a second site — even in this same file — can bind a \
+                 claimed DID before a single DID-TLS check has run and leave every one of them \
+                 green. Authenticate through `handle_hello`, or extend this module to cover the \
+                 new site."
         );
     }
 
