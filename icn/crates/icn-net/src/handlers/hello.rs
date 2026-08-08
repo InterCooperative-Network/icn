@@ -954,6 +954,19 @@ mod binding_before_authentication {
     /// either table it asserts — which is also why the message below spells the alias with an
     /// interpolation instead of the literal.
     ///
+    /// **A count cannot see a function boundary.** Both tables are cardinalities, and there is
+    /// one rearrangement that leaves every row identical while adding a writer: extract the
+    /// lock write into a helper beside the setter, and have the setter delegate to it. The
+    /// write is still counted once, in the same file; the setter is still defined once and
+    /// called once. But the helper is callable, and the dispatcher can reach it before
+    /// `handle_hello` — and because it bypasses the setter, it never drops the admission
+    /// guard, so neither runtime observable moves either. Nothing above would object.
+    ///
+    /// So the sole write is pinned to the setter's *body*, by requiring that no function item
+    /// opens between the setter's signature and the write. That is what makes "call the
+    /// setter" the only route to the state, and therefore what makes the call table decisive
+    /// rather than merely suggestive.
+    ///
     /// **Comments.** Only whole comment lines are dropped. Truncating each line at the first
     /// `//` — the previous behaviour — treats the `//` inside a string literal as a comment
     /// marker and deletes the rest of that line with it, so an access sharing a line with any
@@ -964,6 +977,8 @@ mod binding_before_authentication {
     /// occurrences of the call this counts.
     #[test]
     fn authenticated_state_has_exactly_one_establishing_site() {
+        const WRITER: &str = "src/handlers/mod.rs";
+
         // Composed rather than written: either literal would be an occurrence like any other,
         // and would have to be excused in the tables below.
         let field = ["authenticated", "peer"].join("_");
@@ -1024,6 +1039,7 @@ mod binding_before_authentication {
             std::collections::BTreeMap::new();
         let mut calls: std::collections::BTreeMap<(String, String), usize> =
             std::collections::BTreeMap::new();
+        let mut writer_code = String::new();
         let mut stack = vec![crate_root.join("src")];
 
         while let Some(dir) = stack.pop() {
@@ -1047,6 +1063,9 @@ mod binding_before_authentication {
                 }
                 for occurrence in classify(&code, &setter) {
                     *calls.entry((rel.clone(), occurrence)).or_default() += 1;
+                }
+                if rel == WRITER {
+                    writer_code = code;
                 }
             }
         }
@@ -1108,6 +1127,35 @@ mod binding_before_authentication {
                  invoked, which is how a function-item alias (`let f = Ctx::{setter};` then \
                  `f(ctx, did)`) reaches it while matching no call syntax at all. Authenticate \
                  through `handle_hello`, or extend this module to cover the new site."
+        );
+
+        // Both tables are counts, and a count cannot see a function boundary. Extracting the
+        // write into a helper beside the setter, and delegating to it, leaves every row above
+        // identical — one write, in the same file; one definition and one call of the setter —
+        // while adding a second callable writer the dispatcher can reach before `handle_hello`.
+        // So the sole write is pinned to the setter's own body, which is what makes "call the
+        // setter" the only way to reach it, and therefore what makes the call table decisive.
+        let signature = format!("fn {setter}(");
+        let def = writer_code
+            .find(&signature)
+            .expect("the setter is defined in the writer file");
+        let write_at = writer_code
+            .find(&format!("{field}.write("))
+            .expect("the canonical write is in the writer file");
+        let between = writer_code
+            .get(def + signature.len()..write_at)
+            .unwrap_or("");
+        assert!(
+            write_at > def && !between.contains("fn "),
+            "the one write of `{field}` must live inside `{setter}`'s own body. It does not, \
+             which means some other function in `{WRITER}` performs it and the setter only \
+             delegates. That function is a second way to establish authenticated state, and it \
+             is invisible to both tables above: the write is still counted once, in this same \
+             file, and the setter is still defined once and called once. Nothing else in this \
+             module would object either — a helper that bypasses the setter never drops the \
+             pre-authentication admission guard, so neither runtime observable moves. Put the \
+             write back in the setter, or extend this module to cover the new writer and every \
+             caller that can reach it."
         );
     }
 
