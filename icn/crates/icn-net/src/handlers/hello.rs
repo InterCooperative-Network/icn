@@ -722,7 +722,7 @@ mod binding_before_authentication {
             harness.slots_held(),
             1,
             "{mode}: the pre-authentication slot was released for a connection that never \
-             authenticated, so `record_authenticated_peer` ran before the checks (#2547/#2551)"
+             authenticated, so the setter ran before the checks (#2547/#2551)"
         );
     }
 
@@ -938,8 +938,21 @@ mod binding_before_authentication {
     /// classification rather than a silent pass, which is the entire point: the list this
     /// replaces was silent.
     ///
-    /// The field's name is assembled at run time rather than written, so this test
-    /// contributes no occurrence of its own to the table it asserts.
+    /// **The setter is classified the same way, for the same reason.** Counting `.<setter>(`
+    /// and `::<setter>(` is an allow-list of two *syntaxes* — the same shape of mistake one
+    /// paragraph up, and it misses a reference that never uses call syntax at all:
+    ///
+    /// ```text
+    /// let authenticate = ConnectionContext::<setter>;   // matches neither needle
+    /// authenticate(ctx, did).await;                     // authenticates anyway
+    /// ```
+    ///
+    /// So every mention of the setter is classified too, and the only accepted shape is an
+    /// immediate invocation: the one definition, and the one call. A name that is *referred
+    /// to* rather than *called* lands in `unknown:` and fails. Both names are assembled at
+    /// run time rather than written, so this test contributes no occurrence of its own to
+    /// either table it asserts — which is also why the message below spells the alias with an
+    /// interpolation instead of the literal.
     ///
     /// **Comments.** Only whole comment lines are dropped. Truncating each line at the first
     /// `//` — the previous behaviour — treats the `//` inside a string literal as a comment
@@ -951,13 +964,10 @@ mod binding_before_authentication {
     /// occurrences of the call this counts.
     #[test]
     fn authenticated_state_has_exactly_one_establishing_site() {
-        const RECORD: &str = "record_authenticated_peer";
-        const CALLER: &str = "src/handlers/hello.rs";
-
-        // Composed rather than written: a literal would be an occurrence like any other, and
-        // would have to be excused in the table below.
+        // Composed rather than written: either literal would be an occurrence like any other,
+        // and would have to be excused in the tables below.
         let field = ["authenticated", "peer"].join("_");
-        let calls = [format!(".{RECORD}("), format!("::{RECORD}(")];
+        let setter = ["record", field.as_str()].join("_");
 
         fn is_ident(c: char) -> bool {
             c.is_ascii_alphanumeric() || c == '_'
@@ -1012,7 +1022,8 @@ mod binding_before_authentication {
         let crate_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let mut table: std::collections::BTreeMap<(String, String), usize> =
             std::collections::BTreeMap::new();
-        let mut call_sites: Vec<(String, usize)> = Vec::new();
+        let mut calls: std::collections::BTreeMap<(String, String), usize> =
+            std::collections::BTreeMap::new();
         let mut stack = vec![crate_root.join("src")];
 
         while let Some(dir) = stack.pop() {
@@ -1034,13 +1045,11 @@ mod binding_before_authentication {
                 for occurrence in classify(&code, &field) {
                     *table.entry((rel.clone(), occurrence)).or_default() += 1;
                 }
-                match calls.iter().map(|c| code.matches(c.as_str()).count()).sum() {
-                    0 => {}
-                    n => call_sites.push((rel, n)),
+                for occurrence in classify(&code, &setter) {
+                    *calls.entry((rel.clone(), occurrence)).or_default() += 1;
                 }
             }
         }
-        call_sites.sort();
 
         let observed: Vec<(String, String, usize)> = table
             .into_iter()
@@ -1062,6 +1071,18 @@ mod binding_before_authentication {
         .map(|(file, occurrence, n)| (file.to_owned(), occurrence.to_owned(), n))
         .collect();
 
+        let observed_calls: Vec<(String, String, usize)> = calls
+            .into_iter()
+            .map(|((file, occurrence), n)| (file, occurrence, n))
+            .collect();
+        let expected_calls: Vec<(String, String, usize)> = [
+            ("src/handlers/hello.rs", "call", 1),
+            ("src/handlers/mod.rs", "call", 1),
+        ]
+        .into_iter()
+        .map(|(file, occurrence, n)| (file.to_owned(), occurrence.to_owned(), n))
+        .collect();
+
         assert_eq!(
             observed, expected,
             "every mention of `{field}` in this crate must be one of the classified shapes, \
@@ -1073,18 +1094,20 @@ mod binding_before_authentication {
                  `unknown:*` row means the name is being used in a shape this test cannot reason \
                  about — most importantly a bare borrow, which hands the lock to an expression \
                  this scan never sees. Classify the new row and add it here, or route the access \
-                 through `{RECORD}`."
+                 through `{setter}`."
         );
         assert_eq!(
-            call_sites,
-            vec![(CALLER.to_owned(), 1)],
-            "`{RECORD}` must be called exactly once, from `{CALLER}`; found {call_sites:?}. \
-                 None is a guard that proves nothing, because the identity is no longer bound \
-                 there. More than one is a path the ordering tests in this module cannot see: they \
-                 enter at `handle_hello`, so a second site — even in this same file — can bind a \
-                 claimed DID before a single DID-TLS check has run and leave every one of them \
-                 green. Authenticate through `handle_hello`, or extend this module to cover the \
-                 new site."
+            observed_calls, expected_calls,
+            "every mention of `{setter}` in this crate must be an immediate invocation — the \
+                 one definition in `handlers/mod.rs`, and the one call in `handlers/hello.rs`. \
+                 Zero is a guard that proves nothing, because the identity is no longer bound \
+                 there. A second `call` row is a path the ordering tests in this module cannot \
+                 see: they enter at `handle_hello`, so a second site — even in this same file — \
+                 can bind a claimed DID before a single DID-TLS check has run and leave every \
+                 one of them green. An `unknown:*` row is the setter named without being \
+                 invoked, which is how a function-item alias (`let f = Ctx::{setter};` then \
+                 `f(ctx, did)`) reaches it while matching no call syntax at all. Authenticate \
+                 through `handle_hello`, or extend this module to cover the new site."
         );
     }
 
