@@ -80,7 +80,7 @@
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use tracing::{debug, info, instrument, warn};
 
@@ -114,6 +114,29 @@ const MAX_CONCURRENT_INBOUND_HANDSHAKES: usize = 64;
 const PREAUTH_ADMISSION_REFUSED_CODE: u32 = 0x1c4b;
 
 use crate::preauth_admission::PREAUTH_AUTHENTICATION_TIMEOUT_CODE;
+
+/// End a connection that held a pre-authentication slot without ever authenticating (#2552).
+///
+/// Closes the transport and leaves the slot to the guard's destructor, which the caller reaches
+/// by breaking out of the handler loop. Releasing the reservation while letting the anonymous
+/// connection live on would satisfy the admission table and let the thing it bounds escape the
+/// bound, so the transport is always what ends first.
+///
+/// Shared by the three places the deadline can be observed — expired before a wait, expired
+/// during one, expired mid-read — because they are one event and an operator watching
+/// `icn_network_preauth_authentication_timeout_total` should not have to know which of them
+/// noticed.
+fn close_for_missed_authentication(connection: &quinn::Connection) {
+    warn!(
+        remote_addr = %connection.remote_address(),
+        "Closing inbound connection: it held a pre-authentication slot without ever authenticating"
+    );
+    icn_obs::metrics::network::preauth_authentication_timeout_inc();
+    connection.close(
+        PREAUTH_AUTHENTICATION_TIMEOUT_CODE.into(),
+        b"pre-authentication deadline",
+    );
+}
 
 /// Backoff before re-checking for an endpoint that has not been started yet.
 const ENDPOINT_RETRY_INTERVAL: Duration = Duration::from_millis(100);
@@ -365,24 +388,43 @@ impl NetworkActor {
                 authenticate_by = None;
             }
 
+            // The expiry is *checked*, not raced.
+            //
+            // Deciding it inside the `select!` below alone would make enforcement depend on the
+            // scheduler choosing to poll a timer, and `biased` deliberately does not: it polls
+            // its arms in order and returns on the first that is ready, without touching the
+            // rest. A tokio `Sleep` is not an interrupt — it completes only when polled — so a
+            // peer that keeps `accept_bi` ready on every iteration keeps the timer arm from ever
+            // being polled, and an absolute instant that nothing observes has no effect however
+            // far into the past it goes. What currently prevents that is `max_concurrent_bidi_
+            // streams`, since returning stream credit costs a round trip and so drains the
+            // accept queue to empty constantly; that is a transport tuning constant doing a
+            // security property's job. Asking `Instant::now()` here costs one comparison and
+            // owes nothing to either the scheduler or the stream limit.
+            if let Some(deadline) = authenticate_by {
+                if Instant::now() >= deadline {
+                    close_for_missed_authentication(&connection);
+                    break;
+                }
+            }
+
             // Accept incoming bidirectional stream.
             //
             // While the connection is still anonymous, the deadline races the *wait* — never
-            // the handling. That is the same rule the accept loop above follows for shutdown,
-            // and it is what makes the expiry safe:
+            // the verification. That is the same rule the accept loop above follows for
+            // shutdown, and it is what makes the expiry safe:
             //
             // - `accept_bi` is cancel-safe. quinn removes a stream from the connection's queue
             //   only on the poll that returns it (`poll_accept`), so a losing arm here cannot
             //   swallow a peer's Hello — it stays queued for the next call.
-            // - the deadline can only fire while nothing is being processed. If a Hello has
+            // - the deadline can only fire while nothing is being verified. If a Hello has
             //   arrived, `accept_bi` has already returned and this future is dropped; if the
             //   deadline fires, no Hello has been read, so none can have authenticated. There
             //   is no interleaving in which a verified Hello is discarded by a timeout.
             // - `biased` gives a simultaneous readiness to the peer. A stream that arrives in
-            //   the same instant the timer expires is served, and the deadline — an absolute
-            //   instant, already past — fires on the very next wait. So the tie buys exactly
-            //   one more message, which the anonymous budget already bounds, and never a
-            //   renewed lease.
+            //   the same instant the timer expires is served, and the check above ends the
+            //   connection on the next iteration. So the tie buys exactly one more message,
+            //   which the anonymous budget already bounds, and never a renewed lease.
             //
             // Absolute, not per-iteration: a `timeout` around each wait would restart on every
             // message, and "send something every T-1 seconds" would hold the slot forever
@@ -393,21 +435,7 @@ impl NetworkActor {
                     biased;
                     accepted = connection.accept_bi() => accepted,
                     _ = tokio::time::sleep_until(deadline.into()) => {
-                        warn!(
-                            remote_addr = %connection.remote_address(),
-                            "Closing inbound connection: it held a pre-authentication slot \
-                             without ever authenticating"
-                        );
-                        icn_obs::metrics::network::preauth_authentication_timeout_inc();
-                        // Close the transport, then leave the loop. Releasing the slot while
-                        // letting the anonymous connection live on would satisfy the admission
-                        // table and let the thing it bounds escape the bound. The release
-                        // itself is the guard's destructor, reached by dropping `ctx` when
-                        // this function returns.
-                        connection.close(
-                            PREAUTH_AUTHENTICATION_TIMEOUT_CODE.into(),
-                            b"pre-authentication deadline",
-                        );
+                        close_for_missed_authentication(&connection);
                         break;
                     }
                 },
@@ -415,8 +443,37 @@ impl NetworkActor {
 
             match accepted {
                 Ok((mut send, mut recv)) => {
-                    // Read network message
-                    match read_message(&mut recv).await {
+                    // Read network message.
+                    //
+                    // Bounded by the same absolute instant while the connection is anonymous.
+                    // `read_message` is an unbounded await the *peer* controls: `read_exact`
+                    // on a length prefix whose remaining bytes never arrive never returns, so
+                    // three bytes of a four-byte header parks this task inside the loop body
+                    // forever — past the wait, where no deadline could reach it. That is the
+                    // same squat #2552 is about, reached for the price of one stream.
+                    //
+                    // Bounding the read and not the dispatch is the whole distinction. Reading
+                    // bytes is not verifying them: a cancelled read discards a message nobody
+                    // has looked at yet, on a connection that is being closed regardless.
+                    // Cancelling `handle_hello` could instead abandon a peer *mid-verification*
+                    // — or, worse, after `record_authenticated_peer` had already released the
+                    // slot — so dispatch stays outside the deadline exactly as before.
+                    let read = match authenticate_by {
+                        None => read_message(&mut recv).await,
+                        Some(deadline) => {
+                            match tokio::time::timeout_at(deadline.into(), read_message(&mut recv))
+                                .await
+                            {
+                                Ok(read) => read,
+                                Err(_elapsed) => {
+                                    close_for_missed_authentication(&connection);
+                                    break;
+                                }
+                            }
+                        }
+                    };
+
+                    match read {
                         Ok((message, bytes_read)) => {
                             // Track bandwidth contribution (aggregate, no per-DID tracking)
                             icn_obs::metrics::contribution::total_bandwidth_bytes_add(

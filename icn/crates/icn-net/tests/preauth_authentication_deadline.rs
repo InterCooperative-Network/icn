@@ -429,15 +429,42 @@ async fn expiring_deadlines_return_slots_to_the_source() -> Result<()> {
         "the source's allowance was not full, so this test cannot show a slot being returned"
     );
 
-    // Wait the squatters out. Their deadlines were stamped at admission, so they expire
-    // together, and each release is the guard's destructor.
-    tokio::time::sleep(PREAUTH_AUTHENTICATION_DEADLINE + SLACK).await;
+    // Wait the squatters out structurally, not on a clock.
+    //
+    // A fixed `DEADLINE + SLACK` sleep costs its full length every run and proves less than it
+    // looks: it establishes that time passed, not that the node expired anything, so it would
+    // read identically if the connections had ended for some other reason entirely. Observing
+    // each close — and its code — is the stronger statement and returns as soon as it is true.
+    for squatter in &squatters {
+        let code = squatter
+            .closed_within(PREAUTH_AUTHENTICATION_DEADLINE + SLACK)
+            .await
+            .context("a squatting connection was still open past its deadline")?;
+        assert_eq!(
+            code,
+            u64::from(PREAUTH_AUTHENTICATION_TIMEOUT_CODE),
+            "a squatting connection ended, but not because of the pre-authentication deadline"
+        );
+    }
 
-    let after = WireClient::connect(&IdentityBundle::generate()?, addr).await?;
-    after.tag(node.did()).await?;
-    settle(&delivered).await;
+    // Closed is not yet released, and the difference is the point of this test. The frame the
+    // client just saw is sent by `connection.close()`, which runs *before* the handler returns
+    // and drops the guard, so at this instant every release is imminent rather than done.
+    // Retrying converges as fast as the node actually releases, and still fails outright if the
+    // release never happens — which a sleep long enough to hide the window would not.
+    let mut admitted = false;
+    for _ in 0..20 {
+        let after = WireClient::connect(&IdentityBundle::generate()?, addr).await?;
+        after.tag(node.did()).await?;
+        settle(&delivered).await;
+        if delivered.saw(after.did()) {
+            admitted = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     assert!(
-        delivered.saw(after.did()),
+        admitted,
         "the source was still at its ceiling after every squatting connection timed out: the \
          deadline closed connections without returning their reservations"
     );
@@ -565,6 +592,115 @@ async fn an_invalid_hello_does_not_authenticate_the_connection() -> Result<()> {
     assert!(
         ended.is_ok(),
         "a connection whose Hello failed DID-TLS binding verification was still open"
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// RED — the deadline must not be starvable by keeping the handler busy
+// ---------------------------------------------------------------------------
+
+/// A peer that always has another stream waiting must not outlive its deadline.
+///
+/// [`unauthenticated_traffic_does_not_extend_the_deadline`] sends a burst every few seconds, so
+/// the node spends nearly all of the window *waiting* — and a wait is where the deadline was
+/// being enforced. That leaves the adversarial case untested: a peer that never lets the wait
+/// happen at all.
+///
+/// The enforcement point was a `select!` marked `biased`, which polls its arms in order and
+/// returns on the first that is ready, without polling the rest. A tokio timer is not an
+/// interrupt — a `Sleep` only completes when something polls it. So if `accept_bi` is ready on
+/// every iteration, the timer arm is never polled, never registered, and the absolute deadline
+/// passes unobserved however far into the past it goes.
+///
+/// `max_concurrent_bidi_streams` is 10, which makes the attack self-clocking rather than
+/// bandwidth-bound: each opener parks until the node retires a stream and opens the replacement
+/// immediately, so several openers keep a waiter queued for every credit the node frees. The
+/// anonymous budget (#2491) does not help — an exhausted budget `continue`s the loop, which is
+/// the *fastest* path back to `accept_bi` and so makes the queue easier to keep full, not harder.
+#[tokio::test]
+async fn a_continuous_stream_backlog_does_not_starve_the_deadline() -> Result<()> {
+    init();
+
+    let node = IdentityBundle::generate()?;
+    let (_handle, addr, _guard, _delivered) = spawn_node(node.clone()).await?;
+
+    let client = WireClient::connect(&IdentityBundle::generate()?, addr).await?;
+
+    let mut flood = Vec::new();
+    for _ in 0..4 {
+        flood.push(tokio::spawn({
+            let connection = client.connection.clone();
+            let from = client.did().clone();
+            let to = node.did().clone();
+            async move {
+                while let Ok((mut send, _recv)) = connection.open_bi().await {
+                    let message = NetworkMessage::subscribe(
+                        from.clone(),
+                        to.clone(),
+                        vec!["icn.test.2552".to_string()],
+                    );
+                    let _ = icn_net::write_message(&mut send, &message).await;
+                    let _ = send.finish();
+                }
+            }
+        }));
+    }
+
+    let code = client
+        .closed_within(PREAUTH_AUTHENTICATION_DEADLINE + SLACK)
+        .await;
+    for opener in flood {
+        opener.abort();
+    }
+
+    assert_eq!(
+        code.context(
+            "a connection that kept a stream always ready outlived its pre-authentication \
+             deadline"
+        )?,
+        u64::from(PREAUTH_AUTHENTICATION_TIMEOUT_CODE),
+        "the connection was closed, but not by the pre-authentication deadline"
+    );
+    Ok(())
+}
+
+/// One stream the peer opens and never completes must not postpone the deadline either.
+///
+/// The same starvation reached without any flood, and without racing the scheduler for it.
+/// `read_message` is called *inside* the loop body, after the deadline has been left behind,
+/// and it has no timeout of its own: `read_exact` on a stream whose remaining bytes never
+/// arrive is an await that never returns. The node is then parked in the body of an iteration
+/// forever, so the deadline is not merely lost to a biased poll — it is never reached again.
+///
+/// Three bytes of a four-byte length prefix is the whole attack. It costs one stream and one
+/// packet, and unlike the flood it is deterministic: there is no instant at which the node
+/// could have noticed.
+#[tokio::test]
+async fn a_stalled_stream_does_not_postpone_the_deadline() -> Result<()> {
+    init();
+
+    let node = IdentityBundle::generate()?;
+    let (_handle, addr, _guard, _delivered) = spawn_node(node.clone()).await?;
+
+    let client = WireClient::connect(&IdentityBundle::generate()?, addr).await?;
+
+    // Held for the rest of the test: dropping the stream would reset it and hand the node the
+    // error that ends its wait, which is the node escaping rather than the node coping.
+    let (mut send, _recv) = client.connection.open_bi().await?;
+    send.write_all(&[0u8, 0, 0]).await?;
+
+    let code = client
+        .closed_within(PREAUTH_AUTHENTICATION_DEADLINE + SLACK)
+        .await
+        .context(
+            "a connection holding one incomplete stream outlived its pre-authentication deadline",
+        )?;
+
+    assert_eq!(
+        code,
+        u64::from(PREAUTH_AUTHENTICATION_TIMEOUT_CODE),
+        "the connection was closed, but not by the pre-authentication deadline"
     );
     Ok(())
 }
