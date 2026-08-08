@@ -510,3 +510,418 @@ impl ConnectionContext {
         }
     }
 }
+
+#[cfg(test)]
+mod binding_before_authentication {
+    //! A claim becomes this connection's identity only *after* every DID-TLS check passes.
+    //!
+    //! `handle_hello` calls `record_authenticated_peer` below all three checks, and that
+    //! ordering is what makes an authenticated identity mean anything. Moving the call above
+    //! them — so an unverified claim is bound first and verified afterwards — survived every
+    //! suite that should plausibly have caught it (#2554): `hello_current_cert_binding`,
+    //! `preauth_authentication_deadline`, `authenticated_rate_limit_identity`.
+    //!
+    //! It survived because those suites assert through the *connection*, and the connection is
+    //! exactly what hides this. A failed check returns `Err`, the error propagates out of the
+    //! stream loop, the handler task ends and the transport is destroyed — so "the peer entry
+    //! is absent" and "the connection closed" are true whether the bogus identity was bound or
+    //! not. The safety rests entirely on there being nothing between the failing check and its
+    //! `return`, which is a property of this function, not of the transport.
+    //!
+    //! So these tests call `handle_hello` directly, on a real QUIC connection with a real
+    //! certificate, and read the state the invariant is actually about. The dispatch loop is
+    //! deliberately absent: its teardown is the masking, and a test that keeps it can only
+    //! re-observe what the suites above already do. Everything else is production — real TLS,
+    //! real `BindingInfo`, real admission table.
+    //!
+    //! Two observables, both owned by the test and neither global:
+    //!
+    //! - `authenticated_peer` — the identity bound to this connection. This *is* the state
+    //!   "authenticated" names.
+    //! - the pre-authentication slot (#2547/#2551) — `record_authenticated_peer` also drops the
+    //!   admission guard, so a released slot is a second, independent witness that it ran. The
+    //!   table is constructed here, so it counts one connection and nothing else in the process
+    //!   can move it. The published `icn_network_preauth_admission_released_total` counter
+    //!   would say the same thing, but it is process-global and shared with every concurrently
+    //!   running test.
+
+    use super::*;
+    use crate::preauth_admission::PreAuthAdmission;
+    use crate::replay_guard::ReplayGuard;
+    use crate::{RateLimitConfig, RateLimiter, SessionManager, VersionInfo};
+    use icn_identity::{BindingInfo, IdentityBundle};
+    use quinn::{ClientConfig, Endpoint, ServerConfig};
+    use std::collections::HashMap;
+    use std::net::SocketAddr;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    fn init() {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    }
+
+    /// One inbound connection, mid-handshake: admitted, anonymous, Hello not yet delivered.
+    ///
+    /// The endpoints and the client's connection are held for the test's lifetime because
+    /// dropping either end closes the connection, and `current_peer_certificate` would then
+    /// have nothing to read — which would make every assertion below pass for the wrong reason.
+    struct Harness {
+        ctx: ConnectionContext,
+        connection: quinn::Connection,
+        admission: Arc<PreAuthAdmission>,
+        source: SocketAddr,
+        _client_connection: quinn::Connection,
+        _client_endpoint: Endpoint,
+        _node_endpoint: Endpoint,
+    }
+
+    impl Harness {
+        /// Bring up `node` and dial it presenting `wire_identity`'s certificate.
+        ///
+        /// `wire_identity` is `None` for the client that declines to present one at all. It is
+        /// separate from anything the Hello later *claims* on purpose: the gap between the
+        /// certificate on the wire and the DID in the message is the whole subject.
+        async fn accept(
+            node: &IdentityBundle,
+            wire_identity: Option<&IdentityBundle>,
+        ) -> Result<Self> {
+            let node_endpoint = Endpoint::server(
+                ServerConfig::with_crypto(Arc::new(
+                    quinn::crypto::rustls::QuicServerConfig::try_from(
+                        crate::tls::create_server_config(
+                            vec![node.tls_cert().clone()],
+                            node.tls_key(),
+                        )?,
+                    )?,
+                )),
+                "127.0.0.1:0".parse()?,
+            )?;
+            let node_addr = node_endpoint.local_addr()?;
+
+            let client_tls = match wire_identity {
+                Some(bundle) => crate::tls::create_tofu_client_config(
+                    vec![bundle.tls_cert().clone()],
+                    bundle.tls_key(),
+                )?,
+                // The server's TOFU verifier does not make client auth mandatory, so a client
+                // may simply decline. That still completes the TLS handshake and still reaches
+                // `handle_hello` — with nothing to bind a claim to.
+                None => {
+                    let mut cfg = rustls::ClientConfig::builder()
+                        .dangerous()
+                        .with_custom_certificate_verifier(Arc::new(AcceptAnyServerCert))
+                        .with_no_client_auth();
+                    cfg.alpn_protocols = vec![b"icn/1".to_vec()];
+                    cfg
+                }
+            };
+            let mut client_endpoint = Endpoint::client("127.0.0.1:0".parse()?)?;
+            client_endpoint.set_default_client_config(ClientConfig::new(Arc::new(
+                quinn::crypto::rustls::QuicClientConfig::try_from(client_tls)?,
+            )));
+
+            let accepting = {
+                let endpoint = node_endpoint.clone();
+                tokio::spawn(async move {
+                    let incoming = endpoint
+                        .accept()
+                        .await
+                        .ok_or_else(|| anyhow::anyhow!("node endpoint closed before accepting"))?;
+                    Ok::<quinn::Connection, anyhow::Error>(incoming.await?)
+                })
+            };
+            let client_connection = client_endpoint.connect(node_addr, "localhost")?.await?;
+            let connection = accepting.await??;
+
+            // The slot this connection would have been admitted on (#2547). Taking it here
+            // reproduces the state `handle_connection` hands to a real inbound context, so the
+            // release below is the production release and not a test-only side effect.
+            let source = connection.remote_address();
+            let admission = Arc::new(PreAuthAdmission::new());
+            let guard = admission.try_admit(source).map_err(|refused| {
+                anyhow::anyhow!("test connection was not admitted: {}", refused.as_str())
+            })?;
+
+            let ctx = ConnectionContext::new(
+                Arc::new(|_| {}),
+                Arc::new(RateLimiter::new(RateLimitConfig::default())),
+                Arc::new(RwLock::new(ReplayGuard::new(300, 3600))),
+                None, // neighbor_sets
+                None, // topology_config
+                Arc::new(RwLock::new(SessionManager::new())),
+                Arc::new(RwLock::new(HashMap::new())),
+                None, // blob_registry
+                None, // misbehavior_detector
+                node.clone(),
+                node.did().clone(),
+                ConnectionDirection::Inbound,
+                Arc::new(AtomicBool::new(false)),
+                None, // expected_peer
+                Some(guard),
+            );
+
+            Ok(Self {
+                ctx,
+                connection,
+                admission,
+                source,
+                _client_connection: client_connection,
+                _client_endpoint: client_endpoint,
+                _node_endpoint: node_endpoint,
+            })
+        }
+
+        /// Deliver a Hello, with the claimed DID and the binding supplied independently.
+        async fn hello(&self, from: &Did, binding: &BindingInfo) -> Result<()> {
+            self.ctx
+                .handle_hello(
+                    &self.connection,
+                    from,
+                    binding,
+                    &Some(VersionInfo::new("icnd-test".to_string())),
+                    &None,         // topology_info
+                    &[0x2eu8; 32], // x25519_public
+                    None,          // ml_dsa_public
+                    None,          // ml_kem_public
+                    None,          // pq_binding_proof
+                )
+                .await
+        }
+
+        /// The identity proven for this connection. `None` means "we cannot say who this is".
+        async fn authenticated(&self) -> Option<Did> {
+            self.ctx.authenticated_peer().await
+        }
+
+        /// Pre-authentication slots this connection's source still holds: 1 while anonymous,
+        /// 0 once `record_authenticated_peer` has dropped the guard.
+        fn slots_held(&self) -> usize {
+            self.admission.live_for(self.source)
+        }
+    }
+
+    /// The invariant, stated once.
+    ///
+    /// Note what is deliberately *not* asserted: that the connection closed. It does, and
+    /// `hello_current_cert_binding` already pins that — but closing is a consequence of the
+    /// rejection, not evidence about when the identity was bound, and asserting it here is
+    /// what let the reordering survive in the first place.
+    async fn assert_left_anonymous(harness: &Harness, outcome: Result<()>, mode: &str) {
+        assert!(
+            outcome.is_err(),
+            "{mode}: handle_hello must reject this Hello"
+        );
+        assert_eq!(
+            harness.authenticated().await,
+            None,
+            "{mode}: the connection was recorded as authenticated by a Hello that failed \
+             DID-TLS verification — a claim was bound before it was proven"
+        );
+        assert_eq!(
+            harness.slots_held(),
+            1,
+            "{mode}: the pre-authentication slot was released for a connection that never \
+             authenticated, so `record_authenticated_peer` ran before the checks (#2547/#2551)"
+        );
+    }
+
+    /// (1) The binding names a DID other than the one that sent the Hello.
+    ///
+    /// The sender presents its own certificate and its own internally-valid binding, and
+    /// claims to be somebody else. Nothing here is forged; the mismatch is the attack.
+    #[tokio::test]
+    async fn a_hello_naming_a_different_did_never_authenticates() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let attacker = IdentityBundle::generate()?;
+        let victim_did = IdentityBundle::generate()?.did().clone();
+
+        let harness = Harness::accept(&node, Some(&attacker)).await?;
+        let outcome = harness.hello(&victim_did, &attacker.binding_info()).await;
+
+        assert_left_anonymous(&harness, outcome, "binding names a different DID").await;
+        Ok(())
+    }
+
+    /// (2) The binding's signature does not verify under the claimed DID's key.
+    #[tokio::test]
+    async fn a_hello_with_an_invalid_binding_signature_never_authenticates() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+
+        let mut binding = peer.binding_info();
+        binding.tls_binding_sig[0] ^= 0xff;
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        let outcome = harness.hello(peer.did(), &binding).await;
+
+        assert_left_anonymous(&harness, outcome, "invalid binding signature").await;
+        Ok(())
+    }
+
+    /// (3) The binding is genuine, but binds a certificate other than this connection's.
+    ///
+    /// Every node publishes its own `BindingInfo` in every Hello, so a replayed one is not
+    /// privileged material. Checks (1) and (2) both pass here — only the tie to *this* TLS
+    /// session fails, which is the check #2520 added.
+    #[tokio::test]
+    async fn a_hello_bound_to_another_certificate_never_authenticates() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let attacker = IdentityBundle::generate()?;
+        let victim = IdentityBundle::generate()?;
+
+        // Wire certificate: the attacker's. Claimed DID and binding: the victim's authentic
+        // material, correctly signed — over a certificate this connection is not presenting.
+        let harness = Harness::accept(&node, Some(&attacker)).await?;
+        let outcome = harness.hello(victim.did(), &victim.binding_info()).await;
+
+        assert_left_anonymous(&harness, outcome, "binding is of a different certificate").await;
+        Ok(())
+    }
+
+    /// (4) There is no certificate on the connection to bind anything to.
+    ///
+    /// The absent-certificate branch fails closed, and must fail closed *before* recording an
+    /// identity: "cannot check" is the one case where a bound claim would be pure assertion.
+    #[tokio::test]
+    async fn a_hello_without_a_peer_certificate_never_authenticates() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let claimant = IdentityBundle::generate()?;
+
+        let harness = Harness::accept(&node, None).await?;
+        let outcome = harness
+            .hello(claimant.did(), &claimant.binding_info())
+            .await;
+
+        assert_left_anonymous(&harness, outcome, "no peer certificate").await;
+        Ok(())
+    }
+
+    /// POSITIVE CONTROL: a verified Hello still authenticates, and releases exactly one slot.
+    ///
+    /// Without this, every assertion above is satisfied by a `handle_hello` that rejects
+    /// everything. It also pins #2553's guarantee from the other side.
+    ///
+    /// "Exactly one" is measured against a *companion* slot held by the same source, because
+    /// `release` saturates: a double release of the only outstanding slot leaves the count at 0
+    /// either way and would be invisible. With a second slot outstanding, releasing twice takes
+    /// the source to 0 instead of 1, and the repeated Hello below — verified afresh, as the
+    /// handler always does — is what would do it if taking the guard were not idempotent.
+    #[tokio::test]
+    async fn a_verified_hello_authenticates_and_releases_exactly_its_own_slot() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        // A second anonymous connection from the same source, so an over-release is visible.
+        let _companion = harness
+            .admission
+            .try_admit(harness.source)
+            .map_err(|refused| anyhow::anyhow!("companion not admitted: {}", refused.as_str()))?;
+        assert_eq!(
+            harness.slots_held(),
+            2,
+            "two anonymous connections, one source"
+        );
+
+        harness.hello(peer.did(), &peer.binding_info()).await?;
+
+        assert_eq!(
+            harness.authenticated().await.as_ref(),
+            Some(peer.did()),
+            "a Hello passing every DID-TLS check must authenticate the connection"
+        );
+        assert_eq!(
+            harness.slots_held(),
+            1,
+            "authenticating must release this connection's slot and only this connection's"
+        );
+
+        harness.hello(peer.did(), &peer.binding_info()).await?;
+        assert_eq!(
+            harness.slots_held(),
+            1,
+            "a repeated verified Hello must not release a slot this connection no longer holds"
+        );
+        Ok(())
+    }
+
+    /// A connection that never authenticates still returns its slot when it is torn down.
+    ///
+    /// The negative tests above assert the slot is *not* released by a rejected Hello. That is
+    /// only safe because the guard's destructor is the other release path — otherwise pinning
+    /// "not released here" would be pinning a leak. Both halves of #2547's "no exit path leaks
+    /// a slot" therefore have to be asserted together.
+    #[tokio::test]
+    async fn a_rejected_hello_still_returns_its_slot_when_the_connection_is_dropped() -> Result<()>
+    {
+        init();
+        let node = IdentityBundle::generate()?;
+        let attacker = IdentityBundle::generate()?;
+        let victim = IdentityBundle::generate()?;
+
+        let harness = Harness::accept(&node, Some(&attacker)).await?;
+        let outcome = harness.hello(victim.did(), &victim.binding_info()).await;
+        assert_left_anonymous(&harness, outcome, "teardown precondition").await;
+
+        // What the handler task ending does: the context is dropped, and the guard with it.
+        let Harness {
+            ctx,
+            admission,
+            source,
+            ..
+        } = harness;
+        drop(ctx);
+
+        assert_eq!(
+            admission.live_for(source),
+            0,
+            "dropping the connection context must return the slot it never released"
+        );
+        Ok(())
+    }
+
+    /// Accepts the node's self-signed certificate, for the no-client-certificate case only.
+    #[derive(Debug)]
+    struct AcceptAnyServerCert;
+
+    impl rustls::client::danger::ServerCertVerifier for AcceptAnyServerCert {
+        fn verify_server_cert(
+            &self,
+            _e: &rustls::pki_types::CertificateDer<'_>,
+            _i: &[rustls::pki_types::CertificateDer<'_>],
+            _n: &rustls::pki_types::ServerName<'_>,
+            _o: &[u8],
+            _now: rustls::pki_types::UnixTime,
+        ) -> std::result::Result<rustls::client::danger::ServerCertVerified, rustls::Error>
+        {
+            Ok(rustls::client::danger::ServerCertVerified::assertion())
+        }
+        fn verify_tls12_signature(
+            &self,
+            _m: &[u8],
+            _c: &rustls::pki_types::CertificateDer<'_>,
+            _d: &rustls::DigitallySignedStruct,
+        ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error>
+        {
+            Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+        }
+        fn verify_tls13_signature(
+            &self,
+            _m: &[u8],
+            _c: &rustls::pki_types::CertificateDer<'_>,
+            _d: &rustls::DigitallySignedStruct,
+        ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error>
+        {
+            Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+        }
+        fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+            vec![rustls::SignatureScheme::ED25519]
+        }
+    }
+}
