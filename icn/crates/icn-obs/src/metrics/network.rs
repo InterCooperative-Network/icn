@@ -50,7 +50,7 @@ pub fn init_descriptions() {
     // Pre-authentication connection admission (Issue #2547)
     describe_counter!(
         "icn_network_preauth_admission_refused_total",
-        "Total inbound connections refused a pre-authentication slot, by which bound was hit (global_limit, source_limit or source_churn)"
+        "Total inbound connections refused a pre-authentication slot, by which bound was hit (global_limit or source_limit)"
     );
     describe_counter!(
         "icn_network_preauth_admission_released_total",
@@ -64,15 +64,19 @@ pub fn init_descriptions() {
         "icn_network_preauth_sources_tracked",
         "Distinct sources currently holding at least one pre-authentication slot (bounded by the global admission limit)"
     );
-    // Pre-authentication churn rate (Issue #2549)
-    describe_counter!(
-        "icn_network_preauth_churn_untracked_total",
-        "Total abandoned pre-authentication admissions that went uncharged because the per-source churn table was at capacity"
-    );
     // Pre-authentication deadline (Issue #2552)
     describe_counter!(
         "icn_network_preauth_authentication_timeout_total",
         "Total inbound connections closed for holding a pre-authentication slot without ever authenticating"
+    );
+    // Per-source anonymous work budget (Issue #2549)
+    describe_gauge!(
+        "icn_network_preauth_source_budget_tracked",
+        "Sources holding an anonymous-message allowance below full (entries expire once refilled)"
+    );
+    describe_counter!(
+        "icn_network_preauth_source_budget_degraded_total",
+        "Total anonymous messages charged to the shared budget because the per-source table was full"
     );
     describe_counter!(
         "icn_network_rate_limit_config_changes_total",
@@ -280,20 +284,6 @@ pub fn preauth_admission_released_inc() {
     counter!("icn_network_preauth_admission_released_total").increment(1);
 }
 
-/// An abandoned admission went uncharged because the churn table was full (#2549).
-///
-/// The per-source churn bound's one degraded mode. It is not an error and not an attack on
-/// its own: the table holds a source only while that source has recently abandoned an
-/// admission, so reaching capacity means thousands of distinct return-routable sources are
-/// doing so at once — the distributed case a single node cannot bound anyway.
-///
-/// Sustained non-zero means the rate bound is not being applied to some sources. Read it with
-/// `preauth_admission_refused_total{bound="source_churn"}`: refusals rising with this at zero
-/// is the bound working; this rising is the bound running out of room to work in.
-pub fn preauth_churn_untracked_inc() {
-    counter!("icn_network_preauth_churn_untracked_total").increment(1);
-}
-
 /// Established inbound connections that have not yet authenticated (#2547).
 pub fn preauth_connections_live_set(count: usize) {
     gauge!("icn_network_preauth_connections_live").set(count as f64);
@@ -321,6 +311,27 @@ pub fn preauth_sources_tracked_set(count: usize) {
 /// This flat while the gauge sits at its ceiling would mean the deadline is not firing at all.
 pub fn preauth_authentication_timeout_inc() {
     counter!("icn_network_preauth_authentication_timeout_total").increment(1);
+}
+
+/// How many sources currently hold an anonymous-message allowance below full (#2549).
+///
+/// Not a count of connections or of peers: an entry exists only while a source's allowance has
+/// not refilled, so a quiet network reads zero even with connections established. Watch it
+/// against `MAX_PREAUTH_BUDGET_SOURCES` — approaching that ceiling is the warning that
+/// `preauth_source_budget_degraded_total` is about to start moving.
+pub fn preauth_source_budget_tracked_set(sources: usize) {
+    gauge!("icn_network_preauth_source_budget_tracked").set(sources as f64);
+}
+
+/// An anonymous message was charged to the shared budget instead of its own source's (#2549).
+///
+/// This is the degraded mode, and it is a statement about *this node's table*, not about the
+/// source — which is why it carries no source label, the same unbounded-cardinality reasoning as
+/// `preauth_admission_refused_inc`. Nonzero means the per-source table was full, so every
+/// untracked source is sharing one source's worth of allowance between them. Aggregate work stays
+/// bounded; per-source fairness does not.
+pub fn preauth_source_budget_degraded_inc() {
+    counter!("icn_network_preauth_source_budget_degraded_total").increment(1);
 }
 
 /// Increment rate limit configuration change counter

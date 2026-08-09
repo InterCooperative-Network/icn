@@ -10,6 +10,7 @@
 //! to bypass aggregate rate limits. When enabled, all DIDs belonging to the same
 //! PersonhoodAnchor share a single rate limit bucket.
 
+use crate::preauth_admission::SourceKey;
 use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
@@ -228,6 +229,16 @@ impl TokenBucket {
         }
     }
 
+    /// Whether this bucket has come all the way back to capacity.
+    ///
+    /// Takes `&mut self` because the answer is only current after a refill. A bucket that is full
+    /// grants exactly what a newly built one grants, which is what lets a table of these drop
+    /// entries instead of evicting them (see [`SourcePreAuthBudget::spend`]).
+    fn is_replenished(&mut self) -> bool {
+        self.refill();
+        self.tokens >= self.capacity
+    }
+
     /// Refill tokens based on elapsed time
     fn refill(&mut self) {
         let now = Instant::now();
@@ -312,29 +323,35 @@ pub const PRE_AUTH_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
 
 /// The budget an unauthenticated connection spends, scoped to that connection.
 ///
-/// # Why the connection is the key
+/// **Inbound connections no longer use this** — see [`SourcePreAuthBudget`] and
+/// [`PreAuthBudget`]. It remains the budget for outbound dials and handler unit tests, where
+/// there is no source to aggregate against because *this node* chose the peer.
 ///
-/// The key has to be something the remote end cannot choose, and on an inbound stream
-/// almost nothing qualifies. `NetworkMessage.from` is chosen by the sender outright. The
-/// remote address is transport-derived but is *not* stable per attacker: a new source port
-/// is a new key, so reconnecting mints a fresh budget, and QUIC connection migration can
-/// change it mid-connection. The remote IP is stable but shared — one bucket per IP charges
-/// every peer behind a NAT for its noisiest neighbour, and needs a global map with its own
-/// eviction policy.
+/// # Why the connection was the key, and why that was not enough
 ///
-/// The connection itself has none of those problems. It is created by *this* node when a
-/// handshake completes; nothing in any message influences which one a byte lands on. It
-/// lives and dies with the peer's session, so there is no map to grow and nothing to evict.
-/// And it is the resource actually being consumed: the question a transport limiter answers
-/// is "whose traffic is this connection carrying", not "who wrote this payload".
+/// The key has to be something the remote end cannot choose, and on an inbound stream almost
+/// nothing qualifies. `NetworkMessage.from` is chosen by the sender outright. The connection
+/// itself has neither problem: it is created by *this* node when a handshake completes, nothing
+/// in any message influences which one a byte lands on, and it is the resource actually being
+/// consumed. Rotating the claimed DID buys nothing — every message on one connection meets the
+/// same bucket, whatever name it carries. All of that still holds.
 ///
-/// Rotating the claimed DID therefore buys nothing — every message on one connection meets
-/// the same bucket, whatever name it carries.
+/// What it missed is that the peer decides how many connections exist. One connection, one
+/// budget makes *closing* the connection a way to discard the spent budget and be issued a
+/// fresh one, so a source's aggregate was bounded by nothing at all (#2549).
+///
+/// Keying inbound traffic on the source instead costs exactly what this doc originally said it
+/// would: the remote IP is shared, so one bucket per source charges every peer behind a NAT for
+/// its noisiest neighbour, and it needs a map with an expiry policy. Both prices are paid
+/// deliberately and are documented on [`SourcePreAuthBudget`] — the port is dropped and IPv6 is
+/// aggregated by /64 precisely so that a new source port is *not* a new key, and the burst is
+/// sized at the node's whole simultaneous allowance rather than one connection's so that a NAT
+/// full of honest peers still fits.
 ///
 /// # Scope
 ///
-/// One connection, one budget. *N* connections is *N* budgets; bounding that is connection
-/// admission, which this does not address and does not claim to.
+/// One connection, one budget. *N* connections is *N* budgets — which is why inbound
+/// connections do not use it.
 #[derive(Debug)]
 pub struct PreAuthRateLimiter {
     bucket: RwLock<TokenBucket>,
@@ -364,6 +381,317 @@ impl PreAuthRateLimiter {
 impl Default for PreAuthRateLimiter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// What one source may spend on anonymous messages, however many connections it opens (#2549).
+///
+/// # The resource
+///
+/// Every message dispatched while a connection has not authenticated may be a Hello, and a Hello
+/// costs a DID parse, a `BindingInfo` signature verification, a comparison against the
+/// certificate this connection is actually using (#2520), and — when the peer offers one — an
+/// ML-DSA binding verification. That is the most expensive thing an unauthenticated peer can make
+/// this node do, and [`PreAuthRateLimiter`] bounds it *per connection*, which is not a bound at
+/// all against a peer willing to open another one: closing and reconnecting minted a fresh burst,
+/// so the aggregate was limited only by how fast a source could complete handshakes.
+///
+/// So the bucket is keyed by source and outlives the connections that spend from it. A reconnect
+/// meets the allowance it already spent.
+///
+/// # Why authentication does not buy an exemption
+///
+/// It cannot, because there is nothing to exempt: a token is spent when the work happens and is
+/// never returned. The Hello that authenticates is itself charged — the gate reads the
+/// connection's authenticated peer *before* dispatching, and for that Hello it is still `None`.
+///
+/// This matters more than it looks. Hello authentication is not scarce: a peer can self-mint an
+/// Ed25519 DID, a TLS certificate, and a binding of the one over the other, with no allowlist and
+/// no external trust gate. Any design that charged abandoned connections and forgave authenticated
+/// ones would therefore be selling exemptions for the price of a keypair. Charging the work itself
+/// is the only discriminator an attacker cannot buy.
+///
+/// A side effect worth naming: because acquiring a fresh DID-keyed post-authentication bucket
+/// costs one anonymous dispatch, the rate at which one source can mint fresh identities into the
+/// per-DID limiter is now bounded by this too.
+///
+/// # What this does not bound
+///
+/// The QUIC/TLS handshake, the `ConnectionContext` and task a connection allocates, and the
+/// deserialization of messages that are then denied here — all of that happens before or outside
+/// this gate. See the module note on [`SourcePreAuthBudget::spend`].
+///
+/// # The NAT price, stated rather than buried
+///
+/// One bucket per source is one bucket per NAT, so a noisy peer behind a shared address can spend
+/// its neighbours' allowance. That cost is paid deliberately and sized for: the burst is the full
+/// simultaneous allowance the node already grants a source, not one connection's worth, and an
+/// exhausted budget throttles a *message* rather than refusing a connection — a peer needs one
+/// token to authenticate and waits under a fifth of a second for it.
+pub const PREAUTH_SOURCE_BURST: u32 = crate::preauth_admission::MAX_PREAUTH_CONNECTIONS_PER_SOURCE
+    as u32
+    * PRE_AUTH_RATE_LIMIT.burst_capacity;
+
+/// How long a source takes to renew its whole anonymous allowance.
+///
+/// The burst above is what the node already permits one source to hold *at once*:
+/// [`crate::preauth_admission::MAX_PREAUTH_CONNECTIONS_PER_SOURCE`] concurrent anonymous
+/// connections (#2547), each with [`PRE_AUTH_RATE_LIMIT`]'s burst (#2491). Restating it as a
+/// shared burst is deliberately non-regressive — no instantaneous capability any source has today
+/// is taken away. What changes is only how fast that allowance comes back, which is exactly the
+/// defect #2549 filed.
+///
+/// The renewal period is the authentication deadline (#2552): a source that occupies all of its
+/// concurrent slots for the full deadline and spends every message it is allowed sits exactly at
+/// this rate, so it is the fastest legitimate steady state the existing constants describe.
+///
+/// These numbers are composed from three constants this repository already commits to. The
+/// composition is a policy choice and is not uniquely derived — nothing here depends on the exact
+/// values, only on the burst being the existing simultaneous maximum and the period being the
+/// existing connection lifetime.
+pub const PREAUTH_SOURCE_RENEWAL_WINDOW: Duration =
+    crate::preauth_admission::PREAUTH_AUTHENTICATION_DEADLINE;
+
+/// How many sources may be tracked individually before the table degrades.
+///
+/// A **chosen memory budget**, not a derived bound: at roughly 64 bytes an entry this is a
+/// quarter of a megabyte. Its value decides *when* [`SourcePreAuthBudget`] degrades, never
+/// whether the aggregate stays bounded — see [`SourcePreAuthBudget::spend`].
+pub const MAX_PREAUTH_BUDGET_SOURCES: usize = 4096;
+
+/// Least time between sweeps of replenished entries.
+///
+/// A sweep is O(tracked sources) and only ever runs on the miss path of a full table, so this
+/// keeps a stream of misses against an unreclaimable table from walking it every time. Blocking a
+/// sweep is safe: the caller falls through to the shared budget, which is bounded.
+const BUDGET_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Tokens added per refill interval to renew `PREAUTH_SOURCE_BURST` over the renewal window.
+fn source_refill_rate_per_interval() -> f64 {
+    PREAUTH_SOURCE_BURST as f64 * PRE_AUTH_RATE_LIMIT.refill_interval.as_secs_f64()
+        / PREAUTH_SOURCE_RENEWAL_WINDOW.as_secs_f64()
+}
+
+/// The anonymous-message allowance of every source this endpoint has heard from recently.
+///
+/// One of these per endpoint, created with the accept loop and shared by every inbound
+/// connection.
+#[derive(Debug)]
+pub struct SourcePreAuthBudget {
+    state: std::sync::Mutex<BudgetState>,
+}
+
+#[derive(Debug)]
+struct BudgetState {
+    /// Sources with an allowance that is currently below full.
+    ///
+    /// A replenished bucket is indistinguishable from an absent one, which is what keeps this
+    /// bounded without an eviction policy — see [`SourcePreAuthBudget::spend`].
+    per_source: HashMap<SourceKey, TokenBucket>,
+    /// What every source the table had no room to track shares.
+    shared: TokenBucket,
+    max_sources: usize,
+    last_sweep: Instant,
+    capacity: f64,
+    refill_rate: f64,
+    refill_interval: Duration,
+}
+
+impl BudgetState {
+    fn fresh_bucket(&self) -> TokenBucket {
+        TokenBucket::new(self.capacity, self.refill_rate, self.refill_interval)
+    }
+
+    /// Drop every entry whose allowance has come all the way back.
+    ///
+    /// Returns the number removed. Rate-limited by [`BUDGET_SWEEP_MIN_INTERVAL`]; a refused sweep
+    /// reports zero rather than pretending to have run.
+    fn sweep_replenished(&mut self) -> usize {
+        let now = Instant::now();
+        if now.duration_since(self.last_sweep) < BUDGET_SWEEP_MIN_INTERVAL {
+            return 0;
+        }
+        self.last_sweep = now;
+        let before = self.per_source.len();
+        self.per_source.retain(|_, bucket| !bucket.is_replenished());
+        icn_obs::metrics::network::preauth_source_budget_tracked_set(self.per_source.len());
+        before - self.per_source.len()
+    }
+}
+
+impl SourcePreAuthBudget {
+    /// The allowance table this endpoint's accept loop hands to its connections.
+    pub fn new() -> Self {
+        Self::with_policy(
+            PREAUTH_SOURCE_BURST as f64,
+            source_refill_rate_per_interval(),
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+            MAX_PREAUTH_BUDGET_SOURCES,
+        )
+    }
+
+    /// A table with explicit policy, so tests can state a bound instead of waiting for one.
+    pub fn with_policy(
+        capacity: f64,
+        refill_rate: f64,
+        refill_interval: Duration,
+        max_sources: usize,
+    ) -> Self {
+        Self {
+            state: std::sync::Mutex::new(BudgetState {
+                per_source: HashMap::new(),
+                shared: TokenBucket::new(capacity, refill_rate, refill_interval),
+                max_sources,
+                last_sweep: Instant::now(),
+                capacity,
+                refill_rate,
+                refill_interval,
+            }),
+        }
+    }
+
+    /// Spend one anonymous message against `key`'s allowance.
+    ///
+    /// # What this bounds
+    ///
+    /// Over any window of length *T*, one source's anonymous **dispatches** are at most
+    /// `PREAUTH_SOURCE_BURST + rate * T`. Not `PREAUTH_SOURCE_BURST` per window: a token bucket
+    /// permits a full burst at the start of a window and another once it has refilled, so the
+    /// sliding-window reading of it is wrong by up to a factor of two.
+    ///
+    /// It does **not** bound the QUIC/TLS handshake, which is complete before the source key
+    /// exists at all, nor the `ConnectionContext` and task a connection allocates, nor reading and
+    /// deserializing a message that is then denied here — that read happens before this gate, and
+    /// one held connection can force it without reconnecting even once.
+    ///
+    /// # Bounded state, and what happens when it runs out
+    ///
+    /// An entry is kept only while the source's allowance is below full, because a replenished
+    /// bucket grants exactly what a fresh one does. Entries therefore **expire by refilling**, and
+    /// are never evicted while live. That is the security property, not merely a memory one: an
+    /// attacker cannot evict a victim's entry to reset it, and cannot evict its own — its entry is
+    /// below full precisely because it is spending, and a full one would buy nothing.
+    ///
+    /// When the table is full and a sweep frees nothing, an untracked source spends from a single
+    /// **shared** bucket with one source's burst and rate. So the protection degrades from "each
+    /// source is bounded" to "every untracked source is bounded *together*, by one source's
+    /// worth" — never to "unbounded". Being untracked is never better than being tracked, so
+    /// there is nothing to game by filling the table, and filling it needs source cardinality one
+    /// source does not have.
+    pub fn spend(&self, key: SourceKey) -> bool {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        if let Some(bucket) = state.per_source.get_mut(&key) {
+            return bucket.try_consume();
+        }
+
+        if state.per_source.len() >= state.max_sources {
+            state.sweep_replenished();
+        }
+        if state.per_source.len() >= state.max_sources {
+            icn_obs::metrics::network::preauth_source_budget_degraded_inc();
+            return state.shared.try_consume();
+        }
+
+        let mut bucket = state.fresh_bucket();
+        let allowed = bucket.try_consume();
+        state.per_source.insert(key, bucket);
+        // Published from the two places the table can change size — here and the sweep above —
+        // rather than from the caller, so no exit path can leave it stale.
+        icn_obs::metrics::network::preauth_source_budget_tracked_set(state.per_source.len());
+        allowed
+    }
+
+    /// Rewind every bucket so the table believes `d` has elapsed.
+    ///
+    /// Private and test-only on purpose. Production accounting reads `Instant::now()` inside
+    /// [`TokenBucket::refill`] and takes no timestamp from any caller, which is what makes a
+    /// clock regression unrepresentable rather than merely unlikely; exposing a
+    /// caller-supplied instant to make tests deterministic would put back exactly the seam
+    /// that property removes.
+    #[cfg(test)]
+    fn advance(&self, d: Duration) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let rewind = |at: &mut Instant| {
+            *at = at
+                .checked_sub(d)
+                .expect("test durations stay within Instant range");
+        };
+        for bucket in state.per_source.values_mut() {
+            rewind(&mut bucket.last_refill);
+        }
+        rewind(&mut state.shared.last_refill);
+        rewind(&mut state.last_sweep);
+    }
+
+    /// How many sources currently hold an allowance below full.
+    pub fn tracked_sources(&self) -> usize {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .per_source
+            .len()
+    }
+}
+
+impl Default for SourcePreAuthBudget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Where a connection's anonymous messages are charged.
+///
+/// Two arms because the question "which source is this" has an answer for exactly one of them.
+#[derive(Debug)]
+pub enum PreAuthBudget {
+    /// Inbound: two bounds, because they bound two different things.
+    ///
+    /// The per-connection bucket caps what *one session* may burst (#2491); the source bucket
+    /// caps what one source may spend in aggregate over time, across every connection it opens
+    /// (#2549). Dropping the first in favour of the second would not have been a redesign but a
+    /// trade: it would have let a single fresh connection spend the whole source allowance at
+    /// once, eight times what #2491 permits it today.
+    Source {
+        /// What this one connection may burst, unchanged from #2491.
+        connection: PreAuthRateLimiter,
+        /// The endpoint's allowance table.
+        budget: Arc<SourcePreAuthBudget>,
+        /// Which source this connection is charged to.
+        key: SourceKey,
+    },
+    /// Outbound dials and handler unit tests.
+    ///
+    /// *This node* chose the peer, so there is no source to aggregate against and no churn to
+    /// bound: nobody can make this node dial by reconnecting. The per-connection budget is the
+    /// right one here, and it is the same one `admission_guard` is `None` for.
+    Connection(PreAuthRateLimiter),
+}
+
+impl PreAuthBudget {
+    /// Spend one message's worth of every allowance this connection draws on.
+    ///
+    /// The connection's own bucket is asked first, so a connection that has exhausted its burst
+    /// never reaches the shared lock. If it permits and the source does not, the connection has
+    /// still spent a token on a message that was never dispatched. That is deliberate: it can
+    /// only ever make the bound *tighter* than stated, never looser, and the alternative — a
+    /// peek across two locks followed by a commit — buys nothing for a message that is being
+    /// dropped either way.
+    pub async fn check(&self) -> bool {
+        match self {
+            Self::Source {
+                connection,
+                budget,
+                key,
+            } => connection.check().await && budget.spend(*key),
+            Self::Connection(limiter) => limiter.check().await,
+        }
     }
 }
 
@@ -1576,6 +1904,276 @@ mod refill_semantics_tests {
             !b.try_consume(),
             "a configured 0 msg/s must not replenish - burst is a one-time \
              allowance, not a floor"
+        );
+    }
+}
+
+/// What one source may spend on anonymous work, and what happens when the table runs out (#2549).
+///
+/// The connection-level behaviour is proven end to end against a real node in
+/// `tests/preauth_source_work_budget.rs`. These cover what that cannot reach deterministically:
+/// exact points on the refill curve, source-key normalisation, and the behaviour of a saturated
+/// table — which needs more source cardinality than a loopback test has.
+#[cfg(test)]
+mod source_budget_tests {
+    use super::*;
+    use std::net::SocketAddr;
+
+    /// A table with a small, exactly-known policy, so an assertion can name a number.
+    ///
+    /// Deliberately not the production constants: these tests are about the *mechanism*, and a
+    /// mechanism test that has to spend 160 tokens to reach an edge hides which edge it reached.
+    /// The shipped numbers are exercised by the integration suite.
+    fn table(burst: f64, max_sources: usize) -> SourcePreAuthBudget {
+        // One whole burst per second, so "advance(1s)" is "one full renewal".
+        SourcePreAuthBudget::with_policy(
+            burst,
+            burst / 10.0,
+            Duration::from_millis(100),
+            max_sources,
+        )
+    }
+
+    fn key(addr: &str) -> SourceKey {
+        SourceKey::from_addr(addr.parse::<SocketAddr>().expect("test address"))
+    }
+
+    /// Spend until refused, and report how many went through.
+    fn drain(budget: &SourcePreAuthBudget, k: SourceKey) -> usize {
+        let mut spent = 0;
+        while budget.spend(k) {
+            spent += 1;
+            assert!(spent < 10_000, "bucket never refused; it is not bounded");
+        }
+        spent
+    }
+
+    // -- A9: burst, sustained rate, refill ---------------------------------------------------
+
+    /// The burst is a one-time allowance and the rate is what renews it.
+    #[test]
+    fn burst_then_sustained_rate() {
+        let budget = table(8.0, 16);
+        let k = key("198.51.100.7:1000");
+
+        assert_eq!(
+            drain(&budget, k),
+            8,
+            "the first allowance is the whole burst"
+        );
+        assert!(!budget.spend(k), "and it does not renew instantly");
+
+        // Half a renewal window returns half the burst, not all of it.
+        budget.advance(Duration::from_millis(500));
+        assert_eq!(
+            drain(&budget, k),
+            4,
+            "refill is proportional to elapsed time"
+        );
+
+        // A long silence refills to capacity and no further.
+        budget.advance(Duration::from_secs(60));
+        assert_eq!(drain(&budget, k), 8, "a long gap refills only to the burst");
+    }
+
+    /// Over a window of length T a source gets `burst + rate * T`, not `burst`.
+    ///
+    /// Pinned because the claim is easy to state wrongly, and the wrong statement — "at most
+    /// `burst` per window" — is what a reviewer will check the PR body against. A bucket
+    /// deliberately permits a full burst at the start of a window and another once it has
+    /// refilled, so the sliding-window reading is short by up to a factor of two.
+    #[test]
+    fn a_window_permits_burst_plus_refill_not_burst() {
+        let budget = table(8.0, 16);
+        let k = key("198.51.100.8:1000");
+
+        let first = drain(&budget, k);
+        budget.advance(Duration::from_secs(1)); // exactly one renewal window
+        let second = drain(&budget, k);
+
+        assert_eq!(
+            first + second,
+            16,
+            "one full window yielded {first} + {second}; the honest bound is burst + rate*T"
+        );
+    }
+
+    // -- A7: source-key rotation --------------------------------------------------------------
+
+    /// A new source port is not a new source.
+    #[test]
+    fn rotating_the_source_port_does_not_renew_the_allowance() {
+        let budget = table(4.0, 16);
+        assert_eq!(drain(&budget, key("203.0.113.5:1000")), 4);
+        assert!(
+            !budget.spend(key("203.0.113.5:65000")),
+            "an ephemeral port change bought a fresh allowance"
+        );
+    }
+
+    /// Host bits inside one IPv6 /64 are not new sources.
+    #[test]
+    fn rotating_ipv6_host_bits_does_not_renew_the_allowance() {
+        let budget = table(4.0, 16);
+        assert_eq!(drain(&budget, key("[2001:db8:1:2::1]:1000")), 4);
+        assert!(
+            !budget.spend(key("[2001:db8:1:2:ffff:ffff:ffff:ffff]:1000")),
+            "a host-bit rotation inside one /64 bought a fresh allowance"
+        );
+        assert!(
+            budget.spend(key("[2001:db8:1:3::1]:1000")),
+            "a genuinely different /64 must still be its own source"
+        );
+    }
+
+    /// One source's spending never charges another's.
+    #[test]
+    fn sources_do_not_charge_each_other() {
+        let budget = table(4.0, 16);
+        assert_eq!(drain(&budget, key("203.0.113.1:1000")), 4);
+        assert_eq!(
+            drain(&budget, key("203.0.113.2:1000")),
+            4,
+            "an exhausted neighbour must not spend this source's allowance"
+        );
+    }
+
+    // -- A8: order of use, and the absence of retroactive accounting --------------------------
+
+    /// Interleaving old and new users of a source cannot manufacture refill.
+    ///
+    /// The draft this replaces charged at connection *release* using the admission's own
+    /// timestamp, so a late release from an older connection moved the bucket's clock backwards
+    /// and paid out refill that had not happened. There is no timestamp to supply here: a token
+    /// is taken at the moment the work is about to be done, and nothing is charged when a
+    /// connection ends. So teardown order is not an input, and this pins that it stays that way.
+    #[test]
+    fn use_order_and_teardown_order_are_not_inputs() {
+        let budget = table(8.0, 16);
+        let k = key("203.0.113.9:1000");
+
+        // Two "connections" from one source, used in strict reverse order of creation, with the
+        // older one going last — the shape that used to rewind the clock.
+        let mut spent = 0;
+        for _ in 0..4 {
+            if budget.spend(k) {
+                spent += 1;
+            }
+        }
+        for _ in 0..8 {
+            if budget.spend(k) {
+                spent += 1;
+            }
+        }
+        assert_eq!(spent, 8, "interleaved use paid out more than the burst");
+        assert!(!budget.spend(k), "and left the bucket spent, not renewed");
+    }
+
+    // -- A6: a saturated table degrades, and never fails open ---------------------------------
+
+    /// An entry disappears once its allowance has come all the way back.
+    ///
+    /// This is what bounds the table without an eviction policy, and it is why a full table is
+    /// hard to arrange: only sources that are *currently* below full occupy a slot.
+    #[test]
+    fn a_replenished_source_stops_being_tracked() {
+        let budget = table(4.0, 2);
+        assert!(budget.spend(key("203.0.113.20:1000")));
+        assert_eq!(budget.tracked_sources(), 1);
+
+        // Refill past capacity, then force the sweep by making the table need a slot.
+        budget.advance(Duration::from_secs(30));
+        assert!(budget.spend(key("203.0.113.21:1000")));
+        assert!(budget.spend(key("203.0.113.22:1000")));
+        assert!(
+            budget.tracked_sources() <= 2,
+            "replenished entries were never reclaimed; the table is not bounded by its cap"
+        );
+    }
+
+    /// A full table degrades to a shared allowance — it does not stop bounding anything.
+    ///
+    /// The failure the previous draft had: at capacity it admitted every untracked source without
+    /// accounting, so the headline per-source bound simply ceased to exist once enough other keys
+    /// were present. Here an untracked source draws from one shared bucket, so every untracked
+    /// source *together* gets at most one source's worth.
+    #[test]
+    fn a_full_table_degrades_rather_than_failing_open() {
+        const CAP: usize = 8;
+        let budget = table(4.0, CAP);
+
+        // Fill it with sources that are all below full, so nothing is reclaimable.
+        for i in 0..CAP {
+            assert!(budget.spend(key(&format!("203.0.113.{}:1000", 100 + i))));
+        }
+        assert_eq!(budget.tracked_sources(), CAP);
+
+        // Now attack with a key the table has no room for.
+        let untracked = key("192.0.2.77:1000");
+        let spent = drain(&budget, untracked);
+        assert_eq!(
+            spent, 4,
+            "an untracked source got {spent} dispatches, not the shared burst of 4 — a full \
+             table must not fail open"
+        );
+
+        // And a second untracked source shares that same exhausted allowance rather than
+        // receiving its own.
+        assert!(
+            !budget.spend(key("192.0.2.78:1000")),
+            "each untracked source got its own allowance, so the degraded mode is unbounded in \
+             source cardinality"
+        );
+    }
+
+    // -- A10: concurrency ---------------------------------------------------------------------
+
+    /// Simultaneous spenders from one source share one allowance exactly.
+    ///
+    /// The realistic shape: several connections from one address, each on its own task, all
+    /// charging the same bucket. An accounting race here would show up as a burst larger than the
+    /// one configured.
+    #[test]
+    fn concurrent_spenders_from_one_source_share_one_allowance() {
+        const BURST: usize = 64;
+        const THREADS: usize = 8;
+        // Zero refill, so the assertion is exact rather than a race against wall-clock: any
+        // token beyond the burst is an accounting fault, never replenishment that leaked in
+        // while the threads ran.
+        let budget = Arc::new(SourcePreAuthBudget::with_policy(
+            BURST as f64,
+            0.0,
+            Duration::from_millis(100),
+            16,
+        ));
+        let k = key("203.0.113.30:1000");
+
+        let granted = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut handles = Vec::new();
+        for _ in 0..THREADS {
+            let budget = budget.clone();
+            let granted = granted.clone();
+            handles.push(std::thread::spawn(move || {
+                for _ in 0..BURST {
+                    if budget.spend(k) {
+                        granted.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            }));
+        }
+        for h in handles {
+            h.join().expect("spender thread panicked");
+        }
+
+        let total = granted.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            total <= BURST,
+            "{THREADS} concurrent spenders were granted {total} tokens from a burst of {BURST}"
+        );
+        assert_eq!(
+            total, BURST,
+            "concurrent spenders were granted {total} of a {BURST} burst; an allowance was lost \
+             or duplicated under contention"
         );
     }
 }

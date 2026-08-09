@@ -48,17 +48,19 @@ pub use error::{NetError, Result};
 pub use global_rate_limit::GlobalRateLimiter;
 pub use nat::{NatConfig, NatTraversal, NatType, PublicAddress, TurnServerConfig};
 pub use preauth_admission::{
-    AdmissionGuard, AdmissionRefusal, PreAuthAdmission, MAX_PREAUTH_CHURN_SOURCES,
-    MAX_PREAUTH_CONNECTIONS_PER_SOURCE, MAX_PREAUTH_CONNECTIONS_TOTAL,
-    PREAUTH_AUTHENTICATION_DEADLINE, PREAUTH_AUTHENTICATION_TIMEOUT_CODE,
-    PREAUTH_CHURN_BUDGET_PER_SOURCE, PREAUTH_CHURN_REFILL_WINDOW,
+    AdmissionGuard, AdmissionRefusal, PreAuthAdmission, MAX_PREAUTH_CONNECTIONS_PER_SOURCE,
+    MAX_PREAUTH_CONNECTIONS_TOTAL, PREAUTH_AUTHENTICATION_DEADLINE,
+    PREAUTH_AUTHENTICATION_TIMEOUT_CODE,
 };
 pub use protocol::{
     read_message, read_message_compressed, read_message_negotiated, write_message,
     write_message_compressed, write_message_negotiated, CompressionFormat, EncodingFormat,
     KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, COMPRESSION_THRESHOLD,
 };
-pub use rate_limit::{RateLimitConfig, RateLimiter, NETWORK_DOMAIN};
+pub use rate_limit::{
+    RateLimitConfig, RateLimiter, SourcePreAuthBudget, MAX_PREAUTH_BUDGET_SOURCES, NETWORK_DOMAIN,
+    PREAUTH_SOURCE_BURST, PREAUTH_SOURCE_RENEWAL_WINDOW,
+};
 pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;

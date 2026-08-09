@@ -430,7 +430,9 @@ mod tests {
             // Inbound: we did not choose this peer, so we expected nobody (#2533).
             expected_peer: None,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
-            pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
+            pre_auth_limiter: crate::rate_limit::PreAuthBudget::Connection(
+                crate::rate_limit::PreAuthRateLimiter::new(),
+            ),
             // No inbound admission slot: these contexts are built directly, not by the
             // accept loop (#2547).
             admission_guard: std::sync::Mutex::new(None),

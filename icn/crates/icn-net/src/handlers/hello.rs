@@ -659,6 +659,7 @@ mod binding_before_authentication {
                 Arc::new(AtomicBool::new(false)),
                 None, // expected_peer
                 Some(guard),
+                None, // pre_auth_budget: this harness exercises Hello, not source accounting
             );
 
             Ok(Self {
