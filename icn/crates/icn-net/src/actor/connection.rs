@@ -4,8 +4,10 @@
 //!
 //! - **Connection acceptance**: Listens for new connections via the session manager
 //! - **Stream processing**: Handles bidirectional streams for message exchange
-//! - **Rate limiting**: Two-phase — an anonymous per-*source* budget until the peer
-//!   authenticates, then per-DID and per-personhood-anchor limits for Sybil resistance
+//! - **Rate limiting**: Two-phase. While the peer is anonymous an inbound message spends *both*
+//!   a per-connection burst (#2491) and a shared per-source budget that survives reconnects
+//!   (#2549); once it authenticates, per-DID and per-personhood-anchor limits apply for Sybil
+//!   resistance
 //! - **Byzantine detection**: Reports misbehavior to the misbehavior detector
 //! - **Blob announcements**: Extracts and registers blob availability from incoming messages
 //!

@@ -324,22 +324,128 @@ async fn drain_source(
     Ok(())
 }
 
+/// Consecutive unchanged samples that count as "the node has stopped dispatching".
+///
+/// One is not enough. Dispatch arrives in bursts, and a burst can straddle a sample gap — a
+/// scheduler hiccup, a debug-logging pause or CI contention is all it takes for two reads to
+/// match while more messages are still on their way. Requiring the count to hold still across
+/// several consecutive samples turns a single lucky interval into a quiet *window*.
+const SETTLE_STABLE_SAMPLES: usize = 3;
+
+/// Gap between delivery-count samples.
+const SETTLE_SAMPLE_INTERVAL: Duration = Duration::from_millis(50);
+
+/// Longest [`settle`] waits for the count to stop moving before declaring the run unusable.
+///
+/// Bounded on purpose: an unbounded wait would turn "the node never stopped dispatching" into a
+/// hang instead of a failure.
+const SETTLE_PATIENCE: Duration = Duration::from_secs(5);
+
 /// Let the node finish dispatching before anything is counted.
 ///
 /// Waits for the delivery total to stop moving rather than sleeping a fixed amount, so it can
 /// only ever admit *more* messages than a fixed wait would — never fewer. That direction matters:
 /// every assertion below is an upper bound, so a premature read could only make a test pass when
 /// it should fail, and this removes that.
+///
+/// The quiet has to be *sustained*. A single unchanged sample is not evidence that dispatch has
+/// finished, only that nothing landed in one 50 ms window, so any late arrival resets the run of
+/// quiet samples rather than being absorbed into it. Undercounting here is precisely the failure
+/// this guards: a short read makes every upper bound below easier to satisfy.
+///
+/// Panics rather than returning a partial total if the count never settles — a test that asserts
+/// a bound on a still-growing number is not measuring the bound.
 async fn settle(delivered: &Delivered) {
-    let mut last = usize::MAX;
-    for _ in 0..40 {
+    settle_with(
+        delivered,
+        SETTLE_SAMPLE_INTERVAL,
+        SETTLE_STABLE_SAMPLES,
+        SETTLE_PATIENCE,
+    )
+    .await
+}
+
+/// [`settle`] with its timings named explicitly.
+///
+/// Split out only so the helper's own test can widen the sample interval far enough that it is
+/// measuring the reset rule rather than racing a loaded CI scheduler.
+async fn settle_with(
+    delivered: &Delivered,
+    interval: Duration,
+    required_stable: usize,
+    patience: Duration,
+) {
+    let started = Instant::now();
+    let mut last = delivered.count();
+    let mut stable = 0usize;
+
+    while started.elapsed() < patience {
+        tokio::time::sleep(interval).await;
         let now = delivered.count();
         if now == last {
-            return;
+            stable += 1;
+            if stable >= required_stable {
+                return;
+            }
+        } else {
+            stable = 0;
+            last = now;
         }
-        last = now;
-        tokio::time::sleep(Duration::from_millis(50)).await;
     }
+
+    panic!(
+        "deliveries never settled: count is {} and still moving after {:?} — reached only {} of \
+         the {} consecutive unchanged {:?} samples required. The node is still dispatching, so \
+         any upper bound asserted against this total would be reading a partial count.",
+        delivered.count(),
+        patience,
+        stable,
+        required_stable,
+        interval,
+    );
+}
+
+/// A late arrival resets the quiet window instead of being absorbed into it.
+///
+/// This is a test of the measuring instrument, not of the budget. The previous helper returned
+/// after a *single* unchanged 50 ms sample, so a delivery landing in the very next interval was
+/// never counted — and because every assertion in this file is an upper bound, that undercount
+/// could only ever turn a failure into a pass. The shape below is exactly that: quiet for long
+/// enough to look finished under the old rule, then one more delivery.
+///
+/// The sample interval is widened well past the production one so the margins are in hundreds of
+/// milliseconds: this must fail because the rule is wrong, never because a runner was busy.
+#[tokio::test]
+async fn settle_waits_through_a_late_delivery() {
+    const INTERVAL: Duration = Duration::from_millis(200);
+    const REQUIRED_STABLE: usize = 3;
+
+    let delivered = Delivered(Arc::new(Mutex::new(vec!["first".to_string()])));
+
+    let late = delivered.0.clone();
+    tokio::spawn(async move {
+        // Comfortably after the first unchanged sample the old helper would have returned on,
+        // and comfortably before the third this one needs.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        late.lock()
+            .expect("delivery log poisoned")
+            .push("late".to_string());
+    });
+
+    settle_with(
+        &delivered,
+        INTERVAL,
+        REQUIRED_STABLE,
+        Duration::from_secs(10),
+    )
+    .await;
+
+    assert_eq!(
+        delivered.count(),
+        2,
+        "settle returned before the late delivery landed, so the quiet window was not reset — \
+         an upper-bound assertion taken here would be reading a short count"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -551,14 +657,20 @@ async fn many_peers_behind_one_source_all_authenticate() -> Result<()> {
     Ok(())
 }
 
-/// An honest peer sharing a drained address is delayed, not locked out.
+/// A drained source refills fast enough that a *retrying* peer gets in, and the connection
+/// survives the refusals while it waits.
 ///
-/// The collateral, quantified rather than asserted away. A peer needs one token to authenticate
-/// and the bucket refills continuously, so the wait is about one token's worth of time — and the
-/// connection survives the refusal, because a throttled anonymous message is dropped rather than
-/// closing the session.
+/// The collateral, quantified rather than asserted away: a peer needs one token to authenticate
+/// and the bucket refills continuously, so the allowance is back within about one token-time, and
+/// a throttled anonymous message is dropped rather than closing the session.
+///
+/// **The retry below is this client's, and production has no equivalent.** A refused Hello is
+/// answered with silence, and `wire_new_connection` sends its Hello exactly once, so nothing in
+/// the daemon repeats the attempt. What this test establishes is the budget's behaviour — the
+/// allowance comes back, and the session is still there to use it — not that a real peer would
+/// automatically take advantage of that. Making the refusal recoverable in production is #2561.
 #[tokio::test]
-async fn an_honest_peer_sharing_a_drained_source_recovers() -> Result<()> {
+async fn a_drained_source_refills_for_a_peer_that_retries() -> Result<()> {
     init();
     let node = IdentityBundle::generate()?;
     let (_handle, addr, _guard, delivered) = spawn_node(node.clone()).await?;

@@ -323,9 +323,10 @@ pub const PRE_AUTH_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
 
 /// The budget an unauthenticated connection spends, scoped to that connection.
 ///
-/// **Inbound connections no longer use this** — see [`SourcePreAuthBudget`] and
-/// [`PreAuthBudget`]. It remains the budget for outbound dials and handler unit tests, where
-/// there is no source to aggregate against because *this node* chose the peer.
+/// **Inbound connections no longer rely on this alone** — it is one of *two* bounds they spend,
+/// paired with [`SourcePreAuthBudget`] inside [`PreAuthBudget::Source`]. It remains the *only*
+/// budget for outbound dials and handler unit tests, where there is no source to aggregate
+/// against because *this node* chose the peer.
 ///
 /// # Why the connection was the key, and why that was not enough
 ///
@@ -350,8 +351,10 @@ pub const PRE_AUTH_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
 ///
 /// # Scope
 ///
-/// One connection, one budget. *N* connections is *N* budgets — which is why inbound
-/// connections do not use it.
+/// One connection, one budget. *N* connections is *N* budgets — which is why inbound traffic
+/// cannot be bounded by this *alone*: closing and reopening mints a fresh burst, so a source's
+/// aggregate would be bounded by nothing. Inbound therefore composes it with the source-scoped
+/// budget, which the reconnect does not reset.
 #[derive(Debug)]
 pub struct PreAuthRateLimiter {
     bucket: RwLock<TokenBucket>,
@@ -495,7 +498,14 @@ struct BudgetState {
     /// What every source the table had no room to track shares.
     shared: TokenBucket,
     max_sources: usize,
-    last_sweep: Instant,
+    /// When the last sweep ran, or `None` if none ever has.
+    ///
+    /// `None` rather than "construction time": the throttle exists so a *stream* of misses
+    /// against an unreclaimable table does not walk it every time, and the first miss has no
+    /// previous sweep to be too close to. Starting the clock at construction made the one miss
+    /// with the most to reclaim — the first time the table fills — the only miss that could not
+    /// sweep, which is also the opposite of what the docs above promise.
+    last_sweep: Option<Instant>,
     capacity: f64,
     refill_rate: f64,
     refill_interval: Duration,
@@ -512,10 +522,12 @@ impl BudgetState {
     /// reports zero rather than pretending to have run.
     fn sweep_replenished(&mut self) -> usize {
         let now = Instant::now();
-        if now.duration_since(self.last_sweep) < BUDGET_SWEEP_MIN_INTERVAL {
-            return 0;
+        if let Some(last) = self.last_sweep {
+            if now.duration_since(last) < BUDGET_SWEEP_MIN_INTERVAL {
+                return 0;
+            }
         }
-        self.last_sweep = now;
+        self.last_sweep = Some(now);
         let before = self.per_source.len();
         self.per_source.retain(|_, bucket| !bucket.is_replenished());
         icn_obs::metrics::network::preauth_source_budget_tracked_set(self.per_source.len());
@@ -546,7 +558,7 @@ impl SourcePreAuthBudget {
                 per_source: HashMap::new(),
                 shared: TokenBucket::new(capacity, refill_rate, refill_interval),
                 max_sources,
-                last_sweep: Instant::now(),
+                last_sweep: None,
                 capacity,
                 refill_rate,
                 refill_interval,
@@ -638,7 +650,9 @@ impl SourcePreAuthBudget {
             rewind(&mut bucket.last_refill);
         }
         rewind(&mut state.shared.last_refill);
-        rewind(&mut state.last_sweep);
+        if let Some(last_sweep) = state.last_sweep.as_mut() {
+            rewind(last_sweep);
+        }
     }
 
     /// How many sources this table currently holds an allowance for.
@@ -2138,6 +2152,89 @@ mod source_budget_tests {
             !budget.spend(key("192.0.2.78:1000")),
             "each untracked source got its own allowance, so the degraded mode is unbounded in \
              source cardinality"
+        );
+    }
+
+    /// The very first full-table miss may reclaim, rather than waiting out an interval that
+    /// never started.
+    ///
+    /// `last_sweep` used to be stamped at construction, which made the throttle measure from a
+    /// sweep that had not happened. A table filling inside the first
+    /// [`BUDGET_SWEEP_MIN_INTERVAL`] therefore degraded to the shared bucket with a table full of
+    /// entries it was entitled to reclaim. Nothing about the bound changed — the fallback is
+    /// bounded either way — but the docs promise reclamation "on the miss path of a full table",
+    /// and this is the one miss where that was untrue.
+    #[test]
+    fn the_first_full_table_miss_can_still_sweep() {
+        const CAP: usize = 8;
+        let budget = table(4.0, CAP);
+
+        // Fill the table with entries that are *already* reclaimable: a fresh bucket is full,
+        // which is exactly the condition a sweep looks for. Populated directly rather than by
+        // spending and calling `advance`, because `advance` rewinds `last_sweep` along with the
+        // buckets — it would hand the old code the elapsed interval it is missing and the test
+        // would pass either way.
+        {
+            let mut state = budget.state.lock().expect("test lock");
+            for i in 0..CAP {
+                state.per_source.insert(
+                    key(&format!("203.0.113.{}:1000", 100 + i)),
+                    TokenBucket::new(4.0, 0.4, Duration::from_millis(100)),
+                );
+            }
+        }
+        assert_eq!(budget.tracked_sources(), CAP);
+
+        // The first miss against a full table. No sweep has ever run, so nothing has grounds to
+        // throttle this one. The spend itself succeeds either way — the degraded path would
+        // serve it from the shared bucket — so what separates the two is whether the table was
+        // reclaimed.
+        assert!(budget.spend(key("192.0.2.77:1000")));
+        assert_eq!(
+            budget.tracked_sources(),
+            1,
+            "the first miss against a full table did not reclaim its replenished entries, so a \
+             table that fills before the first interval elapses degrades to the shared bucket \
+             while holding nothing worth holding"
+        );
+    }
+
+    /// Making the first sweep eligible must not remove the throttle from the ones after it.
+    ///
+    /// The interval exists so a stream of misses against an unreclaimable table does not walk it
+    /// every time. Exercised on `BudgetState` directly because the point is the refusal itself,
+    /// and `advance` deliberately rewinds `last_sweep` along with the buckets.
+    #[test]
+    fn the_sweep_throttle_still_applies_after_the_first_sweep() {
+        let budget = table(4.0, 8);
+        let mut state = budget.state.lock().expect("test lock");
+
+        assert_eq!(
+            state.sweep_replenished(),
+            0,
+            "an empty table has nothing to reclaim"
+        );
+        assert!(
+            state.last_sweep.is_some(),
+            "the first sweep must record that it ran, or the throttle never starts"
+        );
+
+        // A brand-new bucket is full, so it is exactly what a sweep would reclaim.
+        state.per_source.insert(
+            key("203.0.113.9:1000"),
+            TokenBucket::new(4.0, 0.4, Duration::from_millis(100)),
+        );
+
+        assert_eq!(
+            state.sweep_replenished(),
+            0,
+            "a second sweep inside BUDGET_SWEEP_MIN_INTERVAL reclaimed an entry, so the throttle \
+             is gone and every miss now walks the whole table"
+        );
+        assert_eq!(
+            state.per_source.len(),
+            1,
+            "a refused sweep must leave the table exactly as it found it"
         );
     }
 
