@@ -7,7 +7,7 @@ use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use url::Url;
+use url::{Host, Url};
 use uuid::Uuid;
 
 use crate::error::{GatewayError, Result};
@@ -188,8 +188,23 @@ fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
         )));
     }
 
-    // Try to parse as IP address and block private ranges
-    if let Ok(ip) = host.parse::<IpAddr>() {
+    // Block literal IP hosts in private/reserved ranges.
+    //
+    // Read the address off `Url::host()`, which hands back the already-parsed
+    // `Ipv4Addr`/`Ipv6Addr`, rather than re-parsing `host_str()`. `host_str()`
+    // returns IPv6 hosts *bracketed* — `https://[::1]/` yields `"[::1]"` — and
+    // brackets are not part of an `IpAddr`, so `host.parse::<IpAddr>()` failed for
+    // every IPv6 literal and skipped this check entirely (#2564). Taking the parsed
+    // value also means the check sees one canonical address per host, so the dotted
+    // and hex spellings of a mapped address need no separate handling.
+    let literal_ip = match url.host() {
+        Some(Host::Ipv4(v4)) => Some(IpAddr::V4(v4)),
+        Some(Host::Ipv6(v6)) => Some(IpAddr::V6(v6)),
+        // A domain still resolves to an address at fetch time; this control only
+        // covers literal-IP hosts. See the note on `is_private_ip`.
+        Some(Host::Domain(_)) | None => None,
+    };
+    if let Some(ip) = literal_ip {
         if is_private_ip(&ip) {
             return Err(GatewayError::BadRequest(format!(
                 "Photo URL {} cannot reference private IP addresses",
@@ -210,7 +225,32 @@ fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
 }
 
 /// Check if an IP address is in a private/reserved range
+///
+/// Covers *literal* addresses only. A hostname that resolves to a private address,
+/// a redirect into one, or DNS rebinding after this check are all outside what this
+/// function can see; it is one layer, not a complete SSRF defence.
+///
+/// A strict IPv4-mapped address (`::ffff:0:0/96`) is judged by the IPv4 rules below.
+/// `a.b.c.d` and `::ffff:a.b.c.d` name the same host, so the representation a caller
+/// happens to write must not change the verdict — without this, every IPv4 range
+/// listed here could be expressed in mapped form and pass, because the IPv6 arm
+/// matches none of them and `Ipv6Addr::is_loopback()` is true only for `::1`, never
+/// for a mapped `127/8` address (#2564).
+///
+/// `to_ipv4_mapped()` and deliberately not `to_ipv4()`: the latter also converts
+/// deprecated IPv4-*compatible* addresses (`::a.b.c.d`) and would rewrite `::1` to
+/// `0.0.0.1`, judging IPv6 loopback by the IPv4 rules. Same strict normalization
+/// `SourceKey::from_addr` (#2557) and `peer_exchange::endpoint_kind_for_addr` (#2563)
+/// use — applied here at the policy boundary, not as a shared global helper, because
+/// other address checks in this crate deliberately want the opposite (see the
+/// dev-mode loopback gate in `server.rs`, where a mapped address failing
+/// `is_loopback()` keeps the privileged path disabled).
 fn is_private_ip(ip: &IpAddr) -> bool {
+    let ip = match ip {
+        IpAddr::V6(ipv6) => ipv6.to_ipv4_mapped().map_or(*ip, IpAddr::V4),
+        already_v4 => *already_v4,
+    };
+
     match ip {
         IpAddr::V4(ipv4) => {
             ipv4.is_private()
@@ -1278,5 +1318,170 @@ mod tests {
         assert!(!is_private_ip(
             &"2607:f8b0:4004:800::200e".parse::<IpAddr>().unwrap()
         ));
+    }
+
+    // ========================================================================
+    // #2564 — IPv4-mapped representation equivalence
+    // ========================================================================
+
+    /// Every IPv4 address the current policy *blocks*, one per distinct class it
+    /// recognises. Kept as data so the equivalence test below cannot silently drift
+    /// away from the classifier it is pinning.
+    const BLOCKED_V4: &[(&str, &str)] = &[
+        ("10.0.0.1", "RFC1918 10/8"),
+        ("172.16.0.1", "RFC1918 172.16/12"),
+        ("192.168.1.1", "RFC1918 192.168/16"),
+        ("127.0.0.1", "loopback"),
+        ("169.254.169.254", "link-local (cloud instance metadata)"),
+        ("255.255.255.255", "broadcast"),
+        ("192.0.2.1", "documentation TEST-NET-1"),
+        ("198.51.100.1", "documentation TEST-NET-2"),
+        ("203.0.113.1", "documentation TEST-NET-3"),
+        ("0.0.0.0", "unspecified"),
+        // RFC 6598 range boundaries as test vectors for the CGNAT rule below, not
+        // anyone's Tailscale address: sanitize-ok
+        ("100.64.0.1", "CGNAT 100.64/10 low edge"), // sanitize-ok
+        ("100.127.255.255", "CGNAT 100.64/10 high edge"), // sanitize-ok
+        ("192.0.0.1", "IETF protocol assignments 192.0.0/24"),
+    ];
+
+    /// Every IPv4 address the current policy *allows*, including the boundaries just
+    /// outside each blocked range. These are the controls: a fix that over-blocks
+    /// fails here rather than passing quietly.
+    const ALLOWED_V4: &[(&str, &str)] = &[
+        ("8.8.8.8", "public"),
+        ("1.1.1.1", "public"),
+        ("172.15.255.255", "just below 172.16/12"),
+        ("172.32.0.0", "just above 172.31/12"),
+        ("100.63.255.255", "just below CGNAT"),
+        ("100.128.0.0", "just above CGNAT"),
+        ("192.0.1.1", "just outside 192.0.0/24"),
+    ];
+
+    /// The property #2564 is about: representation must not change the verdict.
+    ///
+    /// `a.b.c.d` and `::ffff:a.b.c.d` are the same host. Before the fix the mapped
+    /// form took the IPv6 arm, matched none of loopback/unspecified/ULA/link-local,
+    /// and came back `false` for every blocked IPv4 range.
+    #[test]
+    fn mapped_v4_classifies_identically_to_native_v4() {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        for (addr, class) in BLOCKED_V4.iter().chain(ALLOWED_V4.iter()) {
+            let v4: Ipv4Addr = addr.parse().expect("test address");
+            let native = is_private_ip(&IpAddr::V4(v4));
+            let mapped = is_private_ip(&IpAddr::V6(v4.to_ipv6_mapped()));
+            assert_eq!(
+                native, mapped,
+                "{addr} ({class}) classified differently as native v4 ({native}) vs \
+                 ::ffff:{addr} ({mapped})"
+            );
+        }
+    }
+
+    /// Pins the *direction* of each verdict, so the equivalence test above cannot be
+    /// satisfied by a classifier that returns a constant.
+    #[test]
+    fn mapped_v4_verdicts_match_the_documented_policy() {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        for (addr, class) in BLOCKED_V4 {
+            let v4: Ipv4Addr = addr.parse().expect("test address");
+            assert!(
+                is_private_ip(&IpAddr::V6(v4.to_ipv6_mapped())),
+                "::ffff:{addr} ({class}) must be blocked, as native {addr} is"
+            );
+        }
+        for (addr, class) in ALLOWED_V4 {
+            let v4: Ipv4Addr = addr.parse().expect("test address");
+            assert!(
+                !is_private_ip(&IpAddr::V6(v4.to_ipv6_mapped())),
+                "::ffff:{addr} ({class}) must stay allowed, as native {addr} is"
+            );
+        }
+    }
+
+    /// Unmapping must not disturb addresses that are genuinely IPv6. In particular
+    /// `::1` must keep being judged by the IPv6 loopback rule — `to_ipv4()` would
+    /// rewrite it to `0.0.0.1` and judge it as IPv4, which is why the fix uses the
+    /// strict `to_ipv4_mapped()`.
+    #[test]
+    fn genuine_ipv6_policy_is_unchanged() {
+        use std::net::IpAddr;
+
+        for (addr, class) in [
+            ("::1", "v6 loopback"),
+            ("::", "v6 unspecified"),
+            ("fc00::1", "ULA low half"),
+            ("fd00::1", "ULA high half"),
+            ("fe80::1", "link-local"),
+            ("febf::1", "link-local top of fe80::/10"),
+        ] {
+            assert!(
+                is_private_ip(&addr.parse::<IpAddr>().unwrap()),
+                "{addr} ({class}) must remain blocked by the IPv6 arm"
+            );
+        }
+
+        for (addr, class) in [
+            ("2607:f8b0:4004:800::200e", "public v6"),
+            ("2606:4700::1111", "public v6"),
+            // Current policy does not block the IPv6 documentation range. Pinned so
+            // this fix is not mistaken for a licence to widen the IPv6 arm.
+            ("2001:db8::1", "v6 documentation — not blocked today"),
+            ("fec0::1", "site-local — deprecated, not blocked today"),
+        ] {
+            assert!(
+                !is_private_ip(&addr.parse::<IpAddr>().unwrap()),
+                "{addr} ({class}) must remain allowed by the IPv6 arm"
+            );
+        }
+    }
+
+    /// The classifier is only a security control if `validate_photo_url` actually
+    /// reaches it. `Url::host_str()` returns IPv6 hosts *bracketed* (`[::1]`), which
+    /// never parses as an `IpAddr` — so before the fix every IPv6 literal host,
+    /// mapped or genuine, skipped the blocklist entirely.
+    #[test]
+    fn photo_url_applies_the_blocklist_to_bracketed_ipv6_hosts() {
+        for (url, why) in [
+            ("https://[::ffff:169.254.169.254]/p.jpg", "mapped metadata"),
+            ("https://[::ffff:127.0.0.1]/p.jpg", "mapped loopback"),
+            ("https://[::ffff:10.0.0.1]/p.jpg", "mapped RFC1918"),
+            ("https://[::ffff:192.168.1.1]/p.jpg", "mapped RFC1918"),
+            // RFC 6598 test vector, not a real host: sanitize-ok
+            ("https://[::ffff:100.64.0.1]/p.jpg", "mapped CGNAT"), // sanitize-ok
+            // The URL parser canonicalises the mapped form to hex, so the dotted and
+            // hex spellings are the same parsed address and need no separate branch.
+            (
+                "https://[::ffff:7f00:1]/p.jpg",
+                "mapped loopback, hex spelling",
+            ),
+            ("https://[::1]/p.jpg", "genuine v6 loopback"),
+            ("https://[fe80::1]/p.jpg", "genuine v6 link-local"),
+            ("https://[fc00::1]/p.jpg", "genuine v6 ULA"),
+        ] {
+            assert!(
+                validate_photo_url(url, 0).is_err(),
+                "{url} ({why}) must be rejected"
+            );
+        }
+    }
+
+    /// Public hosts stay reachable in either representation — the fix restores
+    /// equivalence, it does not tighten what may be linked.
+    #[test]
+    fn photo_url_still_allows_public_hosts_in_either_representation() {
+        for url in [
+            "https://8.8.8.8/p.jpg",
+            "https://[::ffff:8.8.8.8]/p.jpg",
+            "https://[2607:f8b0:4004:800::200e]/p.jpg",
+            "https://images.unsplash.com/photo.jpg",
+        ] {
+            assert!(
+                validate_photo_url(url, 0).is_ok(),
+                "{url} must remain allowed"
+            );
+        }
     }
 }
