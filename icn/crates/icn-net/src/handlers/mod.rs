@@ -213,12 +213,20 @@ impl ConnectionContext {
         // hold *while refusing to identify itself*, not in how many it may hold. Dropping
         // the guard is the release; taking it is idempotent, so the eventual context drop
         // has nothing left to do.
+        //
+        // This is also the *only* place a release is exempt from the churn charge (#2549).
+        // The exemption is what keeps the rate bound off ordinary peers — a source that keeps
+        // reconnecting and keeps authenticating is not churning — and it is safe to grant here
+        // for the same reason the release is: the DID-TLS binding has already been verified,
+        // so "authenticated" is proven rather than claimed. Every other exit path drops the
+        // guard unmarked and is charged.
         let released = self
             .admission_guard
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
-        if released.is_some() {
+        if let Some(guard) = released {
+            guard.release_authenticated();
             icn_obs::metrics::network::preauth_admission_released_inc();
         }
     }

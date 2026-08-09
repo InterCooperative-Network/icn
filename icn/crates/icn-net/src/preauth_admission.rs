@@ -46,9 +46,33 @@
 //! A duration bound alone would be equally useless: it bounds one connection and aggregates
 //! nothing.
 //!
-//! **Neither is a rate bound.** Together they say how much anonymous concurrency may exist and
-//! for how long, and nothing about how fast a source may open and close connections underneath
-//! them; see "what this does not bound" below.
+//! **Rate** (#2549):
+//!
+//! > A source may take at most [`PREAUTH_CHURN_BUDGET_PER_SOURCE`] admissions that end without
+//! > ever authenticating per [`PREAUTH_CHURN_REFILL_WINDOW`], however quickly it releases them.
+//!
+//! The first two are instantaneous and say nothing about how fast a source may open and close
+//! connections underneath them. A source that connected, spent its anonymous burst, closed and
+//! reconnected stayed inside both forever, because concurrency never rose and no deadline was
+//! ever reached — and each cycle was issued a *fresh* anonymous budget, because the table's
+//! entry for that source had been removed at zero. The third bound is what makes the first two
+//! aggregate over time rather than only describe an instant.
+//!
+//! The three are one policy, and the third is derived from the other two rather than chosen:
+//! see [`PREAUTH_CHURN_BUDGET_PER_SOURCE`].
+//!
+//! **The charge lands at release, not at admission**, because only then is it known whether the
+//! admission was abandoned. One consequence is worth stating rather than leaving to be
+//! rediscovered: a source may hold admissions whose charges have not landed yet, so a burst can
+//! momentarily exceed the budget before any of it is debited. That burst is bounded by
+//! [`MAX_PREAUTH_CONNECTIONS_PER_SOURCE`] — the connections have to be *held* to be uncharged,
+//! and holding is what #2547 already bounds — so it grants nothing that bound did not already
+//! grant. The *sustained* rate is unaffected: every one of those admissions is charged as it
+//! ends. `preauth_source_churn_rate.rs` pins both halves.
+//!
+//! Debiting at admission instead would remove the burst and break the property the bound exists
+//! to protect: a NAT whose peers all reconnect at once would be refused on the ninth peer,
+//! before any of them had a chance to authenticate and prove they were not churn.
 //!
 //! **Pre-authentication only.** The reservation is released the moment a connection
 //! authenticates, so this never constrains established authenticated peers — a peer that
@@ -91,19 +115,12 @@
 //!   solve that locally, and nothing here pretends to.
 //! - QUIC/TLS handshake work *below* this hook — that is the existing concurrent-handshake
 //!   semaphore's job, and it bounds concurrency rather than rate.
-//! - Connection *rate*. A source that opens, spends its anonymous burst, and closes stays
-//!   within every bound here, because concurrency never rises. Churn is throttled only
-//!   indirectly, by handshake concurrency divided by handshake latency. Tracked by #2549,
-//!   which is separate because a rate bound needs entries that *outlive* their connections —
-//!   the opposite of what makes this table's cardinality provable.
-//!
-//!   The deadline does not change this, and it is worth being exact about why, because
-//!   "connections now expire" sounds like it should. Expiry bounds how long one connection may
-//!   squat; it places no floor on how quickly the next may arrive. A source that connects,
-//!   waits, is closed, and immediately reconnects stays inside every bound here forever — it
-//!   simply pays a handshake each time instead of nothing. So the deadline converts a *free*
-//!   permanent hold into a *recurring* cost, which is a real change in the attacker's economics
-//!   and not a rate limit. #2549 remains exactly as necessary as it was.
+//! - Churn by a source that *does* authenticate each time. The rate bound counts abandoned
+//!   admissions, so a peer that proves an identity and disconnects is never charged. That is
+//!   deliberate — it is what keeps the bound off honest reconnects — and it means an adversary
+//!   willing to mint a DID and complete a Hello each cycle is outside this bound. It is then
+//!   inside #2490's and #2491's per-DID limits, and how many such connections it may hold at
+//!   once is #2550.
 //! - How many connections one source may hold once they are *authenticated*: the slot is
 //!   released at the Hello, and DIDs are free to mint. Tracked by #2550. The deadline stops at
 //!   the same boundary deliberately — extending it past authentication would make it a maximum
@@ -187,6 +204,62 @@ pub const MAX_PREAUTH_CONNECTIONS_TOTAL: usize = 256;
 /// claim that no deployment will want to tune it.
 pub const MAX_PREAUTH_CONNECTIONS_PER_SOURCE: usize = 8;
 
+/// How many admissions a source may take *and never authenticate* per
+/// [`PREAUTH_CHURN_REFILL_WINDOW`] (#2549).
+///
+/// # Why this is the same number, and not a new policy
+///
+/// The two bounds above already permit one source to hold
+/// [`MAX_PREAUTH_CONNECTIONS_PER_SOURCE`] anonymous connections for
+/// [`PREAUTH_AUTHENTICATION_DEADLINE`] each, indefinitely, by taking its full allowance and
+/// sitting on it until every deadline expires. That is a *sustained* eight
+/// never-authenticated admissions per thirty seconds, available to any source today, and
+/// #2547 accepted it deliberately.
+///
+/// Deriving the churn budget from that ceiling rather than choosing one gives the bound its
+/// statement:
+///
+/// > Cycling connections cannot obtain more anonymous admissions than squatting on them
+/// > already could.
+///
+/// It is therefore the tightest rate bound that provably refuses nothing the existing count
+/// and duration bounds already allow — a source at the old ceiling is exactly at the new one
+/// and is never refused for churning. Picking any other number would introduce an
+/// externally-visible quota that neither #2547 nor #2552 implies, which is the thing #2549
+/// was filed to avoid smuggling in.
+pub const PREAUTH_CHURN_BUDGET_PER_SOURCE: usize = MAX_PREAUTH_CONNECTIONS_PER_SOURCE;
+
+/// How long a source's exhausted churn budget takes to refill completely (#2549).
+///
+/// Equal to [`PREAUTH_AUTHENTICATION_DEADLINE`] for the reason given on
+/// [`PREAUTH_CHURN_BUDGET_PER_SOURCE`]: the pair is one derivation, not two choices. Budget
+/// over window is precisely the rate a maximally-squatting source already sustains.
+///
+/// Refill is continuous rather than a window that resets, so there is no edge an adversary
+/// can align with to take two full budgets back to back.
+pub const PREAUTH_CHURN_REFILL_WINDOW: Duration = PREAUTH_AUTHENTICATION_DEADLINE;
+
+/// Maximum sources whose churn history is retained at once (#2549).
+///
+/// # What this bound is, and what it is not
+///
+/// Unlike the three above it, this is not a security policy — no property stated anywhere in
+/// this module depends on its value. It is a memory ceiling, and it exists because a defence
+/// that answers unbounded connection work with an unbounded map has not defended anything.
+///
+/// The churn table is the one piece of state here that outlives its connections, which is
+/// what #2549 needs and what #2547's table deliberately refused to have. What keeps it small
+/// in the case this module is *about* is that an entry is created only by an admission that
+/// failed to authenticate, and is charged to a source that completed a QUIC handshake from a
+/// return-routable address. One attacker cycling a single address as fast as it can produces
+/// exactly one entry. Reaching this ceiling requires four thousand distinct return-routable
+/// sources sustaining failed admissions at once — the distributed case this module has always
+/// said it cannot solve.
+///
+/// At capacity the table stops *tracking* new sources rather than refusing them; see
+/// [`PreAuthAdmission`] on why the other direction would be worse than the defect.
+pub const MAX_PREAUTH_CHURN_SOURCES: usize = 4096;
+
 /// The unit a pre-authentication allowance is charged to.
 ///
 /// IPv4 is keyed on the exact address. IPv6 is keyed on the **/64**.
@@ -236,6 +309,13 @@ pub enum AdmissionRefusal {
     GlobalLimit,
     /// This source already holds its maximum pre-authentication allowance.
     SourceLimit,
+    /// This source has spent its budget of admissions that never authenticated (#2549).
+    ///
+    /// Distinct from [`Self::SourceLimit`] because the two describe opposite shapes and an
+    /// operator needs to tell them apart: `SourceLimit` means "you are holding too many at
+    /// once", `SourceChurn` means "you are holding none, and that is the problem — the last
+    /// several you took were abandoned without ever saying who you were".
+    SourceChurn,
 }
 
 impl AdmissionRefusal {
@@ -247,6 +327,7 @@ impl AdmissionRefusal {
         match self {
             AdmissionRefusal::GlobalLimit => "global_limit",
             AdmissionRefusal::SourceLimit => "source_limit",
+            AdmissionRefusal::SourceChurn => "source_churn",
         }
     }
 }
@@ -277,6 +358,53 @@ impl Cardinality {
     }
 }
 
+/// One source's remaining budget of admissions that may end without authenticating (#2549).
+///
+/// A continuously-refilling allowance rather than a counter with a reset, so there is no
+/// window boundary to align with. `tokens` is what is left; it is debited when an admission
+/// is released without ever having authenticated, and refills at
+/// `budget / PREAUTH_CHURN_REFILL_WINDOW`.
+///
+/// The type carries no capacity or rate of its own: both live on [`PreAuthAdmission`], so a
+/// bucket cannot disagree with the policy that created it.
+#[derive(Debug, Clone, Copy)]
+struct ChurnBucket {
+    tokens: f64,
+    /// When `tokens` was last brought up to date. Refill is computed from here on touch
+    /// rather than by a timer, so an untouched entry costs nothing until it is read.
+    updated_at: Instant,
+}
+
+impl ChurnBucket {
+    /// A source seen for the first time: nothing spent yet.
+    fn full(budget: f64, now: Instant) -> Self {
+        Self {
+            tokens: budget,
+            updated_at: now,
+        }
+    }
+
+    /// Bring `tokens` up to `now`, saturating at `budget`.
+    ///
+    /// `saturating_duration_since` rather than subtraction: `now` is supplied by the caller,
+    /// and a clock that appears to go backwards must refill nothing rather than panic.
+    fn refill(&mut self, budget: f64, rate_per_sec: f64, now: Instant) {
+        let elapsed = now.saturating_duration_since(self.updated_at).as_secs_f64();
+        self.tokens = (self.tokens + elapsed * rate_per_sec).min(budget);
+        self.updated_at = now;
+    }
+
+    /// Whether this entry still says anything.
+    ///
+    /// A full bucket is indistinguishable from a source that has never been seen: both admit
+    /// and both debit from the same starting point. Dropping one is therefore not an eviction
+    /// policy with a security consequence — it is removing a record that carries no
+    /// information, which is what lets this map be swept without choosing victims.
+    fn is_spent_out(&self, budget: f64) -> bool {
+        self.tokens >= budget
+    }
+}
+
 #[derive(Debug, Default)]
 struct AdmissionState {
     /// Live pre-authentication connections per source.
@@ -286,6 +414,109 @@ struct AdmissionState {
     per_source: HashMap<SourceKey, usize>,
     /// Live pre-authentication connections, all sources.
     total: usize,
+    /// Per-source churn budgets, which deliberately **outlive** their connections (#2549).
+    ///
+    /// This is the one piece of state here that `per_source` could not be: a rate bound whose
+    /// records die with the last connection is re-minted on every reconnect, which is the
+    /// defect. Bounded by [`MAX_PREAUTH_CHURN_SOURCES`] and swept of spent-out entries rather
+    /// than pinned by construction.
+    churn: HashMap<SourceKey, ChurnBucket>,
+    /// When the churn map was last swept of full buckets.
+    ///
+    /// Sweeping is O(map), so it must not be reachable once per admission or the defence
+    /// becomes its own CPU amplifier. `None` means never swept.
+    churn_swept_at: Option<Instant>,
+}
+
+/// How often the churn map may be swept of spent-out entries.
+///
+/// The sweep is O(map) and is reached only when the map is at capacity, which is exactly when
+/// an adversary would like it to run on every admission. Rate-limiting it converts that from a
+/// per-connection cost into a per-second one; between sweeps a full map simply stops tracking
+/// new sources.
+const CHURN_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(1);
+
+impl AdmissionState {
+    /// Whether `key` may take another admission, debiting nothing.
+    ///
+    /// Refills the source's bucket to `now` and reports whether a whole token is available.
+    /// A source with no entry has spent nothing and is always admitted — and, importantly,
+    /// **no entry is created here**. Checking must not be able to grow the map, or an
+    /// adversary would populate it by being refused, which is the amplification #2547 was
+    /// careful to avoid in the sibling table.
+    fn churn_admits(
+        &mut self,
+        key: SourceKey,
+        budget: f64,
+        refill_per_sec: f64,
+        now: Instant,
+    ) -> bool {
+        let Some(bucket) = self.churn.get_mut(&key) else {
+            return true;
+        };
+        bucket.refill(budget, refill_per_sec, now);
+        if bucket.is_spent_out(budget) {
+            // Refilled to full: the record now says exactly what no record says. Dropping it
+            // here is the ordinary way entries leave, so the map shrinks under normal traffic
+            // without any sweep having to run.
+            self.churn.remove(&key);
+            return true;
+        }
+        bucket.tokens >= 1.0
+    }
+
+    /// Charge `key` for one admission that ended without ever authenticating.
+    ///
+    /// This is the only thing that writes the churn map, which is what makes the bound's
+    /// subject precise: not connections, not admissions, but *abandoned* admissions.
+    fn charge_churn(
+        &mut self,
+        key: SourceKey,
+        budget: f64,
+        refill_per_sec: f64,
+        max_sources: usize,
+        now: Instant,
+    ) {
+        match self.churn.get_mut(&key) {
+            Some(bucket) => {
+                bucket.refill(budget, refill_per_sec, now);
+                bucket.tokens = (bucket.tokens - 1.0).max(0.0);
+            }
+            None => {
+                if self.churn.len() >= max_sources {
+                    self.sweep_churn(budget, refill_per_sec, now);
+                }
+                if self.churn.len() >= max_sources {
+                    // Full even after a sweep — or too soon after the last one. Admit the
+                    // source untracked rather than refuse it: see `PreAuthAdmission` on why
+                    // the other direction turns this defence into an outage.
+                    icn_obs::metrics::network::preauth_churn_untracked_inc();
+                    return;
+                }
+                let mut bucket = ChurnBucket::full(budget, now);
+                bucket.tokens = (bucket.tokens - 1.0).max(0.0);
+                self.churn.insert(key, bucket);
+            }
+        }
+    }
+
+    /// Drop every churn entry that has refilled to full.
+    ///
+    /// Removes only records that carry no information, so it is not an eviction policy and
+    /// has no victim: a swept source is admitted and charged exactly as an unswept one would
+    /// have been. Rate-limited by [`CHURN_SWEEP_MIN_INTERVAL`].
+    fn sweep_churn(&mut self, budget: f64, refill_per_sec: f64, now: Instant) {
+        if let Some(last) = self.churn_swept_at {
+            if now.saturating_duration_since(last) < CHURN_SWEEP_MIN_INTERVAL {
+                return;
+            }
+        }
+        self.churn_swept_at = Some(now);
+        self.churn.retain(|_, bucket| {
+            bucket.refill(budget, refill_per_sec, now);
+            !bucket.is_spent_out(budget)
+        });
+    }
 }
 
 /// The pre-authentication connection allowance, shared by the whole node.
@@ -305,12 +536,36 @@ struct AdmissionState {
 /// nothing to expire: the map's size is pinned to the number of connections currently being
 /// counted, and those are bounded. Releasing is not a background job that could fall behind —
 /// it is [`AdmissionGuard`]'s destructor, so it runs on every exit path including panics.
+///
+/// # The churn table, which is bounded differently and had to be
+///
+/// The rate bound (#2549) could not reuse that argument. A record that dies with the last
+/// connection from a source is re-minted on the next one, so the budget resets on every
+/// reconnect — which is the defect, not the fix. The churn table therefore *outlives* its
+/// connections, and pays for it with an explicit ceiling
+/// ([`MAX_PREAUTH_CHURN_SOURCES`]) and a sweep instead of a proof.
+///
+/// Three things keep that from being a worse leak than the one it closes:
+///
+/// - **only failures are recorded.** An admission that authenticates leaves nothing behind, so
+///   ordinary peers — including many behind one NAT — never create an entry at all.
+/// - **spent-out entries carry no information.** A refilled bucket admits exactly like an
+///   absent one, so sweeping is removal of nothing rather than a choice of victim.
+/// - **at capacity it stops tracking, never stops admitting.** Refusing on a full table would
+///   hand an adversary a way to turn this defence into the outage it exists to prevent: fill
+///   the table from throwaway sources, and every honest peer is refused. Declining to *charge*
+///   a source degrades the rate bound toward its pre-#2549 behaviour for as long as the
+///   pressure lasts, which is the failure this is willing to have.
 #[derive(Debug)]
 pub struct PreAuthAdmission {
     state: Mutex<AdmissionState>,
     max_total: usize,
     max_per_source: usize,
     authentication_deadline: Duration,
+    /// Admissions a source may abandon unauthenticated before it is refused (#2549).
+    churn_budget: f64,
+    /// How long an exhausted [`Self::churn_budget`] takes to refill completely.
+    churn_window: Duration,
 }
 
 impl PreAuthAdmission {
@@ -329,7 +584,7 @@ impl PreAuthAdmission {
         Self::with_policy(max_total, max_per_source, PREAUTH_AUTHENTICATION_DEADLINE)
     }
 
-    /// An admission table with every bound stated explicitly.
+    /// An admission table with explicit counts and deadline, and the default churn budget.
     ///
     /// The whole pre-authentication policy — how many anonymous connections, and for how long —
     /// lives on one object because the two halves are the same bound. A count without a duration
@@ -340,11 +595,51 @@ impl PreAuthAdmission {
         max_per_source: usize,
         authentication_deadline: Duration,
     ) -> Self {
+        Self::with_churn_policy(
+            max_total,
+            max_per_source,
+            authentication_deadline,
+            PREAUTH_CHURN_BUDGET_PER_SOURCE,
+            PREAUTH_CHURN_REFILL_WINDOW,
+        )
+    }
+
+    /// An admission table with every bound stated explicitly, rate included.
+    ///
+    /// The third half of the same policy (#2549). The counts say how much anonymous
+    /// concurrency may exist, the deadline says for how long, and this says how fast a source
+    /// may keep taking fresh allowances after abandoning the last one. All three live on one
+    /// object because an adversary reads them as one number.
+    ///
+    /// Exists in this shape so tests can drive the rate boundary without waiting out a
+    /// thirty-second window.
+    pub fn with_churn_policy(
+        max_total: usize,
+        max_per_source: usize,
+        authentication_deadline: Duration,
+        churn_budget: usize,
+        churn_window: Duration,
+    ) -> Self {
         Self {
             state: Mutex::new(AdmissionState::default()),
             max_total,
             max_per_source,
             authentication_deadline,
+            churn_budget: churn_budget as f64,
+            churn_window,
+        }
+    }
+
+    /// Tokens returned to a source's churn budget per second.
+    ///
+    /// Zero if the window is zero — a degenerate configuration that must not divide by zero
+    /// and must not silently become an infinite allowance.
+    fn churn_refill_per_sec(&self) -> f64 {
+        let window = self.churn_window.as_secs_f64();
+        if window <= 0.0 {
+            0.0
+        } else {
+            self.churn_budget / window
         }
     }
 
@@ -356,17 +651,42 @@ impl PreAuthAdmission {
         self: &Arc<Self>,
         addr: SocketAddr,
     ) -> Result<AdmissionGuard, AdmissionRefusal> {
+        self.try_admit_at(addr, Instant::now())
+    }
+
+    /// [`Self::try_admit`] with the current instant supplied by the caller.
+    ///
+    /// Exists so the churn bound's refill can be asserted at an exact point on the curve
+    /// rather than slept towards. A rate limiter tested by sleeping is tested on the machine
+    /// that ran it; this lets the same assertion mean the same thing everywhere.
+    ///
+    /// Production calls [`Self::try_admit`], which reads the clock itself. Passing a `now`
+    /// that runs backwards cannot manufacture allowance — refill saturates at zero elapsed.
+    pub fn try_admit_at(
+        self: &Arc<Self>,
+        addr: SocketAddr,
+        now: Instant,
+    ) -> Result<AdmissionGuard, AdmissionRefusal> {
         let key = SourceKey::from_addr(addr);
         // Read before the slot is taken, so the deadline can only ever be *shorter* than the
         // slot's real life, never longer. The two are created by one operation, which is what
         // lets the guard state its own expiry rather than the caller guessing when it started.
-        let authenticate_by = Instant::now() + self.authentication_deadline;
+        let authenticate_by = now + self.authentication_deadline;
         let cardinality = {
             let mut state = self.lock_state();
 
             if state.total >= self.max_total {
                 return Err(AdmissionRefusal::GlobalLimit);
             }
+
+            // The rate bound is checked before the count bound is *taken* but after the count
+            // bound is checked, so a refused-for-churn source is never charged concurrency it
+            // did not receive. Reading it here — before any of the work above this hook is
+            // started — is what makes it bound that work rather than describe it.
+            if !state.churn_admits(key, self.churn_budget, self.churn_refill_per_sec(), now) {
+                return Err(AdmissionRefusal::SourceChurn);
+            }
+
             let source_count = state.per_source.entry(key).or_insert(0);
             if *source_count >= self.max_per_source {
                 // Leave no zero-valued entry behind: a refused admission must not be able to
@@ -387,6 +707,12 @@ impl PreAuthAdmission {
             admission: Arc::clone(self),
             key,
             authenticate_by,
+            // Unauthenticated until something proves otherwise. The default is the charged
+            // one on purpose: a release path that forgets to mark itself over-charges a
+            // source, which costs an honest peer a retry, where the opposite default would
+            // silently un-bound the thing this exists to bound.
+            authenticated: false,
+            admitted_at: now,
         })
     }
 
@@ -409,6 +735,35 @@ impl PreAuthAdmission {
         self.lock_state().per_source.len()
     }
 
+    /// Number of sources whose churn history is currently retained (#2549).
+    ///
+    /// The churn map's cardinality. Exposed for the same reason as [`Self::tracked_sources`]:
+    /// a bound on a map that outlives its connections is worth nothing if it can only be
+    /// argued about, and this is the one table here whose size is capped by policy rather than
+    /// pinned by construction.
+    pub fn tracked_churn_sources(&self) -> usize {
+        self.lock_state().churn.len()
+    }
+
+    /// Whole admissions `addr`'s source may still abandon before it is refused (#2549).
+    ///
+    /// Read-only: unlike [`Self::try_admit`] this neither creates, charges, nor sweeps an
+    /// entry, so observing a source cannot change what happens to it. A source with no entry
+    /// reports the full budget, which is what it would in fact receive.
+    pub fn churn_budget_remaining(&self, addr: SocketAddr) -> usize {
+        let key = SourceKey::from_addr(addr);
+        let now = Instant::now();
+        let state = self.lock_state();
+        match state.churn.get(&key) {
+            Some(bucket) => {
+                let mut bucket = *bucket;
+                bucket.refill(self.churn_budget, self.churn_refill_per_sec(), now);
+                bucket.tokens.max(0.0) as usize
+            }
+            None => self.churn_budget as usize,
+        }
+    }
+
     /// Take the state lock, recovering from a poisoned mutex rather than panicking.
     ///
     /// A panic elsewhere must not turn connection admission into a permanent outage: the
@@ -429,10 +784,33 @@ impl PreAuthAdmission {
     /// call sites therefore left the gauges stale for the whole life of every connection
     /// that authenticated and stayed open, which is the ordinary case and precisely the one
     /// an operator reads these gauges to understand.
-    fn release(&self, key: SourceKey) {
+    ///
+    /// `authenticated` decides whether the source is also charged for churn (#2549). It is the
+    /// distinction that keeps the rate bound off ordinary peers: a connection that said who it
+    /// was is not churn however briefly it lived, so a NAT full of peers reconnecting — the
+    /// case #2549 must not break — costs nothing at all.
+    ///
+    /// The charge is stamped `admitted_at` rather than now, because the quantity being
+    /// rate-limited is *taking an allowance*, and that happened when the slot was taken. Two
+    /// consequences, both wanted. Holding a connection open cannot postpone the charge's ageing,
+    /// so squatting to the deadline earns no rate credit over releasing at once — and equally
+    /// cannot *accumulate* it, so a source at the concurrency ceiling is never also refused for
+    /// churn. And the whole accounting then runs on the clock supplied to
+    /// [`Self::try_admit_at`], so nothing here reads a second clock that a test could not
+    /// control or a slow drop could skew.
+    fn release(&self, key: SourceKey, authenticated: bool, admitted_at: Instant) {
         let cardinality = {
             let mut state = self.lock_state();
             state.total = state.total.saturating_sub(1);
+            if !authenticated {
+                state.charge_churn(
+                    key,
+                    self.churn_budget,
+                    self.churn_refill_per_sec(),
+                    MAX_PREAUTH_CHURN_SOURCES,
+                    admitted_at,
+                );
+            }
             if let Some(count) = state.per_source.get_mut(&key) {
                 *count = count.saturating_sub(1);
                 if *count == 0 {
@@ -466,6 +844,18 @@ pub struct AdmissionGuard {
     key: SourceKey,
     /// When this reservation stops being justified — see [`Self::authenticate_by`].
     authenticate_by: Instant,
+    /// Whether the connection holding this slot ever proved an identity (#2549).
+    ///
+    /// Set only by [`Self::release_authenticated`], and read only by the destructor, to decide
+    /// whether the source is charged for churn. It is a property of the *release*, not of the
+    /// connection: the question the churn bound asks is "did this admission end in a peer, or
+    /// in nothing?".
+    authenticated: bool,
+    /// The instant this slot was taken, and the date the churn charge carries (#2549).
+    ///
+    /// See [`PreAuthAdmission::release`] on why the charge is stamped here rather than read
+    /// from the clock when the guard drops.
+    admitted_at: Instant,
 }
 
 impl AdmissionGuard {
@@ -482,11 +872,27 @@ impl AdmissionGuard {
     pub fn authenticate_by(&self) -> Instant {
         self.authenticate_by
     }
+
+    /// Give the slot back for a connection that authenticated, without charging churn (#2549).
+    ///
+    /// **Call this only where an identity has actually been proven against the connection** —
+    /// in practice `ConnectionContext::record_authenticated_peer`, which runs only after the
+    /// DID-TLS binding checks. Calling it anywhere else would let an unauthenticated
+    /// connection buy its way out of the rate bound, which is the whole of what the bound
+    /// counts.
+    ///
+    /// Consuming `self` is deliberate: the release *is* the drop, so there is no window in
+    /// which a guard sits marked-but-unreleased, and no second call to get wrong.
+    pub fn release_authenticated(mut self) {
+        self.authenticated = true;
+        drop(self);
+    }
 }
 
 impl Drop for AdmissionGuard {
     fn drop(&mut self) {
-        self.admission.release(self.key);
+        self.admission
+            .release(self.key, self.authenticated, self.admitted_at);
     }
 }
 

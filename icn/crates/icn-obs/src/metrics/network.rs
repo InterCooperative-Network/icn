@@ -50,7 +50,7 @@ pub fn init_descriptions() {
     // Pre-authentication connection admission (Issue #2547)
     describe_counter!(
         "icn_network_preauth_admission_refused_total",
-        "Total inbound connections refused a pre-authentication slot, by which bound was hit (global_limit or source_limit)"
+        "Total inbound connections refused a pre-authentication slot, by which bound was hit (global_limit, source_limit or source_churn)"
     );
     describe_counter!(
         "icn_network_preauth_admission_released_total",
@@ -63,6 +63,11 @@ pub fn init_descriptions() {
     describe_gauge!(
         "icn_network_preauth_sources_tracked",
         "Distinct sources currently holding at least one pre-authentication slot (bounded by the global admission limit)"
+    );
+    // Pre-authentication churn rate (Issue #2549)
+    describe_counter!(
+        "icn_network_preauth_churn_untracked_total",
+        "Total abandoned pre-authentication admissions that went uncharged because the per-source churn table was at capacity"
     );
     // Pre-authentication deadline (Issue #2552)
     describe_counter!(
@@ -273,6 +278,20 @@ pub fn preauth_admission_refused_inc(bound: &'static str) {
 /// shape — connections arriving that never say who they are.
 pub fn preauth_admission_released_inc() {
     counter!("icn_network_preauth_admission_released_total").increment(1);
+}
+
+/// An abandoned admission went uncharged because the churn table was full (#2549).
+///
+/// The per-source churn bound's one degraded mode. It is not an error and not an attack on
+/// its own: the table holds a source only while that source has recently abandoned an
+/// admission, so reaching capacity means thousands of distinct return-routable sources are
+/// doing so at once — the distributed case a single node cannot bound anyway.
+///
+/// Sustained non-zero means the rate bound is not being applied to some sources. Read it with
+/// `preauth_admission_refused_total{bound="source_churn"}`: refusals rising with this at zero
+/// is the bound working; this rising is the bound running out of room to work in.
+pub fn preauth_churn_untracked_inc() {
+    counter!("icn_network_preauth_churn_untracked_total").increment(1);
 }
 
 /// Established inbound connections that have not yet authenticated (#2547).
