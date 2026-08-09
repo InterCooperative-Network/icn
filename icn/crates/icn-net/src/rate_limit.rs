@@ -575,6 +575,9 @@ impl SourcePreAuthBudget {
     /// permits a full burst at the start of a window and another once it has refilled, so the
     /// sliding-window reading of it is wrong by up to a factor of two.
     ///
+    /// One exception, in the saturated table's promotion path only — see *The promotion transition
+    /// is the one place the per-source burst is not exact* below, and #2562.
+    ///
     /// It does **not** bound the QUIC/TLS handshake, which is complete before the source key
     /// exists at all, nor the `ConnectionContext` and task a connection allocates, nor reading and
     /// deserializing a message that is then denied here — that read happens before this gate, and
@@ -598,9 +601,28 @@ impl SourcePreAuthBudget {
     /// When the table is full and a sweep frees nothing, an untracked source spends from a single
     /// **shared** bucket with one source's burst and rate. So the protection degrades from "each
     /// source is bounded" to "every untracked source is bounded *together*, by one source's
-    /// worth" — never to "unbounded". Being untracked is never better than being tracked, so
-    /// there is nothing to game by filling the table, and filling it needs source cardinality one
-    /// source does not have.
+    /// worth" — never to "unbounded".
+    ///
+    /// # The promotion transition is the one place the per-source burst is not exact
+    ///
+    /// Stated because it is a real exception to the headline bound (#2562 tracks it). A source
+    /// that spends from the shared bucket while untracked and is *then* promoted — a later sweep
+    /// frees a slot — is inserted with [`BudgetState::fresh_bucket`], a full one. Its shared
+    /// spending is not carried across, so across that transition its burst term can reach `2B`
+    /// rather than `B`, once, before settling back to `B + rate × T`.
+    ///
+    /// It is not fixed here because carrying the debt means per-source accounting for sources the
+    /// table has *no room to track* — the exact state the fallback exists to avoid. Bounding it by
+    /// seeding the promoted bucket from the shared level would instead charge a newly-arrived
+    /// honest source for its neighbours' spending.
+    ///
+    /// What survives unchanged is the anti-gaming argument, which is an aggregate one: the extra
+    /// is drawn from the shared bucket, and there is only one of those, so *all* promoted sources
+    /// together can gain at most its throughput. Filling the table costs `max_sources` distinct
+    /// keys and leaves every one of the attacker's sources with less than being tracked would have
+    /// given it. So there is still nothing to gain by filling the table — but "being untracked is
+    /// never better than being tracked", which this doc used to claim outright, is false at the
+    /// moment of promotion.
     pub fn spend(&self, key: SourceKey) -> bool {
         let mut state = self
             .state
