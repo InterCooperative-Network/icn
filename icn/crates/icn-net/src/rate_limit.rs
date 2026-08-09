@@ -414,9 +414,18 @@ impl Default for PreAuthRateLimiter {
 /// ones would therefore be selling exemptions for the price of a keypair. Charging the work itself
 /// is the only discriminator an attacker cannot buy.
 ///
-/// A side effect worth naming: because acquiring a fresh DID-keyed post-authentication bucket
-/// costs one anonymous dispatch, the rate at which one source can mint fresh identities into the
-/// per-DID limiter is now bounded by this too.
+/// A side effect worth naming, with its limit: acquiring a fresh DID-keyed post-authentication
+/// bucket costs one anonymous dispatch **on a connection that is not yet authenticated**, so the
+/// rate at which one source can mint fresh identities *that way* is bounded by this too.
+///
+/// It does **not** bound identity rotation on a connection that has already authenticated. This
+/// gate runs only while `authenticated_peer` is `None`; a later Hello on the same connection is
+/// charged to the currently authenticated DID's bucket, and `record_authenticated_peer` then
+/// overwrites the identity unconditionally. So a peer can walk A → B → C on one established
+/// connection, minting a per-DID bucket each time, without spending another source token. That is
+/// the writable-identity property #2556 exists to remove, not something this budget can reach —
+/// the source key is not consulted after authentication by design, because post-authentication
+/// traffic is bounded per DID and per personhood anchor instead.
 ///
 /// # What this does not bound
 ///
@@ -719,9 +728,21 @@ pub enum PreAuthBudget {
     },
     /// Outbound dials and handler unit tests.
     ///
-    /// *This node* chose the peer, so there is no source to aggregate against and no churn to
-    /// bound: nobody can make this node dial by reconnecting. The per-connection budget is the
-    /// right one here, and it is the same one `admission_guard` is `None` for.
+    /// *This node* chose the peer, so there is no *reconnect* churn to aggregate: closing an
+    /// inbound connection cannot make this node dial. The per-connection budget is the right one
+    /// here, and it is the same one `admission_guard` is `None` for.
+    ///
+    /// "This node chose the peer" is narrower than it sounds, and the gap is deliberate rather
+    /// than overlooked. With peer exchange enabled an authenticated peer can influence *which*
+    /// endpoints this node dials — `supervisor::init_network` auto-dials discovered peers, and
+    /// already caps them for exactly that reason — so an induced dial does get a fresh
+    /// per-connection burst without touching any source budget.
+    ///
+    /// Charging those to the target's source budget is not obviously an improvement: it would let
+    /// a peer that can induce dials at an address drain *that address's* inbound allowance, which
+    /// converts an outbound-churn concern into a remote denial-of-service against the victim.
+    /// Bounding induced dials belongs with the dial cap and the trust gate on peer exchange, not
+    /// with a bucket keyed on the address being dialled.
     Connection(PreAuthRateLimiter),
 }
 
