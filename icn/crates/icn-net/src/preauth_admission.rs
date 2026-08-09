@@ -216,15 +216,31 @@ pub enum SourceKey {
 
 impl SourceKey {
     /// The key a connection from `addr` is charged to.
+    ///
+    /// An IPv4-mapped address is unmapped first. This is not a tidiness step — it is load
+    /// bearing on every dual-stack deployment, which is the default one. `listen_addr` defaults
+    /// to `[::]:7777`, `IPV6_V6ONLY` is left at the OS default (0 on Linux), and nothing in this
+    /// crate sets it, so an IPv4 peer is reported by the socket as `::ffff:a.b.c.d`. Rust does
+    /// not unmap those implicitly, so taking the v6 branch would read a /64 of all zeros and
+    /// collapse **every IPv4 client on the internet into one key** — one shared allowance for the
+    /// entire v4 population, which any single v4 peer could hold empty.
+    ///
+    /// Only `::ffff:0:0/96` is unmapped, via [`std::net::Ipv6Addr::to_ipv4_mapped`]. Deprecated
+    /// IPv4-*compatible* addresses (`::a.b.c.d`) are deliberately left on the v6 path: they are
+    /// not what a dual-stack socket produces, and `to_ipv4` would also rewrite `::1` to
+    /// `0.0.0.1`, quietly merging v6 loopback into a v4 key.
     pub fn from_addr(addr: SocketAddr) -> Self {
         match addr.ip() {
             IpAddr::V4(ip) => SourceKey::V4(ip),
-            IpAddr::V6(ip) => {
-                let octets = ip.octets();
-                let mut prefix = [0u8; 8];
-                prefix.copy_from_slice(&octets[..8]);
-                SourceKey::V6Prefix(prefix)
-            }
+            IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+                Some(v4) => SourceKey::V4(v4),
+                None => {
+                    let octets = ip.octets();
+                    let mut prefix = [0u8; 8];
+                    prefix.copy_from_slice(&octets[..8]);
+                    SourceKey::V6Prefix(prefix)
+                }
+            },
         }
     }
 }
@@ -500,6 +516,52 @@ mod tests {
 
     fn v6(addr: &str) -> SocketAddr {
         format!("[{addr}]:9000").parse().expect("test address")
+    }
+
+    /// Two IPv4 clients arriving over a dual-stack listener are two sources, not one.
+    ///
+    /// The default `listen_addr` is `[::]:7777` and nothing sets `IPV6_V6ONLY`, so on Linux
+    /// (`bindv6only=0`) an IPv4 peer is reported as `::ffff:a.b.c.d`. Rust does not unmap that
+    /// implicitly, so the v6 branch would read a /64 of all zeros and give every IPv4 client on
+    /// the internet one shared key — a single peer could then hold the whole v4 population's
+    /// allowance at empty. This is the regression test for that.
+    #[test]
+    fn ipv4_mapped_sources_do_not_collapse_into_one_key() {
+        let a = SourceKey::from_addr(v6("::ffff:198.51.100.7"));
+        let b = SourceKey::from_addr(v6("::ffff:203.0.113.9"));
+
+        assert_ne!(
+            a, b,
+            "two different IPv4 clients over a dual-stack listener collapsed to one source key"
+        );
+        assert_eq!(
+            a,
+            SourceKey::from_addr(v4("198.51.100.7")),
+            "the same client must key identically whether it arrives mapped or native"
+        );
+        assert!(
+            matches!(a, SourceKey::V4(_)),
+            "a mapped IPv4 address must be charged as IPv4, not as a /64"
+        );
+    }
+
+    /// Unmapping must not swallow addresses that are genuinely IPv6.
+    ///
+    /// `to_ipv4_mapped` is used rather than `to_ipv4` precisely so that `::1` stays v6 — `to_ipv4`
+    /// would rewrite it to `0.0.0.1` and merge v6 loopback into a v4 key.
+    #[test]
+    fn genuine_ipv6_sources_still_key_on_the_prefix() {
+        let a = SourceKey::from_addr(v6("2001:db8::1"));
+        let b = SourceKey::from_addr(v6("2001:db8::dead:beef"));
+        let other = SourceKey::from_addr(v6("2001:db8:1::1"));
+
+        assert_eq!(a, b, "host bits inside one /64 are not new sources");
+        assert_ne!(a, other, "a different /64 must still be its own source");
+        assert!(matches!(a, SourceKey::V6Prefix(_)));
+        assert!(
+            matches!(SourceKey::from_addr(v6("::1")), SourceKey::V6Prefix(_)),
+            "v6 loopback must not be rewritten into an IPv4 key"
+        );
     }
 
     #[test]

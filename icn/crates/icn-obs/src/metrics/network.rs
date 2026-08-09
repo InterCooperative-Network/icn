@@ -69,6 +69,15 @@ pub fn init_descriptions() {
         "icn_network_preauth_authentication_timeout_total",
         "Total inbound connections closed for holding a pre-authentication slot without ever authenticating"
     );
+    // Per-source anonymous work budget (Issue #2549)
+    describe_gauge!(
+        "icn_network_preauth_source_budget_tracked",
+        "Sources the pre-authentication budget table currently holds an allowance for (reclaimed lazily, only when the table is full)"
+    );
+    describe_counter!(
+        "icn_network_preauth_source_budget_degraded_total",
+        "Total anonymous messages charged to the shared budget because the per-source table was full"
+    );
     describe_counter!(
         "icn_network_rate_limit_config_changes_total",
         "Total number of peer rate limit configuration changes"
@@ -302,6 +311,32 @@ pub fn preauth_sources_tracked_set(count: usize) {
 /// This flat while the gauge sits at its ceiling would mean the deadline is not firing at all.
 pub fn preauth_authentication_timeout_inc() {
     counter!("icn_network_preauth_authentication_timeout_total").increment(1);
+}
+
+/// How many sources the anonymous-work budget table currently holds an allowance for (#2549).
+///
+/// Not a count of connections or of peers, and **not** a count of sources currently throttled: an
+/// entry becomes reclaimable once its allowance refills, but is only dropped by a sweep, and a
+/// sweep runs only on the miss path of a full table. Below capacity nothing is reclaimed, so this
+/// climbs with distinct sources seen and does not fall back to zero on a quiet network. Read it as
+/// an upper bound on "sources below full", bounded by `MAX_PREAUTH_BUDGET_SOURCES`.
+///
+/// Reaching that ceiling is therefore not itself degradation — it is the point at which sweeping
+/// begins. `preauth_source_budget_degraded_total` moving is the signal that a sweep freed nothing,
+/// which is the condition that actually costs per-source fairness.
+pub fn preauth_source_budget_tracked_set(sources: usize) {
+    gauge!("icn_network_preauth_source_budget_tracked").set(sources as f64);
+}
+
+/// An anonymous message was charged to the shared budget instead of its own source's (#2549).
+///
+/// This is the degraded mode, and it is a statement about *this node's table*, not about the
+/// source — which is why it carries no source label, the same unbounded-cardinality reasoning as
+/// `preauth_admission_refused_inc`. Nonzero means the per-source table was full, so every
+/// untracked source is sharing one source's worth of allowance between them. Aggregate work stays
+/// bounded; per-source fairness does not.
+pub fn preauth_source_budget_degraded_inc() {
+    counter!("icn_network_preauth_source_budget_degraded_total").increment(1);
 }
 
 /// Increment rate limit configuration change counter

@@ -4,8 +4,10 @@
 //!
 //! - **Connection acceptance**: Listens for new connections via the session manager
 //! - **Stream processing**: Handles bidirectional streams for message exchange
-//! - **Rate limiting**: Two-phase — an anonymous per-connection budget until the peer
-//!   authenticates, then per-DID and per-personhood-anchor limits for Sybil resistance
+//! - **Rate limiting**: Two-phase. While the peer is anonymous an inbound message spends *both*
+//!   a per-connection burst (#2491) and a shared per-source budget that survives reconnects
+//!   (#2549); once it authenticates, per-DID and per-personhood-anchor limits apply for Sybil
+//!   resistance
 //! - **Byzantine detection**: Reports misbehavior to the misbehavior detector
 //! - **Blob announcements**: Extracts and registers blob availability from incoming messages
 //!
@@ -36,7 +38,8 @@
 //!
 //! ```text
 //! before authentication:
-//!     charge the connection's own anonymous budget.
+//!     charge the transport SOURCE's anonymous budget, shared with every other
+//!     connection from that source.
 //!     No DID input: no trust tier, no personhood anchor.
 //!
 //! after an authenticated Hello:
@@ -49,8 +52,18 @@
 //! semantics are a separate question, tracked by #2480; a transport limiter only needs to
 //! know whose traffic this connection is carrying.
 //!
-//! Scope: this bounds what one connection can spend. Bounding how many connections one
-//! source may open is connection admission, below.
+//! The anonymous budget is keyed by source rather than by connection because the connection
+//! was a key the peer could discard (#2549). One connection, one budget answered "which claim
+//! selects this limit" correctly, but it also meant reconnecting was issued a new one, so a
+//! source's aggregate was bounded by nothing. The source key outlives the connections that
+//! spend from it, and authentication does not refund what was already spent — self-minting a
+//! DID and a binding is cheap, so any exemption it could buy would be no bound at all.
+//!
+//! Scope: this bounds the anonymous *dispatch* one source can fund. It does not bound that
+//! source's QUIC/TLS handshake rate, which is complete before the source key exists, nor the
+//! deserialization of a message that is then denied — that read happens before the gate, and
+//! one held connection can drive it without reconnecting. Bounding how many connections one
+//! source holds *at once* is connection admission, below.
 //!
 //! # The anonymous phase is bounded in size and in time
 //!
@@ -184,6 +197,13 @@ impl NetworkActor {
         // on this path is per-connection and so cannot see a source opening many (#2547).
         let admission_ctl = Arc::new(crate::preauth_admission::PreAuthAdmission::new());
 
+        // The other state that aggregates across connections, and the reason it has to (#2549).
+        // The admission table above bounds how many anonymous connections one source holds *at
+        // once*; it cannot bound what a source spends over time, because its entries exist only
+        // while a connection is live and so are re-minted on every reconnect. This one deliberately
+        // outlives the connections that draw on it, which is the whole difference.
+        let pre_auth_budget = Arc::new(crate::rate_limit::SourcePreAuthBudget::new());
+
         loop {
             // Reserve a handshake slot before taking on new work. Acquiring is cancel-safe,
             // so losing this race to shutdown costs nothing.
@@ -256,6 +276,7 @@ impl NetworkActor {
             let own_did_clone = own_did.clone();
             let peer_exchange_enabled = peer_exchange_enabled.clone();
             let admission_ctl = admission_ctl.clone();
+            let pre_auth_budget = pre_auth_budget.clone();
             tokio::spawn(async move {
                 let connection = match incoming.await {
                     Ok(connection) => connection,
@@ -315,6 +336,7 @@ impl NetworkActor {
                     // We did not choose this peer, so there is nobody we expected (#2533).
                     None,
                     Some(admission),
+                    Some(pre_auth_budget),
                 )
                 .await
                 {
@@ -359,6 +381,10 @@ impl NetworkActor {
         // `None` for outbound: we chose to dial that peer, so it is not consuming an
         // allowance meant to bound connections chosen by somebody else.
         admission: Option<crate::preauth_admission::AdmissionGuard>,
+        // The endpoint's per-source anonymous allowance, for inbound connections (#2549).
+        // `None` for outbound, for the same reason `admission` is: nobody can make this node
+        // dial by reconnecting, so there is no churn to aggregate against.
+        pre_auth_budget: Option<Arc<crate::rate_limit::SourcePreAuthBudget>>,
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
@@ -392,6 +418,14 @@ impl NetworkActor {
             peer_exchange_enabled,
             expected_peer,
             admission,
+            // Keyed the same way the admission slot is, so a source cannot be two sources to
+            // the two bounds — the port it dialled from is not part of either (#2547).
+            pre_auth_budget.map(|budget| {
+                (
+                    budget,
+                    crate::preauth_admission::SourceKey::from_addr(connection.remote_address()),
+                )
+            }),
         );
 
         loop {
@@ -548,12 +582,23 @@ impl NetworkActor {
                             };
 
                             if !did_allowed {
-                                // Two different limits reach this branch, and the message says
-                                // which. "Per-DID limit" is not true of a phase that has no
-                                // DID, and the distinction is the operational one: a throttled
+                                // Two limits reach this branch and the message says which of the
+                                // two: "per-DID limit" is not true of a phase that has no DID,
+                                // and the distinction is the operational one — a throttled
                                 // authenticated peer is a tier that may want raising, while an
-                                // exhausted anonymous budget is load from a connection that
-                                // never got as far as saying who it was.
+                                // exhausted anonymous budget is load from a connection that never
+                                // got as far as saying who it was.
+                                //
+                                // The anonymous arm deliberately does *not* name which of its own
+                                // two buckets refused. An inbound connection spends a
+                                // per-connection burst (#2491) and a shared per-source budget
+                                // (#2549), the first is consulted first and short-circuits, and an
+                                // outbound connection has no source budget at all. Naming the
+                                // source here — as this message briefly did — points operators at
+                                // NAT contention for what is just as likely one connection
+                                // spending its own burst. Attributing it exactly means returning
+                                // the refusing bucket from `PreAuthBudget::check`, which is a
+                                // change to the gate itself rather than to this log line.
                                 match &authenticated {
                                     Some(authenticated) => warn!(
                                         claimed_from = %message.from,
@@ -562,8 +607,9 @@ impl NetworkActor {
                                     ),
                                     None => warn!(
                                         claimed_from = %message.from,
-                                        "Rate limited message (pre-authentication connection \
-                                         budget exhausted)"
+                                        "Rate limited message (a pre-authentication budget is \
+                                         exhausted: this connection's own burst, or the shared \
+                                         budget for its source if it has one)"
                                     ),
                                 }
 

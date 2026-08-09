@@ -81,10 +81,19 @@ pub struct ConnectionContext {
     /// The other half of the same idea. `authenticated_peer` answers "may this connection
     /// have a trust-derived limit at all"; this is what it gets while the answer is no.
     ///
-    /// It lives here rather than in the shared [`RateLimiter`] because its key *is* this
-    /// struct: one connection, one budget, no map, no eviction, and nothing the sender can
-    /// say to be issued a different one (#2491).
-    pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter,
+    /// For an inbound connection this carries two bounds: this connection's own burst (#2491)
+    /// and a handle to its source's aggregate allowance (#2549).
+    ///
+    /// One connection, one budget was the right answer to "which claim selects this limit" —
+    /// nothing the sender says picks it — but it made *closing the connection* a way to discard
+    /// the spent budget and be issued a new one, so a source's aggregate was bounded by nothing.
+    /// The source key outlives the connections that spend from it, which is the whole difference.
+    /// The per-connection bucket stays because it answers a different question: it is what stops
+    /// a single fresh connection from spending the source's entire allowance in one burst.
+    ///
+    /// [`crate::rate_limit::PreAuthBudget::Connection`] for outbound dials and handler unit
+    /// tests, for the same reason `admission_guard` is `None` there.
+    pre_auth_limiter: crate::rate_limit::PreAuthBudget,
     /// This connection's share of its source's pre-authentication allowance (#2547).
     ///
     /// The third member of the same idea. `authenticated_peer` says whether this connection
@@ -168,6 +177,10 @@ impl ConnectionContext {
         peer_exchange_enabled: Arc<std::sync::atomic::AtomicBool>,
         expected_peer: Option<Did>,
         admission_guard: Option<crate::preauth_admission::AdmissionGuard>,
+        pre_auth_budget: Option<(
+            Arc<crate::rate_limit::SourcePreAuthBudget>,
+            crate::preauth_admission::SourceKey,
+        )>,
     ) -> Self {
         Self {
             handler,
@@ -184,7 +197,16 @@ impl ConnectionContext {
             direction,
             hello_responded: std::sync::atomic::AtomicBool::new(false),
             authenticated_peer: RwLock::new(None),
-            pre_auth_limiter: crate::rate_limit::PreAuthRateLimiter::new(),
+            pre_auth_limiter: match pre_auth_budget {
+                Some((budget, key)) => crate::rate_limit::PreAuthBudget::Source {
+                    connection: crate::rate_limit::PreAuthRateLimiter::new(),
+                    budget,
+                    key,
+                },
+                None => crate::rate_limit::PreAuthBudget::Connection(
+                    crate::rate_limit::PreAuthRateLimiter::new(),
+                ),
+            },
             admission_guard: std::sync::Mutex::new(admission_guard),
             peer_exchange_enabled,
             expected_peer,
@@ -232,11 +254,17 @@ impl ConnectionContext {
         self.authenticated_peer.read().await.clone()
     }
 
-    /// Spend one message against this connection's anonymous budget.
+    /// Spend one message against the anonymous budget this connection draws on.
     ///
     /// Call this only on the branch where [`Self::authenticated_peer`] is `None`. It takes
     /// no identity because at that point there is none — see
-    /// [`crate::rate_limit::PreAuthRateLimiter`].
+    /// [`crate::rate_limit::PreAuthBudget`].
+    ///
+    /// For an inbound connection the budget is its *source's* and is shared with every other
+    /// connection from that source (#2549), so this is charged before the Hello that would
+    /// authenticate it is dispatched. Authentication cannot refund it, which is the point:
+    /// self-issuing a DID and a binding is cheap, so anything an attacker could buy by
+    /// authenticating would be no bound at all.
     pub(crate) async fn check_pre_auth_rate_limit(&self) -> bool {
         self.pre_auth_limiter.check().await
     }

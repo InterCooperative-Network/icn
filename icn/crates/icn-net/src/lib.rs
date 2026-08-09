@@ -57,7 +57,10 @@ pub use protocol::{
     write_message_compressed, write_message_negotiated, CompressionFormat, EncodingFormat,
     KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, COMPRESSION_THRESHOLD,
 };
-pub use rate_limit::{RateLimitConfig, RateLimiter, NETWORK_DOMAIN};
+pub use rate_limit::{
+    RateLimitConfig, RateLimiter, SourcePreAuthBudget, MAX_PREAUTH_BUDGET_SOURCES, NETWORK_DOMAIN,
+    PREAUTH_SOURCE_BURST, PREAUTH_SOURCE_RENEWAL_WINDOW,
+};
 pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;
