@@ -582,12 +582,23 @@ impl NetworkActor {
                             };
 
                             if !did_allowed {
-                                // Two different limits reach this branch, and the message says
-                                // which. "Per-DID limit" is not true of a phase that has no
-                                // DID, and the distinction is the operational one: a throttled
+                                // Two limits reach this branch and the message says which of the
+                                // two: "per-DID limit" is not true of a phase that has no DID,
+                                // and the distinction is the operational one — a throttled
                                 // authenticated peer is a tier that may want raising, while an
-                                // exhausted anonymous budget is load from a connection that
-                                // never got as far as saying who it was.
+                                // exhausted anonymous budget is load from a connection that never
+                                // got as far as saying who it was.
+                                //
+                                // The anonymous arm deliberately does *not* name which of its own
+                                // two buckets refused. An inbound connection spends a
+                                // per-connection burst (#2491) and a shared per-source budget
+                                // (#2549), the first is consulted first and short-circuits, and an
+                                // outbound connection has no source budget at all. Naming the
+                                // source here — as this message briefly did — points operators at
+                                // NAT contention for what is just as likely one connection
+                                // spending its own burst. Attributing it exactly means returning
+                                // the refusing bucket from `PreAuthBudget::check`, which is a
+                                // change to the gate itself rather than to this log line.
                                 match &authenticated {
                                     Some(authenticated) => warn!(
                                         claimed_from = %message.from,
@@ -596,8 +607,9 @@ impl NetworkActor {
                                     ),
                                     None => warn!(
                                         claimed_from = %message.from,
-                                        "Rate limited message (this source's pre-authentication \
-                                         budget is exhausted)"
+                                        "Rate limited message (a pre-authentication budget is \
+                                         exhausted: this connection's own burst, or the shared \
+                                         budget for its source if it has one)"
                                     ),
                                 }
 
