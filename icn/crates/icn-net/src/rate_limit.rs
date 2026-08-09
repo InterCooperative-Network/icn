@@ -483,10 +483,14 @@ pub struct SourcePreAuthBudget {
 
 #[derive(Debug)]
 struct BudgetState {
-    /// Sources with an allowance that is currently below full.
+    /// Sources this table is currently holding an allowance for.
     ///
     /// A replenished bucket is indistinguishable from an absent one, which is what keeps this
-    /// bounded without an eviction policy — see [`SourcePreAuthBudget::spend`].
+    /// bounded without an eviction policy — see [`SourcePreAuthBudget::spend`]. Reclamation is
+    /// *lazy*: a refilled entry becomes eligible to be dropped but is only actually dropped by
+    /// [`Self::sweep_replenished`], which runs on the miss path of a full table. Below capacity
+    /// nothing sweeps, so this holds every source seen since startup, refilled or not — bounded
+    /// by `max_sources` either way, which is all it has to be.
     per_source: HashMap<SourceKey, TokenBucket>,
     /// What every source the table had no room to track shares.
     shared: TokenBucket,
@@ -566,11 +570,18 @@ impl SourcePreAuthBudget {
     ///
     /// # Bounded state, and what happens when it runs out
     ///
-    /// An entry is kept only while the source's allowance is below full, because a replenished
+    /// An entry is reclaimable once the source's allowance is back to full, because a replenished
     /// bucket grants exactly what a fresh one does. Entries therefore **expire by refilling**, and
     /// are never evicted while live. That is the security property, not merely a memory one: an
     /// attacker cannot evict a victim's entry to reset it, and cannot evict its own — its entry is
     /// below full precisely because it is spending, and a full one would buy nothing.
+    ///
+    /// Reclamation is lazy, and deliberately so. Refilling makes an entry *eligible* to be
+    /// dropped; [`BudgetState::sweep_replenished`] is what actually drops it, and it runs only on
+    /// the miss path of a full table. Below capacity nothing sweeps, so the table simply retains
+    /// every source it has seen. That costs a bounded amount of memory and buys the absence of a
+    /// timer, and it cannot loosen the bound in either direction: a retained-but-refilled entry
+    /// grants exactly the burst a fresh one would.
     ///
     /// When the table is full and a sweep frees nothing, an untracked source spends from a single
     /// **shared** bucket with one source's burst and rate. So the protection degrades from "each
@@ -630,7 +641,11 @@ impl SourcePreAuthBudget {
         rewind(&mut state.last_sweep);
     }
 
-    /// How many sources currently hold an allowance below full.
+    /// How many sources this table currently holds an allowance for.
+    ///
+    /// An upper bound on "sources below full", not a count of them: reclamation is lazy, so a
+    /// source that has refilled stays counted until a sweep needs its slot. See
+    /// [`Self::spend`].
     pub fn tracked_sources(&self) -> usize {
         self.state
             .lock()
@@ -2174,6 +2189,76 @@ mod source_budget_tests {
             total, BURST,
             "concurrent spenders were granted {total} of a {BURST} burst; an allowance was lost \
              or duplicated under contention"
+        );
+    }
+
+    // -- A11: the two buckets, and which one is asked first ------------------------------------
+
+    /// A connection that has spent its own burst cannot spend its source's.
+    ///
+    /// [`PreAuthBudget::check`] asks the connection's bucket before the source's, and `&&` is
+    /// short-circuiting, so a spent connection never reaches the shared lock. That operand order
+    /// *is* the property, which is why it is pinned here: it survives no compiler check and reads
+    /// as an arbitrary style choice to anyone refactoring the expression.
+    ///
+    /// Reversed, denial becomes free. A source token would be taken before the connection is
+    /// consulted, so one connection that had already exhausted its 20 could keep debiting the
+    /// shared bucket at whatever rate it can put packets on the wire, dispatching nothing —
+    /// pinning its whole NAT at zero tokens for the price of messages the node throws away. That
+    /// is strictly worse than the defect #2549 filed, and cheaper.
+    ///
+    /// The identity asserted is exact rather than approximate: with the source's refill set to
+    /// zero, every grant costs exactly one source token, so `granted + left` must equal the burst
+    /// no matter how many tokens the *connection* bucket refills mid-run. Under the reversed
+    /// order the hammer drains the source outright and the sum collapses to `granted`.
+    #[tokio::test]
+    async fn a_spent_connection_does_not_charge_its_source() {
+        const SOURCE_BURST: usize = 100;
+        // Hammered far past the source burst, so a reversed order cannot merely dent it.
+        const HAMMER: usize = 1_000;
+
+        let budget = Arc::new(SourcePreAuthBudget::with_policy(
+            SOURCE_BURST as f64,
+            0.0,
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+            16,
+        ));
+        let k = key("203.0.113.40:1000");
+        let inbound = PreAuthBudget::Source {
+            connection: PreAuthRateLimiter::new(),
+            budget: budget.clone(),
+            key: k,
+        };
+
+        let mut granted = 0usize;
+        for _ in 0..(PRE_AUTH_RATE_LIMIT.burst_capacity as usize + HAMMER) {
+            if inbound.check().await {
+                granted += 1;
+            }
+        }
+
+        // Non-vacuity: the connection has to have been able to spend something, or the sum below
+        // would balance for the trivial reason that nothing ever happened.
+        assert!(
+            granted >= PRE_AUTH_RATE_LIMIT.burst_capacity as usize,
+            "the connection was granted only {granted} of its own burst of {}; this run never \
+             exercised a *spent* connection at all",
+            PRE_AUTH_RATE_LIMIT.burst_capacity
+        );
+        assert!(
+            granted < SOURCE_BURST,
+            "the connection bucket refilled enough to spend the whole source burst ({granted} \
+             grants); the assertion below could no longer tell the two orders apart"
+        );
+
+        let left = drain(&budget, k);
+        assert_eq!(
+            granted + left,
+            SOURCE_BURST,
+            "{granted} dispatches were funded and {left} source tokens remain of {SOURCE_BURST}: \
+             {} went to messages that were never dispatched, so a spent connection is draining \
+             its source's allowance",
+            SOURCE_BURST as i64 - (granted + left) as i64
         );
     }
 }

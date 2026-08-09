@@ -72,7 +72,7 @@ pub fn init_descriptions() {
     // Per-source anonymous work budget (Issue #2549)
     describe_gauge!(
         "icn_network_preauth_source_budget_tracked",
-        "Sources holding an anonymous-message allowance below full (entries expire once refilled)"
+        "Sources the pre-authentication budget table currently holds an allowance for (reclaimed lazily, only when the table is full)"
     );
     describe_counter!(
         "icn_network_preauth_source_budget_degraded_total",
@@ -313,12 +313,17 @@ pub fn preauth_authentication_timeout_inc() {
     counter!("icn_network_preauth_authentication_timeout_total").increment(1);
 }
 
-/// How many sources currently hold an anonymous-message allowance below full (#2549).
+/// How many sources the anonymous-work budget table currently holds an allowance for (#2549).
 ///
-/// Not a count of connections or of peers: an entry exists only while a source's allowance has
-/// not refilled, so a quiet network reads zero even with connections established. Watch it
-/// against `MAX_PREAUTH_BUDGET_SOURCES` — approaching that ceiling is the warning that
-/// `preauth_source_budget_degraded_total` is about to start moving.
+/// Not a count of connections or of peers, and **not** a count of sources currently throttled: an
+/// entry becomes reclaimable once its allowance refills, but is only dropped by a sweep, and a
+/// sweep runs only on the miss path of a full table. Below capacity nothing is reclaimed, so this
+/// climbs with distinct sources seen and does not fall back to zero on a quiet network. Read it as
+/// an upper bound on "sources below full", bounded by `MAX_PREAUTH_BUDGET_SOURCES`.
+///
+/// Reaching that ceiling is therefore not itself degradation — it is the point at which sweeping
+/// begins. `preauth_source_budget_degraded_total` moving is the signal that a sweep freed nothing,
+/// which is the condition that actually costs per-source fairness.
 pub fn preauth_source_budget_tracked_set(sources: usize) {
     gauge!("icn_network_preauth_source_budget_tracked").set(sources as f64);
 }
