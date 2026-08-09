@@ -224,8 +224,33 @@ impl ConnectionContext {
 /// Private/loopback/link-local addresses (RFC1918, ULA, fe80::/10) are classified
 /// as `Local`; everything else is `Public`. This prevents misclassifying LAN peers
 /// as publicly reachable when the observed remote address is non-routable.
+///
+/// IPv4-mapped addresses are unmapped before classifying, and that is load bearing rather than
+/// tidiness. `listen_addr` defaults to `[::]:7777`, nothing in this crate sets `IPV6_V6ONLY`, and
+/// where the OS leaves it off the socket is dual-stack — so an IPv4 peer is reported as
+/// `::ffff:a.b.c.d`. Rust does not unmap that implicitly, so without this the v6 arm would see a
+/// LAN peer, match neither ULA nor link-local, and call it `Public`: precisely the
+/// misclassification described above. `Ipv6Addr::is_loopback` has the same gap — it is true only
+/// for `::1`, never for a mapped `127/8` address.
+///
+/// Only `::ffff:0:0/96` is unmapped, via [`std::net::Ipv6Addr::to_ipv4_mapped`]. Deprecated
+/// IPv4-*compatible* addresses (`::a.b.c.d`) stay on the v6 path: they are not what a dual-stack
+/// socket produces, and `to_ipv4` would additionally rewrite `::1` to `0.0.0.1` and classify v6
+/// loopback through the IPv4 rules. This matches `SourceKey::from_addr` (#2557), so the two
+/// subsystems agree on what a peer's address means.
+///
+/// Normalising once here keeps both classification arms exactly as they were: what counts as local
+/// or public is unchanged, only the representation it is read from.
 fn endpoint_kind_for_addr(addr: SocketAddr) -> EndpointKind {
-    match addr.ip() {
+    let normalized = match addr.ip() {
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => IpAddr::V4(v4),
+            None => IpAddr::V6(v6),
+        },
+        already_v4 => already_v4,
+    };
+
+    match normalized {
         IpAddr::V4(ip) => {
             if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
                 EndpointKind::Local
@@ -247,5 +272,102 @@ fn endpoint_kind_for_addr(addr: SocketAddr) -> EndpointKind {
                 EndpointKind::Public
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod endpoint_kind_tests {
+    use super::*;
+
+    fn kind(addr: &str) -> EndpointKind {
+        endpoint_kind_for_addr(addr.parse::<SocketAddr>().expect("test address"))
+    }
+
+    /// The address a dual-stack listener actually reports for an IPv4 peer.
+    ///
+    /// `listen_addr` defaults to `[::]:7777` and nothing sets `IPV6_V6ONLY`, so an IPv4 peer
+    /// arrives as `::ffff:a.b.c.d`. Rust does not unmap that implicitly, so without normalization
+    /// these take the IPv6 arm, match none of loopback/ULA/link-local, and come out `Public` —
+    /// exactly the misclassification this function exists to prevent.
+    fn mapped(v4: &str) -> String {
+        format!("[::ffff:{v4}]:7777")
+    }
+
+    #[test]
+    fn mapped_rfc1918_is_local() {
+        for v4 in ["10.0.0.1", "172.16.0.1", "192.168.1.5"] {
+            assert_eq!(
+                kind(&mapped(v4)),
+                EndpointKind::Local,
+                "mapped private address ::ffff:{v4} was not classified Local"
+            );
+        }
+    }
+
+    #[test]
+    fn mapped_loopback_is_local() {
+        assert_eq!(
+            kind(&mapped("127.0.0.1")),
+            EndpointKind::Local,
+            "mapped loopback was not classified Local — Ipv6Addr::is_loopback() is true only for \
+             ::1, never for a mapped 127/8 address"
+        );
+    }
+
+    #[test]
+    fn mapped_link_local_is_local() {
+        assert_eq!(
+            kind(&mapped("169.254.1.1")),
+            EndpointKind::Local,
+            "mapped IPv4 link-local was not classified Local"
+        );
+    }
+
+    #[test]
+    fn mapped_public_v4_is_public() {
+        // TEST-NET-3, a documentation range the existing V4 logic treats as non-private.
+        assert_eq!(kind(&mapped("203.0.113.7")), EndpointKind::Public);
+    }
+
+    /// The strongest compact invariant: representation must not change classification.
+    #[test]
+    fn native_and_mapped_v4_classify_identically() {
+        for v4 in [
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.5",
+            "127.0.0.1",
+            "169.254.1.1",
+            "203.0.113.7",
+            "8.8.8.8",
+            // The existing V4 arm does not treat the unspecified address as local, and this
+            // change does not alter that — it only has to reach the same verdict either way.
+            "0.0.0.0",
+        ] {
+            assert_eq!(
+                kind(&format!("{v4}:7777")),
+                kind(&mapped(v4)),
+                "{v4} classified differently depending on whether it arrived native or mapped"
+            );
+        }
+    }
+
+    /// Unmapping must not disturb addresses that are genuinely IPv6.
+    #[test]
+    fn genuine_ipv6_classification_is_unchanged() {
+        assert_eq!(
+            kind("[::1]:7777"),
+            EndpointKind::Local,
+            "::1 is v6 loopback"
+        );
+        assert_eq!(kind("[fd00::1]:7777"), EndpointKind::Local, "ULA");
+        assert_eq!(kind("[fc00::1]:7777"), EndpointKind::Local, "ULA low half");
+        assert_eq!(kind("[fe80::1]:7777"), EndpointKind::Local, "link-local");
+        assert_eq!(
+            kind("[2001:db8::1]:7777"),
+            EndpointKind::Public,
+            "public v6"
+        );
+        assert_eq!(kind("[2606:4700::1111]:7777"), EndpointKind::Public);
     }
 }
