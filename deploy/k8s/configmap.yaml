@@ -11,10 +11,20 @@ data:
   # Examples: "https://icn.example.com", "http://10.8.30.40:30080"
   gateway_base_url: "http://10.8.30.40:30080"
 
-  # Trusted proxy IPs that can set X-Forwarded-* headers (comma-separated)
-  # Only needed if GATEWAY_BASE_URL is not set and you're behind a reverse proxy
-  # Example: "10.42.0.1,10.43.0.1" (K8s cluster IPs)
-  # If not set, only localhost (127.0.0.1, ::1) is trusted
+  # Trusted proxy IPs that may assert forwarding metadata (comma-separated, exact
+  # addresses, no CIDR). Example: "10.42.0.1,10.43.0.1" (K8s cluster IPs).
+  # If not set, only localhost (127.0.0.1, ::1) is trusted.
+  #
+  # This gates BOTH the QR-login URL derivation and — since #2567 — the client IP used
+  # for rate limiting and audit attribution on unauthenticated endpoints. If you run an
+  # ingress in front of the gateway and leave this unset, that ingress is untrusted:
+  # X-Forwarded-For is ignored and every client behind it shares one rate-limit bucket
+  # keyed on the ingress address. That is fail-closed, not fail-open, but it will limit
+  # real users. Set this to the ingress address before serving traffic through a proxy.
+  #
+  # The proxy must also set X-Forwarded-For itself (nginx:
+  # `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). A trusted proxy that
+  # forwards the client's header verbatim launders a caller-supplied claim through the gate.
   # trusted_proxy_ips: "10.42.0.1"
   icn.toml: |
     data_dir = "/data"

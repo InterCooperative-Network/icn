@@ -44,6 +44,12 @@ server {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        # The gateway trusts loopback to assert forwarding metadata, so this proxy MUST
+        # assert it. $proxy_add_x_forwarded_for appends the address nginx actually saw;
+        # the gateway reads the rightmost untrusted hop, discarding anything the caller
+        # prepended. Omitting this line forwards a caller-supplied header verbatim and
+        # launders it through the trust gate (#2567).
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
     # Static: rehearsal landing + member shell + fixture pack.
