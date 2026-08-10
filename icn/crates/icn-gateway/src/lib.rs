@@ -25,6 +25,7 @@ pub mod api;
 pub mod audit;
 pub mod auth;
 pub(crate) mod authority;
+pub(crate) mod client_ip;
 pub mod commons_mgr;
 pub mod commons_store;
 pub mod community_mgr;

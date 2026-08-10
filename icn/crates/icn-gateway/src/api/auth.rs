@@ -11,27 +11,13 @@ use crate::session_authority::SessionAuthority;
 use crate::validation;
 use icn_obs::metrics::gateway;
 
-/// Extract client IP address from request
-/// Returns IP as string, using X-Forwarded-For header if present (proxy support)
+/// Extract client IP address from request.
+///
+/// SECURITY: `X-Forwarded-For` is honoured only when the immediate transport peer is a
+/// trusted proxy; otherwise the socket peer is the client (#2567). See
+/// [`crate::client_ip`] for the trust model.
 fn get_client_ip(req: &HttpRequest) -> String {
-    // Check for X-Forwarded-For header first (reverse proxy support)
-    if let Some(forwarded) = req.headers().get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded.to_str() {
-            // X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2...)
-            // Use the first one (actual client)
-            if let Some(client_ip) = forwarded_str.split(',').next() {
-                return client_ip.trim().to_string();
-            }
-        }
-    }
-
-    // Fall back to connection info
-    if let Some(peer_addr) = req.peer_addr() {
-        return peer_addr.ip().to_string();
-    }
-
-    // Last resort: return placeholder (should never happen)
-    "unknown".to_string()
+    crate::client_ip::client_ip_key(req)
 }
 
 /// POST /auth/challenge - Request authentication challenge

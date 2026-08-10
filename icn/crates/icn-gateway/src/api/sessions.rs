@@ -44,19 +44,14 @@ const WEB_SESSION_SCOPE_CEILING: &[&str] = &[
     "governance:write",
 ];
 
-/// Extract client IP address from request (for rate limiting)
+/// Extract client IP address from request (for rate limiting).
+///
+/// SECURITY: `X-Forwarded-For` is honoured only when the immediate transport peer is a
+/// trusted proxy; otherwise the socket peer is the client (#2567). This is the same
+/// allowlist [`get_gateway_url`] gates `X-Forwarded-*` on, via
+/// [`crate::client_ip::is_trusted_proxy`].
 fn get_client_ip(req: &HttpRequest) -> String {
-    if let Some(forwarded) = req.headers().get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded.to_str() {
-            if let Some(client_ip) = forwarded_str.split(',').next() {
-                return client_ip.trim().to_string();
-            }
-        }
-    }
-    if let Some(peer_addr) = req.peer_addr() {
-        return peer_addr.ip().to_string();
-    }
-    "unknown".to_string()
+    crate::client_ip::client_ip_key(req)
 }
 
 /// Get gateway base URL from environment or request headers
@@ -72,21 +67,12 @@ pub(crate) fn get_gateway_url(req: &HttpRequest) -> String {
         return url;
     }
 
-    // Check if the request came from a trusted proxy
-    let is_trusted_proxy = if let Some(peer_addr) = req.peer_addr() {
-        let peer_ip = peer_addr.ip().to_string();
-
-        // Get trusted proxy list from environment (comma-separated IPs)
-        // Example: TRUSTED_PROXY_IPS="127.0.0.1,::1,10.0.0.1"
-        if let Ok(trusted_ips) = std::env::var("TRUSTED_PROXY_IPS") {
-            trusted_ips.split(',').any(|ip| ip.trim() == peer_ip)
-        } else {
-            // If TRUSTED_PROXY_IPS not set, only trust localhost
-            peer_ip == "127.0.0.1" || peer_ip == "::1"
-        }
-    } else {
-        false
-    };
+    // Check if the request came from a trusted proxy.
+    // One trust model for the whole gateway — see `crate::client_ip` for the semantics of
+    // TRUSTED_PROXY_IPS (exact addresses, comma-separated, loopback by default).
+    let is_trusted_proxy = req
+        .peer_addr()
+        .is_some_and(|peer_addr| crate::client_ip::is_trusted_proxy(peer_addr.ip()));
 
     // Only trust X-Forwarded-* headers if from a trusted proxy
     if is_trusted_proxy {
