@@ -100,16 +100,23 @@ spec:
         # CORS: allow Pilot UI origin for cross-origin API access
         - name: ICN_CORS_ORIGINS
           value: "http://10.8.30.40:30030"
-        # Gateway base URL for QR login - set this to the external URL where the gateway is accessible
-        # This is used in QR codes for mobile wallet login
+        # Gateway base URL for QR login - the external origin (scheme://host[:port]) a
+        # *scanning device* can reach this gateway at. It is embedded in QR material and is
+        # where that device sends its bearer credential, so it is an operator assertion and
+        # is never inferred from request headers or the bind address (#2569).
+        # `optional: true` is retained deliberately: a gateway that issues no QR material
+        # needs no origin. Omitting the key does not fall back to a request-derived origin —
+        # QR issuance fails closed (503) until an origin is configured.
         - name: GATEWAY_BASE_URL
           valueFrom:
             configMapKeyRef:
               name: icn-config
               key: gateway_base_url
               optional: true
-        # Trusted proxy IPs for X-Forwarded-* header validation (comma-separated)
-        # Only these IPs can set X-Forwarded-Host/Proto headers
+        # Trusted proxy IPs allowed to assert the forwarded *client IP* (comma-separated).
+        # Scope is X-Forwarded-For only, for rate-limit and audit identity (#2567/#2568).
+        # It does NOT authorize a proxy to assert the advertised origin: X-Forwarded-Host
+        # and X-Forwarded-Proto are not read at all — set GATEWAY_BASE_URL for that.
         # If not set, only localhost (127.0.0.1, ::1) is trusted
         - name: TRUSTED_PROXY_IPS
           valueFrom:

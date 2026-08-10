@@ -114,39 +114,57 @@ fn unusable(reason: &str) -> GatewayError {
     )
 }
 
+/// The crate's **only** serialization point for test-time `GATEWAY_BASE_URL` mutation.
+///
+/// Every `#[cfg(test)]` module in this crate compiles into the *same* lib test binary, and
+/// libtest runs those tests as threads in one process. A per-module mutex therefore serializes
+/// nothing across modules: two tests holding two different locks still race on the one
+/// process-global variable. That is not merely flaky — it lets a fail-closed assertion observe
+/// another module's configured origin and pass for the wrong reason.
+///
+/// So this lock is process-wide by being the only one. Its `#[cfg(test)]` gate keeps it out of
+/// every non-test build, and `pub(crate)` keeps it off the public API.
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_env {
+    use super::GATEWAY_BASE_URL_ENV;
     use std::sync::{Mutex, MutexGuard};
 
-    /// Serializes mutation of the process-global env this module reads.
     static ENV_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    struct EnvGuard {
+    /// Pins `GATEWAY_BASE_URL` for the guard's lifetime, restoring the prior value on drop.
+    /// Hold it for as long as the value must stay pinned — dropping it releases the lock.
+    pub(crate) struct EnvGuard {
         _lock: MutexGuard<'static, ()>,
         prior: Option<String>,
     }
 
     impl EnvGuard {
-        fn acquire(value: Option<&str>) -> Self {
+        pub(crate) fn acquire(value: Option<&str>) -> Self {
             let lock = ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             let prior = std::env::var(GATEWAY_BASE_URL_ENV).ok();
-            match value {
-                Some(v) => std::env::set_var(GATEWAY_BASE_URL_ENV, v),
-                None => std::env::remove_var(GATEWAY_BASE_URL_ENV),
-            }
+            set_or_clear(value);
             Self { _lock: lock, prior }
         }
     }
 
     impl Drop for EnvGuard {
         fn drop(&mut self) {
-            match self.prior.as_deref() {
-                Some(v) => std::env::set_var(GATEWAY_BASE_URL_ENV, v),
-                None => std::env::remove_var(GATEWAY_BASE_URL_ENV),
-            }
+            set_or_clear(self.prior.as_deref());
         }
     }
+
+    fn set_or_clear(value: Option<&str>) {
+        match value {
+            Some(v) => std::env::set_var(GATEWAY_BASE_URL_ENV, v),
+            None => std::env::remove_var(GATEWAY_BASE_URL_ENV),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_env::EnvGuard;
+    use super::*;
 
     fn resolve(value: Option<&str>) -> Result<String> {
         let _guard = EnvGuard::acquire(value);
@@ -219,6 +237,57 @@ mod tests {
                 "{why}: expected fail-closed ServiceUnavailable, got {err:?}"
             );
         }
+    }
+
+    /// `test_env::EnvGuard` only serializes the modules that actually use it. A new test module
+    /// that reaches for `std::env` directly would silently reintroduce the cross-module race
+    /// (which reproduced at ~47% and could make a fail-closed assertion pass for the wrong
+    /// reason), so the single-mutator property is asserted rather than documented.
+    ///
+    /// This test lives in the one file allowed to mutate, and skips that file — so it cannot
+    /// match its own literals, and stays honest as modules are added.
+    #[test]
+    fn this_module_is_the_only_test_time_mutator_of_the_env() {
+        fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).expect("crate src/ must be readable") {
+                let path = entry.expect("readable dir entry").path();
+                if path.is_dir() {
+                    rs_files(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    out.push(path);
+                }
+            }
+        }
+
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        rs_files(&src, &mut files);
+        assert!(
+            files.len() > 1,
+            "source scan found nothing; the walk is wrong"
+        );
+
+        let this_file = src.join("advertised_origin.rs");
+        let mutators = ["set_var(", "remove_var("];
+
+        let offenders: Vec<String> = files
+            .iter()
+            .filter(|p| **p != this_file)
+            .filter(|p| {
+                let body = std::fs::read_to_string(p).expect("source file must be readable");
+                body.lines().any(|line| {
+                    line.contains(GATEWAY_BASE_URL_ENV) && mutators.iter().any(|m| line.contains(m))
+                })
+            })
+            .map(|p| p.strip_prefix(&src).unwrap_or(p).display().to_string())
+            .collect();
+
+        assert!(
+            offenders.is_empty(),
+            "these modules mutate {GATEWAY_BASE_URL_ENV} directly instead of taking \
+             `advertised_origin::test_env::EnvGuard`; a second lock does not serialize \
+             against the first in a shared lib test process: {offenders:?}"
+        );
     }
 
     /// The refusal must not echo the configured value back to an unauthenticated caller.

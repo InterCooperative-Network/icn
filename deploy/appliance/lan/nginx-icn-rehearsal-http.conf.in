@@ -39,7 +39,8 @@ server {
         # caller-chosen value to a gateway that trusts loopback, laundering attacker
         # authority through this proxy's trust (#2569 — the same class as #2567, one
         # header over). The gateway no longer derives QR authority from any header
-        # (GATEWAY_BASE_URL above is the sole source), so this is defence in depth.
+        # (GATEWAY_BASE_URL, set in the icnd drop-in, is the sole source), so this is
+        # defence in depth.
         proxy_set_header Host @LAN_HOST@;
         # Assert the scheme from nginx's own connection state. Without it the gateway
         # sees only the plaintext loopback hop, so anything reading forwarded proto

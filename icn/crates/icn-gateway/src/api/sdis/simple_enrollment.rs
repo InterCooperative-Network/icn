@@ -1336,6 +1336,11 @@ pub(crate) fn authorize_steward_act(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The crate-wide lock, not a local one: these tests share the process-global
+    // `GATEWAY_BASE_URL` with every other test module in this lib test binary, and a
+    // second mutex would serialize nothing against them (#2569).
+    use crate::advertised_origin::test_env::EnvGuard;
     use actix_web::App;
 
     #[test]
@@ -1398,36 +1403,6 @@ mod tests {
             !qr.contains("192.0.2.10"),
             "the request Host must not reach a device-facing QR payload"
         );
-    }
-
-    /// Serializes mutation of `GATEWAY_BASE_URL` for the tests in this module and restores the
-    /// prior value on drop.
-    struct EnvGuard {
-        _lock: std::sync::MutexGuard<'static, ()>,
-        prior: Option<String>,
-    }
-
-    static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-    impl EnvGuard {
-        fn acquire(value: Option<&str>) -> Self {
-            let lock = ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-            let prior = std::env::var("GATEWAY_BASE_URL").ok();
-            match value {
-                Some(v) => std::env::set_var("GATEWAY_BASE_URL", v),
-                None => std::env::remove_var("GATEWAY_BASE_URL"),
-            }
-            Self { _lock: lock, prior }
-        }
-    }
-
-    impl Drop for EnvGuard {
-        fn drop(&mut self) {
-            match self.prior.as_deref() {
-                Some(v) => std::env::set_var("GATEWAY_BASE_URL", v),
-                None => std::env::remove_var("GATEWAY_BASE_URL"),
-            }
-        }
     }
 
     #[test]
