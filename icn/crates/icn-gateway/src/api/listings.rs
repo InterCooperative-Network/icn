@@ -239,12 +239,16 @@ fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
 ///
 /// `to_ipv4_mapped()` and deliberately not `to_ipv4()`: the latter also converts
 /// deprecated IPv4-*compatible* addresses (`::a.b.c.d`) and would rewrite `::1` to
-/// `0.0.0.1`, judging IPv6 loopback by the IPv4 rules. Same strict normalization
-/// `SourceKey::from_addr` (#2557) and `peer_exchange::endpoint_kind_for_addr` (#2563)
-/// use — applied here at the policy boundary, not as a shared global helper, because
-/// other address checks in this crate deliberately want the opposite (see the
-/// dev-mode loopback gate in `server.rs`, where a mapped address failing
-/// `is_loopback()` keeps the privileged path disabled).
+/// `0.0.0.1`, judging IPv6 loopback by the IPv4 rules. Strict therefore also means
+/// narrow: the other ways an IPv4 address can be embedded in an IPv6 one stay on the
+/// IPv6 arm and remain allowed, exactly as before this change.
+///
+/// Same strict normalization `SourceKey::from_addr` (#2557) and
+/// `peer_exchange::endpoint_kind_for_addr` (#2563) use — applied here at the policy
+/// boundary, not as a shared global helper, because other address checks in this
+/// crate deliberately want the opposite (see the dev-mode loopback gate in
+/// `server.rs`, where a mapped address failing `is_loopback()` keeps the privileged
+/// path disabled).
 fn is_private_ip(ip: &IpAddr) -> bool {
     let ip = match ip {
         IpAddr::V6(ipv6) => ipv6.to_ipv4_mapped().map_or(*ip, IpAddr::V4),
@@ -1436,6 +1440,40 @@ mod tests {
                 "{addr} ({class}) must remain allowed by the IPv6 arm"
             );
         }
+    }
+
+    /// The boundary of the equivalence property above: only `::ffff:0:0/96` is
+    /// unmapped. The other IPv4-in-IPv6 embeddings are left on the IPv6 arm and are
+    /// allowed both before and after this fix — pinned so that boundary is explicit
+    /// rather than inferred from the absence of a test, and so a later "simplification"
+    /// to `to_ipv4()` (which would fold the first of these into the IPv4 rules, and
+    /// `::1` along with it) fails here.
+    #[test]
+    fn non_strict_ipv4_embeddings_are_not_unmapped() {
+        use std::net::{IpAddr, Ipv6Addr};
+
+        for (addr, class) in [
+            (
+                "::7f00:1",
+                "IPv4-compatible ::127.0.0.1, deprecated by RFC 4291",
+            ),
+            ("::ffff:0:7f00:1", "IPv4-translated ::ffff:0:0:0/96"),
+            ("64:ff9b::7f00:1", "NAT64 well-known prefix, RFC 6052"),
+        ] {
+            let v6: Ipv6Addr = addr.parse().expect("test address");
+            assert!(
+                v6.to_ipv4_mapped().is_none(),
+                "{addr} ({class}) must not be treated as strictly IPv4-mapped"
+            );
+            assert!(
+                !is_private_ip(&IpAddr::V6(v6)),
+                "{addr} ({class}) is allowed today; this fix neither blocks nor unblocks it"
+            );
+        }
+
+        // And the same at the call site, so this is a statement about what the
+        // production validator does, not only about the classifier.
+        assert!(validate_photo_url("https://[::127.0.0.1]/p.jpg", 0).is_ok());
     }
 
     /// The classifier is only a security control if `validate_photo_url` actually
