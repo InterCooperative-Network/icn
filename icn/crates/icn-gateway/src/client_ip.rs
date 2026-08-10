@@ -22,6 +22,12 @@
 //! - set and empty — trust nobody; every request is keyed on its socket peer
 //! - unparseable entries are ignored (they cannot match a kernel-supplied peer address)
 //!
+//! A non-empty value **replaces** the loopback default rather than extending it. An operator
+//! adding an upstream ingress must therefore list loopback explicitly if a proxy on this host
+//! also fronts the gateway — the appliance nginx reaches it over `127.0.0.1`. A value whose
+//! entries all fail to parse (a CIDR, say) leaves the list empty, which trusts nobody: that
+//! is fail-closed, but it silently collapses every client onto the proxy address.
+//!
 //! Addresses are compared as parsed [`IpAddr`]s with IPv4-mapped IPv6 unwrapped, so a peer
 //! arriving as `::ffff:10.42.0.1` on a dual-stack listener matches a `10.42.0.1` entry. Both
 //! sides of the comparison come from the same normalization, so this narrows nothing: the
@@ -115,16 +121,17 @@ pub(crate) fn client_ip(req: &HttpRequest) -> Option<IpAddr> {
         return Some(peer);
     }
 
-    let Some(chain) = req
+    // RFC 7230 §3.2.2: repeated field-lines are equivalent to one field-line whose value is
+    // the values joined by comma, in order received. Reading only the first header would let
+    // a caller-supplied `X-Forwarded-For` outrank one a trusted proxy *appended* as a
+    // separate header, putting the attacker's claim to the right of the proxy's assertion.
+    // An absent header, a non-UTF-8 value, and an unparseable chain all leave `hops` empty
+    // and fall through to the socket peer below.
+    let hops: Vec<IpAddr> = req
         .headers()
-        .get(FORWARDED_FOR)
-        .and_then(|value| value.to_str().ok())
-    else {
-        return Some(peer);
-    };
-
-    let hops: Vec<IpAddr> = chain
-        .split(',')
+        .get_all(FORWARDED_FOR)
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
         .map(str::trim)
         .filter_map(|hop| hop.parse::<IpAddr>().ok())
         .map(canonicalize)
@@ -203,6 +210,20 @@ mod tests {
     fn chain_of_only_trusted_hops_yields_the_furthest_upstream() {
         let req = request("127.0.0.1:443", Some("127.0.0.1, ::1"));
         assert_eq!(client_ip_key(&req), "127.0.0.1");
+    }
+
+    #[test]
+    fn repeated_headers_are_one_chain_in_order() {
+        // A proxy that appends its assertion as a *separate* header must still outrank the
+        // caller's, so the two field-lines are read as one comma-joined chain (RFC 7230
+        // §3.2.2). Reading only the first header would return the caller-supplied
+        // 203.0.113.7 here.
+        let req = TestRequest::default()
+            .peer_addr("127.0.0.1:443".parse().expect("valid socket addr"))
+            .append_header((FORWARDED_FOR, "203.0.113.7"))
+            .append_header((FORWARDED_FOR, "198.51.100.42"))
+            .to_http_request();
+        assert_eq!(client_ip_key(&req), "198.51.100.42");
     }
 
     #[test]
