@@ -21,6 +21,7 @@
 // Translation keys are used in error.rs for user-facing API error messages.
 rust_i18n::i18n!("locales", fallback = "en");
 
+pub(crate) mod advertised_origin;
 pub mod api;
 pub mod audit;
 pub mod auth;

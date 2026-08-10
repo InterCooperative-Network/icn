@@ -355,6 +355,7 @@ async fn body_supplied_steward_did_must_match_the_verified_subject() {
 /// `require_coop_access`.
 #[actix_web::test]
 async fn steward_cannot_act_on_another_cooperatives_enrollment() {
+    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -408,6 +409,7 @@ async fn steward_cannot_act_on_another_cooperatives_enrollment() {
 /// lock out every legitimate steward with no test noticing.
 #[actix_web::test]
 async fn same_coop_steward_vouch_succeeds_and_records_the_verified_subject() {
+    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -558,6 +560,7 @@ async fn restricted_reads_require_steward_capability() {
 /// other profile, which is a mount decision, not a route-authority one.
 #[actix_web::test]
 async fn public_enrollment_initiation_remains_anonymous() {
+    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -704,4 +707,12 @@ async fn misassembly_without_session_authority_refuses_even_with_a_usable_auth_m
         500,
         "a misassembled runtime must refuse rather than fall back to signature-only auth"
     );
+}
+
+/// Enrollment initiation issues a device-facing QR, whose `gateway_url` requires an
+/// operator-authoritative origin (#2569). These tests are about route authority, not QR
+/// authority, so they only need a valid one present. Set idempotently to the same value: no
+/// test in this binary wants it unset, so there is nothing to race.
+fn ensure_advertised_origin() {
+    std::env::set_var("GATEWAY_BASE_URL", "https://gateway.example.coop");
 }

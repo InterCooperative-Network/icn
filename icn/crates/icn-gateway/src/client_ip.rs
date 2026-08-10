@@ -6,9 +6,18 @@
 //! peer is explicitly trusted to assert forwarding metadata. If the immediate peer is not
 //! trusted, the socket peer IP is the client IP.
 //!
-//! This is the same allowlist `api::sessions::get_gateway_url` uses to gate `X-Forwarded-*`
-//! for QR-login URL derivation; both read it through [`is_trusted_proxy`] so the gateway has
-//! exactly one trusted-proxy model.
+//! # Scope of this trust
+//!
+//! This allowlist authorizes a peer to assert **one** thing: the client IP used for rate-limit
+//! identity. It is not a general "this peer's headers are operator assertions" switch.
+//!
+//! Concretely, it does **not** cover the origin advertised in QR material. That origin is where
+//! a scanning device sends its bearer credential, so it is operator-configured only and reads no
+//! request metadata at all — see [`crate::advertised_origin`] (#2569). QR-login URL derivation
+//! previously did gate `X-Forwarded-Host`/`-Proto` on this same allowlist; that was insufficient,
+//! because a trusted proxy that *relays* a caller's `Host` launders the caller's claim through
+//! its own trust. Authenticating the sender is not authenticating the provenance of what the
+//! sender forwards.
 //!
 //! # Configuration
 //!
@@ -94,12 +103,6 @@ fn trusted_proxies() -> Vec<IpAddr> {
         .collect()
 }
 
-/// Whether `ip` is allowed to assert forwarding metadata.
-pub(crate) fn is_trusted_proxy(ip: IpAddr) -> bool {
-    let ip = canonicalize(ip);
-    trusted_proxies().contains(&ip)
-}
-
 /// Resolve the client IP for `req`, honouring forwarded metadata only from a trusted peer.
 ///
 /// Returns `None` only when the request has no transport peer.
@@ -109,9 +112,8 @@ pub(crate) fn client_ip(req: &HttpRequest) -> Option<IpAddr> {
 
     if !trusted.contains(&peer) {
         if req.headers().contains_key(FORWARDED_FOR) {
-            // Not a warning: behind an unconfigured proxy this is every request. The
-            // equivalent misconfiguration is surfaced loudly on the QR-login path by
-            // `api::sessions::get_gateway_url`.
+            // Not a warning: behind an unconfigured proxy this is every request, and the
+            // fallback is the safe one (key on the socket peer).
             tracing::debug!(
                 peer = %peer,
                 "Ignoring {FORWARDED_FOR} from an untrusted peer; keying on the socket address. \
