@@ -79,7 +79,25 @@ pub async fn create_invite(
         _ => format!("Coop {}", req.coop_id), // Fallback if charter not found
     };
 
-    // Construct invite URL
+    // Construct invite URL.
+    //
+    // NOTE (#2569): this reads `GATEWAY_BASE_URL` for a *different* purpose than
+    // `crate::advertised_origin`, and the two meanings do not agree. That module treats the
+    // variable as the gateway's own externally reachable API origin — the `{origin}/v1/...`
+    // a scanning device posts a bearer credential to — and fails closed without it. Here the
+    // same value is used as a *member-facing UI* base, and `/join` is not a gateway route;
+    // it exists nowhere in this repository. So under the k8s configmap
+    // (`gateway_base_url: http://…:30080`, the gateway NodePort, while the pilot UI is on
+    // 30030) this already yields a link to a route the gateway does not serve, and the
+    // `localhost:3000` fallback names the compose web-UI port rather than any gateway.
+    //
+    // That is a pre-existing wrong-destination bug, not the #2569 header-authority class:
+    // nothing here is request-derived, so no caller can influence where this points. It is
+    // deliberately left alone rather than half-fixed — giving invites their own operator
+    // variable is a new config surface across every deployment profile, which belongs in its
+    // own change. Do not "unify" these by pointing this at `advertised_origin()`: that would
+    // silently repoint invite links at the API origin and hard-fail invite creation on
+    // gateways that legitimately issue no QR material.
     let base_url =
         std::env::var("GATEWAY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let invite_url = format!("{}/join?code={}", base_url, invite.code);

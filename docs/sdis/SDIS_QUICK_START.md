@@ -136,6 +136,10 @@ View your steward metrics:
 
 #### Enroll a Device
 
+> Step 1 returns `503` unless `GATEWAY_BASE_URL` is set — the QR it issues names an origin a
+> scanning device sends credentials to, and that cannot be guessed from the request
+> (#2569). See [Configuration](#configuration) under *For Operators*.
+
 ```bash
 # Step 1: Request enrollment
 curl -X POST http://localhost:8080/v1/sdis/enrollment/start \
@@ -262,6 +266,35 @@ make build deploy
 ```
 
 ### Configuration
+
+#### `GATEWAY_BASE_URL` — required to issue enrollment QR material
+
+`POST /v1/sdis/enrollment/start` returns a QR payload containing a `gateway_url`. A **second
+device** scans it and posts its bearer credential there, so that origin is a credential
+destination and must be an operator assertion. It is not derived from the request's `Host`,
+`Forwarded`, or `X-Forwarded-*` headers, and not from the bind address (#2569).
+
+Set `GATEWAY_BASE_URL` to the externally reachable `scheme://host[:port]` a scanning phone can
+reach this gateway at — normally your reverse proxy's public origin, not the bind address. It
+must have no userinfo, path, query, or fragment; it is validated at use time.
+
+With no origin configured, enrollment start **fails closed with `503`** and logs the reason.
+The daemon still starts and every other route works — a gateway that issues no QR material
+needs no origin. `TRUSTED_PROXY_IPS` does not substitute for it: trusting a proxy to report
+the client IP (#2567) does not authorize it to assert the advertised origin.
+
+Where each shipped profile gets it: `deploy/k8s/configmap.yaml` (`gateway_base_url`); the LAN
+appliance drop-in `deploy/appliance/lan/icnd-30-lan-origin.conf.in` (from
+`ICN_APPLIANCE_LAN_ORIGIN`); `ICN_DEVNET_NODE_{A,B,C}_ORIGIN` for `deploy/devnet`, which
+ADR-0086 names the canonical Compose entry point; and a commented example in
+`deploy/icnd.env.example` for native installs. The QEMU demo appliance profile deliberately
+does not set one — it is host-only, so no phone can reach it, and QR issuance is correctly off.
+
+The remaining Compose and Kubernetes trees (`deploy/docker-compose.yml`, `deploy/compose/`,
+`deploy/kubernetes/`, `deploy/helm/icn/`) are compatibility material under ADR-0086 and are not
+wired for QR. Do not add an origin to one expecting enrollment to work: the latter two cannot
+bring a gateway to Ready at all, since they probe `/health/liveness` — a route that does not
+exist — and set env names the daemon never reads.
 
 Edit `config/icn.toml`:
 

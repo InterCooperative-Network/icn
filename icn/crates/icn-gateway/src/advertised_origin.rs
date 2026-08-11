@@ -30,9 +30,25 @@
 //! `GATEWAY_BASE_URL` is the single source of authority: one canonical externally reachable
 //! origin per gateway process.
 //!
+//! Where each shipped profile that can issue QR material gets it:
+//!
 //! - k8s supplies it from `deploy/k8s/configmap.yaml` (`gateway_base_url`).
 //! - The LAN appliance supplies it from `ICN_APPLIANCE_LAN_ORIGIN` via `@LAN_ORIGIN@`, the same
 //!   already-validated origin its CORS allowlist uses.
+//! - `deploy/devnet` — ADR-0086's canonical Compose entry point — takes
+//!   `ICN_DEVNET_NODE_{A,B,C}_ORIGIN`, defaulting to empty rather than to a fabricated URL:
+//!   each node is published on a different host port and the host is unknown, so no static
+//!   default could name an origin a scanning phone can reach. Empty is treated as unset.
+//! - Native installs get a documented, commented example in `deploy/icnd.env.example`.
+//!
+//! The other Compose trees (`deploy/docker-compose.yml`, `deploy/compose/`) are compatibility
+//! material under ADR-0086 and are deliberately not wired here; so are `deploy/kubernetes/` and
+//! `deploy/helm/icn/`, which cannot bring a gateway to Ready at all (they probe
+//! `/health/liveness`, a route that does not exist, and set env names nothing reads).
+//!
+//! Profiles that deliberately supply nothing, where failing closed is the correct outcome:
+//! the appliance base unit (bound to `127.0.0.1`) and the QEMU demo profile (`0.0.0.0` behind
+//! user-mode hostfwd is host-only, so no second device can route to it at all).
 //!
 //! There is deliberately **no inference fallback**. A bind address is not an advertised origin:
 //! the appliance gateway is bound to `127.0.0.1`, and `0.0.0.0` names no reachable host at all,
@@ -56,7 +72,7 @@ pub(crate) const GATEWAY_BASE_URL_ENV: &str = "GATEWAY_BASE_URL";
 /// caller: an unauthenticated client learning why the gateway's own configuration was refused
 /// gains nothing it should have.
 pub(crate) fn advertised_origin() -> Result<String> {
-    let configured = std::env::var(GATEWAY_BASE_URL_ENV).unwrap_or_default();
+    let configured = configured_origin().unwrap_or_default();
     let configured = configured.trim();
 
     if configured.is_empty() {
@@ -88,6 +104,16 @@ pub(crate) fn advertised_origin() -> Result<String> {
         return Err(unusable("must not contain a fragment"));
     }
 
+    // Port 0 parses (WHATWG allows it, and `url`'s `parse_port` only rejects >u16::MAX), and
+    // would be advertised verbatim as `https://host:0`. No device can connect there — port 0
+    // names "any free port" to a listener and is not a destination to a client. Rejecting it
+    // is the same rule as the path/query/fragment cases above: refuse a value the scanner
+    // cannot use, here at the gateway with a logged reason, rather than shipping a QR code
+    // that fails silently in someone's hand.
+    if url.port() == Some(0) {
+        return Err(unusable("port 0 is not a reachable destination"));
+    }
+
     let origin = url.origin();
     if !origin.is_tuple() {
         return Err(unusable("does not denote a host-bearing origin"));
@@ -98,6 +124,21 @@ pub(crate) fn advertised_origin() -> Result<String> {
     // scanner), drops a redundant default port, and emits no trailing slash — so the scanner's
     // `{origin}/v1/...` concatenation cannot produce `//v1/...`.
     Ok(origin.ascii_serialization())
+}
+
+/// Where the raw configured origin comes from.
+///
+/// In a normal build this is the process environment — the operator's deployment authority.
+/// Under `cfg(test)` it is a thread-local slot owned by [`test_env`] instead; see that module
+/// for why the lib test process must not resolve this through a shared global.
+#[cfg(not(test))]
+fn configured_origin() -> Option<String> {
+    std::env::var(GATEWAY_BASE_URL_ENV).ok()
+}
+
+#[cfg(test)]
+fn configured_origin() -> Option<String> {
+    test_env::configured_origin()
 }
 
 /// Log the operator-facing reason and return the client-facing refusal.
@@ -114,49 +155,75 @@ fn unusable(reason: &str) -> GatewayError {
     )
 }
 
-/// The crate's **only** serialization point for test-time `GATEWAY_BASE_URL` mutation.
+/// Per-test origin configuration for the lib test binary.
 ///
 /// Every `#[cfg(test)]` module in this crate compiles into the *same* lib test binary, and
-/// libtest runs those tests as threads in one process. A per-module mutex therefore serializes
-/// nothing across modules: two tests holding two different locks still race on the one
-/// process-global variable. That is not merely flaky — it lets a fail-closed assertion observe
-/// another module's configured origin and pass for the wrong reason.
+/// libtest runs those tests concurrently in one process. A process-global therefore has no
+/// owner: two modules that each mutate `GATEWAY_BASE_URL` under their own mutex still race on
+/// the one variable, and a per-module lock serializes nothing against the other module's. That
+/// is not merely flaky — it lets a fail-closed assertion observe a *different* test's
+/// configured origin and pass for the wrong reason.
 ///
-/// So this lock is process-wide by being the only one. Its `#[cfg(test)]` gate keeps it out of
-/// every non-test build, and `pub(crate)` keeps it off the public API.
+/// A previous revision tried to hold that line by asserting, via a source scan, that this
+/// module was the crate's only mutator. That is the wrong enforcement boundary: source
+/// spelling is not a structural property, and review found the scan blind to a rustfmt-wrapped
+/// `set_var(\n  "GATEWAY_BASE_URL",\n  ..)` — a form the formatter itself produces.
+///
+/// So the shared mutable state is removed instead of policed. Under `cfg(test)` the origin
+/// resolves from a thread-local, and libtest gives each test its own thread. Tests are
+/// order-independent by construction and need no lock, and a stray `std::env::set_var` cannot
+/// steer [`advertised_origin`] — there is no spelling left to detect, because this resolver
+/// reads no shared cell. `tests::process_env_mutation_is_inert_against_the_code_under_test`
+/// proves exactly that, using the counterexamples the scan missed.
+///
+/// **Scope of that claim, precisely.** It covers this module's resolver, not the whole crate.
+/// [`crate::api::invites`] still calls `std::env::var("GATEWAY_BASE_URL")` directly for its own
+/// (different, and currently incompatible) purpose, so it continues to read the real process
+/// environment in lib tests as in production. Any future test that mutates the variable can
+/// still perturb that consumer; what is guaranteed here is only that it cannot perturb the
+/// advertised origin. Unifying the two is deliberately a separate change — see the note at the
+/// `invites.rs` call site.
+///
+/// The production path is unchanged and still reads the process environment; integration
+/// tests in `tests/` link the lib without `cfg(test)`, so they exercise that real read
+/// end-to-end through the HTTP call sites.
 #[cfg(test)]
 pub(crate) mod test_env {
-    use super::GATEWAY_BASE_URL_ENV;
-    use std::sync::{Mutex, MutexGuard};
+    use std::cell::RefCell;
 
-    static ENV_TEST_LOCK: Mutex<()> = Mutex::new(());
+    thread_local! {
+        /// `None` models an unconfigured gateway. Private to this module: the only way to
+        /// change it is [`EnvGuard`], which restores on drop.
+        static CONFIGURED_ORIGIN: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
 
-    /// Pins `GATEWAY_BASE_URL` for the guard's lifetime, restoring the prior value on drop.
-    /// Hold it for as long as the value must stay pinned — dropping it releases the lock.
+    /// Read by `super::configured_origin()` under `cfg(test)`.
+    pub(super) fn configured_origin() -> Option<String> {
+        CONFIGURED_ORIGIN.with(|slot| slot.borrow().clone())
+    }
+
+    /// Pins the advertised origin for this test's thread for the guard's lifetime, restoring
+    /// the prior value on drop. Hold it for as long as the value must stay pinned.
+    ///
+    /// Restoring matters even though each test normally owns its thread: `--test-threads=1`
+    /// runs tests on a shared thread, and restore-on-drop keeps that mode order-independent
+    /// too. `EnvGuard::acquire(None)` is the fail-closed precondition, and it is a real
+    /// assertion of absence rather than the hope that nothing else configured one.
     pub(crate) struct EnvGuard {
-        _lock: MutexGuard<'static, ()>,
         prior: Option<String>,
     }
 
     impl EnvGuard {
         pub(crate) fn acquire(value: Option<&str>) -> Self {
-            let lock = ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-            let prior = std::env::var(GATEWAY_BASE_URL_ENV).ok();
-            set_or_clear(value);
-            Self { _lock: lock, prior }
+            let prior = CONFIGURED_ORIGIN.with(|slot| slot.replace(value.map(str::to_owned)));
+            Self { prior }
         }
     }
 
     impl Drop for EnvGuard {
         fn drop(&mut self) {
-            set_or_clear(self.prior.as_deref());
-        }
-    }
-
-    fn set_or_clear(value: Option<&str>) {
-        match value {
-            Some(v) => std::env::set_var(GATEWAY_BASE_URL_ENV, v),
-            None => std::env::remove_var(GATEWAY_BASE_URL_ENV),
+            let prior = self.prior.take();
+            CONFIGURED_ORIGIN.with(|slot| *slot.borrow_mut() = prior);
         }
     }
 }
@@ -228,6 +295,9 @@ mod tests {
             (Some("https://gateway.example.coop/api"), "path"),
             (Some("https://gateway.example.coop?x=1"), "query"),
             (Some("https://gateway.example.coop#frag"), "fragment"),
+            // Parses fine; nothing can connect to it.
+            (Some("https://gateway.example.coop:0"), "port zero"),
+            (Some("http://192.0.2.10:0"), "port zero on a literal IPv4"),
         ];
 
         for (configured, why) in cases {
@@ -239,55 +309,92 @@ mod tests {
         }
     }
 
-    /// `test_env::EnvGuard` only serializes the modules that actually use it. A new test module
-    /// that reaches for `std::env` directly would silently reintroduce the cross-module race
-    /// (which reproduced at ~47% and could make a fail-closed assertion pass for the wrong
-    /// reason), so the single-mutator property is asserted rather than documented.
+    /// The property the deleted source scanner was reaching for, asserted behaviourally.
     ///
-    /// This test lives in the one file allowed to mutate, and skips that file — so it cannot
-    /// match its own literals, and stays honest as modules are added.
+    /// That scanner tried to prove "no other module mutates `GATEWAY_BASE_URL`" by matching
+    /// `set_var(`/`remove_var(` and the variable name **on the same source line**. Review
+    /// supplied two counterexamples; measuring them showed one real hole:
+    ///
+    /// - `set_var(GATEWAY_BASE_URL_ENV, ..)` was in fact caught — the constant's identifier
+    ///   contains the variable name as a substring — so that half of the report was wrong;
+    /// - the rustfmt-wrapped multi-line call below was **not** caught, and rustfmt produces
+    ///   exactly that shape whenever the arguments cross the width limit. A guard the
+    ///   formatter can silently disarm is not a guard.
+    ///
+    /// The fix is not a third spelling. Under `cfg(test)` the origin no longer resolves
+    /// through any process-global, so both spellings — and any spelling not yet imagined —
+    /// are inert against the code under test. This test runs them to show that, and would
+    /// fail loudly if `configured_origin()` were ever repointed at the environment.
+    ///
+    /// Scope: `advertised_origin` only. `api::invites` still reads the variable straight from
+    /// the environment, so these mutations remain visible *there* — see the `test_env` module
+    /// doc. This asserts what the resolver ignores, not that the crate has no env readers.
     #[test]
-    fn this_module_is_the_only_test_time_mutator_of_the_env() {
-        fn rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-            for entry in std::fs::read_dir(dir).expect("crate src/ must be readable") {
-                let path = entry.expect("readable dir entry").path();
-                if path.is_dir() {
-                    rs_files(&path, out);
-                } else if path.extension().is_some_and(|e| e == "rs") {
-                    out.push(path);
-                }
-            }
+    fn process_env_mutation_is_inert_against_the_code_under_test() {
+        let _guard = EnvGuard::acquire(Some("https://gateway.example.coop"));
+
+        // Counterexample 1: single-line literal — the form the scanner did catch.
+        std::env::set_var(GATEWAY_BASE_URL_ENV, "https://attacker.example");
+        assert_eq!(
+            advertised_origin().expect("guard value must survive"),
+            "https://gateway.example.coop",
+            "a single-line set_var reached the code under test"
+        );
+
+        // Counterexample 2: the rustfmt-wrapped form the scanner could not see.
+        #[rustfmt::skip]
+        std::env::set_var(
+            GATEWAY_BASE_URL_ENV,
+            "https://attacker.example/hijacked",
+        );
+        assert_eq!(
+            advertised_origin().expect("guard value must survive"),
+            "https://gateway.example.coop",
+            "a multi-line set_var reached the code under test"
+        );
+
+        // And removal cannot forge a fail-closed result either: a fail-closed assertion must
+        // observe *its own* absence, never another test's `remove_var`.
+        std::env::remove_var(GATEWAY_BASE_URL_ENV);
+        assert_eq!(
+            advertised_origin().expect("guard value must survive"),
+            "https://gateway.example.coop",
+            "a remove_var reached the code under test"
+        );
+    }
+
+    /// Order-independence, asserted rather than assumed.
+    ///
+    /// The failure this rules out is directional and silent: a test asserting the fail-closed
+    /// 503 can only be *fooled* by inheriting a configured origin, so absence must be
+    /// established by the test itself. Taking the guard after a sibling has pinned a value
+    /// must yield absence, and dropping it must restore what the sibling had — which is what
+    /// keeps `--test-threads=1`, where tests share a thread, honest too.
+    #[test]
+    fn absence_is_established_not_inherited() {
+        let outer = EnvGuard::acquire(Some("https://sibling.example.coop"));
+        assert_eq!(
+            advertised_origin().expect("sibling value applies"),
+            "https://sibling.example.coop"
+        );
+
+        {
+            let _inner = EnvGuard::acquire(None);
+            assert!(
+                matches!(
+                    advertised_origin(),
+                    Err(GatewayError::ServiceUnavailable(_))
+                ),
+                "acquiring None must mean absence, not the sibling's origin"
+            );
         }
 
-        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let mut files = Vec::new();
-        rs_files(&src, &mut files);
-        assert!(
-            files.len() > 1,
-            "source scan found nothing; the walk is wrong"
+        assert_eq!(
+            advertised_origin().expect("prior value must be restored on drop"),
+            "https://sibling.example.coop",
+            "dropping a nested guard must restore, or a shared thread leaks between tests"
         );
-
-        let this_file = src.join("advertised_origin.rs");
-        let mutators = ["set_var(", "remove_var("];
-
-        let offenders: Vec<String> = files
-            .iter()
-            .filter(|p| **p != this_file)
-            .filter(|p| {
-                let body = std::fs::read_to_string(p).expect("source file must be readable");
-                body.lines().any(|line| {
-                    line.contains(GATEWAY_BASE_URL_ENV) && mutators.iter().any(|m| line.contains(m))
-                })
-            })
-            .map(|p| p.strip_prefix(&src).unwrap_or(p).display().to_string())
-            .collect();
-
-        assert!(
-            offenders.is_empty(),
-            "these modules mutate {GATEWAY_BASE_URL_ENV} directly instead of taking \
-             `advertised_origin::test_env::EnvGuard`; a second lock does not serialize \
-             against the first in a shared lib test process: {offenders:?}"
-        );
+        drop(outer);
     }
 
     /// The refusal must not echo the configured value back to an unauthenticated caller.

@@ -79,6 +79,10 @@ fn authority(ttl_hours: u64) -> Arc<SessionAuthority> {
 /// `fp01_credential_holder_escalation.rs`, not here.
 macro_rules! sdis_app {
     ($authority:expr) => {{
+        // Mounting the enrollment tree is the last point before a request can reach
+        // `/v1/sdis/enrollment/start`, so the advertised origin is established here rather
+        // than in each test body — see `ensure_advertised_origin`.
+        ensure_advertised_origin();
         test::init_service(
             App::new()
                 .app_data(web::Data::new($authority))
@@ -355,7 +359,6 @@ async fn body_supplied_steward_did_must_match_the_verified_subject() {
 /// `require_coop_access`.
 #[actix_web::test]
 async fn steward_cannot_act_on_another_cooperatives_enrollment() {
-    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -409,7 +412,6 @@ async fn steward_cannot_act_on_another_cooperatives_enrollment() {
 /// lock out every legitimate steward with no test noticing.
 #[actix_web::test]
 async fn same_coop_steward_vouch_succeeds_and_records_the_verified_subject() {
-    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -560,7 +562,6 @@ async fn restricted_reads_require_steward_capability() {
 /// other profile, which is a mount decision, not a route-authority one.
 #[actix_web::test]
 async fn public_enrollment_initiation_remains_anonymous() {
-    ensure_advertised_origin();
     let authority = authority(1);
     let app = sdis_app!(authority.clone());
 
@@ -620,6 +621,9 @@ async fn public_scope_does_not_expose_the_steward_surface() {
 async fn nested_protected_scope_does_not_shadow_sibling_routes() {
     let authority = authority(1);
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
+    // Same rule as `sdis_app!`: this assembles the enrollment tree, so it owns the
+    // precondition too, whether or not this particular case drives `/enrollment/start`.
+    ensure_advertised_origin();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(authority))
@@ -671,6 +675,9 @@ async fn misassembly_without_session_authority_refuses_even_with_a_usable_auth_m
         .expect("mint");
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
+    // Same rule as `sdis_app!`: this assembles the enrollment tree, so it owns the
+    // precondition too, whether or not this particular case drives `/enrollment/start`.
+    ensure_advertised_origin();
     let app = test::init_service(
         App::new()
             // Deliberately NO SessionAuthority. Both plausible shapes of a bare
@@ -711,8 +718,20 @@ async fn misassembly_without_session_authority_refuses_even_with_a_usable_auth_m
 
 /// Enrollment initiation issues a device-facing QR, whose `gateway_url` requires an
 /// operator-authoritative origin (#2569). These tests are about route authority, not QR
-/// authority, so they only need a valid one present. Set idempotently to the same value: no
-/// test in this binary wants it unset, so there is nothing to race.
+/// authority, so they only need a valid origin to exist.
+///
+/// **Called from app assembly, never from a test body.** Leaving it to each test to remember
+/// is what made the sibling binary `fp01_credential_holder_escalation.rs` order-dependent:
+/// a test that reached `/v1/sdis/enrollment/start` without calling this passed only when
+/// another test had run first, and returned 503 in isolation. Assembling the app is the one
+/// step no test can skip and still issue a request, so the precondition lives there.
+///
+/// `Once` rather than an idempotent `set_var`: libtest runs these tests on many threads, and
+/// re-writing on every call means a write can overlap a handler thread's read of the same
+/// variable. One write, and `call_once` gives every later caller a happens-before edge to it.
 fn ensure_advertised_origin() {
-    std::env::set_var("GATEWAY_BASE_URL", "https://gateway.example.coop");
+    static CONFIGURED: std::sync::Once = std::sync::Once::new();
+    CONFIGURED.call_once(|| {
+        std::env::set_var("GATEWAY_BASE_URL", "https://gateway.example.coop");
+    });
 }
