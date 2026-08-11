@@ -178,6 +178,11 @@ PR</strong> <a href="https://github.com/InterCooperative-Network/icn/pull/2450" 
 <h2>For Developers</h2>
 <h3>API Examples</h3>
 <h4>Enroll a Device</h4>
+<blockquote>
+<p>Step 1 returns <code>503</code> unless <code>GATEWAY_BASE_URL</code> is set — the QR it issues names an origin a
+scanning device sends credentials to, and that cannot be guessed from the request
+(#2569). See <a href="#configuration">Configuration</a> under <em>For Operators</em>.</p>
+</blockquote>
 <pre><code class="language-bash"># Step 1: Request enrollment
 curl -X POST http://localhost:8080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
@@ -286,6 +291,35 @@ const anchors = await client.sdis.listAnchors();
 make build deploy
 </code></pre>
 <h3>Configuration</h3>
+<h4><code>GATEWAY_BASE_URL</code> — required to issue enrollment QR material</h4>
+<p><code>POST /v1/sdis/enrollment/start</code> returns a QR payload containing a <code>gateway_url</code>. A <strong>second
+device</strong> scans it and posts its bearer credential there, so that origin is a credential
+destination and must be an operator assertion. It is not derived from the request&#39;s <code>Host</code>,
+<code>Forwarded</code>, or <code>X-Forwarded-*</code> headers, and not from the bind address (#2569).</p>
+<p>Set <code>GATEWAY_BASE_URL</code> to the externally reachable <code>scheme://host[:port]</code> a scanning phone can
+reach this gateway at — normally your reverse proxy&#39;s public origin, not the bind address. It
+must have no userinfo, path, query, or fragment; it is validated at use time.</p>
+<p>With no origin configured, enrollment start <strong>fails closed with <code>503</code></strong> and logs the reason.
+The daemon still starts and every other route works — a gateway that issues no QR material
+needs no origin. <code>TRUSTED_PROXY_IPS</code> does not substitute for it: trusting a proxy to report
+the client IP (#2567) does not authorize it to assert the advertised origin.</p>
+<p>Configuring an origin does <strong>not</strong> by itself make these enrollment routes reachable: as the
+banner at the top of this guide says, <code>/v1/sdis/enrollment/*</code> is mounted only under
+<code>ICN_ENABLE_SELF_SERVE_ENROLLMENT=true</code>, which no shipped profile sets. Where the routes are
+absent you get 404 (or 401 on scope fallthrough), not the 503 described above. The origin below
+is what the <em>other</em> QR flow — <code>POST /v1/sessions</code> — needs on every profile, and what enrollment
+would additionally need on an isolated rehearsal deployment that opts in.</p>
+<p>Where each shipped profile gets it: <code>deploy/k8s/configmap.yaml</code> (<code>gateway_base_url</code>); the LAN
+appliance drop-in <code>deploy/appliance/lan/icnd-30-lan-origin.conf.in</code> (from
+<code>ICN_APPLIANCE_LAN_ORIGIN</code>); <code>ICN_DEVNET_NODE_{A,B,C}_ORIGIN</code> for <code>deploy/devnet</code>, which
+ADR-0086 names the canonical Compose entry point; and a commented example in
+<code>deploy/icnd.env.example</code> for native installs. The QEMU demo appliance profile deliberately
+does not set one — it is host-only, so no phone can reach it, and QR issuance is correctly off.</p>
+<p>The remaining Compose and Kubernetes trees (<code>deploy/docker-compose.yml</code>, <code>deploy/compose/</code>,
+<code>deploy/kubernetes/</code>, <code>deploy/helm/icn/</code>) are compatibility material under ADR-0086 and are not
+wired for QR. Do not add an origin to one expecting enrollment to work: the latter two cannot
+bring a gateway to Ready at all, since they probe <code>/health/liveness</code> — a route that does not
+exist — and set env names the daemon never reads.</p>
 <p>Edit <code>config/icn.toml</code>:</p>
 <pre><code class="language-toml">[sdis]
 # Challenge expiration (seconds)
