@@ -429,9 +429,15 @@ impl Default for PreAuthRateLimiter {
 ///
 /// # What this does not bound
 ///
-/// The QUIC/TLS handshake, the `ConnectionContext` and task a connection allocates, and the
-/// deserialization of messages that are then denied here — all of that happens before or outside
-/// this gate. See the module note on [`SourcePreAuthBudget::spend`].
+/// The QUIC/TLS handshake (#2559), the `ConnectionContext` and task a connection allocates, and
+/// the *reading* of a frame that is then denied here — all of that happens before or outside this
+/// gate. **Deserializing** that frame does not: #2558 moved this gate to sit between frame
+/// acquisition and decode, so a frame is deserialized only if this gate permitted it.
+///
+/// Stated in that direction on purpose. The converse is not an invariant: [`PreAuthBudget::check`]
+/// asks the connection's bucket before the source's, so a connection bucket that permits over a
+/// dry source budget spends a token on a frame nothing goes on to decode. That only ever makes the
+/// bound tighter than stated. See the module note on [`SourcePreAuthBudget::spend`].
 ///
 /// # The NAT price, stated rather than buried
 ///
@@ -579,7 +585,8 @@ impl SourcePreAuthBudget {
     ///
     /// # What this bounds
     ///
-    /// Over any window of length *T*, one source's anonymous **dispatches** are at most
+    /// Over any window of length *T*, one source's anonymous **decodes, and so the dispatches
+    /// they feed**, are at most
     /// `PREAUTH_SOURCE_BURST + rate * T`. Not `PREAUTH_SOURCE_BURST` per window: a token bucket
     /// permits a full burst at the start of a window and another once it has refilled, so the
     /// sliding-window reading of it is wrong by up to a factor of two.
@@ -588,9 +595,15 @@ impl SourcePreAuthBudget {
     /// is the one place the per-source burst is not exact* below, and #2562.
     ///
     /// It does **not** bound the QUIC/TLS handshake, which is complete before the source key
-    /// exists at all, nor the `ConnectionContext` and task a connection allocates, nor reading and
-    /// deserializing a message that is then denied here — that read happens before this gate, and
-    /// one held connection can force it without reconnecting even once.
+    /// exists at all (#2559), nor the `ConnectionContext` and task a connection allocates, nor
+    /// *reading* the frame of a message that is then denied here — frame acquisition precedes
+    /// this gate, and one held connection can force it without reconnecting even once. Frame
+    /// acquisition is bounded in size by `MAX_MESSAGE_SIZE` and in memory by what actually
+    /// arrived (#2573), and in time by `PREAUTH_AUTHENTICATION_DEADLINE` (#2552).
+    ///
+    /// **Deserializing** that message it does bound, since #2558 — decode is on the far side of
+    /// this gate, so a denied message is denied undecoded. Stated one-directionally on purpose:
+    /// see the note on [`PreAuthBudget::check`] for why a spent token does not imply a decode.
     ///
     /// # Bounded state, and what happens when it runs out
     ///

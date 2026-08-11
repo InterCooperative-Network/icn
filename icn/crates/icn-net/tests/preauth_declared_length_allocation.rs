@@ -32,13 +32,13 @@
 //!   allocation limit.
 //! - `PREAUTH_AUTHENTICATION_DEADLINE` bounds how *long* the commitment is held, not how large it
 //!   is.
-//! - The per-connection (#2491) and per-source (#2549/#2557) budgets sit *after* `read_message`
-//!   returns. `preauth_source_work_budget.rs` says so in its own words: reading and deserializing
-//!   a message that is then denied "happens before this gate".
+//! - The per-connection (#2491) and per-source (#2549/#2557) budgets sit *after* the frame has
+//!   been acquired — they gate the decode, not the read (#2558). A frame is read before either is
+//!   consulted, so an allocation made during the read is made on nobody's authority.
 //!
 //! # Scale
 //!
-//! The connection loop reads **sequentially** — `accept_bi().await` then `read_message().await` in
+//! The connection loop reads **sequentially** — `accept_bi().await` then `read_frame().await` in
 //! one task per connection, with no per-stream spawn — so one connection has at most one read in
 //! flight. The multiplier is therefore connections, not streams:
 //! `MAX_PREAUTH_CONNECTIONS_PER_SOURCE` (8) × `MAX_MESSAGE_SIZE` (10 MiB) = **80 MiB per source**,

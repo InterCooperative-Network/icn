@@ -1057,7 +1057,16 @@ fn frame_capacity_target(current_capacity: usize, held: usize, len: usize) -> us
 ///
 /// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
 /// discards a partial buffer whose size is bounded by what the peer really sent.
-async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
+///
+/// # Why this is reachable from the connection loop
+///
+/// `pub(crate)`, not private, because the inbound loop needs the two halves of `read_message`
+/// separately (#2558). Acquiring the frame is bounded work the peer has already paid for in
+/// bytes; turning it into a `NetworkMessage` is not, and the pre-authentication budget has to sit
+/// between them. Splitting here rather than adding a second framing parser keeps the size policy
+/// in one place — which was the whole point of consolidating it (#2573). Deliberately not `pub`:
+/// no caller outside this crate has a reason to hold a raw frame.
+pub(crate) async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
