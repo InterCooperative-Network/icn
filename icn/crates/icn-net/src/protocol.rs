@@ -1049,15 +1049,30 @@ async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Safe to cast after validation
     let len = len_u32 as usize;
 
-    // Reserve a step, not the declaration. `read_exact` on each step means a truncated frame still
-    // fails on the step that runs short, exactly as a single `read_exact` over the whole body did.
-    let mut buf: Vec<u8> = Vec::with_capacity(len.min(FRAME_READ_STEP));
+    // Reserve nothing up front: capacity is only ever taken *after* a step has actually been
+    // read, so a peer that declares a frame and then goes silent holds no buffer at all.
+    // `read_exact` per step means a truncated frame still fails on the step that runs short,
+    // exactly as a single `read_exact` over the whole body did.
+    let mut buf: Vec<u8> = Vec::new();
     let mut step = [0u8; FRAME_READ_STEP];
     while buf.len() < len {
         let want = (len - buf.len()).min(FRAME_READ_STEP);
         recv.read_exact(&mut step[..want])
             .await
             .context("Failed to read message body")?;
+
+        // Grow geometrically — so a large frame still costs amortised O(n) copying rather than
+        // one realloc per step — but never past the declared length. Letting
+        // `extend_from_slice` pick the growth would round a 10 MiB frame up to a 16 MiB
+        // capacity, i.e. *more* than the eager allocation this replaces.
+        if buf.capacity() < buf.len() + want {
+            let target = buf
+                .capacity()
+                .max(FRAME_READ_STEP)
+                .saturating_mul(2)
+                .min(len);
+            buf.reserve_exact(target - buf.len());
+        }
         buf.extend_from_slice(&step[..want]);
     }
 

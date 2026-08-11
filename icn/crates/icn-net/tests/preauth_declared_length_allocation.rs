@@ -368,19 +368,28 @@ async fn a_frame_spanning_several_read_steps_arrives_intact() -> Result<()> {
     let client = IdentityBundle::generate().expect("client identity");
     let (_endpoint, connection) = connect(&client, addr).await?;
 
-    // Comfortably more than one read step once encoded, so reassembly is actually exercised.
-    const TOPICS: usize = 4096;
+    // Sized in absolute terms rather than against the current step, so tuning the step upward
+    // cannot quietly stop this exercising the multi-step path while still passing. It also lands
+    // just past a power of two, which is where an unbounded growth strategy overshoots worst.
+    const TOPICS: usize = 20_000;
+    const SPANNING_FLOOR: usize = 1024 * 1024;
     let topics: Vec<String> = (0..TOPICS)
         .map(|i| format!("icn.test.2558.reassembly.{i:0>48}"))
         .collect();
     let message = NetworkMessage::subscribe(client.did().clone(), server_did, topics);
     let encoded = message.to_bytes_negotiated(false, false)?.len();
     assert!(
-        encoded > 64 * 1024,
-        "payload must span more than one read step to exercise reassembly, got {encoded} bytes"
+        encoded > SPANNING_FLOOR,
+        "payload must be large enough to span several read steps for any plausible step size, \
+         got {encoded} bytes"
+    );
+    assert!(
+        encoded < MAX_MESSAGE_SIZE,
+        "payload must remain a legal message, got {encoded} bytes"
     );
 
     let (mut send, _recv) = connection.open_bi().await.context("open_bi")?;
+    let baseline = arm_peak();
     icn_net::write_message(&mut send, &message).await?;
     send.finish()?;
 
@@ -391,6 +400,19 @@ async fn a_frame_spanning_several_read_steps_arrives_intact() -> Result<()> {
         delivered.topic_counts(),
         vec![TOPICS],
         "a {encoded}-byte frame spanning several read steps must arrive once, intact"
+    );
+
+    // A frame must not retain more than it declared. Growing the buffer by `Vec`'s own amortised
+    // doubling would round a frame just past a power of two up to the next one — for a
+    // maximum-size frame, 16 MiB against a declared 10 MiB, i.e. worse than the eager allocation
+    // this change replaces. The ceiling is generous because the test process is also holding the
+    // sent copy and quinn's buffers; the defect it excludes is a *multiple* of the frame.
+    let growth = peak_growth_since(baseline);
+    assert!(
+        growth < encoded * 3,
+        "a {encoded}-byte frame retained {:.1} MiB — capacity is overshooting the declared \
+         length, not tracking it",
+        mib(growth),
     );
 
     Ok(())
