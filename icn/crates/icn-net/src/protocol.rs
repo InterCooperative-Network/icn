@@ -1016,20 +1016,6 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
     Ok((msg, 4 + buf.len()))
 }
 
-/// Read one length-prefixed frame body, committing memory in proportion to bytes received.
-///
-/// The single framing implementation behind every `read_message*` helper. It was three copies of
-/// the same preamble, which meant a bound added to one left the others open — so the size policy
-/// lives here once (#2558).
-///
-/// `MAX_MESSAGE_SIZE` is unchanged and still rejects an oversized declaration before any body byte
-/// is read, so the wire contract and the fail-closed behaviour are exactly as before. What changed
-/// is the allocation: instead of `vec![0u8; declared]` up front, the buffer starts at one
-/// [`FRAME_READ_STEP`] and grows only as bytes actually land. A peer that declares a large frame
-/// and then sends nothing now holds one step, not the whole declaration.
-///
-/// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
-/// discards a partial buffer whose size is bounded by what the peer really sent.
 /// Capacity the frame buffer should grow to, given what it holds now and the declared length.
 ///
 /// Geometric so a large frame costs amortised O(n) copying rather than one realloc per step, and
@@ -1052,6 +1038,25 @@ fn frame_capacity_target(current_capacity: usize, held: usize, len: usize) -> us
     }
 }
 
+/// Read one length-prefixed frame body, committing memory in proportion to bytes received.
+///
+/// The single framing implementation behind every `read_message*` helper. It was three copies of
+/// the same preamble, which meant a bound added to one left the others open — so the size policy
+/// lives here once (#2558).
+///
+/// `MAX_MESSAGE_SIZE` is unchanged and still rejects an oversized declaration before any body byte
+/// is read, so the wire contract and the fail-closed behaviour are exactly as before. What changed
+/// is the allocation. `vec![0u8; declared]` committed the buffer on the strength of a number the
+/// peer chose; nothing here is sized by the declaration at all. The buffer starts empty, capacity
+/// is taken only in response to bytes [`RecvStream::read_chunk`] has actually delivered, and
+/// [`frame_capacity_target`] caps every subsequent reservation at the declared length. A peer that
+/// declares a large frame and then sends nothing holds no body buffer.
+///
+/// `FRAME_READ_STEP` appears only as the ceiling on a single `read_chunk` request — it bounds how
+/// much may arrive in one poll, never how much is reserved before it does.
+///
+/// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
+/// discards a partial buffer whose size is bounded by what the peer really sent.
 async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
