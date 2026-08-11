@@ -585,7 +585,8 @@ impl SourcePreAuthBudget {
     ///
     /// # What this bounds
     ///
-    /// Over any window of length *T*, one source's anonymous **dispatches** are at most
+    /// Over any window of length *T*, one source's anonymous **decodes, and so the dispatches
+    /// they feed**, are at most
     /// `PREAUTH_SOURCE_BURST + rate * T`. Not `PREAUTH_SOURCE_BURST` per window: a token bucket
     /// permits a full burst at the start of a window and another once it has refilled, so the
     /// sliding-window reading of it is wrong by up to a factor of two.
@@ -594,9 +595,15 @@ impl SourcePreAuthBudget {
     /// is the one place the per-source burst is not exact* below, and #2562.
     ///
     /// It does **not** bound the QUIC/TLS handshake, which is complete before the source key
-    /// exists at all, nor the `ConnectionContext` and task a connection allocates, nor reading and
-    /// deserializing a message that is then denied here — that read happens before this gate, and
-    /// one held connection can force it without reconnecting even once.
+    /// exists at all (#2559), nor the `ConnectionContext` and task a connection allocates, nor
+    /// *reading* the frame of a message that is then denied here — frame acquisition precedes
+    /// this gate, and one held connection can force it without reconnecting even once. Frame
+    /// acquisition is bounded in size by `MAX_MESSAGE_SIZE` and in memory by what actually
+    /// arrived (#2573), and in time by `PREAUTH_AUTHENTICATION_DEADLINE` (#2552).
+    ///
+    /// **Deserializing** that message it does bound, since #2558 — decode is on the far side of
+    /// this gate, so a denied message is denied undecoded. Stated one-directionally on purpose:
+    /// see the note on [`PreAuthBudget::check`] for why a spent token does not imply a decode.
     ///
     /// # Bounded state, and what happens when it runs out
     ///

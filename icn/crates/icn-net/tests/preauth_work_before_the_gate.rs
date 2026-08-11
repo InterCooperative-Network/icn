@@ -28,9 +28,8 @@
 //!
 //! #2549 is about what a source re-acquires by *reconnecting*. Nothing here reconnects: one
 //! connection is opened once and every frame rides a fresh bidirectional stream over it.
-//! `preauth_source_work_budget.rs` says as much in its own words — reading and deserializing a
-//! message that is then denied "happens before this gate", and one held connection "can drive it
-//! without reconnecting even once".
+//! `preauth_source_work_budget.rs` scopes itself out of this in its own words: one held connection
+//! "can drive it without reconnecting even once".
 //!
 //! Nor is the assertion a throughput threshold. Wall-clock rate is reported below as
 //! characterization only. The assertion is an **ordering** fact, read off two counters this node
