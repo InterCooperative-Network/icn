@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Which identity may select an inbound message's rate limit.
 //!
-//! #2491. The rate-limit check runs immediately after `read_message`, before any dispatch,
-//! and it used to be keyed on `NetworkMessage.from` — a field the sender chooses and nobody
-//! has verified at that point. DIDs are public, so naming a well-trusted one bought that
+//! #2491. The rate-limit check runs before any dispatch — for an anonymous connection, before
+//! the decode as well (#2558) — and it used to be keyed on `NetworkMessage.from`, a field the
+//! sender chooses and nobody has verified at that point. DIDs are public, so naming a well-trusted one bought that
 //! peer's tier without holding its key.
 //!
 //! The fix is an ordering, not a new identity mechanism. A connection has two phases, and

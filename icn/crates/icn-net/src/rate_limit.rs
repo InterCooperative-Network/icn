@@ -429,9 +429,11 @@ impl Default for PreAuthRateLimiter {
 ///
 /// # What this does not bound
 ///
-/// The QUIC/TLS handshake, the `ConnectionContext` and task a connection allocates, and the
-/// deserialization of messages that are then denied here — all of that happens before or outside
-/// this gate. See the module note on [`SourcePreAuthBudget::spend`].
+/// The QUIC/TLS handshake (#2559), the `ConnectionContext` and task a connection allocates, and
+/// the *reading* of a frame that is then denied here — all of that happens before or outside this
+/// gate. **Deserializing** that frame does not: #2558 moved this gate to sit between frame
+/// acquisition and decode, so one token buys the decode as well as the dispatch it feeds. See the
+/// module note on [`SourcePreAuthBudget::spend`].
 ///
 /// # The NAT price, stated rather than buried
 ///

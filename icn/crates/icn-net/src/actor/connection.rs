@@ -32,9 +32,8 @@
 //!
 //! # Rate limiting is two phases, not one
 //!
-//! The limit check runs immediately after `read_message`, before any dispatch — which means
-//! before anything has verified who sent the message. So the check cannot ask the message
-//! who to charge (#2491):
+//! Both limit checks run before any dispatch — which means before anything has verified who sent
+//! the message. So neither check can ask the message who to charge (#2491):
 //!
 //! ```text
 //! before authentication:
@@ -59,11 +58,40 @@
 //! spend from it, and authentication does not refund what was already spent — self-minting a
 //! DID and a binding is cheap, so any exemption it could buy would be no bound at all.
 //!
-//! Scope: this bounds the anonymous *dispatch* one source can fund. It does not bound that
-//! source's QUIC/TLS handshake rate, which is complete before the source key exists, nor the
-//! deserialization of a message that is then denied — that read happens before the gate, and
-//! one held connection can drive it without reconnecting. Bounding how many connections one
-//! source holds *at once* is connection admission, below.
+//! Scope: this bounds the anonymous *work* one source can fund — the decode as well as the
+//! dispatch it feeds. It does not bound that source's QUIC/TLS handshake rate, which is complete
+//! before the source key exists (#2559). Bounding how many connections one source holds *at once*
+//! is connection admission, below.
+//!
+//! # The gate sits between framing and decoding, not after both
+//!
+//! It used to sit after both, and that was the defect #2558 filed. `read_message` is two steps
+//! welded together — acquire the frame, then interpret it — and only the first is work the peer
+//! has already paid for in bytes it actually sent. Interpreting a frame means a wire-format parse,
+//! zstd decompression bounded only by `MAX_MESSAGE_SIZE`, and a full postcard deserialization of
+//! the envelope. All of that ran before either budget was consulted, so a refusal cost the sender
+//! nothing and the budget bounded what this node would *act on* rather than what it would *do*:
+//!
+//! ```text
+//! was:  accept_bi -> read frame -> DECODE -> budget -> dispatch
+//! now:  accept_bi -> read frame -> budget -> DECODE -> dispatch
+//! ```
+//!
+//! The new position is the earliest point where both halves of the charge are true: enough of the
+//! peer's input has arrived to justify charging a unit, and the work the budget meters has not
+//! happened yet. Charging on stream accept instead would bill an idle or stalled connection for
+//! work nobody has asked for, which would turn a rate limit into an availability primitive.
+//!
+//! Only the anonymous phase moved. The post-authentication per-DID and per-anchor limits stay
+//! below the decode, because that traffic is attributable to an identity this connection has
+//! proven and because those log lines quote `message.from`. A malformed body is now charged where
+//! it used to be free — deliberately, since unparseable input is exactly what an attacker gets to
+//! manufacture cheaply. It is the same single token the message would have spent one step later,
+//! so nothing is charged twice.
+//!
+//! What this does **not** change is how many frames the node *reads*. A refused peer still gets
+//! its frame read; that is bounded by the authentication deadline and by admission, not by this
+//! budget. Reading bytes is not the resource #2558 is about.
 //!
 //! # The anonymous phase is bounded in size and in time
 //!
@@ -89,11 +117,13 @@
 //! `record_authenticated_peer` had already released its slot, so dispatch is not. `accept_bi` is
 //! cancel-safe, so a losing arm cannot swallow a Hello.
 //!
-//! Bounding the read is not belt-and-braces. `read_message` has no timeout of its own, and
+//! Bounding the read is not belt-and-braces. `read_frame` has no timeout of its own, and
 //! `read_exact` on a length prefix whose remaining bytes never arrive never returns — so a peer
 //! that sends three bytes of a four-byte header parks this task inside the loop body, past every
 //! deadline, holding the slot exactly as if it had sent nothing at all. A deadline that guards
-//! only the wait is defeated by anything that keeps the task out of the wait.
+//! only the wait is defeated by anything that keeps the task out of the wait. The deadline wraps
+//! exactly that peer-controlled await; the decode below it is CPU-bound and has no await to
+//! cancel at, so the split changed nothing about what the deadline covers.
 //!
 //! The expiry is also *checked* at the loop boundary rather than left to the `select!`, because
 //! `biased` returns on the first ready arm without polling the rest and a tokio `Sleep` completes
@@ -115,7 +145,7 @@ use tracing::{debug, info, instrument, warn};
 
 use crate::{
     handlers::ConnectionContext,
-    protocol::{read_message, MessagePayload},
+    protocol::{read_frame, MessagePayload, NetworkMessage},
     replay_guard::ReplayGuard,
     topology::{NeighborSets, TopologyConfig},
     IncomingMessageHandler, SessionManager,
@@ -493,14 +523,25 @@ impl NetworkActor {
 
             match accepted {
                 Ok((mut send, mut recv)) => {
-                    // Read network message.
+                    // Acquire the frame — bytes only, nothing interpreted yet.
+                    //
+                    // This is the first half of what `read_message` used to do in one step. The
+                    // split is the subject of #2558: `read_frame` is bounded work the peer has
+                    // already paid for in bytes it actually sent (#2573), while turning those
+                    // bytes into a `NetworkMessage` is unbounded-by-comparison work this node
+                    // performs on the peer's behalf — a wire-format parse, zstd decompression
+                    // bounded only by `MAX_MESSAGE_SIZE`, and a full postcard deserialization.
+                    // The budget that decides whether an anonymous peer may spend that work now
+                    // sits between the two, below.
                     //
                     // Bounded by the same absolute instant while the connection is anonymous.
-                    // `read_message` is an unbounded await the *peer* controls: `read_exact`
+                    // Frame acquisition is an unbounded await the *peer* controls: `read_exact`
                     // on a length prefix whose remaining bytes never arrive never returns, so
                     // three bytes of a four-byte header parks this task inside the loop body
                     // forever — past the wait, where no deadline could reach it. That is the
-                    // same squat #2552 is about, reached for the price of one stream.
+                    // same squat #2552 is about, reached for the price of one stream. The
+                    // deadline wraps exactly the peer-controlled await and nothing else; decode
+                    // is CPU-bound and has no await to cancel at.
                     //
                     // Bounding the read and not the dispatch is the whole distinction. Reading
                     // bytes is not verifying them: a cancelled read discards a message nobody
@@ -508,13 +549,13 @@ impl NetworkActor {
                     // Cancelling `handle_hello` could instead abandon a peer *mid-verification*
                     // — or, worse, after `record_authenticated_peer` had already released the
                     // slot — so dispatch stays outside the deadline exactly as before.
-                    let read = match authenticate_by {
-                        None => read_message(&mut recv).await,
+                    let frame = match authenticate_by {
+                        None => read_frame(&mut recv).await,
                         Some(deadline) => {
-                            match tokio::time::timeout_at(deadline.into(), read_message(&mut recv))
+                            match tokio::time::timeout_at(deadline.into(), read_frame(&mut recv))
                                 .await
                             {
-                                Ok(read) => read,
+                                Ok(frame) => frame,
                                 Err(_elapsed) => {
                                     close_for_missed_authentication(&connection);
                                     break;
@@ -523,14 +564,87 @@ impl NetworkActor {
                         }
                     };
 
-                    match read {
-                        Ok((message, bytes_read)) => {
-                            // Track bandwidth contribution (aggregate, no per-DID tracking)
-                            icn_obs::metrics::contribution::total_bandwidth_bytes_add(
-                                bytes_read as u64,
-                            );
+                    // Track bandwidth contribution (aggregate, no per-DID tracking).
+                    //
+                    // Counted against the frame, before the gate, rather than against a successful
+                    // decode. Refused traffic was already counted here before this change — a
+                    // refused message had necessarily been decoded by the time it reached the gate
+                    // — and moving the gate earlier without moving this would blind the counter in
+                    // exactly the case #2558 is about. Total bytes: 4 (length prefix) + frame
+                    // body, as `read_message` reported. A frame that never completed is not
+                    // counted, as before.
+                    if let Ok(frame) = &frame {
+                        icn_obs::metrics::contribution::total_bandwidth_bytes_add(
+                            (4 + frame.len()) as u64,
+                        );
+                    }
 
-                            // Check rate limit BEFORE processing message.
+                    // Which identity this connection has proven, read once. Nothing between here
+                    // and the dispatch below can change it — decode is pure — so the pre- and
+                    // post-authentication gates are answering the same question about the same
+                    // instant, as they did when both sat after the decode.
+                    let authenticated = ctx.authenticated_peer().await;
+
+                    // PRE-AUTHENTICATION WORK AUTHORIZATION (#2558).
+                    //
+                    // The earliest point at which both halves of the charge are true: enough of
+                    // the peer's input has arrived to justify charging one unit, and the work the
+                    // budget meters has not happened yet. Charging on stream accept instead would
+                    // bill an idle or stalled connection for work nobody has asked for, turning a
+                    // rate limit into an availability primitive; charging after the decode is
+                    // what this fixes.
+                    //
+                    // A refusal here now costs the sender its token *without* buying the decode,
+                    // which is the property. It also means a malformed body is charged: that is
+                    // deliberate, because unparseable input is exactly the input an attacker gets
+                    // to produce for free otherwise. The token is the same single token the
+                    // message would have spent one step later, so nothing is charged twice.
+                    //
+                    // Only the anonymous phase moves. An authenticated peer's DID- and
+                    // anchor-keyed limits stay where they were, below the decode: that traffic is
+                    // attributable to a proven identity, and #2558 is about work performed for a
+                    // peer that has not proven one.
+                    if frame.is_ok()
+                        && authenticated.is_none()
+                        && !ctx.check_pre_auth_rate_limit().await
+                    {
+                        // No `claimed_from` here, unlike the authenticated arm below: the frame
+                        // has deliberately not been decoded, so there is no claim to log — and
+                        // the claim was never authority for anything in this phase anyway.
+                        //
+                        // The message does not name which of its own two buckets refused. An
+                        // inbound connection spends a per-connection burst (#2491) and a shared
+                        // per-source budget (#2549), the first is consulted first and
+                        // short-circuits, and an outbound connection has no source budget at all.
+                        // Naming the source here points operators at NAT contention for what is
+                        // just as likely one connection spending its own burst. Attributing it
+                        // exactly means returning the refusing bucket from `PreAuthBudget::check`,
+                        // which is a change to the gate itself rather than to this log line.
+                        warn!(
+                            "Refused pre-authentication work (a pre-authentication budget is \
+                             exhausted: this connection's own burst, or the shared budget for its \
+                             source if it has one)"
+                        );
+
+                        icn_obs::metrics::network::messages_rate_limited_inc();
+                        icn_obs::metrics::network::messages_rate_limited_pre_auth_inc();
+
+                        // Close stream before continuing to avoid resource leak
+                        if let Err(e) = send.finish() {
+                            tracing::debug!("Stream finish error during rate limit: {}", e);
+                        }
+
+                        // Drop the frame — undecoded (don't call handler)
+                        continue;
+                    }
+
+                    // Second half: interpret the authorized frame.
+                    let read =
+                        frame.and_then(|frame| NetworkMessage::from_bytes_negotiated(&frame));
+
+                    match read {
+                        Ok(message) => {
+                            // Check the authenticated peer's rate limit BEFORE processing.
                             //
                             // Which identity may select this message's limit is decided by
                             // what *this connection* has proven, never by what the message
@@ -538,10 +652,15 @@ impl NetworkActor {
                             //
                             //   PRE-AUTH   the transport source is known, the peer's DID is
                             //              not. Trust cannot select a tier, and there is no
-                            //              DID to derive a personhood anchor from either.
+                            //              DID to derive a personhood anchor from either. That
+                            //              phase is gated above, before the decode (#2558) —
+                            //              nothing about it needed the message, which is why it
+                            //              could move.
                             //   POST-AUTH  this connection has a DID bound to the
                             //              certificate it is actually using (#2520). That
-                            //              DID selects the tier.
+                            //              DID selects the tier. It stays here: the work is
+                            //              attributable to a proven identity, and `message.from`
+                            //              is available for the diagnostics below.
                             //
                             // `message.from` describes a claimed origin and is kept for
                             // diagnostics below. It never selects transport rate-limit
@@ -549,101 +668,73 @@ impl NetworkActor {
                             // public, so keying on `from` let any sender name a well-trusted
                             // peer and be charged as one.
                             //
-                            // Read per message rather than cached, because the connection's
-                            // identity is genuinely mutable. `handlers::hello` records an
-                            // authenticated peer on *every* valid Hello — the `hello_responded`
-                            // guard bounds the reply (#2537), not the binding — and #2520's
-                            // checks tie a DID to this connection's certificate without tying
-                            // that certificate to the DID's key. A second Hello can therefore
-                            // move this connection from A to B, and the limit must follow the
-                            // identity in force *now*. Caching the first one would keep
-                            // charging a peer that is no longer the one on this session.
-                            let authenticated = ctx.authenticated_peer().await;
-                            let (did_allowed, anchor_allowed) = match &authenticated {
-                                Some(authenticated) => {
-                                    rate_limiter
-                                        .check_rate_limit_with_personhood(authenticated)
-                                        .await
-                                }
-                                // No DID, so nothing DID-keyed runs: not the trust tier and
-                                // not the anchor lookup. Inventing an anchor from the claim
-                                // would let a sender spend somebody else's per-person budget.
-                                //
-                                // The `true` is the anchor verdict, and it does change what
-                                // `EnforcementMode::RequirePersonhood` covers: that mode no
-                                // longer denies pre-authentication traffic. It never usefully
-                                // did. The anchor was looked up for `message.from`, so naming
-                                // any anchored DID satisfied it, while the peers it actually
-                                // turned away were honest un-anchored ones — whose Hello it
-                                // dropped before they could ever authenticate. Personhood is
-                                // now enforced where it can mean something: on the branch
-                                // above, against the DID this connection has proven.
-                                None => (ctx.check_pre_auth_rate_limit().await, true),
-                            };
+                            // `authenticated` is read once per message above rather than cached
+                            // across messages, because the connection's identity is genuinely
+                            // mutable. `handlers::hello` records an authenticated peer on *every*
+                            // valid Hello — the `hello_responded` guard bounds the reply (#2537),
+                            // not the binding — and #2520's checks tie a DID to this connection's
+                            // certificate without tying that certificate to the DID's key. A
+                            // second Hello can therefore move this connection from A to B, and the
+                            // limit must follow the identity in force *now*. Caching the first one
+                            // would keep charging a peer that is no longer the one on this
+                            // session.
+                            //
+                            // With no DID, nothing DID-keyed runs: not the trust tier and not the
+                            // anchor lookup. Inventing an anchor from the claim would let a sender
+                            // spend somebody else's per-person budget. That also means
+                            // `EnforcementMode::RequirePersonhood` does not cover
+                            // pre-authentication traffic. It never usefully did: the anchor was
+                            // looked up for `message.from`, so naming any anchored DID satisfied
+                            // it, while the peers it actually turned away were honest un-anchored
+                            // ones — whose Hello it dropped before they could ever authenticate.
+                            if let Some(peer) = authenticated.as_ref() {
+                                let (did_allowed, anchor_allowed) =
+                                    rate_limiter.check_rate_limit_with_personhood(peer).await;
 
-                            if !did_allowed {
-                                // Two limits reach this branch and the message says which of the
-                                // two: "per-DID limit" is not true of a phase that has no DID,
-                                // and the distinction is the operational one — a throttled
-                                // authenticated peer is a tier that may want raising, while an
-                                // exhausted anonymous budget is load from a connection that never
-                                // got as far as saying who it was.
-                                //
-                                // The anonymous arm deliberately does *not* name which of its own
-                                // two buckets refused. An inbound connection spends a
-                                // per-connection burst (#2491) and a shared per-source budget
-                                // (#2549), the first is consulted first and short-circuits, and an
-                                // outbound connection has no source budget at all. Naming the
-                                // source here — as this message briefly did — points operators at
-                                // NAT contention for what is just as likely one connection
-                                // spending its own burst. Attributing it exactly means returning
-                                // the refusing bucket from `PreAuthBudget::check`, which is a
-                                // change to the gate itself rather than to this log line.
-                                match &authenticated {
-                                    Some(authenticated) => warn!(
+                                if !did_allowed {
+                                    warn!(
                                         claimed_from = %message.from,
-                                        authenticated = %authenticated,
+                                        authenticated = %peer,
                                         "Rate limited message (per-DID limit exceeded)"
-                                    ),
-                                    None => warn!(
+                                    );
+
+                                    // Track rate limiting metric
+                                    icn_obs::metrics::network::messages_rate_limited_inc();
+
+                                    // Close stream before continuing to avoid resource leak
+                                    if let Err(e) = send.finish() {
+                                        tracing::debug!(
+                                            "Stream finish error during rate limit: {}",
+                                            e
+                                        );
+                                    }
+
+                                    // Drop the message (don't call handler)
+                                    continue;
+                                }
+
+                                if !anchor_allowed {
+                                    warn!(
                                         claimed_from = %message.from,
-                                        "Rate limited message (a pre-authentication budget is \
-                                         exhausted: this connection's own burst, or the shared \
-                                         budget for its source if it has one)"
-                                    ),
+                                        authenticated = %peer,
+                                        "Rate limited message (per-person limit exceeded - Sybil mitigation)"
+                                    );
+
+                                    // Track Sybil-specific rate limiting metric
+                                    icn_obs::metrics::network::messages_rate_limited_by_anchor_inc(
+                                    );
+
+                                    // Close stream before continuing to avoid resource leak
+                                    if let Err(e) = send.finish() {
+                                        tracing::debug!(
+                                            "Stream finish error during rate limit: {}",
+                                            e
+                                        );
+                                    }
+
+                                    // Drop the message (don't call handler)
+                                    continue;
                                 }
-
-                                // Track rate limiting metric
-                                icn_obs::metrics::network::messages_rate_limited_inc();
-                                if authenticated.is_none() {
-                                    icn_obs::metrics::network::messages_rate_limited_pre_auth_inc();
-                                }
-
-                                // Close stream before continuing to avoid resource leak
-                                if let Err(e) = send.finish() {
-                                    tracing::debug!("Stream finish error during rate limit: {}", e);
-                                }
-
-                                // Drop the message (don't call handler)
-                                continue;
-                            }
-
-                            if !anchor_allowed {
-                                warn!(
-                                    claimed_from = %message.from,
-                                    "Rate limited message (per-person limit exceeded - Sybil mitigation)"
-                                );
-
-                                // Track Sybil-specific rate limiting metric
-                                icn_obs::metrics::network::messages_rate_limited_by_anchor_inc();
-
-                                // Close stream before continuing to avoid resource leak
-                                if let Err(e) = send.finish() {
-                                    tracing::debug!("Stream finish error during rate limit: {}", e);
-                                }
-
-                                // Drop the message (don't call handler)
-                                continue;
                             }
 
                             info!(

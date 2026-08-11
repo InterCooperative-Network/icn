@@ -33,8 +33,10 @@
 //!
 //! The QUIC/TLS handshake is finished before the source key exists, so nothing here bounds its
 //! rate — see the PR body. Neither is the `ConnectionContext` and task a connection allocates,
-//! nor reading and deserializing a message that is then denied, which happens before this gate
-//! and which one held connection can drive without reconnecting even once.
+//! nor *reading* the frame of a message that is then denied, which one held connection can drive
+//! without reconnecting even once. **Deserializing** that message no longer happens before this
+//! gate: #2558 moved the gate between frame acquisition and decode, so a denied message is denied
+//! undecoded. The observable below is still dispatch, which is a subset of what the token buys.
 //!
 //! # How these tests know
 //!

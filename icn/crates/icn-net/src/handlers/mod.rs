@@ -254,17 +254,23 @@ impl ConnectionContext {
         self.authenticated_peer.read().await.clone()
     }
 
-    /// Spend one message against the anonymous budget this connection draws on.
+    /// Spend one frame's worth of the anonymous budget this connection draws on.
     ///
     /// Call this only on the branch where [`Self::authenticated_peer`] is `None`. It takes
     /// no identity because at that point there is none — see
     /// [`crate::rate_limit::PreAuthBudget`].
     ///
+    /// Charged against a **frame that has arrived in full but has not yet been decoded** (#2558).
+    /// That position is load-bearing in both directions: later and the node performs the decode
+    /// the token is meant to pay for before deciding whether it was authorized; earlier — at
+    /// stream accept, say — and an idle or stalled connection is billed for work nobody asked
+    /// for, which turns this limiter into an availability primitive.
+    ///
     /// For an inbound connection the budget is its *source's* and is shared with every other
     /// connection from that source (#2549), so this is charged before the Hello that would
-    /// authenticate it is dispatched. Authentication cannot refund it, which is the point:
-    /// self-issuing a DID and a binding is cheap, so anything an attacker could buy by
-    /// authenticating would be no bound at all.
+    /// authenticate it is decoded, let alone dispatched. Authentication cannot refund it, which
+    /// is the point: self-issuing a DID and a binding is cheap, so anything an attacker could buy
+    /// by authenticating would be no bound at all.
     pub(crate) async fn check_pre_auth_rate_limit(&self) -> bool {
         self.pre_auth_limiter.check().await
     }
