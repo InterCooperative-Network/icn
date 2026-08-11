@@ -1,8 +1,14 @@
 version: '3.8'
 
-# QR login / SDIS enrollment on this devnet (#2569)
+# QR login on this devnet (#2569)
 #
-# Those flows embed a `gateway_url` in QR material that a *second device* — a phone —
+# Scope: `POST /v1/sessions` only. SDIS enrollment is NOT reachable on this profile and
+# these variables do not change that — `/v1/sdis/enrollment/*` is mounted only when
+# ICN_ENABLE_SELF_SERVE_ENROLLMENT=true (crates/icn-gateway/src/server.rs), which no
+# shipped composition sets, including this one. Those paths return 404 (or 401 on
+# scope fallthrough) because the routes do not exist here, not 503 for a missing origin.
+#
+# QR login embeds a `gateway_url` in QR material that a *second device* — a phone —
 # posts its bearer credential to. So the origin has to be one that phone can actually
 # reach, and it is an operator assertion, never inferred from a request header or the
 # bind address. There is no honest static default here: each node is published on a

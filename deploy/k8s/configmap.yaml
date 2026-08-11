@@ -15,9 +15,15 @@ data:
   # addresses, no CIDR). Example: "10.42.0.1,10.43.0.1" (K8s cluster IPs).
   # If not set, only localhost (127.0.0.1, ::1) is trusted.
   #
-  # This gates BOTH the QR-login URL derivation and — since #2567 — the client IP used
-  # for rate limiting and audit attribution on unauthenticated endpoints. If you run an
-  # ingress in front of the gateway and leave this unset, that ingress is untrusted:
+  # Scope is the client IP only — since #2567, the address used for rate limiting and
+  # audit attribution on unauthenticated endpoints. It does NOT gate QR-login URL
+  # derivation: since #2569 the advertised origin comes solely from `gateway_base_url`
+  # above, and X-Forwarded-Host / X-Forwarded-Proto are not read at all. Trusting a
+  # proxy to report who the client is does not authorize it to say where a scanning
+  # device should send credentials, so configuring only this leaves QR issuance failing
+  # closed with 503 until `gateway_base_url` is set.
+  #
+  # If you run an ingress in front of the gateway and leave this unset, that ingress is untrusted:
   # X-Forwarded-For is ignored and every client behind it shares one rate-limit bucket
   # keyed on the ingress address. That is fail-closed, not fail-open, but it will limit
   # real users. Set this to the ingress address before serving traffic through a proxy.

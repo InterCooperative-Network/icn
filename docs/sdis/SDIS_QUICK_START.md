@@ -283,6 +283,13 @@ The daemon still starts and every other route works — a gateway that issues no
 needs no origin. `TRUSTED_PROXY_IPS` does not substitute for it: trusting a proxy to report
 the client IP (#2567) does not authorize it to assert the advertised origin.
 
+Configuring an origin does **not** by itself make these enrollment routes reachable: as the
+banner at the top of this guide says, `/v1/sdis/enrollment/*` is mounted only under
+`ICN_ENABLE_SELF_SERVE_ENROLLMENT=true`, which no shipped profile sets. Where the routes are
+absent you get 404 (or 401 on scope fallthrough), not the 503 described above. The origin below
+is what the *other* QR flow — `POST /v1/sessions` — needs on every profile, and what enrollment
+would additionally need on an isolated rehearsal deployment that opts in.
+
 Where each shipped profile gets it: `deploy/k8s/configmap.yaml` (`gateway_base_url`); the LAN
 appliance drop-in `deploy/appliance/lan/icnd-30-lan-origin.conf.in` (from
 `ICN_APPLIANCE_LAN_ORIGIN`); `ICN_DEVNET_NODE_{A,B,C}_ORIGIN` for `deploy/devnet`, which
