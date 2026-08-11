@@ -432,8 +432,12 @@ impl Default for PreAuthRateLimiter {
 /// The QUIC/TLS handshake (#2559), the `ConnectionContext` and task a connection allocates, and
 /// the *reading* of a frame that is then denied here — all of that happens before or outside this
 /// gate. **Deserializing** that frame does not: #2558 moved this gate to sit between frame
-/// acquisition and decode, so one token buys the decode as well as the dispatch it feeds. See the
-/// module note on [`SourcePreAuthBudget::spend`].
+/// acquisition and decode, so a frame is deserialized only if this gate permitted it.
+///
+/// Stated in that direction on purpose. The converse is not an invariant: [`PreAuthBudget::check`]
+/// asks the connection's bucket before the source's, so a connection bucket that permits over a
+/// dry source budget spends a token on a frame nothing goes on to decode. That only ever makes the
+/// bound tighter than stated. See the module note on [`SourcePreAuthBudget::spend`].
 ///
 /// # The NAT price, stated rather than buried
 ///

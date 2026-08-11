@@ -594,10 +594,20 @@ impl NetworkActor {
                     // rate limit into an availability primitive; charging after the decode is
                     // what this fixes.
                     //
-                    // A refusal here now costs the sender its token *without* buying the decode,
-                    // which is the property. It also means a malformed body is charged: that is
-                    // deliberate, because unparseable input is exactly the input an attacker gets
-                    // to produce for free otherwise. The token is the same single token the
+                    // The invariant is one-directional, and only that direction is claimed: a
+                    // frame is decoded **only if** this gate permitted it. The converse does not
+                    // hold and does not need to. `PreAuthBudget::check` is
+                    // `connection.check() && budget.spend()`, so an exhausted connection bucket
+                    // short-circuits and costs nothing at all, while a connection bucket that
+                    // permits over a dry source budget spends its token on a frame that is never
+                    // decoded. That asymmetry predates this change and is documented as
+                    // deliberate on `PreAuthBudget::check`; it can only make the bound tighter
+                    // than stated, never looser.
+                    //
+                    // What did change is that a malformed body is now charged for the decode
+                    // *attempt* where it used to be free — the decode error short-circuited past
+                    // this gate entirely, so unparseable input, exactly what an attacker
+                    // manufactures cheaply, was never metered. It is the same single token the
                     // message would have spent one step later, so nothing is charged twice.
                     //
                     // Only the anonymous phase moves. An authenticated peer's DID- and
