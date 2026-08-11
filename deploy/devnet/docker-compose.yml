@@ -21,6 +21,14 @@ version: '3.8'
 #
 # Use this host's LAN address, not localhost. The value is validated at use time
 # (absolute http/https origin, no userinfo, path, query, or fragment).
+#
+# Invite links are deliberately NOT configured here. `POST /v1/invites` returns an
+# `invite_url` of the form `{ICN_INVITE_BASE_URL}/join?code=...`, which is a human-facing
+# UI destination, not a gateway API origin. This profile serves no member UI at all — the
+# only web surface below is Grafana, which happens to occupy port 3000 — so there is no
+# honest origin to name, and inventing one would advertise a route nothing here serves.
+# Setting GATEWAY_BASE_URL above cannot affect invite links: the two authorities are
+# separate variables (see crates/icn-gateway/src/api/invites.rs).
 
 services:
   node-a:

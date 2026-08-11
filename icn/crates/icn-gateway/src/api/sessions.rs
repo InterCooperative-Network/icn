@@ -263,9 +263,9 @@ mod tests {
     use super::*;
     use actix_web::{test, App};
 
-    // The crate-wide lock, not a local one: these tests share the process-global
-    // `GATEWAY_BASE_URL` with every other test module in this lib test binary, and a
-    // second mutex would serialize nothing against them (#2569).
+    // The crate's single test-time origin authority. Under `cfg(test)` the advertised origin
+    // resolves from a module-private thread-local rather than the process environment, so this
+    // guard pins a per-test value and no env locking is needed here (#2569).
     use crate::advertised_origin::test_env::EnvGuard;
 
     /// Builds the `/sessions` app under test.

@@ -79,28 +79,11 @@ pub async fn create_invite(
         _ => format!("Coop {}", req.coop_id), // Fallback if charter not found
     };
 
-    // Construct invite URL.
+    // Construct invite URL — base resolved by `invite_base_url()` below.
     //
-    // NOTE (#2569): this reads `GATEWAY_BASE_URL` for a *different* purpose than
-    // `crate::advertised_origin`, and the two meanings do not agree. That module treats the
-    // variable as the gateway's own externally reachable API origin — the `{origin}/v1/...`
-    // a scanning device posts a bearer credential to — and fails closed without it. Here the
-    // same value is used as a *member-facing UI* base, and `/join` is not a gateway route;
-    // it exists nowhere in this repository. So under the k8s configmap
-    // (`gateway_base_url: http://…:30080`, the gateway NodePort, while the pilot UI is on
-    // 30030) this already yields a link to a route the gateway does not serve, and the
-    // `localhost:3000` fallback names the compose web-UI port rather than any gateway.
-    //
-    // That is a pre-existing wrong-destination bug, not the #2569 header-authority class:
-    // nothing here is request-derived, so no caller can influence where this points. It is
-    // deliberately left alone rather than half-fixed — giving invites their own operator
-    // variable is a new config surface across every deployment profile, which belongs in its
-    // own change. Do not "unify" these by pointing this at `advertised_origin()`: that would
-    // silently repoint invite links at the API origin and hard-fail invite creation on
-    // gateways that legitimately issue no QR material.
-    let base_url =
-        std::env::var("GATEWAY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    let invite_url = format!("{}/join?code={}", base_url, invite.code);
+    // This link is a *member-facing UI* destination, not a gateway API origin — see
+    // `invite_base_url` for why the two configurations are deliberately separate (#2569).
+    let invite_url = format!("{}/join?code={}", invite_base_url(), invite.code);
 
     // Record metrics
     gateway::invites_created(&req.coop_id);
@@ -113,6 +96,103 @@ pub async fn create_invite(
         expires_at: invite.expires_at,
         invite_url,
     }))
+}
+
+/// Operator-set base for the human-facing `{base}/join?code=…` invite link.
+pub(crate) const INVITE_BASE_URL_ENV: &str = "ICN_INVITE_BASE_URL";
+
+/// Local-development default: `deploy/docker-compose.yml` serves the pilot UI on port 3000.
+/// It is honest only where a member UI actually runs there, which is why the doc below is
+/// explicit that no shipped profile serves this route.
+const INVITE_BASE_URL_DEFAULT: &str = "http://localhost:3000";
+
+/// Base URL for the human-facing `{base}/join?code=…` invite link.
+///
+/// # Why this is not `GATEWAY_BASE_URL`
+///
+/// One variable was carrying two incompatible authorities (#2569):
+///
+/// - **A — gateway API origin.** Where a *device* sends authenticated traffic. Owned by
+///   [`crate::advertised_origin`], fails closed when absent, and must stay operator-controlled.
+/// - **B — member UI origin.** Where a *person* opens a join link. That is this value.
+///
+/// Reading A for B coupled them, and wiring A into a deployment then corrupted invite links two
+/// different ways. Both were reproduced: with `GATEWAY_BASE_URL=` present-but-empty (what
+/// Compose exports for an unconfigured `${VAR:-}`) `std::env::var` returns `Ok("")`, so an
+/// `unwrap_or_else` that only fires on `Err` yielded a hostless `/join?code=…`; and with it
+/// set to a real API origin the link became `{gateway API}/join?code=…`, a route the gateway
+/// does not serve. Setting the QR origin must not be able to move a UI link, so this reads its
+/// own variable and never consults `GATEWAY_BASE_URL`.
+///
+/// # Honest status of this link
+///
+/// **No composition in this repository serves `GET /join?code=…`.** The only invite redemption
+/// path is `POST /v1/invites/join`, which carries the code in the request body; `web/pilot-ui`
+/// collects it from a typed form and posts there. Nothing reads `code` from a URL query.
+/// So this string is advisory: an operator who runs a member UI implementing such a route
+/// points `ICN_INVITE_BASE_URL` at it, and otherwise the link addresses nothing.
+///
+/// The default is retained for local development only, and is **not** claimed to be reachable
+/// in any deployment profile — on the devnet profile port 3000 is Grafana, and no member UI is
+/// served at all. Empty and whitespace-only are treated as absent so a misconfigured value
+/// degrades to that default rather than to a hostless path.
+fn invite_base_url() -> String {
+    resolve_invite_base(configured_invite_base())
+}
+
+/// Pure resolution, so the policy is testable without touching any ambient state.
+fn resolve_invite_base(configured: Option<String>) -> String {
+    configured
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| INVITE_BASE_URL_DEFAULT.to_string())
+}
+
+#[cfg(not(test))]
+fn configured_invite_base() -> Option<String> {
+    std::env::var(INVITE_BASE_URL_ENV).ok()
+}
+
+#[cfg(test)]
+fn configured_invite_base() -> Option<String> {
+    test_env::configured()
+}
+
+/// Per-test UI-origin configuration, for the same reason [`crate::advertised_origin::test_env`]
+/// exists: every `#[cfg(test)]` module lands in one lib test binary, so a process-global read
+/// here would let two tests configuring different origins race. libtest gives each test its own
+/// thread, so a thread-local makes them order-independent by construction rather than by a lock
+/// every future author must remember.
+#[cfg(test)]
+pub(crate) mod test_env {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static CONFIGURED: RefCell<Option<String>> = const { RefCell::new(None) };
+    }
+
+    pub(super) fn configured() -> Option<String> {
+        CONFIGURED.with(|slot| slot.borrow().clone())
+    }
+
+    /// Pins the member-UI origin for this thread, restoring the prior value on drop.
+    pub(crate) struct UiOriginGuard {
+        prior: Option<String>,
+    }
+
+    impl UiOriginGuard {
+        pub(crate) fn acquire(value: Option<&str>) -> Self {
+            let prior = CONFIGURED.with(|slot| slot.replace(value.map(str::to_owned)));
+            Self { prior }
+        }
+    }
+
+    impl Drop for UiOriginGuard {
+        fn drop(&mut self) {
+            let prior = self.prior.take();
+            CONFIGURED.with(|slot| *slot.borrow_mut() = prior);
+        }
+    }
 }
 
 /// GET /invites - List all invites for a cooperative
@@ -223,6 +303,120 @@ mod tests {
     use crate::invite::InviteManager;
     use actix_web::http::StatusCode;
     use actix_web::{test as actix_test, App, HttpMessage};
+
+    /// Absent, empty and whitespace-only all mean "unconfigured", and never a hostless link.
+    ///
+    /// The empty case is the one that bit: Compose exports an unconfigured `${VAR:-}` as a
+    /// present-but-empty variable, so `std::env::var` returns `Ok("")` and an `unwrap_or_else`
+    /// that only fires on `Err` produced a relative `/join?code=…` with no host at all.
+    #[test]
+    fn unconfigured_invite_base_degrades_to_the_default_not_to_a_hostless_link() {
+        for configured in [None, Some(""), Some("   "), Some("\t\n")] {
+            let base = resolve_invite_base(configured.map(str::to_string));
+            assert_eq!(
+                base, INVITE_BASE_URL_DEFAULT,
+                "{configured:?} must resolve to the default, got {base:?}"
+            );
+            assert!(
+                base.starts_with("http"),
+                "invite link must carry a host, got {base:?}"
+            );
+        }
+    }
+
+    /// The operator-facing variable name is a documented contract (`deploy/icnd.env.example`,
+    /// `docs/guides/onboarding-runbook.md`), so renaming it should break a test, not just docs.
+    #[test]
+    fn invite_base_url_env_name_is_the_documented_one() {
+        assert_eq!(INVITE_BASE_URL_ENV, "ICN_INVITE_BASE_URL");
+    }
+
+    /// A configured member-UI origin is used verbatim, with surrounding whitespace trimmed.
+    #[test]
+    fn configured_invite_base_is_used_and_trimmed() {
+        assert_eq!(
+            resolve_invite_base(Some("https://members.example.coop".to_string())),
+            "https://members.example.coop"
+        );
+        assert_eq!(
+            resolve_invite_base(Some("  https://members.example.coop  ".to_string())),
+            "https://members.example.coop"
+        );
+    }
+
+    /// **The independence proof.** Setting the gateway API origin alone must not move the
+    /// invite link — driven through the real handler, not the helper.
+    ///
+    /// This is the half of the review finding that treating empty-as-absent did not fix: an
+    /// operator following the QR-origin instructions set `GATEWAY_BASE_URL` to a real API
+    /// origin, and invite links silently became `{gateway API}/join?code=…`, a route the
+    /// gateway does not serve. The two authorities are now separate variables, so the QR
+    /// origin has no reachable path to this value.
+    ///
+    /// The gateway API origin is pinned through the authority that actually owns it, and the
+    /// member-UI origin is left unconfigured. Neither test touches the process environment, so
+    /// the two independence cases below cannot race each other.
+    #[actix_web::test]
+    async fn setting_the_gateway_api_origin_cannot_move_the_invite_link() {
+        let _api = crate::advertised_origin::test_env::EnvGuard::acquire(Some(
+            "http://gateway.example:8080",
+        ));
+        let _ui = test_env::UiOriginGuard::acquire(None);
+
+        let invite_url = created_invite_url().await;
+
+        assert!(
+            !invite_url.contains("gateway.example"),
+            "the gateway API origin leaked into the invite link: {invite_url}"
+        );
+        assert!(
+            invite_url.starts_with(INVITE_BASE_URL_DEFAULT),
+            "expected the member-UI default, got {invite_url}"
+        );
+    }
+
+    /// With both configured to different values, each authority stays in its own lane.
+    #[actix_web::test]
+    async fn api_origin_and_invite_origin_are_independent_when_both_are_set() {
+        let _api = crate::advertised_origin::test_env::EnvGuard::acquire(Some(
+            "http://gateway.example:8080",
+        ));
+        let _ui = test_env::UiOriginGuard::acquire(Some("https://members.example.coop"));
+
+        let invite_url = created_invite_url().await;
+
+        assert!(
+            invite_url.starts_with("https://members.example.coop/join?code="),
+            "invite link must use the member-UI origin only, got {invite_url}"
+        );
+        assert!(
+            !invite_url.contains("gateway.example"),
+            "the gateway API origin leaked into the invite link: {invite_url}"
+        );
+    }
+
+    /// Drives the real `create_invite` handler and returns the `invite_url` it produced.
+    async fn created_invite_url() -> String {
+        let invite_mgr = Arc::new(InviteManager::new());
+        let commons_mgr = Arc::new(CommonsManager::new());
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(invite_mgr))
+                .app_data(web::Data::new(commons_mgr))
+                .service(web::scope("/invites").service(create_invite)),
+        )
+        .await;
+
+        let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
+        let req = actix_test::TestRequest::post()
+            .uri("/invites")
+            .set_json(serde_json::json!({ "coop_id": "coopA", "role": "member" }))
+            .to_request();
+        req.extensions_mut().insert(admin_claims("coopA", &sub));
+
+        let body: InviteResponse = actix_test::call_and_read_body_json(&app, req).await;
+        body.invite_url
+    }
 
     fn admin_claims(coop: &str, sub: &str) -> TokenClaims {
         TokenClaims {

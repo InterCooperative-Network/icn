@@ -176,13 +176,13 @@ fn unusable(reason: &str) -> GatewayError {
 /// reads no shared cell. `tests::process_env_mutation_is_inert_against_the_code_under_test`
 /// proves exactly that, using the counterexamples the scan missed.
 ///
-/// **Scope of that claim, precisely.** It covers this module's resolver, not the whole crate.
-/// [`crate::api::invites`] still calls `std::env::var("GATEWAY_BASE_URL")` directly for its own
-/// (different, and currently incompatible) purpose, so it continues to read the real process
-/// environment in lib tests as in production. Any future test that mutates the variable can
-/// still perturb that consumer; what is guaranteed here is only that it cannot perturb the
-/// advertised origin. Unifying the two is deliberately a separate change — see the note at the
-/// `invites.rs` call site.
+/// **Scope of that claim, precisely.** It covers this module's resolver, not every environment
+/// reader in the crate. `GATEWAY_BASE_URL` now has exactly one consumer — this module — because
+/// [`crate::api::invites`] was moved onto its own `ICN_INVITE_BASE_URL` (the same variable was
+/// previously carrying both a device-facing API origin and a human-facing UI origin). That
+/// module still reads *its* variable from the real process environment, so a test mutating
+/// `ICN_INVITE_BASE_URL` can perturb it. What is guaranteed here is narrower and exact: nothing
+/// a test does to the process environment can change the advertised origin.
 ///
 /// The production path is unchanged and still reads the process environment; integration
 /// tests in `tests/` link the lib without `cfg(test)`, so they exercise that real read
