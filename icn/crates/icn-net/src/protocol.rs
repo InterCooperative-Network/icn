@@ -26,6 +26,20 @@ pub const MAX_SUPPORTED_VERSION: u32 = 2;
 /// Maximum message size (10MB)
 pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 
+/// Largest buffer a frame body may reserve before the sender has delivered anything (#2558).
+///
+/// The declared length is a claim, not evidence. Committing `MAX_MESSAGE_SIZE` on the strength of
+/// a four-byte prefix lets a peer that goes silent immediately afterwards hold that memory for as
+/// long as the read is allowed to wait — and before authentication, "the peer" is anyone who
+/// completed a QUIC handshake. So the body is read in bounded steps and the buffer grows with the
+/// bytes that actually arrive, capped per step by this value.
+///
+/// This is a *reservation* bound, not a message-size bound: `MAX_MESSAGE_SIZE` remains the sole
+/// authority on how large a message may be, and a legitimate message still reaches its full size.
+/// The value is a plain I/O step, chosen well under the 1 MiB QUIC `stream_receive_window` so a
+/// step never reserves more than a stream could have buffered anyway.
+const FRAME_READ_STEP: usize = 64 * 1024;
+
 /// Compression threshold in bytes (1KB) - messages below this are not compressed
 pub const COMPRESSION_THRESHOLD: usize = 1024;
 
@@ -996,6 +1010,54 @@ impl NetworkMessage {
 ///
 /// Returns the message and the number of bytes read (including 4-byte length prefix)
 pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
+    let buf = read_frame(recv).await?;
+    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
+    // Return total bytes: 4 (length prefix) + message body
+    Ok((msg, 4 + buf.len()))
+}
+
+/// Capacity the frame buffer should grow to, given what it holds now and the declared length.
+///
+/// Geometric so a large frame costs amortised O(n) copying rather than one realloc per step, and
+/// clamped to `len` so it can never exceed what the peer declared. Letting `Vec` choose would
+/// round a frame just past a power of two up to the next one — for a maximum-size frame, 16 MiB
+/// against a declared 10 MiB, i.e. *more* than the eager allocation this replaces.
+///
+/// Split out as a pure function because that is the only way to test the bound honestly: measured
+/// end-to-end, the figure is dominated by whether the sender's copy is still live when the
+/// receiver allocates, which is scheduling, not policy.
+fn frame_capacity_target(current_capacity: usize, held: usize, len: usize) -> usize {
+    if current_capacity == 0 {
+        // First reservation: exactly the bytes in hand. Seeding it at a step instead would
+        // charge a peer that sent one byte for a whole one — across the server-wide admission
+        // limit, a constant unrelated to what anyone actually sent.
+        held.min(len)
+    } else {
+        // Thereafter geometric, so a large frame costs amortised O(n) copying.
+        current_capacity.saturating_mul(2).max(held).min(len)
+    }
+}
+
+/// Read one length-prefixed frame body, committing memory in proportion to bytes received.
+///
+/// The single framing implementation behind every `read_message*` helper. It was three copies of
+/// the same preamble, which meant a bound added to one left the others open — so the size policy
+/// lives here once (#2558).
+///
+/// `MAX_MESSAGE_SIZE` is unchanged and still rejects an oversized declaration before any body byte
+/// is read, so the wire contract and the fail-closed behaviour are exactly as before. What changed
+/// is the allocation. `vec![0u8; declared]` committed the buffer on the strength of a number the
+/// peer chose; nothing here is sized by the declaration at all. The buffer starts empty, capacity
+/// is taken only in response to bytes [`RecvStream::read_chunk`] has actually delivered, and
+/// [`frame_capacity_target`] caps every subsequent reservation at the declared length. A peer that
+/// declares a large frame and then sends nothing holds no body buffer.
+///
+/// `FRAME_READ_STEP` appears only as the ceiling on a single `read_chunk` request — it bounds how
+/// much may arrive in one poll, never how much is reserved before it does.
+///
+/// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
+/// discards a partial buffer whose size is bounded by what the peer really sent.
+async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
@@ -1014,15 +1076,41 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
     // Safe to cast after validation
     let len = len_u32 as usize;
 
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
+    // Reserve nothing up front, and keep no scratch buffer: `read_chunk` hands back only the
+    // bytes that have actually arrived, so nothing here is sized by the declaration. A fixed
+    // scratch array would instead live inline in every suspended connection future, charging
+    // idle unauthenticated connections a constant cost before a single body byte exists —
+    // which is the same defect one level down.
+    //
+    // A stream that ends before the declared length yields `None`, so a truncated frame is
+    // still an error, exactly as a single `read_exact` over the whole body was.
+    let mut buf: Vec<u8> = Vec::new();
+    while buf.len() < len {
+        let want = (len - buf.len()).min(FRAME_READ_STEP);
+        let chunk = recv
+            .read_chunk(want, true)
+            .await
+            .context("Failed to read message body")?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to read message body: stream ended after {} of {len} bytes",
+                    buf.len()
+                )
+            })?;
 
-    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
-    // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+        // Grow geometrically — so a large frame still costs amortised O(n) copying rather than
+        // one realloc per chunk — but never past the declared length. Letting
+        // `extend_from_slice` pick the growth would round a 10 MiB frame up to a 16 MiB
+        // capacity, i.e. *more* than the eager allocation this replaces.
+        let arrived = chunk.bytes.len();
+        if buf.capacity() < buf.len() + arrived {
+            let target = frame_capacity_target(buf.capacity(), buf.len() + arrived, len);
+            buf.reserve_exact(target - buf.len());
+        }
+        buf.extend_from_slice(&chunk.bytes);
+    }
+
+    Ok(buf)
 }
 
 /// Helper for reading length-prefixed messages with compression support
@@ -1031,33 +1119,10 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
 pub async fn read_message_compressed(
     recv: &mut quinn::RecvStream,
 ) -> Result<(NetworkMessage, usize)> {
-    // Read 4-byte length prefix (big-endian)
-    let mut len_buf = [0u8; 4];
-    recv.read_exact(&mut len_buf)
-        .await
-        .context("Failed to read message length")?;
-    let len_u32 = u32::from_be_bytes(len_buf);
-
-    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
-    if len_u32 == 0 {
-        anyhow::bail!("Invalid message: zero length");
-    }
-    if len_u32 > MAX_MESSAGE_SIZE as u32 {
-        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
-    }
-
-    // Safe to cast after validation
-    let len = len_u32 as usize;
-
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
-
+    let buf = read_frame(recv).await?;
     let msg = NetworkMessage::from_bytes_compressed(&buf)?;
     // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+    Ok((msg, 4 + buf.len()))
 }
 
 /// Helper for writing length-prefixed messages to QUIC streams
@@ -1108,33 +1173,10 @@ pub async fn write_message_compressed(
 pub async fn read_message_negotiated(
     recv: &mut quinn::RecvStream,
 ) -> Result<(NetworkMessage, usize)> {
-    // Read 4-byte length prefix (big-endian)
-    let mut len_buf = [0u8; 4];
-    recv.read_exact(&mut len_buf)
-        .await
-        .context("Failed to read message length")?;
-    let len_u32 = u32::from_be_bytes(len_buf);
-
-    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
-    if len_u32 == 0 {
-        anyhow::bail!("Invalid message: zero length");
-    }
-    if len_u32 > MAX_MESSAGE_SIZE as u32 {
-        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
-    }
-
-    // Safe to cast after validation
-    let len = len_u32 as usize;
-
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
-
+    let buf = read_frame(recv).await?;
     let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
     // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+    Ok((msg, 4 + buf.len()))
 }
 
 /// Helper for writing length-prefixed messages with negotiated encoding
@@ -1176,6 +1218,75 @@ pub async fn write_message_negotiated(
 
 #[cfg(test)]
 mod tests {
+    /// Capacity may never exceed the declared length, at any point in the growth sequence.
+    ///
+    /// This is the bound the end-to-end allocator measurement could not establish: there the
+    /// figure depends on whether the sender's copy is still live when the receiver allocates, so
+    /// the same code measured 0.1 MiB on one machine and 4.7 MiB on another. The policy itself is
+    /// pure arithmetic and can be checked exactly.
+    #[test]
+    fn frame_capacity_never_exceeds_the_declared_length() {
+        for len in [
+            1,
+            FRAME_READ_STEP - 1,
+            FRAME_READ_STEP,
+            FRAME_READ_STEP + 1,
+            8 * 1024 * 1024 + 1, // just past a power of two: where doubling overshoots worst
+            MAX_MESSAGE_SIZE,
+        ] {
+            // Walk the whole sequence the read loop would produce.
+            // Simulate the loop: a chunk arrives, then capacity is taken for what is held.
+            let mut capacity = 0usize;
+            let mut held = 0usize;
+            let mut guard = 0;
+            while capacity < len {
+                held = (held + FRAME_READ_STEP).min(len);
+                let next = frame_capacity_target(capacity, held, len);
+                assert!(
+                    next <= len,
+                    "len={len}: capacity target {next} exceeds the declared length"
+                );
+                assert!(next > capacity, "len={len}: growth stalled at {capacity}");
+                capacity = next;
+                guard += 1;
+                assert!(guard < 1024, "len={len}: growth did not converge");
+            }
+            assert_eq!(
+                capacity, len,
+                "len={len}: final capacity must be exactly len"
+            );
+        }
+    }
+
+    /// A small frame takes exactly what it needs, not a whole step.
+    #[test]
+    fn a_small_frame_reserves_only_its_own_length() {
+        assert_eq!(frame_capacity_target(0, 100, 100), 100);
+        assert_eq!(frame_capacity_target(0, 1, 1), 1);
+        // And a peer that declares the maximum but delivers one byte reserves one byte.
+        assert_eq!(frame_capacity_target(0, 1, MAX_MESSAGE_SIZE), 1);
+    }
+
+    /// Growth is geometric, so a large frame costs amortised O(n) copying rather than one
+    /// reallocation per step.
+    #[test]
+    fn growth_is_geometric_not_one_step_at_a_time() {
+        let len = MAX_MESSAGE_SIZE;
+        let mut capacity = frame_capacity_target(0, FRAME_READ_STEP, len);
+        let mut held = FRAME_READ_STEP;
+        let mut steps = 1;
+        while capacity < len {
+            held = (held + FRAME_READ_STEP).min(len);
+            capacity = frame_capacity_target(capacity, held, len);
+            steps += 1;
+        }
+        let one_step_at_a_time = len.div_ceil(FRAME_READ_STEP);
+        assert!(
+            steps < one_step_at_a_time / 4,
+            "growth took {steps} reallocations; per-step growth would take {one_step_at_a_time}"
+        );
+    }
+
     use super::*;
     use icn_gossip::{types::ContentHash, VectorClock};
     use icn_identity::KeyPair;

@@ -56,6 +56,7 @@ pub use protocol::{
     read_message, read_message_compressed, read_message_negotiated, write_message,
     write_message_compressed, write_message_negotiated, CompressionFormat, EncodingFormat,
     KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, COMPRESSION_THRESHOLD,
+    MAX_MESSAGE_SIZE,
 };
 pub use rate_limit::{
     RateLimitConfig, RateLimiter, SourcePreAuthBudget, MAX_PREAUTH_BUDGET_SOURCES, NETWORK_DOMAIN,
