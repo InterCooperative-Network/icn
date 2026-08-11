@@ -55,6 +55,11 @@
 //! so neither could be handed to a scanning phone. With no configured origin there is no safe
 //! value to advertise, so QR issuance fails closed (503) rather than guessing one.
 //!
+//! That sentence is enforced, not merely asserted: an operator who pastes a wildcard bind into
+//! the variable is refused. `0.0.0.0`, `[::]` and their IPv4-mapped form parse as perfectly
+//! ordinary tuple origins, so validation rejects unspecified hosts explicitly — a phone that
+//! resolved one would address itself rather than this gateway.
+//!
 //! Validation happens at use time rather than startup: a gateway that never issues QR material
 //! should not fail to boot over configuration it does not need.
 
@@ -112,6 +117,29 @@ pub(crate) fn advertised_origin() -> Result<String> {
     // that fails silently in someone's hand.
     if url.port() == Some(0) {
         return Err(unusable("port 0 is not a reachable destination"));
+    }
+
+    // The wildcard *bind* addresses, pasted into an *advertised* origin. `0.0.0.0` and `[::]`
+    // parse as ordinary tuple origins, so nothing above rejects them — but they name no host.
+    // A phone that resolved one would target itself, not this gateway. This is the same rule as
+    // port 0, and the module contract above already says a bind address is not an origin; this
+    // is where that sentence becomes enforceable rather than advisory.
+    if let Some(url::Host::Ipv4(v4)) = url.host() {
+        if v4.is_unspecified() {
+            return Err(unusable(
+                "unspecified address is not a reachable destination",
+            ));
+        }
+    }
+    if let Some(url::Host::Ipv6(v6)) = url.host() {
+        // `to_ipv4_mapped`, not `to_ipv4`: the latter also unwraps IPv4-*compatible* addresses,
+        // which is the deprecated form this codebase deliberately avoids (#2564).
+        let mapped_unspecified = v6.to_ipv4_mapped().is_some_and(|v4| v4.is_unspecified());
+        if v6.is_unspecified() || mapped_unspecified {
+            return Err(unusable(
+                "unspecified address is not a reachable destination",
+            ));
+        }
     }
 
     let origin = url.origin();
@@ -298,6 +326,16 @@ mod tests {
             // Parses fine; nothing can connect to it.
             (Some("https://gateway.example.coop:0"), "port zero"),
             (Some("http://192.0.2.10:0"), "port zero on a literal IPv4"),
+            // A wildcard *bind* pasted into an *advertised* origin. Parses as a tuple origin,
+            // but names no host: a phone resolving it would target itself.
+            (Some("http://0.0.0.0:8080"), "unspecified IPv4 bind"),
+            (Some("http://0.0.0.0"), "unspecified IPv4, default port"),
+            (Some("http://[::]:8080"), "unspecified IPv6 bind"),
+            (Some("https://[::]"), "unspecified IPv6, default port"),
+            (
+                Some("http://[::ffff:0.0.0.0]:8080"),
+                "IPv4-mapped unspecified",
+            ),
         ];
 
         for (configured, why) in cases {
