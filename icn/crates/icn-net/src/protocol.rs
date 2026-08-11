@@ -1040,11 +1040,16 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
 /// Split out as a pure function because that is the only way to test the bound honestly: measured
 /// end-to-end, the figure is dominated by whether the sender's copy is still live when the
 /// receiver allocates, which is scheduling, not policy.
-fn frame_capacity_target(current_capacity: usize, len: usize) -> usize {
-    current_capacity
-        .max(FRAME_READ_STEP)
-        .saturating_mul(2)
-        .min(len)
+fn frame_capacity_target(current_capacity: usize, held: usize, len: usize) -> usize {
+    if current_capacity == 0 {
+        // First reservation: exactly the bytes in hand. Seeding it at a step instead would
+        // charge a peer that sent one byte for a whole one — across the server-wide admission
+        // limit, a constant unrelated to what anyone actually sent.
+        held.min(len)
+    } else {
+        // Thereafter geometric, so a large frame costs amortised O(n) copying.
+        current_capacity.saturating_mul(2).max(held).min(len)
+    }
 }
 
 async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
@@ -1094,7 +1099,7 @@ async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
         // capacity, i.e. *more* than the eager allocation this replaces.
         let arrived = chunk.bytes.len();
         if buf.capacity() < buf.len() + arrived {
-            let target = frame_capacity_target(buf.capacity(), len).max(buf.len() + arrived);
+            let target = frame_capacity_target(buf.capacity(), buf.len() + arrived, len);
             buf.reserve_exact(target - buf.len());
         }
         buf.extend_from_slice(&chunk.bytes);
@@ -1225,10 +1230,13 @@ mod tests {
             MAX_MESSAGE_SIZE,
         ] {
             // Walk the whole sequence the read loop would produce.
+            // Simulate the loop: a chunk arrives, then capacity is taken for what is held.
             let mut capacity = 0usize;
+            let mut held = 0usize;
             let mut guard = 0;
             while capacity < len {
-                let next = frame_capacity_target(capacity, len);
+                held = (held + FRAME_READ_STEP).min(len);
+                let next = frame_capacity_target(capacity, held, len);
                 assert!(
                     next <= len,
                     "len={len}: capacity target {next} exceeds the declared length"
@@ -1248,8 +1256,10 @@ mod tests {
     /// A small frame takes exactly what it needs, not a whole step.
     #[test]
     fn a_small_frame_reserves_only_its_own_length() {
-        assert_eq!(frame_capacity_target(0, 100), 100);
-        assert_eq!(frame_capacity_target(0, 1), 1);
+        assert_eq!(frame_capacity_target(0, 100, 100), 100);
+        assert_eq!(frame_capacity_target(0, 1, 1), 1);
+        // And a peer that declares the maximum but delivers one byte reserves one byte.
+        assert_eq!(frame_capacity_target(0, 1, MAX_MESSAGE_SIZE), 1);
     }
 
     /// Growth is geometric, so a large frame costs amortised O(n) copying rather than one
@@ -1257,10 +1267,12 @@ mod tests {
     #[test]
     fn growth_is_geometric_not_one_step_at_a_time() {
         let len = MAX_MESSAGE_SIZE;
-        let mut capacity = frame_capacity_target(0, len);
+        let mut capacity = frame_capacity_target(0, FRAME_READ_STEP, len);
+        let mut held = FRAME_READ_STEP;
         let mut steps = 1;
         while capacity < len {
-            capacity = frame_capacity_target(capacity, len);
+            held = (held + FRAME_READ_STEP).min(len);
+            capacity = frame_capacity_target(capacity, held, len);
             steps += 1;
         }
         let one_step_at_a_time = len.div_ceil(FRAME_READ_STEP);
