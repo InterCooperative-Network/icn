@@ -389,7 +389,6 @@ async fn a_frame_spanning_several_read_steps_arrives_intact() -> Result<()> {
     );
 
     let (mut send, _recv) = connection.open_bi().await.context("open_bi")?;
-    let baseline = arm_peak();
     icn_net::write_message(&mut send, &message).await?;
     send.finish()?;
 
@@ -402,18 +401,12 @@ async fn a_frame_spanning_several_read_steps_arrives_intact() -> Result<()> {
         "a {encoded}-byte frame spanning several read steps must arrive once, intact"
     );
 
-    // A frame must not retain more than it declared. Growing the buffer by `Vec`'s own amortised
-    // doubling would round a frame just past a power of two up to the next one — for a
-    // maximum-size frame, 16 MiB against a declared 10 MiB, i.e. worse than the eager allocation
-    // this change replaces. The ceiling is generous because the test process is also holding the
-    // sent copy and quinn's buffers; the defect it excludes is a *multiple* of the frame.
-    let growth = peak_growth_since(baseline);
-    assert!(
-        growth < encoded * 3,
-        "a {encoded}-byte frame retained {:.1} MiB — capacity is overshooting the declared \
-         length, not tracking it",
-        mib(growth),
-    );
+    // NOTE: this test deliberately does *not* assert a capacity ceiling. Measured end to end,
+    // that figure is dominated by whether the sender's copy is still live when the receiver
+    // allocates — the same code measured 0.1 MiB locally and 4.7 MiB on CI, which overlaps the
+    // 6.2 MiB the uncapped defect produces. An assertion that cannot separate those is not
+    // evidence. The capacity bound is proven exactly instead, by
+    // `protocol::tests::frame_capacity_never_exceeds_the_declared_length`.
 
     Ok(())
 }

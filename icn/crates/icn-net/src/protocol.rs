@@ -1030,6 +1030,23 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
 ///
 /// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
 /// discards a partial buffer whose size is bounded by what the peer really sent.
+/// Capacity the frame buffer should grow to, given what it holds now and the declared length.
+///
+/// Geometric so a large frame costs amortised O(n) copying rather than one realloc per step, and
+/// clamped to `len` so it can never exceed what the peer declared. Letting `Vec` choose would
+/// round a frame just past a power of two up to the next one — for a maximum-size frame, 16 MiB
+/// against a declared 10 MiB, i.e. *more* than the eager allocation this replaces.
+///
+/// Split out as a pure function because that is the only way to test the bound honestly: measured
+/// end-to-end, the figure is dominated by whether the sender's copy is still live when the
+/// receiver allocates, which is scheduling, not policy.
+fn frame_capacity_target(current_capacity: usize, len: usize) -> usize {
+    current_capacity
+        .max(FRAME_READ_STEP)
+        .saturating_mul(2)
+        .min(len)
+}
+
 async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
@@ -1066,11 +1083,7 @@ async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
         // `extend_from_slice` pick the growth would round a 10 MiB frame up to a 16 MiB
         // capacity, i.e. *more* than the eager allocation this replaces.
         if buf.capacity() < buf.len() + want {
-            let target = buf
-                .capacity()
-                .max(FRAME_READ_STEP)
-                .saturating_mul(2)
-                .min(len);
+            let target = frame_capacity_target(buf.capacity(), len);
             buf.reserve_exact(target - buf.len());
         }
         buf.extend_from_slice(&step[..want]);
@@ -1184,6 +1197,68 @@ pub async fn write_message_negotiated(
 
 #[cfg(test)]
 mod tests {
+    /// Capacity may never exceed the declared length, at any point in the growth sequence.
+    ///
+    /// This is the bound the end-to-end allocator measurement could not establish: there the
+    /// figure depends on whether the sender's copy is still live when the receiver allocates, so
+    /// the same code measured 0.1 MiB on one machine and 4.7 MiB on another. The policy itself is
+    /// pure arithmetic and can be checked exactly.
+    #[test]
+    fn frame_capacity_never_exceeds_the_declared_length() {
+        for len in [
+            1,
+            FRAME_READ_STEP - 1,
+            FRAME_READ_STEP,
+            FRAME_READ_STEP + 1,
+            8 * 1024 * 1024 + 1, // just past a power of two: where doubling overshoots worst
+            MAX_MESSAGE_SIZE,
+        ] {
+            // Walk the whole sequence the read loop would produce.
+            let mut capacity = 0usize;
+            let mut guard = 0;
+            while capacity < len {
+                let next = frame_capacity_target(capacity, len);
+                assert!(
+                    next <= len,
+                    "len={len}: capacity target {next} exceeds the declared length"
+                );
+                assert!(next > capacity, "len={len}: growth stalled at {capacity}");
+                capacity = next;
+                guard += 1;
+                assert!(guard < 1024, "len={len}: growth did not converge");
+            }
+            assert_eq!(
+                capacity, len,
+                "len={len}: final capacity must be exactly len"
+            );
+        }
+    }
+
+    /// A small frame takes exactly what it needs, not a whole step.
+    #[test]
+    fn a_small_frame_reserves_only_its_own_length() {
+        assert_eq!(frame_capacity_target(0, 100), 100);
+        assert_eq!(frame_capacity_target(0, 1), 1);
+    }
+
+    /// Growth is geometric, so a large frame costs amortised O(n) copying rather than one
+    /// reallocation per step.
+    #[test]
+    fn growth_is_geometric_not_one_step_at_a_time() {
+        let len = MAX_MESSAGE_SIZE;
+        let mut capacity = frame_capacity_target(0, len);
+        let mut steps = 1;
+        while capacity < len {
+            capacity = frame_capacity_target(capacity, len);
+            steps += 1;
+        }
+        let one_step_at_a_time = len.div_ceil(FRAME_READ_STEP);
+        assert!(
+            steps < one_step_at_a_time / 4,
+            "growth took {steps} reallocations; per-step growth would take {one_step_at_a_time}"
+        );
+    }
+
     use super::*;
     use icn_gossip::{types::ContentHash, VectorClock};
     use icn_identity::KeyPair;
