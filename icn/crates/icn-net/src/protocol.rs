@@ -26,6 +26,20 @@ pub const MAX_SUPPORTED_VERSION: u32 = 2;
 /// Maximum message size (10MB)
 pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 
+/// Largest buffer a frame body may reserve before the sender has delivered anything (#2558).
+///
+/// The declared length is a claim, not evidence. Committing `MAX_MESSAGE_SIZE` on the strength of
+/// a four-byte prefix lets a peer that goes silent immediately afterwards hold that memory for as
+/// long as the read is allowed to wait — and before authentication, "the peer" is anyone who
+/// completed a QUIC handshake. So the body is read in bounded steps and the buffer grows with the
+/// bytes that actually arrive, capped per step by this value.
+///
+/// This is a *reservation* bound, not a message-size bound: `MAX_MESSAGE_SIZE` remains the sole
+/// authority on how large a message may be, and a legitimate message still reaches its full size.
+/// The value is a plain I/O step, chosen well under the 1 MiB QUIC `stream_receive_window` so a
+/// step never reserves more than a stream could have buffered anyway.
+const FRAME_READ_STEP: usize = 64 * 1024;
+
 /// Compression threshold in bytes (1KB) - messages below this are not compressed
 pub const COMPRESSION_THRESHOLD: usize = 1024;
 
@@ -996,6 +1010,27 @@ impl NetworkMessage {
 ///
 /// Returns the message and the number of bytes read (including 4-byte length prefix)
 pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
+    let buf = read_frame(recv).await?;
+    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
+    // Return total bytes: 4 (length prefix) + message body
+    Ok((msg, 4 + buf.len()))
+}
+
+/// Read one length-prefixed frame body, committing memory in proportion to bytes received.
+///
+/// The single framing implementation behind every `read_message*` helper. It was three copies of
+/// the same preamble, which meant a bound added to one left the others open — so the size policy
+/// lives here once (#2558).
+///
+/// `MAX_MESSAGE_SIZE` is unchanged and still rejects an oversized declaration before any body byte
+/// is read, so the wire contract and the fail-closed behaviour are exactly as before. What changed
+/// is the allocation: instead of `vec![0u8; declared]` up front, the buffer starts at one
+/// [`FRAME_READ_STEP`] and grows only as bytes actually land. A peer that declares a large frame
+/// and then sends nothing now holds one step, not the whole declaration.
+///
+/// Cancellation is unaffected: the caller's timeout still wraps this future, and dropping it
+/// discards a partial buffer whose size is bounded by what the peer really sent.
+async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
@@ -1014,15 +1049,19 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
     // Safe to cast after validation
     let len = len_u32 as usize;
 
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
+    // Reserve a step, not the declaration. `read_exact` on each step means a truncated frame still
+    // fails on the step that runs short, exactly as a single `read_exact` over the whole body did.
+    let mut buf: Vec<u8> = Vec::with_capacity(len.min(FRAME_READ_STEP));
+    let mut step = [0u8; FRAME_READ_STEP];
+    while buf.len() < len {
+        let want = (len - buf.len()).min(FRAME_READ_STEP);
+        recv.read_exact(&mut step[..want])
+            .await
+            .context("Failed to read message body")?;
+        buf.extend_from_slice(&step[..want]);
+    }
 
-    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
-    // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+    Ok(buf)
 }
 
 /// Helper for reading length-prefixed messages with compression support
@@ -1031,33 +1070,10 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
 pub async fn read_message_compressed(
     recv: &mut quinn::RecvStream,
 ) -> Result<(NetworkMessage, usize)> {
-    // Read 4-byte length prefix (big-endian)
-    let mut len_buf = [0u8; 4];
-    recv.read_exact(&mut len_buf)
-        .await
-        .context("Failed to read message length")?;
-    let len_u32 = u32::from_be_bytes(len_buf);
-
-    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
-    if len_u32 == 0 {
-        anyhow::bail!("Invalid message: zero length");
-    }
-    if len_u32 > MAX_MESSAGE_SIZE as u32 {
-        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
-    }
-
-    // Safe to cast after validation
-    let len = len_u32 as usize;
-
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
-
+    let buf = read_frame(recv).await?;
     let msg = NetworkMessage::from_bytes_compressed(&buf)?;
     // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+    Ok((msg, 4 + buf.len()))
 }
 
 /// Helper for writing length-prefixed messages to QUIC streams
@@ -1108,33 +1124,10 @@ pub async fn write_message_compressed(
 pub async fn read_message_negotiated(
     recv: &mut quinn::RecvStream,
 ) -> Result<(NetworkMessage, usize)> {
-    // Read 4-byte length prefix (big-endian)
-    let mut len_buf = [0u8; 4];
-    recv.read_exact(&mut len_buf)
-        .await
-        .context("Failed to read message length")?;
-    let len_u32 = u32::from_be_bytes(len_buf);
-
-    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
-    if len_u32 == 0 {
-        anyhow::bail!("Invalid message: zero length");
-    }
-    if len_u32 > MAX_MESSAGE_SIZE as u32 {
-        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
-    }
-
-    // Safe to cast after validation
-    let len = len_u32 as usize;
-
-    // Allocate buffer (size is now validated)
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .context("Failed to read message body")?;
-
+    let buf = read_frame(recv).await?;
     let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
     // Return total bytes: 4 (length prefix) + message body
-    Ok((msg, 4 + len))
+    Ok((msg, 4 + buf.len()))
 }
 
 /// Helper for writing length-prefixed messages with negotiated encoding
