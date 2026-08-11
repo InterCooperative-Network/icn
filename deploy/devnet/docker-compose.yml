@@ -1,5 +1,41 @@
 version: '3.8'
 
+# QR login on this devnet (#2569)
+#
+# Scope: `POST /v1/sessions` only. SDIS enrollment is NOT reachable on this profile and
+# these variables do not change that — `/v1/sdis/enrollment/*` is mounted only when
+# ICN_ENABLE_SELF_SERVE_ENROLLMENT=true (crates/icn-gateway/src/server.rs), which no
+# shipped composition sets, including this one. Those paths return 404 (or 401 on
+# scope fallthrough) because the routes do not exist here, not 503 for a missing origin.
+#
+# QR login embeds a `gateway_url` in QR material that a *second device* — a phone —
+# posts its bearer credential to. So the origin has to be one that phone can actually
+# reach, and it is an operator assertion, never inferred from a request header or the
+# bind address. There is no honest static default here: each node is published on a
+# different host port (8080/8081/8082) and the host itself is unknown, while
+# `localhost` names the phone, not this machine.
+#
+# So each node takes its own origin variable, and each defaults to empty. Empty is
+# treated exactly like unset: QR issuance fails closed with 503 and logs why, and the
+# rest of the devnet (gossip, ledger, governance, the protocol tests this profile
+# exists for) is unaffected. Set them only if you are driving a QR flow:
+#
+#   ICN_DEVNET_NODE_A_ORIGIN=http://192.0.2.10:8080 \
+#   ICN_DEVNET_NODE_B_ORIGIN=http://192.0.2.10:8081 \
+#   ICN_DEVNET_NODE_C_ORIGIN=http://192.0.2.10:8082 \
+#     docker compose up -d
+#
+# Use this host's LAN address, not localhost. The value is validated at use time
+# (absolute http/https origin, no userinfo, path, query, or fragment).
+#
+# Invite links are deliberately NOT configured here. `POST /v1/invites` returns an
+# `invite_url` of the form `{ICN_INVITE_BASE_URL}/join?code=...`, which is a human-facing
+# UI destination, not a gateway API origin. This profile serves no member UI at all — the
+# only web surface below is Grafana, which happens to occupy port 3000 — so there is no
+# honest origin to name, and inventing one would advertise a route nothing here serves.
+# Setting GATEWAY_BASE_URL above cannot affect invite links: the two authorities are
+# separate variables (see crates/icn-gateway/src/api/invites.rs).
+
 services:
   node-a:
     image: icn:latest
@@ -12,6 +48,8 @@ services:
       - ICN_NODE_NAME=node-a
       - ICN_DATA_DIR=/data/node-a
       - ICN_GATEWAY_PORT=8080
+      # Advertised origin for QR material — see the header note. Empty = QR off (503).
+      - GATEWAY_BASE_URL=${ICN_DEVNET_NODE_A_ORIGIN:-}
       - ICN_P2P_PORT=9000
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=
@@ -51,6 +89,8 @@ services:
       - ICN_NODE_NAME=node-b
       - ICN_DATA_DIR=/data/node-b
       - ICN_GATEWAY_PORT=8080
+      # Advertised origin for QR material — see the header note. Empty = QR off (503).
+      - GATEWAY_BASE_URL=${ICN_DEVNET_NODE_B_ORIGIN:-}
       - ICN_P2P_PORT=9000
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000
@@ -93,6 +133,8 @@ services:
       - ICN_NODE_NAME=node-c
       - ICN_DATA_DIR=/data/node-c
       - ICN_GATEWAY_PORT=8080
+      # Advertised origin for QR material — see the header note. Empty = QR off (503).
+      - GATEWAY_BASE_URL=${ICN_DEVNET_NODE_C_ORIGIN:-}
       - ICN_P2P_PORT=9000
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000,icn://node-b:9000

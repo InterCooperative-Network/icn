@@ -54,7 +54,7 @@ use tokio::sync::RwLock;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::api::sessions::get_gateway_url;
+use crate::advertised_origin::advertised_origin;
 use crate::error::{GatewayError, Result};
 use crate::session_authority::SessionAuthority;
 use crate::steward_mgr::StewardManager;
@@ -280,10 +280,14 @@ pub struct CompleteEnrollmentResponse {
 /// POST /enrollment/start
 #[post("/enrollment/start")]
 pub async fn start_enrollment(
-    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
     req: web::Json<StartEnrollmentRequest>,
 ) -> Result<HttpResponse> {
+    // The enrollment QR is scanned by a second device, so its origin carries the same
+    // credential-destination authority as the QR-login one and comes from the same
+    // operator-owned source (#2569). Resolved before any enrollment state is allocated.
+    let gateway_url = advertised_origin()?;
+
     let enrollment_id = Uuid::new_v4().to_string();
     let verification_code = generate_verification_code();
     let now = icn_time::current_timestamp_secs();
@@ -294,7 +298,7 @@ pub async fn start_enrollment(
         "type": "icn-enrollment",
         "enrollment_id": enrollment_id,
         "challenge": base64::Engine::encode(&base64::engine::general_purpose::STANDARD, enrollment_id.as_bytes()),
-        "gateway_url": get_gateway_url(&http_req)
+        "gateway_url": gateway_url
     });
 
     // Create enrollment session
@@ -1332,6 +1336,11 @@ pub(crate) fn authorize_steward_act(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The crate's single test-time origin authority. Under `cfg(test)` the advertised origin
+    // resolves from a module-private thread-local rather than the process environment, so this
+    // guard pins a per-test value and no env locking is needed here (#2569).
+    use crate::advertised_origin::test_env::EnvGuard;
     use actix_web::App;
 
     #[test]
@@ -1355,11 +1364,18 @@ mod tests {
         });
     }
 
+    /// Replaces `test_start_enrollment_uses_request_gateway_url`, which asserted that a
+    /// request-supplied `Host` became the enrollment QR's `gateway_url`. That behaviour is the
+    /// #2569 vulnerability, not a feature: the enrollment QR is scanned by a second device, so
+    /// a caller-chosen `Host` chose where that device would send authenticated traffic. The
+    /// authority now comes only from `GATEWAY_BASE_URL`.
+    ///
+    /// Endpoint-level authority coverage (hostile headers across trusted and untrusted peers,
+    /// malformed configuration, fail-closed) lives in
+    /// `tests/qr_gateway_url_authority.rs`; this keeps the in-module happy path honest.
     #[actix_web::test]
-    async fn test_start_enrollment_uses_request_gateway_url() {
-        // Ensure env-based overrides do not short-circuit the request-derived path.
-        std::env::remove_var("GATEWAY_BASE_URL");
-        std::env::remove_var("TRUSTED_PROXY_IPS");
+    async fn test_start_enrollment_advertises_configured_origin_not_request_host() {
+        let _guard = EnvGuard::acquire(Some("https://gateway.example.coop"));
 
         let app = actix_web::test::init_service(
             App::new()
@@ -1377,12 +1393,15 @@ mod tests {
 
         let body = actix_web::test::call_and_read_body(&app, req).await;
         let resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let qr = resp["qr_code"].as_str().unwrap();
+
         assert!(
-            resp["qr_code"]
-                .as_str()
-                .unwrap()
-                .contains("\"gateway_url\":\"http://192.0.2.10:30080\""),
-            "qr payload should advertise the current request gateway"
+            qr.contains("\"gateway_url\":\"https://gateway.example.coop\""),
+            "qr payload must advertise the operator origin, got {qr}"
+        );
+        assert!(
+            !qr.contains("192.0.2.10"),
+            "the request Host must not reach a device-facing QR payload"
         );
     }
 

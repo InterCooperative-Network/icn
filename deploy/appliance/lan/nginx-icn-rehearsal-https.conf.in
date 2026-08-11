@@ -43,7 +43,17 @@ server {
     location /v1/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
+        # ASSERT the operator's authority, do not RELAY the caller's. This server is
+        # `default_server`, so it answers for any Host; `$host` would forward a
+        # caller-chosen value to a gateway that trusts loopback, laundering attacker
+        # authority through this proxy's trust (#2569 — the same class as #2567, one
+        # header over). The gateway no longer derives QR authority from any header
+        # (GATEWAY_BASE_URL is the sole source), so this is defence in depth.
+        proxy_set_header Host @LAN_HOST@;
+        # Assert the scheme from nginx's own connection state: TLS terminates here and
+        # the upstream hop is plaintext loopback, so without this anything reading
+        # forwarded proto would conclude "http" on a TLS deployment.
+        proxy_set_header X-Forwarded-Proto $scheme;
         # The gateway trusts loopback to assert forwarding metadata, so this proxy MUST
         # assert it. $proxy_add_x_forwarded_for appends the address nginx actually saw;
         # the gateway reads the rightmost untrusted hop, discarding anything the caller

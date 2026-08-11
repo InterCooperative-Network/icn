@@ -30,7 +30,8 @@ use icn_identity::IdentityBundle;
 const UNTRUSTED_PEER: &str = "198.51.100.42:54321";
 
 /// Loopback is trusted to assert forwarding metadata when `TRUSTED_PROXY_IPS` is unset,
-/// matching the existing `get_gateway_url` gate in `api/sessions.rs`.
+/// per `crate::client_ip`. That trust covers rate-limit identity only — it does not extend to
+/// the origin advertised in QR material, which is operator-configured (#2569).
 const TRUSTED_PEER: &str = "127.0.0.1:54321";
 
 /// `IpRateLimiter::new_for_auth` has capacity 20 and refills 2 tokens/second. An in-process

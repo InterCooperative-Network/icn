@@ -3,7 +3,7 @@
 # ICN_APPLIANCE_LAN_PROFILE=1. Sorts AFTER 20-demo-profile.conf, so its
 # last-assignment-wins directives override the demo profile's.
 #
-# Two overrides, both load-bearing for the single-origin security posture:
+# Three overrides, all load-bearing for the single-origin security posture:
 #
 # 1. Gateway bind 127.0.0.1:8080 (the demo drop-in binds 0.0.0.0:8080).
 #    On a bridged LAN VM, 0.0.0.0 makes the dev gateway — which runs with
@@ -23,7 +23,21 @@
 #    loopback set PLUS the single LAN origin the reverse proxy serves. Exact
 #    scheme://host[:port] matches only — the gateway's CORS matcher does no
 #    wildcarding (crates/icn-gateway/src/security.rs).
+#
+# 3. GATEWAY_BASE_URL is the operator's assertion of the origin a *second
+#    device* can reach this appliance at. QR login and enrollment embed it in
+#    the QR payload, and the scanning phone posts its bearer credential to it
+#    (examples/mobile-app/.../QRScannerScreen.tsx), so it is a credential
+#    destination and must be operator-owned (#2569). Two reasons it cannot be
+#    inferred at request time:
+#      - the gateway is bound to 127.0.0.1 by override 1, so nothing about the
+#        connection describes a LAN-reachable origin; and
+#      - nginx below is `default_server`, so a caller-chosen Host reaches the
+#        gateway over loopback wearing this host's proxy trust.
+#    @LAN_ORIGIN@ is the same already-validated, already-canonicalized origin
+#    used for CORS above, so this adds no new configuration surface.
 [Service]
 ExecStart=
 ExecStart=/usr/local/bin/icnd --data-dir /var/lib/icn --gateway-enable --gateway-bind 127.0.0.1:8080
 Environment=ICN_CORS_ORIGINS=http://localhost:8090,http://127.0.0.1:8090,http://localhost:18090,http://127.0.0.1:18090,@LAN_ORIGIN@
+Environment=GATEWAY_BASE_URL=@LAN_ORIGIN@

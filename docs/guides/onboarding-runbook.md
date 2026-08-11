@@ -63,6 +63,19 @@ curl -X POST http://localhost:8080/v1/invites \
 # Returns: { "invite_code": "abc123...", "invite_url": "https://..." }
 ```
 
+> **`invite_url` needs a member UI you run yourself.** It is built as
+> `{ICN_INVITE_BASE_URL}/join?code=…`, a human-facing browser destination — a different
+> authority from `GATEWAY_BASE_URL`, which is the gateway API origin devices post to. Setting
+> the gateway origin does not and must not change this link (#2569).
+>
+> No composition shipped in this repository serves `GET /join?code=…`. The redemption path that
+> does exist is `POST /v1/invites/join`, which carries the code in the request body, and the
+> pilot UI collects that code from a typed form. So unless you run a member UI implementing a
+> `/join` route and point `ICN_INVITE_BASE_URL` at it, hand the recipient the `invite_code` and
+> have them enter it in the UI rather than sending them `invite_url`. Unset, the link falls back
+> to `http://localhost:3000`, which is local-development only and not reachable from another
+> device.
+
 ### Post-join admin steps
 
 After the person joins, assign them to committees:

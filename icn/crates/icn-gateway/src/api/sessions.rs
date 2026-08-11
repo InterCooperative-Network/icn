@@ -47,90 +47,13 @@ const WEB_SESSION_SCOPE_CEILING: &[&str] = &[
 /// Extract client IP address from request (for rate limiting).
 ///
 /// SECURITY: `X-Forwarded-For` is honoured only when the immediate transport peer is a
-/// trusted proxy; otherwise the socket peer is the client (#2567). This is the same
-/// allowlist [`get_gateway_url`] gates `X-Forwarded-*` on, via
-/// [`crate::client_ip::is_trusted_proxy`].
+/// trusted proxy; otherwise the socket peer is the client (#2567). See [`crate::client_ip`].
+///
+/// That trust is scoped to *rate-limit identity* and nothing else. It does not extend to the
+/// origin advertised in QR material — see [`crate::advertised_origin`], which takes no request
+/// at all (#2569).
 fn get_client_ip(req: &HttpRequest) -> String {
     crate::client_ip::client_ip_key(req)
-}
-
-/// Get gateway base URL from environment or request headers
-/// Handles reverse proxy scenarios (K8s ingress, Cloudflare, nginx, etc.)
-///
-/// **Security**: Pinned GATEWAY_BASE_URL prevents X-Forwarded-* header spoofing.
-/// If GATEWAY_BASE_URL is not set, X-Forwarded-* headers are only trusted if the
-/// request comes from a trusted proxy IP (configured via TRUSTED_PROXY_IPS).
-pub(crate) fn get_gateway_url(req: &HttpRequest) -> String {
-    // First try environment variable (recommended for production)
-    // This takes precedence over all headers to prevent spoofing
-    if let Ok(url) = std::env::var("GATEWAY_BASE_URL") {
-        return url;
-    }
-
-    // Check if the request came from a trusted proxy.
-    // One trust model for the whole gateway — see `crate::client_ip` for the semantics of
-    // TRUSTED_PROXY_IPS (exact addresses, comma-separated, loopback by default).
-    let is_trusted_proxy = req
-        .peer_addr()
-        .is_some_and(|peer_addr| crate::client_ip::is_trusted_proxy(peer_addr.ip()));
-
-    // Only trust X-Forwarded-* headers if from a trusted proxy
-    if is_trusted_proxy {
-        // Determine scheme from X-Forwarded-Proto (set by reverse proxies)
-        let scheme = req
-            .headers()
-            .get("x-forwarded-proto")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_else(|| {
-                // Check if connection is secure
-                if req.connection_info().scheme() == "https" {
-                    "https"
-                } else {
-                    "http"
-                }
-            });
-
-        // Get host from X-Forwarded-Host (reverse proxy) or Host header
-        let host = req
-            .headers()
-            .get("x-forwarded-host")
-            .and_then(|v| v.to_str().ok())
-            .or_else(|| req.headers().get("host").and_then(|v| v.to_str().ok()));
-
-        if let Some(h) = host {
-            // Strip port for standard ports
-            let clean_host = if (scheme == "https" && h.ends_with(":443"))
-                || (scheme == "http" && h.ends_with(":80"))
-            {
-                h.split(':').next().unwrap_or(h)
-            } else {
-                h
-            };
-            return format!("{scheme}://{clean_host}");
-        }
-    } else if req.headers().contains_key("x-forwarded-for")
-        || req.headers().contains_key("x-forwarded-host")
-    {
-        // Untrusted proxy detected - log warning
-        tracing::warn!(
-            peer_addr = ?req.peer_addr(),
-            "Rejecting X-Forwarded-* headers from untrusted source. \
-             Set GATEWAY_BASE_URL or TRUSTED_PROXY_IPS to enable proxied QR login."
-        );
-    }
-
-    // Fallback: derive from connection info (direct connection only)
-    let scheme = if req.connection_info().scheme() == "https" {
-        "https"
-    } else {
-        "http"
-    };
-
-    if let Some(host) = req.headers().get("host").and_then(|v| v.to_str().ok()) {
-        format!("{scheme}://{host}")
-    } else {
-        "http://localhost:8080".to_string()
-    }
 }
 
 // ============================================================================
@@ -155,14 +78,16 @@ pub async fn create_session(
     // Validate coop_id
     validation::validate_coop_id(&req.coop_id)?;
 
+    // The origin a scanning device will send its bearer credential to. Resolved BEFORE the
+    // session is allocated: an unadvertisable session is useless, and minting one per refused
+    // request would let an unauthenticated caller accumulate session state (#2569).
+    let gateway_url = crate::advertised_origin::advertised_origin()?;
+
     // Create session
     let session = session_mgr
         .create_session(req.coop_id.clone())
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to create session: {e}")))?;
-
-    // Get gateway URL for QR data
-    let gateway_url = get_gateway_url(&http_req);
 
     let qr_data = SessionQrData {
         session_id: session.session_id.clone(),
@@ -338,33 +263,61 @@ mod tests {
     use super::*;
     use actix_web::{test, App};
 
+    // The crate's single test-time origin authority. Under `cfg(test)` the advertised origin
+    // resolves from a module-private thread-local rather than the process environment, so this
+    // guard pins a per-test value and no env locking is needed here (#2569).
+    use crate::advertised_origin::test_env::EnvGuard;
+
+    /// Builds the `/sessions` app under test.
+    macro_rules! session_app {
+        () => {
+            test::init_service(
+                App::new()
+                    .app_data(web::Data::new(Arc::new(SessionManager::new())))
+                    .app_data(web::Data::new(Arc::new(IpRateLimiter::new_for_auth())))
+                    .service(web::scope("/sessions").service(create_session)),
+            )
+            .await
+        };
+    }
+
+    fn create_request() -> actix_http::Request {
+        test::TestRequest::post()
+            .uri("/sessions")
+            .set_json(&CreateSessionRequest {
+                coop_id: "test-coop".to_string(),
+            })
+            .to_request()
+    }
+
     #[actix_web::test]
     async fn test_create_session() {
-        let session_mgr = Arc::new(SessionManager::new());
-        let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+        // QR issuance requires an operator-authoritative origin (#2569); this test previously
+        // relied on one being inferred from the request.
+        let _env = EnvGuard::acquire(Some("https://gateway.example.coop"));
+        let app = session_app!();
 
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(session_mgr))
-                .app_data(web::Data::new(ip_limiter))
-                .service(web::scope("/sessions").service(create_session)),
-        )
-        .await;
-
-        let req_body = CreateSessionRequest {
-            coop_id: "test-coop".to_string(),
-        };
-
-        let req = test::TestRequest::post()
-            .uri("/sessions")
-            .set_json(&req_body)
-            .to_request();
-
-        let resp: CreateSessionResponse = test::call_and_read_body_json(&app, req).await;
+        let resp: CreateSessionResponse =
+            test::call_and_read_body_json(&app, create_request()).await;
 
         assert_eq!(resp.session_id.len(), 64); // 32 bytes hex
         assert_eq!(resp.qr_data.coop_id, "test-coop");
-        assert!(!resp.qr_data.gateway_url.is_empty());
+        assert_eq!(resp.qr_data.gateway_url, "https://gateway.example.coop");
+    }
+
+    /// Without a configured origin there is nothing safe to advertise to a scanning device, so
+    /// the session is refused rather than issued with an inferred authority (#2569).
+    /// Header-level authority coverage lives in `tests/qr_gateway_url_authority.rs`.
+    #[actix_web::test]
+    async fn test_create_session_fails_closed_without_configured_origin() {
+        let _env = EnvGuard::acquire(None);
+        let app = session_app!();
+
+        let resp = test::call_service(&app, create_request()).await;
+        assert_eq!(
+            resp.status(),
+            actix_web::http::StatusCode::SERVICE_UNAVAILABLE
+        );
     }
 
     #[actix_web::test]

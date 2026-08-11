@@ -98,6 +98,10 @@ fn mint(authority: &SessionAuthority, did: &Did, coop: &str, scope_list: &[&str]
 /// mount flags and the app data the enrollment handlers resolve.
 macro_rules! sdis_app {
     ($authority:expr, $trust:expr, $flags:expr) => {{
+        // Mounting the enrollment tree is the last point before a request can reach
+        // `/v1/sdis/enrollment/start`, so the advertised origin is established here rather
+        // than in each test body — see `ensure_advertised_origin`.
+        ensure_advertised_origin();
         test::init_service(
             App::new()
                 .app_data(web::Data::new($authority.clone()))
@@ -696,6 +700,10 @@ async fn no_credential_is_minted_when_a_required_write_fails() {
     let trust = Arc::new(TrustManager::new());
     let store = Arc::new(EnrollmentStore::new());
 
+    // Same rule as `sdis_app!`: this assembles the enrollment tree, so it owns the
+    // precondition too. This case only drives `/enrollment/complete`, but the mounted
+    // tree includes `/enrollment/start` and the next edit here should not have to notice.
+    ensure_advertised_origin();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(authority.clone()))
@@ -773,4 +781,25 @@ async fn no_credential_is_minted_when_a_required_write_fails() {
             .is_none(),
         "no membership may be reported: {body}"
     );
+}
+
+/// Enrollment initiation issues a device-facing QR, whose `gateway_url` requires an
+/// operator-authoritative origin (#2569). These tests are about containment and route
+/// authority, not QR authority, so they only need a valid origin to exist.
+///
+/// **Called from app assembly, never from a test body.** An earlier revision left this to
+/// each test to remember, and `legitimate_enrollment_still_completes` did not: it drives
+/// `/v1/sdis/enrollment/start` through `run_enrollment` and passed only when some sibling
+/// test had already set the variable. Run alone it returned 503 against an expected 200 — a
+/// suite that was green while that case proved nothing. Assembling the app is the one step
+/// no test can skip and still issue a request, so the precondition lives there.
+///
+/// `Once` rather than an idempotent `set_var`: libtest runs these tests on many threads, and
+/// re-writing on every call means a write can overlap a handler thread's read of the same
+/// variable. One write, and `call_once` gives every later caller a happens-before edge to it.
+fn ensure_advertised_origin() {
+    static CONFIGURED: std::sync::Once = std::sync::Once::new();
+    CONFIGURED.call_once(|| {
+        std::env::set_var("GATEWAY_BASE_URL", "https://gateway.example.coop");
+    });
 }
