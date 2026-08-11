@@ -604,6 +604,11 @@ impl NetworkActor {
                     // anchor-keyed limits stay where they were, below the decode: that traffic is
                     // attributable to a proven identity, and #2558 is about work performed for a
                     // peer that has not proven one.
+                    //
+                    // The operand order is load-bearing, not stylistic. `check_pre_auth_rate_limit`
+                    // *consumes* a token, so it must stay last: `&&` short-circuits, and the two
+                    // guards ahead of it are what keep an incomplete frame and an authenticated
+                    // peer from being charged. Reordering this spends tokens on both.
                     if frame.is_ok()
                         && authenticated.is_none()
                         && !ctx.check_pre_auth_rate_limit().await
