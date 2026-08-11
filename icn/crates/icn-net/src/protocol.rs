@@ -1066,27 +1066,38 @@ async fn read_frame(recv: &mut quinn::RecvStream) -> Result<Vec<u8>> {
     // Safe to cast after validation
     let len = len_u32 as usize;
 
-    // Reserve nothing up front: capacity is only ever taken *after* a step has actually been
-    // read, so a peer that declares a frame and then goes silent holds no buffer at all.
-    // `read_exact` per step means a truncated frame still fails on the step that runs short,
-    // exactly as a single `read_exact` over the whole body did.
+    // Reserve nothing up front, and keep no scratch buffer: `read_chunk` hands back only the
+    // bytes that have actually arrived, so nothing here is sized by the declaration. A fixed
+    // scratch array would instead live inline in every suspended connection future, charging
+    // idle unauthenticated connections a constant cost before a single body byte exists —
+    // which is the same defect one level down.
+    //
+    // A stream that ends before the declared length yields `None`, so a truncated frame is
+    // still an error, exactly as a single `read_exact` over the whole body was.
     let mut buf: Vec<u8> = Vec::new();
-    let mut step = [0u8; FRAME_READ_STEP];
     while buf.len() < len {
         let want = (len - buf.len()).min(FRAME_READ_STEP);
-        recv.read_exact(&mut step[..want])
+        let chunk = recv
+            .read_chunk(want, true)
             .await
-            .context("Failed to read message body")?;
+            .context("Failed to read message body")?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to read message body: stream ended after {} of {len} bytes",
+                    buf.len()
+                )
+            })?;
 
         // Grow geometrically — so a large frame still costs amortised O(n) copying rather than
-        // one realloc per step — but never past the declared length. Letting
+        // one realloc per chunk — but never past the declared length. Letting
         // `extend_from_slice` pick the growth would round a 10 MiB frame up to a 16 MiB
         // capacity, i.e. *more* than the eager allocation this replaces.
-        if buf.capacity() < buf.len() + want {
-            let target = frame_capacity_target(buf.capacity(), len);
+        let arrived = chunk.bytes.len();
+        if buf.capacity() < buf.len() + arrived {
+            let target = frame_capacity_target(buf.capacity(), len).max(buf.len() + arrived);
             buf.reserve_exact(target - buf.len());
         }
-        buf.extend_from_slice(&step[..want]);
+        buf.extend_from_slice(&chunk.bytes);
     }
 
     Ok(buf)
