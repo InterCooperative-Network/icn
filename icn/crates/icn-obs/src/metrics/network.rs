@@ -41,7 +41,7 @@ pub fn init_descriptions() {
     // Two-phase inbound rate limiting (Issue #2491)
     describe_counter!(
         "icn_network_messages_rate_limited_pre_auth_total",
-        "Total number of messages denied by an anonymous pre-authentication budget before any peer identity was bound to the connection, by which budget refused (connection or source)"
+        "Total number of messages denied by an anonymous pre-authentication budget before any peer identity was bound to the connection, by which budget refused (connection, source, or shared_fallback when the per-source table is full)"
     );
     describe_counter!(
         "icn_network_messages_rate_limited_by_rate_total",
@@ -253,12 +253,18 @@ pub fn messages_rate_limited_inc() {
 /// this counter is anonymous traffic that never got as far as saying who it was, and a
 /// sustained rise in it is a load signal rather than a configuration one.
 ///
-/// `bound` says which budget refused, and is the **only** label here on purpose (#2558). An
-/// inbound connection spends two: its own burst (#2491) and the one shared by everything from
-/// its source (#2549). Unlabelled, this counter could not separate a single connection
-/// exhausting its own allowance from an address whose whole allowance is gone — conditions that
-/// look identical here and want different responses. The value comes from the closed two-value
-/// set `PreAuthRefusal::as_str`, so nothing a remote peer sends can add a series.
+/// `bound` says which budget refused, and is the **only** label here on purpose (#2558, #2576).
+/// Three closed values, each wanting a different response:
+///
+/// - `connection` — this connection's own anonymous burst (#2491). One peer, one session.
+/// - `source` — this source's own tracked allowance (#2549). One address, and on a NAT that is
+///   everyone behind it.
+/// - `shared_fallback` — the budget table had no room to track this source, so it spends from the
+///   bucket they all share, and that is empty (#2576). A statement about *this node's table*: no
+///   single address can drive it, and the response is capacity, not a peer.
+///
+/// Unlabelled, this counter separated none of them. The value comes from the closed set
+/// `PreAuthRefusal::as_str`, so nothing a remote peer sends can add a series.
 ///
 /// The labels this still deliberately does not carry — the remote address and the source key —
 /// are unbounded and attacker-chosen, which is the same mistake at the metrics layer that #2491
@@ -267,12 +273,14 @@ pub fn messages_rate_limited_inc() {
 /// this refusal happens before the frame is decoded (#2558), so at this point the message has
 /// not said who it claims to be.
 ///
-/// Two readings `bound="source"` does **not** support. It does not mean a source token was spent —
-/// the connection's token was, and the source's was not (see `PreAuthBudget::check`). And it does
-/// not always mean *one address* has spent its allowance: when the budget table is saturated,
-/// untracked sources share a single fallback bucket whose exhaustion is counted here too. Pair it
-/// with `icn_network_preauth_source_budget_degraded_total`, which is non-zero exactly in that
-/// overload mode, before reading a rise here as one noisy address or NAT.
+/// One reading no value here supports: that a token was spent in the budget that refused. It was
+/// not — a refused `try_consume` takes nothing. `source` and `shared_fallback` both mean the
+/// *connection's* token was spent and the source-scoped one was not (see `PreAuthBudget::check`).
+///
+/// `shared_fallback` rises together with `icn_network_preauth_source_budget_degraded_total`, which
+/// counts every spend down that path whether refused or not, and with
+/// `icn_network_preauth_source_budget_tracked` sitting at its ceiling. Those two answer "how long
+/// has the table been full"; this one answers "what did it cost".
 ///
 /// (Distinguishing the *other* rate-limit counter's causes — policy denial versus throttling on
 /// `messages_rate_limited_total` — is #2499's subject, not this one's.)
