@@ -505,6 +505,32 @@ fn source_refill_rate_per_interval() -> f64 {
         / PREAUTH_SOURCE_RENEWAL_WINDOW.as_secs_f64()
 }
 
+/// Which of [`SourcePreAuthBudget`]'s two buckets refused a spend (#2576).
+///
+/// The table tracks a bucket per source until it runs out of room; past that, everything it could
+/// not track spends from one shared bucket. Both refusals used to leave `spend` as a bare `false`,
+/// so both were reported as a per-source refusal — and an operator reading that reaches for the
+/// response to one noisy address when the actual condition is a table with no room left, which
+/// wants a capacity response instead.
+///
+/// Two variants and no payload, so it is admissible as a metric label for the same reason
+/// [`PreAuthRefusal`] and [`crate::preauth_admission::AdmissionRefusal`] are: the value set is
+/// closed in this file and nothing a remote peer sends can add to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceRefusal {
+    /// This source's own tracked bucket is spent.
+    ///
+    /// Also what a source gets on the spend that first tracks it — the table had room, which is
+    /// exactly the difference this variant carries.
+    PerSource,
+    /// The single bucket shared by every source the table had no room to track.
+    ///
+    /// Says nothing about how much *this* source has spent: its neighbours' spending drains the
+    /// same bucket. Accompanied by `icn_network_preauth_source_budget_degraded_total`, which
+    /// counts every spend through this path, permitted or not.
+    SharedFallback,
+}
+
 /// The anonymous-message allowance of every source this endpoint has heard from recently.
 ///
 /// One of these per endpoint, created with the accept loop and shared by every inbound
@@ -660,14 +686,29 @@ impl SourcePreAuthBudget {
     /// given it. So there is still nothing to gain by filling the table — but "being untracked is
     /// never better than being tracked", which this doc used to claim outright, is false at the
     /// moment of promotion.
-    pub fn spend(&self, key: SourceKey) -> bool {
+    /// `Err` names *which* of the two buckets refused (#2576), because they mean different things
+    /// to an operator: `PerSource` is one address that has spent its own allowance, `SharedFallback`
+    /// is the table having no room to track it at all. Reported as one value they read alike, and
+    /// the first invites a NAT/single-source response to what is actually a capacity problem.
+    ///
+    /// The distinction is about *attribution only*. Which bucket is consulted, in what order, and
+    /// what a spend costs are all unchanged.
+    ///
+    /// Each branch names its own bucket where it consults it, rather than the caller inferring one
+    /// afterwards from table occupancy. Those can disagree: a sweep between the spend and the
+    /// report frees slots without changing which bucket answered, so a later reading would explain
+    /// a past decision with a present fact.
+    pub fn spend(&self, key: SourceKey) -> Result<(), SourceRefusal> {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         if let Some(bucket) = state.per_source.get_mut(&key) {
-            return bucket.try_consume();
+            return bucket
+                .try_consume()
+                .then_some(())
+                .ok_or(SourceRefusal::PerSource);
         }
 
         if state.per_source.len() >= state.max_sources {
@@ -675,7 +716,11 @@ impl SourcePreAuthBudget {
         }
         if state.per_source.len() >= state.max_sources {
             icn_obs::metrics::network::preauth_source_budget_degraded_inc();
-            return state.shared.try_consume();
+            return state
+                .shared
+                .try_consume()
+                .then_some(())
+                .ok_or(SourceRefusal::SharedFallback);
         }
 
         let mut bucket = state.fresh_bucket();
@@ -684,7 +729,9 @@ impl SourcePreAuthBudget {
         // Published from the two places the table can change size — here and the sweep above —
         // rather than from the caller, so no exit path can leave it stale.
         icn_obs::metrics::network::preauth_source_budget_tracked_set(state.per_source.len());
-        allowed
+        // A bucket this call just inserted is this source's own, not the fallback: the table had
+        // room, which is the whole difference the two variants carry.
+        allowed.then_some(()).ok_or(SourceRefusal::PerSource)
     }
 
     /// Rewind every bucket so the table believes `d` has elapsed.
@@ -783,7 +830,7 @@ pub enum PreAuthBudget {
 /// behind an address — and #2558 lists not being able to separate them as what would make any new
 /// bound hard to operate.
 ///
-/// Two variants and no payload, deliberately. It is admissible as a metric label for exactly the
+/// Three variants and no payload, deliberately. It is admissible as a metric label for exactly the
 /// reason [`crate::preauth_admission::AdmissionRefusal`] is: the value set is closed in this file,
 /// so nothing a remote peer sends can add a series.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -793,34 +840,56 @@ pub enum PreAuthRefusal {
     /// Reported without the source budget having been consulted at all — see
     /// [`PreAuthBudget::check`].
     Connection,
-    /// The source-scoped budget refused (#2549).
+    /// This source's own tracked allowance is spent (#2549).
     ///
     /// The connection's own token was already taken to reach this — see [`PreAuthBudget::check`].
     ///
-    /// "Source-scoped" is not always "this source's own". When the budget table is saturated and a
-    /// sweep frees nothing, untracked sources spend from a single shared fallback bucket
-    /// ([`SourcePreAuthBudget::spend`]), and its exhaustion is reported here too — so in that
-    /// overload mode this does **not** mean one address has spent its allowance. The two are
-    /// deliberately one label: #2558 asked to separate the per-connection bound from the
-    /// per-source one, and both of these are the per-source one. They do want different responses,
-    /// which is why the overload mode has its own signal — read this alongside
-    /// `icn_network_preauth_source_budget_degraded_total`, which is non-zero exactly when spends
-    /// are going through that fallback, and the `icn_network_preauth_source_budget_tracked` gauge
-    /// sitting at `MAX_PREAUTH_BUDGET_SOURCES`. Promoting the fallback to its own attribution is a
-    /// separate change to `spend`'s signature and is tracked separately.
+    /// Means what it says since #2576: the budget table had a bucket for *this* source and that
+    /// bucket is empty. The saturated-table case is [`Self::SharedFallback`] and no longer arrives
+    /// here.
     Source,
+    /// The budget table had no room for this source, and the bucket they all share is spent
+    /// (#2576).
+    ///
+    /// A statement about *this node's table*, not about the peer. One address cannot drive this on
+    /// its own — it takes more distinct sources than `MAX_PREAUTH_BUDGET_SOURCES` with allowances
+    /// still in flight — so the response is capacity, not a NAT. Rises together with
+    /// `icn_network_preauth_source_budget_degraded_total`, which counts every spend down this path
+    /// whether or not it was refused, and with the
+    /// `icn_network_preauth_source_budget_tracked` gauge sitting at its ceiling.
+    ///
+    /// Per-source fairness is what degrades here; the aggregate bound does not. Every untracked
+    /// source together still gets at most one source's worth — see [`SourcePreAuthBudget::spend`].
+    SharedFallback,
 }
 
 impl PreAuthRefusal {
     /// A short, bounded label for logs and metrics.
     ///
-    /// Deliberately a fixed set of two strings, for the same reason
+    /// Deliberately a fixed set of three strings, for the same reason
     /// [`crate::preauth_admission::AdmissionRefusal::as_str`] is: it is safe as a metric label
-    /// precisely because nothing an attacker sends can add a new value.
+    /// precisely because nothing an attacker sends can add a new value. They are pinned distinct
+    /// by `every_refusal_label_is_distinct` — collapsing two onto one string would lose a
+    /// distinction the counter is the only place to see.
     pub fn as_str(self) -> &'static str {
         match self {
             PreAuthRefusal::Connection => "connection",
             PreAuthRefusal::Source => "source",
+            PreAuthRefusal::SharedFallback => "shared_fallback",
+        }
+    }
+}
+
+impl From<SourceRefusal> for PreAuthRefusal {
+    /// Carry the source budget's own attribution up to the gate unchanged.
+    ///
+    /// A total mapping rather than a judgement call: each of `spend`'s buckets has exactly one
+    /// label, so there is nowhere for the distinction to be lost between the bucket that refused
+    /// and the counter that reports it.
+    fn from(refusal: SourceRefusal) -> Self {
+        match refusal {
+            SourceRefusal::PerSource => PreAuthRefusal::Source,
+            SourceRefusal::SharedFallback => PreAuthRefusal::SharedFallback,
         }
     }
 }
@@ -843,8 +912,12 @@ impl PreAuthBudget {
     /// `a_spent_connection_does_not_charge_its_source` exists to forbid.
     ///
     /// What a refusal does **not** say is that a token was spent in the bucket that refused: a
-    /// refused `TokenBucket::try_consume` takes nothing. `Source` in particular means the
-    /// *connection* was charged and the source was not.
+    /// refused `TokenBucket::try_consume` takes nothing. `Source` and `SharedFallback` in
+    /// particular both mean the *connection* was charged and the source-scoped bucket was not.
+    ///
+    /// The source-scoped half reports which of its own two buckets refused (#2576) and this
+    /// forwards that verdict rather than re-deriving it, so a saturated table cannot be mistaken
+    /// here for one address spending its allowance.
     pub async fn check(&self) -> Result<(), PreAuthRefusal> {
         match self {
             Self::Source {
@@ -855,10 +928,7 @@ impl PreAuthBudget {
                 if !connection.check().await {
                     return Err(PreAuthRefusal::Connection);
                 }
-                if !budget.spend(*key) {
-                    return Err(PreAuthRefusal::Source);
-                }
-                Ok(())
+                budget.spend(*key).map_err(PreAuthRefusal::from)
             }
             Self::Connection(limiter) => {
                 if limiter.check().await {
@@ -2117,7 +2187,7 @@ mod source_budget_tests {
     /// Spend until refused, and report how many went through.
     fn drain(budget: &SourcePreAuthBudget, k: SourceKey) -> usize {
         let mut spent = 0;
-        while budget.spend(k) {
+        while budget.spend(k).is_ok() {
             spent += 1;
             assert!(spent < 10_000, "bucket never refused; it is not bounded");
         }
@@ -2137,7 +2207,7 @@ mod source_budget_tests {
             8,
             "the first allowance is the whole burst"
         );
-        assert!(!budget.spend(k), "and it does not renew instantly");
+        assert!(budget.spend(k).is_err(), "and it does not renew instantly");
 
         // Half a renewal window returns half the burst, not all of it.
         budget.advance(Duration::from_millis(500));
@@ -2182,7 +2252,7 @@ mod source_budget_tests {
         let budget = table(4.0, 16);
         assert_eq!(drain(&budget, key("203.0.113.5:1000")), 4);
         assert!(
-            !budget.spend(key("203.0.113.5:65000")),
+            budget.spend(key("203.0.113.5:65000")).is_err(),
             "an ephemeral port change bought a fresh allowance"
         );
     }
@@ -2193,11 +2263,13 @@ mod source_budget_tests {
         let budget = table(4.0, 16);
         assert_eq!(drain(&budget, key("[2001:db8:1:2::1]:1000")), 4);
         assert!(
-            !budget.spend(key("[2001:db8:1:2:ffff:ffff:ffff:ffff]:1000")),
+            budget
+                .spend(key("[2001:db8:1:2:ffff:ffff:ffff:ffff]:1000"))
+                .is_err(),
             "a host-bit rotation inside one /64 bought a fresh allowance"
         );
         assert!(
-            budget.spend(key("[2001:db8:1:3::1]:1000")),
+            budget.spend(key("[2001:db8:1:3::1]:1000")).is_ok(),
             "a genuinely different /64 must still be its own source"
         );
     }
@@ -2232,17 +2304,20 @@ mod source_budget_tests {
         // older one going last — the shape that used to rewind the clock.
         let mut spent = 0;
         for _ in 0..4 {
-            if budget.spend(k) {
+            if budget.spend(k).is_ok() {
                 spent += 1;
             }
         }
         for _ in 0..8 {
-            if budget.spend(k) {
+            if budget.spend(k).is_ok() {
                 spent += 1;
             }
         }
         assert_eq!(spent, 8, "interleaved use paid out more than the burst");
-        assert!(!budget.spend(k), "and left the bucket spent, not renewed");
+        assert!(
+            budget.spend(k).is_err(),
+            "and left the bucket spent, not renewed"
+        );
     }
 
     // -- A6: a saturated table degrades, and never fails open ---------------------------------
@@ -2254,13 +2329,13 @@ mod source_budget_tests {
     #[test]
     fn a_replenished_source_stops_being_tracked() {
         let budget = table(4.0, 2);
-        assert!(budget.spend(key("203.0.113.20:1000")));
+        assert!(budget.spend(key("203.0.113.20:1000")).is_ok());
         assert_eq!(budget.tracked_sources(), 1);
 
         // Refill past capacity, then force the sweep by making the table need a slot.
         budget.advance(Duration::from_secs(30));
-        assert!(budget.spend(key("203.0.113.21:1000")));
-        assert!(budget.spend(key("203.0.113.22:1000")));
+        assert!(budget.spend(key("203.0.113.21:1000")).is_ok());
+        assert!(budget.spend(key("203.0.113.22:1000")).is_ok());
         assert!(
             budget.tracked_sources() <= 2,
             "replenished entries were never reclaimed; the table is not bounded by its cap"
@@ -2280,7 +2355,9 @@ mod source_budget_tests {
 
         // Fill it with sources that are all below full, so nothing is reclaimable.
         for i in 0..CAP {
-            assert!(budget.spend(key(&format!("203.0.113.{}:1000", 100 + i))));
+            assert!(budget
+                .spend(key(&format!("203.0.113.{}:1000", 100 + i)))
+                .is_ok());
         }
         assert_eq!(budget.tracked_sources(), CAP);
 
@@ -2296,7 +2373,7 @@ mod source_budget_tests {
         // And a second untracked source shares that same exhausted allowance rather than
         // receiving its own.
         assert!(
-            !budget.spend(key("192.0.2.78:1000")),
+            budget.spend(key("192.0.2.78:1000")).is_err(),
             "each untracked source got its own allowance, so the degraded mode is unbounded in \
              source cardinality"
         );
@@ -2336,7 +2413,7 @@ mod source_budget_tests {
         // throttle this one. The spend itself succeeds either way — the degraded path would
         // serve it from the shared bucket — so what separates the two is whether the table was
         // reclaimed.
-        assert!(budget.spend(key("192.0.2.77:1000")));
+        assert!(budget.spend(key("192.0.2.77:1000")).is_ok());
         assert_eq!(
             budget.tracked_sources(),
             1,
@@ -2414,7 +2491,7 @@ mod source_budget_tests {
             let granted = granted.clone();
             handles.push(std::thread::spawn(move || {
                 for _ in 0..BURST {
-                    if budget.spend(k) {
+                    if budget.spend(k).is_ok() {
                         granted.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
@@ -2690,6 +2767,152 @@ mod source_budget_tests {
             Err(PreAuthRefusal::Connection),
             "an outbound connection has no source budget, so naming one here would be reporting a \
              bucket that does not exist"
+        );
+    }
+
+    // -- #2576: the source-scoped budget has two buckets, and they mean different things ---------
+
+    /// A table that never refills, so an attribution assertion cannot race the clock.
+    ///
+    /// Same reasoning as [`frozen_connection`]: these tests assert *which* bucket refused, and a
+    /// bucket that hands a token back mid-assertion turns one variant into the other.
+    fn frozen_table(burst: f64, max_sources: usize) -> SourcePreAuthBudget {
+        SourcePreAuthBudget::with_policy(
+            burst,
+            0.0,
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+            max_sources,
+        )
+    }
+
+    /// Fill `budget` to capacity with distinct sources that are all below full.
+    ///
+    /// Below full matters: a replenished entry is reclaimable, so a table filled with *full*
+    /// buckets would be swept on the next miss and the source under test would be tracked after
+    /// all — the saturated path would never be reached and the test would pass for the wrong
+    /// reason.
+    fn saturate(budget: &SourcePreAuthBudget, cap: usize) {
+        for i in 0..cap {
+            assert!(
+                budget
+                    .spend(key(&format!("203.0.113.{}:1000", 100 + i)))
+                    .is_ok(),
+                "filling the table should not itself be refused"
+            );
+        }
+        assert_eq!(
+            budget.tracked_sources(),
+            cap,
+            "the table did not reach capacity, so nothing below exercises the saturated path"
+        );
+    }
+
+    /// A source the table has room for is refused as itself.
+    ///
+    /// The control for the test below: without it, an implementation that reported *every*
+    /// source-scoped refusal as the shared fallback would look correct.
+    #[test]
+    fn a_tracked_source_is_refused_as_itself() {
+        let budget = frozen_table(4.0, 8);
+        let k = key("203.0.113.50:1000");
+
+        let spent = drain(&budget, k);
+        assert_eq!(spent, 4, "the source did not get its own burst of 4");
+        assert_eq!(
+            budget.tracked_sources(),
+            1,
+            "the source was not tracked, so this run never exercised a per-source bucket"
+        );
+
+        assert_eq!(
+            budget.spend(k),
+            Err(SourceRefusal::PerSource),
+            "a source the table has room for was refused as the shared fallback; the table is \
+             holding {} of 8 entries, so nothing was degraded",
+            budget.tracked_sources()
+        );
+    }
+
+    /// A source the table had no room for is refused as the shared fallback, not as itself.
+    ///
+    /// This is #2576. Both refusals were `false` from `spend` and therefore both reached the gate
+    /// as `PreAuthRefusal::Source`, which reads as "this address has spent its allowance" — the
+    /// NAT/single-source response — when the real condition is table saturation, which wants a
+    /// capacity response instead.
+    #[test]
+    fn an_untracked_source_is_refused_as_the_shared_fallback() {
+        const CAP: usize = 8;
+        let budget = frozen_table(4.0, CAP);
+        saturate(&budget, CAP);
+
+        // Drain the one shared bucket through a key the table has no room for.
+        let untracked = key("192.0.2.77:1000");
+        let spent = drain(&budget, untracked);
+        assert_eq!(
+            spent, 4,
+            "an untracked source got {spent} spends, not the shared burst of 4 — this run is not \
+             on the degraded path at all"
+        );
+        assert_eq!(
+            budget.tracked_sources(),
+            CAP,
+            "the untracked source was tracked after all, so the shared bucket was never consulted"
+        );
+
+        // A *different* untracked source meets that same exhausted allowance.
+        assert_eq!(
+            budget.spend(key("192.0.2.78:1000")),
+            Err(SourceRefusal::SharedFallback),
+            "a refusal from the bucket shared by every untracked source was reported as that \
+             source's own, which points an operator at one address when the condition is a full \
+             table"
+        );
+    }
+
+    /// The distinction survives the trip to the gate.
+    ///
+    /// `PreAuthBudget::check` is where the refusal becomes a metric label, so proving `spend`
+    /// alone would leave the mapping untested — the exact seam where #2576's ambiguity lived.
+    #[tokio::test]
+    async fn a_saturated_table_reaches_the_gate_as_the_shared_fallback() {
+        const CAP: usize = 8;
+        let budget = Arc::new(frozen_table(4.0, CAP));
+        saturate(&budget, CAP);
+
+        let untracked = key("192.0.2.90:1000");
+        drain(&budget, untracked);
+
+        let inbound = PreAuthBudget::Source {
+            connection: frozen_connection(),
+            budget: budget.clone(),
+            key: untracked,
+        };
+
+        assert_eq!(
+            inbound.check().await,
+            Err(PreAuthRefusal::SharedFallback),
+            "the gate collapsed a saturated-table refusal back into a per-source one"
+        );
+    }
+
+    /// The three attributions are three distinct labels.
+    ///
+    /// Cheap, but it is the assertion that fails if a later edit maps two variants onto one
+    /// string — which is how the metric silently loses a distinction while every variant test
+    /// stays green.
+    #[test]
+    fn every_refusal_label_is_distinct() {
+        let labels = [
+            PreAuthRefusal::Connection.as_str(),
+            PreAuthRefusal::Source.as_str(),
+            PreAuthRefusal::SharedFallback.as_str(),
+        ];
+        let unique: std::collections::HashSet<_> = labels.iter().collect();
+        assert_eq!(
+            unique.len(),
+            labels.len(),
+            "two refusal kinds share a metric label ({labels:?}), so the counter cannot separate \
+             them"
         );
     }
 }
