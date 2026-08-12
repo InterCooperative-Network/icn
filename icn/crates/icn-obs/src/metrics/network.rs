@@ -41,7 +41,7 @@ pub fn init_descriptions() {
     // Two-phase inbound rate limiting (Issue #2491)
     describe_counter!(
         "icn_network_messages_rate_limited_pre_auth_total",
-        "Total number of messages denied by a connection's anonymous pre-authentication budget, before any peer identity was bound to it"
+        "Total number of messages denied by an anonymous pre-authentication budget before any peer identity was bound to the connection, by which budget refused (connection or source)"
     );
     describe_counter!(
         "icn_network_messages_rate_limited_by_rate_total",
@@ -253,12 +253,24 @@ pub fn messages_rate_limited_inc() {
 /// this counter is anonymous traffic that never got as far as saying who it was, and a
 /// sustained rise in it is a load signal rather than a configuration one.
 ///
-/// Deliberately unlabelled. The tempting labels here — the claimed DID, the remote address
-/// — are unbounded and attacker-chosen, which is the same mistake at the metrics layer that
-/// #2491 fixes at the policy layer. (Distinguishing denial *causes* more finely is #2499's
-/// subject, not this one's.)
-pub fn messages_rate_limited_pre_auth_inc() {
-    counter!("icn_network_messages_rate_limited_pre_auth_total").increment(1);
+/// `bound` says which budget refused, and is the **only** label here on purpose (#2558). An
+/// inbound connection spends two: its own burst (#2491) and the one shared by everything from
+/// its source (#2549). Unlabelled, this counter could not separate a single connection
+/// exhausting its own allowance from an address whose whole allowance is gone — conditions that
+/// look identical here and want different responses. The value comes from the closed two-value
+/// set `PreAuthRefusal::as_str`, so nothing a remote peer sends can add a series.
+///
+/// The labels this still deliberately does not carry — the claimed DID, the remote address, the
+/// source key — are unbounded and attacker-chosen, which is the same mistake at the metrics
+/// layer that #2491 fixes at the policy layer. They belong in the log line, and are there.
+///
+/// A refusal counted under `bound="source"` does **not** mean a source token was spent: the
+/// connection's token was, and the source's was not. See `PreAuthBudget::check`.
+///
+/// (Distinguishing the *other* rate-limit counter's causes — policy denial versus throttling on
+/// `messages_rate_limited_total` — is #2499's subject, not this one's.)
+pub fn messages_rate_limited_pre_auth_inc(bound: &'static str) {
+    counter!("icn_network_messages_rate_limited_pre_auth_total", "bound" => bound).increment(1);
 }
 
 /// An inbound connection was refused a pre-authentication slot (#2547).

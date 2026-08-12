@@ -615,42 +615,43 @@ impl NetworkActor {
                     // attributable to a proven identity, and #2558 is about work performed for a
                     // peer that has not proven one.
                     //
-                    // The operand order is load-bearing, not stylistic. `check_pre_auth_rate_limit`
-                    // *consumes* a token, so it must stay last: `&&` short-circuits, and the two
-                    // guards ahead of it are what keep an incomplete frame and an authenticated
-                    // peer from being charged. Reordering this spends tokens on both.
-                    if frame.is_ok()
-                        && authenticated.is_none()
-                        && !ctx.check_pre_auth_rate_limit().await
-                    {
-                        // No `claimed_from` here, unlike the authenticated arm below: the frame
-                        // has deliberately not been decoded, so there is no claim to log — and
-                        // the claim was never authority for anything in this phase anyway.
-                        //
-                        // The message does not name which of its own two buckets refused. An
-                        // inbound connection spends a per-connection burst (#2491) and a shared
-                        // per-source budget (#2549), the first is consulted first and
-                        // short-circuits, and an outbound connection has no source budget at all.
-                        // Naming the source here points operators at NAT contention for what is
-                        // just as likely one connection spending its own burst. Attributing it
-                        // exactly means returning the refusing bucket from `PreAuthBudget::check`,
-                        // which is a change to the gate itself rather than to this log line.
-                        warn!(
-                            "Refused pre-authentication work (a pre-authentication budget is \
-                             exhausted: this connection's own burst, or the shared budget for its \
-                             source if it has one)"
-                        );
+                    // The guard order is load-bearing, not stylistic. `check_pre_auth_rate_limit`
+                    // *consumes* a token, so it must stay innermost: the two conditions ahead of
+                    // it are what keep an incomplete frame and an authenticated peer from being
+                    // charged. Reordering this spends tokens on both.
+                    if frame.is_ok() && authenticated.is_none() {
+                        if let Err(refusal) = ctx.check_pre_auth_rate_limit().await {
+                            // No `claimed_from` here, unlike the authenticated arm below: the
+                            // frame has deliberately not been decoded, so there is no claim to
+                            // log — and the claim was never authority for anything in this phase
+                            // anyway.
+                            //
+                            // `refusal` names which of the two budgets refused (#2558): this
+                            // connection's own burst (#2491), or the budget shared by everything
+                            // from its source (#2549). Those want different responses — one
+                            // connection misbehaving against one peer's worth of allowance, or
+                            // an address whose whole allowance is gone — and the counter could
+                            // not tell them apart, which is the operability gap #2558 names.
+                            // It is a closed two-value set, so it is safe to carry as a label.
+                            warn!(
+                                bound = refusal.as_str(),
+                                "Refused pre-authentication work (the named pre-authentication \
+                                 budget is exhausted)"
+                            );
 
-                        icn_obs::metrics::network::messages_rate_limited_inc();
-                        icn_obs::metrics::network::messages_rate_limited_pre_auth_inc();
+                            icn_obs::metrics::network::messages_rate_limited_inc();
+                            icn_obs::metrics::network::messages_rate_limited_pre_auth_inc(
+                                refusal.as_str(),
+                            );
 
-                        // Close stream before continuing to avoid resource leak
-                        if let Err(e) = send.finish() {
-                            tracing::debug!("Stream finish error during rate limit: {}", e);
+                            // Close stream before continuing to avoid resource leak
+                            if let Err(e) = send.finish() {
+                                tracing::debug!("Stream finish error during rate limit: {}", e);
+                            }
+
+                            // Drop the frame — undecoded (don't call handler)
+                            continue;
                         }
-
-                        // Drop the frame — undecoded (don't call handler)
-                        continue;
                     }
 
                     // Second half: interpret the authorized frame.

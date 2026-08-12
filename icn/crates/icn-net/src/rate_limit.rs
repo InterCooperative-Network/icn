@@ -759,6 +759,45 @@ pub enum PreAuthBudget {
     Connection(PreAuthRateLimiter),
 }
 
+/// Which of a connection's anonymous budgets refused a frame (#2558).
+///
+/// The refusal counter used to name no bucket, so an operator watching
+/// `icn_network_messages_rate_limited_pre_auth_total` climb could not tell one connection
+/// spending its own burst (#2491) from a source whose shared allowance is dry (#2549). Those are
+/// different conditions with different responses — the first is one peer, the second is every peer
+/// behind an address — and #2558 lists not being able to separate them as what would make any new
+/// bound hard to operate.
+///
+/// Two variants and no payload, deliberately. It is admissible as a metric label for exactly the
+/// reason [`crate::preauth_admission::AdmissionRefusal`] is: the value set is closed in this file,
+/// so nothing a remote peer sends can add a series.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreAuthRefusal {
+    /// This connection's own anonymous burst is spent (#2491).
+    ///
+    /// Reported without the source budget having been consulted at all — see
+    /// [`PreAuthBudget::check`].
+    Connection,
+    /// This connection's source has spent its shared anonymous allowance (#2549).
+    ///
+    /// The connection's own token was already taken to reach this — see [`PreAuthBudget::check`].
+    Source,
+}
+
+impl PreAuthRefusal {
+    /// A short, bounded label for logs and metrics.
+    ///
+    /// Deliberately a fixed set of two strings, for the same reason
+    /// [`crate::preauth_admission::AdmissionRefusal::as_str`] is: it is safe as a metric label
+    /// precisely because nothing an attacker sends can add a new value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PreAuthRefusal::Connection => "connection",
+            PreAuthRefusal::Source => "source",
+        }
+    }
+}
+
 impl PreAuthBudget {
     /// Spend one message's worth of every allowance this connection draws on.
     ///
@@ -768,14 +807,39 @@ impl PreAuthBudget {
     /// only ever make the bound *tighter* than stated, never looser, and the alternative — a
     /// peek across two locks followed by a commit — buys nothing for a message that is being
     /// dropped either way.
-    pub async fn check(&self) -> bool {
+    ///
+    /// `Err` names the bucket that refused (#2558). Naming it changes nothing about what is
+    /// authorized: the early returns below *are* the short-circuiting `&&` this used to be, so a
+    /// refusing connection still never consults the source, and no bucket is consulted in an
+    /// order it was not consulted in before. Discovering the answer by asking both would be a
+    /// policy change wearing an observability change's clothes — it is the reversal
+    /// `a_spent_connection_does_not_charge_its_source` exists to forbid.
+    ///
+    /// What a refusal does **not** say is that a token was spent in the bucket that refused: a
+    /// refused `TokenBucket::try_consume` takes nothing. `Source` in particular means the
+    /// *connection* was charged and the source was not.
+    pub async fn check(&self) -> Result<(), PreAuthRefusal> {
         match self {
             Self::Source {
                 connection,
                 budget,
                 key,
-            } => connection.check().await && budget.spend(*key),
-            Self::Connection(limiter) => limiter.check().await,
+            } => {
+                if !connection.check().await {
+                    return Err(PreAuthRefusal::Connection);
+                }
+                if !budget.spend(*key) {
+                    return Err(PreAuthRefusal::Source);
+                }
+                Ok(())
+            }
+            Self::Connection(limiter) => {
+                if limiter.check().await {
+                    Ok(())
+                } else {
+                    Err(PreAuthRefusal::Connection)
+                }
+            }
         }
     }
 }
@@ -2385,7 +2449,7 @@ mod source_budget_tests {
 
         let mut granted = 0usize;
         for _ in 0..(PRE_AUTH_RATE_LIMIT.burst_capacity as usize + HAMMER) {
-            if inbound.check().await {
+            if inbound.check().await.is_ok() {
                 granted += 1;
             }
         }
@@ -2412,6 +2476,173 @@ mod source_budget_tests {
              {} went to messages that were never dispatched, so a spent connection is draining \
              its source's allowance",
             SOURCE_BURST as i64 - (granted + left) as i64
+        );
+    }
+
+    // -- #2558: which of the two buckets refused ------------------------------------------------
+
+    /// A source table that refuses the first spend, so a refusal needs no elapsed time to set up.
+    fn dry_table() -> Arc<SourcePreAuthBudget> {
+        Arc::new(SourcePreAuthBudget::with_policy(
+            0.0,
+            0.0,
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+            16,
+        ))
+    }
+
+    /// A dry source is named as the source — until the connection itself runs out.
+    ///
+    /// This is the whole attribution property in one run, and it is deliberately one test rather
+    /// than two: the *switch* is what proves the two refusals are distinguishable. An
+    /// implementation that reported one label for both — the obvious way to get this wrong — is
+    /// green on either half alone and fails here.
+    ///
+    /// The switch point is also the token-consumption asymmetry made observable. A source refusal
+    /// is reached *through* a connection token that has already been spent, so a connection
+    /// sitting over a dry source runs its own bucket down one refusal at a time and eventually
+    /// starts refusing on its own account. That is documented as deliberate on
+    /// [`PreAuthBudget::check`]; it is pinned here so a later change that made refusals free
+    /// cannot pass unnoticed.
+    #[tokio::test]
+    async fn a_dry_source_is_named_until_the_connection_itself_runs_out() {
+        let inbound = PreAuthBudget::Source {
+            connection: PreAuthRateLimiter::new(),
+            budget: dry_table(),
+            key: key("203.0.113.42:1000"),
+        };
+
+        // Every one of these is refused by the *source*: the connection still has tokens, and
+        // spends one to reach the source each time.
+        for spent in 1..=PRE_AUTH_RATE_LIMIT.burst_capacity {
+            assert_eq!(
+                inbound.check().await,
+                Err(PreAuthRefusal::Source),
+                "refusal {spent} was attributed to the wrong bucket: the connection had {} of its \
+                 {} tokens left, so the source is what refused",
+                PRE_AUTH_RATE_LIMIT.burst_capacity - spent + 1,
+                PRE_AUTH_RATE_LIMIT.burst_capacity
+            );
+        }
+
+        assert_eq!(
+            inbound.check().await,
+            Err(PreAuthRefusal::Connection),
+            "the connection spent one of its {} tokens on each source refusal above, so it is now \
+             empty and must be the bucket refusing — reporting the source here would mean either \
+             the connection is not charged for a source refusal, or both refusals carry one label",
+            PRE_AUTH_RATE_LIMIT.burst_capacity
+        );
+    }
+
+    /// A connection that has spent its own burst is named, and its source is never asked.
+    ///
+    /// Both halves matter. The label is what #2558 asks for; the untouched source budget is the
+    /// short-circuit that asking for it must not have cost. An implementation that evaluated both
+    /// buckets to discover which one was empty would satisfy the first assertion and fail the
+    /// second — and would have converted a free denial into one that drains the shared allowance,
+    /// which is exactly the reversal `a_spent_connection_does_not_charge_its_source` forbids.
+    #[tokio::test]
+    async fn a_refusing_connection_is_named_and_leaves_its_source_untouched() {
+        const SOURCE_BURST: usize = 64;
+
+        let budget = Arc::new(SourcePreAuthBudget::with_policy(
+            SOURCE_BURST as f64,
+            0.0,
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+            16,
+        ));
+        let k = key("203.0.113.43:1000");
+        let inbound = PreAuthBudget::Source {
+            connection: PreAuthRateLimiter::new(),
+            budget: budget.clone(),
+            key: k,
+        };
+
+        // Spend the connection's burst. Each grant costs one source token too.
+        let mut granted = 0usize;
+        loop {
+            match inbound.check().await {
+                Ok(()) => {
+                    granted += 1;
+                    assert!(granted < 10_000, "the connection bucket never refused");
+                }
+                Err(refusal) => {
+                    assert_eq!(
+                        refusal,
+                        PreAuthRefusal::Connection,
+                        "a connection that has spent its own burst over a source with \
+                         {} of {SOURCE_BURST} tokens left was attributed to the source",
+                        SOURCE_BURST - granted
+                    );
+                    break;
+                }
+            }
+        }
+        // Non-vacuity: the connection has to have been able to spend something, or the run never
+        // exercised a *spent* connection at all.
+        assert_eq!(
+            granted, PRE_AUTH_RATE_LIMIT.burst_capacity as usize,
+            "the connection was granted {granted} of its burst of {}; this run did not reach the \
+             edge it means to test",
+            PRE_AUTH_RATE_LIMIT.burst_capacity
+        );
+
+        // Several more refusals, so an implementation that consulted the source on the refusal
+        // path is off by more than one token and cannot be mistaken for rounding.
+        for _ in 0..8 {
+            assert_eq!(inbound.check().await, Err(PreAuthRefusal::Connection));
+        }
+
+        assert_eq!(
+            drain(&budget, k),
+            SOURCE_BURST - granted,
+            "the source has fewer tokens left than the {granted} grants account for, so the \
+             refusals above reached it: naming the refusing bucket cost the short-circuit"
+        );
+    }
+
+    /// Both buckets permitting names no bucket at all.
+    #[tokio::test]
+    async fn a_permitted_frame_names_no_bucket() {
+        let inbound = PreAuthBudget::Source {
+            connection: PreAuthRateLimiter::new(),
+            budget: Arc::new(SourcePreAuthBudget::with_policy(
+                8.0,
+                0.0,
+                PRE_AUTH_RATE_LIMIT.refill_interval,
+                16,
+            )),
+            key: key("203.0.113.44:1000"),
+        };
+
+        assert_eq!(
+            inbound.check().await,
+            Ok(()),
+            "a frame both buckets permitted was reported as refused, so a permitted frame would \
+             increment a refusal counter"
+        );
+    }
+
+    /// An outbound connection has no source budget, so its only possible refusal is its own.
+    #[tokio::test]
+    async fn an_outbound_connection_can_only_refuse_as_itself() {
+        let outbound = PreAuthBudget::Connection(PreAuthRateLimiter::new());
+
+        for spent in 1..=PRE_AUTH_RATE_LIMIT.burst_capacity {
+            assert_eq!(
+                outbound.check().await,
+                Ok(()),
+                "grant {spent} of a fresh burst of {} was refused",
+                PRE_AUTH_RATE_LIMIT.burst_capacity
+            );
+        }
+
+        assert_eq!(
+            outbound.check().await,
+            Err(PreAuthRefusal::Connection),
+            "an outbound connection has no source budget, so naming one here would be reporting a \
+             bucket that does not exist"
         );
     }
 }

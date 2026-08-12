@@ -130,6 +130,9 @@ fn install_metrics() -> Snapshotter {
 }
 
 /// Total value of `name` across every label set, or 0 if it was never recorded.
+///
+/// Summing across label sets is what keeps the aggregate readings below meaning the same thing
+/// they meant when the refusal counter carried no labels at all (#2558 added `bound`).
 fn counter(snapshotter: &Snapshotter, name: &str) -> u64 {
     snapshotter
         .snapshot()
@@ -141,6 +144,24 @@ fn counter(snapshotter: &Snapshotter, name: &str) -> u64 {
                 _ => None,
             },
         )
+        .sum()
+}
+
+/// Total value of `name` for label sets carrying `label=value`, or 0 if there are none.
+fn counter_labelled(snapshotter: &Snapshotter, name: &str, label: &str, value: &str) -> u64 {
+    snapshotter
+        .snapshot()
+        .into_vec()
+        .into_iter()
+        .filter_map(|(key, _, _, recorded)| {
+            let key = key.key();
+            let matches =
+                key.name() == name && key.labels().any(|l| l.key() == label && l.value() == value);
+            match (matches, recorded) {
+                (true, DebugValue::Counter(v)) => Some(v),
+                _ => None,
+            }
+        })
         .sum()
 }
 
@@ -363,6 +384,33 @@ async fn frames_are_authorized_before_they_are_decoded() -> Result<()> {
         "the two outcomes do not add up to the {FRAMES} frames sent: {decoded} decoded plus \
          {refused} refused. Under-count means frames were consumed unaccounted; over-count means \
          the node decoded frames it had already refused"
+    );
+
+    // Every refusal names exactly one budget (#2558).
+    //
+    // Conservation rather than an expected split, because the split is a property of the machine
+    // this ran on and the identity is a property of the code. It fails in both directions that
+    // matter: short means a refusal was counted without a `bound` label at all, long means one
+    // refused frame incremented more than one of them.
+    //
+    // This says nothing about *which* label is right — one connection sending far past its own
+    // burst over a source budget it cannot drain produces connection refusals, but an
+    // implementation reporting one label for everything would satisfy this too. That the two are
+    // distinguishable at all is proven deterministically in `rate_limit.rs`, by
+    // `a_dry_source_is_named_until_the_connection_itself_runs_out`; this only proves the gate's
+    // counter carries the attribution end to end.
+    let by_connection = counter_labelled(&metrics, REFUSED_METRIC, "bound", "connection");
+    let by_source = counter_labelled(&metrics, REFUSED_METRIC, "bound", "source");
+    assert_eq!(
+        by_connection + by_source,
+        refused,
+        "{refused} frames were refused but {by_connection} + {by_source} carry a bound label: \
+         a refusal reached the counter without naming a budget, or named two"
+    );
+    assert!(
+        by_connection >= 1,
+        "no refusal was attributed to this connection's own burst, though one connection sent \
+         {FRAMES} frames against a burst of far fewer: the label is not being set from the gate"
     );
 
     assert!(

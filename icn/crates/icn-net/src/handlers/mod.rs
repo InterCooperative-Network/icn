@@ -271,7 +271,12 @@ impl ConnectionContext {
     /// authenticate it is decoded, let alone dispatched. Authentication cannot refund it, which
     /// is the point: self-issuing a DID and a binding is cheap, so anything an attacker could buy
     /// by authenticating would be no bound at all.
-    pub(crate) async fn check_pre_auth_rate_limit(&self) -> bool {
+    /// `Err` names which budget refused, for the log line and the refusal counter (#2558). It
+    /// says nothing about a token having been spent in that budget — see
+    /// [`crate::rate_limit::PreAuthBudget::check`].
+    pub(crate) async fn check_pre_auth_rate_limit(
+        &self,
+    ) -> Result<(), crate::rate_limit::PreAuthRefusal> {
         self.pre_auth_limiter.check().await
     }
 
