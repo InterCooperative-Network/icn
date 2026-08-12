@@ -267,8 +267,12 @@ pub fn messages_rate_limited_inc() {
 /// this refusal happens before the frame is decoded (#2558), so at this point the message has
 /// not said who it claims to be.
 ///
-/// A refusal counted under `bound="source"` does **not** mean a source token was spent: the
-/// connection's token was, and the source's was not. See `PreAuthBudget::check`.
+/// Two readings `bound="source"` does **not** support. It does not mean a source token was spent —
+/// the connection's token was, and the source's was not (see `PreAuthBudget::check`). And it does
+/// not always mean *one address* has spent its allowance: when the budget table is saturated,
+/// untracked sources share a single fallback bucket whose exhaustion is counted here too. Pair it
+/// with `icn_network_preauth_source_budget_degraded_total`, which is non-zero exactly in that
+/// overload mode, before reading a rise here as one noisy address or NAT.
 ///
 /// (Distinguishing the *other* rate-limit counter's causes — policy denial versus throttling on
 /// `messages_rate_limited_total` — is #2499's subject, not this one's.)

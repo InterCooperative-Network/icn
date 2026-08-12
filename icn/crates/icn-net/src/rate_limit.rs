@@ -793,9 +793,21 @@ pub enum PreAuthRefusal {
     /// Reported without the source budget having been consulted at all — see
     /// [`PreAuthBudget::check`].
     Connection,
-    /// This connection's source has spent its shared anonymous allowance (#2549).
+    /// The source-scoped budget refused (#2549).
     ///
     /// The connection's own token was already taken to reach this — see [`PreAuthBudget::check`].
+    ///
+    /// "Source-scoped" is not always "this source's own". When the budget table is saturated and a
+    /// sweep frees nothing, untracked sources spend from a single shared fallback bucket
+    /// ([`SourcePreAuthBudget::spend`]), and its exhaustion is reported here too — so in that
+    /// overload mode this does **not** mean one address has spent its allowance. The two are
+    /// deliberately one label: #2558 asked to separate the per-connection bound from the
+    /// per-source one, and both of these are the per-source one. They do want different responses,
+    /// which is why the overload mode has its own signal — read this alongside
+    /// `icn_network_preauth_source_budget_degraded_total`, which is non-zero exactly when spends
+    /// are going through that fallback, and the `icn_network_preauth_source_budget_tracked` gauge
+    /// sitting at `MAX_PREAUTH_BUDGET_SOURCES`. Promoting the fallback to its own attribution is a
+    /// separate change to `spend`'s signature and is tracked separately.
     Source,
 }
 
