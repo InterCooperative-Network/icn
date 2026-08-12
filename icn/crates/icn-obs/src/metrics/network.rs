@@ -260,9 +260,12 @@ pub fn messages_rate_limited_inc() {
 /// look identical here and want different responses. The value comes from the closed two-value
 /// set `PreAuthRefusal::as_str`, so nothing a remote peer sends can add a series.
 ///
-/// The labels this still deliberately does not carry — the claimed DID, the remote address, the
-/// source key — are unbounded and attacker-chosen, which is the same mistake at the metrics
-/// layer that #2491 fixes at the policy layer. They belong in the log line, and are there.
+/// The labels this still deliberately does not carry — the remote address and the source key —
+/// are unbounded and attacker-chosen, which is the same mistake at the metrics layer that #2491
+/// fixes at the policy layer. Identifying detail belongs in tracing instead, and the remote
+/// address is already on the connection's span. A claimed DID is not among the options at all:
+/// this refusal happens before the frame is decoded (#2558), so at this point the message has
+/// not said who it claims to be.
 ///
 /// A refusal counted under `bound="source"` does **not** mean a source token was spent: the
 /// connection's token was, and the source's was not. See `PreAuthBudget::check`.

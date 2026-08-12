@@ -372,6 +372,21 @@ impl PreAuthRateLimiter {
         }
     }
 
+    /// A budget with an explicit policy, so a test can state a bound instead of racing the clock.
+    ///
+    /// Test-only, and private on purpose. Every production connection gets exactly
+    /// [`PRE_AUTH_RATE_LIMIT`]; a policy seam on the public surface would be an invitation to
+    /// hand some caller a larger anonymous allowance, which is the one thing this budget must not
+    /// have. Tests need it because [`TokenBucket::refill`] reads `Instant::now()`, so a limiter
+    /// built by [`Self::new`] hands back a token every `refill_interval` — which is fine for a
+    /// test asserting a *range*, and fatal to one asserting *which bucket* refused.
+    #[cfg(test)]
+    fn with_policy(capacity: f64, refill_rate: f64, refill_interval: Duration) -> Self {
+        Self {
+            bucket: RwLock::new(TokenBucket::new(capacity, refill_rate, refill_interval)),
+        }
+    }
+
     /// Spend one message's worth of the connection's anonymous budget.
     ///
     /// Takes no DID, and that is the point: there is nothing to pass. A signature here
@@ -2491,6 +2506,29 @@ mod source_budget_tests {
         ))
     }
 
+    /// What a frozen connection budget may spend before it starts refusing.
+    ///
+    /// Stated here rather than taken from `PRE_AUTH_RATE_LIMIT` for the reason `table()` states
+    /// its own numbers: these tests are about *which* bucket refused, and a test that has to
+    /// spend the shipped burst to reach the edge hides which edge it reached.
+    const CONNECTION_BURST: u32 = 4;
+
+    /// A connection budget that never refills.
+    ///
+    /// Zero refill is load-bearing, not tidiness. `TokenBucket::refill` reads `Instant::now()`, so
+    /// a production limiter hands back a token every 100 ms — and a test process descheduled for
+    /// one interval mid-loop would see a connection refusal turn back into a source refusal, or
+    /// be granted more than its burst. The pre-existing
+    /// `a_spent_connection_does_not_charge_its_source` copes by asserting a *range*; these tests
+    /// assert an exact identity and a variant, so they have to freeze the clock out instead.
+    fn frozen_connection() -> PreAuthRateLimiter {
+        PreAuthRateLimiter::with_policy(
+            CONNECTION_BURST as f64,
+            0.0,
+            PRE_AUTH_RATE_LIMIT.refill_interval,
+        )
+    }
+
     /// A dry source is named as the source — until the connection itself runs out.
     ///
     /// This is the whole attribution property in one run, and it is deliberately one test rather
@@ -2507,31 +2545,30 @@ mod source_budget_tests {
     #[tokio::test]
     async fn a_dry_source_is_named_until_the_connection_itself_runs_out() {
         let inbound = PreAuthBudget::Source {
-            connection: PreAuthRateLimiter::new(),
+            connection: frozen_connection(),
             budget: dry_table(),
             key: key("203.0.113.42:1000"),
         };
 
         // Every one of these is refused by the *source*: the connection still has tokens, and
         // spends one to reach the source each time.
-        for spent in 1..=PRE_AUTH_RATE_LIMIT.burst_capacity {
+        for spent in 1..=CONNECTION_BURST {
             assert_eq!(
                 inbound.check().await,
                 Err(PreAuthRefusal::Source),
                 "refusal {spent} was attributed to the wrong bucket: the connection had {} of its \
-                 {} tokens left, so the source is what refused",
-                PRE_AUTH_RATE_LIMIT.burst_capacity - spent + 1,
-                PRE_AUTH_RATE_LIMIT.burst_capacity
+                 {CONNECTION_BURST} tokens left, so the source is what refused",
+                CONNECTION_BURST - spent + 1
             );
         }
 
         assert_eq!(
             inbound.check().await,
             Err(PreAuthRefusal::Connection),
-            "the connection spent one of its {} tokens on each source refusal above, so it is now \
-             empty and must be the bucket refusing — reporting the source here would mean either \
-             the connection is not charged for a source refusal, or both refusals carry one label",
-            PRE_AUTH_RATE_LIMIT.burst_capacity
+            "the connection spent one of its {CONNECTION_BURST} tokens on each source refusal \
+             above, so it is now empty and must be the bucket refusing — reporting the source \
+             here would mean either the connection is not charged for a source refusal, or both \
+             refusals carry one label"
         );
     }
 
@@ -2554,7 +2591,7 @@ mod source_budget_tests {
         ));
         let k = key("203.0.113.43:1000");
         let inbound = PreAuthBudget::Source {
-            connection: PreAuthRateLimiter::new(),
+            connection: frozen_connection(),
             budget: budget.clone(),
             key: k,
         };
@@ -2582,10 +2619,9 @@ mod source_budget_tests {
         // Non-vacuity: the connection has to have been able to spend something, or the run never
         // exercised a *spent* connection at all.
         assert_eq!(
-            granted, PRE_AUTH_RATE_LIMIT.burst_capacity as usize,
-            "the connection was granted {granted} of its burst of {}; this run did not reach the \
-             edge it means to test",
-            PRE_AUTH_RATE_LIMIT.burst_capacity
+            granted, CONNECTION_BURST as usize,
+            "the connection was granted {granted} of its burst of {CONNECTION_BURST}; this run \
+             did not reach the edge it means to test"
         );
 
         // Several more refusals, so an implementation that consulted the source on the refusal
@@ -2606,7 +2642,7 @@ mod source_budget_tests {
     #[tokio::test]
     async fn a_permitted_frame_names_no_bucket() {
         let inbound = PreAuthBudget::Source {
-            connection: PreAuthRateLimiter::new(),
+            connection: frozen_connection(),
             budget: Arc::new(SourcePreAuthBudget::with_policy(
                 8.0,
                 0.0,
@@ -2627,14 +2663,13 @@ mod source_budget_tests {
     /// An outbound connection has no source budget, so its only possible refusal is its own.
     #[tokio::test]
     async fn an_outbound_connection_can_only_refuse_as_itself() {
-        let outbound = PreAuthBudget::Connection(PreAuthRateLimiter::new());
+        let outbound = PreAuthBudget::Connection(frozen_connection());
 
-        for spent in 1..=PRE_AUTH_RATE_LIMIT.burst_capacity {
+        for spent in 1..=CONNECTION_BURST {
             assert_eq!(
                 outbound.check().await,
                 Ok(()),
-                "grant {spent} of a fresh burst of {} was refused",
-                PRE_AUTH_RATE_LIMIT.burst_capacity
+                "grant {spent} of a fresh burst of {CONNECTION_BURST} was refused"
             );
         }
 
