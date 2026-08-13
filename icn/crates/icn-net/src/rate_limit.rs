@@ -499,6 +499,19 @@ pub const MAX_PREAUTH_BUDGET_SOURCES: usize = 4096;
 /// sweep is safe: the caller falls through to the shared budget, which is bounded.
 const BUDGET_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(1);
 
+/// What a source is guaranteed on promotion even when the pool it inherits is empty (#2562).
+///
+/// One token, and the reason is liveness rather than allowance: a peer needs exactly one anonymous
+/// message to send the Hello that authenticates it out of this phase altogether. Seeding a
+/// promotion from a dry fallback without this floor would refuse that first message, and a
+/// legitimate peer that does not retry then sits until `PREAUTH_AUTHENTICATION_DEADLINE` closes it.
+/// The burst docs already promise exactly this much — "a peer needs one token to authenticate".
+///
+/// It is also the exact size of what remains of the promotion exception: at most one token more
+/// than the source had earned, once per promotion, and a repeat requires its own bucket to refill
+/// to full first — see [`SourcePreAuthBudget::spend`].
+const PROMOTION_LIVENESS_FLOOR: usize = 1;
+
 /// Tokens added per refill interval to renew `PREAUTH_SOURCE_BURST` over the renewal window.
 fn source_refill_rate_per_interval() -> f64 {
     PREAUTH_SOURCE_BURST as f64 * PRE_AUTH_RATE_LIMIT.refill_interval.as_secs_f64()
@@ -572,6 +585,41 @@ impl BudgetState {
         TokenBucket::new(self.capacity, self.refill_rate, self.refill_interval)
     }
 
+    /// The bucket a source is inserted with.
+    ///
+    /// A source arriving here is one of two things this table cannot tell apart: a newcomer it had
+    /// room for, or a source being promoted out of the shared fallback it has been spending from.
+    /// Handing both a *full* bucket is what let the second mint a second burst (#2562) — whatever
+    /// it had just spent on the fallback was simply forgotten.
+    ///
+    /// Both therefore inherit the fallback's current level, floored at
+    /// [`PROMOTION_LIVENESS_FLOOR`]. For the promoted source that is exact: the tokens it took from
+    /// the fallback are precisely the ones missing from the level it inherits, so the fallback and
+    /// the promotion together grant one burst rather than two.
+    ///
+    /// For the newcomer it is conservative — it can be seeded low because *other* untracked sources
+    /// drained the pool. Telling those two apart needs per-source accounting for sources the table
+    /// has no room to track, which is the exact state the fallback exists to avoid, so the cost is
+    /// paid rather than removed. It is bounded: at most one burst of initial deficit, refilling at
+    /// the ordinary rate, and never the first message — that is what the floor guarantees.
+    ///
+    /// Below saturation this changes nothing. The shared bucket is only ever spent from on the
+    /// degraded path, so a table that has never run out of room has it at capacity, and every
+    /// insert still gets a full bucket exactly as before.
+    fn promotion_bucket(&mut self) -> TokenBucket {
+        // Read the level *now*: a stale level would credit or charge a promotion for time that
+        // has since passed.
+        self.shared.refill();
+        let inherited = self
+            .shared
+            .tokens
+            .max(PROMOTION_LIVENESS_FLOOR as f64)
+            .min(self.capacity);
+        let mut bucket = self.fresh_bucket();
+        bucket.tokens = inherited;
+        bucket
+    }
+
     /// Drop every entry whose allowance has come all the way back.
     ///
     /// Returns the number removed. Rate-limited by [`BUDGET_SWEEP_MIN_INTERVAL`]; a refused sweep
@@ -632,8 +680,7 @@ impl SourcePreAuthBudget {
     /// permits a full burst at the start of a window and another once it has refilled, so the
     /// sliding-window reading of it is wrong by up to a factor of two.
     ///
-    /// One exception, in the saturated table's promotion path only — see *The promotion transition
-    /// is the one place the per-source burst is not exact* below, and #2562.
+    /// One exception, worth a single token — see *What promotion costs* below (#2562).
     ///
     /// It does **not** bound the QUIC/TLS handshake, which is complete before the source key
     /// exists at all (#2559), nor the `ConnectionContext` and task a connection allocates, nor
@@ -666,26 +713,44 @@ impl SourcePreAuthBudget {
     /// source is bounded" to "every untracked source is bounded *together*, by one source's
     /// worth" — never to "unbounded".
     ///
-    /// # The promotion transition is the one place the per-source burst is not exact
+    /// # What promotion costs
     ///
-    /// Stated because it is a real exception to the headline bound (#2562 tracks it). A source
-    /// that spends from the shared bucket while untracked and is *then* promoted — a later sweep
-    /// frees a slot — is inserted with [`BudgetState::fresh_bucket`], a full one. Its shared
-    /// spending is not carried across, so across that transition its burst term can reach `2B`
-    /// rather than `B`, once, before settling back to `B + rate × T`.
+    /// A source that spent from the shared bucket while untracked and is *then* promoted — a later
+    /// sweep frees a slot — used to be inserted with a **full** bucket, so its shared spending was
+    /// forgotten and its burst term could reach `2B` (#2562). Insertion now goes through
+    /// [`BudgetState::promotion_bucket`], which seeds the new bucket from the shared bucket's
+    /// current level: the tokens the source took from the fallback are exactly the ones missing
+    /// from what it inherits, so the two together grant one burst.
     ///
-    /// It is not fixed here because carrying the debt means per-source accounting for sources the
-    /// table has *no room to track* — the exact state the fallback exists to avoid. Bounding it by
-    /// seeding the promoted bucket from the shared level would instead charge a newly-arrived
-    /// honest source for its neighbours' spending.
+    /// What remains is [`PROMOTION_LIVENESS_FLOOR`] — one token, so that a promoted source can
+    /// always send the Hello that authenticates it out of this phase. The bound is therefore
+    /// `B + rate × T + 1` rather than `B + rate × T`.
     ///
-    /// What survives unchanged is the anti-gaming argument, which is an aggregate one: the extra
-    /// is drawn from the shared bucket, and there is only one of those, so *all* promoted sources
-    /// together can gain at most its throughput. Filling the table costs `max_sources` distinct
-    /// keys and leaves every one of the attacker's sources with less than being tracked would have
-    /// given it. So there is still nothing to gain by filling the table — but "being untracked is
-    /// never better than being tracked", which this doc used to claim outright, is false at the
-    /// moment of promotion.
+    /// That `+1` does not accumulate over repeated promotions, and the mechanism is worth stating
+    /// because elapsed time alone is not the whole of it. The floor only binds when the fallback is
+    /// dry, which leaves the promoted source at zero. The only way back onto the fallback is to be
+    /// swept, [`BudgetState::sweep_replenished`] drops an entry only once it is back at **full**,
+    /// and the sweep *drops* it — so the source forfeits the entire burst it just spent a refill
+    /// period accumulating, and returns holding the floor.
+    ///
+    /// A lap therefore trades `B` earned tokens for `1`. Repetition destroys allowance rather than
+    /// accruing it, which is why the exception stays a single token however many times a source
+    /// goes around. Pinned from both ends:
+    /// `a_floor_grant_leaves_the_source_unsweepable_until_it_refills` for a source that cannot
+    /// refill at all, and `cycling_promotions_over_a_dry_fallback_only_ever_gains_the_floor` for
+    /// one that can.
+    ///
+    /// The price is paid by a *newcomer* promoted while other untracked sources have drained the
+    /// pool: it inherits their spending. Telling it apart from a source promoted out of its own
+    /// debt needs per-source accounting for sources the table has no room to track, which is the
+    /// state the fallback exists to avoid, so the cost is bounded and stated instead of removed —
+    /// at most one burst of deficit, refilling at the ordinary rate, never the first message.
+    ///
+    /// The anti-gaming argument is unchanged and remains an aggregate one: there is one shared
+    /// bucket, so *all* promoted sources together can gain at most its throughput. Filling the
+    /// table costs `max_sources` distinct keys and leaves every one of the attacker's sources with
+    /// less than being tracked would have given it.
+    ///
     /// `Err` names *which* of the two buckets refused (#2576), because they mean different things
     /// to an operator: `PerSource` is one address that has spent its own allowance, `SharedFallback`
     /// is the table having no room to track it at all. Reported as one value they read alike, and
@@ -723,7 +788,7 @@ impl SourcePreAuthBudget {
                 .ok_or(SourceRefusal::SharedFallback);
         }
 
-        let mut bucket = state.fresh_bucket();
+        let mut bucket = state.promotion_bucket();
         let allowed = bucket.try_consume();
         state.per_source.insert(key, bucket);
         // Published from the two places the table can change size — here and the sweep above —
@@ -2913,6 +2978,408 @@ mod source_budget_tests {
             labels.len(),
             "two refusal kinds share a metric label ({labels:?}), so the counter cannot separate \
              them"
+        );
+    }
+
+    // -- #2562: the untracked -> tracked promotion must not mint a second burst -----------------
+
+    /// A burst small enough that "one burst" and "two bursts" are unmistakable in a message.
+    const PROMO_BURST: usize = 8;
+    /// Small on purpose: filling the table is setup, not the property under test.
+    const PROMO_CAP: usize = 4;
+
+    /// A frozen table whose entries are all *below* full, so a sweep can reclaim nothing.
+    ///
+    /// That is what forces the next unknown source onto the shared fallback rather than straight
+    /// into a free slot — the precondition for a promotion to exist at all.
+    fn fill_unreclaimable(budget: &SourcePreAuthBudget, cap: usize) {
+        let mut state = budget.state.lock().expect("test lock");
+        for i in 0..cap {
+            let mut bucket =
+                TokenBucket::new(PROMO_BURST as f64, 0.0, PRE_AUTH_RATE_LIMIT.refill_interval);
+            // One token short of full: not replenished, so `sweep_replenished` retains it.
+            bucket.tokens = PROMO_BURST as f64 - 1.0;
+            state
+                .per_source
+                .insert(key(&format!("203.0.113.{}:1000", 200 + i)), bucket);
+        }
+        assert_eq!(state.per_source.len(), cap);
+    }
+
+    /// Make exactly one tracked entry reclaimable, so the next sweep frees exactly one slot.
+    ///
+    /// `except` is never chosen, and that restriction is the point rather than tidiness: a real
+    /// entry only reaches full by *refilling*, so handing the source under test a full bucket
+    /// would be granting it the very allowance these tests are measuring. Without the exclusion
+    /// this helper silently modelled an attacker who can refill on demand.
+    fn free_one_slot(budget: &SourcePreAuthBudget, except: SourceKey) {
+        let mut state = budget.state.lock().expect("test lock");
+        let victim = *state
+            .per_source
+            .keys()
+            .find(|k| **k != except)
+            .expect("table has an entry other than the source under test");
+        let capacity = state.capacity;
+        state
+            .per_source
+            .get_mut(&victim)
+            .expect("victim present")
+            .tokens = capacity;
+    }
+
+    /// Clear the sweep throttle without moving any allowance.
+    ///
+    /// `advance` rewinds every `last_refill` as well as `last_sweep`, which would normally hand
+    /// out tokens — but every bucket in these tests has `refill_rate = 0`, so the only thing it
+    /// can change is whether [`BUDGET_SWEEP_MIN_INTERVAL`] has elapsed. That is what keeps the
+    /// assertions below about *promotion* rather than about refill.
+    fn allow_next_sweep(budget: &SourcePreAuthBudget) {
+        budget.advance(BUDGET_SWEEP_MIN_INTERVAL);
+    }
+
+    /// Promotion out of the fallback must not hand the source a second burst (#2562).
+    ///
+    /// The transition: a source spends from the shared bucket while the table has no room for it,
+    /// a later sweep frees a slot, and the source is inserted. Inserting a *full* bucket there
+    /// forgets everything it just spent, so across the transition one source could take `2B`
+    /// where its documented burst is `B`.
+    ///
+    /// Every bucket here refills at zero, so the `rate × T` term of the bound is exactly zero and
+    /// any token above the burst was minted by the transition itself rather than earned by
+    /// waiting. That is what makes this a statement about the invariant and not about timing.
+    #[test]
+    fn promotion_out_of_the_fallback_does_not_mint_a_second_burst() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        fill_unreclaimable(&budget, PROMO_CAP);
+
+        let source = key("192.0.2.10:1000");
+
+        // Phase 1 — untracked: everything this source spends comes from the shared bucket.
+        let from_fallback = drain(&budget, source);
+        assert_eq!(
+            from_fallback, PROMO_BURST,
+            "the fallback granted {from_fallback}, not the shared burst of {PROMO_BURST}; this \
+             run never put the source in debt, so it cannot demonstrate the transition"
+        );
+        assert_eq!(
+            budget.tracked_sources(),
+            PROMO_CAP,
+            "the source was tracked while it should have been on the fallback"
+        );
+
+        // Phase 2 — a slot frees and the same source is promoted into it.
+        free_one_slot(&budget, source);
+        allow_next_sweep(&budget);
+        let after_promotion = drain(&budget, source);
+
+        let total = from_fallback + after_promotion;
+        assert!(
+            total <= PROMO_BURST + PROMOTION_LIVENESS_FLOOR,
+            "one source spent {total} across an untracked -> tracked promotion: {from_fallback} \
+             from the shared fallback, then {after_promotion} more from the bucket promotion \
+             handed it. Its burst is {PROMO_BURST} and the refill rate here is zero, so \
+             {} of those tokens were minted by the transition. A promoted source must inherit \
+             the pool it was drawing from, not a fresh allowance.",
+            total.saturating_sub(PROMO_BURST)
+        );
+    }
+
+    /// The control: a promotion the fallback never funded still grants the whole burst.
+    ///
+    /// Without this, "seed every promoted source at the floor" would satisfy the test above while
+    /// quietly making a newly-arrived honest source pay for a saturation it had no part in. The
+    /// table here fills with *replenished* entries, so the sweep frees the slots and the source
+    /// reaches the insert path having spent nothing from the shared bucket.
+    #[test]
+    fn a_promotion_over_an_unspent_fallback_still_grants_the_whole_burst() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        {
+            let mut state = budget.state.lock().expect("test lock");
+            for i in 0..PROMO_CAP {
+                state.per_source.insert(
+                    key(&format!("203.0.113.{}:1000", 210 + i)),
+                    TokenBucket::new(PROMO_BURST as f64, 0.0, PRE_AUTH_RATE_LIMIT.refill_interval),
+                );
+            }
+        }
+
+        let newcomer = key("198.51.100.7:1000");
+        let granted = drain(&budget, newcomer);
+
+        assert_eq!(
+            granted, PROMO_BURST,
+            "a source promoted while the shared bucket was untouched got {granted} of its burst \
+             of {PROMO_BURST}; nothing had drawn on the fallback, so there was no debt to inherit"
+        );
+    }
+
+    /// What the fallback gave and what promotion grants add up to one burst.
+    ///
+    /// Walks the whole range rather than one point: no spending, partial, and a fully drained
+    /// fallback. The identity is exact until the fallback is empty, where the liveness floor is
+    /// the single deliberate exception — a promoted source is always able to send the one message
+    /// that authenticates it out of the anonymous phase.
+    #[test]
+    fn the_fallback_and_the_promotion_together_grant_one_burst() {
+        for taken in [0usize, 1, PROMO_BURST / 2, PROMO_BURST] {
+            let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+            fill_unreclaimable(&budget, PROMO_CAP);
+            let source = key("192.0.2.11:1000");
+
+            for i in 0..taken {
+                assert!(
+                    budget.spend(source).is_ok(),
+                    "fallback refused spend {i} of {taken}"
+                );
+            }
+
+            free_one_slot(&budget, source);
+            allow_next_sweep(&budget);
+            let after_promotion = drain(&budget, source);
+            let total = taken + after_promotion;
+
+            let expected = if taken == PROMO_BURST {
+                PROMO_BURST + PROMOTION_LIVENESS_FLOOR
+            } else {
+                PROMO_BURST
+            };
+            assert_eq!(
+                total, expected,
+                "after taking {taken} from the fallback the source was promoted with \
+                 {after_promotion} more, totalling {total}; expected {expected}"
+            );
+        }
+    }
+
+    /// Retrying while the promoted bucket is still spent grants nothing further.
+    ///
+    /// Deliberately named for what it exercises. It does **not** cover the source refilling and
+    /// being re-promoted — that path is
+    /// [`a_floor_grant_leaves_the_source_unsweepable_until_it_refills`], which is what actually
+    /// bounds the exception in time.
+    #[test]
+    fn a_retry_while_spent_grants_nothing_further() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        fill_unreclaimable(&budget, PROMO_CAP);
+        let source = key("192.0.2.12:1000");
+
+        let from_fallback = drain(&budget, source);
+        free_one_slot(&budget, source);
+        allow_next_sweep(&budget);
+        let first_promotion = drain(&budget, source);
+
+        // Try to go around again: the source's own entry is spent, so it is not sweep-eligible
+        // and nothing can put it back on the fallback.
+        free_one_slot(&budget, source);
+        allow_next_sweep(&budget);
+        let second_round = drain(&budget, source);
+
+        let total = from_fallback + first_promotion + second_round;
+        assert!(
+            total <= PROMO_BURST + PROMOTION_LIVENESS_FLOOR,
+            "cycling sweeps produced {total} for one source against a burst of {PROMO_BURST}: \
+             {from_fallback} on the fallback, {first_promotion} on promotion, {second_round} on a \
+             second attempt. The exception must not be repeatable."
+        );
+    }
+
+    /// A floor grant leaves the source empty, and an empty source cannot be promoted again.
+    ///
+    /// This is what bounds the exception *in time*, and it is the question "is the floor really
+    /// one-time?" answered directly. The only route back onto the fallback is a sweep, and
+    /// [`BudgetState::sweep_replenished`] drops an entry only when it is back at **full**. A source
+    /// that has just taken the floor sits at zero, so the next floor grant is a whole refill of the
+    /// burst away — during which the `rate × T` term of the bound grants it `B`, dwarfing the one
+    /// token by the size of the burst.
+    ///
+    /// The table here never refills, which makes the pinning absolute and the assertion exact: no
+    /// number of sweeps can return this source to the fallback.
+    #[test]
+    fn a_floor_grant_leaves_the_source_unsweepable_until_it_refills() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        fill_unreclaimable(&budget, PROMO_CAP);
+        let source = key("192.0.2.31:1000");
+
+        assert_eq!(
+            drain(&budget, source),
+            PROMO_BURST,
+            "the fallback did not fund the source, so no floor grant follows"
+        );
+        free_one_slot(&budget, source);
+        allow_next_sweep(&budget);
+        assert_eq!(
+            drain(&budget, source),
+            PROMOTION_LIVENESS_FLOOR,
+            "the promotion did not go through the floor, so this run does not test repeating it"
+        );
+
+        // The source is now tracked and empty. Free a slot and sweep repeatedly: none of it can
+        // reclaim *this* entry, so the source can never draw on the fallback again — and so can
+        // never be handed the floor again — until it has refilled to full.
+        for round in 1..=4 {
+            free_one_slot(&budget, source);
+            allow_next_sweep(&budget);
+            assert_eq!(
+                budget.spend(source),
+                Err(SourceRefusal::PerSource),
+                "on sweep round {round} an empty promoted source left its entry and reached the \
+                 fallback again; the floor would then be repeatable without refilling"
+            );
+        }
+    }
+
+    /// Keep the shared fallback empty, as busy neighbours would.
+    ///
+    /// The floor only binds against a dry fallback, so holding it dry is how a test reaches the
+    /// one path where cycling could pay.
+    fn hold_fallback_dry(budget: &SourcePreAuthBudget) {
+        let mut state = budget.state.lock().expect("test lock");
+        state.shared.tokens = 0.0;
+        // Consume the elapsed time as well. Zeroing the balance alone leaves the refill credit
+        // that `advance` just created still owed, and `promotion_bucket` calls `refill()` before
+        // reading the level — so the pool would be full again by the time it is inherited.
+        state.shared.last_refill = Instant::now();
+    }
+
+    /// Is this source currently holding a tracked entry?
+    fn tracked(budget: &SourcePreAuthBudget, k: SourceKey) -> bool {
+        budget
+            .state
+            .lock()
+            .expect("test lock")
+            .per_source
+            .contains_key(&k)
+    }
+
+    /// Put the table in the one state from which a promotion can repeat: the source tracked with a
+    /// **full** bucket, and every other slot held by an entry that can never be reclaimed.
+    ///
+    /// Full is the precondition for being swept, and being swept is the only route back onto the
+    /// fallback — so this is the top of the cycle an attacker would have to ride.
+    fn source_tracked_and_full(budget: &SourcePreAuthBudget, source: SourceKey, refill: f64) {
+        let mut state = budget.state.lock().expect("test lock");
+        state.per_source.clear();
+        state.per_source.insert(
+            source,
+            TokenBucket::new(PROMO_BURST as f64, refill, Duration::from_millis(100)),
+        );
+        for i in 0..(PROMO_CAP - 1) {
+            let mut filler = TokenBucket::new(PROMO_BURST as f64, 0.0, Duration::from_millis(100));
+            filler.tokens = PROMO_BURST as f64 - 1.0;
+            state
+                .per_source
+                .insert(key(&format!("203.0.113.{}:1000", 220 + i)), filler);
+        }
+        assert_eq!(
+            state.per_source.len(),
+            PROMO_CAP,
+            "table should be saturated"
+        );
+    }
+
+    /// Cycling promotions over a dry fallback gains the floor and forfeits a whole burst each lap.
+    ///
+    /// The refill-and-repromotion path, with a **real** refill rate — the test above pins the
+    /// degenerate case where a source can never refill at all, which is not the case worth arguing
+    /// about.
+    ///
+    /// What bounds it is not elapsed time alone. To be swept an entry must be at **full**, and the
+    /// sweep *drops* it, so the source forfeits the entire burst it spent a refill period
+    /// accumulating and comes back holding the floor. Each lap trades `B` earned tokens for `1`.
+    /// Cycling is not a way to accumulate an advantage; it destroys allowance the source already
+    /// had.
+    #[test]
+    fn cycling_promotions_over_a_dry_fallback_only_ever_gains_the_floor() {
+        const LAPS: usize = 3;
+        const REFILL: f64 = 1.0;
+        let budget = SourcePreAuthBudget::with_policy(
+            PROMO_BURST as f64,
+            REFILL,
+            Duration::from_millis(100),
+            PROMO_CAP,
+        );
+        let source = key("192.0.2.32:1000");
+
+        let mut gained = 0usize;
+        for lap in 1..=LAPS {
+            // Top of the cycle: the source holds a full bucket — B tokens it could spend now.
+            source_tracked_and_full(&budget, source, REFILL);
+
+            // An unrelated source misses against the saturated table. That is what runs the sweep,
+            // and the sweep drops the source's full entry: the forfeiture. The throttle has to be
+            // cleared first or the miss reclaims nothing and the lap measures nothing.
+            allow_next_sweep(&budget);
+            hold_fallback_dry(&budget);
+            let probe = key(&format!("198.51.100.{}:1000", 60 + lap));
+            let _ = budget.spend(probe);
+            assert!(
+                !tracked(&budget, source),
+                "lap {lap}: the sweep did not drop the source's full entry, so this lap never \
+                 forfeited anything and cannot measure the trade"
+            );
+
+            // Give it a slot back and let it be promoted over a fallback its neighbours keep dry.
+            free_one_slot(&budget, probe);
+            allow_next_sweep(&budget);
+            hold_fallback_dry(&budget);
+
+            let granted = drain(&budget, source);
+            assert_eq!(
+                granted, PROMOTION_LIVENESS_FLOOR,
+                "lap {lap}: promotion over a dry fallback granted {granted}, not the floor — a \
+                 source riding this cycle would accumulate more than one token per lap"
+            );
+            gained += granted;
+        }
+
+        let forfeited = LAPS * PROMO_BURST;
+        assert_eq!(
+            gained,
+            LAPS * PROMOTION_LIVENESS_FLOOR,
+            "riding {LAPS} promotion cycles gained {gained} tokens"
+        );
+        assert!(
+            gained < forfeited,
+            "cycling gained {gained} against {forfeited} forfeited — a lap must be a net loss, or \
+             repetition becomes an attack rather than a waste"
+        );
+    }
+
+    /// One source draining the fallback does not hand its neighbour a fresh burst either.
+    ///
+    /// The NAT-shaped case, stated rather than buried: while the table is saturated the fallback
+    /// is shared, so a second source promoted after the first has drained it inherits the empty
+    /// pool and receives only the liveness floor. That is the cost of not keeping per-source
+    /// accounting for sources the table has no room to track — it is bounded at one burst, it
+    /// refills at the ordinary rate, and it never denies the source its first message.
+    #[test]
+    fn a_neighbour_promoted_after_the_fallback_is_drained_inherits_the_empty_pool() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        fill_unreclaimable(&budget, PROMO_CAP);
+
+        let noisy = key("192.0.2.20:1000");
+        let neighbour = key("192.0.2.21:1000");
+
+        assert_eq!(
+            drain(&budget, noisy),
+            PROMO_BURST,
+            "the noisy source did not drain the shared fallback"
+        );
+        assert_eq!(
+            budget.spend(neighbour),
+            Err(SourceRefusal::SharedFallback),
+            "the neighbour should be meeting the drained *fallback*, not a bucket of its own"
+        );
+
+        free_one_slot(&budget, neighbour);
+        allow_next_sweep(&budget);
+        let granted = drain(&budget, neighbour);
+
+        assert_eq!(
+            granted, PROMOTION_LIVENESS_FLOOR,
+            "a neighbour promoted over a drained fallback got {granted}; it must get the liveness \
+             floor — enough to authenticate at once — and no more, or the drained pool would be a \
+             way to mint bursts"
         );
     }
 }
