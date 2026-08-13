@@ -363,7 +363,80 @@ Applying facts 12–15 to the 8 pre-containment mutation variants:
 | `ProposalClosed` | mutates `gov:proposal:{id}` + proof | n/a | **undecided** (§7.2) | contain |
 | `DomainCreated` / `DomainUpdated` | `gov:domain:{id}` | Yes | **none exists** (fact 8) | contain |
 
-**v1 restores exactly one variant: `VoteCast`.**
+**Structurally, `VoteCast` is the only candidate. It is not sufficient on its own — see
+§7.0, which narrows this further.**
+
+### 7.0 Membership is not the complete authority predicate for a vote
+
+Re-derived at `c3782321`. StaticList membership is **never** the complete authority
+predicate for `VoteCast` in the production composition:
+
+- `cast_vote` consults a `SuspensionChecker` before recording a vote —
+  `403 Forbidden` if the voter is suspended (`apps/governance/src/http/configure.rs:374–388`,
+  enforced at `handlers.rs:875`). Production wires it to
+  `CoopManager::is_member_suspended` (`icn-gateway/src/server.rs:1904–1908`, installed at
+  `:1947`).
+- `close_proposal` **revalidates** active commons Member standing for every voter and
+  excludes those who lost it (`actor.rs:2149–2189`, driven by handler-computed
+  `eligible_voters`).
+- `GovernanceContextValidationError` (`configure.rs:183`) states outright that production
+  deployments must wire `MemberStandingChecker`, `SuspensionChecker`, a
+  `MembershipResolver` and a `MandateGate`, because *"unresolved standing must not be
+  treated as standing."*
+
+Critically, **a suspended member remains in the domain's `StaticList`.** That is precisely
+the configuration `icn-gateway/tests/e2e_close_time_revalidation.rs` constructs: a
+three-member StaticList domain where Bob's *commons* standing flips to Suspended while his
+StaticList entry is untouched, and his vote is then excluded at resolution. The file states
+the principle directly — *"standing is a continuous predicate across the full decision arc,
+not a one-time entry gate."*
+
+**Consequence for this design.** A suspended-but-listed DID would pass every check in
+§5.6: the signature verifies, the domain resolves, the source is `StaticList`, the
+`membership_hash` matches (they are still listed), and `author ∈ members`. The replication
+path would therefore **apply a vote that the HTTP path refuses with 403** — a bypass of a
+live production gate, reachable by any suspended member who publishes over gossip instead
+of over HTTP.
+
+**Why close-time revalidation does not rescue it.** It filters the *effective tally*, so
+the final outcome is protected on the closing node — but (a) the vote is stored and
+observable before close; (b) revalidation is handler-driven and fails open when the checker
+is unwired (`configure.rs:552–570` says so explicitly for the resolver case); (c) it does
+not make *stored state* converge, so nodes hold different vote sets; and (d) relying on
+downstream filtering to neutralize a write the ingress already believed illegitimate is the
+snapshot-only posture that revalidation was introduced to replace. An ingress must not
+knowingly write state it cannot justify.
+
+**Why the predicate cannot be checked on the receiver.** It lives in commons/coop state,
+which is not governance state, is not reachable from `GovernanceActor` at all (the checkers
+are HTTP-layer closures the actor never sees), and whose own replication is the
+unauthenticated class tracked by #2441. Verifying it on a receiving node would mean
+resolving authority against untrusted, non-deterministic state — manufacturing false
+determinism, and reintroducing the circularity I9 forbids.
+
+Binding a `standing_hash` into the envelope would be **actively wrong** for the same
+reason: the receiver would compare it against commons state that is itself unauthenticated.
+
+### 7.0.1 The resulting v1 authority boundary
+
+> **v1 boundary = `StaticList` membership **AND** no external authority predicate applies
+> on the receiving node.**
+>
+> Not "StaticList-only". A composition that wires a `SuspensionChecker` (or any standing,
+> capability, charter or mandate gate) over vote casting **stays contained**, because the
+> receiver cannot deterministically evaluate that predicate.
+
+Since the production gateway composition always wires `SuspensionChecker`, the honest
+statement is: **authenticated `VoteCast` application is not restorable in the production
+composition in v1.** It is restorable only where no external predicate is wired, and the
+ingress slice must *detect* which composition it is in and fail closed by default — an
+unwired checker must read as "predicate unresolved," never as "predicate satisfied," per
+`configure.rs:183`.
+
+Unblocking production needs a deterministic, authenticated standing source. That is
+squarely #2441's territory (authenticated institutional-state replication) and is **not**
+in scope here. This is the second place where #2469 and #2441 turn out to be genuinely
+coupled — the first being the shared quarantine machinery (§11).
 
 ### 7.1 Why `DelegationRevoked` is excluded despite being safe
 
@@ -547,6 +620,16 @@ unit tests are listed separately in §13.
 15. `ProposalOpened` on a terminal proposal → rejected **even when fully authorized** (T6).
 16. Reopen→close finalization bypass → outcome unchanged.
 
+**Standing predicate — §7.0**
+16b. **A suspended-but-listed member's validly signed `VoteCast` → not applied.** Build the
+     `e2e_close_time_revalidation.rs` shape: DID stays in the `StaticList`, commons standing
+     flips to Suspended. Signature, domain, `membership_hash` and membership all pass, so
+     this fails unless the standing predicate is consulted.
+16c. **A composition with a `SuspensionChecker` wired → `VoteCast` not applied at all**, and
+     asserted as deliberate rather than incidental.
+16d. **An unwired checker reads as "unresolved", not "satisfied"** — the ingress must fail
+     closed, matching `configure.rs:183`.
+
 **Containment retained**
 17. A validly signed, authority-bearing `ProposalCreated` / `DelegationCreated` /
     `DomainCreated` → **still not applied** (§7, §8), asserted as deliberate.
@@ -563,13 +646,13 @@ unit tests are listed separately in §13.
 
 | Slice | Content | Restores state application? |
 |---|---|---|
-| **1** | `SignedGovernanceOp` type, magic + version, canonical encoding, `membership_hash`, sign/verify, derived `op_id`. **Library only, unwired.** | No |
+| **1** | `SignedGovernanceOp` type, magic + version, canonical encoding, `membership_hash`, sign/verify (refusing an author/key mismatch), derived `op_id`. **Library only, unwired.** | No |
 | 2 | Recompute `entry.hash` on receipt in gossip. Generic, separable. | No |
 | 3 | Emit signed envelopes from the governance publish path (durable per-`(author,domain)` seq, #2510 pattern); accept both shapes; apply nothing. | No |
 | 4 | Bounded quarantine store + steward release valve. | No |
 | 5 | Durable `op_id` applied-set + the §10.3 comparator in the state store. | No (local semantics only) |
 | 6 | Lifecycle monotonicity guard, enforced unconditionally. | No |
-| 7 | **Verify + authority + apply, lifting containment for `VoteCast` only.** Containment tests updated, not deleted. | **Yes** |
+| 7 | **Verify + authority + apply, lifting containment for `VoteCast` only, and only in a composition with no external standing predicate (§7.0.1).** Must fail closed when a `SuspensionChecker` or equivalent is wired. Containment tests updated, not deleted. | **Yes, narrowly** |
 
 Slices 1–6 restore nothing. Slice 7 is the only one that lifts containment, and does so in
 the same change that proves positive convergence (test 18).
@@ -594,6 +677,7 @@ the envelope:
 | Collision arbitration | Contain the affected classes (§8) | No — no field needed |
 | Authority snapshot scope | Membership only, not whole config (§5.4) | Yes → **removes `domain_config_hash`** |
 | First restorable variant set | `VoteCast` only (§7) | No — `op_kind` already carries it |
+| **Standing / suspension predicate** (§7.0) | Ingress policy; fail closed where it applies | **No** — see below |
 | `ProposalClosed` authority (old O2) | Contained; deferred with the proof-signer model | No |
 | Key rotation / revocation | Membership-mediated in v1 (§9) | No |
 | Quarantine bounds (old O3) | Slice 4 detail | No |
@@ -602,4 +686,17 @@ The remaining unknowns — derived identifiers, tally-rooted lifecycle authority
 membership witnesses — all resolve into either a **new `ReplicationAuthority` variant** or a
 **version bump**, which is precisely what `version` and the one-variant enum exist to absorb.
 
-**Slice 1 is cleared to implement.**
+### 14.1 Why the standing finding does not move the field set
+
+The §7.0 discovery narrows *what v1 may apply*, not *what v1 must sign*. The envelope
+already binds author, domain, membership snapshot and content; the suspension predicate is
+evaluated against **receiver-local** state at ingress, exactly like the domain lookup and
+the membership check, none of which are carried on the wire either.
+
+Adding a `standing_hash` was considered and rejected: the receiver would have to compare it
+against commons state that is itself unauthenticated (#2441), so the field would create the
+appearance of a deterministic check over non-deterministic data — worse than having no
+field, because it would look like the hole was closed.
+
+**Field set frozen as in §5.1. Slice 1 stands; the correction lands in §7.0/§7.0.1 and in
+slice 7's policy.**

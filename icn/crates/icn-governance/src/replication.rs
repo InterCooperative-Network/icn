@@ -97,6 +97,18 @@ pub enum ReplicationEnvelopeError {
     /// The message variant cannot be carried in a replication envelope.
     #[error("governance message variant {0} is not a replicable state mutation")]
     NotReplicable(&'static str),
+
+    /// The signing key does not belong to the DID named as author.
+    ///
+    /// Constructing such an envelope would produce an object that can never verify, so
+    /// the signing constructor refuses rather than emitting one.
+    #[error("signing key belongs to {derived}, not the declared author {declared}")]
+    AuthorKeyMismatch {
+        /// The DID the supplied signing key actually corresponds to.
+        derived: Box<Did>,
+        /// The DID the caller asked to name as author.
+        declared: Box<Did>,
+    },
 }
 
 /// The basis on which an author claims authority over a domain.
@@ -149,17 +161,35 @@ pub enum GovernanceOpKind {
     DelegationRevoked,
 }
 
-/// Operation kinds authenticated replication v1 is permitted to apply.
+/// Operation kinds authenticated replication v1 may apply — **necessary, not sufficient**.
 ///
-/// Only `VoteCast`: its storage key `gov:vote:{proposal}:{voter}` already embeds the voter
-/// DID, so once the voter is authenticated a cross-author key collision is impossible by
-/// construction. Every other kind either has no authority root (`DomainCreated`,
-/// `DomainUpdated`), has a caller-chosen identifier that permits cross-author collision
-/// (`ProposalCreated`, `DelegationCreated`), or has an undecided state-transition authority
-/// (`ProposalOpened`, `ProposalClosed`).
+/// Only `VoteCast` clears the *structural* bar: its storage key
+/// `gov:vote:{proposal}:{voter}` already embeds the voter DID, so once the voter is
+/// authenticated a cross-author key collision is impossible by construction. Every other
+/// kind either has no authority root (`DomainCreated`, `DomainUpdated`), has a
+/// caller-chosen identifier permitting cross-author collision (`ProposalCreated`,
+/// `DelegationCreated`), or has an undecided state-transition authority (`ProposalOpened`,
+/// `ProposalClosed`).
+///
+/// # Membership is not the whole authority predicate
+///
+/// Passing this list does **not** mean an operation may be applied. In the production
+/// composition, casting a vote additionally requires that the voter is *not suspended*:
+/// `cast_vote` consults a `SuspensionChecker` wired to `CoopManager::is_member_suspended`
+/// (`icn-gateway/src/server.rs:1904`), and `close_proposal` revalidates active commons
+/// Member standing for every voter. A suspended member **remains in the domain's
+/// `StaticList`** — that is exactly the shape
+/// `icn-gateway/tests/e2e_close_time_revalidation.rs` exercises.
+///
+/// That predicate lives in commons/coop state, which is not governance state, is not
+/// visible to `GovernanceActor` at all (the checkers are HTTP-layer closures), and whose
+/// own replication is the unauthenticated class tracked by #2441. It therefore **cannot be
+/// deterministically evaluated on a receiving node**, so the ingress slice must fail closed
+/// wherever such a predicate applies rather than apply on membership alone.
 ///
 /// This is a **declaration**, not an enforcement point — enforcement lands with the ingress
 /// slice. It lives here so the decision is version-controlled next to the wire format.
+/// See `docs/design/authenticated-governance-replication.md` §7.0 and §7.0.1.
 pub const V1_RESTORABLE_OP_KINDS: &[GovernanceOpKind] = &[GovernanceOpKind::VoteCast];
 
 impl GovernanceOpKind {
@@ -262,6 +292,11 @@ impl SignedGovernanceOp {
     /// for same-key conflicts, never an acceptance gate**: a receiver must not reject an
     /// operation for having a lower `seq` than one already seen, because gossip delivers
     /// out of order and doing so would permanently discard legitimate operations.
+    ///
+    /// Refuses with [`ReplicationEnvelopeError::AuthorKeyMismatch`] if `signing_key` does
+    /// not belong to `author`. A public constructor must not hand back an object that is
+    /// unverifiable by construction — the caller would have no way to notice until a
+    /// remote node rejected it.
     pub fn sign(
         signing_key: &SigningKey,
         author: Did,
@@ -270,6 +305,14 @@ impl SignedGovernanceOp {
         seq: u64,
         op: &GovernanceMessage,
     ) -> Result<Self, ReplicationEnvelopeError> {
+        let derived = Did::from_public_key(&signing_key.verifying_key());
+        if derived != author {
+            return Err(ReplicationEnvelopeError::AuthorKeyMismatch {
+                derived: Box::new(derived),
+                declared: Box::new(author),
+            });
+        }
+
         let op_kind = GovernanceOpKind::from_message(op)
             .ok_or(ReplicationEnvelopeError::NotReplicable(op.message_type()))?;
 
@@ -584,23 +627,59 @@ mod tests {
     }
 
     #[test]
-    fn a_signature_from_a_different_key_does_not_verify() {
+    fn signing_refuses_to_name_an_author_the_key_does_not_belong_to() {
         let alice = keypair();
         let mallory = keypair();
 
-        // Mallory signs, but the envelope names Alice as author.
-        let env = SignedGovernanceOp::sign(
+        // Mallory's key, Alice's name. The constructor must refuse rather than hand back
+        // an object that can never verify.
+        let result = SignedGovernanceOp::sign(
             &signing_key(&mallory),
             alice.did().clone(),
             domain(),
             authority(),
             1,
             &vote_msg(alice.did()),
+        );
+
+        match result {
+            Err(ReplicationEnvelopeError::AuthorKeyMismatch { derived, declared }) => {
+                assert_eq!(*derived, *mallory.did());
+                assert_eq!(*declared, *alice.did());
+            }
+            other => panic!("expected AuthorKeyMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_signature_from_a_different_key_does_not_verify() {
+        // The constructor refuses this shape now, so build the adversarial object the way
+        // a hostile peer would have to: sign as Mallory, then rewrite the author on the
+        // wire. The verifier must still be what catches it — a constructor-side check
+        // protects honest callers, not against an attacker who never calls it.
+        let alice = keypair();
+        let mallory = keypair();
+
+        let mut env = SignedGovernanceOp::sign(
+            &signing_key(&mallory),
+            mallory.did().clone(),
+            domain(),
+            authority(),
+            1,
+            &vote_msg(alice.did()),
         )
         .unwrap();
+        env.author = alice.did().clone();
 
         assert_eq!(
             env.verify(),
+            Err(ReplicationEnvelopeError::SignatureInvalid)
+        );
+
+        // The tampered frame must not survive a decode→verify round trip either.
+        let round = SignedGovernanceOp::decode(&env.encode()).unwrap();
+        assert_eq!(
+            round.verify(),
             Err(ReplicationEnvelopeError::SignatureInvalid)
         );
     }
@@ -985,6 +1064,9 @@ mod tests {
 
     #[test]
     fn only_vote_cast_is_restorable_in_v1() {
+        // Structural eligibility only. Clearing this list is necessary, not sufficient —
+        // the production suspension predicate is an additional ingress gate that this
+        // module deliberately does not model. See the constant's docs.
         assert!(GovernanceOpKind::VoteCast.is_restorable_in_v1());
         for kind in [
             GovernanceOpKind::DomainCreated,
