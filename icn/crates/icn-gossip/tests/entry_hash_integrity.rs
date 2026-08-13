@@ -137,6 +137,11 @@ async fn pull_response_entry_with_mismatched_hash_cannot_bypass_the_check() {
     let claimed_hash = sha256(honest_payload);
     let forged = entry_with(&sender, claimed_hash, b"attacker-substituted payload");
 
+    // Echoes the nonce of the PullRequest this answers. Despite the field name it is a
+    // request/response correlation id from `PeerSyncState::next_nonce`, not a cryptographic
+    // nonce — nothing about the check under test depends on its value.
+    let correlation_nonce = u64::from_le_bytes(claimed_hash[..8].try_into().unwrap());
+
     let result = gossip
         .handle_message(
             &sender,
@@ -144,7 +149,7 @@ async fn pull_response_entry_with_mismatched_hash_cannot_bypass_the_check() {
                 topic: TOPIC.to_string(),
                 entries: vec![forged],
                 truncated: false,
-                nonce: 1,
+                nonce: correlation_nonce,
                 next_cursor: None,
             },
         )
