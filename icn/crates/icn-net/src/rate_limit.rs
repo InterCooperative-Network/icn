@@ -724,10 +724,16 @@ impl SourcePreAuthBudget {
     ///
     /// What remains is [`PROMOTION_LIVENESS_FLOOR`] — one token, so that a promoted source can
     /// always send the Hello that authenticates it out of this phase. The bound is therefore
-    /// `B + rate × T + 1` rather than `B + rate × T`, and the extra token is not repeatable at
-    /// will: a second promotion requires the source to be swept first, and a sweep only drops a
-    /// bucket that is back to **full** — by which point the allowance was earned rather than
-    /// minted.
+    /// `B + rate × T + 1` rather than `B + rate × T`.
+    ///
+    /// That `+1` is bounded *per window*, not merely per promotion, and the mechanism is worth
+    /// stating because it is not obvious. The floor only binds when the fallback is dry, which
+    /// leaves the promoted source at zero tokens. The only way back onto the fallback is to be
+    /// swept, and [`BudgetState::sweep_replenished`] drops an entry only once it is back at
+    /// **full** — a whole burst of refill away. So consecutive floor grants to one source are
+    /// separated by a full renewal window, over which the `rate × T` term already grants it `B`.
+    /// The exception cannot be cycled faster than the allowance it is an exception to.
+    /// Pinned by `a_floor_grant_leaves_the_source_unsweepable_until_it_refills`.
     ///
     /// The price is paid by a *newcomer* promoted while other untracked sources have drained the
     /// pool: it inherits their spending. Telling it apart from a source promoted out of its own
@@ -3140,13 +3146,14 @@ mod source_budget_tests {
         }
     }
 
-    /// A second promotion does not compound the exception.
+    /// Retrying while the promoted bucket is still spent grants nothing further.
     ///
-    /// To be promoted again a source must first be swept, and a sweep only drops a bucket that is
-    /// back to full — by which point the allowance was earned rather than minted. Pinned because
-    /// "once per promotion" is only a bound if promotions cannot be cycled.
+    /// Deliberately named for what it exercises. It does **not** cover the source refilling and
+    /// being re-promoted — that path is
+    /// [`a_floor_grant_leaves_the_source_unsweepable_until_it_refills`], which is what actually
+    /// bounds the exception in time.
     #[test]
-    fn repeated_promotions_do_not_compound() {
+    fn a_retry_while_spent_grants_nothing_further() {
         let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
         fill_unreclaimable(&budget, PROMO_CAP);
         let source = key("192.0.2.12:1000");
@@ -3169,6 +3176,51 @@ mod source_budget_tests {
              {from_fallback} on the fallback, {first_promotion} on promotion, {second_round} on a \
              second attempt. The exception must not be repeatable."
         );
+    }
+
+    /// A floor grant leaves the source empty, and an empty source cannot be promoted again.
+    ///
+    /// This is what bounds the exception *in time*, and it is the question "is the floor really
+    /// one-time?" answered directly. The only route back onto the fallback is a sweep, and
+    /// [`BudgetState::sweep_replenished`] drops an entry only when it is back at **full**. A source
+    /// that has just taken the floor sits at zero, so the next floor grant is a whole refill of the
+    /// burst away — during which the `rate × T` term of the bound grants it `B`, dwarfing the one
+    /// token by the size of the burst.
+    ///
+    /// The table here never refills, which makes the pinning absolute and the assertion exact: no
+    /// number of sweeps can return this source to the fallback.
+    #[test]
+    fn a_floor_grant_leaves_the_source_unsweepable_until_it_refills() {
+        let budget = frozen_table(PROMO_BURST as f64, PROMO_CAP);
+        fill_unreclaimable(&budget, PROMO_CAP);
+        let source = key("192.0.2.31:1000");
+
+        assert_eq!(
+            drain(&budget, source),
+            PROMO_BURST,
+            "the fallback did not fund the source, so no floor grant follows"
+        );
+        free_one_slot(&budget, source);
+        allow_next_sweep(&budget);
+        assert_eq!(
+            drain(&budget, source),
+            PROMOTION_LIVENESS_FLOOR,
+            "the promotion did not go through the floor, so this run does not test repeating it"
+        );
+
+        // The source is now tracked and empty. Free a slot and sweep repeatedly: none of it can
+        // reclaim *this* entry, so the source can never draw on the fallback again — and so can
+        // never be handed the floor again — until it has refilled to full.
+        for round in 1..=4 {
+            free_one_slot(&budget, source);
+            allow_next_sweep(&budget);
+            assert_eq!(
+                budget.spend(source),
+                Err(SourceRefusal::PerSource),
+                "on sweep round {round} an empty promoted source left its entry and reached the \
+                 fallback again; the floor would then be repeatable without refilling"
+            );
+        }
     }
 
     /// One source draining the fallback does not hand its neighbour a fresh burst either.
