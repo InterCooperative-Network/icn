@@ -29,12 +29,19 @@ export function resolveBranch(rawBranch: string): string {
 }
 
 /**
- * Enumerate worktree directories under `wtRoot`.
+ * Enumerate candidate worktree entries under `wtRoot`.
  *
  * Returns the failure instead of swallowing it: an unreadable worktree root
  * previously collapsed to `[]`, which is indistinguishable from "no worktrees
  * exist" and reads as success. That is how a misconfigured root stayed
  * invisible while dozens of worktrees went unreported.
+ *
+ * The only filter applied is dotfile exclusion — entries are NOT stat'd, so a
+ * stray non-directory file under `wtRoot` is returned as a candidate. That is
+ * deliberate and consistent with the rule above: the caller resolves each entry
+ * and reports what it finds, so a stray entry surfaces as a visible per-worktree
+ * error rather than being silently filtered out of the listing. Hiding entries
+ * here would reintroduce the same class of defect one level down.
  */
 export function readWorktreeDirs(
   wtRoot: string,
