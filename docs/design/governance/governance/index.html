@@ -728,11 +728,21 @@ let governance_handle = GovernanceActor::spawn(
 </code></pre>
 <p>This mode provides:</p>
 <ul>
-<li><strong>Gossip-based synchronization</strong>: <code>governance:proposal</code> topic</li>
+<li><strong>Gossip-based synchronization</strong>: <code>governance:proposal</code> topic — <strong>outbound only at present;
+see the note below</strong></li>
 <li><strong>Persistent storage</strong>: Domains, proposals, votes in Sled</li>
 <li><strong>Auto-close scheduling</strong>: Background task closes proposals when voting period ends</li>
 <li><strong>Event bus integration</strong>: <code>ProposalAccepted</code> events trigger ledger transactions</li>
 </ul>
+<blockquote>
+<p><strong>Inbound governance replication is suspended.</strong> Locally originated governance is still
+published to the <code>governance:proposal</code> topic, but governance messages <em>received</em> over
+gossip are refused before they are applied. <code>GossipEntry</code> carries a claimed author DID
+and no signature binding it to the entry contents, so a peer could claim any DID;
+applying those messages was an unauthenticated write into governance state. Nodes
+therefore do not currently converge on each other&#39;s domains, proposals, votes or
+delegations. Authenticated replication is tracked in issue #2469.</p>
+</blockquote>
 <p>RPC clients use <code>governance.*</code> methods which delegate to <code>GovernanceHandle</code>:</p>
 <pre><code class="language-bash">icnctl gov proposal create --domain-id &quot;coop:food&quot; --title &quot;Budget&quot;
 # → JSON-RPC to icnd → GovernanceHandle → gossip broadcast
@@ -801,7 +811,7 @@ Other nodes ←────── │  GossipActor    │
 <tbody><tr>
 <td>Production deployment</td>
 <td>GovernanceActor</td>
-<td>Full gossip, persistence, scheduling</td>
+<td>Persistence, scheduling, <strong>outbound</strong> gossip publication. Inbound governance replication is refused — see §11.3 note and issue #2469</td>
 </tr>
 <tr>
 <td>CLI operations</td>
@@ -826,7 +836,7 @@ Other nodes ←────── │  GossipActor    │
 <tr>
 <td>Integration tests</td>
 <td>GovernanceActor</td>
-<td>Multi-node gossip validation</td>
+<td>Single-node validation. Multi-node governance convergence does not currently occur (inbound replication refused)</td>
 </tr>
 </tbody></table>
 <h3>11.5 Source of Truth</h3>

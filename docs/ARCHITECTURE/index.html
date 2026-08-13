@@ -226,6 +226,15 @@ impl RateLimiter {
 <p><strong>Model:</strong> Causal consistency through gossip. All nodes gossip their changes. Each node independently applies gossipped changes in causal order (vector clocks). No quorum needed. Partition-tolerant: if the network splits, both halves continue operating, and merge deterministically when reconnected.</p>
 <p><strong>Why not consensus?</strong> Consensus (Raft, PBFT) couples liveness to quorum: if 33% go offline, the network halts. Cooperatives need availability. Consensus also centralizes power: honest-majority assumption means you need pre-agreed validators. Causal consistency lets any peer participate, and lets the network heal from partitions.</p>
 <p><strong>Governance coordination:</strong> Proposals and votes gossip. Each node tallies votes independently. Once a threshold is reached, the governance oracle executes the decision. No central authority needed.</p>
+<blockquote>
+<p><strong>Current status — governance replication is suspended.</strong> The design above describes the
+intended model, not present behavior. Governance messages received over gossip are
+refused before they are applied to governance state: <code>GossipEntry</code> carries a claimed
+author DID but no signature binding it to the entry contents, so a replicated governance
+message is indistinguishable from a forged one and applying it was an unauthenticated
+write primitive. Locally originated governance is unaffected; cross-node governance
+convergence does not currently occur. Authenticated replication is tracked in issue #2469.</p>
+</blockquote>
 <p><strong>Crate:</strong> <code>icn-gossip</code>, <code>icn-ledger</code> (deterministic merge), <code>icn-governance</code> (proposal dispatch), <code>icn-protocol</code> (message ordering)</p>
 <!-- truth: descriptive -->
 
@@ -1070,7 +1079,9 @@ Federation ──→ Federation (nested federations)
 <ul>
 <li>State: Proposal ledger</li>
 <li>Communication: Announce proposals, gossip votes</li>
-<li>Coordination: Tally votes across peers (no consensus needed, just gossip)</li>
+<li>Coordination: Tally votes across peers (no consensus needed, just gossip) — <strong>note:</strong>
+inbound governance replication is currently refused, so votes do not propagate between
+nodes today; tallying is per-node over locally recorded votes. See §4.7 and issue #2469</li>
 <li>Authorization: Gates voting by membership</li>
 <li>Time: Voting period (block numbers, not wall time)</li>
 </ul>
