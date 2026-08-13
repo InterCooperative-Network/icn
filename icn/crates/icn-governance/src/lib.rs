@@ -69,6 +69,7 @@ pub mod protocol_store;
 #[allow(missing_docs)]
 pub mod protocol_validation;
 #[allow(missing_docs)]
+pub mod replication;
 pub mod resolver;
 #[allow(missing_docs)]
 pub mod sdis;
