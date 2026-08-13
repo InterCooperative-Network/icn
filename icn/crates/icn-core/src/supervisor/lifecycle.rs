@@ -2103,4 +2103,110 @@ mod core_oracle_registration_tests {
              fail closed; got {decision:?}"
         );
     }
+
+    // ---- Composition contract: config -> register_core_oracles -> real limiter ----
+    //
+    // Everything above stops at the `ConstraintSet` the registry hands back, and the
+    // integration suite in `tests/network_domain_oracle_registration.rs` starts from a
+    // hand-built registry — its helper says as much ("Mirrors what
+    // `register_core_oracles` produces"). Each half is real; the seam between them is
+    // not covered by either. A constraint the composition root emits correctly and the
+    // limiter then ignores would satisfy both suites and still be wrong on a live node.
+    //
+    // These two tests span that seam: one operator config, through the real
+    // `register_core_oracles`, into a real `icn_net::RateLimiter`, asserted on the only
+    // thing an operator can actually observe — how many messages get admitted.
+
+    fn limiter_fallback() -> icn_net::RateLimitConfig {
+        // Deliberately far above any configured tier, so anything observed being
+        // blocked was blocked by the oracle decision and not by the fallback bucket.
+        icn_net::RateLimitConfig {
+            max_messages_per_second: 1000,
+            burst_capacity: 1000,
+            ..icn_net::RateLimitConfig::default()
+        }
+    }
+
+    fn limiter_peer() -> icn_identity::Did {
+        // Fixed, valid DID: the trust path parses the actor, and an unparseable one
+        // would take a different branch than the one under test.
+        icn_identity::Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9")
+            .expect("test DID must parse")
+    }
+
+    /// Positive control: the operator's configured burst reaches the real limiter.
+    ///
+    /// `tiered_rate_limiting()` sets `isolated` to a burst of 2, and `FakeTrust` scores
+    /// the peer 0.0 — the isolated class. The whole chain runs for real: config ->
+    /// `register_core_oracles` -> `OracleRegistry` -> `RateLimiter::check_rate_limit`.
+    ///
+    /// The registry assertion is a precondition guard, not the property. The property
+    /// is the admit count: if the limiter ever stops honouring `burst_size`, the
+    /// constraint-value tests above still pass and only this one fails.
+    #[tokio::test]
+    async fn the_configured_burst_survives_into_the_real_limiter() {
+        let registry = std::sync::Arc::new(OracleRegistry::new());
+        register_core_oracles(
+            &registry,
+            Some(FakeTrust::arc(std::sync::Arc::new(UnlimitedOracle), 0.0)),
+            None,
+            &tiered_rate_limiting(),
+        );
+        registry.set_phase(BootstrapPhase::Running);
+
+        // Precondition: the composition root really did put the isolated tier on `net`.
+        let limit = rate_limit_of(registry.evaluate(&request_for(icn_net::NETWORK_DOMAIN)));
+        assert_eq!(
+            limit.burst_size, 2,
+            "precondition: register_core_oracles must place the configured isolated \
+             burst on the network domain; got {limit:?}"
+        );
+
+        let limiter = icn_net::RateLimiter::new_with_oracle(registry, limiter_fallback());
+        let peer = limiter_peer();
+
+        let mut admitted = 0usize;
+        for _ in 0..5 {
+            if limiter.check_rate_limit(&peer).await {
+                admitted += 1;
+            }
+        }
+
+        assert_eq!(
+            admitted, 2,
+            "the operator configured an isolated burst of 2, so five immediate \
+             messages must admit exactly 2. A different count means the number the \
+             composition root registered is not the number the limiter enforces."
+        );
+    }
+
+    /// Negative control: with no network oracle registered, the limiter admits nothing.
+    ///
+    /// This is #2488 as an operator would have experienced it — the daemon starts, the
+    /// registry is live, and every inbound message is dropped. It also proves the
+    /// positive control above is not passing on the generous fallback bucket: same
+    /// limiter, same fallback, same peer, only the registration differs.
+    #[tokio::test]
+    async fn without_the_network_registration_the_real_limiter_drops_everything() {
+        let registry = std::sync::Arc::new(OracleRegistry::new());
+        register_core_oracles(&registry, None, None, &tiered_rate_limiting());
+        registry.set_phase(BootstrapPhase::Running);
+
+        let limiter = icn_net::RateLimiter::new_with_oracle(registry, limiter_fallback());
+        let peer = limiter_peer();
+
+        let mut admitted = 0usize;
+        for _ in 0..5 {
+            if limiter.check_rate_limit(&peer).await {
+                admitted += 1;
+            }
+        }
+
+        assert_eq!(
+            admitted, 0,
+            "an unregistered network domain denies in the Running phase, so the \
+             limiter must admit nothing. A non-zero count means the fallback bucket \
+             is answering and the oracle decision is not reaching the limiter."
+        );
+    }
 }
