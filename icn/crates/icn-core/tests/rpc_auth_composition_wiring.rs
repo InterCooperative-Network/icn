@@ -23,9 +23,27 @@
 //! because no test observes what the *canonical config path* actually installs.
 //!
 //! So this drives the real `RpcConfig::from_daemon_config` — the function the
-//! daemon itself calls — from an operator-facing `Config`, builds the server on the
-//! same branch `init_rpc` takes, and asserts on the capability the server ended up
-//! holding. It does not reimplement the decision; it reads the one production makes.
+//! daemon itself calls, at `lifecycle.rs:1150` — from an operator-facing `Config`,
+//! builds the server on the same branch `spawn_rpc_server` takes, and asserts on the
+//! capability the server ended up holding.
+//!
+//! **What is and is not pinned here.** Be precise about this, because the difference
+//! is the whole point of #2500:
+//!
+//!   * **Pinned for real:** `RpcConfig::from_daemon_config`. It is invoked directly,
+//!     not imitated, so a change that drops the operator's `jwt_secret` or moves the
+//!     bind off loopback fails these tests.
+//!   * **Mirrored, NOT pinned:** the server-construction branch. `server_for` below
+//!     restates the `match` from `spawn_rpc_server` rather than calling it, because
+//!     `spawn_rpc_server` needs a full `RpcDeps` and a `JoinSet`. Changing the
+//!     authenticated arm of `spawn_rpc_server` to `RpcServer::new` would leave
+//!     production RPC unauthenticated and **these tests would still pass**.
+//!   * **Not covered at all:** the `set_auth_manager_with_store` upgrade that
+//!     `spawn_rpc_server` applies after construction to add token revocation (#2437).
+//!
+//! Closing the second and third bullets means driving `spawn_rpc_server` itself, which
+//! is a larger harness than this contract; it is deliberately left as follow-up rather
+//! than claimed here.
 //!
 //! The load-bearing assertion is the last one. Today the unauthenticated branch is
 //! reachable — `gateway.enabled` defaults to `false`, which yields
@@ -41,9 +59,14 @@ use icn_core::supervisor::init_rpc::RpcConfig;
 use icn_identity::IdentityBundle;
 use icn_rpc::RpcServer;
 
-/// Build a server exactly the way `init_rpc::init_rpc_services` does: branch on
-/// whether the composition path produced a JWT secret. Kept in one place so the
-/// tests below observe the real decision rather than restating it.
+/// Build a server the way `init_rpc::spawn_rpc_server` does at its construction site:
+/// branch on whether the composition path produced a JWT secret.
+///
+/// This branch is a **mirror** of `spawn_rpc_server`, not a call into it — that
+/// function requires a full `RpcDeps` and a `JoinSet`. So this helper does not guard
+/// `spawn_rpc_server`'s own arm; see the module header for exactly what that leaves
+/// uncovered. What it does do is keep the branch in one place, so every test below
+/// observes the same `RpcConfig` the production decision produced.
 fn server_for(config: &Config) -> (RpcConfig, RpcServer) {
     let rpc_config = RpcConfig::from_daemon_config(config);
     let signer = IdentityBundle::generate()
@@ -81,8 +104,12 @@ fn operator_enabling_the_gateway_installs_rpc_auth() {
 
 #[test]
 fn an_empty_secret_does_not_count_as_configured_auth() {
-    // An operator who enables the gateway but leaves the secret blank must not get a
-    // server that silently authenticates with an empty key.
+    // Defensive, not an operator scenario: `Config::validate()` (config/mod.rs:219)
+    // already rejects `gateway.enabled = true` with an empty `jwt_secret` as a fatal
+    // error, so a validated config cannot reach this state. This pins the behaviour
+    // for the paths that skip validation — programmatic `Config` construction and
+    // tests — so that if validation is ever relaxed or bypassed, the fallback is a
+    // server with no auth manager rather than one keyed on an empty secret.
     let mut config = Config::default();
     config.gateway.enabled = true;
     config.gateway.jwt_secret = String::new();
