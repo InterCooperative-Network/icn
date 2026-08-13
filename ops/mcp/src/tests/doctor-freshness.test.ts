@@ -11,10 +11,16 @@ describe("classifyTreeFreshness", () => {
     expect(classifyTreeFreshness("feat/x", 0).severity).toBe("ok");
   });
 
-  it("treats an unresolvable origin/main as skipped, not healthy-by-default", () => {
+  it("reports an unresolvable origin/main as unverified, NOT as healthy", () => {
+    // The whole point of this check is that a confident health verdict must
+    // never be issued over unverified truth. `severity` is the only field
+    // maxSeverity folds into the top-level report, so "ok" here — however
+    // well-worded the message — makes the report say "Environment looks
+    // healthy" about a tree whose freshness nobody established.
     const r = classifyTreeFreshness("main", Number.NaN);
-    expect(r.severity).toBe("ok");
-    expect(r.message).toMatch(/skipped/);
+    expect(r.severity).toBe("warn");
+    expect(r.severity).not.toBe("ok");
+    expect(r.message).toMatch(/UNVERIFIED/);
   });
 
   describe("a checkout claiming to be main", () => {

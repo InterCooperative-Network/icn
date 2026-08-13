@@ -39,3 +39,10 @@ jobs:
         run: npm run build
       - name: Validate MCP package entrypoint
         run: test -f ops/mcp/dist/index.js
+      # Without this step the ops/mcp suite is compiled and never executed:
+      # `npm test` was referenced by no workflow, so every test under
+      # ops/mcp/src/tests/ could pass, fail, or be deleted with CI still green.
+      # The freshness check added here is only load-bearing if its tests run.
+      - name: Test MCP server
+        working-directory: ops/mcp
+        run: npm test

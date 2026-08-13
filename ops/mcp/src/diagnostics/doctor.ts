@@ -44,9 +44,16 @@ export function classifyTreeFreshness(
   behindCount: number
 ): { severity: DoctorCheck["severity"]; message: string; detail?: string; repair?: string } {
   if (!Number.isFinite(behindCount)) {
+    // `warn`, not `ok`. The top-level report folds only `severity` (see
+    // maxSeverity), so returning "ok" here with an explanatory message would
+    // still render the whole environment as "healthy" — reintroducing, one
+    // level down, the exact defect this check exists to remove: a confident
+    // health verdict over truth nobody verified. Unverifiable is not fine.
     return {
-      severity: "ok",
-      message: "origin/main not resolvable here; freshness check skipped.",
+      severity: "warn",
+      message:
+        "origin/main not resolvable here; checkout freshness is UNVERIFIED (not confirmed current).",
+      repair: "git fetch origin  # let doctor resolve origin/main and verify freshness",
     };
   }
   if (behindCount === 0) {
