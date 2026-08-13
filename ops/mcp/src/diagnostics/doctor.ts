@@ -79,9 +79,14 @@ export function classifyTreeFreshness(
       repair: "git fetch origin && git rebase origin/main",
     };
   }
+  // A detached checkout reports "HEAD" (or null) and is not claiming to be a
+  // feature branch — describe what it is rather than mislabelling it. Both are
+  // held to the same rule; only the wording differs.
+  const what =
+    branch === null || branch === "HEAD" ? "Detached checkout is" : "Feature branch is";
   return {
     severity: "ok",
-    message: `Feature branch ${behindCount} commit(s) behind origin/main (expected during active work).`,
+    message: `${what} ${behindCount} commit(s) behind origin/main (expected during active work).`,
   };
 }
 

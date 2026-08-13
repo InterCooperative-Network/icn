@@ -67,5 +67,16 @@ describe("classifyTreeFreshness", () => {
       expect(classifyTreeFreshness("HEAD", 30).severity).toBe("ok");
       expect(classifyTreeFreshness(null, 30).severity).toBe("ok");
     });
+
+    it("does not describe a detached checkout as a feature branch", () => {
+      // Same rule, honest wording: a detached HEAD is not a branch, and this
+      // report is read by agents deciding whether to trust the tree.
+      for (const branch of ["HEAD", null]) {
+        const r = classifyTreeFreshness(branch, 3);
+        expect(r.message).not.toMatch(/Feature branch/);
+        expect(r.message).toMatch(/Detached checkout/);
+      }
+      expect(classifyTreeFreshness("feat/x", 3).message).toMatch(/Feature branch/);
+    });
   });
 });

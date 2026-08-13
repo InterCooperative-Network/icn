@@ -61,7 +61,11 @@ async function repoStatus(repoPath: string, name: string) {
     return {
       name,
       resolved: false,
-      error: `Not a readable git repository at ${repoPath}`,
+      // Say what was observed, not a diagnosis. `gitLine` returns "" for any
+      // failure — missing git, timeout, permissions, or genuinely not a repo —
+      // so naming one cause would be asserting more than we checked, which is
+      // the habit this whole change exists to remove.
+      error: `Could not resolve a git branch at ${repoPath} (not a repository, or git failed there); treat this repo's status as unknown, not clean`,
       branch: null,
       dirty: null,
       dirtyFiles: null,
