@@ -766,10 +766,19 @@ let governance_handle = GovernanceActor::spawn(
 ```
 
 This mode provides:
-- **Gossip-based synchronization**: `governance:proposal` topic
+- **Gossip-based synchronization**: `governance:proposal` topic — **outbound only at present;
+  see the note below**
 - **Persistent storage**: Domains, proposals, votes in Sled
 - **Auto-close scheduling**: Background task closes proposals when voting period ends
 - **Event bus integration**: `ProposalAccepted` events trigger ledger transactions
+
+> **Inbound governance replication is suspended.** Locally originated governance is still
+> published to the `governance:proposal` topic, but governance messages *received* over
+> gossip are refused before they are applied. `GossipEntry` carries a claimed author DID
+> and no signature binding it to the entry contents, so a peer could claim any DID;
+> applying those messages was an unauthenticated write into governance state. Nodes
+> therefore do not currently converge on each other's domains, proposals, votes or
+> delegations. Authenticated replication is tracked in issue #2469.
 
 RPC clients use `governance.*` methods which delegate to `GovernanceHandle`:
 ```bash
@@ -848,12 +857,12 @@ Timer expires OR icnctl gov proposal close
 
 | Use Case | Component | Notes |
 |----------|-----------|-------|
-| Production deployment | GovernanceActor | Full gossip, persistence, scheduling |
+| Production deployment | GovernanceActor | Persistence, scheduling, **outbound** gossip publication. Inbound governance replication is refused — see §11.3 note and issue #2469 |
 | CLI operations | RPC → GovernanceActor | Via `icnctl gov` commands |
 | Gateway REST API (dev) | GovernanceManager | Quick testing, no persistence |
 | Gateway REST API (prod) | Gateway + Actor handle | Future: full integration |
 | Unit tests | InMemoryGovernanceStore | Direct store operations |
-| Integration tests | GovernanceActor | Multi-node gossip validation |
+| Integration tests | GovernanceActor | Single-node validation. Multi-node governance convergence does not currently occur (inbound replication refused) |
 
 ### 11.5 Source of Truth
 

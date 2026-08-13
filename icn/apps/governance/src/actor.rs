@@ -1266,37 +1266,38 @@ impl GovernanceActor {
             g.subscribe(GOVERNANCE_TOPIC, did.clone()).await?;
         }
 
-        // Set up notification callback for incoming messages
-        let store_notify = store.clone();
+        // Set up notification callback for incoming messages.
+        //
+        // F-P0-2 containment: this closure deliberately captures **no**
+        // `GovernanceStateStore` handle. A replicated entry therefore cannot reach
+        // governance state by construction, not merely by passing a check that a
+        // later edit could bypass. See `observe_replicated_governance_message`.
         let did_notify = did.clone();
 
         {
             let mut g = gossip.write().await;
             g.add_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
-                // Accept local governance topic and any federation governance topic
-                // (federation topics have format "federation:governance:<fed_id>")
-                let is_federation_gov = topic == icn_federation::TOPIC_FEDERATION_GOVERNANCE
+                // Accept the governance topic and any federation governance topic
+                // (federation topics have format "federation:governance:<fed_id>").
+                //
+                // This filter is dispatch, never authority: it only decides whether the
+                // diagnostic below is worth emitting. The containment does not depend on
+                // it, because this closure captures no `GovernanceStateStore` and so has
+                // no path to governance state on any topic.
+                let federation_root = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
+                let is_governance_topic = topic == GOVERNANCE_TOPIC
+                    || topic == federation_root
                     || topic
-                        .starts_with(&format!("{}:", icn_federation::TOPIC_FEDERATION_GOVERNANCE));
-                if topic != GOVERNANCE_TOPIC && !is_federation_gov {
+                        .strip_prefix(federation_root)
+                        .is_some_and(|rest| rest.starts_with(':'));
+                if !is_governance_topic {
                     return;
                 }
 
                 match GovernanceMessage::from_bytes(&entry.data) {
-                    Ok(msg) => {
-                        info!(
-                            "[{}] Received governance message: {}",
-                            did_notify,
-                            msg.message_type()
-                        );
-                        if let Err(e) =
-                            handle_incoming(store_notify.as_ref(), msg, Some(&entry.author))
-                        {
-                            warn!("Failed to handle incoming governance message: {}", e);
-                        }
-                    }
+                    Ok(msg) => observe_replicated_governance_message(&msg, &did_notify),
                     Err(e) => {
-                        warn!("Failed to deserialize governance message: {}", e);
+                        debug!("Failed to deserialize governance message: {}", e);
                     }
                 }
             }));
@@ -3792,245 +3793,61 @@ impl GovernanceActor {
     }
 }
 
-/// Handle incoming governance messages from gossip.
+// ---- Governance replication ingress (F-P0-2 containment) ----
+
+/// Governance replication ingress — applies nothing.
 ///
-/// `sender` is the `GossipEntry::author` DID of the peer that published the message.
-/// For delegation messages, the sender must match the delegator (or `revoked_by`) to
-/// prevent any peer from injecting or revoking delegations they do not own.
-/// If `sender` is `None` (e.g. in tests that don't have a real gossip entry), delegation
-/// sender validation is skipped.
-fn handle_incoming(
-    store: &dyn GovernanceStateStore,
-    msg: GovernanceMessage,
-    sender: Option<&icn_identity::Did>,
-) -> Result<()> {
-    match msg {
-        GovernanceMessage::DomainCreated { domain } => {
-            store.save_domain(&domain)?;
-        }
-
-        GovernanceMessage::DomainUpdated { domain } => {
-            // Update existing domain with new config
-            store.save_domain(&domain)?;
-            info!("Domain config updated via gossip: {}", domain.id.0);
-        }
-
-        GovernanceMessage::ProposalCreated { proposal } => {
-            store.save_proposal(&proposal)?;
-        }
-
-        GovernanceMessage::ProposalOpened {
-            id,
-            opened_at,
-            closes_at,
-        } => {
-            // Load, update state, persist
-            if let Some(proposal) = store.get_proposal(&id)? {
-                // Force state to Open (idempotent for convergence)
-                let updated = Proposal {
-                    state: ProposalState::Open {
-                        opened_at,
-                        closes_at,
-                    },
-                    updated_at: now_seconds(),
-                    ..proposal
-                };
-                store.save_proposal(&updated)?;
-            }
-        }
-
-        GovernanceMessage::VoteCast { vote, .. } => {
-            store.save_vote(&vote.proposal_id.clone(), &vote)?;
-        }
-
-        GovernanceMessage::ProposalClosed {
-            id,
-            outcome,
-            closed_at,
-            proof_bytes,
-            ..
-        } => {
-            if let Some(mut proposal) = store.get_proposal(&id)? {
-                let new_state = match outcome {
-                    ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
-                    ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
-                    ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
-                };
-                proposal.close(new_state)?;
-                store.save_proposal(&proposal)?;
-            }
-            // Persist proof from remote node (if included and valid)
-            if let Some(bytes) = proof_bytes {
-                // Validate remote proof before storing (untrusted gossip input)
-                let incoming_v2 = match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
-                    &bytes,
-                ) {
-                    Ok(proof) => match validate_secure_v2_proof_for_proposal(&proof, &id) {
-                        Ok(()) => Some(proof),
-                        Err(reason) => {
-                            warn!("Rejected remote proof for proposal {} — {}", id.0, reason);
-                            None
-                        }
-                    },
-                    Err(_) => {
-                        match serde_json::from_slice::<icn_governance::GovernanceProof>(&bytes) {
-                            Ok(legacy) => {
-                                // Legacy proofs must still verify cryptographically. We reject them
-                                // for storage because they cannot carry canonical V2 attestations.
-                                if !legacy.verify_binding() {
-                                    warn!(
-                                    "Rejected legacy remote proof for proposal {} — invalid binding",
-                                    id.0
-                                );
-                                } else {
-                                    match Did::from_str(&legacy.signer_did)
-                                    .and_then(|did| did.to_verifying_key())
-                                {
-                                    Ok(vk) if legacy.verify_signature(&vk) => warn!(
-                                        "Rejected legacy remote proof for proposal {} — missing canonical attestations",
-                                        id.0
-                                    ),
-                                    Ok(_) => warn!(
-                                        "Rejected legacy remote proof for proposal {} — invalid signature",
-                                        id.0
-                                    ),
-                                    Err(e) => warn!(
-                                        "Rejected legacy remote proof for proposal {} — cannot resolve signer DID: {}",
-                                        id.0, e
-                                    ),
-                                }
-                                }
-                                None
-                            }
-                            Err(e) => {
-                                warn!(
-                                    "Rejected remote proof for proposal {} — invalid JSON: {}",
-                                    id.0, e
-                                );
-                                None
-                            }
-                        }
-                    }
-                };
-
-                if let Some(proof) = incoming_v2 {
-                    let should_store = match store.get_proof_bytes(&id)? {
-                        Some(existing_bytes) => {
-                            match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
-                                &existing_bytes,
-                            ) {
-                                Ok(existing)
-                                    if validate_secure_v2_proof_for_proposal(&existing, &id)
-                                        .is_ok() =>
-                                {
-                                    debug!(
-                                        "Skipping remote proof for proposal {} — valid proof already exists",
-                                        id.0
-                                    );
-                                    false
-                                }
-                                _ => true,
-                            }
-                        }
-                        None => true,
-                    };
-
-                    if should_store {
-                        let canonical_bytes = serde_json::to_vec(&proof)?;
-                        store.save_proof_bytes(&id, &canonical_bytes)?;
-                        info!(
-                            "Stored validated governance proof from remote for proposal {}",
-                            id.0
-                        );
-                    }
-                }
-            }
-        }
-
-        GovernanceMessage::DelegationCreated { delegation } => {
-            // Security: verify the gossip sender is the delegator.
-            // Any peer that can publish to the governance topic could otherwise inject
-            // delegations on behalf of DIDs they don't control.
-            if let Some(sender_did) = sender {
-                if *sender_did != delegation.delegator {
-                    warn!(
-                        "DelegationCreated gossip rejected: sender {} does not match delegator {} \
-                         (delegation {})",
-                        sender_did, delegation.delegator, delegation.id.0
-                    );
-                    return Ok(());
-                }
-            }
-            match store.get_delegation(&delegation.id)? {
-                None => {
-                    store.save_delegation(&delegation)?;
-                    info!(
-                        "Delegation synced via gossip: {} -> {} (scope: {:?})",
-                        delegation.delegator, delegation.delegate, delegation.scope
-                    );
-                }
-                Some(existing) => {
-                    let existing_bytes = serde_json::to_vec(&existing)?;
-                    let incoming_bytes = serde_json::to_vec(&delegation)?;
-                    if existing_bytes == incoming_bytes {
-                        debug!(
-                            "Delegation gossip replay ignored (already stored): {} -> {} (scope: {:?})",
-                            delegation.delegator, delegation.delegate, delegation.scope
-                        );
-                    } else {
-                        warn!(
-                            "Delegation gossip conflict ignored: incoming {} differs from stored — possible tampering",
-                            delegation.id.0
-                        );
-                    }
-                }
-            }
-        }
-
-        GovernanceMessage::DelegationRevoked {
-            id,
-            revoked_at,
-            revoked_by,
-        } => {
-            if let Some(delegation) = store.get_delegation(&id)? {
-                // Security: verify the gossip sender is the original delegator.
-                // The `revoked_by` field in the message must also match the stored delegator,
-                // preventing a third party from revoking a delegation they don't own.
-                if let Some(sender_did) = sender {
-                    if *sender_did != delegation.delegator {
-                        warn!(
-                            "DelegationRevoked gossip rejected: sender {} does not match stored \
-                             delegator {} (delegation {})",
-                            sender_did, delegation.delegator, id.0
-                        );
-                        return Ok(());
-                    }
-                }
-                if revoked_by != delegation.delegator {
-                    warn!(
-                        "DelegationRevoked gossip rejected: revoked_by {} does not match stored \
-                         delegator {} (delegation {})",
-                        revoked_by, delegation.delegator, id.0
-                    );
-                    return Ok(());
-                }
-                store.save_revoked_delegation(&delegation, revoked_at)?;
-                info!("Delegation revocation synced via gossip: {}", id.0);
-            } else {
-                // May arrive before the DelegationCreated gossip — log and ignore.
-                debug!(
-                    "DelegationRevoked gossip for unknown delegation {} — ignoring",
-                    id.0
-                );
-            }
-        }
-
-        _ => {
-            // Ignore other message types for now (future: DomainUpdated, ProposalCancelled)
-        }
-    }
-
-    Ok(())
+/// ## Why transport acceptance and state-application authority are separate
+///
+/// Permission to transport or replicate bytes is not permission to apply those bytes as
+/// governance state.
+///
+/// A [`icn_gossip::GossipEntry`] carries a claimed `author` DID and **no signature binding
+/// that DID to the entry contents**. The receive path (`GossipActor::store_entry`) neither
+/// recomputes the entry hash — it dedups on the sender-supplied `entry.hash` — nor enforces
+/// the topic ACL, and the transport-level policy gate above it evaluates a self-declared
+/// sender DID with no threshold attached. Every value that reaches this function is
+/// attacker-chosen *input*, not authenticated authority. Comparing anything against
+/// `entry.author` is not an authorization check: a peer that wants to be treated as some DID
+/// simply writes that DID into the field.
+///
+/// So this ingress applies nothing. Until authenticated governance replication exists
+/// (issue #2469), a message that arrives here is *observed*, not *obeyed*. Entries are still
+/// accepted, stored, clock-merged and gossiped by the generic gossip layer; only the
+/// application of remote governance state is suspended.
+///
+/// ## The containment is structural, not procedural
+///
+/// The registered callback captures **no `GovernanceStateStore` handle**, so a replicated
+/// entry has no path to governance state regardless of what this function does, whether it
+/// runs at all, or how often. Nothing here — not the decode, not this diagnostic, not the
+/// topic the entry arrived on, not the subscriber it was dispatched for, not the claimed
+/// author — is an authorization decision. There is deliberately no telemetry to evade,
+/// because there is deliberately nothing to gate.
+///
+/// ## Why this does not break local governance
+///
+/// `GossipActor::store_entry` fires notification callbacks identically for locally published
+/// entries and for entries received from the network, and no field distinguishes them —
+/// `publish()` sets `author` to the local DID, but a remote peer may claim that same DID.
+/// There is no trustworthy local/remote discriminator at this layer, so the containment does
+/// not try to invent one.
+///
+/// It does not need one: every local `GovernanceCommand` persists through
+/// `GovernanceActor`'s command path *before* it publishes (the delegation arms say so
+/// outright — "failure doesn't roll back the local write"). The loopback copy this ingress
+/// also receives is a redundant re-application of state the node already wrote, so refusing
+/// it costs local governance nothing.
+fn observe_replicated_governance_message(msg: &GovernanceMessage, local_did: &Did) {
+    // Bounded and deliberately low-severity: `message_type()` is a `&'static str` over a
+    // fixed variant set, and this path fires for ordinary local governance too (each local
+    // command persists, then publishes, and `publish` calls `store_entry`, which calls this
+    // callback). It is a diagnostic, not a security signal — see the note above.
+    debug!(
+        local_did = %local_did,
+        message_type = msg.message_type(),
+        "Replicated governance state application is disabled; message not applied"
+    );
 }
 
 // ---- Utility functions ----
@@ -4039,6 +3856,13 @@ fn now_seconds() -> u64 {
     icn_time::current_timestamp_secs()
 }
 
+/// Validate a stored `GovernanceProofV2` before it is served to a reader.
+///
+/// This is a **read-path** check on locally stored proofs (see
+/// `GovernanceHandle::get_proof`). It verifies the receipt and each attestation
+/// signature, but it does not establish that any signer held authority over the
+/// proposal, so it is not an authentication of governance authority and is
+/// deliberately not used to admit replicated state.
 fn validate_secure_v2_proof_for_proposal(
     proof: &icn_governance::GovernanceProofV2,
     proposal_id: &ProposalId,
@@ -4077,200 +3901,79 @@ fn validate_secure_v2_proof_for_proposal(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_governance::{Delegation, DelegationScope};
+    use icn_governance::{Delegation, DelegationScope, GovernanceProfileId, Proposal};
     use icn_identity::KeyPair;
-    use icn_store::SledStore;
-
-    fn make_store() -> SledGovernanceStateStore {
-        SledGovernanceStateStore::new(Arc::new(SledStore::temporary().expect("temp store")))
-    }
 
     fn did() -> Did {
         KeyPair::generate().unwrap().did().clone()
     }
 
-    /// DelegationCreated gossip → delegation is persisted and readable.
-    #[test]
-    fn test_delegation_created_persisted() {
-        let store = make_store();
-        let d = Delegation::new(did(), did(), DelegationScope::Blanket);
-
-        handle_incoming(
-            &store,
-            GovernanceMessage::delegation_created(d.clone()),
-            None,
+    fn sample_domain() -> icn_governance::GovernanceDomain {
+        icn_governance::GovernanceDomain::new(
+            "sample".to_string(),
+            icn_governance::GovernanceConfig::new(
+                GovernanceProfileId::builtin("cooperative_default"),
+                icn_governance::MembershipConfig::static_list(vec![did()]),
+                GovernanceParams::new(50, 50, 3600),
+            ),
         )
-        .unwrap();
-
-        let loaded = store
-            .get_delegation(&d.id)
-            .unwrap()
-            .expect("delegation not persisted");
-        assert_eq!(loaded.id, d.id);
-        assert_eq!(loaded.delegator, d.delegator);
-        assert_eq!(loaded.delegate, d.delegate);
-        assert!(loaded.revoked_at.is_none());
     }
 
-    /// Repeated DelegationCreated with the same delegation is idempotent — no error, same result.
-    #[test]
-    fn test_delegation_created_idempotent() {
-        let store = make_store();
-        let d = Delegation::new(did(), did(), DelegationScope::Blanket);
-
-        handle_incoming(
-            &store,
-            GovernanceMessage::delegation_created(d.clone()),
-            None,
+    fn sample_proposal() -> Proposal {
+        Proposal::new(
+            GovernanceDomainId("d".to_string()),
+            did(),
+            "t".to_string(),
+            "d".to_string(),
+            ProposalPayload::Text {
+                body: "b".to_string(),
+            },
         )
-        .unwrap();
-        // Second application of the same message must not error.
-        handle_incoming(
-            &store,
-            GovernanceMessage::delegation_created(d.clone()),
-            None,
-        )
-        .unwrap();
-
-        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
-        assert_eq!(loaded.id, d.id);
-        assert!(loaded.revoked_at.is_none());
     }
 
-    /// DelegationRevoked gossip after a DelegationCreated → revoked_at is set.
-    #[test]
-    fn test_delegation_revoked_sets_revoked_at() {
-        let store = make_store();
-        let delegator = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
-
-        // Persist first so the revoke handler finds it.
-        store.save_delegation(&d).unwrap();
-
-        let revoke_ts: Timestamp = 999_999;
-        handle_incoming(
-            &store,
-            GovernanceMessage::delegation_revoked(d.id.clone(), delegator, revoke_ts),
-            None,
-        )
-        .unwrap();
-
-        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
-        assert_eq!(loaded.revoked_at, Some(revoke_ts));
-    }
-
-    /// DelegationRevoked gossip for an unknown delegation is silently ignored (no error).
+    /// The replication ingress observes and returns; it must not touch governance state
+    /// for any variant, including the eight that the pre-containment ingress persisted.
     ///
-    /// This covers the out-of-order gossip case where the revoke arrives before the create.
+    /// This replaces the delegation-replication tests that previously asserted gossip
+    /// *could* create and revoke delegations. That behavior was the vulnerability: those
+    /// arms compared the delegation owner against `GossipEntry::author`, which is
+    /// attacker-chosen, so "correct sender accepted" only ever meant "correct sender
+    /// successfully impersonated".
+    ///
+    /// The real containment is structural and is proven at the production boundary in
+    /// `tests/fp02_governance_replication_containment.rs`: the registered callback
+    /// captures no `GovernanceStateStore`, so no replicated entry has a path to
+    /// governance state whatever this function does.
     #[test]
-    fn test_delegation_revoked_before_create_is_ignored() {
-        let store = make_store();
-        let delegator = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+    fn observing_a_replicated_message_is_side_effect_free() {
+        let local = did();
+        let d = Delegation::new(did(), did(), DelegationScope::Blanket);
 
-        // Do NOT persist the delegation — simulate out-of-order gossip.
-        let result = handle_incoming(
-            &store,
-            GovernanceMessage::delegation_revoked(d.id.clone(), delegator, 1234),
-            None,
-        );
-
-        assert!(result.is_ok(), "out-of-order revoke must not error");
-        assert!(
-            store.get_delegation(&d.id).unwrap().is_none(),
-            "unknown delegation must not be created by revoke"
-        );
-    }
-
-    /// DelegationCreated gossip with wrong sender is rejected (security: #1340).
-    #[test]
-    fn test_delegation_created_wrong_sender_rejected() {
-        let store = make_store();
-        let delegator = did();
-        let attacker = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
-
-        // Attacker tries to inject a delegation owned by `delegator`.
-        let result = handle_incoming(
-            &store,
+        let messages = vec![
+            GovernanceMessage::domain_created(sample_domain()),
+            GovernanceMessage::domain_updated(sample_domain()),
+            GovernanceMessage::proposal_created(sample_proposal()),
+            GovernanceMessage::proposal_opened(ProposalId("p".to_string()), 1, 2),
+            GovernanceMessage::vote_cast(
+                Vote::new(ProposalId("p".to_string()), did(), VoteChoice::For),
+                None,
+            ),
+            GovernanceMessage::proposal_closed(
+                ProposalId("p".to_string()),
+                ProposalOutcome::Accepted,
+                3,
+                TallySnapshot::new(1, 0, 0, 1),
+                None,
+            ),
             GovernanceMessage::delegation_created(d.clone()),
-            Some(&attacker),
-        );
+            GovernanceMessage::delegation_revoked(d.id.clone(), d.delegator.clone(), 4),
+        ];
 
-        assert!(result.is_ok(), "wrong-sender rejection must not error");
-        assert!(
-            store.get_delegation(&d.id).unwrap().is_none(),
-            "delegation from wrong sender must not be persisted"
-        );
-    }
-
-    /// DelegationCreated gossip with correct sender is accepted (security: #1340).
-    #[test]
-    fn test_delegation_created_correct_sender_accepted() {
-        let store = make_store();
-        let delegator = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
-
-        handle_incoming(
-            &store,
-            GovernanceMessage::delegation_created(d.clone()),
-            Some(&delegator),
-        )
-        .unwrap();
-
-        assert!(
-            store.get_delegation(&d.id).unwrap().is_some(),
-            "delegation from correct sender must be persisted"
-        );
-    }
-
-    /// DelegationRevoked gossip with wrong sender is rejected (security: #1340).
-    #[test]
-    fn test_delegation_revoked_wrong_sender_rejected() {
-        let store = make_store();
-        let delegator = did();
-        let attacker = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
-
-        store.save_delegation(&d).unwrap();
-
-        let result = handle_incoming(
-            &store,
-            GovernanceMessage::delegation_revoked(d.id.clone(), delegator.clone(), 1234),
-            Some(&attacker),
-        );
-
-        assert!(result.is_ok(), "wrong-sender rejection must not error");
-        // revoked_at should still be None — revocation was dropped
-        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
-        assert!(
-            loaded.revoked_at.is_none(),
-            "delegation revoked by wrong sender must not be revoked"
-        );
-    }
-
-    /// DelegationRevoked with mismatched revoked_by field is rejected (security: #1340).
-    #[test]
-    fn test_delegation_revoked_mismatched_revoked_by_rejected() {
-        let store = make_store();
-        let delegator = did();
-        let impersonator = did();
-        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
-
-        store.save_delegation(&d).unwrap();
-
-        // Sender matches delegator but revoked_by is a different DID.
-        let result = handle_incoming(
-            &store,
-            GovernanceMessage::delegation_revoked(d.id.clone(), impersonator.clone(), 1234),
-            Some(&delegator),
-        );
-
-        assert!(result.is_ok(), "mismatched revoked_by must not error");
-        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
-        assert!(
-            loaded.revoked_at.is_none(),
-            "delegation with mismatched revoked_by must not be revoked"
-        );
+        // The function takes no store and returns nothing: there is no value to assert on
+        // and no state to inspect. Exercising every mutating variant pins that it stays
+        // that way — if a future edit reintroduces a store parameter, this stops compiling.
+        for msg in &messages {
+            observe_replicated_governance_message(msg, &local);
+        }
     }
 }

@@ -274,8 +274,11 @@ impl SledGovernanceStateStore {
         Self { store }
     }
 
-    /// Expose the inner store for callers that still need raw KV access
-    /// (e.g. `handle_incoming` which operates on a `&dyn Store`).
+    /// Expose the inner store for callers that still need raw KV access.
+    ///
+    /// This used to name the gossip ingress (`handle_incoming`) as the motivating
+    /// caller. That ingress no longer applies replicated state and holds no store
+    /// handle at all — see `actor::observe_replicated_governance_message`.
     pub fn as_store(&self) -> &dyn Store {
         self.store.as_ref()
     }

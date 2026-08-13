@@ -220,6 +220,14 @@ Every ICN node provides these eight primitives. Apps compose them into instituti
 
 **Governance coordination:** Proposals and votes gossip. Each node tallies votes independently. Once a threshold is reached, the governance oracle executes the decision. No central authority needed.
 
+> **Current status — governance replication is suspended.** The design above describes the
+> intended model, not present behavior. Governance messages received over gossip are
+> refused before they are applied to governance state: `GossipEntry` carries a claimed
+> author DID but no signature binding it to the entry contents, so a replicated governance
+> message is indistinguishable from a forged one and applying it was an unauthenticated
+> write primitive. Locally originated governance is unaffected; cross-node governance
+> convergence does not currently occur. Authenticated replication is tracked in issue #2469.
+
 **Crate:** `icn-gossip`, `icn-ledger` (deterministic merge), `icn-governance` (proposal dispatch), `icn-protocol` (message ordering)
 
 <!-- truth: descriptive -->
@@ -830,7 +838,9 @@ Uses kernel primitives: State, Communication, Coordination, Authorization, Time
 Cooperatives need to make decisions collectively. ICN provides:
 - State: Proposal ledger
 - Communication: Announce proposals, gossip votes
-- Coordination: Tally votes across peers (no consensus needed, just gossip)
+- Coordination: Tally votes across peers (no consensus needed, just gossip) — **note:**
+  inbound governance replication is currently refused, so votes do not propagate between
+  nodes today; tallying is per-node over locally recorded votes. See §4.7 and issue #2469
 - Authorization: Gates voting by membership
 - Time: Voting period (block numbers, not wall time)
 
