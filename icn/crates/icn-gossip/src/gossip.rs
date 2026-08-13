@@ -626,7 +626,13 @@ impl GossipActor {
                     Some(requester),
                     GossipMessage::Response {
                         entry: GossipEntry {
-                            hash: blake3::hash(&response_data).into(),
+                            // Canonical entry hash (SHA-256 over the logical payload). This
+                            // built a blake3 digest instead, which no receiver ever checked;
+                            // now that the receive path re-derives the hash, a blake3 one
+                            // would be rejected on arrival. `handle_rotation_message` has no
+                            // caller today, so this corrects a latent divergence rather than
+                            // a live path — see the PR for #2469 slice 2.
+                            hash: Self::hash_data(&response_data),
                             author: self.own_did.clone(),
                             clock: self.clock.clone(),
                             topic: crate::key_rotation::TOPIC_KEY_ROTATION.to_string(),
@@ -966,6 +972,37 @@ impl GossipActor {
     ///
     /// This method is async to allow non-blocking access to the storage quota manager.
     pub(crate) async fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
+        // Content integrity, ahead of everything that trusts `entry.hash` (#2469).
+        //
+        // On every receive path `entry.hash` is a value the sending peer chose, and the rest
+        // of this function keys off it: the dedup lookup below, the bloom filter, and the
+        // storage map itself. Re-deriving it from the payload first is what stops a peer
+        // filing arbitrary bytes under a digest they do not hash to, and stops it squatting
+        // the dedup slot of an entry it has never seen so the genuine one is later dropped
+        // as a duplicate.
+        //
+        // Enforced here rather than in the individual receive handlers because this is the
+        // only function that inserts into `self.entries` — a check in the handlers would be
+        // one forgotten ingress path away from being bypassed. It is correct for the local
+        // `publish` path too: that path hashes the caller's bytes and only then compresses,
+        // so it already satisfies the invariant by construction.
+        //
+        // This binds content to digest and nothing else. `entry.author` is still unsigned
+        // and self-declared, so this is not authorship authentication — see
+        // `GossipEntry::validate_content_integrity`.
+        if let Err(e) = entry.validate_content_integrity() {
+            warn!(
+                author = %entry.author,
+                topic = %entry.topic,
+                claimed_hash = %hex::encode(entry.hash),
+                entry_size = entry.data.len(),
+                error = %e,
+                "Rejecting entry - payload does not match claimed content hash"
+            );
+            icn_obs::metrics::gossip::entries_rejected_hash_mismatch_inc();
+            bail!("Entry rejected: {e}");
+        }
+
         let topic = &entry.topic;
         let hash = entry.hash;
         let entry_size = entry.data.len() as u64;
@@ -1217,14 +1254,11 @@ impl GossipActor {
     }
 
     /// Hash data to create content hash
+    ///
+    /// Delegates to [`crate::types::content_hash`] so the digest a publisher stamps on an
+    /// entry and the digest the receive path re-derives cannot drift apart.
     fn hash_data(data: &[u8]) -> ContentHash {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let result = hasher.finalize();
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(&result);
-        hash
+        crate::types::content_hash(data)
     }
 
     /// Export gossip actor state for persistence
@@ -2469,7 +2503,7 @@ mod tests {
         // ACL does not gate (`store_entry` accepts entries regardless of publish rights).
         let sender = KeyPair::generate().unwrap().did().clone();
         let entry = GossipEntry {
-            hash: [11u8; 32],
+            hash: crate::types::content_hash(b"after recreate"),
             author: sender.clone(),
             clock: VectorClock::new(),
             topic: "reconfig:me".to_string(),
@@ -2533,7 +2567,7 @@ mod tests {
             *c.lock().unwrap() += 1;
         }));
         let entry = GossipEntry {
-            hash: [9u8; 32],
+            hash: crate::types::content_hash(b"after restart"),
             author: sender.clone(),
             clock: VectorClock::new(),
             topic: "runtime:created".to_string(),

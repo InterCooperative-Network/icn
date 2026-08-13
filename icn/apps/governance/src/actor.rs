@@ -3803,13 +3803,14 @@ impl GovernanceActor {
 /// governance state.
 ///
 /// A [`icn_gossip::GossipEntry`] carries a claimed `author` DID and **no signature binding
-/// that DID to the entry contents**. The receive path (`GossipActor::store_entry`) neither
-/// recomputes the entry hash — it dedups on the sender-supplied `entry.hash` — nor enforces
-/// the topic ACL, and the transport-level policy gate above it evaluates a self-declared
-/// sender DID with no threshold attached. Every value that reaches this function is
-/// attacker-chosen *input*, not authenticated authority. Comparing anything against
-/// `entry.author` is not an authorization check: a peer that wants to be treated as some DID
-/// simply writes that DID into the field.
+/// that DID to the entry contents**. The receive path (`GossipActor::store_entry`) does
+/// re-derive the entry hash from the payload and reject a mismatch (#2469 slice 2), but that
+/// binds *content to digest* and nothing else: it does not enforce the topic ACL, and the
+/// transport-level policy gate above it evaluates a self-declared sender DID with no
+/// threshold attached. Every value that reaches this function is still attacker-chosen
+/// *input*, not authenticated authority. Comparing anything against `entry.author` is not an
+/// authorization check: a peer that wants to be treated as some DID simply writes that DID
+/// into the field — and hashes its own chosen payload perfectly correctly while doing so.
 ///
 /// So this ingress applies nothing. Until authenticated governance replication exists
 /// (issue #2469), a message that arrives here is *observed*, not *obeyed*. Entries are still
