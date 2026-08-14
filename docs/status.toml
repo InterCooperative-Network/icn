@@ -15,7 +15,7 @@ status = "exceeds-spec"
 truth_class = "operational"
 evidence_type = "test"
 evidence = [
-  "SDIS complete through Phase S6",
+  "SDIS complete through Phase S6 (ROADMAP CLAIM — NOT source-verifiable; rests only on docs/sdis/SDIS_IMPLEMENTATION_PLAN.md:3 asserting its own completion; NOT re-traced this pass and NOT covered by last_verified)",
   "Post-quantum crypto (ML-DSA + ML-KEM) operational with feature flags",
   "ZKP credential presentation (3 levels: QR, NFC/BLE, Network)",
   "Steward network with threshold PRF for VUI computation",
@@ -38,7 +38,7 @@ status = "confirmed"
 truth_class = "operational"
 evidence_type = "demo"
 evidence = [
-  "Test attributes re-derived 2026-08-14: 1290 static #[test]/#[tokio::test] lines (779 icn-governance + 511 apps/governance, 0 #[ignore]) — an attribute count, NOT a passing-test count; run cargo test for an authoritative figure",
+  "Test attributes re-derived 2026-08-14: 1366 static #[test]/#[tokio::test] lines (779 icn-governance + 587 apps/governance) — an attribute count, NOT a passing-test count; run cargo test for an authoritative figure",
   "Full 9-state proposal lifecycle verified vs enum ProposalState in icn-governance/src/proposal.rs: Draft -> Deliberation -> Open -> Accepted/Rejected/NoQuorum/Cancelled/Vetoed/ForceClosed",
   "Liquid democracy delegation (scope + expiry aware)",
   "Decision receipts binding integrity/authenticity: blake3 content hashes (proof.rs:23) with Ed25519 node-local attestations (proof.rs:1035-1041) — AUTHORIZATION is explicitly out of scope (verify.rs:24-25); there is no voter-signed attestation type",
@@ -48,7 +48,7 @@ evidence = [
 ]
 last_verified = "2026-08-14"
 verified_by = "status-refresh-2026-08-14"
-review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the 9-state ProposalState enum (proposal.rs:265-330) confirmed exactly as listed; delegation scope-and-expiry (delegation.rs:91,222,228,261); REST surface counted at 67 resource paths / 87 verb registrations (http/configure.rs), so the old 20+ held but badly understated; test attributes re-derived statically as 1290 (779 + 511, 0 ignored) via grep -rc on the #[test]/#[tokio::test] attribute — an attribute count, not a pass count, and no cargo was run. CORRECTIONS: the proof bullet said Ed25519 hashes (hashes are blake3, proof.rs:23) and voter attestations (the only attestation is node-local, proof.rs:1035-1041; no VoterAttestation exists anywhere in the crate), and verify.rs:24-25 places authorization and legitimacy explicitly out of scope, so cryptographic decision proofs overclaimed as worded; the charter bullet said TOML but persistence is JSON and authored charters are CCL YAML; the charter-templates gap is stale against docs/reference/ccl-charter-templates.md; the 3-of-7 voting-models gap has NO source referent (zero Futarchy/Sociocracy/Sortition strings and no VotingModel enum in either crate — the only occurrence in the repo was this file); and #1308 is a ledger/compute item per ADR-0007, already tracked under economics and ccl, so it is removed here as misfiled. Two previously unrecorded gaps were confirmed at source and added below. NOT verified this pass: the 14-call K3s demo flow and every runtime/deployment assertion (ops-only); the open/closed state of any issue; and whether the 1290 test attributes compile or pass."
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the 9-state ProposalState enum (proposal.rs:265-330) confirmed exactly as listed; delegation scope-and-expiry (delegation.rs:91,222,228,261); REST surface counted at 67 resource paths / 87 verb registrations (http/configure.rs), so the old 20+ held but badly understated; test attributes re-derived statically as 1366 (779 icn-governance + 587 apps/governance) — an attribute count, not a pass count, and no cargo was run. NOTE a counting error caught in review on this PR: the first figure (1290) anchored the attribute pattern on a literal closing bracket immediately after the word test, which silently skipped the 76 attributes written with arguments as tokio::test(flavor = ...) in apps/governance; the corrected pattern accepts either a closing bracket or an opening parenthesis after test. icn/apps/governance-app is a separate crate and is excluded, since this subsystem's crates list is icn-governance + apps/governance. CORRECTIONS: the proof bullet said Ed25519 hashes (hashes are blake3, proof.rs:23) and voter attestations (the only attestation is node-local, proof.rs:1035-1041; no VoterAttestation exists anywhere in the crate), and verify.rs:24-25 places authorization and legitimacy explicitly out of scope, so cryptographic decision proofs overclaimed as worded; the charter bullet said TOML but persistence is JSON and authored charters are CCL YAML; the charter-templates gap is stale against docs/reference/ccl-charter-templates.md; the 3-of-7 voting-models gap has NO source referent (zero Futarchy/Sociocracy/Sortition strings and no VotingModel enum in either crate — the only occurrence in the repo was this file); and #1308 is a ledger/compute item per ADR-0007, already tracked under economics and ccl, so it is removed here as misfiled. Two previously unrecorded gaps were confirmed at source and added below. NOT verified this pass: the 14-call K3s demo flow and every runtime/deployment assertion (ops-only); the open/closed state of any issue; and whether the 1290 test attributes compile or pass."
 crates = ["icn-governance", "apps/governance"]
 gaps = [
   "Proposal authorship diverges by deployment mode: manager.rs:3480 accepts a proposer DID but the actor-backed branch (:3486-3497) never passes it, and actor.rs:1926 stamps the NODE DID as proposer; the in-process fallback (:3512) uses the caller",
@@ -284,7 +284,7 @@ total_subsystems = 10
 # total_tests: NOT re-derived this pass. The "2287" figure is from the March gap analysis and
 # is stale (workspace grew; icn-governance alone now greps to 600+ test attrs). Run `cargo test`
 # for an authoritative total before re-asserting a precise number.
-total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation. Partial static re-derivation 2026-08-14: governance alone greps to 1290 #[test]/#[tokio::test] attribute lines (779 icn-governance + 511 apps/governance), so the workspace total is far above 2287; attribute counts are not pass counts."
+total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation. Partial static re-derivation 2026-08-14: governance alone greps to 1366 #[test]/#[tokio::test] attribute lines (779 icn-governance + 587 apps/governance), so the workspace total is far above 2287; attribute counts are not pass counts."
 total_crates = "38 crates + 7 apps + 3 binaries = 48 workspace members"   # verified 2026-07-13 vs icn/Cargo.toml [workspace].members
 loc_approx = "414K"   # not re-measured this pass
 deployment = "3-node K3s cluster, running since Dec 2025 — NEEDS OPS RE-CONFIRMATION (runtime claim; node addresses documented in deployment guides/runbooks)"

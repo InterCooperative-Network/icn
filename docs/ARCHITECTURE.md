@@ -604,12 +604,14 @@ Community ──→ Federation
 Federation ──→ Federation (nested federations)
 ```
 
-**Cooperative lifecycle:**
-1. **Formation** — charter drafted, initial capital pledged
+**Cooperative lifecycle** — five states (`CoopStatus`, `icn/crates/icn-coop/src/types.rs:344`; mirrored by `EntityStatus`, `icn/crates/icn-entity/src/entity.rs:304`):
+1. **Forming** — charter drafted, initial capital pledged
 2. **Active** — members joined, operations running
-3. **Dissolution** — asset distribution plan approved
+3. **Suspended** — participation halted without dissolution
+4. **Dissolving** — asset distribution plan approved, wind-down in progress
+5. **Dissolved** — wind-down complete
 
-**Treasury management:** Each cooperative has a deterministic treasury DID, derived from the coop's EntityId. Treasury manages budgets, allocates surplus, settles inter-coop trades. No separate treasury entity needed; it's derived.
+**Treasury management:** Each cooperative has a deterministic treasury **anchor**, derived from the coop id by BLAKE3 (`derive_treasury_did`, `icn/crates/icn-coop/src/lifecycle.rs:22`). Treasury manages budgets, allocates surplus, settles inter-coop trades; no separate treasury entity is needed. **Note:** despite the `did:icn:treasury:…` shape and the function name, this is a **keyless identifier string** held in an `Option<String>` — it has no keypair behind it and would not satisfy `Did::from_str` (`icn/crates/icn-identity/src/lib.rs:210-241`). A second, non-equal treasury identifier is derived independently at `icn/crates/icn-coop/src/actor.rs:489`.
 
 **Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (mutual aid network), Ecosystem (full cooperative ecosystem) — four variants (`icn/crates/icn-community/src/types.rs:9-14`). Types are configurable; these are defaults.
 
