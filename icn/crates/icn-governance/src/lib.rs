@@ -68,6 +68,7 @@ pub mod protocol_defaults;
 pub mod protocol_store;
 #[allow(missing_docs)]
 pub mod protocol_validation;
+pub mod replication;
 #[allow(missing_docs)]
 pub mod resolver;
 #[allow(missing_docs)]
