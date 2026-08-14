@@ -1001,6 +1001,15 @@ depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/rf
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/PRINCIPAL_MODEL.md"]
+category = "architecture"
+status = "draft"
+title = "The Principal Model"
+description = "Who ICN can honestly say did something. Establishes the Person != Device != Node != Institution invariant, records the verified current state at 74c832f1 (a single opaque key-derived Did; a device roster whose Capability::Sign is never checked in production; SignedGovernanceOp accepting only the author's root key; the node DID standing in as proposal author in actor-backed mode), and proposes a four-class principal taxonomy in which an institution deliberately holds no signing key. Specifies member-origin signing via a carried, self-contained device authorization, and derives implementation slices and their exact dependency on #2469 slices 4-7. Design only: no implementation, no change to SignedGovernanceOp, no lifting of #2470 containment."
+last_updated = "2026-08-14"
+owner = "matt"
+audiences = ["developers", "architects"]
+
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
 category = "architecture"
 status = "living"
