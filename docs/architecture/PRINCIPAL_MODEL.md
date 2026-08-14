@@ -773,8 +773,20 @@ any prefix can derive the current root **without trusting anyone's assertion** �
 is categorically different from resolving a bare `can_sign` lookup.
 
 A compromised original root can then only **fork** the chain, producing two events at
-the same version. That is detectable, and choosing the convergence rule is the
-remaining hard question — the same fork rule slice A0 must settle.
+the same version. That is detectable — but *detecting* a fork is not *resolving* it.
+
+> **Convergence is not correctness.** *(Raised in review round 12.)* If the genesis
+> key is compromised **after** a legitimate rotation, the attacker signs a competing
+> successor at the same version. **Both branches verify from genesis**, because both
+> are signed by a key that was authorized at that point in the chain. A content-only
+> tie-breaker (lowest hash, say) makes every peer pick the *same* branch, which is
+> convergence — and it may well be the attacker's branch. Agreeing on the wrong root
+> is not a fix.
+>
+> Selecting the legitimate branch requires an **authenticated** fork-selection
+> mechanism: a threshold-approved checkpoint, a governed decision, or another
+> authority outside the chain itself. Recorded as **O16**, with an adversarial fork
+> test required before A0 can be said to unblock anything.
 
 **Recovery is the exception, and it does not fit this rule.** *(Raised in review
 round 9.)* `RotationEvent::verify` requires `signed_by` to be an existing,
@@ -1037,7 +1049,7 @@ primitives are wrong — not NYCN.
 | T4 | Malicious hosting provider | host key ≠ institution authority | mandate chain; revocable hosting assignment | host can deny service; state portability required |
 | T5 | Compromised institution admin | admin ≠ sovereign | roles carry scopes, not sovereignty (`structure.rs:167-170`) | scoped damage until governed revocation |
 | T6 | Lost root key | recovery preserves Person P | **missing — O14-blocked.** In total loss the ordinary transition needs an unavailable old key (`multi_device.rs:541-552`), and trustee attestations are not cryptographically verified (`sync.rs:261-267`) | recovery cannot advance the authenticated chain, so P is **not** preserved for other receivers; trustee collusion is a *further* risk once it works |
-| T7 | Revoked device operating offline | a revoked device must stop being accepted | **none today** — roster revocation has no protocol effect (§6.5) | **open (O9).** Under shape (a) a receiver could order revocation against the carried version; under shape (b) revocation invalidates the device's past authorizations too |
+| T7 | Revoked device operating offline | a revoked device must stop being accepted | **none today** — roster revocation has no protocol effect (§6.5) | **open (O9), and no candidate works.** Shape (a) is **refuted** — every operation carries the same once-signed authorization version, so it cannot order anything; (a′) needs a per-operation position in a replicated total order that does not exist; (b) needs rollback/revalidation semantics that do not exist |
 | T8 | Cloned node / restore-twice | one instance, one identity | unresolved — see §13 | **open** |
 | T9 | Gateway impersonates a member | a relay cannot author | §6; and today, #2469 §7.0.2 fallback already prevents *signed* forgery | today the unsigned legacy path carries it |
 | T10 | Federation overreach | member sovereignty | co-equal scopes, not a ladder | requires authority checks not yet enforced |
@@ -1144,6 +1156,7 @@ This model does **not** provide, and must not be read as providing:
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator, **and the canonicalization rule for DID strings**, given that `from_str` accepts any multibase while `Did` equality is string equality (§2.1)? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
 | **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
 | **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
+| **O16** | **How is a legitimate chain branch selected when a compromised genesis key forks it?** Both branches verify from genesis; a content-only tie-breaker converges but may converge on the attacker (§6.3) | **A0 resolves O8 only partially without this.** Needs an authenticated selector — threshold checkpoint, governed decision, or equivalent — plus an adversarial fork test |
 | O15 | What is the canonical preimage of the node-claim transcript — version, domain separator, field order/encoding, and how the two signatures plus capability proof are incorporated? (§5.3) | Node and claimant are separate implementations; without it they can sign different serializations, and an ad-hoc encoding invites cross-protocol reuse. Blocks slice E's dual-signature invariant |
 | O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
 | O11 | What is the canonical encoding and normalization of a genesis decision before hashing to an `EntityId`? (§7.1) | Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug |
@@ -1170,7 +1183,7 @@ Legend: **I** implemented · **P** partial · **M** missing · **C** conflicting
 | First-device bootstrap | **M** — `index.ts:2059` needs a prior device | self-bootstrapping | new flow | high | sdk + gateway |
 | Mobile identity genesis | **P** — real, but zero CI (`wallet.ts:93`) | shipped + tested | CI + release | med | sdk/react-native |
 | Multi-device | **P** — roster only (§2.2) | roster + authority | wire signing | high | icn-identity |
-| Recovery | **P** — `recovery.rs` 7-step flow implemented | reconcile + surface | client + audit trail | med | icn-identity |
+| Recovery | **C** — the 7-step flow exists, but total-loss recovery **cannot advance the authenticated chain**: `RotationEvent::verify` needs an unavailable old authorized key (`multi_device.rs:541-552`) and `sync.rs:261-267` counts trustee DIDs without verifying signatures | authenticated threshold-recovery transition | **new cryptographic work, O14-blocked** — not merely reconciliation or UI | **critical** | icn-identity |
 | Key rotation preserving DID | **I** — stable across rotation (`:21-22`) | unchanged | none | — | icn-identity |
 | Node DID | **I** — first-boot generated | unchanged | none | — | icnd |
 | Node claiming | **M** — ABSENT; `operator_did = node_did` (`lifecycle.rs:371-374`) | Person claims instance | ceremony + grant | high | icn-core |
@@ -1222,8 +1235,10 @@ would bake in a format that cannot express the two things that make it safe.
 **A0 resolves O8 only.** *(Corrected in review round 11 — an earlier revision of this
 section claimed it resolved both.)*
 
-- **O8 — yes.** A verifiable, monotonic, signature-chained identity document lets a
-  receiver derive the **current root** from the genesis key the DID encodes (§6.3).
+- **O8 — partially.** A verifiable, monotonic, signature-chained identity document
+  lets a receiver derive the **current root** from the genesis key the DID encodes
+  (§6.3) in the non-adversarial case. It does **not** settle which branch is
+  legitimate when a compromised genesis key forks the chain — that is **O16**.
 - **O9 — no.** A0 orders *identity-document events relative to each other*; it says
   nothing about whether a governance **operation** was signed before or after a
   revocation, because the authorization carries one fixed version for its whole life
@@ -1281,5 +1296,9 @@ Slices 4–6 are explicitly **not blocked** by this work.
 - **Retire dead paths deliberately.** `can_sign` and the unwired institutional
   signing surfaces should be either wired or deleted, with the decision recorded
   — not left as ambiguous half-truths.
-- **Order:** **A0** → (A ∥ B ∥ C) → D → (E → F → G) → H → I. A0 is new and precedes
-  everything, because O8 and O9 both resolve into it (§15.1).
+- **Order:** **A0** → (B ∥ C) → **[A and D remain blocked on O9]** → (E → F → G) →
+  H → I. A0 precedes everything, but it resolves **O8 only, and only partially**
+  (fork selection is O16). It explicitly excludes revocation policy, so it cannot
+  order governance operations against revocations or roll back applied effects —
+  scheduling A and D after it would freeze the authorization format and the v2
+  envelope before deterministic revocation exists (§15.1).
