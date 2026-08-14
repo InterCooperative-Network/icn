@@ -1,17 +1,26 @@
 # Authenticated governance replication (#2469)
 
 **Status:** design + slice 1 (unwired primitive).
-**Derived against:** `origin/main` = `c378232132139235e2a8cc305792eaee2571267a`.
+**Derived against:** `origin/main` = `3d401dce0c65d70eea117335b48719baa2231e2e`.
 **Owns:** the durable replacement for the #2470 containment.
-**Refs:** #2469, #2441, #2470 (`bc291305`), #2471, #2480, #2510, #2520, #2535, #2544.
+**Refs:** #2469, #2441, #2470 (`bc291305`), #2471, #2480, #2510, #2520, #2535, #2544, #2583.
 
-Everything in §1 was re-derived from source at `c3782321`. Where an older campaign note
-disagrees, the source wins and the disagreement is called out.
+Everything in §1 was re-derived from source — originally at `c3782321`, re-verified at
+`3d401dce`. Where an older campaign note disagrees, the source wins and the disagreement is
+called out.
 
 **Revision 2** corrects three mechanisms from revision 1 that were unsafe under
 eventually-consistent delivery: the sequence gate, first-writer-wins collision
 arbitration, and whole-config authority binding. Revision 1's `prev` hash-chain field is
 also removed. See §10, §5.2, §5.3.
+
+**Revision 3** re-derives §1 against `3d401dce`, where **slice 2 has landed** as #2583:
+gossip now re-derives `entry.hash` from the payload before an unseen entry may claim a
+content-addressed slot. T3 is closed, and §5.6 step 6 became an upstream guarantee rather
+than work this design still has to schedule. **No architectural premise changed** — #2583
+authenticates payload↔digest only, and leaves authorship, authority and the #2470
+containment exactly as they were. Revision 3 also corrects a §7.0 mis-citation: the vote
+suspension gate was cited at the *proposer* gate's line.
 
 ---
 
@@ -24,8 +33,8 @@ also removed. See §10, §5.2, §5.3.
 | 1 | Operator issues a `GovernanceCommand` (RPC/HTTP) | `icn-rpc/src/handler/governance.rs`, `apps/governance/src/http/handlers.rs` |
 | 2 | `GovernanceActor` **persists to `GovernanceStateStore` first** | `apps/governance/src/actor.rs` command arms |
 | 3 | Actor builds a `GovernanceMessage`, serializes with `to_bytes()` = **`serde_json::to_vec`** | `icn-governance/src/message.rs:417` |
-| 4 | `gossip.publish(topic, data, author = own_did)`; ACL checked **for the local DID only**; `hash = Self::hash_data(&data)` | `icn-gossip/src/gossip.rs:911`, `:919` |
-| 5 | `store_entry(entry)` → fires notification callbacks (including governance's own loopback copy) | `icn-gossip/src/gossip.rs:968` |
+| 4 | `gossip.publish(topic, data, author = own_did)`; ACL checked **for the local DID only**; `hash = Self::hash_data(&data)` | `icn-gossip/src/gossip.rs:858`, `:925` |
+| 5 | `store_entry(entry)` → fires notification callbacks (including governance's own loopback copy) | `icn-gossip/src/gossip.rs:974` |
 | 6 | Outbound send wraps the `GossipMessage` in a **`SignedEnvelope`** — `PayloadType::Gossip`, Ed25519 by the node keypair, **durable monotonic sequence**, fail-closed if the sequence cannot be persisted (#2510) | `icn-core/src/supervisor/init_send_callback.rs:163` |
 | 7 | Sent as `MessagePayload::Signed` | `icn-net/src/protocol.rs:628` |
 
@@ -41,15 +50,20 @@ also removed. See §10, §5.2, §5.3.
 | 9b | Unsigned path → `gossip.handle_message(&net_msg.from, msg)` — `from` is **self-declared** | `icn-core/src/supervisor/init_network.rs:59–71` |
 | 10 | `handle_message_inner`: policy-oracle check on `sender` (`Domain::trust()`, `ActionKind::Read`). A coarse trust gate, **not** an authorship check | `icn-gossip/src/protocol.rs:46–68` |
 | 11 | `handle_response` — **ignores `sender` entirely**, stores the entry verbatim | `icn-gossip/src/handlers/push.rs:109–121` |
-| 12 | `store_entry`: dedups on the **sender-supplied `entry.hash`**; hash is **never recomputed**; no topic ACL; no signature — `GossipEntry` has no signature field | `icn-gossip/src/gossip.rs:968`, `types.rs:116–144` |
+| 12 | `store_entry`: **re-derives `entry.hash` from the payload before an unseen entry may claim a content-addressed slot (#2583)**; still no topic ACL; still no signature — `GossipEntry` has no signature field | `icn-gossip/src/gossip.rs:974`, `types.rs:116–144` |
 | 13 | Fires `EntryNotificationCallback = Fn(String, GossipEntry, Did)`. **No sender. No origin discriminator.** | `icn-gossip/src/gossip.rs:38` |
-| 14 | Governance callback: topic filter → `from_bytes` → `observe_replicated_governance_message` → **`debug!` only. No state mutation.** | `apps/governance/src/actor.rs:1277–1303`, `:3841` |
+| 14 | Governance callback: topic filter → `from_bytes` → `observe_replicated_governance_message` → **`debug!` only. No state mutation.** | `apps/governance/src/actor.rs:1277–1303`, `:3843` |
 
 ### 1.3 The verified facts that constrain the design
 
 1. **`GossipEntry` carries no signature.** `author: Did` is attacker-chosen.
-2. **The entry hash is never recomputed on receipt.** `hash_data` has exactly one caller,
-   the publish path (`gossip.rs:919`). Dedup keys on attacker-supplied `entry.hash`.
+2. **The entry hash *is* re-derived on receipt, as of #2583** (`3d401dce`). `store_entry`
+   (`gossip.rs:974`) refuses an unseen entry whose payload does not hash to its claimed
+   `entry.hash`, via `GossipEntry::validate_content_integrity` (`types.rs`). A slot already
+   owned by a validated entry short-circuits to a read-only duplicate lookup, so replayed
+   compressed bytes are never re-decompressed. This closes T3 and satisfies §5.6 step 6.
+   **It authenticates payload↔digest only** — `entry.author` remains an unsigned,
+   self-declared field that any peer may set to any DID, which is why fact 1 still stands.
 3. **The transport peer *is* authenticated** — Hello binds DID → live TLS cert
    (`handlers/hello.rs:44–108`), fails closed with no peer certificate.
 4. **That identity is discarded at the gossip seam.**
@@ -115,11 +129,11 @@ Attacker: can open a QUIC connection, complete Hello (so holds *some* valid DID 
 free to mint), and send arbitrary frames. Does not hold any victim's private key. May be a
 legitimate federation member acting outside its authority.
 
-| # | Attack | Status on `c3782321` |
+| # | Attack | Status on `3d401dce` |
 |---|---|---|
 | T1 | Forge `entry.author` as a victim DID and publish governance state | **Blocked** by containment; would otherwise fully succeed |
 | T2 | Publish raw unsigned `MessagePayload::Gossip` | **Open** (`connection.rs:822`) |
-| T3 | Supply `entry.hash` unrelated to content → poison dedup, pre-claim a hash to suppress a legitimate entry | **Open** — hash never recomputed |
+| T3 | Supply `entry.hash` unrelated to content → poison dedup, pre-claim a hash to suppress a legitimate entry | **Closed** by #2583 (`3d401dce`) — re-derived in `store_entry` |
 | T4 | Replay a legitimately signed op into a *different* domain | Open under a signature that omits domain binding |
 | T5 | Replay a superseded op | Open without a replay identity |
 | T6 | `ProposalOpened` force-reset on a terminal proposal, then `ProposalClosed` — **two-message finalization bypass** | **Blocked**; must stay blocked *regardless of authentication* |
@@ -319,7 +333,10 @@ witness protocol.
    lookup, no network.** → I1, I2
 4. Decode `op_bytes`; reject if the decoded variant disagrees with `op_kind`.
 5. Reject if the op's internal principal disagrees with `author` (`vote.voter`).
-6. Recompute `entry.hash` from `entry.data`; reject mismatch. → T3
+6. **Satisfied upstream since #2583** — `store_entry` re-derives `entry.hash` from the
+   payload before any notification callback fires, so an entry reaching this ingress has
+   already been shown to match its digest. Kept as a numbered step because the ingress
+   contract depends on the property holding, not because this design must still build it. → T3
 7. Resolve `domain_id` in **local durable state**. Absent → **quarantine; never fetch**. → I9
 8. **Resolve the op's state anchor locally and confirm it belongs to `domain_id`.** For
    `VoteCast`: load `vote.proposal_id`; absent → quarantine; reject unless
@@ -346,8 +363,8 @@ the gate stays reachable and its counters mean something under attack.
   instead of a bare `GovernanceMessage`.
 - Frames are distinguished by a leading **magic + version**, never by trial decoding (a bare
   `GovernanceMessage` is JSON; trial decoding is fragile and attacker-steerable).
-- The `entry.hash` recomputation (step 6) is a **generic gossip** change, separable, and
-  fixes T3 for all topics independently of this envelope.
+- The `entry.hash` recomputation (step 6) was a **generic gossip** change, separable, and
+  fixes T3 for all topics independently of this envelope. **Landed as #2583 (`3d401dce`).**
 
 ## 7. First safe replication variant set
 
@@ -368,14 +385,23 @@ Applying facts 12–15 to the 8 pre-containment mutation variants:
 
 ### 7.0 Membership is not the complete authority predicate for a vote
 
-Re-derived at `c3782321`. StaticList membership is **never** the complete authority
-predicate for `VoteCast` in the production composition:
+Re-derived at `c3782321` and re-verified at `3d401dce`. StaticList membership is **never**
+the complete authority predicate for `VoteCast` in the production composition:
 
-- `cast_vote` consults a `SuspensionChecker` before recording a vote —
-  `403 Forbidden` if the voter is suspended (`apps/governance/src/http/configure.rs:374–388`,
-  enforced at `handlers.rs:875`). Production wires it to
+- `cast_vote` (`handlers.rs:1812`) consults **two** external predicates before recording a
+  vote, either of which yields `403 Forbidden`: a `MemberStandingChecker` — the voter must
+  hold active commons Member standing (`handlers.rs:1850`) — and a `SuspensionChecker` — the
+  voter must not be suspended (`handlers.rs:1864`; type and contract at
+  `apps/governance/src/http/configure.rs:374–388`). Production wires the latter to
   `CoopManager::is_member_suspended` (`icn-gateway/src/server.rs:1904–1908`, installed at
   `:1947`).
+
+  > *Revision 3 correction.* Revision 2 cited this gate at `handlers.rs:875`. That line is
+  > the **proposer** suspension gate on proposal *submission*, not the vote gate; the file
+  > is untouched by #2583, so this was a mis-citation in revision 2 rather than drift. The
+  > substance is unchanged and in fact **stronger** than revision 2 claimed: vote casting
+  > carries two external predicates, not one, and neither is reproducible on a receiving
+  > node.
 - `close_proposal` **revalidates** active commons Member standing for every voter and
   excludes those who lost it (`actor.rs:2149–2189`, driven by handler-computed
   `eligible_voters`).
@@ -592,7 +618,9 @@ unit tests are listed separately in §13.
 3. Valid envelope re-wrapped under a different `entry.author` → still applied on its own
    merits (proves `entry.author` is *not* an authority) **and** rejected if the inner
    signature fails.
-4. `entry.hash` not matching `entry.data` → rejected.
+4. `entry.hash` not matching `entry.data` → rejected. **Already covered on main** by
+   #2583's `icn-gossip/tests/entry_hash_integrity.rs`; retained here as the ingress-level
+   assertion that the envelope path inherits that guarantee rather than re-implementing it.
 5. Envelope validly signed for domain A, replayed naming domain B → rejected.
 
 **Authority**
@@ -647,7 +675,7 @@ unit tests are listed separately in §13.
 | Slice | Content | Restores state application? |
 |---|---|---|
 | **1** | `SignedGovernanceOp` type, magic + version, canonical encoding, `membership_hash`, sign/verify (refusing an author/key mismatch), derived `op_id`. **Library only, unwired.** | No |
-| 2 | Recompute `entry.hash` on receipt in gossip. Generic, separable. | No |
+| 2 | ✅ **DONE — #2583 (`3d401dce`).** Re-derive `entry.hash` on receipt in gossip. Generic, separable. | No |
 | 3 | Emit signed envelopes from the governance publish path (durable per-`(author,domain)` seq, #2510 pattern); accept both shapes; apply nothing. | No |
 | 4 | Bounded quarantine store + steward release valve. | No |
 | 5 | Durable `op_id` applied-set + the §10.3 comparator in the state store. | No (local semantics only) |
