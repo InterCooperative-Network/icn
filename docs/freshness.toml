@@ -166,9 +166,9 @@ notes = "Entity model fully implements spec. Stable."
 
 [sections."14-federation"]
 title = "Federation"
-last_updated = "2026-07-14T22:05:00"
-last_verified_by = "lan-rehearsal-deployment"
-review_note = "Re-verified 2026-07-14: the ONLY icn-federation/src change since the 2026-06-14 verification is #2055 (rand 0.8->0.9 migration, mechanical; no federation semantics). Prior facts re-affirmed: bilateral clearing present (clearing.rs, receipt_clearing.rs); gaps unchanged - no multilateral netting, no dispute engine, no BFT/checkpointing."
+last_updated = "2026-08-14T00:00:00"
+last_verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1 against icn/crates/icn-federation/src/. CORRECTION: the 'no multilateral netting' claim was FALSE and had propagated to three places (this note, the ARCHITECTURE.md section body, and the status.toml federation gap list). netting.rs:1,44 implements NettingEngine, it is exported at lib.rs:73, and it is called from production at clearing_manager.rs:414-420; the real limitation, recorded in source at :412 and previously absent from all three docs, is that it is informational only and does not modify positions. Note the failure mode: the 2026-07-14 pass re-affirmed the prior claim on the basis that no semantic federation change had landed, rather than re-checking source — so a wrong claim survived two verification passes. Also corrected this pass: attestation signing is not installed in production (FederationGossipHandler::set_keypair, gossip.rs:83, has callers only under #[cfg(test)]; init_federation.rs:128-133 never installs a keypair; icn-rpc/src/handler/federation.rs:566-575 stores attestations without .sign()), so announcements are emitted unsigned into a verifier path that expects signatures. Re-affirmed at source: bilateral clearing (clearing.rs, receipt_clearing.rs), dispute resolution still an Option<String> method label (agreement/types.rs:493), and no checkpoint/epoch or bft/byzantine types in this crate (icn-core carries the partition-healing and byzantine integration tests). NOT re-verified: no build, test or runtime execution."
 staleness_threshold_days = 30
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-federation/src/**"]
