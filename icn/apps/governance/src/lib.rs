@@ -43,6 +43,8 @@ pub mod mandate_gate;
 pub mod receipt_backend;
 pub mod registry;
 pub mod rehearsal_workspace;
+pub mod replication_emission;
+pub mod replication_sequence;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};

@@ -1,7 +1,7 @@
 # Authenticated governance replication (#2469)
 
-**Status:** design + slice 1 (unwired primitive).
-**Derived against:** `origin/main` = `3d401dce0c65d70eea117335b48719baa2231e2e`.
+**Status:** design + slice 1 (primitive) + slice 2 (#2583) + slice 3 (signed emission).
+**Derived against:** `origin/main` = `6754d30c83cc944e5ad22e4687e5bb63ac8dc51e`.
 **Owns:** the durable replacement for the #2470 containment.
 **Refs:** #2469, #2441, #2470 (`bc291305`), #2471, #2480, #2510, #2520, #2535, #2544, #2583.
 
@@ -21,6 +21,13 @@ than work this design still has to schedule. **No architectural premise changed*
 authenticates payload↔digest only, and leaves authorship, authority and the #2470
 containment exactly as they were. Revision 3 also corrects a §7.0 mis-citation: the vote
 suspension gate was cited at the *proposer* gate's line.
+
+**Revision 4** lands **slice 3** (signed emission) at `6754d30c` and records what wiring the
+emission path revealed. Two findings are load-bearing for slice 7 and are written up in
+§7.0.2 and §7.0.3: **a node can only sign for itself**, which removes gateway-hosted votes
+from the signable set for a reason independent of §7.0.1; and **per-federation governance
+topics are never created**, so that route carries nothing today. Neither moves the field set.
+§13 records the slice as done.
 
 ---
 
@@ -464,6 +471,62 @@ squarely #2441's territory (authenticated institutional-state replication) and i
 in scope here. This is the second place where #2469 and #2441 turn out to be genuinely
 coupled — the first being the shared quarantine machinery (§11).
 
+### 7.0.2 A node can only sign for itself — the custody boundary
+
+Derived while wiring slice 3, at `6754d30c`.
+
+The envelope's `author` is the **acting principal**, and `SignedGovernanceOp::sign` refuses
+any key that does not derive it (`replication.rs:308`). A `GovernanceActor` holds exactly one
+key: the node's own identity key, extracted from `identity_bundle.keypair()`
+(`icn-core/src/supervisor/lifecycle.rs:782`).
+
+But `GovernanceCommand::CastVote { proposal_id, voter, choice, comment }`
+(`apps/governance/src/actor.rs:2073`) takes `voter` as a **parameter**, and the actor never
+constrains it to `self.did`. In the gateway composition many members vote through one node,
+which holds none of their key material.
+
+> **A node can emit a signed operation only when it *is* the acting principal.**
+> Gateway-hosted votes are unsignable in v1 — not a gap to patch, a custody fact. Signing a
+> member's vote with the node's key would assert an authorship that does not exist, which is
+> precisely the forgery this envelope exists to prevent.
+
+This is **additive to §7.0.1, not a restatement**, and it bites at the opposite end of the
+pipe. §7.0.1 says a *receiver* cannot evaluate the standing predicate, so it must not apply.
+This says a *sender* cannot produce the envelope at all. Either one alone is enough to keep
+production contained; together they mean the gateway path is contained twice over.
+
+**Consequence for slice 7.** Restoring `VoteCast` application does not, by itself, make
+gateway deployments converge, because those nodes emit nothing to converge on. A deployment
+only produces signed votes where the voter's own daemon holds the voter's key. Any plan that
+assumes slice 7 restores replication for the gateway composition is wrong on both counts.
+
+Slice 3 therefore falls back to the legacy payload whenever the key does not belong to the
+acting principal, and pins that in `signed_governance_emission.rs`
+(`a_vote_cast_for_another_member_is_never_signed`).
+
+### 7.0.3 Per-federation governance topics are never created
+
+Also derived at `6754d30c`, and **pre-existing** — unchanged by slice 3.
+
+`publish_federation_if_scoped` (`actor.rs:3269`) publishes to
+`federation:governance:<fed_id>`. The only federation governance topic anything creates or
+subscribes is the **root** `federation:governance`
+(`icn-core/src/supervisor/init_gossip.rs:325`). `TopicAutoCreationPolicy` defaults to
+`Reject` (`icn-gossip/src/types.rs:617`) and nothing in production calls
+`set_topic_auto_creation_policy`, so the per-federation publish is refused — and
+`publish_federation_if_scoped` swallows the error with a `warn!`.
+
+Federation-scoped governance therefore **never reaches the wire** in the default
+configuration, signed or legacy, before slice 3 or after it. Verified empirically: a
+federation-scoped vote produces three entries on `governance:proposal` and zero on
+`federation:governance:<fed_id>`.
+
+The emission policy still covers the route **by construction** — `publish` and
+`publish_to_topic` share one encoder — which the suite proves by declaring the topic first.
+Wiring the topic itself is a topic-lifecycle change outside #2469; the current behaviour is
+pinned by `a_per_federation_topic_is_never_created_in_the_default_configuration` so a later
+fix cannot land silently.
+
 ### 7.1 Why `DelegationRevoked` is excluded despite being safe
 
 Revocation is monotonic, idempotent, order-independent, and authorized by a principal named
@@ -676,7 +739,7 @@ unit tests are listed separately in §13.
 |---|---|---|
 | **1** | `SignedGovernanceOp` type, magic + version, canonical encoding, `membership_hash`, sign/verify (refusing an author/key mismatch), derived `op_id`. **Library only, unwired.** | No |
 | 2 | ✅ **DONE — #2583 (`3d401dce`).** Re-derive `entry.hash` on receipt in gossip. Generic, separable. | No |
-| 3 | Emit signed envelopes from the governance publish path (durable per-`(author,domain)` seq, #2510 pattern); accept both shapes; apply nothing. | No |
+| 3 | ✅ **DONE.** Emit signed envelopes from the governance publish path (durable per-`(author,domain)` seq, #2510 pattern); recognise both shapes; apply nothing. | No |
 | 4 | Bounded quarantine store + steward release valve. | No |
 | 5 | Durable `op_id` applied-set + the §10.3 comparator in the state store. | No (local semantics only) |
 | 6 | Lifecycle monotonicity guard, enforced unconditionally. | No |
@@ -684,6 +747,25 @@ unit tests are listed separately in §13.
 
 Slices 1–6 restore nothing. Slice 7 is the only one that lifts containment, and does so in
 the same change that proves positive convergence (test 18).
+
+**Slice 3, as built.** `publish` (`actor.rs:3128`) and `publish_to_topic` (`:3136`) are the
+only two functions that hand governance bytes to gossip, and both route through one
+`encode_for_emission` seam, so federation cannot drift onto a different policy. Corrected
+counts: **12** `publish` call sites (not ~10), and **1** `publish_to_topic` call site (not
+~9) — `publish_federation_if_scoped`, which itself has 7 callers.
+
+Eligibility falls back to the legacy payload at every step (kind not replicable, no acting
+principal, domain unresolvable, membership not `StaticList`, no key, key not the
+principal's); **commitment** fails closed, because a signed operation carrying a sequence
+that was never persisted is an ambiguity no receiver can detect. Signing is not restricted
+to `V1_RESTORABLE_OP_KINDS` — `ProposalCreated`, `DelegationCreated` and `DelegationRevoked`
+are signed where their principal is the node — but **eligible is not restorable**, and
+ingress still applies nothing.
+
+Recognition reads `entry.get_data()`, not `entry.data`: `publish` compresses entries above a
+size threshold *after* hashing, so the raw field is not the payload and a prefix check over
+it would misclassify every large entry. This matches `computed_content_hash`, which resolves
+the logical payload for the same reason.
 
 **Slice 1 unit tests (this change):**
 sign→verify round-trip; tampered `op_bytes`; tampered `domain_id`; tampered `author`;
