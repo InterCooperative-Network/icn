@@ -551,27 +551,29 @@ Terminal states: Accepted, Rejected, NoQuorum, Cancelled, Vetoed, ForceClosed. E
 
 **Delegation (liquid democracy):** Members can delegate their vote to a representative. Delegation is scoped: "I delegate to Alice for labor decisions, to Bob for finance decisions." Delegation has expiry: "My delegation to Alice expires in 90 days."
 
-**Charter system:** A governance constitution defining proposal types, quorum/threshold rules, committees and amendment procedures. Charters are **authored as CCL YAML** (`docs/reference/ccl-charter-templates.md`) and **persisted as JSON** (`charter_store.rs:200,246` via `serde_json`). *(Corrected 2026-08-14: this section previously described and demonstrated a TOML charter; `icn/crates/icn-governance/src/charter.rs` contains no TOML support, so the old example would have led authors to the wrong representation.)* Example, abridged from Template 1:
+**Charter system:** A governance constitution defining proposal types, quorum/threshold rules, committees and amendment procedures. Charters are **authored as CCL YAML** (`docs/reference/ccl-charter-templates.md`) and **persisted as JSON** (`charter_store.rs:200,246` via `serde_json`). *(Corrected 2026-08-14: this section previously described and demonstrated a TOML charter; `icn/crates/icn-governance/src/charter.rs` contains no TOML support, so the old example would have led authors to the wrong representation.)* Example, abridged from `contracts/templates/worker-coop.yaml`. **The top-level keys must be those `CclDocument` recognises** — `schema_version`, `entity`, `governance`, `economics`, `agreement`, `extensions` (`icn/crates/icn-ccl/src/schema/mod.rs:52-77`). Unknown top-level keys are *not* rejected, so a document wrapped in some other root object parses as empty and translates to no constraints:
 
 ```yaml
-charter:
-  name: "Example Federation"
-  version: 1
-  entity_type: federation
-  identity:
-    entity_id: "example"
-    display_name: "Example Federation"
-  governance:
-    quorum_percent: 50
-    approval_threshold: 66
-  committees:
-    - name: finance
-      veto_power: true
-    - name: labor
-      veto_power: false
-  amendments:
-    text_proposal_threshold: 50
-    constitutional_amendment_threshold: 75
+schema_version: v0
+
+entity:
+  name: "Example Worker Cooperative"
+  type: cooperative
+  subtype: worker
+  membership:
+    open_to: [individual]
+    classes:
+      - name: worker_owner
+        default: true
+    rights_by_class:
+      worker_owner: [vote, propose, patronage_refund]
+
+governance:
+  bodies:
+    - name: general_assembly
+      composition: all_members
+      convenes:
+        regular: quarterly
 ```
 
 **Amendment process:** Changing the charter requires a super-majority (e.g., 75% approval). Amendments are themselves proposals and can be vetoed by committees (if defined).
@@ -647,22 +649,22 @@ Federation enables multiple cooperatives to coordinate without surrendering auto
 
 **Registry and attestations:** Federation gossips coop announcements (coop name, DID, trust context) and attestations in which federation member A attests to member B's identity. The attestation **type** is signature-bearing, but signing is **not installed in production**: `FederationGossipHandler::set_keypair` (`gossip.rs:83`) has callers only under `#[cfg(test)]`, and the composition root (`icn-core/src/supervisor/init_federation.rs:128-133`) never installs a keypair, so announcements are emitted unsigned and are then **rejected** by the receiver's signature check (`gossip.rs:203-210`), meaning production peer discovery through this path does not complete; the RPC issue path (`icn-rpc/src/handler/federation.rs:566-575`) likewise stores attestations without calling `.sign()`. *(Verified 2026-08-14: `FederatedTrustAttestation` in icn/crates/icn-federation/src/attestation.rs; signing-installation gap tracked as #2500.)*
 
-**Clearing (added since the March 2026 snapshot):** Federation has bilateral clearing agreements (`CrossCoopTransfer`, Phase F3) and a receipt-clearing path for cross-scope settlement (`ReceiptClearingManager` with batch clearing, Epic 4 / #941). This is genuine cross-coop settlement infrastructure. A multilateral net-position solver also exists (`NettingEngine`, `netting.rs`) and is reachable from production via `ClearingManager::perform_multilateral_netting` — but it is **informational only**: it computes which cycles could be cancelled and does **not** modify positions (`clearing_manager.rs:412`). *(Correction 2026-08-14: this paragraph and the gap below previously stated that no multilateral netting existed. Verified against icn/crates/icn-federation/src/{clearing.rs,receipt_clearing.rs,netting.rs,clearing_manager.rs}.)*
+**Clearing (added since the March 2026 snapshot):** Federation has bilateral clearing agreements (`CrossCoopTransfer`, Phase F3) and a receipt-clearing path for cross-scope settlement (`ReceiptClearingManager` with batch clearing, Epic 4 / #941). This is genuine cross-coop settlement infrastructure. A multilateral net-position solver also exists and settles: `NettingEngine` (`netting.rs:44`) computes cancellable cycles via `ClearingManager::perform_multilateral_netting` (`clearing_manager.rs:414-420`, informational per `:412`), and `apply_multilateral_netting` (`:472-535`) updates and persists positions. Both are exposed as gateway endpoints (`icn-gateway/src/api/federation.rs:1140,:1177-1190`, registered at `server.rs:2534-2535`). *(Correction 2026-08-14: this paragraph and the gap below previously stated that no multilateral netting existed. Verified against icn/crates/icn-federation/src/{clearing.rs,receipt_clearing.rs,netting.rs,clearing_manager.rs} and the gateway route registration.)*
 
 **Known gaps (honest; federation gaps re-verified 2026-08-14 against icn/crates/icn-federation/src/, remainder 2026-06-14):**
-- Multilateral netting computes but does not settle — `NettingEngine` (`netting.rs:44`) is invoked at `clearing_manager.rs:414-420` and explicitly does not modify positions (`:412`); applying a netting result is the missing step
+- *(Resolved 2026-08-14 — retained for history: this previously read "no multilateral netting algorithm". Netting is built end to end, including the apply/settle step; see the clearing paragraph above.)*
 - No dispute-resolution engine — agreements carry only an optional `dispute_resolution: Option<String>` *method label* (icn/crates/icn-federation/src/agreement/types.rs); disagreements still require human intervention
 - No three-epoch checkpointing / explicit partition-healing protocol (no `checkpoint`/`epoch` types in the crate; partition healing is eventual via gossip)
 - No BFT (Byzantine fault tolerance assumes honest majority, not 1/3 adversary — no `bft`/`byzantine` implementation in the crate)
 - No cross-federation async proof exchange (federation is single-cloud, not multi-federation)
 
-**Status: PARTIALLY CONFIRMED** (registry types and bilateral clearing work; attestation *signing* is not installed in production, so announcements are rejected by the receiver's signature check — see above; multilateral netting computes but does not settle; BFT and dispute resolution incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
+**Status: PARTIALLY CONFIRMED** (registry types and bilateral clearing work; attestation *signing* is not installed in production, so announcements are rejected by the receiver's signature check — see above; multilateral netting is built including its apply step; BFT and dispute resolution incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
 
 <!-- truth: descriptive -->
 
 ## 15. Distributed Compute
 
-Distributed compute enables cooperatives to execute work (CCL contracts or WASM) across a network of trusted nodes. Work is trust-gated, fuel-metered, and auditable.
+Distributed compute enables cooperatives to execute work (CCL contracts or WASM) across a network of trusted nodes. Work is trust-gated and auditable. **Fuel metering applies to the CCL interpreter, not to the WASM path** — see below.
 
 **Work submission flow:**
 1. User submits CCL contract or WASM module to the network
@@ -676,7 +678,7 @@ Distributed compute enables cooperatives to execute work (CCL contracts or WASM)
 
 **Trust-gated execution:** Only executors with sufficient trust score attempt to execute. Isolated peers can't claim tasks. Partner+ peers can. (Configurable per cooperative.)
 
-**Fuel metering:** Contracts have fuel budgets. Execution halts when fuel runs out. Prevents infinite loops and resource exhaustion.
+**Fuel metering (CCL only):** CCL contracts have fuel budgets and execution halts when fuel runs out (`icn-ccl/src/types.rs:399-402` returns an error on depletion; charged per statement at `interpreter.rs:162`), preventing infinite loops and resource exhaustion. **The WASM path is NOT fuel-metered:** `icn-compute/src/wasm_executor.rs:58-59` constructs `Engine::default()` with the comment that "fuel metering can be enabled later", and accounting is a flat `saturating_sub(100)` per call (`:163,:211`). WASM host imports also use wall-clock `SystemTime::now()` (`:248,:331,:428`), so that path is neither metered nor deterministic. *(Corrected 2026-08-14 at 74c832f1.)*
 
 **Proof verification:** Other nodes re-execute the contract independently. If output differs, the executor is penalized (reputation hit, possible expulsion). This creates incentive for honest execution without requiring a consensus mechanism.
 
