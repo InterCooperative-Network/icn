@@ -745,6 +745,18 @@ A compromised original root can then only **fork** the chain, producing two even
 the same version. That is detectable, and choosing the convergence rule is the
 remaining hard question — the same fork rule slice A0 must settle.
 
+**Recovery is the exception, and it does not fit this rule.** *(Raised in review
+round 9.)* `RotationEvent::verify` requires `signed_by` to be an existing,
+non-revoked method holding the required capability (`multi_device.rs:541-552`), and
+verifies the proof under **that old key**. In total-loss recovery there is no old
+key by definition, so the ordinary chain rule cannot advance the document — the one
+case recovery exists to serve is the one it cannot express. A separately
+authenticated **threshold-recovery transition** is required, verified against the
+`RecoveryConfig` trustee set rather than against a prior device key. Today that
+verification does not exist: `sync.rs:261-267` counts trustee DIDs and carries the
+in-source admission *"In production, verify the cryptographic signature here / For
+now, accept if trustee is in the list"*. Recorded as **O14**.
+
 **Still unresolved (O8, §13), and it blocks slice A**, which must not freeze an
 authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
 §7 say about identity continuity holds only for the pre-rotation case.
@@ -795,13 +807,24 @@ verifier it is meant to satisfy.
 
 **Two reachable shapes**, and they differ in what they can prove:
 
-- **(a) Ordering.** The authorization carries the issuing `DidDocument.version`;
-  the receiver holds a replicated, signature-checked document whose
-  `revoke_device` bumps that version (`multi_device.rs:443`). Then
-  `carried_version < revocation_version` is a deterministic local comparison, and
-  the existing version-LWW merge (`sync.rs:115-119`) is already the right rule.
-  **This is the only shape that distinguishes an operation signed *before*
-  revocation from one signed *after*.**
+- **(a) Ordering — and it does *not* work as first described.** *(Corrected in
+  review round 9.)* The idea was that the authorization carries the issuing
+  `DidDocument.version` and the receiver compares `carried_version <
+  revocation_version`. But the authorization is signed **once**, so every operation
+  the device ever produces carries the **same** version — including operations
+  signed after revocation. The comparison therefore says nothing about *when the
+  operation* was signed. It degenerates into either rejecting every operation ever
+  made under that authorization (which is shape (b) with extra steps) or letting a
+  peer that applied an operation before learning of the revocation diverge from one
+  that learned first.
+
+- **(a′) Per-operation causal marker.** Genuine before/after discrimination needs
+  the *operation* — not the authorization — to carry a signed position in a
+  replicated total order, with the revocation recorded at a position in that same
+  order. ICN has no such order for identity events today, and #2469 deliberately
+  declined to create one for governance (`seq` is a comparator, never a gate).
+  This is the expensive option and it is not recommended without a much stronger
+  reason.
 - **(b) Snapshot invalidation.** Bind a canonical hash of the DID's non-revoked
   signing methods into the authorization. Any revocation changes the hash and
   every authorization against the stale hash fails closed. Needs no clock and no
@@ -809,9 +832,18 @@ verifier it is meant to satisfy.
   **It cannot distinguish before from after: it invalidates the device's past
   authorizations too**, which is a real semantic cost, not a rounding error.
 
-**Neither is adopted here.** The choice is **O9**, and it is load-bearing for the
-wire format: (a) requires the authorization to carry a version, (b) requires it to
-carry a set-hash. **The field set cannot be frozen before O9 is answered.**
+**Recommendation, not yet a decision: (b).** It is the only shape that is both
+correct and cheap, and it mirrors a precedent ICN has already accepted. Its cost
+must be stated plainly rather than discovered later: **revocation is retroactive**
+— revoking a device invalidates the operations it already signed, because the
+receiver can no longer reconstruct a set-hash under which they verify. For
+governance that may be tolerable, since applied operations are already recorded
+and replaying history is not the normal path; for anything that must preserve the
+validity of historical signatures it is not.
+
+The choice remains **O9**, and it is load-bearing for the wire format: (a′)
+requires a per-operation causal marker, (b) requires a carried set-hash. **The
+field set cannot be frozen before O9 is answered.**
 
 Until then the honest statement is: **a device authorization, once issued, is
 acceptable to every receiver for as long as the format is valid.** Roster
@@ -1028,6 +1060,10 @@ This model does **not** provide, and must not be read as providing:
 
 - anonymity or unlinkability (§10);
 - institutional signing keys (§4.1 — deliberately);
+- **enforcement of the "V1 is node-authored only" migration rule** — it is not
+  checkable at ingress (§16, O13);
+- **a recovery path that advances the identity chain** — the ordinary rotation rule
+  cannot express total key loss (§6.3, O14);
 - **any device revocation with protocol effect** — roster revoke is local bookkeeping;
   a compromised device's authorization is acceptable to every receiver indefinitely (§6.5);
 - expiry as a security bound — `not_after` is custody hygiene on an honest device only (§6.4);
@@ -1056,6 +1092,8 @@ This model does **not** provide, and must not be read as providing:
 | **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
 | **O9** | **Which deterministic revocation anchor?** Ordering (carry `DidDocument.version`, compare against the revocation's) or snapshot invalidation (carry a hash of the non-revoked signing-method set)? (§6.5) | **BLOCKS slices A and D.** The two shapes require *different carried fields*, so the wire format cannot be frozen first. Ordering distinguishes before/after revocation; snapshot does not and retroactively invalidates. Neither exists today — the closest path (`RotationEvent`) is unreplicated and its `verify()` has zero production callers |
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
+| **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
+| **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
 | O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
 | O11 | What is the canonical encoding and normalization of a genesis decision before hashing to an `EntityId`? (§7.1) | Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug |
 
@@ -1112,7 +1150,7 @@ node/institution arc, which does not block D.
 
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
-| **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, currently **zero production callers**); fix `icnctl device revoke`'s signing preimage (`bins/icnctl/src/main.rs:6410`) to match `signing_message()`; durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; icnctl-minted event verifies; **two conflicting events at the same version converge identically on two nodes** | no governance wiring; no device-authorization format; no revocation policy |
+| **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes, and **two honest nodes applying the same events derive byte-identical documents** | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, **zero production callers**); fix **both** `icnctl` preimages — add/approve (`bins/icnctl/src/main.rs:6302-6308`) and revoke (`:6410`) — to match `signing_message()`; make `apply_event` derive `added_at`/`revoked_at`/`updated_at` from **signed event data** instead of local `current_timestamp()`/`SystemTime::now()` (`sync.rs:126,148,286,338`; `multi_device.rs:270,279,344`); a separately authenticated **threshold-recovery transition** (see non-goals); durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; **both** icnctl event kinds round-trip through the verifier; **identical documents across skewed clocks**; **two conflicting events at the same version converge identically on two nodes**; adversarial recovery proofs rejected | no governance wiring; no device-authorization format; no revocation policy |
 | **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **BLOCKED on O8 (§6.3) AND O9 (§6.5)** — both change the field set, so freezing the format first would be premature. Must also settle O10 (canonical bytes, version, domain separator). v1 issues authorizations **root-only** (§5.2). See §15.1: slice A is no longer the correct first slice |
 | **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable; **the enrolment signature covers the enrolled key and capabilities** | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected; **tampering with `public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
@@ -1164,8 +1202,18 @@ Slices 4–6 are explicitly **not blocked** by this work.
 
 ## 16. Migration and evolution
 
-- **Additive, never a rewrite.** `GOV_OP_V1` stays valid for node-authored
-  operations, where the node genuinely is the acting principal.
+- **Additive — but V1 must be retired, not merely coexist.** *(Raised in review
+  round 9.)* The intent was that `GOV_OP_V1` remains valid for node-authored
+  operations. **A receiver cannot enforce that restriction.** `Did` carries no
+  principal-type tag (§2.1) and `SignedGovernanceOp::verify` recovers exactly one
+  key from `author` (`replication.rs:373`), so nothing at ingress can distinguish
+  a node-authored V1 op from a Person-authored one. While V1 is accepted, a
+  compromised **pre-rotation Person root** can sign V1 operations and bypass V2's
+  device authorization, current-root discovery *and* revocation entirely — the
+  V2 protections become optional for exactly the attacker they exist to stop.
+  Recorded as **O13**: either define a cryptographically checkable principal
+  classification at ingress, or set a V1 retirement point. A dual-stack that never
+  ends is not a migration.
 - **Containment holds.** Nothing here lifts #2470; slice D is a signing capability,
   not an application capability.
 - **One primitive, many consumers.** Device authorization lands in `icn-identity`
