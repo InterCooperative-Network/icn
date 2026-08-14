@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
+use crate::replication_emission::{self, Eligibility};
+use crate::replication_sequence::GovernanceSequenceCounter;
 use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_gossip::GossipActor;
 use icn_identity::Did;
@@ -1244,6 +1246,19 @@ pub struct GovernanceActor {
     /// (proposal_id, effect_kind) keeps this safe when the HTTP handler
     /// also invokes emission after the actor-backed close returns.
     receipt_store: Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>>,
+    /// Durable per-`(author, domain)` sequence source for signed governance emission (#2469).
+    ///
+    /// Consumed only on the emission path, and only after an operation has been found
+    /// eligible to sign. `seq` is a comparator for same-key conflicts, never an acceptance
+    /// gate — there is deliberately no receive-side counterpart.
+    replication_sequences: Arc<GovernanceSequenceCounter>,
+    /// The DID derived from [`Self::signing_key`], or `None` when no key is available.
+    ///
+    /// Cached at construction because deriving it is a scalar multiplication and the
+    /// emission path consults it on every publish. Holding it separately from `did` is what
+    /// lets `classify` check the key against the acting principal *and* against this node's
+    /// identity rather than assuming the two agree.
+    signing_key_did: Option<Did>,
 }
 
 impl GovernanceActor {
@@ -1257,6 +1272,33 @@ impl GovernanceActor {
         signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     ) -> Result<GovernanceHandle> {
         info!("Spawning GovernanceActor for DID: {}", did);
+
+        // Durable emission sequences share the governance store, so a restart resumes them
+        // together with the state they order. Opening fails only on a corrupt or
+        // future-versioned store, which must stop the actor rather than silently restart
+        // sequences this node has already published under its signature (#2510).
+        let replication_sequences = Arc::new(GovernanceSequenceCounter::new(store.clone())?);
+
+        // Derived once: the identity the available key actually proves. This is checked
+        // against the acting principal on every signed emission.
+        let signing_key_did = signing_key
+            .as_ref()
+            .map(|k| Did::from_public_key(&k.verifying_key()));
+
+        if let Some(ref key_did) = signing_key_did {
+            if key_did != &did {
+                // Not fatal: signing simply never engages, because `classify` requires the
+                // key to belong to both the acting principal and this node. Worth saying
+                // loudly, since it means every governance emission stays on the legacy path.
+                warn!(
+                    actor_did = %did,
+                    key_did = %key_did,
+                    "Governance signing key does not match the actor DID; \
+                     signed replication emission is disabled for this node"
+                );
+            }
+        }
+
         // Wrap raw store in typed state store abstraction
         let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(store));
 
@@ -1294,7 +1336,41 @@ impl GovernanceActor {
                     return;
                 }
 
-                match GovernanceMessage::from_bytes(&entry.data) {
+                // Resolve the *logical* payload before looking at it. `GossipActor::publish`
+                // compresses entries above a size threshold *after* hashing them, so
+                // `entry.data` is not necessarily the payload — reading it raw would
+                // misclassify every entry large enough to have been compressed, in both
+                // directions.
+                //
+                // `get_data` is the accessor `computed_content_hash` already uses for
+                // exactly this reason, and its decompression is bounded. It has also
+                // already succeeded once for this entry: `store_entry` runs
+                // `validate_content_integrity` (#2583) before firing any callback, so
+                // nothing here is the first code to touch hostile bytes.
+                let payload = match entry.get_data() {
+                    Ok(payload) => payload,
+                    Err(e) => {
+                        debug!("Governance entry payload could not be read: {}", e);
+                        return;
+                    }
+                };
+
+                // Discriminate the two wire shapes on the frame magic, never by trying to
+                // decode one and falling through on failure. Trial decoding would make the
+                // format decision a function of a parser's error behaviour on hostile bytes,
+                // and would silently reclassify anything a future decoder became more
+                // permissive about.
+                //
+                // Recognition only. A signed frame is *not* decoded, *not* verified and
+                // *not* applied here: slice 3 restores no remote state application, and
+                // parsing an unverified attacker-supplied envelope to enrich a log line
+                // would be work done on behalf of an unauthenticated peer for no benefit.
+                if payload.starts_with(icn_governance::replication::GOV_OP_MAGIC) {
+                    observe_replicated_signed_frame(payload.len(), &did_notify);
+                    return;
+                }
+
+                match GovernanceMessage::from_bytes(&payload) {
                     Ok(msg) => observe_replicated_governance_message(&msg, &did_notify),
                     Err(e) => {
                         debug!("Failed to deserialize governance message: {}", e);
@@ -1322,6 +1398,8 @@ impl GovernanceActor {
             executor: None,
             action_item_store: None,
             receipt_store: None,
+            replication_sequences,
+            signing_key_did,
         };
 
         // Slot for the scheduler task JoinHandle; filled in after spawn.
@@ -3124,9 +3202,63 @@ impl GovernanceActor {
         Ok(())
     }
 
+    /// Encode an outbound governance message, signing it when this node can (#2469 slice 3).
+    ///
+    /// The **single** encoding seam. `publish` and `publish_to_topic` are the only two
+    /// functions that hand governance bytes to gossip, and both route through here, so the
+    /// federation topics cannot drift onto a different emission policy than
+    /// `governance:proposal` — there is no second place to forget to update.
+    ///
+    /// Returns either a `SignedGovernanceOp` frame or the legacy payload, byte-identical to
+    /// what this node published before slice 3. See [`crate::replication_emission`] for why
+    /// eligibility degrades to legacy while commitment fails closed.
+    ///
+    /// The returned bytes become the gossip entry's `data` verbatim, and `store_entry`
+    /// re-derives `entry.hash` from them (#2583) — the frame is bound to its digest by that
+    /// mechanism, not by a second one here.
+    async fn encode_for_emission(&self, msg: &GovernanceMessage) -> Result<Vec<u8>> {
+        let decision = replication_emission::classify(
+            self.store.as_ref(),
+            msg,
+            &self.did,
+            self.signing_key_did.as_ref(),
+        );
+
+        let Eligibility::Signed {
+            author,
+            domain_id,
+            authority,
+        } = decision
+        else {
+            if let Eligibility::Legacy(reason) = decision {
+                debug!(
+                    message_type = msg.message_type(),
+                    reason = reason.as_str(),
+                    "Emitting governance message unsigned"
+                );
+            }
+            return msg.to_bytes().map_err(Into::into);
+        };
+
+        // Eligibility already established that a key exists and derives `author`; this is the
+        // structural proof of it rather than an `expect`.
+        let Some(ref signing_key) = self.signing_key else {
+            return msg.to_bytes().map_err(Into::into);
+        };
+
+        replication_emission::build_signed_frame(
+            signing_key,
+            author,
+            domain_id,
+            authority,
+            &self.replication_sequences,
+            msg,
+        )
+    }
+
     /// Publish a governance message to the network
     async fn publish(&self, msg: GovernanceMessage) -> Result<[u8; 32]> {
-        let bytes = msg.to_bytes()?;
+        let bytes = self.encode_for_emission(&msg).await?;
         let mut g = self.gossip.write().await;
         let hash = g.publish(GOVERNANCE_TOPIC, bytes).await?;
         Ok(hash)
@@ -3134,7 +3266,7 @@ impl GovernanceActor {
 
     /// Publish a governance message to a specific topic
     async fn publish_to_topic(&self, topic: &str, msg: GovernanceMessage) -> Result<[u8; 32]> {
-        let bytes = msg.to_bytes()?;
+        let bytes = self.encode_for_emission(&msg).await?;
         let mut g = self.gossip.write().await;
         let hash = g.publish(topic, bytes).await?;
         Ok(hash)
@@ -3840,6 +3972,24 @@ impl GovernanceActor {
 /// outright — "failure doesn't roll back the local write"). The loopback copy this ingress
 /// also receives is a redundant re-application of state the node already wrote, so refusing
 /// it costs local governance nothing.
+/// Note a `SignedGovernanceOp` frame arriving on a governance topic (#2469 slice 3).
+///
+/// The signed shape is **recognised, not honoured**. Everything the containment above says
+/// applies unchanged: this runs in the same callback, which captures no
+/// `GovernanceStateStore`, so a signed entry has no more path to governance state than an
+/// unsigned one. A valid signature proves content and authorship; it proves nothing about
+/// authority over a domain, and authority is what applying state would require.
+///
+/// Only the frame length is recorded — deliberately not the author, op kind or domain, all
+/// of which would require parsing an unverified envelope supplied by an unauthenticated peer.
+fn observe_replicated_signed_frame(frame_len: usize, local_did: &Did) {
+    debug!(
+        local_did = %local_did,
+        frame_len,
+        "Signed governance replication frame observed; recognised but not verified or applied"
+    );
+}
+
 fn observe_replicated_governance_message(msg: &GovernanceMessage, local_did: &Did) {
     // Bounded and deliberately low-severity: `message_type()` is a `&'static str` over a
     // fixed variant set, and this path fires for ordinary local governance too (each local
