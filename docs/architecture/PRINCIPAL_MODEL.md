@@ -1068,9 +1068,17 @@ every membership record, every vote key
 (`gov:vote:{pid}:{voter}` — the one author-bound storage key, #2469 §1.4 fact 13),
 and every gossiped operation.
 
-`Did::from_str` (§2.1) permits exactly one identifier form, so **pairwise or
-derived identifiers are not expressible today** without changing the `Did`
-type itself — which every crate depends on.
+**Correction (review round 13): this does not require changing `Did`.** An earlier
+revision said pairwise identifiers were inexpressible without altering the type. They
+are not. Nothing binds a human to a single DID — `KeyPair::generate()` is free to call
+and each fresh keypair yields an ordinary `Did`, so a person can already hold a
+distinct DID per institution today.
+
+What is missing is not an *identifier form* but the **relationship semantics** around
+a set of them: a private linkage secret joining them to one person, recovery that
+covers every pairwise identity rather than one anchor, and membership proofs that
+establish standing without revealing the linkage. Those are new mechanisms, not a
+change to a type every crate depends on.
 
 Directions, none free:
 - **Pairwise Person DIDs per institution**, linked by a private linkage secret.
@@ -1146,7 +1154,7 @@ This model does **not** provide, and must not be read as providing:
 |---|---|---|
 | O1 | May the Person root key live on the first phone, or must it be generated to backup material? | Usability vs. custody; determines whether phone-only onboarding is complete or degraded |
 | O2 | Does a restored/migrated node keep its Node DID? | Keeping it makes restore-twice indistinguishable from a clone; rotating it breaks peer expectations and hosting assignments (T8) |
-| O3 | Pairwise identifiers — adopt, and at what cost to recovery and the single-anchor model? (§10) | Requires changing `Did`, on which every crate depends |
+| O3 | Pairwise identifiers — adopt, and at what cost to recovery and the single-anchor model? (§10) | **Not a type change** (a person may already hold many ordinary DIDs). The open work is managing and *proving relationships among* multiple DIDs: private linkage, recovery spanning all of them, and membership proofs that do not reveal the linkage |
 | O4 | Is `EntityId`-bound-to-genesis-hash sufficient, or does an institution need a resolvable record? (§7.1) | Affects federation-scale name resolution |
 | O5 | Remove or wire `public_did` institutional signing? (§11.3) | §4.1 implies remove; existing federation-accept verification implies wire |
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
@@ -1156,6 +1164,7 @@ This model does **not** provide, and must not be read as providing:
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator, **and the canonicalization rule for DID strings**, given that `from_str` accepts any multibase while `Did` equality is string equality (§2.1)? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
 | **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
 | **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
+| **O17** | **What is the authenticated genesis document (or genesis event), and how does a first-contact peer obtain and verify it?** (§15.1) | **A0 cannot be genesis-anchored without it.** The DID carries only the genesis key, `verify` needs a prior document, and the cache accepts unauthenticated documents — so the chain has no trustworthy starting point |
 | **O16** | **How is a legitimate chain branch selected when a compromised genesis key forks it?** Both branches verify from genesis; a content-only tie-breaker converges but may converge on the attacker (§6.3) | **A0 resolves O8 only partially without this.** Needs an authenticated selector — threshold checkpoint, governed decision, or equivalent — plus an adversarial fork test |
 | O15 | What is the canonical preimage of the node-claim transcript — version, domain separator, field order/encoding, and how the two signatures plus capability proof are incorporated? (§5.3) | Node and claimant are separate implementations; without it they can sign different serializations, and an ad-hoc encoding invites cross-protocol reuse. Blocks slice E's dual-signature invariant |
 | O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
@@ -1214,7 +1223,7 @@ node/institution arc, which does not block D.
 
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
-| **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes, and **two honest nodes applying the same events derive byte-identical documents** | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, **zero production callers**); fix **both** `icnctl` preimages — add/approve (`bins/icnctl/src/main.rs:6302-6308`) and revoke (`:6410`) — to match `signing_message()`; make `apply_event` derive `added_at`/`revoked_at`/`updated_at` from **signed event data** instead of local `current_timestamp()`/`SystemTime::now()` (`sync.rs:126,148,286,338`; `multi_device.rs:270,279,344`); a separately authenticated **threshold-recovery transition** (see non-goals); durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; **both** icnctl event kinds round-trip through the verifier; **identical documents across skewed clocks**; **two conflicting events at the same version converge identically on two nodes**; adversarial recovery proofs rejected | no governance wiring; no device-authorization format; no revocation policy |
+| **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes, and **two honest nodes applying the same events derive byte-identical documents** | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, **zero production callers**); fix **both** `icnctl` preimages — add/approve (`bins/icnctl/src/main.rs:6302-6308`) and revoke (`:6410`) — to match `signing_message()`; make `apply_event` derive `added_at`/`revoked_at`/`updated_at` from **signed event data** instead of local `current_timestamp()`/`SystemTime::now()` (`sync.rs:126,148,286,338`; `multi_device.rs:270,279,344`); a separately authenticated **threshold-recovery transition** (see non-goals); **a specified authenticated genesis document/event with a first-contact acquisition path** (O17); durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; **both** icnctl event kinds round-trip through the verifier; **identical documents across skewed clocks**; **two conflicting events at the same version converge identically on two nodes**; adversarial recovery proofs rejected | no governance wiring; no device-authorization format; no revocation policy |
 | **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **BLOCKED on O8 (§6.3) AND O9 (§6.5)** — both change the field set, so freezing the format first would be premature. Must also settle O10 (canonical bytes, version, domain separator). v1 issues authorizations **root-only** (§5.2). See §15.1: slice A is no longer the correct first slice |
 | **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable; **the enrolment signature covers the enrolled key and capabilities** | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected; **tampering with `public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
@@ -1235,10 +1244,21 @@ would bake in a format that cannot express the two things that make it safe.
 **A0 resolves O8 only.** *(Corrected in review round 11 — an earlier revision of this
 section claimed it resolved both.)*
 
-- **O8 — partially.** A verifiable, monotonic, signature-chained identity document
-  lets a receiver derive the **current root** from the genesis key the DID encodes
-  (§6.3) in the non-adversarial case. It does **not** settle which branch is
-  legitimate when a compromised genesis key forks the chain — that is **O16**.
+- **O8 — partially, and only once the chain can be *started*.** A verifiable,
+  monotonic, signature-chained identity document lets a receiver derive the
+  **current root** from the genesis key the DID encodes (§6.3) in the
+  non-adversarial case. Two things it does not settle:
+  - which branch is legitimate when a compromised genesis key forks the chain —
+    **O16**;
+  - **how a first-contact peer obtains a trustworthy starting document at all** —
+    **O17**. `RotationEvent::verify` needs a prior `DidDocument` containing the named
+    `signed_by` method and its capability (`multi_device.rs:541-552`), but a DID
+    carries only the genesis Ed25519 key; `DidDocument::new` additionally wants an
+    X25519 key and stamps local timestamps (`:250`), and `DidDocumentCache::update`
+    accepts whole documents with **no authentication**. A verifier meeting a Person
+    after several rotations must therefore either trust an unsigned starting document
+    or fail to verify the first event — and cannot derive the byte-identical document
+    A0 promises.
 - **O9 — no.** A0 orders *identity-document events relative to each other*; it says
   nothing about whether a governance **operation** was signed before or after a
   revocation, because the authorization carries one fixed version for its whole life
