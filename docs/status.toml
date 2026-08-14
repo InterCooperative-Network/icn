@@ -165,7 +165,7 @@ truth_class = "descriptive"
 evidence_type = "code-review"
 evidence = [
   "Trust-gated distributed execution (scheduler.rs:1306, policy.rs:1887-1915)",
-  "WASM execution via wasmtime — fuel metering NOT enforced (Engine::default(), wasm_executor.rs:58-59) and host imports use wall clock (:248,:331,:428), so this path is neither metered nor deterministic",
+  "WASM execution via wasmtime — fuel metering NOT enforced (Engine::default(), wasm_executor.rs:58-59) and host imports use wall clock (wasm_executor.rs:248,:331,:428), so this path is neither metered nor deterministic",
   "CCL contract execution with fuel metering — genuinely enforced, but in icn-ccl (types.rs:399-402), not on the WASM path",
   "Gossip-based task distribution (icn-core/src/supervisor/init_compute.rs:110-128)",
   "Task cost model exists (icn-compute/src/cost.rs), so compute is no longer strictly free",

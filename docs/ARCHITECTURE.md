@@ -611,9 +611,9 @@ Federation ──→ Federation (nested federations)
 
 **Treasury management:** Each cooperative has a deterministic treasury DID, derived from the coop's EntityId. Treasury manages budgets, allocates surplus, settles inter-coop trades. No separate treasury entity needed; it's derived.
 
-**Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (shared values). Types are configurable; these are defaults.
+**Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (mutual aid network), Ecosystem (full cooperative ecosystem) — four variants (`icn/crates/icn-community/src/types.rs:9-14`). Types are configurable; these are defaults.
 
-**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`. *(§13 verified accurate 2026-06-14: four entity types confirmed in `EntityType`/`EntityKind` (icn/crates/icn-entity/src/entity.rs); cooperative Formation → Active → Dissolution lifecycle confirmed in icn/crates/icn-coop/src/handle.rs; community types Geographic/Interest/Solidarity in icn/crates/icn-community/src/types.rs; deterministic treasury DID derivation via `derive_treasury_did`/`generate_treasury_did_deterministic` in icn/crates/icn-coop/src/.)*
+**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`. *(§13 re-verified 2026-08-14 at 74c832f1: four entity types confirmed in `EntityType`/`EntityKind` (icn/crates/icn-entity/src/entity.rs:265,:429). **Two corrections to the 2026-06-14 pass:** the cooperative lifecycle has five states, not three — `Forming, Active, Suspended, Dissolving, Dissolved` (icn/crates/icn-coop/src/types.rs:344, mirrored by `EntityStatus` at icn-entity/src/entity.rs:304); and `CommunityType` has four variants, not three (icn/crates/icn-community/src/types.rs:9-14). Treasury derivation via `derive_treasury_did` (icn/crates/icn-coop/src/lifecycle.rs:22) yields a **keyless identifier string**, not a keypair-backed DID — it would not satisfy `Did::from_str`.)*
 
 <!-- truth: descriptive -->
 
@@ -647,7 +647,7 @@ Federation enables multiple cooperatives to coordinate without surrendering auto
 - No BFT (Byzantine fault tolerance assumes honest majority, not 1/3 adversary — no `bft`/`byzantine` implementation in the crate)
 - No cross-federation async proof exchange (federation is single-cloud, not multi-federation)
 
-**Status: PARTIALLY CONFIRMED** (registry, attestations, and bilateral clearing work; multilateral/BFT/dispute-resolution features incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
+**Status: PARTIALLY CONFIRMED** (registry types and bilateral clearing work; attestation *signing* is not installed in production, so announcements are rejected by the receiver's signature check — see above; multilateral netting computes but does not settle; BFT and dispute resolution incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
 
 <!-- truth: descriptive -->
 
