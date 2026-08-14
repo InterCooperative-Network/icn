@@ -255,10 +255,20 @@ appliance image must never collapse them."*
 (`deploy/appliance/appliance.manifest.example.yaml:161`;
 `DEBIAN_APPLIANCE_MODEL.md:187`).
 
-Critically, institution genesis is an authenticated API call signed with the
-**node's** keystore: `icnctl institution bootstrap apply --gateway --coop-id`
-(`icn/bins/icnctl/src/institution_bootstrap.rs:190-198,972,1298-1380`). **Hosting
-institution X on node N means N's key signs X's genesis.**
+Institution genesis is an API call authorized by a **bearer token**, and nothing
+signs the genesis content at all. `icnctl institution bootstrap apply` obtains a
+JWT via challenge/response using whichever identity `--data-dir` selects, then
+`POST /v1/entities` sends a plain JSON body (`identifier`, `name`, `description`,
+`parent_id`) under that token
+(`icn/bins/icnctl/src/institution_bootstrap.rs:965-972`); with `--local-mint` even
+the challenge is skipped and the gateway secret mints the token directly.
+
+*Correction (2026-08-14, raised in review on PR #2586): an earlier revision of this
+section said the node's key signs institution genesis. It does not. The node key
+may complete a challenge to obtain a token, but no key signs the genesis payload.*
+**The consequence is stronger, not weaker: institutional genesis carries no
+authorship binding whatsoever**, so the §7.3 remedy — genesis signed by the
+founding Persons — is closing a hole that is currently fully open.
 
 ### 2.9 Clients
 
@@ -509,7 +519,36 @@ A carried proof is self-certifying. Both signatures verify against keys recovere
 from the DIDs in the envelope itself. No resolution, no external state, no
 ingress-path dependency.
 
-### 6.3 What this does not solve — revocation freshness
+### 6.3 The rotation problem — a blocking flaw in this design
+
+*Raised in review on PR #2586; it is real and it is load-bearing.*
+
+Because a DID **is** its genesis public key (§2.1), `P.to_verifying_key()` always
+recovers the **original** key, even after the Person rotates or recovers. A verifier
+that checks the carried authorization against `P.to_verifying_key()` therefore:
+
+- **rejects** authorizations signed by the *replacement* root, and
+- **keeps accepting** authorizations signed by a *compromised original* root, indefinitely.
+
+That inverts the recovery guarantee in §7: rotation would break the person's ability
+to authorize devices while leaving the attacker's ability intact. A carried,
+self-contained proof cannot resolve this on its own, because deciding *which* root is
+current is exactly a question about state the receiver does not hold. Both obvious
+repairs are unsatisfying:
+
+- **A carried rotation chain** (each new root signed by its predecessor, walked from
+  the DID-embedded genesis key) restores the new root — but an attacker holding the
+  compromised original can mint a *competing* chain, and "longest chain wins" is not a
+  security argument.
+- **An authenticated current-root source** resolves it correctly but reintroduces the
+  external-state dependency §6.2 exists to avoid.
+
+**This is unresolved (O8, §13) and blocks slice A**, which must not freeze an
+authorization format that cannot express rotation. Whatever this document says about
+identity continuity in §5.1 and §7 holds only for the pre-rotation case until O8 is
+answered.
+
+### 6.4 What this also does not solve — revocation freshness
 
 A carried authorization is self-contained, and that cuts both ways: **a revoked
 device's previously-issued authorization still verifies.** This is inherent to
@@ -523,7 +562,7 @@ Mitigations, in order of strength:
 This residual risk must be stated in the envelope's own documentation rather than
 implied away. It is the honest cost of not depending on receiver-local state.
 
-### 6.4 Implications for `SignedGovernanceOp` — **not changed here**
+### 6.5 Implications for `SignedGovernanceOp` — **not changed here**
 
 Per the session constraint, nothing in `SignedGovernanceOp` is modified. Recording
 implications only:
@@ -542,10 +581,10 @@ implications only:
 - **Migration:** v1 and v2 must coexist; v1 remains valid for node-authored ops
   (where the node genuinely is the principal). This is additive, not a rewrite.
 
-### 6.5 Layer boundary
+### 6.6 Layer boundary
 
 Device authorization is a **principal-authentication** primitive, not a governance
-one. It belongs in `icn-identity` and must be usable by any subsystem that needs
+one. It belongs in `icn-identity` (§6.6) and must be usable by any subsystem that needs
 "principal A authorized principal B to act in class X" — settlement, membership,
 compute. #2469 consumes it; #2469 does not own it.
 
@@ -731,6 +770,9 @@ This model does **not** provide, and must not be read as providing:
 - proof that a hosting operator will not deny service (only that it cannot
   *become* the institution);
 - a solution to node cloning (§13);
+- support for Person root-key rotation or recovery in the carried authorization
+  format — see §6.3; until O8 is resolved, rotation breaks device authorization
+  while leaving a compromised original root able to authorize (§6.3);
 - any change to #2470 containment, which remains in force.
 
 ---
@@ -746,6 +788,7 @@ This model does **not** provide, and must not be read as providing:
 | O5 | Remove or wire `public_did` institutional signing? (§11.3) | §4.1 implies remove; existing federation-accept verification implies wire |
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
 | O7 | Which operation classes may a device sign, and which require the root key? | Determines the default scope set in §5.2 |
+| **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
 
 ---
 
@@ -796,7 +839,7 @@ node/institution arc, which does not block D.
 
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
-| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped, time-bounded authorization | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; expiry; scope mismatch; wrong signer; revoked device | no governance wiring; no envelope change |
+| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped, time-bounded authorization | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; expiry; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization** | no governance wiring; no envelope change. **Blocked on O8 (§6.3)** — the format must not be frozen until rotation is expressible |
 | **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable | `icn-gateway/src/identity_mgr.rs`, `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
 | **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; expired rejected; `op_id` covers the authorization | **does not lift #2470 containment**; does not change v1 |

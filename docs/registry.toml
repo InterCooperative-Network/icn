@@ -1009,6 +1009,17 @@ description = "Who ICN can honestly say did something. Establishes the Person !=
 last_updated = "2026-08-14"
 owner = "matt"
 audiences = ["developers", "architects"]
+truth_class = "descriptive"
+canonical = "no"
+last_reviewed = "2026-08-14"
+recommended_action = "keep"
+freshness = "current"
+depends_on = [
+  "icn/crates/icn-identity/src/**",
+  "icn/crates/icn-governance/src/replication.rs",
+  "icn/crates/icn-entity/src/**",
+  "docs/design/authenticated-governance-replication.md",
+]
 
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
 category = "architecture"
