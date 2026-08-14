@@ -58,8 +58,15 @@ shipping code**, and cannot express tests 3–5 at all. §2 shows where.
 - **The DID is the anchor; institutions are changing contexts.** Cooperatives,
   communities and federations are co-equal — never a ladder. (Already binding
   doctrine: `.claude/rules/design.md`.)
-- **Authority is proven, not asserted.** A bearer token proves key control at
-  mint time, not institutional authority. *A token is not a mandate.*
+- **Authority is proven, not asserted.** *A token is not a mandate* — and it is not
+  uniformly an authorship proof either. Whether a bearer token evidences key control
+  **depends on which issuance path minted it** (§2.4a): the challenge/response paths
+  verify an Ed25519 signature over a server nonce, while invite redemption does not.
+  A consumer must never read `claims.sub` as "this requester controls that DID's key"
+  without knowing the mint path.
+- **An authenticated session is not a cryptographic content author.** A session says
+  the gateway is willing to act for a subject; authorship says a key signed these bytes.
+  Collapsing the two is the root of §2.4 and §2.5.
 - **Proof travels with the claim.** A receiver must be able to verify authorship
   from the bytes in front of it, without consulting distributed state whose own
   authenticity it cannot establish. (Derived from #2469 §14.1.)
@@ -164,16 +171,61 @@ person.** This is the precise mechanism behind #2469 §7.0.2's custody boundary.
   (`icn-gateway/src/auth.rs:184`), not the DID's key. The intended trusted
   issuance gate `TokenAuthority` is `DenyUntilWired` with "no production caller"
   (`token_authority.rs:32,150-176`).
-- Only the challenge/response path proves key custody (`auth.rs:279,315`).
-  **Invite redemption does not**: `api/invites.rs:256-282` parses a
-  client-supplied DID from the request body, validates only its *form*, and
-  mints a bearer token on it. Granted scopes are `coop:read`, `coop:write`,
-  `ledger:read`, `ledger:transact` — **not** governance scopes, so this is not a
-  vote-forgery path, but it does permit acting on settlement authority under an
-  arbitrary DID. Flagged, not addressed here.
+- **Invite redemption mints a token for an unproven subject** (`api/invites.rs:258-261,280`):
+  `req.did` comes from the request body with form validation only, and
+  `join_via_invite` takes no `HttpRequest`, so it inspects neither the caller's
+  claims nor any scope. Preconditions are narrower than "unauthenticated" — the
+  route sits behind `.wrap(auth)` (`server.rs:2433-2442`), so an attacker needs
+  *some* valid bearer token plus an invite code (and `coop:read` reaches
+  `list_invites`, `:206`). Given both, they mint a token naming **any DID**.
+  Tracked as #2589.
+
+  What that token actually reaches, traced to live guards rather than inferred
+  from scope names: `create_coop` (`api/coops.rs:44`, which notably has **no**
+  `require_coop_access`, so the new coop id escapes the invite's coop binding),
+  `create_listing` (`api/listings.rs:616`), listing update/delete/status
+  (`:756`, `:826`, `:871`), and `express_interest` (`:937`) — all attributed to
+  the impersonated DID — plus ledger and coop **reads** confined to the invite's
+  coop.
+
+  **Correction (review round 8).** An earlier revision said this permitted
+  "acting on settlement authority". It does not. `ledger:transact` has **zero
+  handler guards repo-wide** — its only non-test occurrences are this grant and
+  the session *ceiling* at `api/sessions.rs:42` — while both ledger mutation
+  routes require `ledger:write` (`api/ledger.rs:68`, `:557`), which this token
+  lacks. No value moves. The finding is narrower than first stated and still
+  security-relevant, because identity attribution and cooperative creation are
+  reachable under a DID the requester cannot sign for.
 - `GovernanceProof` binds *what was recorded*, not *who authorized it*;
   `icn-governance/src/verify.rs:22-27` states authorization is explicitly out of
   scope.
+
+### 2.4a Token issuance taxonomy — what a bearer token actually evidences
+
+All gateway and RPC tokens are **HMAC HS256 over a shared secret**
+(`auth.rs:415-419`, `:190-192`) — there is no asymmetric issuer key, so a token
+proves only that *something holding the gateway secret* emitted these claims.
+What it says about the **subject** varies by path:
+
+| Mode | Who picks `sub` | Key-control proof | Production-reachable | Evidences |
+|---|---|---|---|---|
+| `/auth/verify` (`auth.rs:368`) | client, **pinned by signature** | **yes** — Ed25519 over server nonce (`auth.rs:315`) | dev + loopback only (`server.rs:197-199`) | custody of `sub`'s key; `coop_id`/scopes self-asserted |
+| **`/invites/join`** (`invites.rs:280`) | **client, body field** | **NONE** | **yes — always mounted** | issuer assertion only |
+| SDIS enrolment complete (`simple_enrollment.rs:782`) | client, pinned by signature | yes (`:587`) | only if `ICN_ENABLE_SELF_SERVE_ENROLLMENT` | custody + steward authorization |
+| session approve (`sessions.rs:225`) | **server**, from approver's verified claims | none fresh; inherited | yes | attenuated authorization |
+| `icnctl --local-mint` (`bins/icnctl/src/main.rs:7692`) | caller | none — authority *is* the HMAC secret | operator-local | issuer assertion only |
+| RPC `auth.verify` (`icn-rpc/auth.rs:672`; `handler/auth.rs:235`) | client, pinned by signature | yes (`icn-rpc/auth.rs:651`); the coop variant also checks membership (`handler/auth.rs:190`) | yes | custody (+ membership) |
+| `TokenAuthority` (`token_authority.rs:212`) | — | — | **no — test-only, no production caller** | — |
+
+**The load-bearing row is `/invites/join`**: the only always-mounted production
+path whose subject is fully client-chosen and unproven. `allow_self_asserted_coop`
+does not help — it gates `coop_id` and scopes on `/auth/verify`, never `sub`,
+and that path's `sub` is cryptographically proven regardless.
+
+**Consequence for this model.** "Authenticated" is not one predicate. Any design
+that consumes `claims.sub` as authorship must name which modes it trusts; §6
+exists precisely so that governance authorship stops depending on this table at
+all.
 
 ### 2.5 The node already stands in for the person — in production
 
@@ -368,6 +420,55 @@ What an institution *does* need is a **non-squattable, stable identifier**.
 Today's human-chosen slug (§2.6) is neither. §7.1 proposes binding it to its
 genesis decision.
 
+#### 4.1.1 The options, tested against the invariants
+
+*Re-evaluated in review round 8, deliberately not for symmetry with Person/Device/Node.*
+
+| | A. Key-derived Institution DID | A′. Same, threshold-held | B. Stable identifier + governed mandates | C. Today's `EntityId` unchanged |
+|---|---|---|---|---|
+| Host replacement doesn't replace the institution | only if custody is off-host | yes | **yes** — identifier is infra-independent | yes |
+| No key-holder becomes the institution | **fails** — custody *is* the institution | partly: the current share-holders are | **yes** — there is no key to hold | yes |
+| Legitimacy derives from governance | bolted on | bolted on | **yes** — mandate chain *is* the provenance | weak — no binding |
+| Independently addressable | yes | yes | yes, if resolvable | **fails** — squattable slug |
+| Can authenticate its own statements | **yes, directly** | yes | **no** — requires a chain | no |
+| Federations don't collapse into operators | only with custody discipline | yes | **yes** | yes |
+| Hosted institution keeps sovereignty | only with custody discipline | yes | **yes** | yes |
+
+**A′ is real and was taken seriously.** ICN ships threshold primitives
+(`icn-crypto-pq/src/{threshold,shamir}.rs`), and the steward network already runs a
+3-of-5 threshold PRF in production (`icn-steward/src/config.rs:61-62`), so
+"institution key held m-of-n by stewards" is not hypothetical. It genuinely fixes
+the single-sovereign objection.
+
+It loses on a different axis. `Did` is **definitionally a public key**
+(`icn-identity/src/lib.rs:210-235`: `did:icn:` + multibase base58btc + exactly 32
+bytes + a valid Ed25519 key). A public key is a *static* fact. Institutional
+authority is a **time-varying governed relation** — who may act for a cooperative
+changes by election, suspension and dissolution. Encoding it as a keypair means
+every governance change becomes a key-custody ceremony, and it inherits O8 wholesale:
+the DID would still derive the *genesis* key, so institutional rotation needs exactly
+the chain machinery §6.3 is blocked on, at institutional scale and with a re-sharing
+ceremony on top.
+
+**Conclusion — the repo's `Did` is the wrong abstraction for institutional identity**,
+not because institutions don't deserve identity, but because `Did` models custody and
+institutions are constituted by governance. B keeps the two separable: identity is an
+identifier, authority is a mandate chain, and the two are joined by evidence rather
+than by a secret.
+
+**The cost is real and is not hidden:** under B an institution **cannot make a
+self-authenticating statement**. Every institutional claim is a chain a verifier must
+walk (charter → decision → mandate → grant → signature). Where an institution must
+appear as an authorization *subject*, ICN cannot express it today at all —
+`icn-authz::SubjectId` requires a `did:` prefix (`model/ids.rs:19,24`), so entities
+appear only as resources.
+
+**Status: PROPOSED**, not established. It is a design recommendation with a named
+cost, resting on the ESTABLISHED source facts that no institution signs in production
+(§2.6) and that `Did` is structurally a public key (§2.1). Reopening it is legitimate
+if institutions turn out to need self-authenticating statements — that is the decisive
+test, and it is recorded as **O12**.
+
 ### 4.2 Why Device gets a DID
 
 A device already holds an Ed25519 keypair (§2.2, `wallet.ts:93`), and a
@@ -430,7 +531,8 @@ device generates its own keypair  ──►  Device DID
 Person signs a DeviceAuthorization{person, device, scopes, not_before, not_after}
               │
               ▼
-   device may act for Person, within scopes, until expiry or revocation
+   device may act for Person, within scopes
+   (no deterministic end today — see §6.5)
 ```
 
 - The device **never receives the Person's root key.** This is the whole point.
@@ -444,8 +546,10 @@ Person signs a DeviceAuthorization{person, device, scopes, not_before, not_after
   require a carried delegation chain, which is the same unresolved problem as
   O8 (§6.3). *(Contradiction raised in review on PR #2586: §5.2 previously said
   an existing device could sign the authorization, which §6.1 forbids.)*
-- Revocation: roster revoke (`revoke_device`) **plus** authorization expiry.
-  See §6.3 for the freshness problem this creates.
+- Revocation: roster revoke (`revoke_device`) mutates the **local** document.
+  It has **no protocol effect today** — see §6.5. `not_after` is custody hygiene
+  on an honest device, **not** revocation: a compromised device holds the key and
+  ignores it, and §6.4 forbids receivers from enforcing it.
 - Hardware backing (Secure Enclave / Android Keystore / passkey) is a property of
   the device key, not a new principal class. Absent in Rust today (§2.1).
 
@@ -465,8 +569,63 @@ Node DID genesis already works (§2.7). What is missing is **claiming**: the ste
 that binds a running node instance to an administering Person.
 
 The claim must bind **the running instance**, not the image — an image is copied,
-an instance is not. A claim ceremony should therefore be challenge-response over
-the node's own key, not a bearer secret baked into a build.
+an instance is not.
+
+> **Challenge-response over the node's key is necessary and badly insufficient.**
+> *(Raised in review round 8.)* A challenge signed by the node proves that the
+> responder controls the **node** key — which the node always does. It says nothing
+> about why the requesting Person is entitled to become the first administrator.
+> If an unclaimed node is network-reachable, **the first caller to arrive wins**,
+> binds their own DID, and locks out the intended operator. A slice-E test suite
+> built only around the node's signature would pass against exactly that attack.
+
+**Required invariant.** *Network reachability alone MUST NOT confer first-claim
+authority.* First claim must require a factor the network cannot supply.
+
+**Proposed ceremony.** At first boot the node generates, in addition to its
+keypair, a high-entropy one-time **claim capability**, emitted only through a
+channel that already implies physical or provisioning control — console output,
+an attached display, or a root-only file. This is the same operator-scope channel
+the appliance model already relies on, and the same boundary it already insists is
+not institutional authority (`DEBIAN_APPLIANCE_MODEL.md:187`).
+
+The claim transcript binds **both** principals and is signed **twice**:
+
+```
+transcript = { node_did, claimant_person_did, node_nonce,
+               claim_capability_proof, intended_capability, session_id }
+
+  node signs transcript      -> proves this instance issued this nonce
+  claimant signs transcript  -> proves control of the Person key being bound
+```
+
+Neither signature alone is sufficient: the node's proves liveness of the
+instance, the claimant's proves custody of the Person key, and the
+`claim_capability_proof` supplies the out-of-band factor that a remote attacker
+lacks. Because both DIDs are inside the signed transcript, neither signature can
+be replayed to bind a different pair.
+
+**Bearer-sensitivity.** If the capability is delivered as a QR, **that QR is
+bearer-sensitive** — possession is authority until first use. This is the opposite
+of the #2569 QR, which carried a *destination* and was dangerous precisely because
+it was mistaken for inert data (`advertised_origin.rs:5-9`). A claim QR must never
+be logged, screenshotted into support channels, or embedded in an image.
+
+**Invalidation.** The capability is consumed on first successful claim and MUST
+be single-use; it should also carry an expiry so an abandoned unclaimed node does
+not remain claimable indefinitely from a stale photograph.
+
+**Headless and hosted nodes.** There is no display, so the capability must surface
+through the provisioning channel that already implies control — cloud-init output,
+the hypervisor console, or a file readable only by the operator account. This
+makes explicit what hosting already means: **the host can always claim the node it
+boots.** That is not a leak in the ceremony; it is why §7.3 keeps institutional
+authority off the node key entirely.
+
+**Reset.** An unclaimed node whose capability expired, or a node being
+re-provisioned, must regenerate the capability — and that regeneration must itself
+require local access. A remote reset path would reintroduce the very attack this
+ceremony exists to prevent.
 
 A restored or migrated node is a **new instance**. Whether it keeps its Node DID
 is a genuine open question (§13) with a real security cost either way: keeping it
@@ -508,6 +667,9 @@ Person P                                (root key — offline / backup)
    │ signs once
    ▼
 DeviceAuthorization{ person: P, device: D, scopes, not_before, not_after, sig_P }
+   │            (not_before/not_after are honest-signer hygiene — NOT verified
+   │             by receivers; see §6.4. The revocation-anchor field O9 will add
+   │             is not yet chosen, so this field set is NOT final.)
    │ carried with every op
    ▼
 Device D signs the governance operation with D's key
@@ -517,11 +679,18 @@ gateway / node RELAYS  ── holds no key of P, asserts no authorship ──►
    │
    ▼
 receiver verifies, using ONLY the bytes received:
-   1. sig_P over the DeviceAuthorization, under P.to_verifying_key()
+   1. sig_P over the DeviceAuthorization        [current-root discovery is OPEN — O8, §6.3]
    2. op signature under D.to_verifying_key()
-   3. now within [not_before, not_after]
-   4. scope admits this operation class
+   3. scope admits this operation class
+   4. authorization not revoked                 [anchor is OPEN — O9, §6.5]
 ```
+
+> **This recipe is deliberately incomplete, and the two gaps are the design's
+> unfinished work.** Step 1 cannot simply read `P.to_verifying_key()`, because that
+> recovers the *genesis* key and so cannot survive rotation (§6.3). Step 4 has no
+> deterministic anchor in the repo today (§6.5). An earlier revision listed a
+> wall-clock `now within [not_before, not_after]` check here; that was **wrong**
+> and is removed — §6.4 explains why a receiver must not evaluate it.
 
 **Author remains the Person DID.** The device is the *acting* principal, carried
 alongside. A gateway can relay this without ever holding P's key — which is
@@ -564,10 +733,21 @@ repairs are unsatisfying:
 - **An authenticated current-root source** resolves it correctly but reintroduces the
   external-state dependency §6.2 exists to avoid.
 
-**This is unresolved (O8, §13) and blocks slice A**, which must not freeze an
-authorization format that cannot express rotation. Whatever this document says about
-identity continuity in §5.1 and §7 holds only for the pre-rotation case until O8 is
-answered.
+**Candidate resolution — and it is the same primitive as §6.5.** A *signature-chained*
+key history is not the unauthenticated external state §6.2 rejects. `RotationEvent`
+(`multi_device.rs:135`) is signed by a key authorized in the *previous* document version
+and enforces `new_version == version + 1` (`:527`), so the chain is anchored at the
+genesis key the DID already encodes and every step verifies forward. A receiver holding
+any prefix can derive the current root **without trusting anyone's assertion** — which
+is categorically different from resolving a bare `can_sign` lookup.
+
+A compromised original root can then only **fork** the chain, producing two events at
+the same version. That is detectable, and choosing the convergence rule is the
+remaining hard question — the same fork rule slice A0 must settle.
+
+**Still unresolved (O8, §13), and it blocks slice A**, which must not freeze an
+authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
+§7 say about identity continuity holds only for the pre-rotation case.
 
 ### 6.4 Expiry is not order-independent — a second constraint on slice D
 
@@ -579,27 +759,63 @@ after it at peer B is accepted by A and permanently rejected by B. That directly
 contradicts #2469, which gives wall-clock no ordering authority and carries no
 timestamp field precisely so that late delivery stays safe (§5.1 of that design).
 
-So the expiry window in §5.2 is sound as a *custody* control on the signing
-device, but it **must not be used as an ingress validity gate** in a replicated
-operation without a deterministic rule. Candidate directions, none adopted here:
-bind validity to a monotonic, replicated quantity (for example the domain's
-membership epoch) rather than wall-clock; or evaluate expiry only where the
-verdict is local and non-replicated. Recorded as **O9** and as a slice-D test
-requirement (delayed delivery, clock skew).
+So the expiry window in §5.2 is sound as *custody hygiene* on an honest signing
+device — it bounds how long a cooperative device keeps reusing an authorization —
+but it **must not be an ingress validity gate**, and it is **not a revocation
+mechanism at all**. A compromised device holds the private key: it will not honour
+`not_after`, and if no receiver may reject on wall-clock, its authorization stays
+acceptable **indefinitely**. Expiry bounds only behaviour an attacker has no
+reason to exhibit.
 
-### 6.5 What this also does not solve — revocation freshness
+What would actually revoke a device is the subject of §6.5.
 
-A carried authorization is self-contained, and that cuts both ways: **a revoked
-device's previously-issued authorization still verifies.** This is inherent to
-carried proofs, not a defect of this particular design.
+### 6.5 Device revocation — no deterministic anchor exists today
 
-Mitigations, in order of strength:
-- short `not_after` with routine re-issue (bounded exposure window; the primary control);
-- revocation propagation as gossiped state, consulted where freshness matters more than availability;
-- high-consequence operation classes excluded from device scopes entirely, requiring root-key signature.
+*Reworked in review round 8. The previous text called short expiry "the primary
+control", which §6.4 had already invalidated.*
 
-This residual risk must be stated in the envelope's own documentation rather than
-implied away. It is the honest cost of not depending on receiver-local state.
+For a receiver to reject a compromised device's operation, it needs replicated,
+authenticated state that two honest nodes agree on. **ICN has none today.**
+Verified at `74c832f1`:
+
+| Candidate | Replicated | Authenticated | Monotonic | Live |
+|---|---|---|---|---|
+| `DidDocument.version` + `RotationEvent` (`multi_device.rs:24,154,527`) | no | by construction | **yes**, `+1` enforced | **`verify()` has zero production callers** |
+| `RevocationRegistry` (`revocation_store.rs:17`) | no — in-process maps | no signature field | no — wall-clock `is_effective()` | node-local only; no device-key revocation type |
+| `identity:recovery` topic (`recovery.rs:366`) | — | attestations never verified | — | **subscribed (`init_gossip.rs:258`) but never declared, so the subscribe fails and is warn-swallowed** |
+| `DidDocumentCache` (`sync.rs`) | — | accepts documents with **no signature check** | version-LWW | **no production caller** |
+| `membership_hash` (`replication.rs:253`) | carried, not the set | binding is authenticated; the set is not | **no — a set hash cannot sequence** | live (emission) |
+
+The closest mechanism is the **first row, and every hard part of it already
+exists** — capability check, Ed25519 verification, strict `+1` monotonicity. What
+is missing is the whole replication path, plus a correctness bug: `icnctl device
+revoke` signs an ad-hoc string (`bins/icnctl/src/main.rs:6410`) that is not
+`signing_message()`'s preimage, so an icnctl-minted event would fail the very
+verifier it is meant to satisfy.
+
+**Two reachable shapes**, and they differ in what they can prove:
+
+- **(a) Ordering.** The authorization carries the issuing `DidDocument.version`;
+  the receiver holds a replicated, signature-checked document whose
+  `revoke_device` bumps that version (`multi_device.rs:443`). Then
+  `carried_version < revocation_version` is a deterministic local comparison, and
+  the existing version-LWW merge (`sync.rs:115-119`) is already the right rule.
+  **This is the only shape that distinguishes an operation signed *before*
+  revocation from one signed *after*.**
+- **(b) Snapshot invalidation.** Bind a canonical hash of the DID's non-revoked
+  signing methods into the authorization. Any revocation changes the hash and
+  every authorization against the stale hash fails closed. Needs no clock and no
+  ordering — this is precisely the shape #2469 already accepted for membership.
+  **It cannot distinguish before from after: it invalidates the device's past
+  authorizations too**, which is a real semantic cost, not a rounding error.
+
+**Neither is adopted here.** The choice is **O9**, and it is load-bearing for the
+wire format: (a) requires the authorization to carry a version, (b) requires it to
+carry a set-hash. **The field set cannot be frozen before O9 is answered.**
+
+Until then the honest statement is: **a device authorization, once issued, is
+acceptable to every receiver for as long as the format is valid.** Roster
+revocation is a local bookkeeping act with no protocol effect.
 
 ### 6.6 Implications for `SignedGovernanceOp` — **not changed here**
 
@@ -717,7 +933,7 @@ The reference flow, and what each step needs that does not exist yet:
 | receive and accept an invitation | invite → membership without DID assertion | **exists but unsound** (§2.4) |
 | see coop + federation context | `/me/standing` | **partial** (shipped subset, PR #1627) |
 | create / vote on a proposal | member-origin signing | **missing** (§6) |
-| device signs locally; node relays | v2 envelope | **missing** (§6.4) |
+| device signs locally; node relays | v2 envelope | **missing** (§6.6); blocked on O8/O9 |
 | network verifies; state converges | slice 7 + authority | **blocked on the above** |
 
 NYCN is used here strictly as an **acceptance test for generic primitives** — a
@@ -733,13 +949,13 @@ primitives are wrong — not NYCN.
 
 | # | Threat | Required invariant | Mitigation | Residual |
 |---|---|---|---|---|
-| T1 | Stolen phone | device compromise ≠ person compromise | device key ≠ root key; revoke + short expiry | ops signed before revocation stand (§6.3) |
-| T2 | Compromised device | blast radius bounded by scope | least-authority scopes; high-consequence classes excluded | in-scope ops until expiry |
+| T1 | Stolen phone | device compromise ≠ person compromise | device key ≠ root key, so the *person* is not compromised | **exposure is unbounded in time** — no deterministic revocation anchor exists (§6.5); expiry does not bind an attacker |
+| T2 | Compromised device | blast radius bounded by scope | least-authority scopes; high-consequence classes require the root key | full in-scope authority, **indefinitely**, until O9 is answered |
 | T3 | Malicious node operator | node key cannot author member acts | authorship = carried device proof; relay asserts nothing | operator can withhold/delay relay |
 | T4 | Malicious hosting provider | host key ≠ institution authority | mandate chain; revocable hosting assignment | host can deny service; state portability required |
 | T5 | Compromised institution admin | admin ≠ sovereign | roles carry scopes, not sovereignty (`structure.rs:167-170`) | scoped damage until governed revocation |
 | T6 | Lost root key | recovery preserves Person P | social recovery (`recovery.rs`), delay + cancel | trustee collusion ≥ threshold |
-| T7 | Revoked device operating offline | revocation must bound in time | `not_after`; revocation gossip | the §6.3 window — accepted, documented |
+| T7 | Revoked device operating offline | a revoked device must stop being accepted | **none today** — roster revocation has no protocol effect (§6.5) | **open (O9).** Under shape (a) a receiver could order revocation against the carried version; under shape (b) revocation invalidates the device's past authorizations too |
 | T8 | Cloned node / restore-twice | one instance, one identity | unresolved — see §13 | **open** |
 | T9 | Gateway impersonates a member | a relay cannot author | §6; and today, #2469 §7.0.2 fallback already prevents *signed* forgery | today the unsigned legacy path carries it |
 | T10 | Federation overreach | member sovereignty | co-equal scopes, not a ladder | requires authority checks not yet enforced |
@@ -812,7 +1028,9 @@ This model does **not** provide, and must not be read as providing:
 
 - anonymity or unlinkability (§10);
 - institutional signing keys (§4.1 — deliberately);
-- protection against a device compromised *before* authorization expiry (§6.3);
+- **any device revocation with protocol effect** — roster revoke is local bookkeeping;
+  a compromised device's authorization is acceptable to every receiver indefinitely (§6.5);
+- expiry as a security bound — `not_after` is custody hygiene on an honest device only (§6.4);
 - consensus, finality, or double-vote prevention beyond #2469's own mechanisms;
 - proof that a hosting operator will not deny service (only that it cannot
   *become* the institution);
@@ -836,8 +1054,9 @@ This model does **not** provide, and must not be read as providing:
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
 | O7 | Which operation classes may a device sign, and which require the root key? | Determines the default scope set in §5.2 |
 | **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
-| **O9** | **What deterministic rule bounds an authorization's validity, given that wall-clock expiry is not order-independent?** (§6.4) | **Constrains slice D.** Local-clock evaluation makes the same operation accepted by one peer and permanently rejected by another, contradicting #2469 |
+| **O9** | **Which deterministic revocation anchor?** Ordering (carry `DidDocument.version`, compare against the revocation's) or snapshot invalidation (carry a hash of the non-revoked signing-method set)? (§6.5) | **BLOCKS slices A and D.** The two shapes require *different carried fields*, so the wire format cannot be frozen first. Ordering distinguishes before/after revocation; snapshot does not and retroactively invalidates. Neither exists today — the closest path (`RotationEvent`) is unreplicated and its `verify()` has zero production callers |
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
+| O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
 | O11 | What is the canonical encoding and normalization of a genesis decision before hashing to an `EntityId`? (§7.1) | Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug |
 
 ---
@@ -852,7 +1071,10 @@ Legend: **I** implemented · **P** partial · **M** missing · **C** conflicting
 | Person DID | **I** — self-sovereign, offline (`lib.rs:177,191,341`) | unchanged | none | — | icn-identity |
 | Device keypair + roster | **I** — `multi_device.rs`, gateway + icnctl | unchanged | none | — | icn-identity |
 | Device DID as principal | **M** — device is a string id (`:259`) | first-class DID | new type usage | high | icn-identity |
-| Device authorization proof | **M** — `Capability::Sign` never checked; no nested signature type | carried, signed, scoped | new primitive | **critical** | icn-identity |
+| Device authorization proof | **M** — `Capability::Sign` never checked; no nested signature type | carried, signed, scoped | new primitive, **blocked on O8+O9** | **critical** | icn-identity |
+| Deterministic device revocation | **M** — no replicated authenticated anchor; roster revoke is node-local (§6.5) | ordering or snapshot invalidation | decision O9 + slice A0 | **critical** | icn-identity |
+| Identity-document replication | **C** — `RotationEvent::verify` has zero production callers; `identity:recovery` subscribed but never declared; `icnctl` revoke preimage ≠ `signing_message()` | verifiable monotonic chain | slice A0 | **critical** | icn-identity / icn-core |
+| Node first-claim ceremony | **M** — no claiming at all; node-key challenge alone would let the first remote caller win (§5.3) | out-of-band one-time capability + dual-signed transcript | slice E | high | icn-core |
 | Device enrolment integrity | **C** — add/revoke signature covers only did+device_id+label; key and capabilities are unsigned (`identity_mgr.rs:488-493`) | signature covers full payload | live defect | **critical** | icn-gateway |
 | Member-origin signing | **M** — `SignedGovernanceOp` is root-key-only (`:308,373`) | device-signed, person-authored | v2 envelope | **critical** | icn-governance |
 | Client-side governance signing | **M** — zero client references | device signs locally | SDK + CI | high | sdk/react-native |
@@ -890,15 +1112,42 @@ node/institution arc, which does not block D.
 
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
-| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **Blocked on O8 (§6.3);** must also settle O10 (canonical bytes, version, domain separator) before the format is frozen. v1 issues authorizations **root-only** (§5.2) |
+| **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, currently **zero production callers**); fix `icnctl device revoke`'s signing preimage (`bins/icnctl/src/main.rs:6410`) to match `signing_message()`; durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; icnctl-minted event verifies; **two conflicting events at the same version converge identically on two nodes** | no governance wiring; no device-authorization format; no revocation policy |
+| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **BLOCKED on O8 (§6.3) AND O9 (§6.5)** — both change the field set, so freezing the format first would be premature. Must also settle O10 (canonical bytes, version, domain separator). v1 issues authorizations **root-only** (§5.2). See §15.1: slice A is no longer the correct first slice |
 | **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable; **the enrolment signature covers the enrolled key and capabilities** | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected; **tampering with `public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
-| **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key, **without a non-convergent validity predicate** | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; `op_id` covers the authorization; **delayed delivery and clock-skew tests showing two honest peers reach the same verdict** | **does not lift #2470 containment**; does not change v1. **Constrained by O9 (§6.4)** — wall-clock expiry must not become an ingress gate |
+| **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key, **without a non-convergent validity predicate** | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; `op_id` covers the authorization; **delayed delivery and clock-skew tests showing two honest peers reach the same verdict** | **does not lift #2470 containment**; does not change v1. **Constrained by O9 (§6.5)** — no wall-clock predicate may become an ingress gate, and the revocation check must be deterministic |
 | **E. Node claim + admin grant** | A Person administers a node instance; node ≠ operator | `icn-core` claim ceremony; `operator_did` unwired from `node_did` | claim binds instance not image; re-claim rejected; admin delegation | no hosting semantics |
 | **F. Institution genesis, governed** | Genesis is person-signed and governed, not `entity:write`, and the `EntityId` binds to a **canonically encoded** decision | `icn-gateway/src/api/entity.rs`; `institution_bootstrap.rs` | founder authority expires; genesis body carries an authorship binding; **same decision yields the same id under reordered maps and founder signatures** | no institutional signing key (§4.1). Requires O11 |
 | **G. Hosting assignment** | Hosting is explicit, scoped, revocable; host ≠ institution | node config → assignment record | host cannot act as institution; revoke and re-host | no billing/accounting |
 | **H. Mobile member vertical** | The §8 flow works end to end | SDK + member shell | full vertical | not a UI project |
 | **I. NYCN acceptance** | Generic primitives express a real federation | institution package only | no NYCN semantics in kernel | — |
+
+### 15.1 Slice A is no longer the correct first slice
+
+*Conclusion of review round 8.* Slice A is blocked twice over — **O8** (rotation) and
+**O9** (revocation anchor) — and both change the *carried field set*, not merely the
+policy around it. Freezing a `DeviceAuthorization` encoding before either is answered
+would bake in a format that cannot express the two things that make it safe.
+
+Both resolve into the **same primitive**, which is why A0 exists: a verifiable,
+monotonic, signature-chained identity document.
+
+- O8 needs it to derive the **current root** from the genesis key (§6.3).
+- O9 shape (a) needs it to **order** an authorization against a revocation (§6.5).
+
+And it is unusually cheap, because the hard cryptographic parts are already written:
+capability checking, Ed25519 verification and strict `+1` monotonicity all exist in
+`multi_device.rs`. What is missing is a declared topic, a receive path that calls
+`RotationEvent::verify` (**zero production callers today**), a corrected `icnctl`
+signing preimage, and a fork-convergence rule. That is wiring and one decision — not
+new cryptography.
+
+**Revised order: A0 → (A ∥ B ∥ C) → D → (E → F → G) → H → I.**
+
+A0 is proof-bearing on its own: it either converges on two nodes under a forked
+rotation event, or it does not, and that is testable without governance, without
+mobile, and without touching `SignedGovernanceOp`.
 
 ### Dependency on #2469
 
@@ -925,4 +1174,5 @@ Slices 4–6 are explicitly **not blocked** by this work.
 - **Retire dead paths deliberately.** `can_sign` and the unwired institutional
   signing surfaces should be either wired or deleted, with the decision recorded
   — not left as ambiguous half-truths.
-- **Order:** A → (B ∥ C) → D → (E → F → G) → H → I.
+- **Order:** **A0** → (A ∥ B ∥ C) → D → (E → F → G) → H → I. A0 is new and precedes
+  everything, because O8 and O9 both resolve into it (§15.1).
