@@ -307,7 +307,7 @@ ICN identity is cryptographic, decentralized, and resistant to Sybil attacks thr
 - **Secondary keys:** Device keys (e.g., phone, laptop) tied to primary via explicit binding
 - **Key rotation:** Explicit, gossipped, history tracked on ledger
 - **Recovery:** Social recovery (steward-attested recovery keys) or explicit backup
-- **Keystore migration:** Auto-migration across formats v1 → v2 (TLS binding) → v2.1 (X25519 encryption keys) → v3 (DID Document + multi-device) → v4 (SDIS Anchor + KeyBundle with hybrid signatures). *(Verified against icn/crates/icn-identity/src/keystore.rs format docs, 2026-06-14.)*
+- **Keystore migration:** On-disk formats are v1 → v2 (TLS binding) → v2.1 (X25519 encryption keys) → v3 (DID Document + multi-device) → v4 (SDIS Anchor + KeyBundle with hybrid signatures). **Automatic migration terminates at v3** (`keystore.rs:1098`): a v3 keystore is unlocked and returned without being upgraded (`:1064`), and v4 is written only when SDIS fields are added (`save_v4`, `:481`). There is no v5 on-disk format — the `v5` comments at `keystore.rs:98,184` label feature-gated optional fields inside `StoredKeyV4`, whose `version` is always 4 (`:143`). *(Corrected 2026-08-14 at 74c832f1; the prior note described migration as reaching v4 automatically.)*
 
 **Cryptographic suite:**
 - **Signing:** Ed25519 (512-bit signatures, ~2 million ops/sec on modern hardware)
@@ -551,20 +551,29 @@ Terminal states: Accepted, Rejected, NoQuorum, Cancelled, Vetoed, ForceClosed. E
 
 **Delegation (liquid democracy):** Members can delegate their vote to a representative. Delegation is scoped: "I delegate to Alice for labor decisions, to Bob for finance decisions." Delegation has expiry: "My delegation to Alice expires in 90 days."
 
-**Charter system:** TOML-formatted governance constitution. Defines proposal types, quorum/threshold rules, committees, amendment procedures. Example:
+**Charter system:** A governance constitution defining proposal types, quorum/threshold rules, committees and amendment procedures. Charters are **authored as CCL YAML**. Two cautions, both verified at `74c832f1`: **(a)** the starter templates in `docs/reference/ccl-charter-templates.md` still wrap every example in a top-level `charter:` object, which `CclDocument` neither recognises nor rejects — submitting one activates an empty, permissive charter, so follow the key set shown below rather than the template wrapper until those templates are fixed; **(b)** active CCL charters are **not persisted** — the acceptance hook loads them into `CharterPolicyOracle`, whose store is an in-memory `HashMap<String, (CclDocument, CharterContext)>` (`icn/apps/charter/src/oracle.rs:48`) initialised empty at startup, so a ratified charter is **lost on restart unless redeployed**. `charter_store.rs` serialises the separate `icn_governance::Charter` founding-document model and has no production consumer outside its own tests; it is not where active CCL charters live. *(Corrected 2026-08-14: this section previously described and demonstrated a TOML charter; `icn/crates/icn-governance/src/charter.rs` contains no TOML support, so the old example would have led authors to the wrong representation.)* Example, abridged from `contracts/templates/worker-coop.yaml`. **The top-level keys must be those `CclDocument` recognises** — `schema_version`, `entity`, `governance`, `economics`, `agreement`, `extensions` (`icn/crates/icn-ccl/src/schema/mod.rs:52-77`). Unknown top-level keys are *not* rejected, so a document wrapped in some other root object parses as empty and translates to no constraints:
 
-```toml
-[governance]
-quorum_percent = 50
-approval_threshold = 66
+```yaml
+schema_version: v0
 
-[committees]
-finance = { members = ["Alice", "Bob"], veto_power = true }
-labor = { members = ["Carol"], veto_power = false }
+entity:
+  name: "Example Worker Cooperative"
+  type: cooperative
+  subtype: worker
+  membership:
+    open_to: [individual]
+    classes:
+      - name: worker_owner
+        default: true
+    rights_by_class:
+      worker_owner: [vote, propose, patronage_refund]
 
-[amendments]
-text_proposal_threshold = 50
-constitutional_amendment_threshold = 75
+governance:
+  bodies:
+    - name: general_assembly
+      composition: all_members
+      convenes:
+        regular: quarterly
 ```
 
 **Amendment process:** Changing the charter requires a super-majority (e.g., 75% approval). Amendments are themselves proposals and can be vetoed by committees (if defined).
@@ -604,16 +613,18 @@ Community ──→ Federation
 Federation ──→ Federation (nested federations)
 ```
 
-**Cooperative lifecycle:**
-1. **Formation** — charter drafted, initial capital pledged
+**Cooperative lifecycle** — five states (`CoopStatus`, `icn/crates/icn-coop/src/types.rs:344`; mirrored by `EntityStatus`, `icn/crates/icn-entity/src/entity.rs:304`):
+1. **Forming** — charter drafted, initial capital pledged
 2. **Active** — members joined, operations running
-3. **Dissolution** — asset distribution plan approved
+3. **Suspended** — participation halted without dissolution
+4. **Dissolving** — asset distribution plan approved, wind-down in progress
+5. **Dissolved** — wind-down complete
 
-**Treasury management:** Each cooperative has a deterministic treasury DID, derived from the coop's EntityId. Treasury manages budgets, allocates surplus, settles inter-coop trades. No separate treasury entity needed; it's derived.
+**Treasury management:** Each cooperative has a deterministic treasury **anchor**, derived from the coop id by BLAKE3 (`derive_treasury_did`, `icn/crates/icn-coop/src/lifecycle.rs:22`). Treasury manages budgets, allocates surplus, settles inter-coop trades; no separate treasury entity is needed. **Note:** despite the `did:icn:treasury:…` shape and the function name, this is a **keyless identifier string** held in an `Option<String>` — it has no keypair behind it and would not satisfy `Did::from_str` (`icn/crates/icn-identity/src/lib.rs:210-241`). A second, non-equal treasury identifier is derived independently at `icn/crates/icn-coop/src/actor.rs:489`.
 
-**Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (shared values). Types are configurable; these are defaults.
+**Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (mutual aid network), Ecosystem (full cooperative ecosystem) — four variants (`icn/crates/icn-community/src/types.rs:9-14`). Types are configurable; these are defaults.
 
-**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`. *(§13 verified accurate 2026-06-14: four entity types confirmed in `EntityType`/`EntityKind` (icn/crates/icn-entity/src/entity.rs); cooperative Formation → Active → Dissolution lifecycle confirmed in icn/crates/icn-coop/src/handle.rs; community types Geographic/Interest/Solidarity in icn/crates/icn-community/src/types.rs; deterministic treasury DID derivation via `derive_treasury_did`/`generate_treasury_did_deterministic` in icn/crates/icn-coop/src/.)*
+**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`. *(§13 re-verified 2026-08-14 at 74c832f1: four entity types confirmed in `EntityType`/`EntityKind` (icn/crates/icn-entity/src/entity.rs:265,:429). **Two corrections to the 2026-06-14 pass:** the cooperative lifecycle has five states, not three — `Forming, Active, Suspended, Dissolving, Dissolved` (icn/crates/icn-coop/src/types.rs:344, mirrored by `EntityStatus` at icn-entity/src/entity.rs:304); and `CommunityType` has four variants, not three (icn/crates/icn-community/src/types.rs:9-14). Treasury derivation via `derive_treasury_did` (icn/crates/icn-coop/src/lifecycle.rs:22) yields a **keyless identifier string**, not a keypair-backed DID — it would not satisfy `Did::from_str`.)*
 
 <!-- truth: descriptive -->
 
@@ -636,24 +647,24 @@ Federation enables multiple cooperatives to coordinate without surrendering auto
 
 **Federated DID resolution:** A DID like `did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK` includes a coop prefix. Federation nodes route DID resolution requests to the named coop.
 
-**Registry and attestations:** Federation gossips coop announcements (coop name, DID, trust context) and cryptographic attestations (federation member A attests to member B's identity). *(Verified 2026-06-14: `FederatedTrustAttestation` in icn/crates/icn-federation/src/attestation.rs.)*
+**Registry and attestations:** Federation gossips coop announcements (coop name, DID, trust context) and attestations in which federation member A attests to member B's identity. The attestation **type** is signature-bearing, but signing is **not installed in production**: `FederationGossipHandler::set_keypair` (`gossip.rs:83`) has callers only under `#[cfg(test)]`, and the composition root (`icn-core/src/supervisor/init_federation.rs:128-133`) never installs a keypair, so announcements are emitted unsigned and are then **rejected** by the receiver's signature check (`gossip.rs:203-210`), meaning production peer discovery through this path does not complete; the RPC issue path (`icn-rpc/src/handler/federation.rs:566-575`) likewise stores attestations without calling `.sign()`. *(Verified 2026-08-14: `FederatedTrustAttestation` in icn/crates/icn-federation/src/attestation.rs; signing-installation gap tracked as #2500.)*
 
-**Bilateral clearing (added since the March 2026 snapshot):** Federation now has bilateral clearing agreements (`CrossCoopTransfer`, Phase F3) and a receipt-clearing path for cross-scope settlement (`ReceiptClearingManager` with batch clearing, Epic 4 / #941). This is genuine cross-coop settlement infrastructure — but it is **bilateral**, not multilateral netting. *(Verified against icn/crates/icn-federation/src/clearing.rs and receipt_clearing.rs.)*
+**Clearing (added since the March 2026 snapshot):** Federation has bilateral clearing agreements (`CrossCoopTransfer`, Phase F3) and a receipt-clearing path for cross-scope settlement (`ReceiptClearingManager` with batch clearing, Epic 4 / #941). This is genuine cross-coop settlement infrastructure. A multilateral net-position solver also exists and settles: `NettingEngine` (`netting.rs:44`) computes cancellable cycles via `ClearingManager::perform_multilateral_netting` (`clearing_manager.rs:414-420`, informational per `:412`), and `apply_multilateral_netting` (`:472-535`) updates and persists positions. Both are exposed as gateway endpoints (`icn-gateway/src/api/federation.rs:1140,:1177-1190`, registered at `server.rs:2534-2535`). *(Correction 2026-08-14: this paragraph and the gap below previously stated that no multilateral netting existed. Verified against icn/crates/icn-federation/src/{clearing.rs,receipt_clearing.rs,netting.rs,clearing_manager.rs} and the gateway route registration.)*
 
-**Known gaps (honest, re-verified 2026-06-14 against icn/crates/icn-federation/src/):**
-- No multilateral netting algorithm — clearing is bilateral (`clearing.rs`), with no multi-party net-position solver
+**Known gaps (honest; federation gaps re-verified 2026-08-14 against icn/crates/icn-federation/src/, remainder 2026-06-14):**
+- *(Resolved 2026-08-14 — retained for history: this previously read "no multilateral netting algorithm". Netting is built end to end, including the apply/settle step; see the clearing paragraph above.)*
 - No dispute-resolution engine — agreements carry only an optional `dispute_resolution: Option<String>` *method label* (icn/crates/icn-federation/src/agreement/types.rs); disagreements still require human intervention
 - No three-epoch checkpointing / explicit partition-healing protocol (no `checkpoint`/`epoch` types in the crate; partition healing is eventual via gossip)
 - No BFT (Byzantine fault tolerance assumes honest majority, not 1/3 adversary — no `bft`/`byzantine` implementation in the crate)
 - No cross-federation async proof exchange (federation is single-cloud, not multi-federation)
 
-**Status: PARTIALLY CONFIRMED** (registry, attestations, and bilateral clearing work; multilateral/BFT/dispute-resolution features incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
+**Status: PARTIALLY CONFIRMED** (registry types and bilateral clearing work; attestation *signing* is not installed in production, so announcements are rejected by the receiver's signature check — see above; multilateral netting is built including its apply step; BFT and dispute resolution incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
 
 <!-- truth: descriptive -->
 
 ## 15. Distributed Compute
 
-Distributed compute enables cooperatives to execute work (CCL contracts or WASM) across a network of trusted nodes. Work is trust-gated, fuel-metered, and auditable.
+Distributed compute enables cooperatives to execute work (CCL contracts or WASM) across a network of trusted nodes. Work is trust-gated and auditable. **Fuel metering applies to the CCL interpreter, not to the WASM path** — see below.
 
 **Work submission flow:**
 1. User submits CCL contract or WASM module to the network
@@ -667,13 +678,13 @@ Distributed compute enables cooperatives to execute work (CCL contracts or WASM)
 
 **Trust-gated execution:** Only executors with sufficient trust score attempt to execute. Isolated peers can't claim tasks. Partner+ peers can. (Configurable per cooperative.)
 
-**Fuel metering:** Contracts have fuel budgets. Execution halts when fuel runs out. Prevents infinite loops and resource exhaustion.
+**Fuel metering (CCL only):** CCL contracts have fuel budgets and execution halts when fuel runs out (`icn-ccl/src/types.rs:399-402` returns an error on depletion; charged per statement at `interpreter.rs:162`), preventing infinite loops and resource exhaustion. **The WASM path is NOT fuel-metered:** `icn-compute/src/wasm_executor.rs:58-59` constructs `Engine::default()` with the comment that "fuel metering can be enabled later", and accounting is a flat `saturating_sub(100)` per call (`:163,:211`). WASM host imports also use wall-clock `SystemTime::now()` (`:248,:331,:428`), so that path is neither metered nor deterministic. *(Corrected 2026-08-14 at 74c832f1.)*
 
 **Proof verification:** Other nodes re-execute the contract independently. If output differs, the executor is penalized (reputation hit, possible expulsion). This creates incentive for honest execution without requiring a consensus mechanism.
 
-**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. A task cost model has landed since the March snapshot (`icn/crates/icn-compute/src/cost.rs`: fuel-limit × optional `payment_rate` → credit cost), so compute is no longer strictly "free" — but there is still no job marketplace, no bidding, and no workload-manifest schema. *(Verified 2026-06-14: no `marketplace`/`bidding`/`WorkloadManifest` constructs in icn/crates/icn-compute/src/; cost model confirmed in cost.rs; `ExecutionReceipt` in receipt.rs.)*
+**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. A task cost model has landed since the March snapshot (`icn/crates/icn-compute/src/cost.rs`), so compute is no longer strictly "free". **A workload manifest does now exist** — the E1 field block on `ComputeTask` (`icn/crates/icn-compute/src/types.rs:318-322` ff: `inputs_hash`, `policy_hash`, `determinism_class`, `privacy_class`), recorded in ADR-0030 as `status: accepted` / `implementation_status: implemented`. What remains absent is a job marketplace and bidding. *(Corrected 2026-08-14 at 74c832f1; the prior note inferred absence from a search for a type literally named `WorkloadManifest`.)*
 
-**Status: FOUNDATION ONLY** (runtime + cost model exist, marketplace/bidding/manifest-schema not built). Crate: `icn-compute`
+**Status: FOUNDATION ONLY** (runtime, cost model and workload manifest exist; marketplace/bidding not built). Crate: `icn-compute`
 
 <!-- truth: operational -->
 
@@ -735,7 +746,7 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 
 **Privacy / anonymity status (re-verified 2026-06-14):**
 - **Onion routing — now implemented** (was previously listed here as deferred). `icn-privacy` ships a 540-line `OnionRouter` (layered encryption, circuits, `wrap_message`, `peel_layer`, metrics) in icn/crates/icn-privacy/src/onion_routing.rs, and it is **wired into the network actor**: `MessagePayload::Onion` is dispatched in icn/crates/icn-net/src/actor/connection.rs and relayed by `handle_onion`/`forward_onion` in icn/crates/icn-net/src/handlers/onion.rs. This is a crate-level multi-hop capability; it is not claimed as production-grade anonymity (no adversarial traffic-analysis audit). NEEDS SME review: end-to-end anonymity guarantees and threat model.
-- **Traffic obfuscation / cover traffic — still not built** (no cover-traffic implementation found in icn-net/icn-privacy).
+- **Traffic obfuscation / cover traffic — built at crate level, NOT integrated.** `icn/crates/icn-privacy/src/traffic_obfuscation.rs` (385 lines) implements `TrafficObfuscator` with cover-message generation and size padding, exported at `icn-privacy/src/lib.rs:63` — but its only consumers are `icn-privacy/tests/privacy_integration.rs`; nothing in `icn-net` calls it. *(Corrected 2026-08-14: previously stated no implementation existed.)*
 - **Perfect forward secrecy (PFS) per session** — not yet a standing guarantee (achievable with session ephemeral keys).
 
 *(Numbering note: the previous "Phase 21" tags on onion routing / traffic obfuscation used the retired Phase 1–18/19–35 scheme and have been removed per the Phase 0/1/2 model in CLAUDE.md / docs/PHASE_PROGRESS.md.)*

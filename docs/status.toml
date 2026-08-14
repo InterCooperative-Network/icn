@@ -15,18 +15,22 @@ status = "exceeds-spec"
 truth_class = "operational"
 evidence_type = "test"
 evidence = [
-  "SDIS complete through Phase S6",
+  "SDIS complete through Phase S6 (ROADMAP CLAIM — NOT source-verifiable; rests only on docs/sdis/SDIS_IMPLEMENTATION_PLAN.md:3 asserting its own completion; NOT re-traced this pass and NOT covered by last_verified)",
   "Post-quantum crypto (ML-DSA + ML-KEM) operational with feature flags",
   "ZKP credential presentation (3 levels: QR, NFC/BLE, Network)",
   "Steward network with threshold PRF for VUI computation",
-  "Age-encrypted keystore with auto-migration (v1-v4)",
-  "Social key recovery via steward attestations",
+  "Age-encrypted keystore, on-disk formats v1-v4 (legacy auto-migration terminates at v3; v4 is written only when SDIS fields are added)",
+  "Key recovery: two distinct mechanisms — steward-attested SDIS ceremony and a separate M-of-N trustee scheme (icn-identity/src/recovery.rs)",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: 3-of-5 steward threshold (icn-steward gossip.rs/enrollment.rs) and keystore migration v1->v4 (icn-identity keystore.rs). 'SDIS complete through Phase S6' and enrollment-flow gap retained from gap-analysis (not independently re-traced this pass)."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: age/scrypt keystore (keystore.rs:571,610); the format chain header (keystore.rs:4-8) still terminates at v4 with no StoredKeyV5 — the v5 comments at :98,184 label feature-gated optional fields inside StoredKeyV4 (version always 4, :143) and are a naming hazard, not a new format; legacy migration actually ends at v3 (:1098) and a v3 keystore loads without upgrade (:1064), so the previous v1-v4 auto-migration wording overstated the terminal version. Also re-traced: ML-DSA/ML-KEM modules (icn-crypto-pq/src/lib.rs:48-49), the three-level presentation ladder which lives in icn-gateway/src/api/sdis/verify.rs:1-7 rather than icn-zkp and where NFC/BLE is a transport label with no NFC/BLE code in-repo, the 3-of-5 VUI threshold (icn-steward/src/config.rs:61-62), and both recovery mechanisms (icn-steward/src/ceremony/recovery.rs:18 and icn-identity/src/recovery.rs:3, which are different schemes — trustees are arbitrary DIDs, not stewards). CORRECTION: the previous sole gap claimed the enrollment flow was not built. There is indeed no icn-enrollment crate, but enrollment IS built — icn-steward/src/ceremony/enrollment.rs (417 lines) and icn-gateway/src/api/sdis/simple_enrollment.rs (1827 lines) with live routes at :281,:335,:410,:534 registered in sdis/mod.rs:361, plus web/pilot-ui/sdis-enrollment.*. That gap is replaced below by three real gaps found this pass. NOT re-traced and carried forward: SDIS complete through Phase S6, which rests solely on docs/sdis/SDIS_IMPLEMENTATION_PLAN.md:3 asserting its own completion and is not source-checkable; no cargo build or test was run."
 crates = ["icn-identity", "icn-crypto-pq", "icn-steward", "icn-zkp"]
-gaps = ["Enrollment flow (icn-enrollment) planned but not built"]
+gaps = [
+  "HSM/PKCS#11 custody is non-functional scaffolding — every operation bails (keystore_pkcs11.rs:3,133)",
+  "TPM backend seals at rest but signs in SOFTWARE after unseal (keystore_tpm.rs:4-5,868) — not hardware-held signing",
+  "Per-device capability model is declared but unenforced: DidDocument::can_sign (multi_device.rs:308) has zero production callers and Capability::Sign is read nowhere outside icn-identity",
+]
 
 [subsystems.governance]
 name = "Governance"
@@ -34,22 +38,23 @@ status = "confirmed"
 truth_class = "operational"
 evidence_type = "demo"
 evidence = [
-  "Test count NEEDS RE-DERIVATION: prior '547 tests' is stale (icn-governance #[test]/#[tokio::test] grep now 600+); run cargo test for an exact figure before re-asserting",
+  "Test attributes re-derived 2026-08-14: 1366 static #[test]/#[tokio::test] lines (779 icn-governance + 587 apps/governance) — an attribute count, NOT a passing-test count; run cargo test for an authoritative figure",
   "Full 9-state proposal lifecycle verified vs enum ProposalState in icn-governance/src/proposal.rs: Draft -> Deliberation -> Open -> Accepted/Rejected/NoQuorum/Cancelled/Vetoed/ForceClosed",
   "Liquid democracy delegation (scope + expiry aware)",
-  "Cryptographic decision proofs (Ed25519 hashes + voter attestations)",
-  "20+ REST API endpoints",
-  "Charter system (TOML format per coop/community)",
+  "Decision receipts binding integrity/authenticity: blake3 content hashes (proof.rs:23) with Ed25519 node-local attestations (proof.rs:1035-1041) — AUTHORIZATION is explicitly out of scope (verify.rs:24-25); there is no voter-signed attestation type",
+  "67 distinct REST resource paths / 87 verb registrations (apps/governance/src/http/configure.rs)",
+  "Charter system — JSON at rest (charter_store.rs:200,246); authored charters are CCL YAML (docs/reference/ccl-charter-templates.md:5), not TOML",
   "14-call governance demo flow verified on K3s (NEEDS OPS RE-CONFIRMATION — runtime claim)",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: 9-state lifecycle confirmed against source. Test count flagged stale (not re-asserted with a precise number). Demo/K3s claims left to ops re-confirmation."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the 9-state ProposalState enum (proposal.rs:265-330) confirmed exactly as listed; delegation scope-and-expiry (delegation.rs:91,222,228,261); REST surface counted at 67 resource paths / 87 verb registrations (http/configure.rs), so the old 20+ held but badly understated; test attributes re-derived statically as 1366 (779 icn-governance + 587 apps/governance) — an attribute count, not a pass count, and no cargo was run. NOTE a counting error caught in review on this PR: the first figure (1290) anchored the attribute pattern on a literal closing bracket immediately after the word test, which silently skipped the 76 attributes written with arguments as tokio::test(flavor = ...) in apps/governance; the corrected pattern accepts either a closing bracket or an opening parenthesis after test. icn/apps/governance-app is a separate crate and is excluded, since this subsystem's crates list is icn-governance + apps/governance. CORRECTIONS: the proof bullet said Ed25519 hashes (hashes are blake3, proof.rs:23) and voter attestations (the only attestation is node-local, proof.rs:1035-1041; no VoterAttestation exists anywhere in the crate), and verify.rs:24-25 places authorization and legitimacy explicitly out of scope, so cryptographic decision proofs overclaimed as worded; the charter bullet said TOML but persistence is JSON and authored charters are CCL YAML; the charter-templates gap is stale against docs/reference/ccl-charter-templates.md; the 3-of-7 voting-models gap has NO source referent (zero Futarchy/Sociocracy/Sortition strings and no VotingModel enum in either crate — the only occurrence in the repo was this file); and #1308 is a ledger/compute item per ADR-0007, already tracked under economics and ccl, so it is removed here as misfiled. Two previously unrecorded gaps were confirmed at source and added below. NOT verified this pass: the 14-call K3s demo flow and every runtime/deployment assertion (ops-only); the open/closed state of any issue; and whether the 1290 test attributes compile or pass."
 crates = ["icn-governance", "apps/governance"]
 gaps = [
-  "3 of 7 voting models deferred (Futarchy, Sociocracy circles, Sortition)",
-  "Charter templates not yet created",
-  "CCL formula extraction from Rust (#1308)",
+  "Proposal authorship diverges by deployment mode: manager.rs:3480 accepts a proposer DID but the actor-backed branch (:3486-3497) never passes it, and actor.rs:1926 stamps the NODE DID as proposer; the in-process fallback (:3512) uses the caller",
+  "Stored and replicated votes are not independently verifiable: Vote carries no signature field (vote.rs:23-41), so a third party cannot check authorship from the record alone — this is the hole verify.rs:24 disclaims. NOTE the REST boundary IS authenticated: CastVoteRequest has no voter field (models.rs:365-368) and the handler derives the voter solely from claims.sub (http/handlers.rs:1818-1822); the unconstrained voter parameter is on the internal actor command, not reachable with an arbitrary DID over REST",
+  "Voting-model coverage is unquantified — no VotingModel/TallyMethod enum exists, so the prior 3-of-7 framing had no source referent",
+  "Charter starter templates exist as docs (docs/reference/ccl-charter-templates.md) but are not shipped as loadable in-repo coop/community defaults",
 ]
 
 [subsystems.economics]
@@ -61,19 +66,20 @@ evidence = [
   "Double-entry mutual credit ledger (Merkle-DAG, append-only, content-addressed)",
   "Multi-unit support (Hours, USD, kWh, custom)",
   "Credit limits per-participant per-unit",
-  "Settlement operations (cross-cooperative)",
-  "Patronage distribution (S14 complete, internal capital accounts)",
-  "Treasury anchor (deterministic DID derivation)",
+  "Settlement operations — in-scope only; federation- and commons-scope receipts are REFUSED here (settlement.rs:239,244) and delegated to icn-federation clearing",
+  "Patronage RECORDING against internal capital accounts (patronage.rs:48,111) — no surplus-allocation or distribution computation exists",
+  "Treasury anchor: deterministic blake3 derivation from coop id (icn-coop/src/lifecycle.rs:22) — an identifier string, NOT a keypair-backed resolvable DID",
   "Budget management + escrow system",
   "Python Mesa simulation validating mutual credit parameters",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: double-entry invariant + Merkle-DAG + receipt chain (AllocationReceipt->SettlementIntent->JournalEntry) confirmed in icn-ledger src. Gaps (#1308 CCL formula, #1303 terminology rename) retained from gap-analysis — issue states not independently re-confirmed closed this pass."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the double-entry invariant (entry.rs:243, enforced in build() at :204), Merkle-DAG parent links and content hashing (entry.rs:82,127; hash.rs:1), append-only entry API (ledger.rs:1219,1225), per-member per-unit credit limits (credit_policy.rs:23,88), treasury budgets (treasury/budgets.rs:19,166), and the Mesa simulation (sims/mutual-credit/model.py:8). THREE claims did not survive re-tracing and were reworded above: cross-cooperative settlement is actively REJECTED by icn-ledger (settlement.rs:239,244) and delegated to icn-federation/src/clearing.rs:189, so it was capability the listed crates do not provide; patronage distribution overstated patronage.rs, which records externally-decided amounts with no allocation computation and writes to its own KV store rather than the double-entry journal; and treasury anchor deterministic DID derivation is misleading — lifecycle.rs:22 mints a keyless did:icn:treasury:<bs58-16B> string held in Option<String> (icn-coop/src/types.rs:308) that would FAIL Did::from_str (icn-identity/src/lib.rs:210-241 requires multibase base58btc, exactly 32 bytes, and a valid Ed25519 key), while actor.rs:489 independently derives a SECOND, different treasury DID via Did::from_anchor_id -> new_unchecked; the keypair-backed generate_treasury_did (types.rs:566) is not on the activation path. Multi-unit support is real but open-ended strings (types.rs:146 currency: String), not the enumerated type the old parenthetical implied. Escrow is real but lives in icn-kernel-api/src/escrow.rs, outside the listed crates. NOT re-verified: the S14 sprint label, issue open/closed states, apps/ledger, and any test execution."
 crates = ["icn-ledger", "apps/ledger"]
 gaps = [
-  "Commons credit formula hardcoded in Rust, not in CCL (#1308)",
-  "Terminology rename pending: payment->settlement, currency->unit, balance->position (#1303)",
+  "Commons credit formula hardcoded in Rust, not in CCL (#1308) — icn-ledger/src/commons_credits.rs:77,224",
+  "Terminology rename (#1303) has LANDED on the enforced public surface (gateway /position, /settle, positions/unit wire fields); icn-ledger internals, FX CurrencyPair and labor_shares BondPayment are deliberately out of scope per docs/dev/language-guide.md:200-204. Note the compliance linter checks a narrow named-pattern list, so zero violations is weaker than rename complete",
+  "A cooperative carries two mutually inconsistent treasury identifiers (lifecycle.rs:22 vs actor.rs:489), neither keypair-backed",
 ]
 
 [subsystems.federation]
@@ -82,15 +88,17 @@ status = "partially-confirmed"
 truth_class = "descriptive"
 evidence_type = "code-review"
 evidence = [
-  "Federation registry and attestations working",
+  "Federation registry types and gossip plumbing exist, but production peer discovery through this path does NOT work: because no keypair is installed, announce() emits an unsigned CoopAnnounce and handle_coop_announce rejects it on signature verification (gossip.rs:203-210); query_cooperatives() has no production caller either",
+  "Attestation TYPES exist, but signing is not installed in production: FederationGossipHandler::set_keypair (gossip.rs:83) has callers only under #[cfg(test)] (:682 ff) and init_federation.rs:128-133 never installs a keypair, so announce/vouch/accept are emitted UNSIGNED; the RPC issue path (icn-rpc/src/handler/federation.rs:566-575) also stores attestations without calling .sign()",
   "Cross-coop settlement working",
   "Gossip-based registry discovery",
   "DID resolution across federation boundaries",
   "Demo federation (4 personas: BrightWorks, River City Tool Library, Harbor Homes, Finger Lakes CDN)",
   "Federation joining/leaving proposal types",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the registry announce/verify flow (gossip.rs:150,187,370-400,479), cross-coop settlement (clearing.rs:189; clearing_manager.rs), federated DID resolution (resolver.rs:1-4), join/leave proposal types (icn-kernel-api/src/governance.rs:129-130; effects.rs:330,335), the demo personas (demo/scripts/reseed-federation-demo.sh:23-26,478), and the gateway scope allowlist (icn-gateway/src/validation.rs:51,105,120 — federation:write and treasury:write both present, confirming the prior RESOLVED note). TWO corrections. First, the attestations working claim is split above: the set_keypair defect is confirmed — the type is FederationGossipHandler (not FederationGossip as the inline comment at gossip.rs:548 says), set_keypair is defined at gossip.rs:83, and its only callers (:725,:848,:906) sit inside the #[cfg(test)] module beginning at :682, while the composition root icn-core/src/supervisor/init_federation.rs:128-133 calls set_own_coop but never set_keypair; announce() IS driven in production (:354,:369), so a real deployment broadcasts unsigned messages that the receiver then REJECTS on signature verification (gossip.rs:203-210), meaning discovery through this path does not complete in production (raised in review on PR #2587). Additionally the production RPC path icn-rpc/src/handler/federation.rs:566-575 stores attestations without calling .sign(), and FederatedTrustAttestation::new leaves signature empty (attestation.rs:99 documents it as unsigned). Second, the multilateral netting gap was FACTUALLY WRONG and is rewritten below: netting.rs:1,44 implements NettingEngine, exported at lib.rs:73 and called from production at clearing_manager.rs:414-420 — the real limitation, recorded in source at :412 and absent from these docs, is that it is informational only and does not modify positions. Partition-healing and BFT gaps are narrowed to this crate, since icn-core carries partition_healing_multistate_integration.rs and byzantine_integration.rs. NOT re-traced: no build, test or runtime execution, so runtime signature behaviour and demo-flow success remain unverified, as does the cross-federation async proof exchange absence claim."
 crates = ["icn-federation"]
 # Re-verified 2026-06-14 (#2047) against icn/crates/icn-federation/src/.
 # UPDATE: bilateral clearing now exists (clearing.rs CrossCoopTransfer Phase F3,
@@ -99,10 +107,11 @@ crates = ["icn-federation"]
 #   (icn/crates/icn-gateway/src/validation.rs); the K3s env ALLOWED_SCOPES list is a deploy concern.
 gaps = [
   "Three-epoch checkpoint system NOT BUILT (no checkpoint/epoch types in crate)",
-  "Partition healing NOT BUILT (eventual via gossip only)",
-  "Byzantine fault tolerance NOT IMPLEMENTED (no bft/byzantine impl in crate)",
+  "Partition healing NOT BUILT IN icn-federation (eventual via gossip only; icn-core has partition_healing_multistate_integration.rs)",
+  "Byzantine fault tolerance NOT IMPLEMENTED IN icn-federation (icn-core has byzantine_integration.rs)",
   "Cross-federation async proof exchange NOT SPECIFIED",
-  "Multilateral netting algorithm NOT BUILT (clearing is bilateral)",
+  "Multilateral netting is fully built INCLUDING the apply step: NettingEngine (netting.rs:44) computes cycles via perform_multilateral_netting (clearing_manager.rs:414-420, informational, :412), and apply_multilateral_netting (clearing_manager.rs:472-535) updates and persists positions; both are exposed as gateway endpoints (api/federation.rs:1140,:1177-1190, registered server.rs:2534-2535). The prior 'NOT BUILT' gap was wrong and the interim 'does not settle' wording was also wrong",
+  "Federation attestation signing is not installed in production (see evidence) — announcements and issued attestations are unsigned",
   "Inter-org dispute-resolution engine NOT BUILT (agreements carry only an Option<String> method label)",
 ]
 
@@ -115,16 +124,15 @@ evidence = [
   "CCL interpreter with fuel metering",
   "Deterministic execution",
   "Capability-based security",
-  "WASM execution via wasmtime (optional feature flag)",
-  "Fuzz testing target",
+  "Three fuzz targets with corpus (fuzz_interpreter, fuzz_contract_json, fuzz_contract_validate)",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: interpreter + FuelConfig + deterministic bounded expressions + capability-based security confirmed in icn-ccl src. Note: WASM/wasmtime lives in icn-compute (wasm feature), not icn-ccl — corrected in ARCHITECTURE.md §11."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the interpreter with genuinely enforcing fuel metering (interpreter.rs:1,30,61; types.rs:399-402 consume_fuel errors when depleted), deterministic execution via DeterminismClass::Canonical with E3 enforcement gating ledger writes (types.rs:355,374; interpreter.rs:608-615), and capability-based security (interpreter.rs:173,216,274 -> CclError::MissingCapability). CORRECTION: the WASM execution via wasmtime bullet has been REMOVED rather than merely footnoted — icn-ccl/Cargo.toml has no wasmtime dependency at all; it lives at icn-compute/Cargo.toml:53,71 behind the wasm feature and is already claimed under [subsystems.compute]. The previous pass footnoted this in a note while leaving the false bullet in the evidence list, so the note and the evidence contradicted each other. Fuzzing was also understated: three targets exist plus a corpus, not one. All four gaps hold at source — examples/ contains only timebank.rs and a repo-wide find for *.ccl returns zero files — though the charter gap is narrowed below, since charter_rules.rs/charter_validator.rs DO express and evaluate charter rules as CCL AST; what is missing is the prose-to-rules translation step. NOT re-verified: whether the fuzz targets run in CI, the ARCHITECTURE.md correction asserted by the prior note, and the non-programmer-interface gap (a usability judgment, not source-checkable)."
 crates = ["icn-ccl"]
 gaps = [
   "No pre-built contract library for common cooperative patterns",
-  "No charter-to-CCL translation pipeline",
+  "No prose-charter-to-CCL-rules translation pipeline (charter_rules.rs/charter_validator.rs DO evaluate charter rules as CCL AST; the authoring step is what is missing)",
   "Commons credit formula not extracted to CCL (#1308)",
   "CCL requires programming expertise (non-programmer interface missing)",
 ]
@@ -137,12 +145,12 @@ evidence_type = "code-review"
 evidence = [
   "Merkle-DAG working for ledger",
   "Sled KV store for local persistence",
-  "NFS-backed persistent volumes on K3s",
-  "Tamper-evident, independently verifiable",
+  "NFS-backed persistent volumes on K3s (DEPLOY/OPS CLAIM — NOT source-verifiable; not covered by last_verified)",
+  "Tamper-evident via in-crate verification (ledger.rs:2412 verify_integrity, entry.rs:52 verify_entry_signature); no external third-party verifier traced",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: three-tier (Hot/Warm/Cold) storage still NOT implemented in icn-store src (no Hot/Warm/Cold tier types). Gap claims hold."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: Merkle-DAG content hashing with parent links (icn-ledger/src/hash.rs:1,43), sled-backed local persistence (icn-store/Cargo.toml:11; icn-store/src/lib.rs:636,642), and integrity verification (ledger.rs:2412; entry.rs:52). All three gaps re-confirmed: icn-store/src contains only blob_store.rs, lib.rs, maintenance.rs, peer_cache.rs and pos.rs with no Hot/Warm/Cold tier types, and neither icn-store nor icn-snapshot contains archive-compensation or node-class types. NOT covered by this date: the NFS/K3s bullet is a deploy/ops claim whose only artifact is a manifest (deploy/k8s/backup-pvc.yaml:12 storageClassName: nfs-client) showing configured intent, not a running cluster — it is now tagged inline so it does not ride the fresh date. Also not established: the word independently in the previous tamper-evident bullet, since only in-crate verification functions were found."
 crates = ["icn-store", "icn-snapshot"]
 gaps = [
   "Three-tier storage (Hot/Warm/Cold) not implemented",
@@ -156,21 +164,21 @@ status = "foundation-only"
 truth_class = "descriptive"
 evidence_type = "code-review"
 evidence = [
-  "Trust-gated distributed execution (icn-compute)",
-  "WASM execution via wasmtime",
-  "CCL contract execution with fuel metering",
-  "Gossip-based task distribution",
-  "ExecutionReceiptGate merged",
+  "Trust-gated distributed execution (scheduler.rs:1306, policy.rs:1887-1915)",
+  "WASM execution via wasmtime — fuel metering NOT enforced (Engine::default(), wasm_executor.rs:58-59) and host imports use wall clock (wasm_executor.rs:248,:331,:428), so this path is neither metered nor deterministic",
+  "CCL contract execution with fuel metering — genuinely enforced, but in icn-ccl (types.rs:399-402), not on the WASM path",
+  "Gossip-based task distribution (icn-core/src/supervisor/init_compute.rs:110-128)",
+  "Task cost model exists (icn-compute/src/cost.rs), so compute is no longer strictly free",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: still foundation-only — no marketplace/bidding/WorkloadManifest in icn-compute src. UPDATE: task cost model now exists (icn-compute/src/cost.rs: fuel x payment_rate -> credit cost), so compute is no longer strictly free."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1, source-traced only. Re-traced: trust gating (scheduler.rs:1306 with default min_trust 0.3; policy.rs:1887-1915), gossip task distribution wiring (init_compute.rs:110-128), and CCL fuel metering which genuinely errors when depleted (icn-ccl/src/types.rs:399-402; interpreter.rs:162). The WASM path at current HEAD still uses Engine::default() with metering explicitly deferred (wasm_executor.rs:58-59), a flat saturating_sub(100) per-call estimate (:163,:211) and wall-clock SystemTime::now() host imports — so fuel metering must NOT be attributed to WASM and that path is not deterministic; the two bullets have been split accordingly. THREE gaps were stale-pessimistic and are rewritten below: the workload manifest EXISTS as the E1 field block on ComputeTask (types.rs:318-322 ff) and ADR-0030 records status accepted / implementation_status implemented; DeterminismClass::{Canonical, Advisory} EXISTS (icn-kernel-api/src/compute.rs:189-212) and is threaded into execution (executor.rs:124-140; wasm_executor.rs:339-357); and the cell operator boundary IS defined (compute.rs:60-82 with the E5 one-operator-per-cell rule, services.rs:1314-1326,:1406-1411). ExecutionReceiptGate was moved out of evidence: it is real but lives at icn-governance/src/gate.rs:1 guarding ledger allocations, outside this subsystem's crates list. E3 advisory-cannot-mutate IS enforced on the CCL mutation path — executor.rs:124-140 maps task.determinism_class into the CCL context and interpreter.rs:608-618 rejects ledger writes via context.can_mutate_state(); an earlier draft of this note concluded the opposite by searching for a helper named is_advisory, which is not the helper the enforcement uses (corrected in review on PR #2587). NOT re-traced: E3 on the WASM path, app-side CellService implementors (can_join_cell defaults permissive when a cell has no mode set), and anything requiring a build or test run."
 crates = ["icn-compute"]
 gaps = [
-  "Workload manifest schema NOT BUILT",
-  "Deterministic vs advisory classification NOT BUILT",
-  "Job marketplace with bidding NOT BUILT",
-  "Cell operator boundary NOT DEFINED",
+  "WASM fuel metering NOT enforced and WASM host imports are non-deterministic (wall clock) — wasm_executor.rs:58-59,:163,:211,:248",
+  "E3 advisory-cannot-mutate IS enforced on the CCL mutation path (interpreter.rs:608-618 rejects via context.can_mutate_state(), with determinism_class mapped in at executor.rs:124-140); what remains unverified is enforcement on the WASM path, which is unmetered and non-deterministic",
+  "Job marketplace with bidding NOT BUILT (no Bid/auction type; scheduler.rs:983 only anticipates it in a doc comment)",
+  "Cell operator boundary DEFINED in kernel API (E5) but runtime enforcement NOT VERIFIED — can_join_cell defaults to permissive when a cell has no operator mode set",
 ]
 
 [subsystems.security]
@@ -186,17 +194,20 @@ evidence = [
   "Bloom filter deduplication",
   "Trust graph: 3D (Social, Economic, Technical)",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: DID-TLS binding construction and verification (icn-identity/src/bundle.rs:267,413 with the wire check in icn-net/src/handlers/hello.rs, not tls.rs), SignedEnvelope (envelope.rs:61), persistent replay/sequence tracking (replay_guard.rs, sequence_tracker.rs), ChaCha20-Poly1305 topic encryption (encryption.rs:90-92), Bloom dedup (icn-gossip/src/bloom.rs:95), and the three trust dimensions (icn-trust/src/types.rs:23 — note icn-trust is NOT in this entry's crates list). Onion routing re-confirmed at the stated sizes, but the previous inline comment's dispatch path was WRONG: there is no icn-net/src/connection.rs; dispatch is at icn-net/src/actor/connection.rs:869-870. TWO gaps were stale-pessimistic and are rewritten below. Cover traffic IS built (icn-privacy/src/traffic_obfuscation.rs, 385 lines) though consumed only by icn-privacy/tests/privacy_integration.rs and not integrated into icn-net. Active attack detection is decisively NOT a stub: icn-security/src/misbehavior.rs is 2041 of the crate's 2056 lines (MisbehaviorDetector, Violation, reputation scoring, quarantine/ban) and is referenced from 17 production files across icn-gossip, icn-ledger, icn-net, icn-compute, icn-core supervisor/config and apps/trust-app. NOT re-traced and carried forward: the anonymity / traffic-analysis threat model, which remains an SME-review item and is not source-verifiable."
 crates = ["icn-net", "icn-crypto", "icn-security", "icn-privacy"]
 # Re-verified 2026-06-14 (#2047). Onion routing is now IMPLEMENTED and wired:
 #   icn/crates/icn-privacy/src/onion_routing.rs (OnionRouter, layered encryption, circuits, 540 LOC)
-#   + icn/crates/icn-net/src/handlers/onion.rs (peel/forward) + connection.rs dispatch.
+#   + icn/crates/icn-net/src/handlers/onion.rs (peel/forward), dispatched at
+#   icn/crates/icn-net/src/actor/connection.rs:869-870. (Path corrected 2026-08-14:
+#   there is no icn-net/src/connection.rs.) INBOUND/RELAY ONLY — NetworkHandle::send_onion_message
+#   (icn-net/src/actor/mod.rs:982) has zero callers, so nothing originates onion traffic.
 #   Retired "Phase 20" numbering removed (Phase 0/1/2 model is canonical).
 gaps = [
-  "Onion routing IMPLEMENTED at crate level (icn-privacy + icn-net) but anonymity threat model NEEDS SME REVIEW (not audited for traffic analysis)",
-  "Traffic obfuscation / cover traffic NOT BUILT",
-  "Active attack detection STUB (icn-security minimal)",
+  "Onion routing inbound/relay path is wired, but NO production code originates onion traffic — send_onion_message (icn-net/src/actor/mod.rs:982) has zero callers; anonymity threat model still NEEDS SME REVIEW (not audited for traffic analysis)",
+  "Traffic obfuscation / cover traffic is BUILT at crate level (icn-privacy/src/traffic_obfuscation.rs, 385 lines) but NOT integrated into icn-net — only tests consume it",
 ]
 
 [subsystems.network]
@@ -205,24 +216,25 @@ status = "confirmed"
 truth_class = "operational"
 evidence_type = "demo"
 evidence = [
-  "QUIC/TLS (quinn + rustls)",
-  "mDNS + DHT discovery",
+  "QUIC/TLS (quinn + rustls) — transport is TOFU (tls.rs:272-279); peer identity is proven only by the Hello three-fact cert binding (handlers/hello.rs:62-97), per connection",
+  "Discovery via mDNS (mdns_sd), configured bootstrap entries, and peer exchange — there is NO DHT (no Kademlia/libp2p/DHT anywhere in icn/crates or icn/bins)",
   "Topic-based gossip with anti-entropy + Bloom filter dedup",
   "SignedEnvelope + EncryptedEnvelope formats",
   "DID bootstrap format",
   "K3s deployment running 2+ months (NEEDS OPS RE-CONFIRMATION — runtime claim NOT verified this pass; not covered by last_verified)",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
 # last_verified covers ONLY the code-level facts re-verified at source this pass
 # (gossip primitives, envelope formats, default ports). The K3s runtime claim is
 # explicitly carved out of the fresh timestamp — it is NOT source-verifiable and
 # was NOT re-confirmed by ops in #2047. It is tagged inline as NEEDS OPS RE-CONFIRMATION
 # so it does not ride the fresh date. (See PR #2051 review thread, comment 3410749048.)
-review_note = "Re-verified #2047 (code-level only): gossip primitives (vector_clock/bloom/anti_entropy), envelope formats, and default ports confirmed in src — this is what last_verified=2026-06-14 attests to. NOT covered by the fresh date: 'K3s running 2+ months' is a runtime/deployment claim, not source-verifiable, NOT re-confirmed by ops this pass (tagged NEEDS OPS RE-CONFIRMATION inline in evidence). NAT-traversal hardening gap retained."
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1, code-level only — this is what last_verified attests to. Re-traced at source: quinn + rustls (icn-net/Cargo.toml:13-15); gossip Bloom dedup and anti-entropy (icn-gossip/src/gossip.rs:99-100; anti_entropy.rs:75-92); SignedEnvelope (envelope.rs:61) and EncryptedEnvelope (encryption.rs:123); the icn://did:icn:X@HOST:PORT bootstrap format (handlers/mod.rs:118; bins/icnctl/src/main.rs:1032); the TOFU transport posture (tls.rs:272-279) with identity proven only by the Hello three-fact cert binding (handlers/hello.rs:62-97); and the bootstrap-DID expectation policy, which warns and counts on divergence but keeps the connection and penalises nobody (handlers/mod.rs:297-340, pinned by icn-net/tests/bootstrap_did_expectation.rs, #2533) — a deliberate design choice recorded here as a clarifier, not a defect. DISCONFIRMED AT SOURCE: DHT discovery does not exist. A case-insensitive grep for kademlia|libp2p|dht across icn/crates, icn/bins and icn/apps returns zero hits and there is no such dependency; discovery.rs uses mdns_sd only. The evidence bullet has been corrected — this was a claimed capability with no implementation inside an operational/confirmed list. NAT traversal is also more built than the old gap implied: STUN, TURN, nat and relay_proxy modules exist and are wired into session establishment (session.rs:250,:311), AND a direct public-address dial path documented in-source as NAT hole punch is raced via Happy Eyeballs with relay fallback (icn-core/src/supervisor/nat_dial.rs:7,:162-239, fed by init_notifications.rs:444-492). An earlier draft of this note denied that capability on the basis that no function is named attempt_hole_punch — a symbol-name search, not evidence (corrected in review on PR #2587). What is genuinely open is validation against symmetric and port-restricted NATs; separately, docs/design/nat-traversal-design.md:3 is stale at Design Phase with shipped STUN/TURN work still unchecked. NOT covered by this date and NOT re-confirmed: K3s running 2+ months remains a runtime/deployment claim, not source-verifiable (see the carve-out block above, preserved verbatim)."
 crates = ["icn-net", "icn-gossip"]
 gaps = [
-  "NAT traversal needs hardening for production internet use",
+  "NAT traversal completeness NOT ESTABLISHED under real-world NAT: STUN/TURN/relay are built and wired (stun.rs, turn.rs, nat.rs, relay_proxy.rs; session.rs:250,:311) and a direct public-address dial path described in-source as NAT hole punch is raced via Happy Eyeballs with relay fallback (icn-core/src/supervisor/nat_dial.rs:7,:162-239, fed by init_notifications.rs:444-492) — what is missing is validation of that flow against symmetric/port-restricted NATs, not the capability itself",
+  "docs/design/nat-traversal-design.md is stale — still marked Design Phase with shipped STUN/TURN work unchecked",
 ]
 
 [subsystems.entity]
@@ -232,18 +244,21 @@ truth_class = "descriptive"
 evidence_type = "test"
 evidence = [
   "Full EntityId format with type + identifier",
-  "Cooperative lifecycle (Formation -> Active -> Dissolution)",
-  "Community types (Geographic, Interest, Solidarity)",
+  "Cooperative lifecycle: 5 states — Forming, Active, Suspended, Dissolving, Dissolved (icn-coop/src/types.rs:344; mirrored by EntityStatus at icn-entity/src/entity.rs:304)",
+  "Community types: 4 variants — Geographic, Interest, Solidarity, Ecosystem (icn-community/src/types.rs:9-14)",
   "Federation entity (inter-coop coordination)",
   "Recursive composite membership",
-  "Naming service with bounded alias resolution",
-  "Deterministic treasury DID derivation",
+  "Naming service with bounded alias resolution — implemented in icn-kernel-api/src/naming.rs:69,:582, a crate NOT in this subsystem's list",
+  "Deterministic treasury anchor derivation (icn-coop/src/lifecycle.rs:22) — an identifier, not a keypair-backed DID; nothing in icn-entity derives it",
 ]
-last_verified = "2026-06-14"
-verified_by = "freshness-2047"
-review_note = "Re-verified #2047: EntityType/EntityKind, coop Formation->Active->Dissolution, CommunityType Geographic/Interest/Solidarity, deterministic treasury DID derivation all confirmed in src. No gaps recorded; holds."
+last_verified = "2026-08-14"
+verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. Re-traced at source: the entity:icn:<type>:<identifier> EntityId format (entity.rs:35-43), EntityType and EntityKind including Federation (:265,:429), and recursive composite membership (membership.rs:17; entity.rs:588). TWO enumerations in the previous pass were undercounts and are corrected above rather than re-asserted: CommunityType has FOUR variants (Geographic, Interest, Solidarity, Ecosystem — icn-community/src/types.rs:9-14), not three, and the cooperative lifecycle has FIVE states (Forming, Active, Suspended, Dissolving, Dissolved — icn-coop/src/types.rs:344), not the three-arrow Formation->Active->Dissolution. Two bullets were also misattributed: bounded alias resolution is implemented in icn-kernel-api/src/naming.rs (zero alias/naming hits in icn-entity/src), and treasury derivation lives in icn-coop, with treasury_account in icn-entity being caller-supplied (entity.rs:462,628). The previously empty gaps list is replaced with the attribution and precision defects found this pass; no functional hole was found, so status confirmed / descriptive still holds. NOT verified: any runtime or registry behaviour, and whether the alias bound is enforced end-to-end on live entity resolution."
 crates = ["icn-entity", "icn-coop", "icn-community"]
-gaps = []
+gaps = [
+  "Two evidence capabilities are carried by crates outside the declared list (bounded alias resolution -> icn-kernel-api)",
+  "icn-entity does not itself derive or validate treasury identifiers; treasury_account is caller-supplied (entity.rs:462,628)",
+]
 
 # Meaning Firewall is tracked separately as a cross-cutting concern
 [meaning-firewall]
@@ -269,7 +284,7 @@ total_subsystems = 10
 # total_tests: NOT re-derived this pass. The "2287" figure is from the March gap analysis and
 # is stale (workspace grew; icn-governance alone now greps to 600+ test attrs). Run `cargo test`
 # for an authoritative total before re-asserting a precise number.
-total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation"
+total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation. Partial static re-derivation 2026-08-14: governance alone greps to 1366 #[test]/#[tokio::test] attribute lines (779 icn-governance + 587 apps/governance), so the workspace total is far above 2287; attribute counts are not pass counts."
 total_crates = "38 crates + 7 apps + 3 binaries = 48 workspace members"   # verified 2026-07-13 vs icn/Cargo.toml [workspace].members
 loc_approx = "414K"   # not re-measured this pass
 deployment = "3-node K3s cluster, running since Dec 2025 — NEEDS OPS RE-CONFIRMATION (runtime claim; node addresses documented in deployment guides/runbooks)"
@@ -277,5 +292,5 @@ deployment = "3-node K3s cluster, running since Dec 2025 — NEEDS OPS RE-CONFIR
 # per-subsystem rows and the meaning-firewall recount against source, but did NOT run a full
 # cargo-test/LOC/deployment sweep. The 2026-03-17 gap analysis remains the last *full* verification.
 last_full_verification = "2026-03-17"
-last_partial_verification = "2026-06-14"   # #2047 source-level re-verification of subsystem rows + meaning-firewall recount
-verification_source = "docs/strategy/ICN-Gap-Analysis-March-2026.md; #2047 source re-verification 2026-06-14"
+last_partial_verification = "2026-08-14"   # source-level re-verification of all 10 subsystem rows (meaning-firewall block NOT re-audited)
+verification_source = "docs/strategy/ICN-Gap-Analysis-March-2026.md; #2047 source re-verification 2026-06-14; source re-verification 2026-08-14 (all 10 subsystem rows re-traced at HEAD 74c832f1; no cargo build/test run; meaning-firewall per-crate classifications NOT re-audited)"

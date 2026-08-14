@@ -65,7 +65,7 @@ notes = "Seven invariants. Changes only if regulatory strategy changes."
 title = "Identity & Cryptography"
 last_updated = "2026-06-14"
 last_verified_by = "freshness-2047"
-review_note = "3-of-5 steward threshold verified (icn-steward gossip.rs/enrollment.rs); keystore migration chain v1->v2->v2.1->v3->v4 verified (icn-identity keystore.rs); unverifiable '88 modules' descriptor removed."
+review_note = "3-of-5 steward threshold verified (icn-steward gossip.rs/enrollment.rs); keystore on-disk formats v1->v2->v2.1->v3->v4 verified (icn-identity keystore.rs); unverifiable '88 modules' descriptor removed. CORRECTION 2026-08-14: automatic migration terminates at v3 (keystore.rs:1098) — a v3 keystore is unlocked without upgrade (:1064) and v4 is written only when SDIS fields are added (save_v4, :481), so the chain is a list of formats, not an automatic path to v4. No v5 on-disk format exists; the v5 comments at :98,184 label optional fields inside StoredKeyV4 (version always 4, :143)."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = [
@@ -151,9 +151,9 @@ notes = "Most actively verified subsystem; demo flow proven. Exact test count NE
 
 [sections."13-entity-model"]
 title = "Entity Model"
-last_updated = "2026-06-14"
-last_verified_by = "freshness-2047"
-review_note = "Verified accurate: EntityType/EntityKind (icn-entity), coop Formation->Active->Dissolution (icn-coop/handle.rs), CommunityType Geographic/Interest/Solidarity (icn-community/types.rs), deterministic treasury DID derivation (icn-coop)."
+last_updated = "2026-08-14T00:00:00"
+last_verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. CORRECTION: the previous note undercounted two enumerations. The cooperative lifecycle has FIVE states, not the three-arrow Formation->Active->Dissolution — Forming, Active, Suspended, Dissolving, Dissolved (icn-coop/src/types.rs:344, mirrored by EntityStatus at icn-entity/src/entity.rs:304). CommunityType has FOUR variants, not three — Geographic, Interest, Solidarity, Ecosystem (icn-community/src/types.rs:9-14). Re-affirmed at source: EntityType/EntityKind including Federation (icn-entity/src/entity.rs:265,:429) and recursive composite membership (membership.rs:17). Two capabilities credited here are implemented elsewhere: bounded alias resolution lives in icn-kernel-api/src/naming.rs (zero alias/naming hits in icn-entity/src), and treasury derivation lives in icn-coop/src/lifecycle.rs:22 — and it yields a keyless identifier string, not a keypair-backed DID, so calling it DID derivation overstates it. NOT re-verified: any runtime or registry behaviour."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = [
@@ -166,9 +166,9 @@ notes = "Entity model fully implements spec. Stable."
 
 [sections."14-federation"]
 title = "Federation"
-last_updated = "2026-07-14T22:05:00"
-last_verified_by = "lan-rehearsal-deployment"
-review_note = "Re-verified 2026-07-14: the ONLY icn-federation/src change since the 2026-06-14 verification is #2055 (rand 0.8->0.9 migration, mechanical; no federation semantics). Prior facts re-affirmed: bilateral clearing present (clearing.rs, receipt_clearing.rs); gaps unchanged - no multilateral netting, no dispute engine, no BFT/checkpointing."
+last_updated = "2026-08-14T00:00:00"
+last_verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1 against icn/crates/icn-federation/src/. CORRECTION: the 'no multilateral netting' claim was FALSE and had propagated to three places (this note, the ARCHITECTURE.md section body, and the status.toml federation gap list). netting.rs:1,44 implements NettingEngine, it is exported at lib.rs:73, and it is called from production at clearing_manager.rs:414-420; perform_multilateral_netting (clearing_manager.rs:414-420) is informational per :412, but apply_multilateral_netting (:472-535) DOES update and persist positions, and both steps are registered gateway endpoints (icn-gateway/src/api/federation.rs:1140,:1177-1190; server.rs:2534-2535). An interim draft of this note said netting computes but does not settle; that was also wrong. Netting is built end to end. Note the failure mode: the 2026-07-14 pass re-affirmed the prior claim on the basis that no semantic federation change had landed, rather than re-checking source — so a wrong claim survived two verification passes. Also corrected this pass: attestation signing is not installed in production (FederationGossipHandler::set_keypair, gossip.rs:83, has callers only under #[cfg(test)]; init_federation.rs:128-133 never installs a keypair; icn-rpc/src/handler/federation.rs:566-575 stores attestations without .sign()), so announcements are emitted unsigned into a verifier path that expects signatures. Re-affirmed at source: bilateral clearing (clearing.rs, receipt_clearing.rs), dispute resolution still an Option<String> method label (agreement/types.rs:493), and no checkpoint/epoch or bft/byzantine types in this crate (icn-core carries the partition-healing and byzantine integration tests). NOT re-verified: no build, test or runtime execution."
 staleness_threshold_days = 30
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-federation/src/**"]
@@ -177,9 +177,9 @@ notes = "Known gaps (BFT, netting, dispute resolution). Review when any federati
 
 [sections."15-distributed-compute"]
 title = "Distributed Compute"
-last_updated = "2026-06-14"
-last_verified_by = "freshness-2047"
-review_note = "Verified: still foundation-only — no marketplace/bidding/WorkloadManifest in icn-compute. Updated: cost model now exists (cost.rs, fuel x payment_rate -> credit cost), so 'workers execute for free' qualified."
+last_updated = "2026-08-14T00:00:00"
+last_verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. CORRECTION: a workload manifest DOES exist — the E1 field block on ComputeTask (icn-compute/src/types.rs:318-322 ff: inputs_hash, policy_hash, determinism_class, privacy_class), with ADR-0030 recording status accepted / implementation_status implemented. The previous note inferred absence from a search for a type literally named WorkloadManifest. Also corrected: E3 advisory-cannot-mutate IS enforced on the CCL mutation path (icn-ccl/src/interpreter.rs:608-618 via context.can_mutate_state(), with determinism_class mapped in at icn-compute/src/executor.rs:124-140), and the cell operator boundary IS defined (icn-kernel-api/src/compute.rs:60-82, E5). Re-affirmed: no marketplace or bidding type exists in crates/ or apps/. Still open and now stated precisely: the WASM path is unmetered and non-deterministic — Engine::default() with metering deferred (wasm_executor.rs:58-59), a flat saturating_sub(100) per-call estimate (:163,:211) and wall-clock host imports (:248,:331,:428). The cost model exists (cost.rs). NOT re-verified: runtime enforcement of E3 on the WASM path, app-side CellService implementors, and anything requiring a build or test run."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-compute/src/**"]
