@@ -12,6 +12,24 @@
 //! applying state would require. The containment assertions at the bottom of this file are
 //! part of the slice, not a formality — and the full #2470 suite in
 //! `fp02_governance_replication_containment.rs` must stay green alongside it.
+//!
+//! # A deliberately unkillable mutant
+//!
+//! Deleting the signed-frame recognition branch from the ingress callback entirely — so a
+//! signed frame falls through to the legacy decode and merely logs a different line — fails
+//! **no** test here or in the #2470 suite. That was checked, and it is the correct outcome
+//! rather than a coverage hole.
+//!
+//! Recognition is a *diagnostic*, and the containment it sits inside is *structural*: the
+//! callback captures no `GovernanceStateStore`, so neither branch can reach governance state
+//! and neither branch is an authorization decision. The mutant is equivalent with respect to
+//! every property this slice guarantees, which is exactly the claim
+//! `observe_replicated_governance_message` already makes about itself — "there is
+//! deliberately no telemetry to evade, because there is deliberately nothing to gate."
+//!
+//! Emission is where the observable behaviour lives, and that is where the mutation proof
+//! bites: collapsing the sequence key, unbinding the domain, dropping the author/key check,
+//! or letting `publish_to_topic` bypass the shared encoder each kill tests below.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
