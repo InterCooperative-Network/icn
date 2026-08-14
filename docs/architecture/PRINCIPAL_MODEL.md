@@ -86,8 +86,24 @@ Verified at `74c832f1`. This section is descriptive.
 ### 2.1 One opaque, key-derived identifier for everything
 
 `pub struct Did(String)` (`icn/crates/icn-identity/src/lib.rs:177`).
-`Did::from_str` (`:210-235`) hard-requires `did:icn:` + multibase base58btc +
-exactly 32 bytes + a valid Ed25519 key.
+`Did::from_str` (`:209-244`) requires the `did:icn:` prefix, a decodable
+**multibase** payload of exactly 32 bytes, and a valid Ed25519 public key.
+
+> **Correction (review round 10): it does *not* pin the multibase alphabet.**
+> `let (_base, decoded_bytes) = multibase::decode(encoded_part)` discards the base
+> (`:223`) and the constructor retains the **original string**, `Ok(Did(s.to_string()))`
+> (`:243`). `from_public_key` always *emits* Base58Btc (`:194`), but `from_str`
+> *accepts* any multibase encoding of the same key — and since `Did` derives
+> `PartialEq, Eq, Hash` over the inner `String` (`:174`), **two encodings of one key
+> are two unequal, differently-hashing DIDs**.
+>
+> So `Did` equality is *string* equality, not *key* equality. In practice most paths
+> fail closed, because membership matching and storage keys are string comparisons and
+> the canonical producer is base58btc — a non-canonical author simply fails to match.
+> But the invariant "one key ⇒ one identifier" is **not enforced by the type**, and
+> any design that assumes it must normalize explicitly. That includes this document:
+> §6's authorization binds `person` and `device` as DIDs, and O9 shape (b) hashes a
+> *set* of signing methods — both require a canonicalization rule, now folded into O10.
 
 **A DID *is* an Ed25519 public key.** There is no method namespace, no role tag,
 and structurally no room for one. The same `Did` names a node
@@ -832,18 +848,34 @@ verifier it is meant to satisfy.
   **It cannot distinguish before from after: it invalidates the device's past
   authorizations too**, which is a real semantic cost, not a rounding error.
 
-**Recommendation, not yet a decision: (b).** It is the only shape that is both
-correct and cheap, and it mirrors a precedent ICN has already accepted. Its cost
-must be stated plainly rather than discovered later: **revocation is retroactive**
-— revoking a device invalidates the operations it already signed, because the
-receiver can no longer reconstruct a set-hash under which they verify. For
-governance that may be tolerable, since applied operations are already recorded
-and replaying history is not the normal path; for anything that must preserve the
-validity of historical signatures it is not.
+**(b) is not convergent either, and the earlier recommendation of it is withdrawn.**
+*(Review round 10.)* Suppose peer A applies a device-signed operation and only then
+learns of the revocation, while peer B learns of the revocation first. B rejects the
+operation; A has already recorded its effect. Acceptance depends on **the order in
+which a receiver learned two independent facts**, which is the same divergence class
+§6.4 rejects for wall-clock. Restoring convergence would need deterministic rollback
+or revalidation of already-applied operations, and #2469 has no such path — its
+applied-set only *deduplicates* `op_id`s. Retroactive invalidation is not merely a
+semantic cost; without rollback semantics it is a correctness bug.
 
-The choice remains **O9**, and it is load-bearing for the wire format: (a′)
-requires a per-operation causal marker, (b) requires a carried set-hash. **The
-field set cannot be frozen before O9 is answered.**
+**Honest conclusion: no convergent device-revocation model is available today.**
+
+| Shape | Status |
+|---|---|
+| (a) carried authorization version | **refuted** — the authorization is signed once, so it cannot order operations |
+| (a′) per-operation causal marker in a replicated total order | theoretically sound; **no such order exists**, and #2469 deliberately declined to create one |
+| (b) snapshot invalidation | **not convergent without rollback/revalidation semantics**, which do not exist |
+
+**O9 is therefore a genuine open architecture problem, not a choice between two
+ready options.** It requires either a replicated total order for identity events, or
+deterministic rollback semantics for already-applied operations — each a substantial
+design in its own right. Recording it as "pick (a) or (b)" would have been inventing
+an answer.
+
+Until O9 is resolved, the honest statement stands: **a device authorization, once
+issued, is acceptable to every receiver indefinitely**, and roster revocation is local
+bookkeeping with no protocol effect. **The field set cannot be frozen before O9 is
+answered**, because every candidate implies different carried fields.
 
 Until then the honest statement is: **a device authorization, once issued, is
 acceptable to every receiver for as long as the format is valid.** Roster
@@ -1090,8 +1122,8 @@ This model does **not** provide, and must not be read as providing:
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
 | O7 | Which operation classes may a device sign, and which require the root key? | Determines the default scope set in §5.2 |
 | **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
-| **O9** | **Which deterministic revocation anchor?** Ordering (carry `DidDocument.version`, compare against the revocation's) or snapshot invalidation (carry a hash of the non-revoked signing-method set)? (§6.5) | **BLOCKS slices A and D.** The two shapes require *different carried fields*, so the wire format cannot be frozen first. Ordering distinguishes before/after revocation; snapshot does not and retroactively invalidates. Neither exists today — the closest path (`RotationEvent`) is unreplicated and its `verify()` has zero production callers |
-| O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
+| **O9** | **How is a device revoked convergently at all?** All three candidate shapes fail today: (a) is refuted, (a′) needs a replicated total order ICN does not have, (b) needs rollback/revalidation semantics #2469 does not have (§6.5) | **BLOCKS slices A and D, and is a genuine open architecture problem** — not a choice between ready options. Requires either a total order for identity events or deterministic rollback for applied operations. Every candidate implies different carried fields, so the format cannot be frozen first |
+| O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator, **and the canonicalization rule for DID strings**, given that `from_str` accepts any multibase while `Did` equality is string equality (§2.1)? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
 | **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
 | **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
 | O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
