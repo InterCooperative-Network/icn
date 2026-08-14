@@ -2382,6 +2382,12 @@ pub mod gossip {
         counter!("icn_gossip_messages_rejected_low_trust_total").increment(1);
     }
 
+    /// #2469: Entries rejected because the payload does not hash to the claimed
+    /// `entry.hash` (content-integrity failure, not an authorship check)
+    pub fn entries_rejected_hash_mismatch_inc() {
+        counter!("icn_gossip_entries_rejected_hash_mismatch_total").increment(1);
+    }
+
     // Issue #123: Message compression metrics
     /// Track bytes before compression
     pub fn bytes_before_compression_add(bytes: u64) {

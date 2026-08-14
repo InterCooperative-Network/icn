@@ -197,6 +197,58 @@ impl GossipEntry {
             Ok(self.data.clone())
         }
     }
+
+    /// Re-derive the content hash this entry's own payload implies.
+    ///
+    /// Hashes the *logical* payload via [`GossipEntry::get_data`], so compression is
+    /// transparent here exactly as it is for every other reader. Decompression stays
+    /// bounded, so a hostile payload yields an error rather than exhausting memory.
+    pub fn computed_content_hash(&self) -> anyhow::Result<ContentHash> {
+        Ok(content_hash(&self.get_data()?))
+    }
+
+    /// Check, fail-closed, that `hash` really is the digest of this entry's payload.
+    ///
+    /// A payload that cannot be decoded at all is a failure, not a pass: an entry whose
+    /// hash cannot be re-derived has not been shown to satisfy the invariant.
+    ///
+    /// # What a pass does and does not mean
+    ///
+    /// Passing proves exactly one thing: `data` corresponds to the digest in `hash`. It
+    /// authenticates **neither `author`, nor the peer that relayed the entry, nor any
+    /// institutional authority** — `author` remains an unsigned, self-declared field that
+    /// any peer may set to any DID. Authenticated authorship is issue #2469's remaining
+    /// work, not a property of this check.
+    pub fn validate_content_integrity(&self) -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        let computed = self
+            .computed_content_hash()
+            .context("entry payload could not be decoded to re-derive its hash")?;
+
+        if computed != self.hash {
+            anyhow::bail!(
+                "content hash mismatch: entry claims {} but its payload hashes to {}",
+                hex::encode(self.hash),
+                hex::encode(computed)
+            );
+        }
+
+        Ok(())
+    }
+}
+
+/// Canonical content hash for a gossip entry payload.
+///
+/// [`GossipEntry::hash`] commits to the entry's *logical* payload — the bytes the publisher
+/// supplied, before any transport compression is applied. Publication and receive-side
+/// validation both derive it here so the two can never drift apart.
+pub fn content_hash(data: &[u8]) -> ContentHash {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher.finalize().into()
 }
 
 /// Decompress zstd data with a bounded output size to prevent memory exhaustion.

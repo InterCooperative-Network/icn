@@ -11,12 +11,14 @@
 //! ## The mechanism these tests exercise
 //!
 //! `GossipEntry` (`icn-gossip/src/types.rs`) carries a claimed `author` DID but
-//! **no signature binding that DID to the entry contents**, and the receive path
-//! (`GossipActor::store_entry`) neither recomputes the entry hash nor enforces the
-//! topic ACL. So any peer that can reach the node may publish an entry claiming
-//! *any* author. The governance replication ingress therefore receives an
-//! attacker-chosen DID, not an authenticated one — comparing anything against it
-//! is not an authorization check.
+//! **no signature binding that DID to the entry contents**. The receive path
+//! (`GossipActor::store_entry`) re-derives the entry hash before an entry may claim a
+//! content-addressed slot, and rejects a payload that does not match it (#2469 slice 2),
+//! but it does not enforce the topic ACL and that hash says nothing about who wrote the
+//! entry. So any peer that can reach the node may still publish a correctly-hashed entry
+//! claiming *any* author. The governance replication ingress therefore receives an
+//! attacker-chosen DID, not an authenticated one — comparing anything against it is not
+//! an authorization check.
 //!
 //! Every negative test below uses a genuinely attacker-controlled `entry.author`.
 //! A test that merely passes `None` would not exercise the real vulnerability.
@@ -85,10 +87,6 @@ struct Node {
     /// only a bounded `debug!` — which is precisely why the containment holds. The negative
     /// assertions below inspect durable governance state directly.
     observed: Arc<std::sync::Mutex<Vec<(String, Did)>>>,
-    /// Distinguishes otherwise-identical injections. `store_entry` dedups on the
-    /// sender-supplied `entry.hash`, so replays must carry distinct claimed hashes to
-    /// reach the ingress independently — which is exactly the attacker's capability.
-    seq: std::sync::atomic::AtomicU64,
 }
 
 impl Node {
@@ -148,7 +146,6 @@ impl Node {
             ops,
             state,
             observed,
-            seq: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -201,16 +198,16 @@ impl Node {
         wire_sender: &Did,
         data: Vec<u8>,
     ) {
-        // The attacker picks the hash freely: `store_entry` dedups on this field and
-        // never recomputes it from `data`. Mixing in a per-injection counter models that
-        // freedom and keeps repeated injections of identical bytes from being silently
-        // deduped away before they reach the ingress.
-        let nonce = self.seq.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let mut hash = [0u8; 32];
-        for (i, b) in data.iter().take(24).enumerate() {
-            hash[i] = *b ^ 0xA5;
-        }
-        hash[24..32].copy_from_slice(&nonce.to_le_bytes());
+        // Hash the attacker's own chosen bytes honestly. Since #2469 slice 2 the receive
+        // path re-derives this digest and refuses a mismatch, so a forged hash would be
+        // dropped by the transport and never reach the ingress these tests exist to probe.
+        //
+        // That costs the attacker nothing this suite depends on: a correct content hash
+        // says only that `data` matches the digest, and `claimed_author` below is still
+        // whatever DID the attacker cares to write. The one capability it does remove is
+        // dedup evasion — identical bytes now collapse to a single entry — so a test that
+        // needs N independent deliveries has to vary the payload rather than the hash.
+        let hash = icn_gossip::content_hash(&data);
 
         let entry = GossipEntry {
             hash,
@@ -688,12 +685,16 @@ async fn quarantine_does_not_stop_generic_gossip_transport() {
 
     let domain = make_domain("transport-check", vec![mallory.clone()]);
     let domain_id = domain.id.clone();
-    let msg = GovernanceMessage::domain_created(domain);
 
     // `inject_forged` already asserts `handle_message` returns Ok — transport accepted
     // the entry. Confirm the entry was retained by the gossip layer for observability.
-    node.inject_forged(GOVERNANCE_TOPIC, &mallory, &mallory, &msg)
-        .await;
+    node.inject_forged(
+        GOVERNANCE_TOPIC,
+        &mallory,
+        &mallory,
+        &GovernanceMessage::domain_created(domain),
+    )
+    .await;
 
     let entries = node.gossip.read().await.get_entries(GOVERNANCE_TOPIC);
     assert!(
@@ -701,9 +702,15 @@ async fn quarantine_does_not_stop_generic_gossip_transport() {
         "the quarantined entry must still be stored by the gossip layer"
     );
 
-    // And the actor keeps serving further traffic.
-    node.inject_forged(GOVERNANCE_TOPIC, &mallory, &mallory, &msg)
-        .await;
+    // And the actor keeps serving further traffic — a second, distinct domain, since
+    // identical bytes would now be absorbed by content-addressed dedup.
+    node.inject_forged(
+        GOVERNANCE_TOPIC,
+        &mallory,
+        &mallory,
+        &GovernanceMessage::domain_created(make_domain("transport-check-2", vec![mallory.clone()])),
+    )
+    .await;
     assert!(
         node.state.get_domain(&domain_id).unwrap().is_none(),
         "transport retention must not become state application"
@@ -721,16 +728,22 @@ async fn replayed_unauthenticated_messages_remain_non_mutating() {
     let (_, proposal_id) = seed_open_proposal(&node).await;
 
     let victim = node.did.clone();
-    let vote = Vote::new(proposal_id.clone(), victim.clone(), VoteChoice::Against);
-    let msg = GovernanceMessage::vote_cast(vote, None);
 
-    // Same payload, replayed three times, each carrying a *different* claimed hash —
-    // which is what an attacker does to defeat `store_entry`'s dedup. Each injection
-    // therefore reaches the ingress independently (asserted by the positive control in
-    // `inject_forged`), and each must still be refused.
-    for _ in 0..3 {
-        node.inject_forged(GOVERNANCE_TOPIC, &victim, &mallory, &msg)
-            .await;
+    // Three attempts to record the same vote, by the same victim, on the same proposal,
+    // differing only in the vote's own timestamp. Varying the payload is what an attacker
+    // has to do to get each attempt past content-addressed dedup and in front of the
+    // ingress independently — the positive control in `inject_forged` asserts each one
+    // actually arrived. All three must still be refused.
+    for i in 0..3u64 {
+        let mut vote = Vote::new(proposal_id.clone(), victim.clone(), VoteChoice::Against);
+        vote.timestamp += i;
+        node.inject_forged(
+            GOVERNANCE_TOPIC,
+            &victim,
+            &mallory,
+            &GovernanceMessage::vote_cast(vote, None),
+        )
+        .await;
     }
 
     assert!(

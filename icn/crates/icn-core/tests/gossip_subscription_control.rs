@@ -80,15 +80,20 @@ fn counting_callback() -> (EntryNotificationCallback, Arc<Mutex<u32>>) {
     (cb, count)
 }
 
-/// A well-formed entry that did not come from us. `author` and `hash` are attacker-chosen;
-/// `hash` is never recomputed by the receiver, so it is not an identity of anything.
+/// A well-formed entry that did not come from us. `author` is attacker-chosen and stays
+/// unauthenticated: since #2469 slice 2 the receiver re-derives `hash` from the payload, but
+/// a correct content hash identifies the *bytes*, never the peer that sent them.
+///
+/// `marker` varies the payload rather than the hash, so repeated injections remain distinct
+/// entries now that the digest is a function of the content.
 fn remote_entry(author: &Did, marker: u8) -> GossipEntry {
+    let data = format!("remote entry {marker}").into_bytes();
     GossipEntry {
-        hash: [marker; 32],
+        hash: icn_gossip::content_hash(&data),
         author: author.clone(),
         clock: VectorClock::new(),
         topic: TOPIC.to_string(),
-        data: b"remote entry".to_vec(),
+        data,
         compressed: false,
         timestamp: 1_700_000_000_000,
         replica_offered: None,
