@@ -39,8 +39,8 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>authenticated governance replication</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/authenticated-governance-replication.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Authenticated governance replication (#2469)</h1>
-<p><strong>Status:</strong> design + slice 1 (unwired primitive).
-<strong>Derived against:</strong> <code>origin/main</code> = <code>3d401dce0c65d70eea117335b48719baa2231e2e</code>.
+<p><strong>Status:</strong> design + slice 1 (primitive) + slice 2 (#2583) + slice 3 (signed emission).
+<strong>Derived against:</strong> <code>origin/main</code> = <code>6754d30c83cc944e5ad22e4687e5bb63ac8dc51e</code>.
 <strong>Owns:</strong> the durable replacement for the #2470 containment.
 <strong>Refs:</strong> #2469, #2441, #2470 (<code>bc291305</code>), #2471, #2480, #2510, #2520, #2535, #2544, #2583.</p>
 <p>Everything in §1 was re-derived from source — originally at <code>c3782321</code>, re-verified at
@@ -57,6 +57,12 @@ than work this design still has to schedule. <strong>No architectural premise ch
 authenticates payload↔digest only, and leaves authorship, authority and the #2470
 containment exactly as they were. Revision 3 also corrects a §7.0 mis-citation: the vote
 suspension gate was cited at the <em>proposer</em> gate&#39;s line.</p>
+<p><strong>Revision 4</strong> lands <strong>slice 3</strong> (signed emission) at <code>6754d30c</code> and records what wiring the
+emission path revealed. Two findings are load-bearing for slice 7 and are written up in
+§7.0.2 and §7.0.3: <strong>a node can only sign for itself</strong>, which removes gateway-hosted votes
+from the signable set for a reason independent of §7.0.1; and <strong>per-federation governance
+topics are never created</strong>, so that route carries nothing today. Neither moves the field set.
+§13 records the slice as done.</p>
 <hr>
 <h2>1. Verified current behavior — source-to-sink trace</h2>
 <h3>1.1 Outbound: operator action → wire</h3>
@@ -655,6 +661,51 @@ unwired checker must read as &quot;predicate unresolved,&quot; never as &quot;pr
 squarely #2441&#39;s territory (authenticated institutional-state replication) and is <strong>not</strong>
 in scope here. This is the second place where #2469 and #2441 turn out to be genuinely
 coupled — the first being the shared quarantine machinery (§11).</p>
+<h3>7.0.2 A node can only sign for itself — the custody boundary</h3>
+<p>Derived while wiring slice 3, at <code>6754d30c</code>.</p>
+<p>The envelope&#39;s <code>author</code> is the <strong>acting principal</strong>, and <code>SignedGovernanceOp::sign</code> refuses
+any key that does not derive it (<code>replication.rs:308</code>). A <code>GovernanceActor</code> holds exactly one
+key: the node&#39;s own identity key, extracted from <code>identity_bundle.keypair()</code>
+(<code>icn-core/src/supervisor/lifecycle.rs:782</code>).</p>
+<p>But <code>GovernanceCommand::CastVote { proposal_id, voter, choice, comment }</code>
+(<code>apps/governance/src/actor.rs:2073</code>) takes <code>voter</code> as a <strong>parameter</strong>, and the actor never
+constrains it to <code>self.did</code>. In the gateway composition many members vote through one node,
+which holds none of their key material.</p>
+<blockquote>
+<p><strong>A node can emit a signed operation only when it <em>is</em> the acting principal.</strong>
+Gateway-hosted votes are unsignable in v1 — not a gap to patch, a custody fact. Signing a
+member&#39;s vote with the node&#39;s key would assert an authorship that does not exist, which is
+precisely the forgery this envelope exists to prevent.</p>
+</blockquote>
+<p>This is <strong>additive to §7.0.1, not a restatement</strong>, and it bites at the opposite end of the
+pipe. §7.0.1 says a <em>receiver</em> cannot evaluate the standing predicate, so it must not apply.
+This says a <em>sender</em> cannot produce the envelope at all. Either one alone is enough to keep
+production contained; together they mean the gateway path is contained twice over.</p>
+<p><strong>Consequence for slice 7.</strong> Restoring <code>VoteCast</code> application does not, by itself, make
+gateway deployments converge, because those nodes emit nothing to converge on. A deployment
+only produces signed votes where the voter&#39;s own daemon holds the voter&#39;s key. Any plan that
+assumes slice 7 restores replication for the gateway composition is wrong on both counts.</p>
+<p>Slice 3 therefore falls back to the legacy payload whenever the key does not belong to the
+acting principal, and pins that in <code>signed_governance_emission.rs</code>
+(<code>a_vote_cast_for_another_member_is_never_signed</code>).</p>
+<h3>7.0.3 Per-federation governance topics are never created</h3>
+<p>Also derived at <code>6754d30c</code>, and <strong>pre-existing</strong> — unchanged by slice 3.</p>
+<p><code>publish_federation_if_scoped</code> (<code>actor.rs:3269</code>) publishes to
+<code>federation:governance:&lt;fed_id&gt;</code>. The only federation governance topic anything creates or
+subscribes is the <strong>root</strong> <code>federation:governance</code>
+(<code>icn-core/src/supervisor/init_gossip.rs:325</code>). <code>TopicAutoCreationPolicy</code> defaults to
+<code>Reject</code> (<code>icn-gossip/src/types.rs:617</code>) and nothing in production calls
+<code>set_topic_auto_creation_policy</code>, so the per-federation publish is refused — and
+<code>publish_federation_if_scoped</code> swallows the error with a <code>warn!</code>.</p>
+<p>Federation-scoped governance therefore <strong>never reaches the wire</strong> in the default
+configuration, signed or legacy, before slice 3 or after it. Verified empirically: a
+federation-scoped vote produces three entries on <code>governance:proposal</code> and zero on
+<code>federation:governance:&lt;fed_id&gt;</code>.</p>
+<p>The emission policy still covers the route <strong>by construction</strong> — <code>publish</code> and
+<code>publish_to_topic</code> share one encoder — which the suite proves by declaring the topic first.
+Wiring the topic itself is a topic-lifecycle change outside #2469; the current behaviour is
+pinned by <code>a_per_federation_topic_is_never_created_in_the_default_configuration</code> so a later
+fix cannot land silently.</p>
 <h3>7.1 Why <code>DelegationRevoked</code> is excluded despite being safe</h3>
 <p>Revocation is monotonic, idempotent, order-independent, and authorized by a principal named
 in state the receiver already holds — it is genuinely safe. But it can only act on a
@@ -904,7 +955,7 @@ assertion that the envelope path inherits that guarantee rather than re-implemen
 </tr>
 <tr>
 <td>3</td>
-<td>Emit signed envelopes from the governance publish path (durable per-<code>(author,domain)</code> seq, #2510 pattern); accept both shapes; apply nothing.</td>
+<td>✅ <strong>DONE.</strong> Emit signed envelopes from the governance publish path (durable per-<code>(author,domain)</code> seq, #2510 pattern); recognise both shapes; apply nothing.</td>
 <td>No</td>
 </tr>
 <tr>
@@ -930,6 +981,22 @@ assertion that the envelope path inherits that guarantee rather than re-implemen
 </tbody></table>
 <p>Slices 1–6 restore nothing. Slice 7 is the only one that lifts containment, and does so in
 the same change that proves positive convergence (test 18).</p>
+<p><strong>Slice 3, as built.</strong> <code>publish</code> (<code>actor.rs:3128</code>) and <code>publish_to_topic</code> (<code>:3136</code>) are the
+only two functions that hand governance bytes to gossip, and both route through one
+<code>encode_for_emission</code> seam, so federation cannot drift onto a different policy. Corrected
+counts: <strong>12</strong> <code>publish</code> call sites (not ~10), and <strong>1</strong> <code>publish_to_topic</code> call site (not
+~9) — <code>publish_federation_if_scoped</code>, which itself has 7 callers.</p>
+<p>Eligibility falls back to the legacy payload at every step (kind not replicable, no acting
+principal, domain unresolvable, membership not <code>StaticList</code>, no key, key not the
+principal&#39;s); <strong>commitment</strong> fails closed, because a signed operation carrying a sequence
+that was never persisted is an ambiguity no receiver can detect. Signing is not restricted
+to <code>V1_RESTORABLE_OP_KINDS</code> — <code>ProposalCreated</code>, <code>DelegationCreated</code> and <code>DelegationRevoked</code>
+are signed where their principal is the node — but <strong>eligible is not restorable</strong>, and
+ingress still applies nothing.</p>
+<p>Recognition reads <code>entry.get_data()</code>, not <code>entry.data</code>: <code>publish</code> compresses entries above a
+size threshold <em>after</em> hashing, so the raw field is not the payload and a prefix check over
+it would misclassify every large entry. This matches <code>computed_content_hash</code>, which resolves
+the logical payload for the same reason.</p>
 <p><strong>Slice 1 unit tests (this change):</strong>
 sign→verify round-trip; tampered <code>op_bytes</code>; tampered <code>domain_id</code>; tampered <code>author</code>;
 tampered <code>seq</code>; tampered <code>authority</code>; tampered <code>op_kind</code>; wrong-signer rejection; unknown
