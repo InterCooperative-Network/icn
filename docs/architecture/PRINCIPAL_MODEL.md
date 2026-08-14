@@ -435,8 +435,15 @@ Person signs a DeviceAuthorization{person, device, scopes, not_before, not_after
 
 - The device **never receives the Person's root key.** This is the whole point.
 - Authorization is scoped and time-bounded by default (least authority).
-- Adding a second device: an existing device holding `AddDevice`, or the root
-  key, signs the new authorization. This machinery already exists (§2.2).
+- Adding a second device: the existing roster machinery (§2.2) lets a device
+  holding `AddDevice` mutate the **roster**. But issuing a `DeviceAuthorization`
+  is a different act: §6.1 requires `sig_P` verifiable under
+  `P.to_verifying_key()`, which an existing device cannot produce.
+  **For v1, issuing a device authorization is root-only**; roster add/revoke
+  stays device-capable. Allowing an existing device to authorize another would
+  require a carried delegation chain, which is the same unresolved problem as
+  O8 (§6.3). *(Contradiction raised in review on PR #2586: §5.2 previously said
+  an existing device could sign the authorization, which §6.1 forbids.)*
 - Revocation: roster revoke (`revoke_device`) **plus** authorization expiry.
   See §6.3 for the freshness problem this creates.
 - Hardware backing (Secure Enclave / Android Keystore / passkey) is a property of
@@ -562,7 +569,25 @@ authorization format that cannot express rotation. Whatever this document says a
 identity continuity in §5.1 and §7 holds only for the pre-rotation case until O8 is
 answered.
 
-### 6.4 What this also does not solve — revocation freshness
+### 6.4 Expiry is not order-independent — a second constraint on slice D
+
+*Raised in review on PR #2586.*
+
+`not_after` evaluated against each receiver's local clock is **not** a
+convergent predicate: an operation delivered before the deadline at peer A and
+after it at peer B is accepted by A and permanently rejected by B. That directly
+contradicts #2469, which gives wall-clock no ordering authority and carries no
+timestamp field precisely so that late delivery stays safe (§5.1 of that design).
+
+So the expiry window in §5.2 is sound as a *custody* control on the signing
+device, but it **must not be used as an ingress validity gate** in a replicated
+operation without a deterministic rule. Candidate directions, none adopted here:
+bind validity to a monotonic, replicated quantity (for example the domain's
+membership epoch) rather than wall-clock; or evaluate expiry only where the
+verdict is local and non-replicated. Recorded as **O9** and as a slice-D test
+requirement (delayed delivery, clock skew).
+
+### 6.5 What this also does not solve — revocation freshness
 
 A carried authorization is self-contained, and that cuts both ways: **a revoked
 device's previously-issued authorization still verifies.** This is inherent to
@@ -576,7 +601,7 @@ Mitigations, in order of strength:
 This residual risk must be stated in the envelope's own documentation rather than
 implied away. It is the honest cost of not depending on receiver-local state.
 
-### 6.5 Implications for `SignedGovernanceOp` — **not changed here**
+### 6.6 Implications for `SignedGovernanceOp` — **not changed here**
 
 Per the session constraint, nothing in `SignedGovernanceOp` is modified. Recording
 implications only:
@@ -595,10 +620,10 @@ implications only:
 - **Migration:** v1 and v2 must coexist; v1 remains valid for node-authored ops
   (where the node genuinely is the principal). This is additive, not a rewrite.
 
-### 6.6 Layer boundary
+### 6.7 Layer boundary
 
 Device authorization is a **principal-authentication** primitive, not a governance
-one. It belongs in `icn-identity` (§6.6) and must be usable by any subsystem that needs
+one. It belongs in `icn-identity` (§6.7) and must be usable by any subsystem that needs
 "principal A authorized principal B to act in class X" — settlement, membership,
 compute. #2469 consumes it; #2469 does not own it.
 
@@ -614,9 +639,14 @@ decision, so that claiming a slug requires producing the decision that created
 it. The human-readable slug remains a label; the binding is what makes it
 non-forgeable.
 
-*This is a proposal.* The current `EntityId` is an unbound human-chosen string
-(§2.6), and `derive_treasury_did` compounds this by minting DID-shaped strings
-with no key and no `Did` validation.
+*This is a proposal, and it is incomplete until O11 is answered:* binding an id
+to a decision hash requires a **domain-separated canonical encoding** and explicit
+normalization, or two nodes serializing the same decision with different map or
+founder-signature ordering will derive different ids for the same institution.
+The hashed field set must also be stated, so a decision cannot be rebound to a
+different slug. The current `EntityId` is an unbound human-chosen string (§2.6),
+and `derive_treasury_did` compounds this by minting DID-shaped strings with no key
+and no `Did` validation.
 
 ### 7.2 Membership is a relationship, never inheritance
 
@@ -806,6 +836,9 @@ This model does **not** provide, and must not be read as providing:
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
 | O7 | Which operation classes may a device sign, and which require the root key? | Determines the default scope set in §5.2 |
 | **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
+| **O9** | **What deterministic rule bounds an authorization's validity, given that wall-clock expiry is not order-independent?** (§6.4) | **Constrains slice D.** Local-clock evaluation makes the same operation accepted by one peer and permanently rejected by another, contradicting #2469 |
+| O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
+| O11 | What is the canonical encoding and normalization of a genesis decision before hashing to an `EntityId`? (§7.1) | Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug |
 
 ---
 
@@ -857,12 +890,12 @@ node/institution arc, which does not block D.
 
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
-| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped, time-bounded authorization | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; expiry; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization** | no governance wiring; no envelope change. **Blocked on O8 (§6.3)** — the format must not be frozen until rotation is expressible |
+| **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **Blocked on O8 (§6.3);** must also settle O10 (canonical bytes, version, domain separator) before the format is frozen. v1 issues authorizations **root-only** (§5.2) |
 | **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable; **the enrolment signature covers the enrolled key and capabilities** | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected; **tampering with `public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
-| **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; expired rejected; `op_id` covers the authorization | **does not lift #2470 containment**; does not change v1 |
+| **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key, **without a non-convergent validity predicate** | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; `op_id` covers the authorization; **delayed delivery and clock-skew tests showing two honest peers reach the same verdict** | **does not lift #2470 containment**; does not change v1. **Constrained by O9 (§6.4)** — wall-clock expiry must not become an ingress gate |
 | **E. Node claim + admin grant** | A Person administers a node instance; node ≠ operator | `icn-core` claim ceremony; `operator_did` unwired from `node_did` | claim binds instance not image; re-claim rejected; admin delegation | no hosting semantics |
-| **F. Institution genesis, governed** | Genesis is person-signed and governed, not `entity:write` | `icn-gateway/src/api/entity.rs`; `institution_bootstrap.rs` | founder authority expires; node key does not sign genesis | no institutional signing key (§4.1) |
+| **F. Institution genesis, governed** | Genesis is person-signed and governed, not `entity:write`, and the `EntityId` binds to a **canonically encoded** decision | `icn-gateway/src/api/entity.rs`; `institution_bootstrap.rs` | founder authority expires; genesis body carries an authorship binding; **same decision yields the same id under reordered maps and founder signatures** | no institutional signing key (§4.1). Requires O11 |
 | **G. Hosting assignment** | Hosting is explicit, scoped, revocable; host ≠ institution | node config → assignment record | host cannot act as institution; revoke and re-host | no billing/accounting |
 | **H. Mobile member vertical** | The §8 flow works end to end | SDK + member shell | full vertical | not a UI project |
 | **I. NYCN acceptance** | Generic primitives express a real federation | institution package only | no NYCN semantics in kernel | — |
