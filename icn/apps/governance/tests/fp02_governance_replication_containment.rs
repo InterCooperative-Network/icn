@@ -12,12 +12,13 @@
 //!
 //! `GossipEntry` (`icn-gossip/src/types.rs`) carries a claimed `author` DID but
 //! **no signature binding that DID to the entry contents**. The receive path
-//! (`GossipActor::store_entry`) re-derives the entry hash and rejects a payload that
-//! does not match it (#2469 slice 2), but it does not enforce the topic ACL and that
-//! hash says nothing about who wrote the entry. So any peer that can reach the node
-//! may still publish a correctly-hashed entry claiming *any* author. The governance
-//! replication ingress therefore receives an attacker-chosen DID, not an
-//! authenticated one — comparing anything against it is not an authorization check.
+//! (`GossipActor::store_entry`) re-derives the entry hash before an entry may claim a
+//! content-addressed slot, and rejects a payload that does not match it (#2469 slice 2),
+//! but it does not enforce the topic ACL and that hash says nothing about who wrote the
+//! entry. So any peer that can reach the node may still publish a correctly-hashed entry
+//! claiming *any* author. The governance replication ingress therefore receives an
+//! attacker-chosen DID, not an authenticated one — comparing anything against it is not
+//! an authorization check.
 //!
 //! Every negative test below uses a genuinely attacker-controlled `entry.author`.
 //! A test that merely passes `None` would not exercise the real vulnerability.

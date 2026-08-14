@@ -3804,8 +3804,9 @@ impl GovernanceActor {
 ///
 /// A [`icn_gossip::GossipEntry`] carries a claimed `author` DID and **no signature binding
 /// that DID to the entry contents**. The receive path (`GossipActor::store_entry`) does
-/// re-derive the entry hash from the payload and reject a mismatch (#2469 slice 2), but that
-/// binds *content to digest* and nothing else: it does not enforce the topic ACL, and the
+/// re-derive the entry hash from the payload before that entry may claim a content-addressed
+/// slot, and rejects a mismatch (#2469 slice 2), but that binds *content to digest* and
+/// nothing else: it does not enforce the topic ACL, and the
 /// transport-level policy gate above it evaluates a self-declared sender DID with no
 /// threshold attached. Every value that reaches this function is still attacker-chosen
 /// *input*, not authenticated authority. Comparing anything against `entry.author` is not an

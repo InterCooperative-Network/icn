@@ -972,14 +972,42 @@ impl GossipActor {
     ///
     /// This method is async to allow non-blocking access to the storage quota manager.
     pub(crate) async fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
-        // Content integrity, ahead of everything that trusts `entry.hash` (#2469).
+        // Content integrity for anything that can CLAIM a content-addressed slot (#2469).
         //
-        // On every receive path `entry.hash` is a value the sending peer chose, and the rest
-        // of this function keys off it: the dedup lookup below, the bloom filter, and the
-        // storage map itself. Re-deriving it from the payload first is what stops a peer
-        // filing arbitrary bytes under a digest they do not hash to, and stops it squatting
-        // the dedup slot of an entry it has never seen so the genuine one is later dropped
-        // as a duplicate.
+        // The invariant maintained here is:
+        //
+        //     no unvalidated entry may claim or mutate a content-addressed slot.
+        //
+        // `entry.hash` is chosen by the sending peer, so on arrival it is a *claim*. It is
+        // used below as the storage key, the dedup key and the bloom-filter key.
+        //
+        // Read-only duplicate lookup first. Consulting an untrusted hash is safe for a
+        // *read* because every entry resident in `self.entries` got there through this
+        // function and so already satisfied the invariant — `create_topic` only ever
+        // inserts an empty map, `restore_state` restores clock/topics/subscriptions but no
+        // entries, and there is no other writer. A hit therefore proves the slot is already
+        // owned by a validated entry, which the incoming bytes can neither claim nor mutate:
+        // they are discarded unread. Deliberately the canonical map and not the bloom
+        // filter, which is probabilistic — a false positive there would suppress a real
+        // entry.
+        //
+        // Skipping re-derivation for that case is what stops a peer replaying one ~350-byte
+        // zstd frame to force a 10 MiB decompress plus SHA-256 on every delivery while
+        // holding the actor write lock (ingress rate limiting charges per message, not per
+        // decompressed byte).
+        if self
+            .entries
+            .get(&entry.topic)
+            .is_some_and(|topic_entries| topic_entries.contains_key(&entry.hash))
+        {
+            return Ok(()); // Already have it, and it was validated when it was stored
+        }
+
+        // The slot is unclaimed, so the hash is still only a claim. Re-derive it from the
+        // payload before this entry may create storage, bloom/dedup state, or callbacks —
+        // this is what stops a peer filing arbitrary bytes under a digest they do not hash
+        // to, and stops it squatting the slot of an entry it has never seen so the genuine
+        // one is later dropped as a duplicate.
         //
         // Enforced here rather than in the individual receive handlers because this is the
         // only function that inserts into `self.entries` — a check in the handlers would be
@@ -1000,7 +1028,7 @@ impl GossipActor {
                 "Rejecting entry - payload does not match claimed content hash"
             );
             icn_obs::metrics::gossip::entries_rejected_hash_mismatch_inc();
-            bail!("Entry rejected: {e}");
+            return Err(e.context("rejecting gossip entry claiming an unoccupied content hash"));
         }
 
         let topic = &entry.topic;
@@ -1008,13 +1036,8 @@ impl GossipActor {
         let entry_size = entry.data.len() as u64;
         let author = entry.author.clone();
 
-        // Get or create topic entries
+        // Get or create topic entries. The duplicate case already returned above.
         let topic_entries = self.entries.entry(topic.clone()).or_default();
-
-        // Check if already have this entry
-        if topic_entries.contains_key(&hash) {
-            return Ok(()); // Already have it
-        }
 
         // Phase 18 Week 6: Check storage quota for author
         if let Some(quota_manager) = &self.storage_quota_manager {

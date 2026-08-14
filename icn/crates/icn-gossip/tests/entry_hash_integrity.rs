@@ -7,11 +7,18 @@
 //! Every entry a peer supplies arrives with that hash already filled in, and the receive
 //! path used it as a storage key without ever recomputing it. These tests drive the real
 //! ingress paths (`GossipMessage::Response` and `GossipMessage::PullResponse`) through
-//! `GossipActor::handle_message` and pin that a claimed hash is re-derived before it is
-//! trusted.
+//! `GossipActor::handle_message` and pin the invariant:
+//!
+//!     no unvalidated entry may claim or mutate a content-addressed slot.
+//!
+//! An untrusted claimed hash may be read to establish that a slot is *already* owned by a
+//! previously validated entry, in which case the incoming duplicate is discarded and its
+//! bytes are never trusted or even decoded. Anything reaching new storage, new bloom/dedup
+//! state, or callbacks must first have its logical payload re-derived to its hash.
 //!
 //! Scope note: matching hashes prove only that the payload corresponds to the claimed
-//! digest. They authenticate neither `entry.author` nor any institutional authority.
+//! digest — `content <-> digest`. They authenticate neither `entry.author`, nor the relaying
+//! peer, nor any institutional authority or governance authorization.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -242,6 +249,85 @@ async fn compressed_entry_with_mismatched_hash_is_rejected() {
     assert!(
         gossip.get_entries(TOPIC).is_empty(),
         "a rejected compressed entry must never be stored"
+    );
+}
+
+/// Once a slot is occupied by a validated entry, the incoming bytes for that same hash are
+/// irrelevant — they cannot claim or mutate the slot, so they must not be decompressed or
+/// re-hashed at all.
+///
+/// The duplicate here is deliberately one that would FAIL `validate_content_integrity()` if
+/// it were ever invoked (`compressed = true` over bytes that are not a zstd frame). It must
+/// still be absorbed as a plain duplicate: no error escapes, the stored entry is untouched,
+/// and no second callback fires.
+///
+/// This is the property that makes the duplicate fast path safe rather than merely faster:
+/// an already-validated slot makes the incoming payload unable to affect any state.
+#[tokio::test]
+async fn duplicate_of_a_validated_hash_is_absorbed_without_touching_its_payload() {
+    let (mut gossip, delivered) = subscribed_actor().await;
+    let sender = KeyPair::generate().unwrap().did().clone();
+
+    // 1. A legitimate entry establishes the slot.
+    let payload = b"the genuine payload that owns this slot";
+    let hash = sha256(payload);
+    gossip
+        .handle_message(
+            &sender,
+            GossipMessage::Response {
+                entry: entry_with(&sender, hash, payload),
+            },
+        )
+        .await
+        .expect("the genuine entry must be accepted");
+
+    assert_eq!(
+        gossip.get_entries(TOPIC).len(),
+        1,
+        "precondition: the slot is occupied exactly once"
+    );
+    assert_eq!(
+        *delivered.lock().unwrap(),
+        vec![hash],
+        "precondition: the genuine entry fired exactly one callback"
+    );
+
+    // 2. A duplicate claiming the same hash, whose payload could not be re-derived at all.
+    let mut poisoned = entry_with(&sender, hash, b"not a zstd frame, and not the payload");
+    poisoned.compressed = true;
+    assert!(
+        poisoned.validate_content_integrity().is_err(),
+        "precondition: this payload must be one that validation would reject, so the test \
+         proves validation was skipped rather than passed"
+    );
+
+    let result = gossip
+        .handle_message(&sender, GossipMessage::Response { entry: poisoned })
+        .await;
+
+    // 3. It is absorbed as an ordinary duplicate — the decompression failure never happens.
+    assert!(
+        result.is_ok(),
+        "a duplicate of an already-validated hash must be discarded quietly, not decoded"
+    );
+    assert_eq!(
+        gossip.get_entries(TOPIC).len(),
+        1,
+        "the duplicate must not add a second entry"
+    );
+    assert_eq!(
+        gossip.get_entry(TOPIC, &hash).map(|e| e.data),
+        Some(payload.to_vec()),
+        "the stored entry must be untouched by the duplicate's payload"
+    );
+    assert!(
+        !gossip.get_entry(TOPIC, &hash).unwrap().compressed,
+        "the duplicate must not have mutated the stored entry's framing"
+    );
+    assert_eq!(
+        *delivered.lock().unwrap(),
+        vec![hash],
+        "a duplicate must not fire a second notification callback"
     );
 }
 
