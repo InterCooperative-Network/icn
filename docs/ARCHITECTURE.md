@@ -307,7 +307,7 @@ ICN identity is cryptographic, decentralized, and resistant to Sybil attacks thr
 - **Secondary keys:** Device keys (e.g., phone, laptop) tied to primary via explicit binding
 - **Key rotation:** Explicit, gossipped, history tracked on ledger
 - **Recovery:** Social recovery (steward-attested recovery keys) or explicit backup
-- **Keystore migration:** Auto-migration across formats v1 → v2 (TLS binding) → v2.1 (X25519 encryption keys) → v3 (DID Document + multi-device) → v4 (SDIS Anchor + KeyBundle with hybrid signatures). *(Verified against icn/crates/icn-identity/src/keystore.rs format docs, 2026-06-14.)*
+- **Keystore migration:** On-disk formats are v1 → v2 (TLS binding) → v2.1 (X25519 encryption keys) → v3 (DID Document + multi-device) → v4 (SDIS Anchor + KeyBundle with hybrid signatures). **Automatic migration terminates at v3** (`keystore.rs:1098`): a v3 keystore is unlocked and returned without being upgraded (`:1064`), and v4 is written only when SDIS fields are added (`save_v4`, `:481`). There is no v5 on-disk format — the `v5` comments at `keystore.rs:98,184` label feature-gated optional fields inside `StoredKeyV4`, whose `version` is always 4 (`:143`). *(Corrected 2026-08-14 at 74c832f1; the prior note described migration as reaching v4 automatically.)*
 
 **Cryptographic suite:**
 - **Signing:** Ed25519 (512-bit signatures, ~2 million ops/sec on modern hardware)
@@ -551,20 +551,27 @@ Terminal states: Accepted, Rejected, NoQuorum, Cancelled, Vetoed, ForceClosed. E
 
 **Delegation (liquid democracy):** Members can delegate their vote to a representative. Delegation is scoped: "I delegate to Alice for labor decisions, to Bob for finance decisions." Delegation has expiry: "My delegation to Alice expires in 90 days."
 
-**Charter system:** TOML-formatted governance constitution. Defines proposal types, quorum/threshold rules, committees, amendment procedures. Example:
+**Charter system:** A governance constitution defining proposal types, quorum/threshold rules, committees and amendment procedures. Charters are **authored as CCL YAML** (`docs/reference/ccl-charter-templates.md`) and **persisted as JSON** (`charter_store.rs:200,246` via `serde_json`). *(Corrected 2026-08-14: this section previously described and demonstrated a TOML charter; `icn/crates/icn-governance/src/charter.rs` contains no TOML support, so the old example would have led authors to the wrong representation.)* Example, abridged from Template 1:
 
-```toml
-[governance]
-quorum_percent = 50
-approval_threshold = 66
-
-[committees]
-finance = { members = ["Alice", "Bob"], veto_power = true }
-labor = { members = ["Carol"], veto_power = false }
-
-[amendments]
-text_proposal_threshold = 50
-constitutional_amendment_threshold = 75
+```yaml
+charter:
+  name: "Example Federation"
+  version: 1
+  entity_type: federation
+  identity:
+    entity_id: "example"
+    display_name: "Example Federation"
+  governance:
+    quorum_percent: 50
+    approval_threshold: 66
+  committees:
+    - name: finance
+      veto_power: true
+    - name: labor
+      veto_power: false
+  amendments:
+    text_proposal_threshold: 50
+    constitutional_amendment_threshold: 75
 ```
 
 **Amendment process:** Changing the charter requires a super-majority (e.g., 75% approval). Amendments are themselves proposals and can be vetoed by committees (if defined).
@@ -673,9 +680,9 @@ Distributed compute enables cooperatives to execute work (CCL contracts or WASM)
 
 **Proof verification:** Other nodes re-execute the contract independently. If output differs, the executor is penalized (reputation hit, possible expulsion). This creates incentive for honest execution without requiring a consensus mechanism.
 
-**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. A task cost model has landed since the March snapshot (`icn/crates/icn-compute/src/cost.rs`: fuel-limit × optional `payment_rate` → credit cost), so compute is no longer strictly "free" — but there is still no job marketplace, no bidding, and no workload-manifest schema. *(Verified 2026-06-14: no `marketplace`/`bidding`/`WorkloadManifest` constructs in icn/crates/icn-compute/src/; cost model confirmed in cost.rs; `ExecutionReceipt` in receipt.rs.)*
+**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. A task cost model has landed since the March snapshot (`icn/crates/icn-compute/src/cost.rs`), so compute is no longer strictly "free". **A workload manifest does now exist** — the E1 field block on `ComputeTask` (`icn/crates/icn-compute/src/types.rs:318-322` ff: `inputs_hash`, `policy_hash`, `determinism_class`, `privacy_class`), recorded in ADR-0030 as `status: accepted` / `implementation_status: implemented`. What remains absent is a job marketplace and bidding. *(Corrected 2026-08-14 at 74c832f1; the prior note inferred absence from a search for a type literally named `WorkloadManifest`.)*
 
-**Status: FOUNDATION ONLY** (runtime + cost model exist, marketplace/bidding/manifest-schema not built). Crate: `icn-compute`
+**Status: FOUNDATION ONLY** (runtime, cost model and workload manifest exist; marketplace/bidding not built). Crate: `icn-compute`
 
 <!-- truth: operational -->
 
@@ -737,7 +744,7 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 
 **Privacy / anonymity status (re-verified 2026-06-14):**
 - **Onion routing — now implemented** (was previously listed here as deferred). `icn-privacy` ships a 540-line `OnionRouter` (layered encryption, circuits, `wrap_message`, `peel_layer`, metrics) in icn/crates/icn-privacy/src/onion_routing.rs, and it is **wired into the network actor**: `MessagePayload::Onion` is dispatched in icn/crates/icn-net/src/actor/connection.rs and relayed by `handle_onion`/`forward_onion` in icn/crates/icn-net/src/handlers/onion.rs. This is a crate-level multi-hop capability; it is not claimed as production-grade anonymity (no adversarial traffic-analysis audit). NEEDS SME review: end-to-end anonymity guarantees and threat model.
-- **Traffic obfuscation / cover traffic — still not built** (no cover-traffic implementation found in icn-net/icn-privacy).
+- **Traffic obfuscation / cover traffic — built at crate level, NOT integrated.** `icn/crates/icn-privacy/src/traffic_obfuscation.rs` (385 lines) implements `TrafficObfuscator` with cover-message generation and size padding, exported at `icn-privacy/src/lib.rs:63` — but its only consumers are `icn-privacy/tests/privacy_integration.rs`; nothing in `icn-net` calls it. *(Corrected 2026-08-14: previously stated no implementation existed.)*
 - **Perfect forward secrecy (PFS) per session** — not yet a standing guarantee (achievable with session ephemeral keys).
 
 *(Numbering note: the previous "Phase 21" tags on onion routing / traffic obfuscation used the retired Phase 1–18/19–35 scheme and have been removed per the Phase 0/1/2 model in CLAUDE.md / docs/PHASE_PROGRESS.md.)*

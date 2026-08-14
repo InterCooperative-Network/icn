@@ -65,7 +65,7 @@ notes = "Seven invariants. Changes only if regulatory strategy changes."
 title = "Identity & Cryptography"
 last_updated = "2026-06-14"
 last_verified_by = "freshness-2047"
-review_note = "3-of-5 steward threshold verified (icn-steward gossip.rs/enrollment.rs); keystore migration chain v1->v2->v2.1->v3->v4 verified (icn-identity keystore.rs); unverifiable '88 modules' descriptor removed."
+review_note = "3-of-5 steward threshold verified (icn-steward gossip.rs/enrollment.rs); keystore on-disk formats v1->v2->v2.1->v3->v4 verified (icn-identity keystore.rs); unverifiable '88 modules' descriptor removed. CORRECTION 2026-08-14: automatic migration terminates at v3 (keystore.rs:1098) — a v3 keystore is unlocked without upgrade (:1064) and v4 is written only when SDIS fields are added (save_v4, :481), so the chain is a list of formats, not an automatic path to v4. No v5 on-disk format exists; the v5 comments at :98,184 label optional fields inside StoredKeyV4 (version always 4, :143)."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = [
@@ -177,9 +177,9 @@ notes = "Known gaps (BFT, netting, dispute resolution). Review when any federati
 
 [sections."15-distributed-compute"]
 title = "Distributed Compute"
-last_updated = "2026-06-14"
-last_verified_by = "freshness-2047"
-review_note = "Verified: still foundation-only — no marketplace/bidding/WorkloadManifest in icn-compute. Updated: cost model now exists (cost.rs, fuel x payment_rate -> credit cost), so 'workers execute for free' qualified."
+last_updated = "2026-08-14T00:00:00"
+last_verified_by = "status-refresh-2026-08-14"
+review_note = "Re-verified 2026-08-14 at HEAD 74c832f1. CORRECTION: a workload manifest DOES exist — the E1 field block on ComputeTask (icn-compute/src/types.rs:318-322 ff: inputs_hash, policy_hash, determinism_class, privacy_class), with ADR-0030 recording status accepted / implementation_status implemented. The previous note inferred absence from a search for a type literally named WorkloadManifest. Also corrected: E3 advisory-cannot-mutate IS enforced on the CCL mutation path (icn-ccl/src/interpreter.rs:608-618 via context.can_mutate_state(), with determinism_class mapped in at icn-compute/src/executor.rs:124-140), and the cell operator boundary IS defined (icn-kernel-api/src/compute.rs:60-82, E5). Re-affirmed: no marketplace or bidding type exists in crates/ or apps/. Still open and now stated precisely: the WASM path is unmetered and non-deterministic — Engine::default() with metering deferred (wasm_executor.rs:58-59), a flat saturating_sub(100) per-call estimate (:163,:211) and wall-clock host imports (:248,:331,:428). The cost model exists (cost.rs). NOT re-verified: runtime enforcement of E3 on the WASM path, app-side CellService implementors, and anything requiring a build or test run."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-compute/src/**"]
