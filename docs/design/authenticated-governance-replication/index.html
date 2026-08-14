@@ -1,0 +1,1070 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Authenticated governance replication (#2469) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>authenticated governance replication</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/authenticated-governance-replication.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Authenticated governance replication (#2469)</h1>
+<p><strong>Status:</strong> design + slice 1 (unwired primitive).
+<strong>Derived against:</strong> <code>origin/main</code> = <code>3d401dce0c65d70eea117335b48719baa2231e2e</code>.
+<strong>Owns:</strong> the durable replacement for the #2470 containment.
+<strong>Refs:</strong> #2469, #2441, #2470 (<code>bc291305</code>), #2471, #2480, #2510, #2520, #2535, #2544, #2583.</p>
+<p>Everything in §1 was re-derived from source — originally at <code>c3782321</code>, re-verified at
+<code>3d401dce</code>. Where an older campaign note disagrees, the source wins and the disagreement is
+called out.</p>
+<p><strong>Revision 2</strong> corrects three mechanisms from revision 1 that were unsafe under
+eventually-consistent delivery: the sequence gate, first-writer-wins collision
+arbitration, and whole-config authority binding. Revision 1&#39;s <code>prev</code> hash-chain field is
+also removed. See §10, §5.2, §5.3.</p>
+<p><strong>Revision 3</strong> re-derives §1 against <code>3d401dce</code>, where <strong>slice 2 has landed</strong> as #2583:
+gossip now re-derives <code>entry.hash</code> from the payload before an unseen entry may claim a
+content-addressed slot. T3 is closed, and §5.6 step 6 became an upstream guarantee rather
+than work this design still has to schedule. <strong>No architectural premise changed</strong> — #2583
+authenticates payload↔digest only, and leaves authorship, authority and the #2470
+containment exactly as they were. Revision 3 also corrects a §7.0 mis-citation: the vote
+suspension gate was cited at the <em>proposer</em> gate&#39;s line.</p>
+<hr>
+<h2>1. Verified current behavior — source-to-sink trace</h2>
+<h3>1.1 Outbound: operator action → wire</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Operator issues a <code>GovernanceCommand</code> (RPC/HTTP)</td>
+<td><code>icn-rpc/src/handler/governance.rs</code>, <code>apps/governance/src/http/handlers.rs</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>GovernanceActor</code> <strong>persists to <code>GovernanceStateStore</code> first</strong></td>
+<td><code>apps/governance/src/actor.rs</code> command arms</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Actor builds a <code>GovernanceMessage</code>, serializes with <code>to_bytes()</code> = <strong><code>serde_json::to_vec</code></strong></td>
+<td><code>icn-governance/src/message.rs:417</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>gossip.publish(topic, data, author = own_did)</code>; ACL checked <strong>for the local DID only</strong>; <code>hash = Self::hash_data(&amp;data)</code></td>
+<td><code>icn-gossip/src/gossip.rs:858</code>, <code>:925</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>store_entry(entry)</code> → fires notification callbacks (including governance&#39;s own loopback copy)</td>
+<td><code>icn-gossip/src/gossip.rs:974</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Outbound send wraps the <code>GossipMessage</code> in a <strong><code>SignedEnvelope</code></strong> — <code>PayloadType::Gossip</code>, Ed25519 by the node keypair, <strong>durable monotonic sequence</strong>, fail-closed if the sequence cannot be persisted (#2510)</td>
+<td><code>icn-core/src/supervisor/init_send_callback.rs:163</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Sent as <code>MessagePayload::Signed</code></td>
+<td><code>icn-net/src/protocol.rs:628</code></td>
+</tr>
+</tbody></table>
+<p><strong>Honest nodes already sign every outbound gossip message.</strong></p>
+<h3>1.2 Inbound: wire → state</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8a</td>
+<td><code>MessagePayload::Signed</code> → <code>ctx.handle_signed()</code> → <code>envelope.verify(max_age_secs)</code>: Ed25519 over <code>canonical_encoding()</code> (<code>sequence ‖ timestamp ‖ payload_type ‖ payload</code>), age check, replay guard</td>
+<td><code>icn-net/src/actor/connection.rs:857</code>, <code>handlers/signed.rs:360</code>, <code>replay_guard.rs</code></td>
+</tr>
+<tr>
+<td>8b</td>
+<td><strong><code>MessagePayload::Gossip</code> (raw, unsigned) is also accepted</strong> and forwarded to the same external handler</td>
+<td><code>icn-net/src/actor/connection.rs:822</code></td>
+</tr>
+<tr>
+<td>9a</td>
+<td>Signed path → <code>gossip.handle_message(&amp;envelope.from, msg)</code> — <code>from</code> <strong>is</strong> authenticated</td>
+<td><code>icn-core/src/supervisor/init_network.rs:225–255</code></td>
+</tr>
+<tr>
+<td>9b</td>
+<td>Unsigned path → <code>gossip.handle_message(&amp;net_msg.from, msg)</code> — <code>from</code> is <strong>self-declared</strong></td>
+<td><code>icn-core/src/supervisor/init_network.rs:59–71</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>handle_message_inner</code>: policy-oracle check on <code>sender</code> (<code>Domain::trust()</code>, <code>ActionKind::Read</code>). A coarse trust gate, <strong>not</strong> an authorship check</td>
+<td><code>icn-gossip/src/protocol.rs:46–68</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>handle_response</code> — <strong>ignores <code>sender</code> entirely</strong>, stores the entry verbatim</td>
+<td><code>icn-gossip/src/handlers/push.rs:109–121</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>store_entry</code>: <strong>re-derives <code>entry.hash</code> from the payload before an unseen entry may claim a content-addressed slot (#2583)</strong>; still no topic ACL; still no signature — <code>GossipEntry</code> has no signature field</td>
+<td><code>icn-gossip/src/gossip.rs:974</code>, <code>types.rs:116–144</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Fires <code>EntryNotificationCallback = Fn(String, GossipEntry, Did)</code>. <strong>No sender. No origin discriminator.</strong></td>
+<td><code>icn-gossip/src/gossip.rs:38</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Governance callback: topic filter → <code>from_bytes</code> → <code>observe_replicated_governance_message</code> → <strong><code>debug!</code> only. No state mutation.</strong></td>
+<td><code>apps/governance/src/actor.rs:1277–1303</code>, <code>:3843</code></td>
+</tr>
+</tbody></table>
+<h3>1.3 The verified facts that constrain the design</h3>
+<ol>
+<li><strong><code>GossipEntry</code> carries no signature.</strong> <code>author: Did</code> is attacker-chosen.</li>
+<li><strong>The entry hash <em>is</em> re-derived on receipt, as of #2583</strong> (<code>3d401dce</code>). <code>store_entry</code>
+(<code>gossip.rs:974</code>) refuses an unseen entry whose payload does not hash to its claimed
+<code>entry.hash</code>, via <code>GossipEntry::validate_content_integrity</code> (<code>types.rs</code>). A slot already
+owned by a validated entry short-circuits to a read-only duplicate lookup, so replayed
+compressed bytes are never re-decompressed. This closes T3 and satisfies §5.6 step 6.
+<strong>It authenticates payload↔digest only</strong> — <code>entry.author</code> remains an unsigned,
+self-declared field that any peer may set to any DID, which is why fact 1 still stands.</li>
+<li><strong>The transport peer <em>is</em> authenticated</strong> — Hello binds DID → live TLS cert
+(<code>handlers/hello.rs:44–108</code>), fails closed with no peer certificate.</li>
+<li><strong>That identity is discarded at the gossip seam.</strong></li>
+<li><strong>The unsigned gossip door is open</strong> (<code>connection.rs:822</code>).</li>
+<li><strong><code>SignedEnvelope</code> authenticates the <em>hop</em>, not the <em>author</em>.</strong> <code>handle_response</code>
+(<code>push.rs:109</code>) stores a received entry verbatim; <code>handle_request_missing</code>
+(<code>pull.rs:461</code>) re-serves <code>entry.clone()</code> onward under the <em>relay&#39;s own</em> envelope
+signature. <code>entry.author</code> crosses every hop unauthenticated. <strong>Any design requiring
+<code>envelope.from == entry.author</code> accepts only single-hop delivery and destroys relay
+and anti-entropy convergence.</strong></li>
+<li><strong>The DID <em>is</em> the public key.</strong> <code>Did::to_verifying_key()</code> (<code>icn-identity/src/lib.rs:255</code>).
+Verification needs no resolution, no DID document, no network round-trip.</li>
+<li><strong><code>GovernanceDomain</code> has no owner, creator, or admin field</strong> (<code>domain.rs:33–50</code>).
+<code>GovernanceDomainId::generate()</code> is a random UUID; the domain declares its own
+membership.</li>
+<li><strong><code>MembershipSource::TrustThreshold</code> is node-subjective</strong> (<code>resolver.rs:71–75</code>).</li>
+<li><strong><code>save_domain</code> / <code>save_proposal</code> / <code>save_vote</code> are LWW upserts</strong> (<code>state_store.rs:32,43,54</code>).</li>
+<li><strong><code>VoteCast.signature</code> is dead</strong> (only producer <code>actor.rs:2090</code> passes <code>None</code>);
+<code>GovernanceDomainSeedManifest</code> (<code>bootstrap.rs:114</code>) has zero production consumers.</li>
+</ol>
+<h3>1.4 New in revision 2 — identity and key structure</h3>
+<ol start="12">
+<li><p><strong>All governance identifiers are caller-chosen strings.</strong>
+<code>ProposalId::generate()</code> / <code>GovernanceDomainId::generate()</code> / <code>DelegationId::generate()</code>
+are random UUIDv4, and each type also exposes <code>new(impl Into&lt;String&gt;)</code> accepting an
+arbitrary string (<code>proposal.rs:243–255</code>, <code>domain.rs:9–21</code>, <code>delegation.rs:69–81</code>).
+<strong>No identifier is bound to its creator.</strong></p>
+</li>
+<li><p><strong>Exactly one storage key is author-bound.</strong> From <code>state_store.rs:192–247</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Key helper</th>
+<th>Shape</th>
+<th>Binds principal?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>vote_key(proposal_id, voter)</code></td>
+<td><code>gov:vote:{pid}:{voter}</code></td>
+<td><strong>Yes — the voter DID</strong></td>
+</tr>
+<tr>
+<td><code>proposal_key(id)</code></td>
+<td><code>gov:proposal:{id}</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>domain_key(id)</code></td>
+<td><code>gov:domain:{id}</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>delegation_key(id)</code></td>
+<td><code>gov:delegation:{id}</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>proof_key(id)</code> / <code>close_intent_key(id)</code></td>
+<td><code>…:{pid}</code></td>
+<td>No</td>
+</tr>
+</tbody></table>
+</li>
+<li><p><strong>The pre-containment mutation set was exactly 8 variants</strong> (from the <code>bc291305</code>
+diff): <code>DomainCreated</code>, <code>DomainUpdated</code>, <code>ProposalCreated</code>, <code>ProposalOpened</code>,
+<code>VoteCast</code>, <code>ProposalClosed</code>, <code>DelegationCreated</code>, <code>DelegationRevoked</code>.
+<strong><code>Comment*</code>, <code>Deliberation*</code> and <code>Reaction*</code> were never persisted by the replication
+ingress</strong> — <code>GovernanceStateStore</code> has no comment key space at all. Revision 1 listed
+them as restoration candidates; that was wrong, and replicating them would be a no-op.</p>
+</li>
+<li><p><strong><code>CastVote</code> overwrites unconditionally</strong> (<code>actor.rs:2072–2087</code>) — no &quot;already voted&quot;
+check. A voter can change their vote, so the vote key is <strong>not</strong> write-once.</p>
+</li>
+<li><p><strong><code>GovernanceConfig</code> = <code>{ profile, membership, params, emergency }</code></strong> (<code>config.rs:25–37</code>).
+<code>params</code> (quorum, approval thresholds) and <code>emergency</code> govern how state is <em>evaluated</em>,
+not who may <em>author</em>. <strong><code>cooperative_default()</code> uses <code>MembershipConfig::trust_threshold(0.3)</code></strong>
+(<code>config.rs:81</code>) — i.e. the default profile is <strong>not</strong> supported by v1 (§5.5).</p>
+</li>
+</ol>
+<h3>1.5 The authority-root finding</h3>
+<ul>
+<li><strong>Domain-anchored variants</strong> reference a domain directly or via <code>proposal_id</code>.
+Authority <em>could</em> be membership in that domain — if the receiver already holds it.</li>
+<li><strong>Domain-defining variants</strong> (<code>DomainCreated</code>, <code>DomainUpdated</code>): per fact 8, <strong>no
+authority root exists in the data model.</strong> A signature proves only &quot;some keypair said so.&quot;</li>
+</ul>
+<hr>
+<h2>2. Threat model</h2>
+<p>Attacker: can open a QUIC connection, complete Hello (so holds <em>some</em> valid DID — DIDs are
+free to mint), and send arbitrary frames. Does not hold any victim&#39;s private key. May be a
+legitimate federation member acting outside its authority.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Attack</th>
+<th>Status on <code>3d401dce</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1</td>
+<td>Forge <code>entry.author</code> as a victim DID and publish governance state</td>
+<td><strong>Blocked</strong> by containment; would otherwise fully succeed</td>
+</tr>
+<tr>
+<td>T2</td>
+<td>Publish raw unsigned <code>MessagePayload::Gossip</code></td>
+<td><strong>Open</strong> (<code>connection.rs:822</code>)</td>
+</tr>
+<tr>
+<td>T3</td>
+<td>Supply <code>entry.hash</code> unrelated to content → poison dedup, pre-claim a hash to suppress a legitimate entry</td>
+<td><strong>Closed</strong> by #2583 (<code>3d401dce</code>) — re-derived in <code>store_entry</code></td>
+</tr>
+<tr>
+<td>T4</td>
+<td>Replay a legitimately signed op into a <em>different</em> domain</td>
+<td>Open under a signature that omits domain binding</td>
+</tr>
+<tr>
+<td>T5</td>
+<td>Replay a superseded op</td>
+<td>Open without a replay identity</td>
+</tr>
+<tr>
+<td>T6</td>
+<td><code>ProposalOpened</code> force-reset on a terminal proposal, then <code>ProposalClosed</code> — <strong>two-message finalization bypass</strong></td>
+<td><strong>Blocked</strong>; must stay blocked <em>regardless of authentication</em></td>
+</tr>
+<tr>
+<td>T7</td>
+<td>Collide a <code>GovernanceDomainId</code> / <code>ProposalId</code> / <code>DelegationId</code> and overwrite via LWW</td>
+<td><strong>Open</strong> in the data model (facts 12–13); masked by containment</td>
+</tr>
+<tr>
+<td>T8</td>
+<td>Member of domain A authors an op affecting domain B</td>
+<td>Open without explicit per-domain authority</td>
+</tr>
+<tr>
+<td>T9</td>
+<td>Relay tampers with a relayed entry&#39;s contents</td>
+<td><strong>Open</strong> — no content binding survives a hop</td>
+</tr>
+<tr>
+<td>T10</td>
+<td>Two honest nodes disagree on <code>TrustThreshold</code> membership → divergent verdicts</td>
+<td><strong>Latent</strong>; resolved by the O1 decision (§5.5)</td>
+</tr>
+<tr>
+<td>T11</td>
+<td><strong>Delivery-order divergence</strong> — two honest nodes apply the same op set in different orders and reach different final state</td>
+<td><strong>Latent</strong>; the subject of §10</td>
+</tr>
+<tr>
+<td>T12</td>
+<td><strong>Sequence-gap denial</strong> — an attacker (or ordinary loss) causes an op to be discarded permanently because a higher sequence arrived first</td>
+<td>Would be <strong>introduced</strong> by revision 1&#39;s design; corrected in §10</td>
+</tr>
+</tbody></table>
+<p>Out of scope per #2469: TLS redesign, governance consensus, the <code>GovernanceProofV2</code>
+attestation-signer authority model, generic gossip ACL redesign.</p>
+<hr>
+<h2>3. Required invariants</h2>
+<ul>
+<li><strong>I1 Content binding.</strong> Signature over the exact op bytes, verified before any state read
+the op could influence.</li>
+<li><strong>I2 Author binding.</strong> Verifies under <code>author.to_verifying_key()</code>; <code>author</code> is the acting
+principal — not <code>entry.author</code>, not <code>envelope.from</code>.</li>
+<li><strong>I3 Domain binding.</strong> The signed bytes include the affected <code>GovernanceDomainId</code>.</li>
+<li><strong>I4 Authority.</strong> <code>author</code> held a specific authority over that specific domain.</li>
+<li><strong>I5 Origin vs relay.</strong> Relay is untrusted; only the origin signature counts.</li>
+<li><strong>I6 Replay identity.</strong> Applying the same op twice is a no-op.</li>
+<li><strong>I7 Lifecycle monotonicity.</strong> Terminal proposals never regress, <em>independently of
+authentication</em>.</li>
+<li><strong>I8 Conflict safety.</strong> Colliding IDs must not permit silent overwrite.</li>
+<li><strong>I9 No circular bootstrap.</strong> Verification never fetches authority material over the
+channel carrying the op.</li>
+<li><strong>I10 Deterministic verdict.</strong> Two honest nodes with the same durable state reach the same
+accept/reject decision.</li>
+<li><strong>I11 Positive convergence.</strong> A legitimate op from another node <strong>is applied</strong>.</li>
+<li><strong>I12 Order-independent convergence (new).</strong> Two honest nodes that receive the same set of
+ops in <em>any</em> order reach the same final state. No op is permanently discarded because of
+arrival order.</li>
+</ul>
+<hr>
+<h2>4. Design alternatives</h2>
+<h3>A. Signed <code>GossipEntry</code> (generic content envelope)</h3>
+<p><em>Against:</em> changes the shared gossip wire format for every subsystem at once; requires every
+entry producer to hold a signing key; delivers <strong>no</strong> authority (I4). The &quot;generic gossip
+security&quot; broadening #2469 warns against.</p>
+<h3>B. Transport rebinding + sender-authored-entry requirement</h3>
+<p><strong>Disqualified.</strong> Per fact 6, requiring <code>envelope.from == entry.author</code> accepts only
+single-hop delivery, breaking relay and anti-entropy (violates I5, I11). Closing the
+unsigned door (T2) remains worth doing separately under #2471/#2480.</p>
+<h3>C. Governance-specific signed replication envelope — <strong>recommended</strong></h3>
+<p>Carried inside <code>entry.data</code>, which gossip already treats as opaque. Minimal blast radius;
+carries domain binding (I3) and authority context (I4), which A and B structurally cannot;
+survives relay because the signature is <em>inside</em> the replicated content (I5).</p>
+<h3>D. Typed <code>ReplicationPolicy</code> at the shared topic-registration seam (#2441)</h3>
+<p>The name <strong>already exists</strong> at <code>icn-kernel-api/src/state.rs:29</code> as a durability/placement
+policy — #2441&#39;s proposal collides head-on. Substantively, the three #2441 classes have
+different authority roots; a shared seam would be a framework built before any instance is
+proven. <strong>Prove the governance instance first.</strong></p>
+<h3>E. Reuse <code>SignedEnvelope</code></h3>
+<p>Hop authenticator (fact 6), no domain binding, no authority model. <strong>Reuse the pattern, not
+the type</strong> — specifically its length-prefixed <code>canonical_encoding()</code> and its
+sign-the-transmitted-bytes discipline (§5.4).</p>
+<hr>
+<h2>5. Recommended minimal architecture</h2>
+<h3>5.1 The v1 envelope</h3>
+<pre><code class="language-rust">pub struct SignedGovernanceOp {
+    pub version: u16,                     // GOV_OP_V1; unknown → reject
+    pub author: Did,                      // acting principal; key via to_verifying_key()
+    pub domain_id: GovernanceDomainId,    // explicit, never inferred from the payload
+    pub authority: ReplicationAuthority,  // StaticMembership { membership_hash }
+    pub seq: u64,                         // per-(author, domain); COMPARATOR, never a gate
+    pub op_kind: GovernanceOpKind,        // signed routing discriminator
+    pub op_bytes: Vec&lt;u8&gt;,                // transmitted verbatim; signature covers these bytes
+    pub signature: Vec&lt;u8&gt;,               // Ed25519 over canonical_body()
+}
+
+pub enum ReplicationAuthority {
+    StaticMembership { membership_hash: [u8; 32] },
+}
+</code></pre>
+<p><code>op_id = SHA-256(canonical_body())</code> — <strong>derived, never carried</strong>, so it cannot disagree with
+content.</p>
+<p>Removed from revision 1: <code>prev</code> (hash chaining — see §10) and <code>domain_config_hash</code>
+(over-binding — see §5.3). No timestamp field: wall-clock orders nothing here, so carrying
+one would only invite it to be used.</p>
+<h3>5.2 Canonical encoding</h3>
+<p><code>canonical_body()</code> is an explicit, hand-rolled, length-prefixed concatenation in the style of
+<code>SignedEnvelope::canonical_encoding</code> (<code>icn-net/src/envelope.rs:403</code>):</p>
+<pre><code>&quot;ICN-GOV-OP-v1\0&quot;                     domain separator (fixed, unambiguous)
+u16_be(version)
+lp(author.as_str())                   lp(x) = u32_be(len) ‖ bytes
+lp(domain_id.0)
+u8(authority discriminant) ‖ authority payload
+u64_be(seq)
+u8(op_kind discriminant)
+lp(op_bytes)
+</code></pre>
+<p>Every variable-length field is length-prefixed, so no field boundary is ambiguous and no
+concatenation collision is reachable.</p>
+<h3>5.3 Why <code>op_bytes</code> is opaque, and why that is <em>not</em> &quot;signing serde_json&quot;</h3>
+<p><code>op_bytes</code> are signed and transmitted <strong>verbatim</strong>: the receiver verifies the signature over
+exactly the bytes it received, and decodes those same bytes. There is no re-serialization
+step anywhere in the pipeline, so serde_json&#39;s determinism is <strong>never relied upon</strong>. This is
+strictly stronger than canonicalizing <code>GovernanceMessage</code>, and it is the discipline
+<code>SignedEnvelope</code> already uses (<code>payload: Vec&lt;u8&gt;</code> + <code>payload_type</code>).</p>
+<p>Verbatim transport is guaranteed by verified fact 6: <code>entry.data</code> is opaque to gossip and
+relays re-serve <code>entry.clone()</code> byte-for-byte.</p>
+<p>The alternative — hand-rolling a canonical encoder for ~20 <code>GovernanceMessage</code> variants over
+deeply nested types (<code>Proposal</code>, <code>GovernanceDomain</code>, <code>TallySnapshot</code>, <code>GovernanceProofV2</code>) —
+would be a large, permanently-maintained surface where <strong>a newly added field is silently
+excluded from the signature</strong>. That is a worse vulnerability class than the one it avoids.</p>
+<p><em>Accepted consequence:</em> JSON is malleable, so two byte strings can decode to the same
+message and yield different <code>op_id</code>s. Not exploitable — an attacker cannot re-sign a
+re-encoding — and the §10 comparator resolves any resulting duplicate deterministically.</p>
+<h3>5.4 The authority snapshot — membership only, not whole config</h3>
+<p>Revision 1 bound <code>domain_config_hash</code>. That conflates two different questions:</p>
+<ul>
+<li><strong>who may author an operation</strong> → depends only on the member set;</li>
+<li><strong>the rules under which the resulting state is evaluated</strong> → <code>params</code>, <code>emergency</code>,
+<code>profile</code>.</li>
+</ul>
+<p>Binding the whole config means an unrelated quorum-threshold edit invalidates every
+in-flight signed vote — a liveness failure with <strong>no</strong> security benefit, because a quorum
+change never grants anyone authorship.</p>
+<p>v1 therefore binds exactly the authority-relevant snapshot:</p>
+<pre><code>membership_hash = SHA-256(
+    &quot;ICN-GOV-STATIC-MEMBERSHIP-v1\0&quot;
+  ‖ lp(domain_id.0)
+  ‖ u32_be(member_count)
+  ‖ lp(member[0]) ‖ lp(member[1]) ‖ …      // sorted bytewise, deduplicated
+)
+</code></pre>
+<p>Sorted and deduplicated so the hash is a function of the <em>set</em>, not of list order.
+<code>domain_id</code> is inside the hash so a membership snapshot cannot be lifted between domains
+even if two domains happen to share a member set.</p>
+<p>The <code>ReplicationAuthority</code> enum exists so a v2 basis (witness set, <code>AuthorityGrant</code> from
+<code>icn-governance/src/authority.rs</code>, charter binding) can be added as a new variant that a v1
+verifier rejects explicitly rather than misreads. One variant today; no abstract framework.</p>
+<h3>5.5 O1 resolved — StaticList only, and what that excludes</h3>
+<p><strong>Decision: v1 supports only domains whose <code>MembershipSource</code> is <code>StaticList</code>.</strong></p>
+<p><code>TrustThreshold</code> resolves against each node&#39;s local trust graph (fact 9), so two honest
+nodes can legitimately compute different membership and reach different verdicts on the
+same op — permanent divergence (T10, violating I10). It <strong>remains fail-closed for remote
+state application</strong> until ICN has a separately designed deterministic membership-snapshot /
+witness protocol.</p>
+<p><strong>Compatibility limitation, stated plainly:</strong></p>
+<ul>
+<li><code>GovernanceConfig::cooperative_default()</code> uses <code>trust_threshold(0.3)</code> (<code>config.rs:81</code>).
+<strong>Domains built from the default cooperative profile are NOT eligible for authenticated
+replication in v1</strong>, and no part of #2469 attempts to make that configuration safe.</li>
+<li>A <code>TrustThreshold</code> domain behaves exactly as it does under the #2470 containment today:
+replicated governance ops targeting it are <strong>not applied</strong>. This is a no-op change for
+those domains, not a regression.</li>
+<li>Eligibility is decided by the <strong>receiver&#39;s local</strong> copy of the domain. A node that holds a
+<code>StaticList</code> domain applies eligible ops; a node whose copy is <code>TrustThreshold</code> does not.
+Operators must therefore not mix membership sources for the same logical institution
+across nodes — a mixed deployment converges only on the <code>StaticList</code> side.</li>
+</ul>
+<h3>5.6 Verification order at ingress (fail-closed, in this order)</h3>
+<ol>
+<li>Decode the envelope framing; reject unknown magic or <code>version</code>.</li>
+<li>Reject <code>op_kind</code> outside the v1 restorable set (§7) — <strong>before</strong> decoding <code>op_bytes</code>, so
+an unsupported or oversized payload is never parsed.</li>
+<li>Recover <code>author.to_verifying_key()</code>; verify <code>signature</code> over <code>canonical_body()</code>. <strong>No
+lookup, no network.</strong> → I1, I2</li>
+<li>Decode <code>op_bytes</code>; reject if the decoded variant disagrees with <code>op_kind</code>.</li>
+<li>Reject if the op&#39;s internal principal disagrees with <code>author</code> (<code>vote.voter</code>).</li>
+<li><strong>Satisfied upstream since #2583</strong> — <code>store_entry</code> re-derives <code>entry.hash</code> from the
+payload before any notification callback fires, so an entry reaching this ingress has
+already been shown to match its digest. Kept as a numbered step because the ingress
+contract depends on the property holding, not because this design must still build it. → T3</li>
+<li>Resolve <code>domain_id</code> in <strong>local durable state</strong>. Absent → <strong>quarantine; never fetch</strong>. → I9</li>
+<li><strong>Resolve the op&#39;s state anchor locally and confirm it belongs to <code>domain_id</code>.</strong> For
+<code>VoteCast</code>: load <code>vote.proposal_id</code>; absent → quarantine; reject unless
+<code>proposal.domain_id == envelope.domain_id</code>. Without this a member of domain D could
+vote into domain E&#39;s tally by declaring <code>domain_id = D</code> — the signature, the membership
+check and the domain binding would all pass, because none of them looks at what the
+<em>proposal</em> belongs to. → I3, T8</li>
+<li>Reject unless the local domain&#39;s <code>MembershipSource</code> is <code>StaticList</code>. → §5.5</li>
+<li>Recompute <code>membership_hash</code> from the local member set; reject mismatch. → I10</li>
+<li>Reject unless <code>author</code> ∈ the local member set. → I4</li>
+<li>Reject if <code>op_id</code> is already in the durable applied-set. → I6</li>
+<li>Lifecycle: reject terminal-state regressions <strong>unconditionally</strong>. → I7, T6</li>
+<li>Apply under the §10 comparator, not LWW.</li>
+</ol>
+<p>Note the ordering discipline: the allow-list gate (2) precedes the fallible decode (4), so
+the gate stays reachable and its counters mean something under attack.</p>
+<hr>
+<h2>6. Wire-format implications</h2>
+<ul>
+<li><strong>Gossip wire format: unchanged.</strong> <code>entry.data</code> is already opaque bytes.</li>
+<li><strong>Governance topic payload: changed.</strong> <code>entry.data</code> becomes a <code>SignedGovernanceOp</code> frame
+instead of a bare <code>GovernanceMessage</code>.</li>
+<li>Frames are distinguished by a leading <strong>magic + version</strong>, never by trial decoding (a bare
+<code>GovernanceMessage</code> is JSON; trial decoding is fragile and attacker-steerable).</li>
+<li>The <code>entry.hash</code> recomputation (step 6) was a <strong>generic gossip</strong> change, separable, and
+fixes T3 for all topics independently of this envelope. <strong>Landed as #2583 (<code>3d401dce</code>).</strong></li>
+</ul>
+<h2>7. First safe replication variant set</h2>
+<p>Applying facts 12–15 to the 8 pre-containment mutation variants:</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Storage key</th>
+<th>Cross-author collision</th>
+<th>Authority root</th>
+<th>v1</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>VoteCast</code></strong></td>
+<td><code>gov:vote:{pid}:{voter}</code> — <strong>author-bound</strong></td>
+<td><strong>Impossible</strong> (§8)</td>
+<td>membership + <code>vote.voter == author</code></td>
+<td><strong>RESTORE</strong></td>
+</tr>
+<tr>
+<td><code>ProposalCreated</code></td>
+<td><code>gov:proposal:{id}</code></td>
+<td><strong>Yes</strong> — any member may pick another&#39;s <code>ProposalId</code></td>
+<td>membership</td>
+<td>contain (§8)</td>
+</tr>
+<tr>
+<td><code>DelegationCreated</code></td>
+<td><code>gov:delegation:{id}</code></td>
+<td><strong>Yes</strong> — same</td>
+<td>membership</td>
+<td>contain (§8)</td>
+</tr>
+<tr>
+<td><code>DelegationRevoked</code></td>
+<td>mutates existing <code>gov:delegation:{id}</code></td>
+<td>n/a</td>
+<td><code>revoked_by == delegator</code> in local state</td>
+<td>contain — safe but inert (§7.1)</td>
+</tr>
+<tr>
+<td><code>ProposalOpened</code></td>
+<td>mutates <code>gov:proposal:{id}</code></td>
+<td>n/a</td>
+<td><strong>undecided</strong> (§7.2)</td>
+<td>contain</td>
+</tr>
+<tr>
+<td><code>ProposalClosed</code></td>
+<td>mutates <code>gov:proposal:{id}</code> + proof</td>
+<td>n/a</td>
+<td><strong>undecided</strong> (§7.2)</td>
+<td>contain</td>
+</tr>
+<tr>
+<td><code>DomainCreated</code> / <code>DomainUpdated</code></td>
+<td><code>gov:domain:{id}</code></td>
+<td>Yes</td>
+<td><strong>none exists</strong> (fact 8)</td>
+<td>contain</td>
+</tr>
+</tbody></table>
+<p><strong>Structurally, <code>VoteCast</code> is the only candidate. It is not sufficient on its own — see
+§7.0, which narrows this further.</strong></p>
+<h3>7.0 Membership is not the complete authority predicate for a vote</h3>
+<p>Re-derived at <code>c3782321</code> and re-verified at <code>3d401dce</code>. StaticList membership is <strong>never</strong>
+the complete authority predicate for <code>VoteCast</code> in the production composition:</p>
+<ul>
+<li><p><code>cast_vote</code> (<code>handlers.rs:1812</code>) consults <strong>two</strong> external predicates before recording a
+vote, either of which yields <code>403 Forbidden</code>: a <code>MemberStandingChecker</code> — the voter must
+hold active commons Member standing (<code>handlers.rs:1850</code>) — and a <code>SuspensionChecker</code> — the
+voter must not be suspended (<code>handlers.rs:1864</code>; type and contract at
+<code>apps/governance/src/http/configure.rs:374–388</code>). Production wires the latter to
+<code>CoopManager::is_member_suspended</code> (<code>icn-gateway/src/server.rs:1904–1908</code>, installed at
+<code>:1947</code>).</p>
+<blockquote>
+<p><em>Revision 3 correction.</em> Revision 2 cited this gate at <code>handlers.rs:875</code>. That line is
+the <strong>proposer</strong> suspension gate on proposal <em>submission</em>, not the vote gate; the file
+is untouched by #2583, so this was a mis-citation in revision 2 rather than drift. The
+substance is unchanged and in fact <strong>stronger</strong> than revision 2 claimed: vote casting
+carries two external predicates, not one, and neither is reproducible on a receiving
+node.</p>
+</blockquote>
+</li>
+<li><p><code>close_proposal</code> <strong>revalidates</strong> active commons Member standing for every voter and
+excludes those who lost it (<code>actor.rs:2149–2189</code>, driven by handler-computed
+<code>eligible_voters</code>).</p>
+</li>
+<li><p><code>GovernanceContextValidationError</code> (<code>configure.rs:183</code>) states outright that production
+deployments must wire <code>MemberStandingChecker</code>, <code>SuspensionChecker</code>, a
+<code>MembershipResolver</code> and a <code>MandateGate</code>, because <em>&quot;unresolved standing must not be
+treated as standing.&quot;</em></p>
+</li>
+</ul>
+<p>Critically, <strong>a suspended member remains in the domain&#39;s <code>StaticList</code>.</strong> That is precisely
+the configuration <code>icn-gateway/tests/e2e_close_time_revalidation.rs</code> constructs: a
+three-member StaticList domain where Bob&#39;s <em>commons</em> standing flips to Suspended while his
+StaticList entry is untouched, and his vote is then excluded at resolution. The file states
+the principle directly — <em>&quot;standing is a continuous predicate across the full decision arc,
+not a one-time entry gate.&quot;</em></p>
+<p><strong>Consequence for this design.</strong> A suspended-but-listed DID would pass every check in
+§5.6: the signature verifies, the domain resolves, the source is <code>StaticList</code>, the
+<code>membership_hash</code> matches (they are still listed), and <code>author ∈ members</code>. The replication
+path would therefore <strong>apply a vote that the HTTP path refuses with 403</strong> — a bypass of a
+live production gate, reachable by any suspended member who publishes over gossip instead
+of over HTTP.</p>
+<p><strong>Why close-time revalidation does not rescue it.</strong> It filters the <em>effective tally</em>, so
+the final outcome is protected on the closing node — but (a) the vote is stored and
+observable before close; (b) revalidation is handler-driven and fails open when the checker
+is unwired (<code>configure.rs:552–570</code> says so explicitly for the resolver case); (c) it does
+not make <em>stored state</em> converge, so nodes hold different vote sets; and (d) relying on
+downstream filtering to neutralize a write the ingress already believed illegitimate is the
+snapshot-only posture that revalidation was introduced to replace. An ingress must not
+knowingly write state it cannot justify.</p>
+<p><strong>Why the predicate cannot be checked on the receiver.</strong> It lives in commons/coop state,
+which is not governance state, is not reachable from <code>GovernanceActor</code> at all (the checkers
+are HTTP-layer closures the actor never sees), and whose own replication is the
+unauthenticated class tracked by #2441. Verifying it on a receiving node would mean
+resolving authority against untrusted, non-deterministic state — manufacturing false
+determinism, and reintroducing the circularity I9 forbids.</p>
+<p>Binding a <code>standing_hash</code> into the envelope would be <strong>actively wrong</strong> for the same
+reason: the receiver would compare it against commons state that is itself unauthenticated.</p>
+<h3>7.0.1 The resulting v1 authority boundary</h3>
+<blockquote>
+<p><strong>v1 boundary = <code>StaticList</code> membership <strong>AND</strong> no external authority predicate applies
+on the receiving node.</strong></p>
+<p>Not &quot;StaticList-only&quot;. A composition that wires a <code>SuspensionChecker</code> (or any standing,
+capability, charter or mandate gate) over vote casting <strong>stays contained</strong>, because the
+receiver cannot deterministically evaluate that predicate.</p>
+</blockquote>
+<p>Since the production gateway composition always wires <code>SuspensionChecker</code>, the honest
+statement is: <strong>authenticated <code>VoteCast</code> application is not restorable in the production
+composition in v1.</strong> It is restorable only where no external predicate is wired, and the
+ingress slice must <em>detect</em> which composition it is in and fail closed by default — an
+unwired checker must read as &quot;predicate unresolved,&quot; never as &quot;predicate satisfied,&quot; per
+<code>configure.rs:183</code>.</p>
+<p>Unblocking production needs a deterministic, authenticated standing source. That is
+squarely #2441&#39;s territory (authenticated institutional-state replication) and is <strong>not</strong>
+in scope here. This is the second place where #2469 and #2441 turn out to be genuinely
+coupled — the first being the shared quarantine machinery (§11).</p>
+<h3>7.1 Why <code>DelegationRevoked</code> is excluded despite being safe</h3>
+<p>Revocation is monotonic, idempotent, order-independent, and authorized by a principal named
+in state the receiver already holds — it is genuinely safe. But it can only act on a
+delegation that exists locally, and <code>DelegationCreated</code> is contained, so on a remote node it
+is a guaranteed no-op. Shipping a capability with no reachable effect adds verification
+surface for nothing. It becomes useful the moment <code>DelegationCreated</code> is restorable.</p>
+<h3>7.2 Why <code>ProposalOpened</code> / <code>ProposalClosed</code> / <code>ProposalCancelled</code> are excluded</h3>
+<p>Membership is not the right authority for choosing an outcome. <code>ProposalClosed</code> carries
+<code>outcome</code> and <code>tally</code> as <strong>attacker-supplied fields</strong>; accepting it on membership alone lets
+any single member declare any result, which is strictly worse than the current containment.
+The correct authority is the tally/state transition itself — which entangles with the
+<code>GovernanceProofV2</code> signer-authority model that #2469 lists as a non-goal. <code>ProposalOpened</code>
+is the force-reset half of the T6 finalization bypass and must not return before the
+lifecycle guard exists.</p>
+<h3>7.3 Honest scope of what v1 delivers</h3>
+<p>A replicated <code>VoteCast</code> requires the referenced proposal to be present locally, so that step
+5&#39;s domain check can confirm the vote belongs to <code>domain_id</code>. Since <code>ProposalCreated</code> stays
+contained, <strong>v1 restores vote convergence only for proposals a node already holds</strong> (created
+locally or provisioned out of band). That is a narrow capability. It is nonetheless the
+right first slice: it is the smallest change that exercises the entire chain — sign → gossip
+→ relay → verify → authority → apply → converge — which is exactly the positive-convergence
+evidence #2469 demands, and it establishes the pattern without inventing unsafe semantics
+for the harder variants.</p>
+<h2>8. Collision semantics — corrected</h2>
+<p>Revision 1 proposed first-writer-wins. <strong>That is arrival-order dependent and non-convergent</strong>
+(T11): node A sees Alice&#39;s object first, node B sees Bob&#39;s colliding object first, and the
+two permanently disagree on the owner. It is withdrawn.</p>
+<p>Since no identifier is bound to its creator (fact 12), the options for a colliding
+<code>ProposalId</code> / <code>DelegationId</code> are:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Deterministic?</th>
+<th>Safe?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>First-writer-wins</td>
+<td><strong>No</strong> — arrival-order</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Deterministic tiebreak (e.g. highest <code>op_id</code> wins)</td>
+<td>Yes</td>
+<td><strong>No</strong> — lets any member displace another&#39;s proposal content by grinding <code>op_id</code>; votes keyed by <code>(pid, voter)</code> survive and silently re-attach to the substituted proposal</td>
+</tr>
+<tr>
+<td>Reject on existing-with-different-author</td>
+<td>No — arrival-order</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Derived identifiers</strong> — <code>ProposalId = H(proposer ‖ domain ‖ nonce ‖ content)</code></td>
+<td>Yes</td>
+<td>Yes — collision becomes impossible by construction</td>
+</tr>
+</tbody></table>
+<p>Derived identifiers are the correct fix, and they are <strong>out of scope for #2469</strong>: identifier
+construction reaches HTTP routes, RPC, storage keys, receipts, proofs and the test suite.</p>
+<p><strong>Per the standing instruction, the affected mutation class stays contained rather than
+receiving invented conflict semantics.</strong> <code>ProposalCreated</code>, <code>DelegationCreated</code>,
+<code>DomainCreated</code> and <code>DomainUpdated</code> remain refused. A follow-up issue should give governance
+objects creator-derived identifiers; that unlocks them.</p>
+<p><strong><code>VoteCast</code> needs none of this.</strong> <code>vote_key(proposal_id, voter)</code> already embeds the voter
+DID, and step 5 requires <code>vote.voter == author</code>, which step 3 authenticated. Alice can write
+only <code>gov:vote:{pid}:{alice}</code>. <strong>Cross-author collision on a vote key is impossible by
+construction</strong> — the one place the existing data model already does the right thing.</p>
+<h2>9. Key rotation / revocation</h2>
+<p>Because the DID <em>is</em> the key (fact 7), an op signed by DID <em>D</em> verifies forever — so rotation
+and revocation are invisible at the signature layer.</p>
+<p><code>DidDocument</code> exists (<code>icn-identity/src/multi_device.rs:19</code>) with a <code>DidDocumentCache</code>
+(<code>sync.rs:68</code>), and <code>revocation.rs</code> / <code>revocation_store.rs</code> exist, but the supervisor wires
+revocation only for <strong>RPC tokens</strong> (<code>init_rpc.rs:57–63</code>), not identities.</p>
+<p><strong>v1 treats rotation and revocation as <em>membership</em> changes, not signature-layer changes.</strong>
+A removed or rotated-out member fails the step 10 membership check even though the signature
+still verifies. This keeps the signature layer lookup-free (I9) and puts revocation where
+authority already lives. Because <code>membership_hash</code> is bound into the signature, an op
+authored against a stale member set is rejected at step 9 — membership edits invalidate
+in-flight ops by construction, which is the desired fail-closed direction.</p>
+<p>Accepting an op signed by a key valid <em>at authoring time</em> but rotated since requires a
+trusted time source and resolvable key history. <strong>Deferred to its own issue.</strong></p>
+<h2>10. Replay / order / conflict semantics — corrected</h2>
+<p>Revision 1 proposed rejecting <code>seq &lt;= last_seen</code>. <strong>That is unsafe</strong> and is withdrawn.</p>
+<h3>10.1 The failure it would have caused</h3>
+<p>Alice authors seq=10 (vote on proposal P) and seq=11 (vote on proposal Q). Node B receives 11
+then 10. A watermark gate rejects 10 as stale, so <strong>B permanently loses Alice&#39;s vote on P</strong>
+while A has it — T12, violating I12. Gossip guarantees no delivery order, and anti-entropy
+can deliver an op arbitrarily late.</p>
+<h3>10.2 The five candidate mechanisms</h3>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>op_id</code>-only durable dedup</strong></td>
+<td><strong>Necessary and sufficient for replay.</strong> Order-independent; never discards an unseen op. Does not by itself resolve same-key conflict.</td>
+</tr>
+<tr>
+<td><code>seq</code> + sliding replay window</td>
+<td>❌ A window is a bounded watermark. Gossip delivery delay is unbounded — anti-entropy may deliver hours later — so any window drops legitimate ops.</td>
+</tr>
+<tr>
+<td><code>seq</code> + gap quarantine + contiguous-prefix watermark</td>
+<td>❌ The most plausible-looking option and the trap: it requires contiguity, so a <strong>permanently dropped op wedges that author&#39;s entire stream forever</strong>, and the quarantine grows unboundedly under a trivial attack (author high sequence numbers, never send the gaps).</td>
+</tr>
+<tr>
+<td>Hash chaining (<code>prev</code>)</td>
+<td>❌ Same wedge as above — a missing link blocks every descendant — and it forces an author&#39;s ops to be strictly serial, which they are not. This is why <code>prev</code> is removed from the envelope.</td>
+</tr>
+<tr>
+<td>Drop <code>seq</code> from acceptance entirely; rely on state/lifecycle/CAS</td>
+<td>✅ Correct for <em>acceptance</em>. Insufficient alone for same-key conflict where state is non-monotonic — and vote state <strong>is</strong> non-monotonic (For ↔ Against, fact 15).</td>
+</tr>
+</tbody></table>
+<h3>10.3 The chosen design</h3>
+<p><strong><code>seq</code> has zero role in acceptance. It is only a comparator, scoped to a key.</strong></p>
+<ul>
+<li><strong>Replay gate — the only acceptance gate.</strong> A durable set of applied <code>op_id</code>s. Reject iff
+<code>op_id</code> was already applied. Order-independent; an op arriving late is applied normally.
+No watermark, no contiguity requirement, no gap quarantine. Gaps are normal and permanent.</li>
+<li><strong>Same-key conflict — deterministic comparator.</strong> When a key already holds a value, apply
+the incoming op iff <code>(incoming.seq, incoming.op_id) &gt; (stored.seq, stored.op_id)</code>
+lexicographically. <code>seq</code> carries the author&#39;s intent order (a later vote beats an earlier
+one); <code>op_id</code> breaks ties deterministically.</li>
+</ul>
+<p>This converges under any delivery order. Worked through the §10.1 scenario, and through
+Alice changing her vote (seq=10 For, seq=11 Against):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Node A (10 then 11)</th>
+<th>Node B (11 then 10)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>first op</td>
+<td>apply 10 → For</td>
+<td>apply 11 → Against</td>
+</tr>
+<tr>
+<td>second op</td>
+<td>11 &gt; 10 → apply → <strong>Against</strong></td>
+<td>10 &lt; 11 → no-op → <strong>Against</strong></td>
+</tr>
+</tbody></table>
+<p>Both converge to Against, and <strong>op 10 is never <em>rejected</em> — it is accepted and then loses
+the comparator</strong>, which is the distinction that makes §10.1 safe.</p>
+<p><code>seq</code> must be per-<code>(author, domain)</code> monotonic at the origin. The durable monotonic counter
+pattern from #2510 (<code>init_send_callback.rs</code>, fail-closed on persistence failure) is the
+precedent to reuse when slice 3 wires emission.</p>
+<ul>
+<li><strong>Cross-author ordering is deliberately not provided.</strong> That is consensus, which #2469
+excludes. Safety without it comes from I7 (lifecycle monotonicity) and §8 (no cross-author
+key collisions in the restorable set).</li>
+<li><strong>Wall-clock fields order nothing.</strong> <code>entry.timestamp</code>, <code>vote.timestamp</code> and
+<code>updated_at</code>-style LWW are attacker-supplied and are not authorities.</li>
+</ul>
+<h2>11. Relationship to #2441</h2>
+<p>Same defect <em>class</em>, different authority roots.</p>
+<ul>
+<li>#2441&#39;s proposed <code>ReplicationPolicy</code> <strong>name-collides</strong> with <code>icn-kernel-api/src/state.rs:29</code>.
+Whichever issue moves first should rename.</li>
+<li>Governance can close without #2441, and vice versa.</li>
+<li><strong>Do not build the shared seam yet.</strong> The pieces most likely to generalize are the
+quarantine store, the canonical-encoding helper and the <code>op_id</code> dedup set — <strong>not</strong> the
+authority model, which is genuinely per-class.</li>
+</ul>
+<h2>12. RED tests required before implementation</h2>
+<p>Exercised through production wiring (<code>init_governance_actor</code> + <code>GossipActor::handle_message</code>),
+extending <code>apps/governance/tests/fp02_governance_replication_containment.rs</code>. Slice 1&#39;s own
+unit tests are listed separately in §13.</p>
+<p><strong>Content / author / domain binding</strong></p>
+<ol>
+<li>Forged <code>author</code>, no valid signature → rejected before any state write.</li>
+<li>Valid signature, one byte of <code>op_bytes</code> mutated → rejected.</li>
+<li>Valid envelope re-wrapped under a different <code>entry.author</code> → still applied on its own
+merits (proves <code>entry.author</code> is <em>not</em> an authority) <strong>and</strong> rejected if the inner
+signature fails.</li>
+<li><code>entry.hash</code> not matching <code>entry.data</code> → rejected. <strong>Already covered on main</strong> by
+#2583&#39;s <code>icn-gossip/tests/entry_hash_integrity.rs</code>; retained here as the ingress-level
+assertion that the envelope path inherits that guarantee rather than re-implementing it.</li>
+<li>Envelope validly signed for domain A, replayed naming domain B → rejected.</li>
+</ol>
+<p><strong>Authority</strong>
+6. Valid signature by a non-member of the target domain → rejected.
+7. <code>vote.voter</code> ≠ envelope <code>author</code> → rejected.
+7b. <strong>Cross-domain tally injection:</strong> a member of domain D signs a <code>VoteCast</code> for a
+    proposal belonging to domain E, declaring <code>domain_id = D</code> → rejected at step 8. Every
+    other check passes, so this fails only if the proposal anchor is checked.
+8. Unknown <code>domain_id</code> → quarantined, not applied, <strong>no network fetch</strong>.
+8b. Known <code>domain_id</code> but unknown <code>vote.proposal_id</code> → quarantined, not applied.
+9. Local domain is <code>TrustThreshold</code> → <strong>not applied</strong> (§5.5), and this is asserted as
+   deliberate, not incidental.
+10. <code>membership_hash</code> computed against a stale member set → rejected.</p>
+<p><strong>Replay / order — the corrected semantics</strong>
+11. Byte-identical replay of an applied op → no second application.
+12. <strong>Out-of-order delivery: ops seq=10 (proposal P) and seq=11 (proposal Q) delivered 11
+    then 10 → BOTH applied.</strong> The direct regression test for T12; must fail against a
+    watermark implementation.
+13. Same-key conflict delivered in both orders (10 For / 11 Against, and 11 then 10) → both
+    nodes converge to Against.
+14. An op with <code>seq</code> far below the author&#39;s highest seen, on an untouched key → applied.</p>
+<p><strong>Lifecycle</strong>
+15. <code>ProposalOpened</code> on a terminal proposal → rejected <strong>even when fully authorized</strong> (T6).
+16. Reopen→close finalization bypass → outcome unchanged.</p>
+<p><strong>Standing predicate — §7.0</strong>
+16b. <strong>A suspended-but-listed member&#39;s validly signed <code>VoteCast</code> → not applied.</strong> Build the
+     <code>e2e_close_time_revalidation.rs</code> shape: DID stays in the <code>StaticList</code>, commons standing
+     flips to Suspended. Signature, domain, <code>membership_hash</code> and membership all pass, so
+     this fails unless the standing predicate is consulted.
+16c. <strong>A composition with a <code>SuspensionChecker</code> wired → <code>VoteCast</code> not applied at all</strong>, and
+     asserted as deliberate rather than incidental.
+16d. <strong>An unwired checker reads as &quot;unresolved&quot;, not &quot;satisfied&quot;</strong> — the ingress must fail
+     closed, matching <code>configure.rs:183</code>.</p>
+<p><strong>Containment retained</strong>
+17. A validly signed, authority-bearing <code>ProposalCreated</code> / <code>DelegationCreated</code> /
+    <code>DomainCreated</code> → <strong>still not applied</strong> (§7, §8), asserted as deliberate.</p>
+<p><strong>Positive convergence — the test that makes this a fix rather than another block</strong>
+18. A legitimately signed, authority-bearing <code>VoteCast</code> from a <em>second</em> node, relayed through
+    a <em>third</em>, <strong>is applied</strong>, and the nodes converge. Must exercise a real relay hop so
+    fact 6 is actually covered.</p>
+<p><strong>Migration</strong>
+19. An unsigned legacy payload is refused while a signed one is applied.</p>
+<h2>13. Implementation slices, in order</h2>
+<table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Content</th>
+<th>Restores state application?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1</strong></td>
+<td><code>SignedGovernanceOp</code> type, magic + version, canonical encoding, <code>membership_hash</code>, sign/verify (refusing an author/key mismatch), derived <code>op_id</code>. <strong>Library only, unwired.</strong></td>
+<td>No</td>
+</tr>
+<tr>
+<td>2</td>
+<td>✅ <strong>DONE — #2583 (<code>3d401dce</code>).</strong> Re-derive <code>entry.hash</code> on receipt in gossip. Generic, separable.</td>
+<td>No</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Emit signed envelopes from the governance publish path (durable per-<code>(author,domain)</code> seq, #2510 pattern); accept both shapes; apply nothing.</td>
+<td>No</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Bounded quarantine store + steward release valve.</td>
+<td>No</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Durable <code>op_id</code> applied-set + the §10.3 comparator in the state store.</td>
+<td>No (local semantics only)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Lifecycle monotonicity guard, enforced unconditionally.</td>
+<td>No</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Verify + authority + apply, lifting containment for <code>VoteCast</code> only, and only in a composition with no external standing predicate (§7.0.1).</strong> Must fail closed when a <code>SuspensionChecker</code> or equivalent is wired. Containment tests updated, not deleted.</td>
+<td><strong>Yes, narrowly</strong></td>
+</tr>
+</tbody></table>
+<p>Slices 1–6 restore nothing. Slice 7 is the only one that lifts containment, and does so in
+the same change that proves positive convergence (test 18).</p>
+<p><strong>Slice 1 unit tests (this change):</strong>
+sign→verify round-trip; tampered <code>op_bytes</code>; tampered <code>domain_id</code>; tampered <code>author</code>;
+tampered <code>seq</code>; tampered <code>authority</code>; tampered <code>op_kind</code>; wrong-signer rejection; unknown
+version rejected; bad magic rejected; truncated frame rejected; <code>op_id</code> determinism and
+sensitivity to every signed field; <code>membership_hash</code> set-order and duplicate invariance,
+domain separation, and sensitivity to member changes; encode→decode round-trip;
+<code>op_kind</code>/payload disagreement rejected.</p>
+<h2>14. Is the field set stable enough to freeze?</h2>
+<p><strong>Yes.</strong> Each previously open question either has a decision or has been shown not to touch
+the envelope:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Resolution</th>
+<th>Touches field set?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>O1 membership determinism</td>
+<td>StaticList-only (§5.5)</td>
+<td>Yes → <code>ReplicationAuthority::StaticMembership { membership_hash }</code></td>
+</tr>
+<tr>
+<td>Replay under out-of-order delivery</td>
+<td><code>op_id</code> gate + <code>seq</code> comparator (§10.3)</td>
+<td>Yes → keeps <code>seq</code>, <strong>removes <code>prev</code></strong></td>
+</tr>
+<tr>
+<td>Collision arbitration</td>
+<td>Contain the affected classes (§8)</td>
+<td>No — no field needed</td>
+</tr>
+<tr>
+<td>Authority snapshot scope</td>
+<td>Membership only, not whole config (§5.4)</td>
+<td>Yes → <strong>removes <code>domain_config_hash</code></strong></td>
+</tr>
+<tr>
+<td>First restorable variant set</td>
+<td><code>VoteCast</code> only (§7)</td>
+<td>No — <code>op_kind</code> already carries it</td>
+</tr>
+<tr>
+<td><strong>Standing / suspension predicate</strong> (§7.0)</td>
+<td>Ingress policy; fail closed where it applies</td>
+<td><strong>No</strong> — see below</td>
+</tr>
+<tr>
+<td><code>ProposalClosed</code> authority (old O2)</td>
+<td>Contained; deferred with the proof-signer model</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Key rotation / revocation</td>
+<td>Membership-mediated in v1 (§9)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Quarantine bounds (old O3)</td>
+<td>Slice 4 detail</td>
+<td>No</td>
+</tr>
+</tbody></table>
+<p>The remaining unknowns — derived identifiers, tally-rooted lifecycle authority, deterministic
+membership witnesses — all resolve into either a <strong>new <code>ReplicationAuthority</code> variant</strong> or a
+<strong>version bump</strong>, which is precisely what <code>version</code> and the one-variant enum exist to absorb.</p>
+<h3>14.1 Why the standing finding does not move the field set</h3>
+<p>The §7.0 discovery narrows <em>what v1 may apply</em>, not <em>what v1 must sign</em>. The envelope
+already binds author, domain, membership snapshot and content; the suspension predicate is
+evaluated against <strong>receiver-local</strong> state at ingress, exactly like the domain lookup and
+the membership check, none of which are carried on the wire either.</p>
+<p>Adding a <code>standing_hash</code> was considered and rejected: the receiver would have to compare it
+against commons state that is itself unauthenticated (#2441), so the field would create the
+appearance of a deterministic check over non-deterministic data — worse than having no
+field, because it would look like the hole was closed.</p>
+<p><strong>Field set frozen as in §5.1. Slice 1 stands; the correction lands in §7.0/§7.0.1 and in
+slice 7&#39;s policy.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
