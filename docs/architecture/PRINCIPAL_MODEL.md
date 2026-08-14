@@ -450,13 +450,19 @@ genesis decision.
 | Federations don't collapse into operators | only with custody discipline | yes | **yes** | yes |
 | Hosted institution keeps sovereignty | only with custody discipline | yes | **yes** | yes |
 
-**A′ is real and was taken seriously.** ICN ships threshold primitives
-(`icn-crypto-pq/src/{threshold,shamir}.rs`), and the steward network already runs a
-3-of-5 threshold PRF in production (`icn-steward/src/config.rs:61-62`), so
-"institution key held m-of-n by stewards" is not hypothetical. It genuinely fixes
-the single-sovereign objection.
+**A′ was taken seriously, but ICN cannot express it today.** *(Corrected in review
+round 11 — an earlier revision cited the steward primitives as evidence that A′ was
+already buildable. That was wrong.)* What exists is a threshold **PRF**, not
+threshold **signing**: `threshold.rs` computes HMAC partials that a user combines to
+derive a VUI, and its own header lists *"(Future) FROST threshold signatures"*
+(`threshold.rs:6`); `shamir.rs` provides secret **reconstruction**
+(`interpolate_at_zero`, `:168`). Neither can produce an Ed25519 signature without
+reassembling the whole private key at one site — which recreates precisely the
+single-custodian problem A′ exists to avoid. A′ therefore requires a **new threshold
+signature protocol** (FROST or equivalent), not configuration of what is already
+there.
 
-It loses on a different axis. `Did` is **definitionally a public key**
+It also loses on a second axis. `Did` is **definitionally a public key**
 (`icn-identity/src/lib.rs:210-235`: `did:icn:` + multibase base58btc + exactly 32
 bytes + a valid Ed25519 key). A public key is a *static* fact. Institutional
 authority is a **time-varying governed relation** — who may act for a cooperative
@@ -620,6 +626,15 @@ instance, the claimant's proves custody of the Person key, and the
 `claim_capability_proof` supplies the out-of-band factor that a remote attacker
 lacks. Because both DIDs are inside the signed transcript, neither signature can
 be replayed to bind a different pair.
+
+**The transcript above is a field list, not a wire format.** Node and claimant are
+separate implementations, so without a version, a domain separator, an explicit
+field order and encoding, and a stated rule for how the two signatures and the
+capability proof are incorporated, the two sides can sign different serializations
+of the same logical transcript — and an ad-hoc encoding invites cross-protocol
+reuse. A canonical preimage plus interoperability and tamper vectors are required
+before slice E can treat the dual signature as an invariant. Recorded as **O15**,
+the same class of obligation as O10.
 
 **Bearer-sensitivity.** If the capability is delivered as a QR, **that QR is
 bearer-sensitive** — possession is authority until first use. This is the opposite
@@ -897,8 +912,11 @@ implications only:
   proof could be swapped between ops.
 - The canonical encoding's length-prefixed discipline (§5.2) extends naturally;
   the authorization is one more length-prefixed field.
-- **Migration:** v1 and v2 must coexist; v1 remains valid for node-authored ops
-  (where the node genuinely is the principal). This is additive, not a rewrite.
+- **Migration:** additive in form, but **v1 must be retired, not indefinitely
+  coexist**. *(Corrected in review round 11.)* "v1 remains valid for node-authored
+  ops" is not enforceable: ingress cannot distinguish a node DID from a Person DID
+  (§2.1), so while v1 is accepted a compromised pre-rotation Person root bypasses
+  every v2 device-authorization and revocation rule. See **O13**.
 
 ### 6.7 Layer boundary
 
@@ -1018,7 +1036,7 @@ primitives are wrong — not NYCN.
 | T3 | Malicious node operator | node key cannot author member acts | authorship = carried device proof; relay asserts nothing | operator can withhold/delay relay |
 | T4 | Malicious hosting provider | host key ≠ institution authority | mandate chain; revocable hosting assignment | host can deny service; state portability required |
 | T5 | Compromised institution admin | admin ≠ sovereign | roles carry scopes, not sovereignty (`structure.rs:167-170`) | scoped damage until governed revocation |
-| T6 | Lost root key | recovery preserves Person P | social recovery (`recovery.rs`), delay + cancel | trustee collusion ≥ threshold |
+| T6 | Lost root key | recovery preserves Person P | **missing — O14-blocked.** In total loss the ordinary transition needs an unavailable old key (`multi_device.rs:541-552`), and trustee attestations are not cryptographically verified (`sync.rs:261-267`) | recovery cannot advance the authenticated chain, so P is **not** preserved for other receivers; trustee collusion is a *further* risk once it works |
 | T7 | Revoked device operating offline | a revoked device must stop being accepted | **none today** — roster revocation has no protocol effect (§6.5) | **open (O9).** Under shape (a) a receiver could order revocation against the carried version; under shape (b) revocation invalidates the device's past authorizations too |
 | T8 | Cloned node / restore-twice | one instance, one identity | unresolved — see §13 | **open** |
 | T9 | Gateway impersonates a member | a relay cannot author | §6; and today, #2469 §7.0.2 fallback already prevents *signed* forgery | today the unsigned legacy path carries it |
@@ -1126,6 +1144,7 @@ This model does **not** provide, and must not be read as providing:
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator, **and the canonicalization rule for DID strings**, given that `from_str` accepts any multibase while `Did` equality is string equality (§2.1)? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
 | **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
 | **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
+| O15 | What is the canonical preimage of the node-claim transcript — version, domain separator, field order/encoding, and how the two signatures plus capability proof are incorporated? (§5.3) | Node and claimant are separate implementations; without it they can sign different serializations, and an ad-hoc encoding invites cross-protocol reuse. Blocks slice E's dual-signature invariant |
 | O12 | Do institutions ever need to make a **self-authenticating** statement — one a verifier can check without walking a mandate chain? (§4.1.1) | This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale |
 | O11 | What is the canonical encoding and normalization of a genesis decision before hashing to an `EntityId`? (§7.1) | Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug |
 
@@ -1200,11 +1219,17 @@ node/institution arc, which does not block D.
 policy around it. Freezing a `DeviceAuthorization` encoding before either is answered
 would bake in a format that cannot express the two things that make it safe.
 
-Both resolve into the **same primitive**, which is why A0 exists: a verifiable,
-monotonic, signature-chained identity document.
+**A0 resolves O8 only.** *(Corrected in review round 11 — an earlier revision of this
+section claimed it resolved both.)*
 
-- O8 needs it to derive the **current root** from the genesis key (§6.3).
-- O9 shape (a) needs it to **order** an authorization against a revocation (§6.5).
+- **O8 — yes.** A verifiable, monotonic, signature-chained identity document lets a
+  receiver derive the **current root** from the genesis key the DID encodes (§6.3).
+- **O9 — no.** A0 orders *identity-document events relative to each other*; it says
+  nothing about whether a governance **operation** was signed before or after a
+  revocation, because the authorization carries one fixed version for its whole life
+  (§6.5) and no rollback path exists. **Slice A therefore remains blocked after A0
+  completes**, until operations and revocations share a replicated total order, or
+  deterministic rollback/revalidation is designed.
 
 And it is unusually cheap, because the hard cryptographic parts are already written:
 capability checking, Ed25519 verification and strict `+1` monotonicity all exist in
@@ -1213,7 +1238,9 @@ capability checking, Ed25519 verification and strict `+1` monotonicity all exist
 signing preimage, and a fork-convergence rule. That is wiring and one decision — not
 new cryptography.
 
-**Revised order: A0 → (A ∥ B ∥ C) → D → (E → F → G) → H → I.**
+**Revised order: A0 → (B ∥ C) → [A, D blocked on O9] → (E → F → G) → H → I.**
+B and C do not depend on the authorization format and can proceed; A and D cannot
+start until O9 has an answer.
 
 A0 is proof-bearing on its own: it either converges on two nodes under a forked
 rotation event, or it does not, and that is testable without governance, without
