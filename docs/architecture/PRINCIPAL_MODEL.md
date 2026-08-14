@@ -101,10 +101,24 @@ the goal is already met.**
 
 `Capability = { Sign, AddDevice, RevokeDevice, RotateKey, Recover, Encrypt }`.
 
-Device add/revoke is genuinely cryptographically authorized: `identity_mgr.rs:161`
-checks `Capability::AddDevice` and `:188-197` verifies an Ed25519 signature from
-an existing method before mutating the roster (`:295` for revoke; `icnctl`
-mirrors at `main.rs:6254,6383`).
+Device add/revoke is signature-gated: `identity_mgr.rs:161` checks
+`Capability::AddDevice` and `:188-197` verifies an Ed25519 signature from an
+existing method before mutating the roster (`:295` for revoke; `icnctl` mirrors at
+`main.rs:6254,6383`).
+
+> **But the signature does not cover what is enrolled.**
+> `build_add_device_message` (`identity_mgr.rs:488-490`) signs exactly
+> `ICN_ADD_DEVICE:{did}:{device_id}:{label}`. The `public_key`,
+> `encryption_public_key` and `capabilities` from the request are parsed and
+> applied *after* verification (`:200-228`) **without being covered by that
+> signature**. A captured or replayed authorization can therefore be altered to
+> enrol a *different key* with *different capabilities* under the same device id.
+> Revoke has the same shape (`:493`, covering only did + device id).
+>
+> Raised in review on PR #2586 and verified at `74c832f1`. **This is a live
+> defect in shipping code, not merely a design gap**, and slice B must fix the
+> signed message to cover the full enrolment payload before treating this
+> machinery as sufficient for §5.2.
 
 **But:**
 
@@ -647,10 +661,13 @@ A malicious host is removed by **revoking the hosting assignment and
 re-materializing state elsewhere** — possible only if institutional state is
 portable and institutional authority never depended on the host's key.
 
-This requires changing one thing in particular: institution genesis currently
-signs with the **node's** keystore (§2.8). Under this model, genesis must be
-signed by the founding **Persons**, with the node merely relaying — the same
-relay/authorship split as §6.
+This requires changing one thing in particular: institution genesis is currently
+authorized by a **bearer token and signed by nobody** (§2.8) — the request body is
+plain JSON. Under this model, genesis must be signed by the founding **Persons**,
+with the node merely relaying — the same relay/authorship split as §6. Note the
+remedy is not about taking custody away from the node key, because the node key
+never signed the genesis payload in the first place; it is about introducing an
+authorship binding where there is none.
 
 Five deployment shapes must all work without changing anyone's identity: phone
 only; person + personal node; institution on a hosted node; institution on its own
@@ -803,6 +820,7 @@ Legend: **I** implemented · **P** partial · **M** missing · **C** conflicting
 | Device keypair + roster | **I** — `multi_device.rs`, gateway + icnctl | unchanged | none | — | icn-identity |
 | Device DID as principal | **M** — device is a string id (`:259`) | first-class DID | new type usage | high | icn-identity |
 | Device authorization proof | **M** — `Capability::Sign` never checked; no nested signature type | carried, signed, scoped | new primitive | **critical** | icn-identity |
+| Device enrolment integrity | **C** — add/revoke signature covers only did+device_id+label; key and capabilities are unsigned (`identity_mgr.rs:488-493`) | signature covers full payload | live defect | **critical** | icn-gateway |
 | Member-origin signing | **M** — `SignedGovernanceOp` is root-key-only (`:308,373`) | device-signed, person-authored | v2 envelope | **critical** | icn-governance |
 | Client-side governance signing | **M** — zero client references | device signs locally | SDK + CI | high | sdk/react-native |
 | First-device bootstrap | **M** — `index.ts:2059` needs a prior device | self-bootstrapping | new flow | high | sdk + gateway |
@@ -816,7 +834,7 @@ Legend: **I** implemented · **P** partial · **M** missing · **C** conflicting
 | Hosted nodes | **M** — only a *prohibition* on tenancy | explicit assignment | new record | high | icn-core |
 | Institution identity | **C** — unbound slug; keyless `derive_treasury_did` | genesis-bound `EntityId` | binding | high | icn-entity |
 | Institution signing | **C** — modelled, unwired, contradicts §4.1 | never signs | decision O5 | med | icn-federation |
-| Institution genesis | **P** — needs only `entity:write`; node key signs | governed, person-signed | authority + relay split | high | icn-gateway |
+| Institution genesis | **P** — needs only `entity:write`; body is unsigned JSON under a bearer token, no key signs it | governed, person-signed | authorship binding + relay split | high | icn-gateway |
 | Institution migration | **M** — restoration is an ADR-0086 open blocker | state portable | portability | high | deploy |
 | Membership relationship | **I** — bidirectional index | unchanged | none | — | icn-entity |
 | Membership credential | **M** — no VC layer at all | portable standing | new layer (O6) | med | icn-entity |
@@ -840,7 +858,7 @@ node/institution arc, which does not block D.
 | Slice | Invariant | Source seam | Tests | Non-goals |
 |---|---|---|---|---|
 | **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped, time-bounded authorization | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; expiry; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization** | no governance wiring; no envelope change. **Blocked on O8 (§6.3)** — the format must not be frozen until rotation is expressible |
-| **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable | `icn-gateway/src/identity_mgr.rs`, `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected | no QR (inherits #2569 rules — separate) |
+| **B. Device enrollment + revocation, end to end** | First device self-bootstraps; revocation is provable; **the enrolment signature covers the enrolled key and capabilities** | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke; revoked device rejected; **tampering with `public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
 | **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; expired rejected; `op_id` covers the authorization | **does not lift #2470 containment**; does not change v1 |
 | **E. Node claim + admin grant** | A Person administers a node instance; node ≠ operator | `icn-core` claim ceremony; `operator_did` unwired from `node_did` | claim binds instance not image; re-claim rejected; admin delegation | no hosting semantics |
