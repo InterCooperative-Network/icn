@@ -18,6 +18,26 @@ to it.
 > adoption. Where a proposal contradicts shipping code, §11 names the conflict
 > rather than papering over it.
 
+> **SUPERSESSION (2026-08-15).** §1–§3 of this document — the invariant, the
+> verified current state, and the classification of historical intent — are
+> **retained** and remain the reference evidence map.
+> **§4–§16 are superseded by
+> [HUMAN_IDENTITY_ARCHITECTURE.md](HUMAN_IDENTITY_ARCHITECTURE.md)**, which
+> re-derived human identity from requirements and concluded that O8, O9, O13,
+> O16, O17 and O18 are six consequences of a single choice: making the durable
+> Person identifier key-derived. That document rejects the key-derived durable
+> identifier, narrows `Did` to "cryptographic principal", and replaces the
+> A0→A→B→D program.
+>
+> A first-principles re-trace at `b26bf681` also **corrected several §2 claims**
+> — most consequentially that the gateway multi-device path is unreachable in
+> production (`IdentityManager::get_or_create_document` has zero production
+> callers), that the acting principal in SDIS enrollment is already the device
+> key so no deployed anchor carries authority, and that ~50% of hash-derived
+> DIDs fail Ed25519 deserialization. The full
+> correction list is HUMAN_IDENTITY_ARCHITECTURE.md §3.0. Read §2 here **together
+> with** that table, not alone.
+
 **Related, deferred to, not restated:**
 [Passport / Keyring / Position / Receipt](../design/passport-keyring-position-receipt.md)
 (vocabulary doctrine) ·

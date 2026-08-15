@@ -1,0 +1,1415 @@
+---
+Status: descriptive
+Canonical: no
+Last Reviewed: 2026-08-15
+---
+
+# Human Identity in ICN — a first-principles architecture
+
+What a human identity *should* be in ICN, how cryptographic authority over it
+should evolve, what institutions and peers should observe, and how devices act
+for humans.
+
+> **Truth status.** §3 is **descriptive**, verified at `b26bf681` with file:line
+> citations; every claim in it was traced in source during this pass and the
+> load-bearing ones were re-verified by hand (§3.0 lists which). Everything from
+> §6 onward is **PROPOSED architecture** — design, not implementation. No claim
+> here asserts production operation, pilot readiness, or institutional adoption.
+> Every substantive result carries an explicit classification
+> (ESTABLISHED / RECOMMENDED / OPEN / LEGACY / REJECTED); §20 is the full index.
+> Prose that reads like a fact but is not classified ESTABLISHED is a defect in
+> this document.
+
+> **Relationship to [PRINCIPAL_MODEL.md](PRINCIPAL_MODEL.md).** That document's
+> §1–§3 (the invariant, the verified current state, the classification of
+> historical intent) remain the best evidence map in the repo and are **retained**;
+> §3.0 below lists the corrections this pass found in them. Its §4–§16 (the
+> proposed four-class taxonomy, member-origin signing via a carried
+> `DeviceAuthorization`, and the A0→A→B→D slice program) are **superseded** by
+> this document — not because they were careless, but because the open decisions
+> they accumulated (O8, O9, O13, O16, O17, O18) turned out to be six symptoms of
+> one structural choice, which §5 identifies and §6 removes.
+
+**Related, deferred to, not restated:**
+[authenticated-governance-replication](../design/authenticated-governance-replication.md)
+(#2469 — the convergence doctrine this design must satisfy) ·
+[AUTHORITY_SPINE](AUTHORITY_SPINE.md) (attenuation / revocation lifecycle) ·
+[MEMBER_STANDING](MEMBER_STANDING.md) (the derived read model) ·
+[KERNEL_APP_SEPARATION](KERNEL_APP_SEPARATION.md) (the Meaning Firewall) ·
+[passport-keyring-position-receipt](../design/passport-keyring-position-receipt.md)
+(vocabulary doctrine)
+
+---
+
+## 1. The executive answer
+
+**A human identity in ICN should not be a globally published identifier at all.**
+
+It should be three separable things, and ICN's current difficulty comes almost
+entirely from having collapsed them into one 32-byte string:
+
+| Layer | What it is | Who sees it | Lifetime |
+|---|---|---|---|
+| **Cryptographic principal** | a key. Exactly what `Did` already is. | whoever verifies a signature | as long as the key is held |
+| **Context subject** | the identifier a person is known by *inside one institution* | that institution's members | as long as the relationship |
+| **Continuity root** | a private secret the person's own app holds, linking their contexts and driving recovery | **nobody but the person** | lifetime, recoverable |
+
+The person is not any one of these. The person is the human who holds the
+continuity root and, through it, organizes a set of context relationships, each
+of which is currently exercised by one or more device keys.
+
+Three consequences follow immediately, and they are the substance of this
+document:
+
+1. **`Did` should mean exactly one thing — a cryptographic principal (a public
+   key).** Every other use of it today (privacy anchor, treasury identifier,
+   stable subject across rotation, credential subject) is type reuse that the
+   type cannot support, and §3 shows it failing in production code.
+
+2. **Authority to act for a subject evolves in a log the subject alone writes,
+   and each institution decides for itself how fresh that log must be.** The
+   subject keeps a single-writer key-event log; the institution is the *relying
+   party* that holds a copy and sets its own recency bar. Neither owns the other:
+   the person cannot force an institution to accept them, and the institution
+   cannot rewrite who the person is. #2469 §9 already reached the neighbouring
+   conclusion for key rotation ("v1 treats rotation and revocation as *membership*
+   changes"); §6 shows what it generalizes to, and that generalization dissolves
+   five of the six open blockers.
+
+3. **There is no convergent global device revocation, and there cannot be one.**
+   That is not a gap to close; it is a consequence of asking an asynchronous
+   partition-tolerant system with no consensus to agree on a time-varying
+   predicate. The correct move is to stop asking. Revocation must be scoped to a
+   *relying party that has an authoritative view* — which is exactly why ICN's
+   one working revocation mechanism (RPC/gateway token revocation,
+   [AUTHORITY_SPINE](AUTHORITY_SPINE.md) §2) works today.
+
+The recommended architecture is **Model C** of §7 — *context-scoped identity with
+a private continuity root* — and §9 states it precisely.
+
+**What this does not do.** It does not eliminate hard work; it relocates it. The
+recommendation depends on a **per-subject, single-writer key-event log** that does
+not exist today (§3.7 proves the absence of any ordering substrate). That is one
+named, bounded piece of infrastructure whose cost is formally understood — a
+single-writer object has **consensus number 1** and is implementable with reliable
+broadcast alone (§6.1) — replacing six unbounded open questions about a global
+namespace. That trade is the whole argument, and §9.6 states honestly what
+remains open.
+
+---
+
+## 2. Normative requirements
+
+Derived before any representation was chosen, from the mission brief, the
+[Constitutional Core](../ai/ICN_CONSTITUTIONAL_CORE.md) immutable principles,
+#2469's invariants I1–I12, and PRINCIPAL_MODEL §1's five invariant tests.
+
+Labels: **[HARD]** a violation is a defect · **[STRONG]** tradeable only against
+another HARD/STRONG, explicitly · **[SOFT]** a goal whose cost may exceed benefit.
+
+### R1 Sovereignty
+- **R1.1 [HARD]** Genesis requires no registrar, no network, no permission.
+- **R1.2 [HARD]** No institution, node, gateway or operator holds a key that lets
+  it author acts as a human. *Custody defines identity.*
+- **R1.3 [HARD]** Loss of any infrastructure must not destroy the human's identity
+  or their ability to establish identity elsewhere.
+- **R1.4 [STRONG]** No single institution may revoke a person's *identity*. It may
+  revoke *standing within itself* only.
+
+### R2 Continuity — three properties that must not be conflated
+- **R2.1 [HARD] Continuity of subject.** The same human remains the same subject
+  across device replacement, key rotation, total device loss, algorithm change.
+- **R2.2 [HARD] Continuity of authority.** Which keys may currently act is
+  time-varying and must change without changing the subject.
+- **R2.3 [HARD] Validity of history.** An act validly authored when made stays
+  *verifiable as having been made*, forever, independent of later authority
+  changes. (Verifiable ≠ still-effective — see R5.)
+- **R2.4 [STRONG]** Subject continuity must not require a permanent master secret
+  whose compromise is unrecoverable.
+
+### R3 Multi-device and least privilege
+- **R3.1 [HARD]** A device holds its own key and never receives another
+  principal's key.
+- **R3.2 [HARD]** Delegated authority is a strict subset of the delegator's own
+  (attenuation). *Currently violated — #2590.*
+- **R3.3 [HARD]** Every security-relevant field of a delegation is
+  cryptographically bound to it. *Currently violated — #2588.*
+- **R3.4 [STRONG]** Adding or replacing a device must not require the highest
+  authority to be online, except where root-only is a deliberate choice.
+- **R3.5 [STRONG]** Device classes differ by scope and custody strength, never by
+  principal class.
+
+### R4 Determinism and partition tolerance *(inherited from #2469; non-negotiable)*
+- **R4.1 [HARD]** No validity decision depends on the receiver's wall clock.
+- **R4.2 [HARD]** No validity decision depends on the order in which a receiver
+  learned two independent facts. (I12)
+- **R4.3 [HARD]** Two honest nodes with the same durable state reach the same
+  verdict. (I10)
+- **R4.4 [HARD]** Verification never fetches authority material over the channel
+  carrying the act. (I9)
+- **R4.5 [HARD]** Authority **may** be evaluated against receiver-local replicated
+  state **iff** that state is itself authenticated and converges deterministically.
+  > *This corrects PRINCIPAL_MODEL §6.2's "carried, not resolved", which
+  > over-generalized #2469 §14.1. #2469 resolves against local durable state at
+  > ingress steps 7–11 by design; what it forbids is resolving against
+  > **unauthenticated** state (§7.0: "the receiver would compare it against
+  > commons state that is itself unauthenticated"). The distinction is
+  > load-bearing: it is what makes §9 possible at all.*
+- **R4.6 [HARD]** A legitimate act is eventually applied; nothing is permanently
+  discarded because of arrival order. (I11/I12)
+
+### R5 Revocation — a requirement on *effect*, not on admission
+- **R5.1 [HARD]** A compromised device loses the ability to produce **new
+  effective** acts within a bounded, stated window, without requiring a global
+  total order.
+- **R5.2 [HARD]** Revocation semantics is stated **per act class** and never
+  differs silently between classes.
+- **R5.3 [STRONG]** Revocation does not retroactively invalidate acts whose
+  effects have already settled irreversibly. Without rollback semantics that is a
+  correctness bug, not a security win (PRINCIPAL_MODEL §6.5 established this).
+- **R5.4 [HARD]** "Could not determine whether this was revoked" never resolves to
+  "not revoked". (AUTHORITY_SPINE §2)
+
+### R6 Privacy — structural
+- **R6.1 [STRONG]** Two institutions cannot correlate a person by default from
+  protocol-visible identifiers alone.
+- **R6.2 [STRONG]** A person proves standing in a context without revealing other
+  contexts.
+- **R6.3 [STRONG]** A person may, at their option, prove two personas are one human.
+- **R6.4 [STRONG]** Recovery does not require deanonymizing every persona.
+- **R6.5 [SOFT]** Network- and device-layer correlation is outside identity's sole
+  control, but must not be made worse.
+- **R6.6 [HARD]** Sybil resistance must not require a public global person
+  identifier. **Uniqueness ≠ identification.**
+
+### R7 Offline and partitioned operation
+- **R7.1 [HARD]** Genesis works fully offline. **R7.2 [HARD]** Signing works fully
+  offline. **R7.3 [HARD]** Delayed/reordered delivery is safe and converges.
+- **R7.4 [STRONG]** Multiple devices may act concurrently while partitioned.
+
+### R8 Authorship and governance
+- **R8.1 [HARD]** Infrastructure never manufactures human authorship.
+- **R8.2 [HARD]** These five stay distinct: session authentication · content
+  authorship · delegated authority · institutional authority · transport identity.
+- **R8.3 [HARD]** A receiver establishes authorship from bytes in hand plus
+  authenticated local state — never from unauthenticated state.
+- **R8.4 [STRONG]** A relay relays without holding any key of the author.
+
+### R9 Recovery
+- **R9.1 [HARD]** Recovery is possible from total device loss.
+- **R9.2 [HARD]** Recovery is an authenticated, auditable event, never a silent
+  substitution.
+- **R9.3 [HARD]** Competing recovery attempts resolve deterministically; the
+  losing attempt is visible.
+- **R9.4 [HARD]** M-of-N counts **distinct authenticated** participants. *(#2591)*
+- **R9.5 [STRONG]** Recovery does not create a new permanent single point of
+  catastrophic failure.
+- **R9.6 [STRONG]** Recovery is contestable by the legitimate subject (delay + veto).
+
+### R10 Usability
+- **R10.1 [HARD]** A member never needs to understand DIDs, PKI, Merkle trees,
+  quorums or key-event logs to join and participate.
+- **R10.2 [HARD]** Phone-only onboarding produces a secure, recoverable identity
+  **by default** — not a degraded one to repair later.
+- **R10.3 [STRONG]** At most one irreversible user decision at onboarding.
+
+### R11 Infrastructure independence
+- **R11.1 [HARD]** Identity works with no node / one personal node / many personal
+  nodes / hosted-only. Moving between them changes *hosting*, never identity.
+
+### R12 Evolvability
+- **R12.1 [HARD]** Signature algorithm replaceable without "create a new person".
+- **R12.2 [HARD]** New device classes without protocol change.
+- **R12.3 [STRONG]** A migration has an enforceable end state. *A dual-stack that
+  never ends is not a migration* (#2469 / O13).
+
+### R13 Meaning Firewall *(constitutional)*
+- **R13.1 [HARD]** The kernel holds keys, identifiers and opaque scopes — never
+  `Person`, `member`, `role`, `cooperative`.
+  > PRINCIPAL_MODEL §1.1 states this, and then §4 proposes `Person` and `Device`
+  > as principal classes in `icn-identity`. That tension is real and §9.5
+  > resolves it.
+
+### Invariant tests (PRINCIPAL_MODEL §1, retained verbatim)
+T1 replacing a phone must not create a new human · T2 replacing a node must not
+create a new cooperative · T3 hosting a cooperative must not make the host the
+cooperative · T4 assigning a personal node to a coop must not rewrite the node's
+identity · T5 running one institution's workload must not change the node's species.
+
+---
+
+## 3. What ICN implements today
+
+Verified at `b26bf681`. **This section is descriptive.** It does not restate
+PRINCIPAL_MODEL §2, which remains accurate on the points it covers; it records
+what this pass found *in addition to and in correction of* it.
+
+### 3.0 Corrections to PRINCIPAL_MODEL §2, and new findings
+
+Rows marked **verified** were re-read in source by hand during this pass; rows
+marked *(agent-traced)* were produced by a source-tracing pass and spot-checked
+rather than fully re-read. **One agent-traced claim was checked and found wrong**
+— see F4 — so the *(agent-traced)* rows should be treated as high-confidence but
+not yet load-bearing, and re-verified before any of them is used to justify
+deleting code.
+
+| # | Finding | Evidence | Status vs PRINCIPAL_MODEL |
+|---|---|---|---|
+| **F1** | **≈50% of hash-derived DIDs cannot be deserialized.** A SHA-256 digest is a valid compressed Ed25519 point only about half the time; `Did`'s hand-written `Deserialize` routes through `from_str` (`icn-identity/src/lib.rs:181-189`) which calls `VerifyingKey::from_bytes`. So an anchor-derived `Did` **serializes and stores fine and fails to read back ~50% of the time.** Measured 1994/4000 = 49.9% valid over SHA-256 outputs (independent check this session). Corroborated in-tree: `icn-governance/src/mandate.rs:404` and `apps/governance/src/manager.rs:10309` both warn that fixtures must hand-pick seeds that decompress. | verified | **New.** O18 understates this: it is not only "no controllable key", it is a coin-flip serialization defect. |
+| **F2** | **`icn-zkp` silently substitutes an all-zero issuer key.** `prover.rs:227-230`: `match attestation.issuer_did.to_verifying_key() { Ok(vk) => *vk.as_bytes(), Err(_) => [0u8; 32] }` with the comment `// Fallback for test/development`, then proceeds to generate a proof. Combined with F1, an anchor-issued attestation produces a proof bound to a key nobody holds instead of failing. | verified verbatim | **New.** |
+| **F3** | **The SDIS anchor is documented as *not* key-derived, on purpose.** `anchor.rs:1-13`: *"Unlike traditional DIDs where the identifier is derived from a public key, an SDIS Anchor is derived from a VUI"*; properties listed are **Permanent** (survives rotation), **Recoverable**, **Unique** (sybil resistance), **Privacy-preserving**. | verified verbatim | **New context for O18** — the anchor is a deliberate durable-subject primitive, and `to_did()` is what breaks it. |
+| **F4** | **The VUI→anchor derivation *is* wired — and it is fed a VUI derived from the public DID.** `Anchor::from_vui` is called at `icn-commons/src/inner.rs:106`, inside `create_anchor_from_enrollment` (`:76`), which is production-reachable from `icn-gateway/src/api/commons/mod.rs:492`, `icn-gateway/src/api/sdis/simple_enrollment.rs:703` and `icn-core/src/services/sdis_service.rs:643`. But the VUI is `SHA256("gateway-enrollment-vui:" ‖ did)` (`inner.rs:81-87`), with the in-source comment *"Generate pseudo-VUI from DID (in real SDIS, this comes from ceremony)"*. `genesis_random` **is** generated (`:90-92`) but is not a field of `Anchor`, so it is discarded and the anchor cannot be re-derived from a re-presented VUI. | verified by grep + read | **New.** Together with F6 this is the **second independent site** where the VUI is a pure function of the public DID, so no deployed anchor carries the uniqueness or unlinkability the design claims. *(An earlier draft of this row, from a subagent trace, said `from_vui` had no production callers. That was wrong and is corrected here.)* |
+| **F5** | **Even in the SDIS enrollment path the anchor is already a label, not a principal.** `simple_enrollment.rs:667`: `// The DID is the ephemeral_did - in SDIS, keys are created on the device`; the token is minted for `&ephemeral_did` (`:782`). The anchor is returned alongside as `anchor_id`. | verified verbatim | **New.** Anchor-derived DIDs carry no authority anywhere. |
+| **F6** | **The routed enrollment endpoint bypasses the threshold PRF entirely.** `compute_temporary_vui(did) = SHA256(did.to_string())` (`simple_enrollment.rs:76-80`, used `:606`), a pure function of the *public* DID. This destroys the VUI's own stated properties — `vui.rs:17-19` claims *"Private: VUI reveals nothing about the person"* and *"Unlinkable: Without pepper, can't reverse VUI to identity"*. The file admits it: `:13-16` says **"NO sybil resistance"**. | *(agent-traced)* | **New.** |
+| **F7** | **`combine_prf_partials` is XOR-then-hash, not a threshold scheme.** `icn-crypto-pq/src/threshold.rs:103-128`. Different t-subsets XOR to different values, so the VUI is reproducible only from **the exact set used at derivation** — n-of-n in effect, not 3-of-5. The header itself lists *"(Future) FROST threshold signatures"*. | verified verbatim | **New** (PRINCIPAL_MODEL §4.1.1 noted "PRF not signing"; the availability consequence is new). |
+| **F8** | **The gateway multi-device subsystem is unreachable in production.** `IdentityManager::get_or_create_document` (`icn-gateway/src/identity_mgr.rs:60`) has **exactly three references repo-wide: the definition and two unit tests** (`:510`, `:515`, `:533`). No route, enrollment path or bootstrap ever creates a `DidDocument`, so `register_device` always returns `NotFound` at `:158`. | verified by grep | **Corrects the gap matrix**, which rates "Device keypair + roster" as **I — implemented**. It is implemented and **not reachable**. |
+| **F9** | **`RotationEvent::verify()` and `DidDocumentCache::apply_event` have zero production callers, and `apply_event` never calls `verify()` at all.** `IDENTITY_UPDATES_TOPIC` (`sync.rs:23`) has no publisher and no subscriber. | *(agent-traced, grep-verified)* | Extends PRINCIPAL_MODEL §6.5 row 1: not only unwired, but the apply path would not verify even if wired. |
+| **F10** | **The one production rotation signer and the verifier sign different messages.** `icnctl` signs a format string — `format!("{}:add_device:{}:{}:{}", …)` (`bins/icnctl/src/main.rs:6302-6311`) and the revoke analogue (`:6409-6418`) — while `verify()` checks a signature over `icn_encoding::encode(event_with_proof_cleared)` (`multi_device.rs:583,594-601`). **Every rotation event ICN actually produces would be rejected by its own verifier.** | *(agent-traced)* | PRINCIPAL_MODEL noted this for revoke; it holds for **both** kinds. |
+| **F11** | **`is_anchor_did` is a tautology** — `self.as_str().starts_with("did:icn:")` (`anchor.rs:203-209`), true of every valid `Did`. | verified verbatim | Confirms "indistinguishable by format" with the stronger statement that the *discriminator function itself* is vacuous. |
+| **F12** | **`RotationEvent::signing_message` is bincode over the struct with no domain separator** (`multi_device.rs:594-601`), sharing a signing domain with any bincode payload of the same shape. | *(agent-traced)* | New; folds into O10's obligation. |
+| **F13** | **RPC recovery lets a caller name an arbitrary victim, and the *node* signs the trustee attestation.** `handle_recovery_initiate` takes `old_did`, `threshold` and `delay_period` from caller params (`icn-rpc/src/handler/recovery.rs:52-58`); `attest` builds the attestation with `state.own_signer()` — the node's own key (`:138`, `:173-183`). `RecoveryEvent` has no trustee registry, so any attestation counts. Reachable with the `recovery:write` scope. | verified verbatim | **New, and distinct from #2591**, which covers `sync.rs` / `recovery.rs` verification and dedup. |
+| **F13a** | **F13 is currently inert.** `RecoveryEvent::finalize()` (`icn-identity/src/recovery.rs:215-225`) only sets a status field and a timestamp; no production code consumes `RecoveryStatus::Finalized` to change any authority, and `sync.rs::apply_event` (the only path that would clear verification methods) has no production callers (F9). **The defect is a latent critical: it becomes a takeover the moment anyone wires application of recovery events.** | verified by grep | Stated precisely so it is neither overstated nor dismissed. |
+| **F14** | **Every wall-clock expiry check in the identity stack fails *open*.** `icn_time::current_timestamp_secs()` returns **0** on clock error (`icn-time/src/timestamp.rs:34-42`), so `now > expiry` is false and nothing has expired. | verified verbatim | New; strengthens R4.1's case beyond convergence into fail-open. |
+| **F15** | **No pairwise, per-relationship or per-verifier identifier exists anywhere.** Not found workspace-wide: Pedersen commitment, nullifier, linkage secret, re-randomization, BBS+, selective disclosure, scoped DID, HKDF-derived *identifier*. | *(agent-traced)* | Confirms O3 is unstarted. |
+| **F16** | **ICN has no working identity-privacy primitive.** `icn-crypto-pq/src/blind.rs:18-20` self-declares *"simplified commit-hash based"* and `unblind` stores the blinding factor **in the clear** (`:153-163`) — no unlinkability, and no caller outside the crate. `icn-zkp`'s AIRs set their transition constraints to zero (`stark/non_revocation.rs:122-123`) — **in fairness, the file argues soundness rests on boundary assertions plus trace commitment instead, and points to issue #506 for algebraic constraints**, so this is a tracked design position, not a hidden hole; but it does mean the transition relation is not algebraically enforced. Alongside it: the accumulator uses a 32-bit test modulus (`accumulator.rs:87-90`); `verify_non_membership` only checks the witness is nonzero (`:254-259`); `is_trusted_issuer` returns true when the trusted list is **empty** (`verifier.rs:78-80`); and `default = []` with `stark` behind a feature flag (`Cargo.toml:57-59`), so the default build can neither prove nor verify. `icn-privacy` is network-metadata privacy (onion routing, topic-name encryption), not identity. | *(agent-traced)* | **New and load-bearing:** any architecture depending on ZK selective disclosure is proposing **new cryptographic work**, not wiring. |
+| **F17** | **`AuthorityGrant` and `Mandate` carry no signature field and are not replicated**; membership records carry no signature (`icn-entity/src/membership.rs:23-48`) and merge by **last-write-wins on a wall-clock field** (`icn-entity/src/actor.rs:315-330`); memberships are not gossiped at all — only the parent entity record is announced (`actor.rs:277-279`). | *(agent-traced)* | New; constrains what "authenticated local state" can mean today. |
+| **F18** | **The only cryptographic evidence an institution exists is a set of *person* signatures over its charter** — `FounderSignature { did, signature, timestamp }` (`icn-governance/src/charter.rs:388-397`). | *(agent-traced)* | Supports PRINCIPAL_MODEL §4.1's conclusion with a concrete existing primitive. |
+| **F19** | **The React Native client has no Person-vs-Device distinction at all.** `wallet.ts:94-120` generates one Ed25519 key per install and the DID is a direct encoding of it (`:106`); the private key is stored **hex and exportable** (`:102`, `:110`). Reinstalling produces a different person. `sdk/typescript` `registerDevice` signs nothing itself — the caller must hand-reproduce the `ICN_ADD_DEVICE:` string. | *(agent-traced)* | Extends §2.9. |
+| **F20** | **`/v1/sdis/anchor` add-device and rotate-keys are disabled**, not merely unauthenticated: the handlers take no arguments and unconditionally return `Forbidden` (`api/sdis/anchor.rs:274-279`, `:309-314`). The sibling **reads** remain unauthenticated. | *(agent-traced)* | Narrows #2448's framing. |
+
+### 3.1 What a `Did` actually is
+
+`pub struct Did(String)` (`icn-identity/src/lib.rs:177`). `from_str` (`:209-244`)
+requires `did:icn:` + multibase decode + exactly 32 bytes + a valid Ed25519 point.
+`from_public_key` (`:193-196`) always emits base58btc; `from_str` accepts any
+multibase, and `PartialEq`/`Hash` are derived over the inner `String` (`:174`) —
+so **`Did` equality is string equality, not key equality**.
+
+`new_unchecked` (`:284`) bypasses all of it. It has **one** call site:
+`from_anchor_id` (`anchor.rs:194-197`). And `from_anchor_id`'s production use has
+almost nothing to do with persons — it is a generic *"mint a `Did` from 32
+arbitrary bytes"* hatch: cooperative **treasury** identifiers
+(`icn-coop/src/actor.rs:493,788`; `apps/membership/src/coop_core/actor.rs:359,523`,
+from 16 bytes zero-padded to 32), a ZKP holder pseudonym
+(`icn-zkp/src/prover.rs:257`), and placeholders (`icn-ledger/src/fx.rs:118`,
+`icn-gateway/src/api/sdis/qr.rs:163`).
+
+**ESTABLISHED: `Did` is a key identifier, and every non-key use of it is type
+reuse the type cannot support.** F1 and F2 are that reuse failing in production
+code, not in theory.
+
+### 3.2 Genesis is already sovereign — and that part is right
+
+`KeyPair::generate()` (`:341`) → `Did::from_public_key` (`:191`). No registry, no
+network. **R1.1 and R7.1 are already met and must be preserved.**
+
+### 3.3 The device model is built, unreachable, and unverifiable
+
+F8, F9 and F10 together: `multi_device.rs` implements a coherent roster and
+rotation model; the gateway path that would use it can never find a document; the
+verifier has no callers; and the one production signer signs a different message
+than the verifier checks. `can_sign` has zero production callers (confirmed —
+`docs/status.toml:32` already records this).
+
+**Consequence for #2588 and #2590.** Both describe real defects in real code. But
+the gateway route they sit on is **currently unreachable** (F8), which changes
+their *urgency* without changing their *validity*: they are correctness debts to
+fix before the path is wired, not live exploited surface. This document does not
+propose closing them here; it proposes (§19) that they be fixed as part of
+whatever wires device authority, so the wiring cannot ship the defects.
+
+### 3.4 Authority is a bearer token over an HMAC, and one mint path proves nothing
+
+Confirmed against source: `join_via_invite` (`api/invites.rs:245-296`) takes
+`req.did` from the request body with form validation only, takes no
+`HttpRequest`, and mints a token for it (`:280`) — **#2589 confirmed
+line-for-line.** The challenge paths do prove key control, but the signed payload
+is the **raw nonce bytes only** (`auth.rs:315`), with no domain separator and no
+binding to the requested `coop_id` or `scopes`.
+
+### 3.5 SDIS held two incompatible models of its own anchor, simultaneously
+
+This is the most important historical finding, and it is a genuine unreconciled
+split rather than a decision that was made and lost:
+
+- **Anchor as public identifier** — it *becomes* the DID
+  (`SDIS_IMPLEMENTATION_PLAN.md:344-345`), is a URL path key
+  (`/v1/sdis/anchor/{anchor_id}`), is written to replicated state, is carried in
+  cleartext gossip, is typed by users during recovery, and is returned in an HTTP
+  response **alongside its own hex** (`api/commons/anchor.rs:67`).
+- **Anchor as secret witness** — `Attestation` is *"Private attestation from an
+  issuer (kept secret by holder)"* (`icn-zkp/src/types.rs:217`); the membership
+  circuit takes the anchor-derived DID as a **private** input
+  (`icn-zkp/src/circuit/membership.rs:60-63`); the audit checklist requires
+  *"No VUI/anchor logged"* (`SDIS_AUDIT_CHECKLIST.md:286`).
+
+**Anchor-to-anchor correlation across cooperatives is never named as a threat in
+any SDIS document.** And `genesis_random`'s only documented rationale —
+*"prevents rainbow table attacks on VUIs"* (`anchor.rs:102-104`) — is a
+*pre-image* defence, which only makes sense if the anchor is published. So the
+honest reading is: **the anchor was intended to be a publishable pseudonym that
+hides its inputs, not a private continuity root** — and the ZK layer, built on
+the opposite assumption, was never reconciled with it.
+
+`Anchor::to_did` was in the original SDIS commit (`8c434077`, 2025-12-10) but was
+specified under *"Task S2.1.2: Implement DID format extension"* with the literal
+instruction **"Add backward compatibility"** — an interop bridge to the
+pre-existing key-derived `Did`, not a doctrine that a person's public identifier
+should be their anchor.
+
+### 3.6 Documented contradictions nobody has adjudicated
+
+The sharpest, which PRINCIPAL_MODEL does not record: **does recovery preserve the
+DID?** `design/multi-device-identity-design.md:664` says the DID stays stable;
+`design/social-recovery-design.md:26,29` says recovery **creates a new DID** and
+installs a `did_mapping:<old_did>` indirection. Those are incompatible, both are
+"PARTIALLY CURRENT", and each has code. Also unadjudicated: whether keys are
+exportable (`CLIENT_MODEL` says never; MDI ships an encrypted `BackupSeed`), and
+whether a person has one DID or many (`CLIENT_MODEL:99` vs PRINCIPAL_MODEL:1144).
+
+### 3.7 There is no ordering substrate. At all.
+
+This is the fact that decides the architecture, so it is stated flatly.
+
+| Substrate | Authenticated | Ordered | Scope | Replicated |
+|---|---|---|---|---|
+| `SignedGovernanceOp` | yes (Ed25519 over a length-prefixed canonical body) | **no** — `seq` is per-`(author, domain)` and is explicitly *"a comparator for same-key conflicts, never an acceptance gate"* (`replication.rs:291-294`) | per-domain key, no domain-wide order | **no** — emission only; ingress recognises the frame and returns without applying (`apps/governance/src/actor.rs:1368-1371`) |
+| Gossip | **no** — `GossipEntry` has `author: Did` and **no signature field** (`types.rs:116-133`) | partial only; the vector clock is node-global, LRU-evicting at 10 000, and never used to order within a topic | topics are global-by-domain (`governance:proposal`, `identity:updates`, `entity:updates`) | yes |
+| Ledger journal | yes (per-entry Ed25519) | partial — Merkle-**DAG**, local timestamps | per-**currency** | yes |
+| Entity / membership | **no** | LWW on a wall-clock field | global public topic; memberships not gossiped at all | partial |
+| Identity rotation | event is signed, but the apply path never verifies it | per-DID `new_version` | per-DID | **no** — topic unwired |
+| `Coordination` / Raft | — | — | — | **zero implementors** (`icn-kernel-api/src/coord.rs:124`) |
+
+**ESTABLISHED: ICN has no replicated authenticated ordered log that a governance
+operation lands on, and no per-cooperative or per-domain order that a governance
+operation and an identity event could share.** The nearest specification of one is
+#2469 §5.6, and it is unbuilt.
+
+---
+
+## 4. What "identity" collapses today
+
+Testing the mission's decomposition hypothesis against §3, `Did` is currently
+serving as **eight** distinct concepts:
+
+| # | Concept | Where | Must it be a key? |
+|---|---|---|---|
+| 1 | key identifier | `from_public_key` | **yes — this is what the type is** |
+| 2 | durable subject across rotation | `DidDocument.id` (`multi_device.rs:21-22`) | **no — see below** |
+| 3 | privacy anchor | `Anchor::to_did` | **no**, and it must not be public |
+| 4 | entity identifier | treasury DIDs from 16 padded bytes | **no** |
+| 5 | network principal | node DID + Hello cert binding | yes |
+| 6 | credential subject | `icn-zkp` holder DID | no — should be per-context |
+| 7 | storage / membership key | sled keys, `gov:vote:{pid}:{voter}` | needs canonical bytes, not string-equality |
+| 8 | session subject | `claims.sub` | no — a session is not authorship |
+
+**Result of the decomposition test.** Only 1 and 5 genuinely need to be a public
+key. Concept 2 is the decisive one:
+
+> **ESTABLISHED: a durable human subject identifier must not be a public key.**
+>
+> *Proof.* R2.1 requires the subject to survive rotation; R2.2 requires the
+> authorizing keys to change; R1.2 says custody defines identity. If the subject
+> identifier *is* a key, then either that key can never be retired — contradicting
+> R2.2 — or the subject is permanently named by a key nobody controls. ICN
+> already exhibits the second horn: `DidDocument.id` is the original key's DID, so
+> after `revoke_device("device-1")` **the document is identified by the key it
+> just revoked** (`multi_device.rs:21-22`, `:426-447`). ∎
+
+Concepts 2, 3, 6 and 8 must therefore each get their own representation. §9 gives
+them one; §10 states what is left for `Did`.
+
+---
+
+## 5. The structural diagnosis: one choice, six blockers
+
+PRINCIPAL_MODEL accumulated O8, O9, O13, O16, O17 and O18 across twenty review
+rounds. They are not six problems. They are six consequences of **one** decision:
+
+> **The Person's durable identifier is derived from a key, and authority over it
+> must nevertheless evolve.**
+
+Trace each:
+
+| Blocker | Question | Why the choice forces it |
+|---|---|---|
+| **O17** | How does a first-contact peer get a trustworthy *starting* document? | The identifier commits to a **key**, not to a genesis **event**, so nothing self-certifies the document's origin. |
+| **O8** | How does a verifier learn the *current* root after rotation? | `to_verifying_key()` recovers the **genesis** key forever, so the identifier points at the wrong authority the moment it changes. |
+| **O16** | Which branch is legitimate when a compromised genesis key forks the chain? | The chain is anchored at a key that **can never be retired**, because retiring it would break the anchor. A permanent root is a permanent forking capability. |
+| **O18** | How are anchor-derived Persons modelled? | Anything that is *not* a key cannot be an identifier — so a legitimately non-key subject (F3) had to be smuggled through `new_unchecked`, producing F1 and F2. |
+| **O13** | How is `GOV_OP_V1` retired convergently? | `Did` carries no principal type tag and no version position, so no receiver can classify an author or place a cutover. |
+| **O9** | How is a device revoked convergently? | An authorization is signed once against an authority that changes, and there is no order relating the two. |
+
+O16 deserves emphasis because it is the deepest: **a key-derived durable
+identifier makes its genesis key a permanent master secret.** That directly
+violates R2.4 and R9.5, and no amount of chain machinery repairs it — the chain's
+anchor *is* the master key.
+
+**REJECTED: the key-derived durable Person identifier** (PRINCIPAL_MODEL §4's
+Person row, and Model A of §7). Not because it is inelegant, but because it
+mathematically entails a permanent unretireable root, and every one of the six
+blockers is downstream of that.
+
+O9 is the one blocker that is **not** dissolved by fixing the identifier, because
+it is not a consequence of the choice — it is a consequence of physics. §6.1.
+
+---
+
+## 6. The reframe: three moves, two of them forced
+
+### 6.1 Move 1 — stop asking for global convergent revocation. It is impossible.
+
+**ESTABLISHED (external, primary sources).**
+
+1. Requiring all peers to agree on whether an act preceded a revocation is
+   requiring **atomic broadcast**. Chandra & Toueg, *Unreliable Failure Detectors
+   for Reliable Distributed Systems*, JACM 43(2), 1996: *"Consensus and Atomic
+   Broadcast are equivalent in asynchronous systems with crash failures… a
+   solution for one automatically yields a solution for the other."*
+2. Consensus is unsolvable in that model. Fischer, Lynch & Paterson, JACM 32(2),
+   1985: *"every protocol for this problem has the possibility of nontermination,
+   even with only one faulty process."*
+
+⇒ **O9, as posed — "how is a device revoked convergently *at all*" across the
+network — has no solution.** PRINCIPAL_MODEL was right that all three candidate
+shapes fail; it stopped one step short of the reason, which is that the target is
+unreachable rather than unbuilt.
+
+The survey confirms it empirically: **no deployed system achieves decentralized
+global convergence on revocation.** Every one either supplies an ordering
+authority (Signal Sesame's central server; Matrix's homeserver; WebAuthn's RP
+database; BitstringStatusList's issuer endpoint), only *detects* divergence
+(Certificate Transparency, CONIKS, KEYTRANS — and draft-ietf-keytrans-architecture-09
+§3.3 concedes detection needs *"a connected graph of all users"*, so a partition
+defeats it), or deliberately discards the ambiguous case (DIDComm: *"The message
+recipient MUST ignore those messages"*). KERI detects duplicity and resolves it
+only **per validator** — *"the first seen version of an event is the authoritative
+one for that validator"* — so partitioned validators diverge **by design**.
+
+**The escape hatch is formal.** Guerraoui, Kuznetsov, Monti, Pavlovic &
+Seredinschi, *The Consensus Number of a Cryptocurrency*, PODC 2019: *"the
+consensus number of an asset transfer object is 1… a more general k-shared asset
+transfer object where up to k processes can atomically withdraw from the same
+account… has consensus number k."* Consensus number 1 means **reliable broadcast
+suffices — no consensus needed.**
+
+> **This gives the design its single most important constraint:**
+> **keep the authority log single-writer.** The moment two devices can
+> independently author authority changes for the same subject, k > 1 and the
+> system is back in consensus territory.
+
+### 6.2 Move 2 — make the identifier commit to an *event*, not to a key
+
+A **self-addressing identifier** — `SAID = H(inception_event)` — is
+self-certifying without being a key. Given the identifier and the inception
+event, any peer verifies the binding by hashing. This is KERI's construction, and
+it is the only one in the survey that discovers current authority **with no
+online authority, no clock and no consensus** (by replaying a log anchored at a
+self-certifying inception).
+
+Two consequences fall out immediately:
+
+- **O17 dissolves.** The genesis document *is* the thing the identifier commits
+  to. There is no bootstrap problem and no trusted starting document to obtain.
+- **O16 is largely defused by pre-rotation.** KERI's inception commits a *digest*
+  of the next key set; rotation reveals it. A compromised **current** key
+  therefore cannot rotate, because it does not hold the pre-committed next keys.
+  Forking requires compromising cold, never-used key material. The residual case
+  — genuine duplicity — is *detectable by every honest validator*, which can then
+  independently refuse; that is convergent refusal, which is achievable, unlike
+  convergent branch selection, which is not.
+
+### 6.3 Move 3 — let the acceptor set recency, and let the subject own the order
+
+Rivest, *Can We Eliminate Certificate Revocation Lists?*, FC'98 — 28 years old and
+still the correct architecture here:
+
+> **"Proposition 1: Recency requirements must be set by the acceptor, not the
+> certificate issuer. The reason is that the acceptor is the one who is running
+> the risk if his decision is wrong."**
+> *Corollary 1: "Periodically-issued CRLs are wrong."*
+> *Proposition 2: "The signer can (and should) supply all the evidence the
+> acceptor needs, including recency information."*
+
+Applied to ICN: an institution is the acceptor. It decides how fresh a member's
+authority evidence must be. The member's device supplies that evidence with the
+act. Nobody needs a global agreement, because **no global decision is being
+made** — each institution decides for itself, about its own state, which is
+exactly the scope in which it already has legitimate authority.
+
+This also explains why ICN's one *working* revocation mechanism works: RPC and
+gateway token revocation (AUTHORITY_SPINE §2) is scoped to a single relying party
+with a durable store and a fail-closed read. It is not an accident; it is the only
+shape that can work.
+
+### 6.4 What the external survey teaches, architecture by architecture
+
+Primary specifications, not summaries. **Adopted** means the idea is used in §9;
+**rejected** means it was examined and does not fit ICN's premises.
+
+| Architecture | The one thing it teaches | Verdict |
+|---|---|---|
+| **W3C DID Core** | The four *verification relationships* (`authentication`, `assertionMethod`, `capabilityInvocation`, `capabilityDelegation`) are a clean device least-privilege vocabulary. But its own §9.8 says that positioning a signature in time requires anchoring "*on a blockchain*", and otherwise "*the only safe course is to disallow any consideration of DID state with respect to time*". | **data model adopted; resolution rejected** |
+| **did:key** | The correct primitive for *genesis* and the wrong one for a durable subject. Its spec says so: *"they cannot be updated or deactivated"*, *"any change to the cryptographic key… effectively creat[es] a new identity"*, and a section titled **"Long Term Usage is Discouraged."** **This is precisely what ICN's `Did` is being used as today.** | **diagnosis adopted** |
+| **did:peer / DIDComm** | Relationship-scoped identifiers with no registry — the direct precedent for per-context subjects. But its rotation answer is *"The message recipient MUST ignore those messages"*: determinism bought with **silent message loss**, which violates R4.6. | **scoping adopted; rotation rejected** |
+| **VC 2.0 + BitstringStatusList** | Portable standing is real and worth having (§17, O6). Its revocation is not: status checking mandates an online fetch (`STATUS_RETRIEVAL_ERROR` when unreachable), and its own privacy section concedes correlation below ~131 072 entries — unattainable per cooperative. | **credentials adopted as a layer; status lists rejected** |
+| **KERI** | The closest architecture to ICN's premises, and the source of the two mechanisms §9 uses: **self-addressing identifiers** and **pre-rotation**. Also the honest limit: duplicity is *"first seen… for that validator"*, so partitioned validators diverge **by design**. | **mechanisms adopted; the stack (witnesses, watchers, CESR, OOBI) rejected as too heavy for ICN's stage** |
+| **Key transparency / CT / CONIKS** | Non-equivocation is *detection*, never a decision. draft-ietf-keytrans-architecture-09 §3.3: detecting a fork needs *"a connected graph of all users"*, else the log "*can attempt to partition users into subsets that do not gossip*". | **rejected** — it yields an alarm, not a verdict |
+| **WebAuthn / passkeys** | The best deployed device-holder proof and UX, and a model of correlation resistance: *"Relying Parties are not able to detect any properties, or even the existence, of credentials scoped to other Relying Parties."* Revocation is purely the RP's database. | **adopted as a device-key gate; rejected as a subject identifier** |
+| **UCAN / ZCAP-LD** | Attenuating delegation chains are the right shape for R3.2, and UCAN's revocation set is deliberately a **grow-only, order-insensitive CRDT**. But it concedes it does not undo an already-honoured invocation — convergence on the *set*, not on the *effect*. | **attenuation adopted; revocation-as-answer rejected** |
+| **FROST (RFC 9591)** | A stable group public key with membership changing beneath it — the shape a threshold-held institution key would need. But *"FROST does not provide robustness"*, DKG is out of scope, and signing needs `t` reachable participants in one session. | **deferred** — see O12 |
+| **BBS+ / anonymous credentials** | The only design offering cross-institution unlinkability *and* third-party verifiability. Requires a BLS12-381 pairing stack, is still Internet-Draft, and its revocation story falls back to status lists. | **deferred** — and F16 means ICN could not wire it today regardless |
+| **Signal Sesame / Matrix cross-signing** | Two shipping patterns worth stealing: **tombstone-with-bounded-window** (Sesame keeps stale device records until `MAXLATENCY` so delayed messages still decrypt) and **receive-time trust re-evaluation** (Matrix: *"messages sent from non-cross-signed devices… SHOULD NOT be displayed"*). Both assume a central ordering authority ICN does not have. | **patterns adopted (§9.3); central authority rejected** |
+
+**The cross-cutting lesson.** Of every architecture surveyed, exactly one
+discovers current authority with **no online authority, no clock and no
+consensus** — KERI, by replaying a single-writer log anchored at a self-certifying
+inception. That is not a coincidence: it is the only one built from the same
+premises ICN's R1/R4/R7 state.
+
+### 6.5 What the three moves buy
+
+| Blocker | Disposition |
+|---|---|
+| O17 | **Dissolved** by 6.2 — self-addressing inception is its own trust root. |
+| O8 | **Dissolved** by 6.2 — current authority is derived by replaying the subject's own log from a self-certifying inception. |
+| O16 | **Largely defused** by 6.2 (pre-rotation); residual is convergent *refusal*, not convergent selection. Remains OPEN as a policy question (§17). |
+| O18 | **Dissolved** by 6.2 + §10 — a non-key durable subject becomes expressible, so nothing needs `new_unchecked`. |
+| O13 | **Dissolved** by 6.2 — retirement becomes an event in the subject's own single-writer log, so the cutover is per-subject and ordered (§18). |
+| **O9** | **REJECTED as posed** by 6.1 — provably unachievable. **Replaced** by a per-act-class requirement (§9.3) that is achievable. |
+
+---
+
+## 7. Candidate models
+
+Five models, each stated at its strongest. None is a straw man; A is the repo's
+own current proposal and D is the position most of the external ecosystem holds.
+
+### Model A — Key-as-Person *(the status quo, plus the A0 program)*
+
+The Person identifier is a self-certifying key-derived `Did`. Authority evolves
+through an authenticated identity-document chain anchored at the genesis key the
+DID encodes. Device authority travels as a carried, self-contained
+`DeviceAuthorization`.
+
+**Strongest case.** Nothing new to build for genesis — it already works offline
+(§3.2). Verification needs no resolution, no registry, no network round-trip:
+`author.to_verifying_key()` and done, which is exactly why #2469 could freeze a
+field set. One identifier everywhere means membership records, storage keys and
+the whole existing type surface keep working. The chain's cheap parts already
+exist: capability checks, Ed25519 verification, strict `+1` monotonicity.
+
+**Why it fails.** §5: the identifier's binding to the genesis key makes that key a
+**permanent, unretireable master secret**, which is a direct R2.4/R9.5 violation
+and the root of O16. O8, O17, O13 and O18 follow. It also fails R6.1 outright —
+one permanent 32-byte value in every membership record, every `gov:vote:{pid}:{voter}`
+key and every gossiped op. **REJECTED.**
+
+### Model B — Stable non-key Person anchor, globally resolvable
+
+A durable Person identifier exists independent of keys (random bytes, or a hash);
+keys and devices are authorized *for* it. This is what SDIS's `Anchor` actually is
+(F3).
+
+**Strongest case.** It gets R2.1/R2.2 right — subject and authority are genuinely
+separate, rotation is natural, and there is no permanent genesis key. It matches
+the strongest existing ICN design intent, and `KeyBundle::did()` already carries
+the doc-comment *"Returns the anchor's DID, **not a key-based DID**"*.
+
+**Why it fails.** Three ways. (i) **Genesis has no authority root**: nothing stops
+a second party claiming an unclaimed anchor, and first-writer-wins in a global
+namespace is arrival-order dependent — the exact rule #2469 §8 withdrew as
+non-convergent. (ii) **Resolution requires a global authenticated directory**, so
+you inherit key-transparency's split-view problem, whose own architecture draft
+concedes detection needs *"a connected graph of all users"*. (iii) **Correlation
+is worse than Model A**, because a permanent non-rotating anchor cannot even be
+changed. **REJECTED** as a *global* identifier; its core idea — a durable non-key
+subject — is retained in §9 and made self-certifying and *per-context*.
+
+### Model C — Context-scoped identity with a private continuity root
+
+There is no global Person identifier. The person holds keys and a private
+continuity root. Each institution knows them by a distinct, self-certifying
+subject identifier whose authority evolves in a log the subject alone writes. The
+institution is the relying party.
+
+**Strongest case.** Satisfies R6.1 structurally rather than by policy. Removes the
+global namespace and therefore O8/O16/O17 in their global form. Single-writer
+authority logs have consensus number 1 (§6.1), so no consensus is required.
+Matches the only external designs built on the same premises (did:peer's
+relationship-scoped registry; KERI's per-relationship AIDs).
+
+**Costs, stated up front.** Recovery is per-context work, not one act (§12).
+Cross-context proof requires an explicit linkage step (§11.3). Sybil resistance
+needs a nullifier, and ICN's ZK stack cannot currently provide one (F16). "Who is
+this person, globally?" becomes unanswerable — which is usually correct and
+occasionally inconvenient.
+
+### Model D — Credential-centric, no person identifier at all
+
+The person holds keys; institutions issue verifiable credentials; every
+relationship is a credential. Standing is proven by presentation.
+
+**Strongest case.** Maximum portability — standing provable to a third party that
+holds no registry, which is precisely the gap PRINCIPAL_MODEL §7.2 names. Aligns
+with the largest external ecosystem (VC-DM 2.0). Institutions already behave this
+way: `FounderSignature` (F18) is a credential in all but name.
+
+**Why it fails as the *whole* answer.** (i) A credential subject still needs an
+identifier, so pairwise identifiers reappear — D collapses into C plus a
+credential layer. (ii) **Credential revocation is the same impossibility again**,
+and the ecosystem's answer is BitstringStatusList, which mandates an online fetch
+(`STATUS_RETRIEVAL_ERROR` if unreachable) and whose own privacy section concedes
+correlation below ~131 072 entries — unattainable per cooperative. (iii) It
+supplies **no continuity mechanism**: lose every device and there is nothing that
+is still you. **REJECTED as the whole answer; adopted as a layer** (§11.2, §14).
+
+### Model E — Hybrid identity/authority graph
+
+Continuity anchor + authority keys + pairwise identities + recovery authorities +
+institutional credentials, all first-class.
+
+**Strongest case.** It can express every requirement, and every component has a
+real justification somewhere in §2.
+
+**Why it fails.** Complexity is itself a cost, and here it is disqualifying: five
+first-class concepts means five genesis stories, five recovery stories and five
+revocation stories, whose interactions are where security bugs live. §3 is a
+catalogue of what happens when ICN maintains several parallel identity models at
+once — three "steward vouch" authority models that disagree (F6/§3.5), two
+incompatible `DidDocument` types, two contradictory definitions of "who may sign".
+E institutionalizes that failure mode. **REJECTED** — but note that C *is* E with
+four of the five concepts demoted from protocol objects to client-side or
+app-layer concerns, which is the whole point.
+
+### Evaluation matrix
+
+Qualitative, with reasons rather than false precision.
+**✔** meets · **~** partial / costed · **✘** fails · **n/a** not applicable.
+
+| Criterion | A key-as-person | B global anchor | **C context-scoped** | D credential-only | E hybrid |
+|---|---|---|---|---|---|
+| Self-sovereignty (R1.1–R1.3) | ✔ | ~ needs directory | **✔** | ✔ | ✔ |
+| No centralization dependence | ✔ | ✘ global directory | **✔** | ~ status lists | ~ |
+| Offline genesis (R7.1) | ✔ | ~ claim race | **✔** | ✔ | ✔ |
+| Device compromise bounded (R3.2) | ~ | ~ | **~** bounded, not eliminated | ~ | ~ |
+| **Root compromise survivable (R2.4)** | **✘ permanent master** | ✔ | **✔ pre-rotation** | n/a | ~ |
+| Total-loss recovery (R9.1) | ✘ O14 — chain cannot advance | ~ | **~** per-context | ✘ nothing persists | ✔ |
+| Multi-device (R3) | ~ roster only | ~ | **✔** | ~ | ✔ |
+| Least privilege (R3.2) | ✘ #2590 | ~ | **✔** attenuated | ✔ | ✔ |
+| Deterministic verdict (R4.3) | ~ | ✘ split view | **✔** single-writer | ✘ fetch may fail | ~ |
+| Partition tolerance (R7.3) | ~ | ✘ | **✔** | ✘ | ~ |
+| Historical signature validity (R2.3) | ~ ambiguous after recovery | ~ | **✔** anchored position | ✔ | ~ |
+| **Correlation resistance (R6.1)** | **✘** | **✘ worse** | **✔** | ✔ | ✔ |
+| Selective disclosure (R6.2) | ✘ | ✘ | ~ needs new crypto (F16) | ✔ | ✔ |
+| Governance authorship (R8) | ~ blocked O8/O9 | ~ | **✔** | ~ | ✔ |
+| Institutional delegation | ~ | ~ | **✔** | ✔ | ✔ |
+| Hosted-node independence (R11) | ✔ | ✔ | **✔** | ✔ | ✔ |
+| User experience (R10) | ✔ one identity | ✔ | **~** many contexts, hidden by the app | ~ | ✘ |
+| Implementation complexity | ~ | ✘ directory | **~** | ~ | ✘ |
+| Protocol complexity | ~ | ✘ | **~** | ~ | ✘ |
+| **Migration complexity** | ✔ none | ✘ | **✔ near-zero — see §15** | ✘ | ✘ |
+| Cryptographic agility (R12.1) | ✘ DID pins the suite | ✔ | **✔** | ✔ | ✔ |
+| Auditability (R9.2) | ~ | ~ | **✔** append-only log | ~ | ~ |
+| Meaning Firewall (R13.1) | ✘ `Person` in kernel | ✘ | **✔** §9.5 | ✔ | ✘ |
+
+**Selected: Model C.**
+
+---
+
+## 8. Adversarial scenarios
+
+All 25 mission scenarios, walked against **Model C as specified in §9**, with the
+discriminating failures of the rival models noted. A scenario that Model C cannot
+answer is marked **OPEN** and appears in §17 — none are silently absorbed.
+
+| # | Scenario | Model C outcome | Where A/B/D/E differ |
+|---|---|---|---|
+| 1 | Genesis key compromised 5 yrs after a legitimate rotation | **Contained.** The identifier commits to the inception *event*, not to a key, and rotation revealed pre-committed next keys. A stolen genesis key can sign nothing current and cannot rotate — it does not hold the pre-rotated material. | **A fails catastrophically** — the genesis key is the chain anchor forever (O16). |
+| 2 | Attacker and user each create a same-generation successor | **Requires cold-key compromise**, since rotation must reveal the pre-committed digest. If it happens: duplicity is detectable by every honest validator from two events at one position, and all refuse. **Convergent refusal, not convergent selection.** Residual policy = **OPEN (O16′, §17)**. | A: both branches verify from genesis; a content tiebreak converges *on the attacker*. |
+| 3 | Two concurrent recovery attempts | Recovery is per-context (§12). Each institution runs its own delay-and-veto and reaches one outcome. Contexts **can** diverge — the person may recover Coop A while an attacker takes Coop B. That is a real cost, and it is *bounded blast radius* rather than a global race. **Stated, not hidden.** | A/B: one global race decides everything at once. |
+| 4 | One trustee submits the same proof M times | Rejected — thresholds count **distinct authenticated** participants (R9.4). Today this fails: `sync.rs:263-269` has neither signature check nor dedup (#2591), and SDIS's `approve_by_steward()` is a bare `+= 1`. | same for all models; a requirement, not a differentiator |
+| 5 | Threshold trustees collude | **Not fully mitigated, by design.** Mitigations: per-context recovery means colluding guardians must pass *each* institution's procedure; delay + subject veto (R9.6); recovery is a logged event, never silent (R9.2). **Residual risk stated.** | E claims more; the extra machinery does not remove the trust |
+| 6 | Phone stolen while disconnected two weeks | The thief can act **within the device's attenuated scope** until the subject's log advances past the authorization. The window is bounded by §9.3's staleness rule, **not** by wall-clock. | A: unbounded — PRINCIPAL_MODEL T1 records exposure as indefinite |
+| 7 | Revoked phone signs a governance action and delivers it late | **Per act class (§9.3).** Deferred-decision acts (votes): the decision pins a log position, so the act is evaluated against converged state and does not count. Settled acts: revocation is **prospective only**; the act stands and the bound is scope, not retroaction. | **No model solves this globally — §6.1 proves it impossible.** A/B claim to and cannot |
+| 8 | User loses every device | Recovery from the continuity root, per context (§12). | A: **impossible today** — `RotationEvent::verify` needs an existing non-revoked key (O14). D: nothing persists |
+| 9 | Replacing a ten-year-old phone | Ordinary device authorization + revocation in the subject's log. Invariant test **T1 passes**. | all pass |
+| 10 | Signature algorithm deprecated | Rotate to a new suite; the identifier is a hash of an event, not of a key, so it is unchanged (R12.1). | **A fails** — the DID *is* an Ed25519 key |
+| 11 | Gateway compromised | It relays; it holds no subject key and cannot author (R8.1/R8.4). It **can** withhold or delay — unmitigated and stated. | all models that separate relay from authorship |
+| 12 | Personal node compromised | Same as 11. The node is a distinct principal; T4 passes. | — |
+| 13 | Malicious hosting provider | Cannot become the institution: institutional acts are person-signed mandate chains, not host-key signatures (§14). **T3 passes.** Can deny service — stated. | — |
+| 14 | Institution impersonates a member | Cannot: the institution holds no key that derives the member's subject, and acts carry a device signature the institution cannot produce. | today this **fails** — #2589 mints a token for an unproven subject |
+| 15 | Member wants Coop A and Coop B unable to correlate them | **Satisfied by construction** — distinct subject identifiers, distinct per-context device keys (§11.1). | **A and B fail** — one identifier everywhere |
+| 16 | Member wants to prove two personas are one human | Sign a linkage statement with both subjects' current keys (§11.3). Cheap and consent-gated. | A: trivial but always-on, i.e. not consent-gated |
+| 17 | Federation needs a delegated mandate without learning unnecessary identity | The delegating coop attests "this subject is our delegate"; the federation learns the federation-scoped subject only. Note the coop **does** learn both — necessarily, since it created the delegation. **Correlation follows the relationship, not the identifier.** | — |
+| 18 | User has no personal node | Unaffected — identity is client-side; a gateway relays. **R11.1.** | all pass |
+| 19 | User runs three personal nodes | Unaffected — nodes are separate principals. **T4/T5 pass.** | all pass |
+| 20 | User signs while partitioned | Works: signing is offline (R7.2); the act references a log position the device already holds. | — |
+| 21 | Device authorization arrives before/after a root rotation, in different orders | Both are events in **one single-writer log** with `+1` monotonicity, so their relative order is fixed by the log, not by arrival. Out-of-order delivery **buffers**, never rejects (R4.6). | **A cannot place them at all** — this is exactly O8's collapse into O9 |
+| 22 | Revocation and a member act arrive in opposite orders | Admission is monotone and order-independent; **effect** is computed from converged state at a pinned position (§9.3). Two honest nodes agree. | A/B: arrival-order divergence — PRINCIPAL_MODEL §6.5 refutes both shapes |
+| 23 | An old receipt must stay verifiable after recovery | **Yes.** The act names the log position at which its signing key was authorized; the log is append-only and hash-chained, so "K was authorized at position N" is a permanent fact. R2.3. | A: recovery replaces the root and history becomes ambiguous |
+| 24 | Migrating an SDIS anchor identity | Near-free. F5 (the anchor was never the acting principal) and F20 (mutating routes disabled) mean **no deployed anchor carries authority**; F4 shows the VUI feeding it is `SHA256(did)`, so none carries uniqueness either. §15.2. | A: O18 is listed as **critical** precisely because it assumed otherwise |
+| 25 | An existing key-derived DID holder must not "become a new person" | **They do not change at all.** Their `Did` remains their principal; their initial context subject may simply *be* that DID. Migration is opt-in and incremental. §15.1. | B/D/E require a cutover |
+
+**Scenarios Model C does not fully answer, carried to §17:** 2 (residual duplicity
+policy), 3 (cross-context divergence under concurrent recovery), 5 (guardian
+collusion), 7 (irreducible — §6.1), 11 (relay withholding).
+
+---
+
+## 9. The recommended architecture
+
+**Classification: RECOMMENDED.** It is the strongest model after comparison, not a
+forced conclusion. §17 lists what would reopen it.
+
+### 9.1 Four objects, each with exactly one job
+
+| Object | Definition | Layer | Public? |
+|---|---|---|---|
+| **Principal** | a keypair. Its public key **is** a `Did`. | kernel | yes, to whoever verifies a signature |
+| **Subject** | `SubjectId = H(inception_event)` — a **self-addressing identifier**, not a key. One per context. | identity | to that context only |
+| **Authority log** | a per-subject, **single-writer**, hash-chained, `+1`-monotone log of authority events, with **pre-rotation** | identity | replicated to that subject's relying parties |
+| **Continuity root** | a private client-side secret: the person's index of their own subjects, plus the pre-rotation material that lets them recover each one | **client only — never published, never sent** | **no** |
+
+The person is not an object in the protocol. That is the point. `Person` is an
+app-layer word for *the human who holds a continuity root*, and no kernel type
+needs to know it exists (R13.1).
+
+**Why the subject is a hash of an event, not a key.** §4 proved a durable subject
+must not be a key; §6.2 supplies the alternative. Given `SubjectId` and the
+inception event, any peer verifies the binding by hashing — self-certifying with
+no registrar, no resolver and no trusted starting document. That is the direct
+answer to O17.
+
+### 9.2 How authority evolves
+
+The inception event declares the subject's initial authorized keys **and commits
+to a digest of the next key set** (pre-rotation). Each later event is signed by a
+key authorized in the immediately preceding state and advances the position by
+exactly one.
+
+```
+inception  { keys: [K0], next: H(K1set), policy }        position 0
+   │        SubjectId = H(this event)          ← self-certifying, no registry
+   ▼
+authorize  { device: D1, scopes, valid_for }             position 1
+   ▼
+rotate     { reveal K1set, next: H(K2set) }              position 2
+   ▼
+revoke     { device: D1 }                                position 3
+```
+
+Four properties, and each does specific work:
+
+- **Single-writer ⇒ consensus number 1** (§6.1). Merging is *"take the longest
+  verified prefix"* — a monotone join, i.e. a CRDT. No consensus, no total order,
+  no clock. This is the formal licence for the whole design.
+- **Pre-rotation** means a compromised *current* key cannot rotate: it does not
+  hold the pre-committed next material. Scenario 1 contained; scenario 2 reduced
+  to cold-key compromise.
+- **`+1` monotonicity** makes out-of-order delivery **buffer**, never reject
+  (R4.6) — which is precisely the gap-fill obligation PRINCIPAL_MODEL's A0 already
+  identified, now with a reason it is safe.
+- **Duplicity ⇒ convergent refusal.** Two events at one position are detectable by
+  everyone holding both; every honest holder refuses to advance past the fork.
+  Convergent *refusal* is achievable; convergent *selection* is not (§6.1).
+
+> **Do not let two devices write this log.** The instant two devices can
+> independently author authority events for one subject, k > 1 and consensus is
+> required again (§6.1). Concurrency here is a **correctness boundary**, not a
+> feature request.
+
+### 9.3 Revocation, stated per act class — the replacement for O9
+
+Because §6.1 forbids a single global answer, the semantics is stated per class.
+**R5.2 requires this table to be explicit; silence would be the defect.**
+
+| Class | Examples | Admission | Effect | Revocation reaches back? |
+|---|---|---|---|---|
+| **1 — deferred-decision** | votes, nominations, anything tallied at a decision point | monotone: well-formed **and** authored by a key authorized at the referenced log position. Never depends on revocation state. | computed at the decision point against the log prefix **the decision pins**. Deterministic function of converged state. | **yes, within the open window** — and the cost is small because votes are keyed `gov:vote:{pid}:{voter}`, i.e. **by subject**, so the person re-casts from a new device and loses nothing |
+| **2 — immediately settled** | ledger entries, receipts, anything with irreversible external effect | authority checked once, at admission, and **finalized** | fixed at admission | **no — prospective only.** Bounded by *scope*, not by retroaction (R5.3). Honest analogue: a stolen card is stopped going forward, not unwound |
+| **3 — authority events** | the log's own events | ordered by the log itself | — | n/a — self-ordering |
+
+**Bounding the window without a clock (R5.1).** A device authorization carries
+validity expressed in **log positions**, not wall-clock: valid for acts
+referencing positions in `[N, N+k]`. The subject periodically advances the log, so
+stale authorizations age out **deterministically** — every holder of the log
+computes the same answer, with no clock anywhere (R4.1, and it avoids F14's
+fail-open entirely). This is Let's Encrypt's short-lived-credential strategy
+translated into a counter.
+
+*Cost, stated:* a subject who never advances their log leaves authorizations
+valid, and a subject who advances too aggressively can strand an offline device.
+**Choosing `k` and the re-authorization cadence is OPEN (§17, O-N1).**
+
+> **Class 1 has a dependency this document does not discharge.** "Evaluated at the
+> decision point against the log prefix the decision pins" is deterministic *only
+> if the decision point itself is deterministic* — i.e. if closing a proposal is a
+> replicated act that fixes the pinned position, rather than a node-local handler
+> action. ICN does not have that today: #2469 §7.2 keeps `ProposalClosed`
+> **contained** precisely because "membership is not the right authority for
+> choosing an outcome" and `outcome`/`tally` are attacker-supplied fields, and the
+> correct authority "entangles with the `GovernanceProofV2` signer-authority
+> model" that #2469 lists as a non-goal.
+>
+> So class 1 is **convergent conditional on deterministic proposal closure**, which
+> is a governance problem with a known shape and a named owner — not an identity
+> problem, and not one this document solves. Recorded as **O-N6** (§17). Until it
+> is answered, class 1 degrades to class 2 semantics: authority fixed at admission,
+> revocation prospective only. That degradation is safe, and it is what a receiver
+> should do in the absence of a pinned position.
+
+### 9.4 Governance authorship
+
+```
+Person holds continuity root (offline / backup)
+   │
+   ├── subject S_A in Coop A, with its own authority log
+   │        │
+   │        └── log authorizes device D (scopes, positions [N, N+k])
+   │
+   ▼
+D signs the governance act, referencing log position N
+   │
+   ▼
+gateway / node RELAYS — holds no key of S_A, asserts no authorship
+   │
+   ▼
+receiver verifies, from bytes in hand + its own authenticated local state:
+   1. act signature under D's key                       [bytes]
+   2. D authorized at position N, scope admits the act  [local log prefix]
+   3. S_A ∈ this domain's members                       [local domain state]
+   4. position N within validity                        [local log prefix]
+   ── if the local prefix is shorter than N: QUARANTINE, never reject
+```
+
+This satisfies #2469's I9 (no circular bootstrap — the log arrives on its own
+topic, not on the channel carrying the act) and R4.5 (local state that is
+authenticated and converges). It is the honest resolution of PRINCIPAL_MODEL
+§7.0.2's custody boundary: **the gateway relays an act it cannot author**, which
+is exactly what #2469 says is impossible today.
+
+> **Quarantine must be bounded, and correctness rests on re-delivery — not on
+> retention.** "Never reject" invites an obvious attack: reference a log position
+> that will never exist and the entry sits in quarantine forever. Rejecting
+> unknown signing keys is *not* the fix — a device legitimately authorized at
+> position `N+1` will act before slow receivers hold `N+1`, and rejecting it
+> would permanently discard a legitimate act, violating R4.6.
+>
+> The correct shape is the one #2469 slice 4 already specifies: a **bounded**
+> quarantine store with eviction and a steward release valve, where an evicted
+> entry is recovered by **anti-entropy re-delivery** once the log prefix catches
+> up. Convergence therefore depends on gossip re-delivery being reliable over
+> time, which is a property of the replication layer rather than of this design.
+> Stating it as "never reject" without that qualification would be an unbounded
+> memory claim. Folded into **O-N5**.
+
+Note what is *not* claimed: this does not make the production gateway composition
+converge on its own. #2469 §7.0.1's second barrier — a receiver cannot
+deterministically evaluate standing/suspension because that state is
+unauthenticated (F17) — is untouched by anything here, and remains #2441's.
+
+### 9.5 Where the Meaning Firewall falls
+
+PRINCIPAL_MODEL §1.1 forbids `Person` in the kernel and §4 then proposes it as a
+principal class. This model has no such tension:
+
+| Layer | Holds | Never holds |
+|---|---|---|
+| **kernel** (`icn-kernel-api`, `icn-identity` core) | `Did` (a key), signature verification, canonical encodings, a generic **attenuating delegation** between principals | any notion of person, member, device-class or coop |
+| **identity** (`icn-identity`) | `SubjectId`, the authority log, pre-rotation | why a subject exists, or what it is a subject *of* |
+| **app** (`apps/*`, governance, membership) | `Person`, `member`, `role`, standing, recovery policy, act-class rules | key custody |
+
+A **subject** is meaning-free: it is any entity with an evolving authorized key
+set. A person, a treasury and a node are all subjects. That is why this model
+satisfies R13.1 where a `Person` principal class cannot.
+
+### 9.6 What this does not solve — read this before building on it
+
+1. **The per-subject authority log does not exist.** §3.7. `RotationEvent` has the
+   right shape (signed, `+1` monotone) and is unwired, unverified on apply, and
+   signed with a different preimage than it verifies (F9, F10). This is real work.
+2. **Pre-rotation does not exist** anywhere in ICN. It is the load-bearing new
+   cryptographic mechanism, and it is the reason scenarios 1 and 2 are contained.
+3. **Selective disclosure does not exist and cannot be wired today.** F16: blind
+   signatures are not blind, the accumulator uses a 32-bit test modulus, the
+   trusted-issuer check passes on an empty list, and the default build can neither
+   prove nor verify. R6.2 and any nullifier-based sybil story are **new
+   cryptographic work**, not integration.
+4. **#2469 §7.0.1 still contains the production gateway composition.** Nothing
+   here lifts it.
+5. **Guardian collusion and relay withholding remain unmitigated** (scenarios 5, 11).
+6. **Cross-context divergence under concurrent recovery is a real cost** (scenario 3).
+
+---
+
+## 10. What `Did` should mean
+
+**RECOMMENDED: option B of the mission's list — `Did` names a cryptographic
+principal, and nothing else.**
+
+That is what the type already is (§3.1); the change is to stop projecting other
+concepts into it, and to make the type enforce what it claims.
+
+| Change | Rationale | Classification |
+|---|---|---|
+| `Did` = an Ed25519 (or successor) public key. No other construction. | §3.1; F1 and F2 are the current alternative failing in production | RECOMMENDED |
+| **Remove `Did::from_anchor_id` and `new_unchecked`** | Their only effect today is to mint values that ~50% of the time cannot be read back (F1) and that a ZK prover silently replaces with an all-zero key (F2) | RECOMMENDED |
+| **Canonicalize the encoding** — pin base58btc at parse, or compare by decoded key bytes | `Did` equality is string equality (§3.1), so two encodings of one key are two unequal DIDs. Folds in PRINCIPAL_MODEL O10 | RECOMMENDED |
+| Treasury identifiers become `EntityId`-shaped, not `Did`-shaped | A treasury holds no key; `derive_treasury_did` mints a string that would fail `Did::from_str` and a *second, different* one via `from_anchor_id` (`icn-coop/src/actor.rs:493`) — already flagged in `docs/status.toml:77` | RECOMMENDED |
+| A durable subject is a `SubjectId`, never a `Did` | §4's proof | ESTABLISHED (the proof), RECOMMENDED (the type) |
+
+**Should a global Person ID exist? No.** Not because privacy outranks
+verifiability, but because nothing needs it: authorship is provable against
+context-local authenticated state (§9.4), and sybil resistance needs *uniqueness*,
+not *identification* (R6.6). Every mechanism whose sole purpose was to make a
+global identifier work — global current-root discovery, global fork selection,
+global genesis bootstrap — is cost with no corresponding requirement.
+
+---
+
+## 11. Privacy and correlation
+
+### 11.1 What each observer learns
+
+| Observer | Learns | Does not learn |
+|---|---|---|
+| unrelated network peer | that some key signed something on a topic | which subject, which person, which contexts |
+| node operator / gateway | the subjects and device keys it relays for | the continuity root; other contexts' subjects |
+| a cooperative | its own `S_A`, its authorized device keys, its acts | `S_B`; that `S_A` and `S_B` are one human |
+| a federation | the federation-scoped subject of a delegate | the delegate's coop-scoped subject, unless the coop discloses it |
+| recovery guardian | that they are a guardian for one subject | the person's other contexts (if guardians are per-context) |
+
+**Device keys must be per-context too.** If one device key appears in two
+contexts, the identifier separation is defeated. Per-context device keys are a
+deterministic derivation from the device's own secret — bookkeeping, not custody
+burden.
+
+**Residual correlation, stated honestly.** Unlinkability is *across* contexts, not
+*within* one: everyone in Coop A can correlate `S_A`'s activity in Coop A, which
+is both unavoidable and correct. Two coops with overlapping human membership can
+correlate through social knowledge, timing and network metadata. This is
+**protocol-level unlinkability, not anonymity**, and nothing here should be
+described as the latter.
+
+### 11.2 Sybil resistance without identification
+
+SDIS's genuine contribution is `VUI` — *"proves uniqueness without revealing the
+underlying identity data"*. The correct shape is a **per-context nullifier**
+derived from a uniqueness credential: an institution learns "this is one distinct
+verified human, and not one it has already admitted" without learning which.
+
+**This cannot be built today (F16),** and saying otherwise would be inventing a
+protocol to close a hole. Interim honest posture: uniqueness is a *steward
+attestation* against a registry the steward holds — which is what SDIS actually
+does — and that registry is a correlation surface. Recorded as **OPEN (O-N2)**.
+
+### 11.3 Proving two personas are one human
+
+The person signs a linkage statement with the current authorized keys of both
+subjects, naming both `SubjectId`s and a purpose. Cheap, consent-gated,
+verifiable, and revealing nothing until the person chooses. This is the property
+Model A gets backwards: there, linkage is *always on* and cannot be withheld.
+
+---
+
+## 12. Recovery
+
+### 12.1 Pre-rotation is the recovery mechanism
+
+The inception event commits to a digest of the next key set. If that next key set
+is derived from the **continuity root**, held in backup and not on any device,
+then total device loss is recovered by restoring the root, deriving the
+pre-committed keys, and rotating.
+
+**This dissolves O14's mechanism — and only its mechanism.** O14 asks how a
+total-loss recovery can *advance the chain* when `RotationEvent::verify` requires
+an existing non-revoked authorized key (`multi_device.rs:541-552`) and total loss
+has none. Pre-rotation answers exactly that: the committed-but-never-used next key
+*is* an authorized key, so no separate "threshold-recovery transition" needs to be
+bolted beside the chain rule — it **is** the chain rule.
+
+> **What it does not solve, stated plainly.** Pre-rotation presupposes the
+> pre-rotation material survived. It converts "I lost my devices" into a solvable
+> problem; it does **not** solve "I lost my devices *and* my backup." That case has
+> only one answer — guardians (path (b) below) — and a person who chose path (a)
+> and lost both has lost the subject. Describing O14 as fully closed would be
+> exactly the invented-protocol failure the review discipline forbids.
+
+### 12.2 Two paths; the person chooses
+
+| | (a) Self-recovery | (b) Guardian-gated |
+|---|---|---|
+| Pre-rotation commits to | keys derived from the continuity root (recovery phrase) | a **threshold** key set held by M-of-N guardians |
+| Total-loss recovery | restore phrase → rotate | M distinct guardians co-sign → rotate |
+| Root/backup compromise | **takeover** | insufficient alone |
+| UX cost | one phrase at onboarding | guardian setup + coordination |
+
+**Default is (a), upgradeable to (b).** That answers PRINCIPAL_MODEL's **O1**
+("may the root live on the first phone?"): the *operational* keys live on the
+phone; the *pre-rotation* material is backed up off-device at onboarding. R10.2 is
+met — phone-only onboarding is secure and recoverable by default rather than
+degraded — at the cost of exactly one irreversible user decision (R10.3).
+
+### 12.3 Constraints any recovery must satisfy
+
+- **R9.4 — distinct authenticated participants.** Today both threshold paths fail:
+  `sync.rs:263-269` neither verifies signatures nor deduplicates; SDIS's
+  `approve_by_steward()` is a bare `+= 1`. Fixing this is #2591 plus its SDIS
+  sibling, and it is a precondition for (b), not a follow-up.
+- **R9.2 — recovery is a logged event.** It is an ordinary event in the subject's
+  authority log, visible to every relying party. Never a silent substitution.
+- **R9.6 — contestable.** A relying party may apply a notice-and-veto window
+  before honouring a recovery rotation. Per Rivest Proposition 1 this is the
+  *acceptor's* policy, so it need not be globally uniform — and during the window
+  institutions may legitimately hold different views. **Stated, not hidden.**
+- **R9.5 and R2.4 — path (a) does not meet them, and that is a deliberate trade.**
+  The continuity root in path (a) *is* a permanent secret, and an attacker holding
+  it can rotate the subject away. Recovery from that is a race the legitimate
+  holder may lose, mitigated only by a relying party's notice-and-veto policy.
+  **Path (a) therefore trades R2.4/R9.5 [STRONG] against R10.2 [HARD]** — phone-only
+  onboarding that is recoverable by default. Path (b) removes the single-secret
+  failure at the cost of guardian UX. The trade is the person's to make, and a
+  deployment that silently pins everyone to (a) has made it for them.
+- **The recovery↔DID contradiction must be adjudicated** (§3.6). Under this model
+  **the subject identifier is unchanged by recovery** — it commits to the
+  inception event, which recovery does not rewrite. `social-recovery-design.md`'s
+  `did_mapping:<old_did>` indirection becomes unnecessary and should be retired.
+
+---
+
+## 13. Offline and partition semantics
+
+| Operation | Offline? | Why it converges |
+|---|---|---|
+| Genesis (inception) | **fully** | self-addressing; nothing to contact (R7.1) |
+| Signing an act | **fully** | references a log position the device already holds (R7.2) |
+| Authorizing a device | **fully** | an event in the subject's own log |
+| Recovery rotation | **fully** to produce; relying parties apply on receipt | log event |
+| Verifying an act | needs the log prefix | shorter prefix ⇒ **quarantine**, never reject (R4.6) |
+| Two devices acting concurrently while partitioned | **yes** | acts are unordered; only the *authority log* is single-writer (R7.4) |
+| Two devices *authorizing* concurrently | **no — forbidden** | k > 1 ⇒ consensus (§6.1). A correctness boundary |
+
+**No wall clock anywhere in a validity decision.** Positions replace timestamps
+(§9.3), which also removes F14's fail-open failure mode.
+
+> **Where clocks legitimately remain — and why they are not R4.1 violations.**
+> R4.1 forbids a *receiver's* clock from deciding *validity*. Three clock-shaped
+> things survive, and none is that:
+>
+> | Thing | Whose clock | What it decides |
+> |---|---|---|
+> | "the subject **periodically** advances the log" (§9.3) | the **subject's**, on their own device | when *they* re-authorize. A liveness schedule, not a verdict. Every receiver still decides positionally |
+> | a relying party's **notice-and-veto window** before honouring a recovery (§12.3) | the **acceptor's** | its own local policy, per Rivest Proposition 1. Two institutions may legitimately differ, and §12.3 says so |
+> | quarantine **eviction** (§9.4) | the receiver's | when to *forget* and rely on re-delivery — never whether an act is valid |
+>
+> The test to apply to any future addition: *if two honest receivers with identical
+> durable state could reach different verdicts because their clocks differ, it is an
+> R4.1 violation.* None of the three above can.
+
+---
+
+## 14. Institutions and nodes
+
+### 14.1 The pattern generalizes — and that is a result, not an aesthetic
+
+> durable subject ≠ current authority
+
+holds for humans (subject ≠ device keys), for institutions (charter ≠ current
+stewards) and for nodes (instance ≠ operator). All three are **subjects** in the
+§9.1 sense, which is why the identity layer can stay meaning-free.
+
+### 14.2 Institutions: PRINCIPAL_MODEL §4.1 is upheld, with a caveat
+
+Its conclusion — an institution holds no signing key, because `Did` models custody
+and institutions are constituted by governance — **stands, and this model
+strengthens the reasoning**: `Did` is *only* a key here, so it is even more clearly
+the wrong type for a governed entity.
+
+But the caveat matters. The argument's premise was "an institution's identity
+would have to be a key." Under §9.1 that premise is false: an institution could be
+a **subject** with an authority log whose authorized keys are its current
+stewards, and no single person would "be" the institution. **O12 therefore
+reopens on better terms** — the question is no longer "key or mandate chain" but
+"does an institution need a self-authenticating statement, given that a subject
+log now makes one possible without single-custodian capture?" Recorded in §17.
+
+`FounderSignature` (F18) is the existing primitive to build on: an institution's
+inception event, signed by its founding persons, is a natural `EntityId` binding
+and resolves PRINCIPAL_MODEL's O11 by construction (the id commits to the event).
+
+### 14.3 Nodes
+
+Node identity is the strongest binding ICN has — the Hello three-fact cert check
+(`icn-net/src/handlers/hello.rs:62-97`) is genuinely sound, and is **per
+connection, not per peer** (`handlers/mod.rs:76-78`). Nothing here changes it.
+
+Two facts worth carrying forward: `operator_did` is populated as `did.clone(),
+did.clone()` (`supervisor/lifecycle.rs:371-375`), so node and operator are the
+same principal today; and node key rotation produces a new DID and **is never
+persisted** (`keystore.rs:1224-1257` does not call `save_v4`). Under §9.1 a node
+becomes a subject whose authority log survives key rotation — which is the
+principled fix for both, and which also gives **O2** (does a restored node keep
+its DID?) a cleaner answer: the *subject* persists, the *keys* rotate, and
+restore-twice is detectable as duplicity rather than indistinguishable from a clone.
+
+---
+
+## 15. Migration
+
+Classification per mechanism: **KEEP · MIGRATE · DEPRECATE · REMOVE ·
+COMPATIBILITY-ONLY**.
+
+### 15.1 Key-derived Person DIDs — KEEP, and no user-visible event
+
+This is the largest deployed class and it **does not change**. An existing
+`did:icn:<key>` is already exactly what §10 says a `Did` should be: a
+cryptographic principal. Two consequences:
+
+- Nobody "becomes a new person" (scenario 25). No cutover, no re-enrollment.
+- A person's **first** context subject may simply *be* their existing DID, with an
+  inception event that names it as the initial authorized key. Adopting distinct
+  per-context subjects is then **opt-in and incremental** — a privacy upgrade the
+  person elects, not a migration the protocol forces.
+
+### 15.2 SDIS anchor-derived DIDs — DEPRECATE, at near-zero cost
+
+PRINCIPAL_MODEL rates O18 **critical** on the assumption that anchor-derived
+Persons are a live identity class with deployed authority. Anchors *are* created
+in production (F4) — but two verified facts show they carry no authority:
+
+- **F5** — in the enrollment path the acting principal is already the **device
+  key**: `simple_enrollment.rs:667` (*"The DID is the ephemeral_did — in SDIS, keys
+  are created on the device"*), and the token is minted for `ephemeral_did` (`:782`).
+  The anchor is returned alongside as `anchor_id`.
+- **F20** — the anchor's mutating routes are disabled, returning `Forbidden`.
+
+And **F4** shows the anchors that do exist carry none of the properties the design
+claims for them: the VUI is `SHA256("gateway-enrollment-vui:" ‖ did)`, so it is a
+pure function of the public DID.
+
+**No deployed anchor-derived DID carries authority, and no deployed anchor carries
+a uniqueness or unlinkability property.** Migration is therefore:
+
+> **One trace this document did not complete.** Anchor-derived DIDs are used as
+> store keys (`personhood_store.rs:203,347,657`) while enrollment creates the
+> anchor *for* the member's `ephemeral_did`. Whether any standing or membership
+> lookup keys on the anchor DID in one place and the member DID in another is a
+> concrete question this pass did not resolve, and it should be traced before the
+> `to_did()` removal in the table below. Flagged, not claimed.
+
+| Mechanism | Disposition |
+|---|---|
+| `Anchor` as a record | **KEEP** — it is a durable subject label, which is a real need |
+| `Anchor::to_did` / `Did::from_anchor_id` | **REMOVE** — the source of F1 and F2 |
+| anchor id in API responses | **COMPATIBILITY-ONLY**, then removed — it is currently returned twice, as `anchor_id` **and** as `did` (`api/commons/anchor.rs:67`) |
+| `is_anchor_did` | **REMOVE** — vacuous (F11) |
+| `VUI` / steward network | **KEEP the concept, MIGRATE the wiring** — uniqueness is a real requirement (R6.6); `compute_temporary_vui = SHA256(did)` (F6) must go, and `combine_prf_partials` is not a threshold scheme (F7) |
+
+### 15.3 Everything else
+
+| Mechanism | Disposition | Note |
+|---|---|---|
+| `DidDocument` (`multi_device.rs`) | **MIGRATE** → authority log | Cheaper than it looks: the gateway path never creates one (F8), so only the `icnctl`/keystore path has state |
+| `DidDocument` (`icn-kernel-api`) | **REMOVE** | zero implementors; a parallel unimplemented sketch over `pub type Did = String` |
+| `RotationEvent` | **MIGRATE** | right shape; needs a domain-separated canonical preimage (F12) and a signer/verifier that agree (F10) |
+| device rosters | **MIGRATE** | fix #2588 (binding) and #2590 (attenuation) **as part of** the migration, never after |
+| memberships | **KEEP**, extended | the bidirectional index (`sled_registry.rs:9-12`) is the right shape; add the subject and its log reference. Signing and replication remain #2441's (F17) |
+| governance state | **KEEP** | `gov:vote:{pid}:{voter}` being subject-keyed is what makes §9.3 class 1 cheap |
+| historical signatures / receipts | **KEEP — permanently verifiable** | "key K was authorized at position N" is an append-only fact (R2.3) |
+| gateway challenge auth | **MIGRATE** | add a domain separator and bind `coop_id`/`scopes` into the signed payload (§3.4) |
+| invite redemption | **REMOVE the unproven-subject mint** | #2589 |
+| React Native wallet | **MIGRATE** | today one key per install *is* the person (F19); needs subject/device separation and off-device pre-rotation backup |
+| personal nodes | **KEEP** | §14.3 |
+| `GOV_OP_V1` | **DEPRECATE per subject** | see O13 in §18 |
+
+---
+
+## 16. Rejected alternatives
+
+| Rejected | Reason |
+|---|---|
+| **Key-derived durable Person identifier** (Model A; PRINCIPAL_MODEL §4 Person row) | Entails a permanent, unretireable master key (§5); violates R2.4/R9.5; generates O8/O13/O16/O17/O18 |
+| **Globally resolvable non-key anchor** (Model B) | Genesis has no authority root; resolution needs a global directory with an unsolved split-view problem; correlation worse than A |
+| **Credential-only, no subject identifier** (Model D) | Collapses into C plus a credential layer; revocation reintroduces an online correlator; no continuity mechanism |
+| **Hybrid five-concept graph** (Model E) | Complexity is the cost; §3 documents what ICN's existing parallel identity models already produce |
+| **O9 as posed** — a convergent global device-revocation model | **Provably unachievable** (§6.1). Replaced by §9.3 |
+| **Wall-clock validity windows** (`not_after` as an ingress gate) | Non-convergent (#2469); and F14 shows ICN's clock helper fails *open* |
+| **`standing_hash` in the envelope** | #2469 §14.1 — a deterministic-looking check over unauthenticated state |
+| **Carried-proof-only verification** ("carried, not resolved" as an absolute) | Over-generalizes #2469, which resolves against local durable state by design. Corrected in R4.5 |
+| **Institution DID held by threshold signing (A′)** | ICN has a threshold **PRF**, not threshold **signing** (F7); requires FROST-class new work. Not rejected forever — see O12 in §17 |
+| **ZK selective disclosure as a near-term mechanism** | F16 — the stack cannot prove or verify in its default build |
+
+---
+
+## 17. Open decisions
+
+Carried forward from PRINCIPAL_MODEL where still live, plus new ones from this
+pass. **A correct OPEN is better than an invented answer.**
+
+| # | Question | Why open |
+|---|---|---|
+| **O-N1** | What are the device-authorization validity span `k` and the re-authorization cadence (§9.3)? | Too small strands offline devices; too large widens the compromise window. Needs empirical UX input, not a derivation |
+| **O-N2** | How is per-context sybil resistance built, given F16? | A nullifier needs working ZK. Interim is steward attestation against a registry that is itself a correlation surface (§11.2) |
+| **O-N3** | Are recovery guardians per-context or shared across contexts? | Shared is far better UX and worse privacy (a guardian learns the linkage); per-context is the reverse (R6.4) |
+| **O-N4** | Which act classes exist beyond the three in §9.3, and who assigns a new act to a class? | §9.3 is exhaustive today but the taxonomy must be governed, or class assignment becomes an unreviewed security decision |
+| **O-N5** | How is the authority log replicated and bounded? | It is per-subject and monotone, so gossip suffices in principle — but topic naming, retention, and a bound on log growth are unspecified, and ICN's topics are global-by-domain today (§3.7). **Topic naming is also a correlation surface** (§11.1) |
+| **O-N6** | What makes a governance decision point deterministic, so §9.3 class 1 can pin a log position? | #2469 §7.2 contains `ProposalClosed` because `outcome`/`tally` are attacker-supplied and the real authority entangles with the `GovernanceProofV2` signer model, an explicit #2469 non-goal. **A governance problem, not an identity one** — but class 1 degrades to class 2 until it is answered |
+| **O16′** | On detected duplicity, what happens beyond refusal? | Convergent refusal is achievable; recovery *from* a fork is a governance question. KERI's own answer concedes *"an unavoidable race condition"* |
+| **O12** | Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture? | **Reopened on better terms.** The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise |
+| **O2** | Does a restored node keep its identifier? | §14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy |
+| **O5** | Remove or wire `public_did` institutional signing? | Depends on O12 |
+| **O6** | Does the membership-credential layer belong in this arc? | Needed for portable standing (Model D's genuine contribution); not needed for §9.4 |
+| **O11** | Canonical encoding of a genesis decision before hashing to an `EntityId`? | §14.2 makes this the *same* mechanism as `SubjectId`, so it should be solved once, not twice |
+| **O15** | Canonical preimage of the node-claim transcript | Unchanged from PRINCIPAL_MODEL §5.3 |
+
+**Closed by this document:** O1 (§12.2), O3 (§11 — adopted, with costs stated),
+O8, O9, O10, O13, O14, O17, O18 (§18), O7 (§9.3's class table answers "which
+operation classes may a device sign").
+
+---
+
+## 18. Consequences for the recorded open decisions and slices
+
+| Item | Disposition |
+|---|---|
+| **O8** — current root after rotation | **DISSOLVED.** Replay the subject's log from a self-certifying inception (§6.2, §9.2). No external authority, no clock |
+| **O9** — convergent device revocation | **REJECTED AS POSED** (§6.1, provably unachievable). **REPLACED** by §9.3's per-act-class semantics plus position-bounded validity |
+| **O10** — canonical `DeviceAuthorization` bytes | **STILL REQUIRED**, and widened: it now covers the log event preimage (F12: bincode, no domain separator) and the `Did` canonicalization rule (§10) |
+| **O13** — retiring `GOV_OP_V1` | **DISSOLVED.** Retirement becomes an event in the subject's own single-writer log ("v1 no longer accepted for me"). Per-subject, ordered, convergent — replacing an unenforceable global cutover |
+| **O14** — total-loss recovery cannot advance the chain | **MECHANISM DISSOLVED by pre-rotation** (§12.1) — the committed-but-unused next key *is* the missing authorized key. **The custody question remains**: pre-rotation presupposes the backup survived, and "lost devices *and* backup" is answered only by guardians |
+| **O16** — fork selection under genesis compromise | **LARGELY DEFUSED** by pre-rotation; residual is convergent *refusal*. Policy beyond refusal is **O16′** |
+| **O17** — authenticated genesis document | **DISSOLVED.** The identifier *is* the commitment to the inception event (§6.2) |
+| **O18** — anchor-derived Persons | **DISSOLVED**, at far lower cost than estimated (§15.2, F4/F5/F20) |
+| **Slice A0** (identity-document chain) | **REDIRECTED, not deleted.** Becomes the per-subject authority log with self-addressing inception and pre-rotation. Its hard prerequisites change: O17 and O14 are answered by construction; O16 shrinks; and it gains one new requirement — pre-rotation — that did not exist before |
+| **Slice A** (device principal + authorization) | **UNBLOCKED in principle**, because O8 and O9 no longer gate it — but its field set now depends on O-N1 (validity span) and O10 (canonical bytes) |
+| **Slice B** (device enrolment) | **KEEP, with #2588 + #2590 folded in.** F8 shows the path is unreachable today, so this is a "fix before wiring" job, not a live-incident response |
+| **Slice C** (mobile genesis) | **KEEP, widened** — must now also produce a subject and off-device pre-rotation backup (F19, §12.2) |
+| **Slice D** (`GOV_OP_V2`) | **UNBLOCKED from O9/O13**, still bounded by #2469 §7.0.1: the receiver cannot evaluate standing/suspension because that state is unauthenticated (F17). That barrier is #2441's, not this document's |
+| **Slices E/F/G** (node claim, institution genesis, hosting) | **KEEP.** §14.2 makes F's `EntityId` binding the same mechanism as `SubjectId` — solve once |
+| **#2469 slices 4–6** | **Still independent.** Nothing here blocks them |
+
+---
+
+## 19. Revised dependency graph and the next slice
+
+### 19.1 The graph
+
+```
+  N1  authority-log primitive          (library only; no wiring)
+   │      SubjectId = H(inception) · pre-rotation · +1 monotone
+   │      canonical domain-separated preimage  [absorbs O10, F12]
+   │
+   ├──► N2  narrow `Did`               [F1, F2 — removes from_anchor_id]
+   │
+   ├──► N3  log replication + quarantine/buffer      [needs O-N5]
+   │          │
+   │          └──► N4  device authorization + attenuation
+   │                     [folds #2588, #2590; needs O-N1]
+   │                          │
+   │                          └──► N5  GOV_OP_V2 member-origin signing
+   │                                    [still bounded by #2469 §7.0.1]
+   │
+   └──► N6  mobile: subject + device split + pre-rotation backup   [F19]
+
+  independent, and should not wait:
+     X1  #2589 invite-mint fix
+     X2  #2591 recovery signature + dedup  (+ the SDIS sibling)
+     X3  the F2 / F13 findings — see §19.3
+```
+
+The old order — `[O18] → A0 → (B ∥ C) → [A blocked on O9; D blocked on O9+O13] → …`
+— is **replaced**. O18 no longer precedes anything (§15.2), and A/D are no longer
+blocked on O9 because O9 is not a prerequisite; it was an unachievable goal.
+
+### 19.2 The exact next slice — **N1: the authority-log primitive**
+
+Smallest slice that either validates or refutes the architecture, with **no
+wiring, no gateway change, no `SignedGovernanceOp` change**.
+
+- **Invariant.** A subject's authority history is a self-certifying, single-writer,
+  monotone log: `SubjectId == H(inception_event)`; every later event is signed by a
+  key authorized in the immediately preceding state at exactly `position + 1`; a
+  rotation is valid only if it reveals key material matching the predecessor's
+  pre-rotation commitment; **and any permutation of a given event set yields a
+  byte-identical resulting state.**
+- **Seam.** A new module beside `icn/crates/icn-identity/src/multi_device.rs`. Do
+  not modify `multi_device.rs` in this slice.
+- **Proof / tests.**
+  1. `SubjectId` verifies by hashing the inception event; a tampered inception
+     fails.
+  2. Every delivery permutation of one event set ⇒ identical state (the
+     order-independence property, R4.2/R4.6).
+  3. An out-of-order event **buffers**; it is never rejected, and never wedges.
+  4. Rotation without the pre-committed material is **rejected** — this is the
+     scenario-1 test and the reason the slice exists.
+  5. Duplicity (two events at one position) is **detected**, and every honest
+     verifier refuses identically.
+  6. Encode/decode round trip over a **versioned, domain-separated,
+     length-prefixed** preimage, plus cross-implementation vectors (absorbs O10;
+     avoids F12's bare-bincode signing domain).
+  7. **No wall clock is read anywhere in the module** — assert this in CI, given
+     F14.
+- **Security properties.** Compromise of a current key cannot rotate. Compromise of
+  the inception key after a legitimate rotation grants nothing.
+- **Non-goals.** No replication, no gossip topic, no device-authorization format,
+  no revocation policy, no `Did` change, no migration.
+- **Dependencies.** None. This is why it is first.
+- **Migration impact.** None — additive library code.
+
+### 19.3 Findings that warrant issues before any of this
+
+Listed, **not filed** — filing is a separate decision for the maintainer.
+
+| Finding | Why it should not wait |
+|---|---|
+| **F2** — `icn-zkp/src/prover.rs:227-230` substitutes `[0u8;32]` for a failed issuer key and proceeds | A silent all-zero-key fallback in a prover. Independent of everything here |
+| **F13/F13a** — RPC recovery lets a caller name an arbitrary victim `old_did` with `threshold: 1`, and the **node** signs the trustee attestation | Latent critical: inert only because nothing applies recovery events (F9). Distinct from #2591 |
+| **F6** — `compute_temporary_vui(did) = SHA256(did)` on the routed enrollment path | Destroys the VUI's stated unlinkability; the file itself says "NO sybil resistance" |
+| **F1** — ~50% of hash-derived DIDs fail deserialization | Data-integrity defect masked by hand-picked test fixtures |
+| **F14** — `current_timestamp_secs()` returns 0 on clock error | Every expiry check in the identity stack fails **open** |
+| **F8** — the gateway multi-device path is unreachable | Not a defect; a **truth correction** — `docs/status.toml` and the PRINCIPAL_MODEL gap matrix rate this capability as implemented |
+
+### 19.4 Entry conditions for the N1 session
+
+N1 is a design-and-test slice, not a wiring task. Before writing code it must
+settle three things this document deliberately left open, because each changes
+the event field set and freezing the format first would repeat the mistake
+PRINCIPAL_MODEL §15.1 identified:
+
+1. **The canonical preimage** — version, domain separator, field order, encoding,
+   and the `Did` canonicalization rule (§10). Absorbs O10; must not repeat F12's
+   bare-bincode signing domain.
+2. **The pre-rotation commitment scheme** — what is committed (a digest of what,
+   over which key set), and how a rotation proves it. This is the load-bearing new
+   mechanism and has no precedent in the repo.
+3. **The event taxonomy** — inception / rotate / authorize / revoke / recover, and
+   which of them may carry a validity span (O-N1).
+
+Everything else in §19.2 is testable once those three are fixed.
+
+---
+
+## 20. Decision classification index
+
+| Result | Class |
+|---|---|
+| A durable human subject identifier must not be a public key (§4) | **ESTABLISHED** (proof from R1.2/R2.1/R2.2, exhibited in `multi_device.rs:21-22`) |
+| `Did` is a key identifier; every non-key use is unsupported type reuse (§3.1) | **ESTABLISHED** (F1, F2, F11) |
+| ICN has no replicated authenticated ordered log a governance op lands on (§3.7) | **ESTABLISHED** (source-traced) |
+| Global convergent revocation is unachievable (§6.1) | **ESTABLISHED** (FLP 1985 + Chandra–Toueg 1996) |
+| A single-writer authority log needs no consensus (§6.1) | **ESTABLISHED** (Guerraoui et al., PODC 2019) |
+| Recency is the acceptor's decision (§6.3) | **ESTABLISHED** (Rivest, FC'98) |
+| No deployed system achieves decentralized global revocation convergence (§6.1) | **ESTABLISHED** (survey of primary specs) |
+| Model C — context-scoped identity with a private continuity root (§9) | **RECOMMENDED** |
+| `Did` narrowed to "cryptographic principal" (§10) | **RECOMMENDED** |
+| No global Person identifier (§10) | **RECOMMENDED** |
+| Per-act-class revocation semantics (§9.3) | **RECOMMENDED** |
+| Pre-rotation as the recovery mechanism (§12.1) | **RECOMMENDED** |
+| Per-context subjects and per-context device keys (§11.1) | **RECOMMENDED** |
+| Institutions hold no signing key (§14.2) | **RECOMMENDED**, with O12 reopened |
+| Anchors retained as labels; `to_did` removed (§15.2) | **RECOMMENDED** |
+| Key-derived Person DIDs unchanged (§15.1) | **RECOMMENDED** |
+| O-N1…O-N5, O16′, O12, O2, O5, O6, O11, O15 (§17) | **OPEN** |
+| Anchor-derived `Did`s; `new_unchecked`; `is_anchor_did`; kernel-api `DidDocument`; `did_mapping` recovery indirection | **LEGACY** — compatibility only, then removed |
+| Model A key-as-person; Model B global anchor; Model D credential-only; Model E hybrid; O9 as posed; wall-clock validity; `standing_hash`; carried-proof-only as an absolute; threshold-held institution DID (for now); near-term ZK selective disclosure | **REJECTED** (§16) |
