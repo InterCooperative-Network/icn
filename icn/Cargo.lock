@@ -3463,6 +3463,7 @@ dependencies = [
  "lru",
  "multibase",
  "pem",
+ "proptest",
  "rand 0.9.4",
  "rand_core 0.6.4",
  "rcgen",
