@@ -91,6 +91,17 @@ for humans.
 > **R2.3 is qualified**: receipts from orphaned positions keep a verifying signature
 > but degrade from "authorized" to "authored on a superseded branch" (**O-N9**).
 >
+> **Round 5** found **three more**:
+> **(16)** FROST alone does **not** remove the guardian kill switch — a group key
+> authenticates a quorum but does not bind it to one message, so closing it needs
+> **enforced** canonical body derivation plus **one next-authority commitment per
+> position** (§9.2.1 constraint 3);
+> **(17)** §9.4's normative verification flow still checked the **signer-chosen**
+> position after round 4 fixed only the narrative (§9.4 step 4);
+> **(18)** deriving the **initial** device key from `SubjectId` is a fixed point —
+> `S = H(inception(KDF(secret, S), …))` — so genesis is uncomputable; the initial
+> key must derive from a **pre-subject context nonce** (§11.1).
+>
 > §9.6 lists every shortfall the model does not discharge.
 
 **Related, deferred to, not restated:**
@@ -1156,14 +1167,32 @@ attack:
    KDF(root ‖ p+1)` with every other field determined — so an honest retry collapses
    to one `event_id`. **Normative for §19.4 item 2.**
 
-3. **Threshold recovery must produce one body, not one body per quorum.** With `M`-of-`N`
-   guardians signing independently, two different quorums yield two different
-   authorized establishment bodies at `p` ⇒ permanent halt. So **any `M` guardians
-   hold a kill switch, not merely a takeover** — and even with no adversary, a
-   phrase-holder rotating at `p` while a guardian quorum recovers at `p` halts the
-   subject. Path (b) therefore requires a **single group public key producing one
-   signature over one body** (FROST-class), which makes **N7 a hard prerequisite of
-   guardian recovery, not an upgrade** (§12.2, §19.1).
+3. **Exactly one authorized establishment body may exist per position — and
+   threshold signing alone does not deliver that.** *(Sharpened in review round 5.)*
+   With `M`-of-`N` guardians signing independently, two quorums yield two authorized
+   bodies at `p` ⇒ permanent halt, so **any `M` guardians hold a kill switch, not
+   merely a takeover**. But FROST does not fix it either: a group key authenticates
+   *a quorum*, it does not restrict that quorum to signing **one message**, and the
+   same `M` guardians can still sign two distinct bodies — as can a phrase-holder
+   racing a guardian quorum with a different body.
+
+   Two rules together are required, and both are normative for N1:
+
+   - **`authorized` must enforce canonical derivation**, not merely permit it. An
+     establishment body is authorized only if it *equals* the body canonically
+     derived from the revealed pre-committed material. A non-canonical body — from
+     a malicious quorum or an honest retry — fails `authorized` and never enters
+     `C`. This is constraint 2 promoted from "re-derivable" to "checked".
+   - **Each position commits to exactly ONE next authority.** Pre-rotation must not
+     arm two alternative recovery paths at the same position; the person selects
+     path (a) *or* path (b) at each rotation, never both. Otherwise the two paths
+     reveal different material and derive two different canonical bodies, and the
+     race returns.
+
+   With both, at most one authorized establishment body can exist at a position, so
+   `supersede` never has to choose between two. **N7 remains a hard prerequisite of
+   guardian recovery** (§12.2, §19.1) — it is necessary and, on its own, not
+   sufficient.
 
 #### What this does and does not give
 
@@ -1379,9 +1408,20 @@ receiver verifies, from bytes in hand + its own authenticated local state:
    1. act signature under D's key                       [bytes]
    2. D authorized at position N, scope admits the act  [local log prefix]
    3. S_A ∈ this domain's members                       [local domain state]
-   4. position N within validity                        [local log prefix]
+   4. VALIDITY — and NOT against N, which the signer chooses:
+        class 1: the DECISION-PINNED evaluation position P ∈ [N, N+k]
+        class 2: no evaluation position exists ⇒ NO validity bound
+                 (R5.1 not met; see §9.3)
    ── if the local prefix is shorter than N: QUARANTINE, never reject
 ```
+
+> **Step 4 is written this way deliberately.** An earlier revision read "position
+> `N` within validity", which is the rule §9.3 retracts: the signer picks `N`, so a
+> compromised device keeps referencing an in-range position forever. Round 4 fixed
+> the narrative and left this normative flow stale — caught in round 5. Class 1
+> checks the position **the decision pins**; class 2 has no such position and
+> therefore carries the explicit R5.1 shortfall rather than a bound that does not
+> bind.
 
 This satisfies #2469's I9 (no circular bootstrap — the log arrives on its own
 topic, not on the channel carrying the act) and R4.5 (local state that is
@@ -1486,6 +1526,9 @@ satisfies R13.1 where a `Person` principal class cannot.
     position the signer does not control, and class 2 has none (§9.3).
 18. **R2.3 [HARD] is qualified** — receipts from positions orphaned by a superseding
     rotation lose their authorization proof (**O-N9**).
+19. **Threshold signing alone does not remove the guardian kill switch** — closing
+    it also needs enforced canonical body derivation and one next-authority
+    commitment per position (§9.2.1 constraint 3).
 
 ---
 
@@ -1529,6 +1572,17 @@ global genesis bootstrap — is cost with no corresponding requirement.
 **Device keys must be per-context too.** If one device key appears in two
 contexts, the identifier separation is defeated. Per-context device keys are a
 deterministic derivation from the device's own secret.
+
+> **The derivation must not take `SubjectId` as input for the *initial* key, or
+> genesis is uncomputable.** *(Caught in review round 5.)* The inception body
+> contains the initial key `K₀`, and `SubjectId = event_id(inception body)`. So
+> setting `K₀ = KDF(secret, SubjectId)` requires solving the fixed point
+> `S = H(inception(KDF(secret, S), …))` — offline genesis cannot construct it.
+>
+> The fix is to derive the initial key from a **pre-subject context nonce** chosen
+> locally and carried in the inception body: `K₀ = KDF(secret, nonce)`. The nonce
+> exists before the subject does, so there is no cycle. Keys for *later* positions
+> may safely take `SubjectId` as input, because by then the subject exists.
 
 > **That derivation is itself a correlation oracle, and an earlier draft called it
 > "bookkeeping, not custody burden".** *(Corrected in adversarial review.)* Anyone
@@ -1621,6 +1675,12 @@ bolted beside the chain rule — it **is** the chain rule.
 > signature over one body** (FROST-class), which makes **N7 a hard prerequisite of
 > guardian recovery rather than an optional upgrade**. An earlier draft's "insufficient
 > alone" understated this badly.
+>
+> **And N7 alone still does not close it** *(round 5)*: a group key authenticates a
+> quorum, it does not restrict that quorum to signing **one message**. Closing it
+> needs the two rules in §9.2.1 constraint 3 — `authorized` must **enforce** canonical
+> body derivation, and each position must commit to **exactly one** next authority, so
+> path (a) and path (b) can never both be armed at the same position.
 
 > **Path (a) root compromise is not a race the victim can win.** An attacker
 > holding the continuity root derives the pre-committed keys, rotates first, **and
@@ -2110,7 +2170,10 @@ PRINCIPAL_MODEL §15.1 identified:
    pre-rotation commits to the *next key set* and not to the *body* — so a
    non-deterministic construction lets one honest signer author two authorized
    rotations at one position and halt the subject permanently, with no attacker
-   present (§9.2.1, constraint 2).
+   present (§9.2.1, constraint 2). **`authorized` must ENFORCE the canonical
+   derivation, not merely permit it**, and **each position must commit to exactly
+   one next authority** — otherwise two quorums, or a phrase-holder racing a
+   guardian quorum, still produce two authorized bodies (§9.2.1, constraint 3).
 3. **The event taxonomy** — inception / rotate / authorize / revoke / recover;
    which are **establishment** events (and so eligible for `supersede`); and which
    may carry a validity span (O-N1). Two invariants are normative, not stylistic:
