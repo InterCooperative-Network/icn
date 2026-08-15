@@ -2493,7 +2493,7 @@ exactly the invented-protocol failure the review discipline forbids.</p>
 <tr>
 <td>Any M guardians can...</td>
 <td>—</td>
-<td><strong>halt the subject permanently</strong>, unless (b) uses a single group key — see below</td>
+<td><strong>halt the subject permanently.</strong> Closing this needs a single group key (N7) <strong>and</strong> <code>authorized</code> enforcing canonical body derivation <strong>and</strong> exactly one next authority per position — <strong>N7 alone is not sufficient</strong>; see below</td>
 </tr>
 <tr>
 <td>Produced offline?</td>
@@ -2507,7 +2507,8 @@ exactly the invented-protocol failure the review discipline forbids.</p>
 </tr>
 </tbody></table>
 <blockquote>
-<p><strong>Path (b) is a kill switch unless it uses a single group key.</strong> With <code>M</code>-of-<code>N</code>
+<p><strong>Path (b) is a kill switch, and a single group key is necessary but not
+sufficient to close it.</strong> With <code>M</code>-of-<code>N</code>
 guardians signing <strong>independently</strong>, two different quorums produce two different
 authorized establishment bodies at the same position, so <code>supersede</code> cannot
 choose and the subject <strong>halts permanently</strong> (§9.2.1, constraint 3). That means
@@ -2861,8 +2862,8 @@ lookup behind.</p>
 </tr>
 <tr>
 <td>historical signatures / receipts</td>
-<td><strong>KEEP — permanently verifiable</strong></td>
-<td>&quot;key K was authorized at position N&quot; is an append-only fact (R2.3)</td>
+<td><strong>KEEP — the signature is permanently verifiable; the <em>authorization</em> is not</strong></td>
+<td>Pre-fork positions: &quot;key K was authorized at position N&quot; is an append-only fact and R2.3 holds. After a superseding rotation at <code>p</code>, a key first authorized at <code>N &gt; p</code> is no longer established by the derived view — the receipt still proves <em>&quot;K signed these bytes&quot;</em>, and with the orphaned bodies retained <em>&quot;this body existed on a branch later superseded&quot;</em>, but <strong>not</strong> that K remained authorized (§9.2.2). Migration must therefore keep the orphaned bodies and their chaining, <strong>not the raw receipts alone</strong>; full historical authorization needs the per-branch endorsement evidence <strong>O-N9</strong> leaves undefined</td>
 </tr>
 <tr>
 <td>gateway challenge auth</td>
@@ -3141,6 +3142,11 @@ untraced anchor↔member keying question in §15.2.</p>
               signing (F7).  Without N7, independent M-of-N signatures give any
               M guardians a KILL SWITCH (two quorums =&gt; two authorized bodies at
               one position =&gt; permanent halt), so path (b) must not ship first.
+              NECESSARY BUT NOT SUFFICIENT: N7 alone leaves the halt attack
+              intact — a group key authenticates a quorum, it does not bind that
+              quorum to ONE message.  Path (b) is safe only with N7 PLUS
+              `authorized` ENFORCING canonical body derivation PLUS exactly ONE
+              next authority armed per position (§9.2.1 constraint 3).
               Without N7, R9.1 [HARD] is met only by the backup-phrase path.
 
   independent, and should not wait:
@@ -3414,7 +3420,7 @@ longest chain.</li>
 </tr>
 <tr>
 <td>N7 (threshold signing) is a hard prerequisite of guardian recovery (§12.2)</td>
-<td><strong>RECOMMENDED</strong> — otherwise any <code>M</code> guardians hold a kill switch</td>
+<td><strong>RECOMMENDED</strong> — <strong>necessary, not sufficient</strong>. Without it any <code>M</code> guardians hold a kill switch; with it the switch closes only alongside enforced canonical body derivation and exactly one next-authority commitment per position (§9.2.1 constraint 3)</td>
 </tr>
 <tr>
 <td>Fork monitoring is a client obligation (&quot;responsive controller&quot;) (§9.2.2)</td>
