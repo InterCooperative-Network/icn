@@ -1001,6 +1001,26 @@ depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/rf
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/PRINCIPAL_MODEL.md"]
+category = "architecture"
+status = "draft"
+title = "The Principal Model"
+description = "Who ICN can honestly say did something. Establishes the Person != Device != Node != Institution invariant, records the verified current state at 74c832f1 (TWO semantically different Person-identity constructions — key-derived Dids, and SDIS anchor-derived Dids built from H(VUI || genesis_random) via new_unchecked that embed no controllable key and are indistinguishable by format, recorded as open decision O18; a device roster whose Capability::Sign is never checked in production; an AddDevice signer able to grant capabilities it does not itself hold; SignedGovernanceOp accepting only the author's root key; the node DID standing in as proposal author in actor-backed mode), and proposes a four-class principal taxonomy in which an institution deliberately holds no signing key. Specifies member-origin signing via a carried, self-contained device authorization, and derives implementation slices and their exact dependency on #2469 slices 4-7. Records ten open decisions (O3, O8-O18), the load-bearing one being O9: ICN has no convergent cross-node device-revocation model, and all three candidate shapes are refuted against current semantics. Design only: no implementation, no change to SignedGovernanceOp, no lifting of #2470 containment."
+last_updated = "2026-08-14"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+canonical = "no"
+last_reviewed = "2026-08-14"
+recommended_action = "keep"
+freshness = "current"
+depends_on = [
+  "icn/crates/icn-identity/src/**",
+  "icn/crates/icn-governance/src/replication.rs",
+  "icn/crates/icn-entity/src/**",
+  "docs/design/authenticated-governance-replication.md",
+]
+
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
 category = "architecture"
 status = "living"
