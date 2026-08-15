@@ -141,7 +141,19 @@ existing method before mutating the roster (`:295` for revoke; `icnctl` mirrors 
 > Raised in review on PR #2586 and verified at `74c832f1`. **This is a live
 > defect in shipping code, not merely a design gap**, and slice B must fix the
 > signed message to cover the full enrolment payload before treating this
-> machinery as sufficient for §5.2.
+> machinery as sufficient for §5.2. Tracked as **#2588**.
+
+> **And signing the field would not be enough — capabilities are not attenuated.**
+> `identity_mgr.rs:160-165` checks only that the signing device holds
+> `Capability::AddDevice`, then `:199` applies `request.capabilities` verbatim.
+> A device holding *only* `AddDevice` can therefore enrol a key carrying
+> `Recover`, `RotateKey` and `RevokeDevice` — **strictly more authority than the
+> signer possesses**. `RotationEvent::verify` applies the same rule
+> (`multi_device.rs:541-552`), so this survives into any replicated chain: once A0
+> replicates these events, a local escalation becomes a network-identity takeover.
+> This is **privilege escalation by design, not by tampering**, and it is a
+> *separate* defect from #2588 with a separate fix — enrolment must attenuate to
+> capabilities the signer may delegate, or require root approval.
 
 **But:**
 
@@ -796,9 +808,16 @@ key by definition, so the ordinary chain rule cannot advance the document — th
 case recovery exists to serve is the one it cannot express. A separately
 authenticated **threshold-recovery transition** is required, verified against the
 `RecoveryConfig` trustee set rather than against a prior device key. Today that
-verification does not exist: `sync.rs:261-267` counts trustee DIDs and carries the
+verification does not exist: `sync.rs:262-268` counts trustee DIDs and carries the
 in-source admission *"In production, verify the cryptographic signature here / For
-now, accept if trustee is in the list"*. Recorded as **O14**.
+now, accept if trustee is in the list"*.
+
+**The same loop is also un-thresholded.** It increments `valid_proofs` for every
+entry without deduplicating `proof.trustee`, so **one** trustee's proof repeated M
+times satisfies an M-of-N threshold — collapsing it to 1-of-N. Authenticating each
+proof is therefore necessary but not sufficient; the transition must also enforce
+**distinct** trustees. Recorded as **O14**, which must carry both a signature-
+verification requirement and a duplicate-proof adversarial test.
 
 **Still unresolved (O8, §13), and it blocks slice A**, which must not freeze an
 authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
@@ -1191,7 +1210,8 @@ Legend: **I** implemented · **P** partial · **M** missing · **C** conflicting
 | Deterministic device revocation | **M** — no replicated authenticated anchor; roster revoke is node-local (§6.5) | ordering or snapshot invalidation | decision O9 + slice A0 | **critical** | icn-identity |
 | Identity-document replication | **C** — `RotationEvent::verify` has zero production callers; `identity:recovery` subscribed but never declared; `icnctl` revoke preimage ≠ `signing_message()` | verifiable monotonic chain | slice A0 | **critical** | icn-identity / icn-core |
 | Node first-claim ceremony | **M** — no claiming at all; node-key challenge alone would let the first remote caller win (§5.3) | out-of-band one-time capability + dual-signed transcript | slice E | high | icn-core |
-| Device enrolment integrity | **C** — add/revoke signature covers only did+device_id+label; key and capabilities are unsigned (`identity_mgr.rs:488-493`) | signature covers full payload | live defect | **critical** | icn-gateway |
+| Device enrolment integrity | **C** — add/revoke signature covers only did+device_id+label; key and capabilities are unsigned (`identity_mgr.rs:488-493`) | signature covers full payload | live defect, **#2588** | **critical** | icn-gateway |
+| Device capability attenuation | **C** — an `AddDevice` signer may grant `Recover`/`RotateKey`/`RevokeDevice`, i.e. more authority than it holds (`identity_mgr.rs:160-165`, `:199`; same rule in `multi_device.rs:541-552`) | enrolment attenuates to the signer's delegable set, or requires root approval | live defect, **separate from #2588** — signing the field prevents tampering, not escalation | **critical** | icn-gateway / icn-identity |
 | Member-origin signing | **M** — `SignedGovernanceOp` is root-key-only (`:308,373`) | device-signed, person-authored | v2 envelope | **critical** | icn-governance |
 | Client-side governance signing | **M** — zero client references | device signs locally | SDK + CI | high | sdk/react-native |
 | First-device bootstrap | **M** — `index.ts:2059` needs a prior device | self-bootstrapping | new flow | high | sdk + gateway |
@@ -1230,7 +1250,7 @@ node/institution arc, which does not block D.
 |---|---|---|---|---|
 | **A0. Authenticated identity-document chain** *(new — precedes A)* | A DID's key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes, and **two honest nodes applying the same events derive byte-identical documents** | declare an identity topic (`icn-core/src/supervisor/init_*`); call `RotationEvent::verify` on receive (`multi_device.rs:526`, **zero production callers**); fix **both** `icnctl` preimages — add/approve (`bins/icnctl/src/main.rs:6302-6308`) and revoke (`:6410`) — to match `signing_message()`; make `apply_event` derive `added_at`/`revoked_at`/`updated_at` from **signed event data** instead of local `current_timestamp()`/`SystemTime::now()` (`sync.rs:126,148,286,338`; `multi_device.rs:270,279,344`); a separately authenticated **threshold-recovery transition** (see non-goals); **a specified authenticated genesis document/event with a first-contact acquisition path** (O17); durable applied-set | chain verifies from genesis forward; `new_version != version + 1` rejected; unauthorized signer rejected; **both** icnctl event kinds round-trip through the verifier; **identical documents across skewed clocks**; **an adversarial fork resolves to the LEGITIMATE branch** — convergence alone is insufficient, since a content-hash tie-breaker converges while letting a compromised genesis key win (O16); adversarial recovery proofs rejected | no governance wiring; no device-authorization format; no revocation policy |
 | **A. Device principal + authorization** | A device key may act for a Person only within a signed, scoped authorization, over a **specified canonical encoding** | `icn-identity` — new type beside `multi_device.rs` | sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; **pre- and post-rotation authorization**; **encode/decode round trip and cross-implementation vectors** | no governance wiring; no envelope change. **BLOCKED on O8 (§6.3) AND O9 (§6.5)** — both change the field set, so freezing the format first would be premature. Must also settle O10 (canonical bytes, version, domain separator). v1 issues authorizations **root-only** (§5.2). See §15.1: slice A is no longer the correct first slice |
-| **B. Device enrolment + LOCAL roster management** | First device self-bootstraps, and **the enrolment signature covers the enrolled key and capabilities** (closes #2588) | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message` and `build_revoke_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke updates the local document; **tampering with `public_key`, `encryption_public_key` or `capabilities` under a valid signature is rejected** | no QR (inherits #2569 rules — separate). **Scope narrowed in review round 14:** these seams mutate only the gateway's *local* document, so B must NOT claim provable or end-to-end revocation — a revoked device is rejected *by that node only*. Any cross-node rejection criterion is **blocked on O9** (§6.5) |
+| **B. Device enrolment + LOCAL roster management** | First device self-bootstraps, and **the enrolment signature covers the enrolled key and capabilities** (closes #2588) | `icn-gateway/src/identity_mgr.rs` (incl. `build_add_device_message` and `build_revoke_device_message`), `api/devices.rs`, SDKs | first-device path; add second; revoke updates the local document; **tampering with `public_key`, `encryption_public_key` or `capabilities` under a valid signature is rejected**; **an `AddDevice`-only signer cannot enrol a key holding `Recover`/`RotateKey`/`RevokeDevice`** | no QR (inherits #2569 rules — separate). **Scope narrowed in review round 14:** these seams mutate only the gateway's *local* document, so B must NOT claim provable or end-to-end revocation — a revoked device is rejected *by that node only*. Any cross-node rejection criterion is **blocked on O9** (§6.5) |
 | **C. Person genesis on mobile, shipped** | Genesis is local, offline, and CI-covered | `sdk/react-native` | keygen determinism; secure-storage custody; CI added | no new crypto — it exists |
 | **D. Member-origin signing (`GOV_OP_V2`)** | Authorship is provable without the relay holding the author's key, **without a non-convergent validity predicate** | `icn-governance/src/replication.rs` — version bump per #2469 §14 | v1/v2 coexistence; device-signed op verifies; wrong device rejected; `op_id` covers the authorization; **delayed delivery and clock-skew tests showing two honest peers reach the same verdict** | **does not lift #2470 containment**. **BLOCKED on O9 (§6.5)** — no wall-clock predicate may become an ingress gate and the revocation check must be deterministic — **and on O13 (§16)**: shipping v2 while v1 stays indefinitely acceptable leaves a compromised pre-rotation Person root able to emit indistinguishable v1 operations and bypass every v2 device-authorization and revocation check. D must either land behind an enforceable v1 retirement/classification step or carry one |
 | **E. Node claim + admin grant** | A Person administers a node instance; node ≠ operator; **network reachability alone confers no first-claim authority** (§5.3) | `icn-core` claim ceremony; `operator_did` unwired from `node_did` | claim binds instance not image; re-claim rejected; admin delegation; **canonical-transcript interoperability and tamper vectors**, and a remote caller without the out-of-band capability is rejected | no hosting semantics. **BLOCKED on O15** — separate node and claimant implementations could otherwise pass the claim tests while signing incompatible or cross-protocol-reusable encodings |
@@ -1271,12 +1291,19 @@ section claimed it resolved both.)*
   completes**, until operations and revocations share a replicated total order, or
   deterministic rollback/revalidation is designed.
 
-And it is unusually cheap, because the hard cryptographic parts are already written:
-capability checking, Ed25519 verification and strict `+1` monotonicity all exist in
-`multi_device.rs`. What is missing is a declared topic, a receive path that calls
-`RotationEvent::verify` (**zero production callers today**), a corrected `icnctl`
-signing preimage, and a fork-convergence rule. That is wiring and one decision — not
-new cryptography.
+Some of it is cheap: capability checking, Ed25519 verification and strict `+1`
+monotonicity already exist in `multi_device.rs`, so the declared topic, the receive
+path calling `RotationEvent::verify` (**zero production callers today**), the
+corrected `icnctl` preimages and deterministic event application are wiring.
+
+**But A0 is not merely wiring, and an earlier revision of this paragraph said so
+wrongly.** *(Corrected after O14/O16/O17 were added.)* A0's own acceptance criteria
+now require an **authenticated fork selector** (O16), an **authenticated
+threshold-recovery transition** (O14), and an **authenticated genesis document**
+(O17). Those are new protocol design with security-critical failure modes, not
+configuration. Scheduling A0 as a wiring task — or declaring it complete once the
+topic is declared and the preimages match — would ship exactly the gaps it exists to
+close. **O14, O16 and O17 are prerequisites of A0, not follow-ups.**
 
 **Revised order: A0 → (B ∥ C) → [A blocked on O9; D blocked on O9 + O13] → (E blocked on O15 → F → G) → H → I.**
 B and C do not depend on the authorization format and can proceed — but **B is
