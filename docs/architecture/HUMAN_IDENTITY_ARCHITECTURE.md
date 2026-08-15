@@ -1938,27 +1938,27 @@ wiring, no gateway change, no `SignedGovernanceOp` change**.
       absence claim over an unbounded space that nothing can fail.)*
 
   *Cases the first draft of this list could not fail — added after review round 2:*
-  16. **re-signed identical body collapses to one element** and does **not** produce
+  14. **re-signed identical body collapses to one element** and does **not** produce
       `Halted`; the witness set grows instead;
-  17. **deterministic rotation body** — deriving the same rotation twice from the
+  15. **deterministic rotation body** — deriving the same rotation twice from the
       same state yields one `event_id`; a non-deterministic construction that yields
       two authorized rotations at one position is rejected at construction time,
       because at `derive` time it is already an unrecoverable halt;
-  18. **digest consistency** — `σ`, `prev_digest` and dedup all use
+  16. **digest consistency** — `σ`, `prev_digest` and dedup all use
       `event_id = H(canonical_body)`; a child naming a whole-event digest fails;
-  19. **fork behind the frontier** — bodies at 0–5 and 8–9 with a fork at 3 must halt
+  17. **fork behind the frontier** — bodies at 0–5 and 8–9 with a fork at 3 must halt
       at 3, and a superseding rotation at 3 must be shown to **orphan** 4, 5, 8, 9
       (the test asserts the loss, so it cannot be discovered later as a surprise);
-  20. **unilateral self-equivocation** — one authorized key emitting two distinct
+  18. **unilateral self-equivocation** — one authorized key emitting two distinct
       bodies at one position halts the subject with no second party involved;
-  21. **authority principals are raw `Did`s** — an event naming a `SubjectId` as a
+  19. **authority principals are raw `Did`s** — an event naming a `SubjectId` as a
       device or guardian is rejected, so `derive` cannot become mutually recursive.
 
   *Encoding and hygiene:*
-  14. encode/decode round trip over a **versioned, domain-separated,
+  20. encode/decode round trip over a **versioned, domain-separated,
       length-prefixed** preimage, plus cross-implementation vectors (absorbs O10;
       avoids F12's bare-bincode signing domain);
-  15. **no wall clock is read anywhere in the module** — assert in CI, given F14.
+  21. **no wall clock is read anywhere in the module** — assert in CI, given F14.
 - **Security properties.** Compromise of a current key cannot rotate, and can fork
   only non-establishment events — which superseding rotation recovers. Compromise of
   the inception key after a legitimate rotation grants nothing. Compromise of the
