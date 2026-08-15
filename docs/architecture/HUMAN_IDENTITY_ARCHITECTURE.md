@@ -51,6 +51,27 @@ for humans.
 > **(3)** under the default recovery path, continuity-root compromise is a
 > **takeover and is unrecoverable** (§12.2);
 > **(4)** the class-1 fallback is a known R5.1 violation, not a safe default (§9.3).
+>
+> **Round 2** attacked the replicated state model specifically and found **seven
+> more blockers**, all corrected:
+> **(5)** the durable element must be a canonical **body**, not an event — Ed25519
+> admits several valid signatures per message, so an event-keyed set is really a map
+> with an undefined value merge (§9.2.1);
+> **(6)** `σ` and `prev_digest` must use the **body** digest too, or a re-signing
+> mints a second `SubjectId` and a child can name a discarded parent (§9.2.1);
+> **(7)** pre-rotation commits to the next *key set*, not the *body*, so rotation
+> bodies must be **deterministic** or an honest crash-retry halts the subject
+> permanently (§9.2.1);
+> **(8)** independent M-of-N guardian signatures give any `M` guardians a **kill
+> switch**, making threshold signing a prerequisite rather than an upgrade (§12.2);
+> **(9)** a single compromised current key **halts a subject unilaterally**, and
+> superseding recovery **orphans the entire suffix** (§9.2.1, §9.2.2);
+> **(10)** class-2 settlement is **not convergent under a fork** — `Live(A) → Live(B)`
+> leaves permanently different settled state, so this model is not by itself a
+> sufficient basis for irreversible settlement (**O-N7**);
+> **(11)** the durable set is attacker-writable, so eviction must be
+> protocol-specified or convergence-under-attack is vacuous (**O-N8**).
+>
 > §9.6 lists every shortfall the model does not discharge.
 
 **Related, deferred to, not restated:**
@@ -96,8 +117,9 @@ document:
    the person cannot force an institution to accept them, and the institution
    cannot rewrite who the person is. #2469 §9 already reached the neighbouring
    conclusion for key rotation ("v1 treats rotation and revocation as *membership*
-   changes"); §6 shows what it generalizes to, and that generalization dissolves
-   five of the six open blockers.
+   changes"); §6 shows what it generalizes to. That generalization **dissolves two**
+   blockers (O8, O18), **partly answers two** (O13, O17), **narrows one** (O16), and
+   **rejects one as posed** (O9) — see §6.5, which is the authoritative summary.
 
 3. **There is no convergent global device revocation, and there cannot be one
    without paying a price ICN has declined to pay.** Agreeing on a time-varying
@@ -568,8 +590,10 @@ self-certifying inception).
 
 Two consequences fall out immediately:
 
-- **O17 dissolves.** The genesis document *is* the thing the identifier commits
-  to. There is no bootstrap problem and no trusted starting document to obtain.
+- **O17's *authenticity* half dissolves.** The genesis document *is* the thing the
+  identifier commits to, so there is no trusted starting document to obtain. Its
+  **acquisition** half does not: a truncated-but-valid prefix verifies perfectly and
+  yields a stale authority state, so completeness remains open (§18, O-N5).
 - **O16 is narrowed by pre-rotation — for rotations only.** KERI's inception
   commits a *digest* of the next key set; rotation reveals it. A compromised
   **current** key therefore cannot *rotate*, because it does not hold the
@@ -888,8 +912,9 @@ needs to know it exists (R13.1).
 **Why the subject is a hash of an event, not a key.** §4 proved a durable subject
 must not be a key; §6.2 supplies the alternative. Given `SubjectId` and the
 inception event, any peer verifies the binding by hashing — self-certifying with
-no registrar, no resolver and no trusted starting document. That is the direct
-answer to O17.
+no registrar, no resolver and no trusted starting document. That answers **O17's
+authenticity half only** — completeness of the prefix you were handed is a separate,
+still-open question (§18).
 
 ### 9.2 How authority evolves
 
@@ -928,190 +953,202 @@ Four properties, and each does specific work:
 
 ### 9.2.1 The replicated state model
 
-*This subsection replaces a formulation two earlier drafts got wrong. The first
-called the merge "a monotone join, i.e. a CRDT" while also saying holders "refuse
-to advance past the fork" — which cannot both hold. The second proposed the pair
-`(longest verified prefix, set of duplicity positions)`; **that is also not a
-join**, and review supplied the counterexample: if replica A advances its prefix
-through `X@n` and replica B through `Y@n`, then after exchange, recording the
-duplicity requires either selecting a branch (no authority to do so) or truncating
-an already-advanced prefix (non-monotone). Both drafts are recorded here rather
-than quietly replaced, because the error is instructive: **a verified prefix is a
-conclusion, not a state.***
+*Three successive drafts got this wrong, and all three errors are recorded because
+each is instructive. **(a)** The first called the merge "a monotone join, i.e. a
+CRDT" while also saying holders "refuse to advance past the fork" — which cannot
+both hold. **(b)** The second proposed `(longest verified prefix, set of duplicity
+positions)`; review supplied the counterexample — if A advances through `X@n` and B
+through `Y@n`, recording the duplicity needs either branch selection (no authority)
+or prefix truncation (non-monotone). **(c)** The third stored whole events in a set;
+review pointed out that Ed25519 admits more than one valid signature per message, so
+that is really a keyed map with an undefined value merge — and any rule for picking
+a signature is a content-based tiebreak that breaks commutativity. The lesson each
+time: **a verified prefix is a conclusion, and a signature is not part of identity.***
 
-The fix is to stop storing conclusions. Split **durable replicated state** (which
-must be a join-semilattice) from a **derived view** (a pure function of it).
-
-#### Durable state — a set of admissible events
-
-For subject σ, the replicated state is a **set**:
+#### Digests, stated once and used everywhere
 
 ```
-S(σ) = { e : admissible(e) ∧ e.subject = σ }
+event_id     = H(canonical_body)          ← signatures are OUTSIDE every digest
+SubjectId σ  = event_id(inception body)
+prev_digest  = event_id(parent body)
 ```
 
-where `admissible` is **state-independent** — decidable from the event bytes alone,
-with no reference to any other event:
+All three must use the **body** digest. If `σ` or `prev_digest` hashed the whole
+event, a hedged or retrying signer re-signing an identical body would mint a second
+`SubjectId` — or a child would name a parent variant that dedup discards, wedging
+the chain permanently. That is precisely the false duplicity the body rule exists to
+remove, relocated one layer down.
+
+#### Durable state — two grow-only sets, whose elements are bodies
+
+For subject σ:
+
+```
+Bodies(σ)   = { b : ∃ s. admissible(b, s) ∧ b.subject = σ }     -- canonical bodies
+Witness(σ)  = { (event_id(b), s) : admissible(b, s) }           -- signatures, never compared
+```
+
+`admissible(b, s)` is **state-independent** — decidable from the bytes alone:
 
 1. canonical encoding parses; version and domain separator are as specified;
-2. `e.signature` verifies under `e.signer_key`, which the event carries inline
-   *(this proves only "some key signed these bytes" — not that the key had
-   authority; that is a derived question)*;
-3. for an inception event, `σ == H(e)`; otherwise `e.subject == σ`.
+2. `s` verifies under `b.signer_key`, carried inline *(this proves only "some key
+   signed this body" — authority is a derived question)*;
+3. for an inception body, `σ == event_id(b)`; otherwise `b.subject == σ`;
+4. `b.position ≤ MAX_POSITION`, an **absolute protocol constant** — not
+   `local_frontier + C`, which would make admissibility depend on local state and
+   break the join.
 
-Global state is the pointwise map `σ ↦ S(σ)`.
-
-- **Partial order:** `S₁ ⊑ S₂ ⟺ S₁ ⊆ S₂` (pointwise per subject).
-- **Join:** `S₁ ⊔ S₂ = S₁ ∪ S₂` (pointwise union).
+- **Partial order:** componentwise `⊆`. **Join:** componentwise `∪`.
 - **Associative, commutative, idempotent:** inherited from set union. ∎
-- **Receipt order cannot change durable state**, because union discards order.
-- **Monotone:** nothing is ever removed, so no replica retracts.
+- **Receipt order cannot change durable state** — union discards order.
+- **Monotone:** nothing is removed by the join.
 
-`admissible` being state-independent is what makes this work: every replica
-classifies a given event identically, so the filter commutes with union —
-`filter(A) ∪ filter(B) = filter(A ∪ B)`.
-
-> **`admissible` is cheap to satisfy, so `S(σ)` needs an admission bound that the
-> join definition deliberately does not contain.** Anyone can mint unlimited
-> admissible events for any `σ`: sign arbitrary bytes with a key they generated and
-> set `subject = σ`. Those are well-formed and self-signed, so they enter `S(σ)`
-> and grow it without limit. They can never *fork* anything (they are unauthorized,
-> so they never enter `C` — case 7), but they are a storage and bandwidth attack.
->
-> The bound must therefore live **outside** the lattice, as receiver-local resource
-> policy — the same position bound and bounded store as §9.4: admit only
-> `position ≤ (highest verified) + C`, cap the per-subject retained set, and prefer
-> events that chain to the verified prefix. Putting the bound *inside* `admissible`
-> would break state-independence and therefore the join.
->
-> The honest consequence: **two replicas applying different resource policies hold
-> different sets.** That is the same liveness-not-safety trade as retention — a
-> replica missing an event is indistinguishable from one that has not received it —
-> and it means convergence is stated over *the eventual retained set*, never over
-> "all events ever authored". Folded into **O-N5**.
+**Why bodies and not events.** Ed25519 permits several valid signatures over one
+message. With whole events as elements, `(id, s₁)` and `(id, s₂)` are two elements at
+one position — manufacturing duplicity that halts the subject — and collapsing them
+requires choosing a signature, which is a content tiebreak and destroys
+commutativity and idempotence. With bodies as elements, re-signings collapse
+automatically and `Witness` simply accumulates; nothing ever compares two signatures.
 
 **Representation of the awkward cases falls out for free:**
 
 | Case | Representation |
 |---|---|
-| **gap** | `S(σ)` simply contains no event at that position. No sentinel needed |
-| **duplicity** | `S(σ)` contains two events at one position. No flag needed |
-| **invalid** (fails `admissible`) | never enters `S(σ)` — and because the test is state-independent, every replica agrees |
-| **unauthorized but well-formed** | *is* in `S(σ)`, and is simply never selected by the derived view. This matters: **spam cannot manufacture duplicity** |
+| **gap** | `Bodies(σ)` contains no body at that position. No sentinel |
+| **duplicity** | two **distinct bodies** at one position. No flag |
+| **invalid** (fails `admissible`) | never enters — and because the test is state-independent, every replica agrees |
+| **re-signed identical body** | one element, several witnesses. **Not** duplicity |
+| **unauthorized but well-formed** | *is* in `Bodies(σ)`, and is never selected by the derived view. **Spam cannot manufacture duplicity** |
 
-#### Derived view — a deterministic function of `S(σ)`
+State-independence is what makes the filter commute with union —
+`filter(A) ∪ filter(B) = filter(A ∪ B)` — and it is why the bound in rule 4 must be
+an absolute constant.
+
+> **Admission is cheap, so the durable set is attacker-writable, and "retention
+> affects liveness not safety" was too strong.** Anyone can mint unlimited
+> admissible bodies for any public σ by signing arbitrary bytes with a fresh key.
+> They can never enter `C` (they are unauthorized), so they cannot fork anything —
+> but they are a storage and bandwidth attack, which forces eviction, and eviction
+> is a per-replica function. **Under adversarial shaping, "convergence over the
+> eventual retained set" is close to vacuous.**
+>
+> Two consequences, both stated rather than absorbed: the eviction rule must be
+> **protocol-specified rather than implementation-chosen**, so that two honest
+> replicas under the same attack retain the same set; and per-signer admission cost
+> belongs in the replication layer (N3), where it may be state-dependent without
+> touching the join. Recorded as **O-N5**.
+
+#### Derived view — a pure function of `Bodies(σ)`
 
 ```
-derive(S(σ)):
-    e₀ ← the unique e ∈ S(σ) with σ = H(e)        # see uniqueness note
+derive(Bodies(σ)):
+    b₀ ← the unique b with σ = event_id(b)          # unique by construction
     if none: return Unknown
-    state ← apply(e₀);  p ← 1
+    state ← apply(b₀);  p ← 1
     loop:
-        C ← { e ∈ S(σ) : e.position = p
-                        ∧ e.prev_digest = H(chosen(p−1))
-                        ∧ authorized(e, state) }
-        C ← supersede(C)                           # see below
+        C ← { b ∈ Bodies(σ) : b.position = p
+                            ∧ b.prev_digest = event_id(chosen(p−1))
+                            ∧ authorized(b, state) }
+        C ← supersede(C)
         match |C|:
-            0 → return Live(state, frontier = p)          # gap, or the end
+            0 → return Live(state, frontier = p)
             1 → state ← apply(state, c);  p ← p+1
             _ → return Halted(state, disputed_at = p, candidates = C)
 ```
 
-`authorized(e, state)` checks that `e.signer_key` is a non-revoked key holding the
-capability `e.kind` requires in `state`, and — for an establishment event — that it
-reveals pre-image material matching the pre-rotation commitment carried in `state`.
+**Inception cannot fork:** two different inception bodies hash to two different `σ`,
+so they are two different subjects.
 
-**Inception is unique by construction**, so position 0 can never fork: two
-different inception events hash to two different `σ`, and are therefore two
-different subjects rather than one forked subject. Self-addressing buys this for
-free.
+**The recursion is well-founded:** `derive` advances one position at a time and only
+after `|C| = 1`, so `chosen(p−1)` is defined whenever `C` at `p` is computed; if
+`p−1` halts, `derive` has already returned.
 
-**The derived view may regress; the durable state may not.** A replica holding
-`{X@n}` derives `frontier = n+1`; on learning `Y@n` it derives `Halted(n)`. That is
-new information changing a conclusion, not state being retracted — and it is
-convergent, because every replica holding both reaches the same conclusion.
+**The derived view may regress; the durable state may not.** That is a conclusion
+changing on new information, and it is convergent — every replica holding the same
+`Bodies(σ)` computes the same verdict.
 
-#### `supersede` — the one selection rule, and it is authority-based
+**`derive` is pure only if authority principals are keys.** Every principal named
+inside an event — device, guardian, recovery authority — must be a raw `Did`,
+verifiable from bytes. If a guardian were named by `SubjectId`, `authorized` would
+depend on *another* subject's log, which may itself be gapped or halted, and mutual
+guardianship would make the recursion non-well-founded. **Normative for N1.**
+
+#### `supersede` — the one selection rule, and the constraints that make it safe
 
 ```
 supersede(C) = if C contains any establishment event
-               then { e ∈ C : e is an establishment event }
+               then { b ∈ C : b is an establishment event }
                else C
 ```
 
-**Establishment events (rotations) supersede non-establishment events (authorize,
-revoke) at the same position.** This is KERI's superseding recovery, and it is the
-authenticated selector O16 needed:
+Establishment events (rotations, recovery) supersede non-establishment events
+(authorize, revoke) at the same position — KERI's superseding recovery, and the
+authenticated selector O16 needed. It selects by **authority class**, never by
+content: no lowest-hash, no first-seen, no longest-chain. Where it cannot select on
+authority it **halts**.
 
-- An attacker holding a **current** key can fork a non-establishment event (§6.2).
-- Only the holder of the **pre-committed** key material can produce an
-  establishment event at that position — so the legitimate subject recovers by
-  **rotating at the disputed position** (not at `p+1`; the derived view never
-  reaches `p+1` while `p` is disputed).
-- Because pre-rotation admits at most one authorized rotation per position, this
-  never has to choose *between* two rotations.
+Three constraints are load-bearing. Violating any one turns the selector into an
+attack:
 
-**It is a selection rule and is declared as one.** It selects by *authority class*,
-never by content — no lowest-hash, no first-seen, no longest-chain. Where it cannot
-select on authority — two authorized establishment events, which requires the
-attacker to hold the cold pre-rotation material too — it **halts** rather than
-guessing. That residual is the case §12.2 already records as unrecoverable, and it
-is **O16′**.
+1. **Establishment eligibility is defined by a pre-rotation pre-image reveal — never
+   by a capability flag, and no delegation may mint it.** If `recover` were
+   establishment because the signer holds a `Recover` capability, an attacker with a
+   compromised *current* device would author an establishment event and **win
+   `supersede` against the legitimate holder's rotation** — authority-based selection
+   becoming attacker-based selection. F13/F13a in §19.3 is exactly such a route in
+   today's code. This also explicitly bars §9.5's generic attenuating delegation from
+   delegating establishment authority. Same class of error as #2590, one layer up.
 
-> **`supersede` is only safe under a load-bearing constraint on what counts as an
-> establishment event, and getting this wrong turns the rule into a privilege
-> escalation.** *(Found while re-checking the rule against #2590's defect pattern.)*
->
-> **Establishment eligibility must be defined by possession of pre-committed
-> material — never by a capability flag in the current key set.** If `recover`, or
-> any future event kind, were classed as establishment merely because the signer
-> holds a `Recover` capability, then an attacker with a compromised *current* device
-> could author an establishment event and **win `supersede` against the legitimate
-> holder's rotation**. The selector would then hand the attacker exactly the
-> priority it exists to give the victim.
->
-> So: `rotate` and `recover` are establishment events **because and only because**
-> they must reveal material matching a commitment the current key set does not
-> contain. `authorize`/`revoke` are not, and no capability grant may promote them.
-> This is the same class of error as #2590 (an `AddDevice` signer granting
-> capabilities it does not hold), one layer up — and it is a required N1 test
-> (§19.2, test 12).
+2. **Rotation bodies must be deterministic.** Pre-rotation commits to
+   `H(K_next_set)`, *not* to the rotation body — so the holder of `K_next` can
+   author `rotate{reveal K_next, next: H(K_a)}` and `rotate{reveal K_next, next:
+   H(K_b)}`, both authorized, different bodies ⇒ `|C| = 2` ⇒ **permanent halt with no
+   attacker present** (a device that crashes before persisting its new commitment and
+   retries with fresh randomness kills the subject). The commitment scheme must
+   therefore make the whole rotation body **re-derivable** — e.g. `K_{p+1} =
+   KDF(root ‖ p+1)` with every other field determined — so an honest retry collapses
+   to one `event_id`. **Normative for §19.4 item 2.**
+
+3. **Threshold recovery must produce one body, not one body per quorum.** With `M`-of-`N`
+   guardians signing independently, two different quorums yield two different
+   authorized establishment bodies at `p` ⇒ permanent halt. So **any `M` guardians
+   hold a kill switch, not merely a takeover** — and even with no adversary, a
+   phrase-holder rotating at `p` while a guardian quorum recovers at `p` halts the
+   subject. Path (b) therefore requires a **single group public key producing one
+   signature over one body** (FROST-class), which makes **N7 a hard prerequisite of
+   guardian recovery, not an upgrade** (§12.2, §19.1).
 
 #### What this does and does not give
 
 | Question | Answer |
 |---|---|
-| Can later events become usable after a fork? | **Yes, and only** via a superseding establishment event at the disputed position. Nothing else unblocks it |
-| Does any rule silently select a branch? | **No.** `supersede` is explicit and authority-based; every other case with `\|C\| ≥ 2` halts |
-| Is the `chosen(p−1)` recursion well-founded? | **Yes.** `derive` advances strictly one position at a time and only after `\|C\| = 1`, so `chosen(p−1)` is defined whenever `C` at `p` is computed. If `p−1` halts, `derive` has already returned and `p` is never evaluated — which is also why a fork at position 3 makes events at 8 and 9 unreachable until the fork is superseded, no matter how many later events are held |
-| Does BRB prevent equivocation? | **No** — and nothing here assumes it does. BRB gives non-equivocating *delivery* among receivers; a Byzantine writer can still author two conflicting signed events. That is exactly why `derive` must handle `\|C\| ≥ 2` |
-| What about already-applied effects when a fork appears? | Acts referencing positions `< p` remain evaluable (that authority is undisputed). Acts at or after `p` are not. Class-2 settled effects are **not** unwound (§9.3, R5.3) — **and that leaves a stated non-convergence, below** |
+| Can later events become usable after a fork? | **Yes, and only** via a superseding establishment event at the disputed position |
+| Does any rule silently select a branch? | **No.** `supersede` is explicit and authority-based; every other `\|C\| ≥ 2` halts |
+| Does BRB prevent equivocation? | **No**, and nothing here assumes it. BRB gives non-equivocating *delivery* among receivers; a Byzantine writer can still author two conflicting signed bodies — which is why `derive` must handle `\|C\| ≥ 2` |
+| Can one compromised current key halt a subject unilaterally? | **Yes.** It authors `authorize{D₁}@p` and `authorize{D₂}@p`, both authorized ⇒ `Halted(p)` with **no victim action**. Current-key compromise is an instant DoS whose only cure is a cold rotation, and if device compromise persists each revealed generation is captured in turn, burning one pre-rotation generation per round. **O16′** |
+| What does superseding recovery cost? | **It orphans the suffix.** Rotating at a disputed `p` changes `chosen(p)`, so every honest later body whose `prev_digest` names the old `chosen(p)` can never enter `C` — events at `p+1 … frontier` are lost and must be re-authored. Recovery destroys legitimate later authority events, and a fork deep in the log is far more expensive than one at the frontier |
+| Are class-2 settled acts convergent under a fork? | **No — and this is a settlement-safety problem, not a liveness one.** See below |
 
-> **Late fork detection is a stated non-convergence for class-2 acts, and it is the
-> irreducible residue of §6.1.** A replica that admits and settles a class-2 act
-> while position `p` still looks authorized, and only afterwards learns of the fork
-> at `p`, keeps that effect. A replica that learned of the fork first never admits
-> it. Both behave correctly; they permanently differ.
+> **Class-2 settlement is not convergent under a fork, and the earlier framing
+> understated it.** The regression is not only `Live → Halted`; it is
+> `Live(branch A) → Live(branch B)`. Replica R1 receives only the attacker's
+> `authorize@5`, derives `Live(frontier 6)`, and finalizes a class-2 ledger act
+> citing position 5. R2 receives the victim's `rotate@5` first and rejects the same
+> act. After merge both hold an identical set and derive an identical verdict — and
+> hold **permanently different ledger state**, because R5.3 says settled effects are
+> never unwound. That is the arrival-order divergence #2469 §8 withdrew, reintroduced
+> through class 2.
 >
-> This cannot be repaired without rollback semantics ICN does not have, and it is
-> not a defect introduced here — it is the same boundary KERI states plainly, where
-> duplicity is judged *"for that validator"* and *"once duplicity is detected that
-> identifier loses all its value to any detecting validator."* Class 1 does not have
-> the problem, because it evaluates at a decision point over converged state.
+> An earlier draft hid this by saying "acts at positions `< p` remain evaluable", as
+> if `p` were known at admission. **It is not — `p` is discovered afterwards.**
 >
-> The honest bound is therefore: **class-2 divergence is limited to acts admitted
-> inside the fork-propagation window**, and shrinking that window is a replication
-> concern (§9.4, O-N5), not something the authority model can fix.
-| Does retention policy break convergence? | It affects **liveness, not safety**. A replica that evicts an event is indistinguishable from one that has not yet received it; both derive a shorter frontier. Convergence is stated over *the eventual retained set*, and anti-entropy re-delivery is what makes retention converge (§9.4) |
-
-> **Event identity must be the canonical *body* digest, not the full bytes.**
-> Derived while walking case 6 below. Ed25519 permits more than one valid
-> signature over the same message, so a set keyed on whole-event bytes would let a
-> Byzantine — or merely non-deterministic — signer produce two elements at one
-> position with **identical content**, manufacturing false duplicity that halts the
-> subject. So: `event_id = H(canonical_body)`, the set is keyed by `event_id`,
-> `prev_digest` refers to `event_id`, and the signature is carried outside the
-> hashed body. Two events are duplicitous only when their **bodies** differ.
+> There is no fix inside this model. Reducing exposure means admitting class-2 acts
+> only against positions deep enough to be beyond challenge, which is a **finality
+> depth** — a concept ICN does not have, and one whose local evaluation reintroduces
+> the same divergence in weaker form. Recorded as **O-N7**, and **O16′ is
+> reclassified from a liveness question to a settlement-safety question**. Until it
+> is answered, **this authority model is not by itself a sufficient basis for
+> irreversible settlement**, and §9.3 class 2 must be read with that limit attached |
 
 ### 9.2.2 The model against adversarial delivery orders
 
@@ -1129,8 +1166,9 @@ the same eventual event set.**
 | 6 | identical event repeatedly | union is idempotent; keyed on `event_id = H(body)`, so re-signings collapse to one element | unchanged | ✔ *(only because of the body-digest rule above)* |
 | 7 | invalid event at `n` before the valid one | fails `admissible` ⇒ never enters `S`. If merely **unauthorized**, it enters `S` but never enters `C` | the valid event is unaffected — **spam cannot block or fork** | ✔ |
 | 8 | `rotate@n` without the pre-committed material | enters `S` (it is well-formed and self-signed) | fails `authorized`, so never enters `C`; ignored | ✔ |
-| 9 | compromised current key forks a non-establishment event at `n` | both in `S` | if the legitimate device also acted at `n`: `Halted(n)`. If **only** the attacker's: `derive` advances on it — a stolen-key action, not a fork | ✔ (converges; the second case is a real compromise, not a divergence) |
-| 10 | legitimate rotation recovers from case 9 | attacker's `authorize@n` and victim's `rotate@n` both in `S` | `supersede` filters to the establishment event ⇒ `\|C\| = 1` ⇒ advance, rotating the attacker out | ✔ — **recovery is defined and deterministic** |
+| 9 | compromised current key forks a non-establishment event at `n` | both bodies in `Bodies(σ)` | **A single compromised key needs no victim to fork.** It authors `authorize{D₁}@n` *and* `authorize{D₂}@n` — both authorized, distinct bodies ⇒ `Halted(n)` **unilaterally**. (If it authors only one, `derive` advances on it: a stolen-key action, not a fork.) | ✔ converges — on a halted subject. Current-key compromise is an **instant DoS**; cure is a cold rotation |
+| 10 | legitimate rotation recovers from case 9 | attacker's `authorize@n` and victim's `rotate@n` both present | `supersede` filters to the establishment event ⇒ `\|C\| = 1` ⇒ advance, rotating the attacker out | ✔ **defined and deterministic — but it orphans the suffix.** Changing `chosen(n)` strands every honest body at `> n` whose `prev_digest` names the old `chosen(n)`; those must be re-authored (§9.2.1) |
+| 11 | fork **behind** the frontier: bodies at 0–5 and 8–9, fork at 3 | all present | `Halted(3)`. Bodies at 4, 5, 8, 9 are unreachable — `derive` never evaluates past 3. Rotating at 3 recovers the subject and **permanently orphans 4, 5, 8, 9** | ✔ converges; the cost grows with fork depth. Case 10 alone would not have caught this |
 
 **Two operational consequences that are easy to get wrong.**
 
@@ -1350,6 +1388,16 @@ satisfies R13.1 where a `Person` principal class cannot.
 10. **Byzantine reliable broadcast is a prerequisite and does not exist** — gossip
     entries carry no signature at all (§3.7, §6.1).
 11. **Class 1 currently degrades to a known R5.1 violation** until O-N6 (§9.3).
+12. **Class 2 is not convergent under a fork** — two replicas can hold permanently
+    different settled state (**O-N7**). This model is **not** by itself a sufficient
+    basis for irreversible settlement.
+13. **A single compromised current key halts a subject unilaterally**, and recovery
+    **orphans every later event** (§9.2.1). Fork depth is a cost multiplier.
+14. **Guardian recovery needs threshold *signing* (N7) to avoid being a kill
+    switch** — independent M-of-N signatures make any `M` guardians able to halt the
+    subject permanently (§12.2).
+15. **The durable set is attacker-writable**; eviction must be protocol-specified or
+    convergence-under-attack is vacuous (**O-N8**).
 
 ---
 
@@ -1470,8 +1518,21 @@ bolted beside the chain rule — it **is** the chain rule.
 | Pre-rotation commits to | keys derived from the continuity root (recovery phrase) | a **threshold** key set held by M-of-N guardians |
 | Total-loss recovery | restore phrase → rotate | M distinct guardians co-sign → rotate |
 | Root/backup compromise | **takeover, and *unrecoverable*** — see below | insufficient alone |
+| Any M guardians can... | — | **halt the subject permanently**, unless (b) uses a single group key — see below |
 | Produced offline? | **yes** | **no** — needs an online M-of-N quorum |
 | UX cost | one phrase at onboarding | guardian setup + coordination |
+
+> **Path (b) is a kill switch unless it uses a single group key.** With `M`-of-`N`
+> guardians signing **independently**, two different quorums produce two different
+> authorized establishment bodies at the same position, so `supersede` cannot
+> choose and the subject **halts permanently** (§9.2.1, constraint 3). That means
+> any `M` colluding guardians can destroy the subject rather than merely capture it
+> — a strictly worse outcome than takeover — and it can happen with **no adversary
+> at all**, if a phrase-holder rotates at `p` while a guardian quorum recovers at
+> `p`. Path (b) therefore requires a **single group public key emitting one
+> signature over one body** (FROST-class), which makes **N7 a hard prerequisite of
+> guardian recovery rather than an optional upgrade**. An earlier draft's "insufficient
+> alone" understated this badly.
 
 > **Path (a) root compromise is not a race the victim can win.** An attacker
 > holding the continuity root derives the pre-committed keys, rotates first, **and
@@ -1655,11 +1716,16 @@ a uniqueness or unlinkability property.** Migration is therefore:
 > |---|---|
 > | `PersonhoodAnchorStore::put` indexes the **anchor-derived** DID | `personhood_store.rs:202-205` — `let did = anchor.to_did(); … put(&did_index_key(&did), anchor_id)` |
 > | `link_did`, which would add the member's real DID to that index | **zero production callers.** The one hit, `icn-net/src/rate_limit.rs:1781`, sits after the `#[cfg(test)]` boundary at `:1406` |
-> | `PersonhoodAnchorStore::get_by_did` | **zero production callers** outside the store's own tests |
+> | `PersonhoodAnchorStore::get_by_did` | reached only by the trait forwarder `get_anchor_by_did` at `personhood_store.rs:599`, and **no production code constructs this store** (`supervisor/lifecycle.rs:1407` passes `None`). *(An earlier draft said "zero production callers", which was imprecise.)* |
+| the **live** anchor-by-DID lookup is a **different store** | `icn-commons/src/store.rs:529`, reached from `api/commons/mod.rs:131,469` — and it maintains an explicit bridge, `put_anchor_did_index`, doc-commented *"used when the enrollment DID differs from the anchor's internal DID"* (`store.rs:539-545`), written during enrollment at `icn-commons/src/inner.rs:173` |
 > | standing / holder lookups | go through `CommonsStore::get_holder_by_did(holder_did)`, where `holder_did` is the DID passed to `create_holder_from_anchor` — the **member's `ephemeral_did`** in the enrollment path (`simple_enrollment.rs:703`) |
 >
-> **So there is no live cross-keying mismatch: the anchor-DID index is written and
-> never read.** Standing and membership consistently key on the member/device DID.
+> **So there is no live cross-keying mismatch — and for a better reason than the
+> first draft gave.** The live path (`icn-commons`) maintains an *explicit bridge
+> index* from the enrollment DID to the anchor, precisely because the two differ;
+> the path that indexes only the anchor DID (`icn-identity`'s
+> `PersonhoodAnchorStore`) is never constructed in production. Standing and
+> membership consistently key on the member/device DID.
 >
 > This does not make the migration risk-free, and the finding should not be read as
 > a clean bill of health. It means the hazard is **latent rather than active**: the
@@ -1687,7 +1753,7 @@ a uniqueness or unlinkability property.** Migration is therefore:
 | `RotationEvent` | **MIGRATE** | right shape; needs a domain-separated canonical preimage (F12) and a signer/verifier that agree (F10) |
 | device rosters | **MIGRATE** | fix #2588 (binding) and #2590 (attenuation) **as part of** the migration, never after |
 | memberships | **KEEP**, extended | the bidirectional index (`sled_registry.rs:9-12`) is the right shape; add the subject and its log reference. Signing and replication remain #2441's (F17) |
-| governance state | **KEEP** | `gov:vote:{pid}:{voter}` being subject-keyed is what makes §9.3 class 1 cheap |
+| governance state | **KEEP** | class 1 becomes cheap **once votes key on the subject**; today `vote_key(proposal_id, voter: &Did)` (`apps/governance/src/state_store.rs:222`) keys on a **`Did`**, so re-casting from a new device writes a second tallied row (§9.3) |
 | historical signatures / receipts | **KEEP — permanently verifiable** | "key K was authorized at position N" is an append-only fact (R2.3) |
 | gateway challenge auth | **MIGRATE** | add a domain separator and bind `coop_id`/`scopes` into the signed payload (§3.4) |
 | invite redemption | **REMOVE the unproven-subject mint** | #2589 |
@@ -1705,7 +1771,7 @@ a uniqueness or unlinkability property.** Migration is therefore:
 | **Globally resolvable non-key anchor** (Model B) | Genesis has no authority root; resolution needs a global directory with an unsolved split-view problem; correlation worse than A |
 | **Credential-only, no subject identifier** (Model D) | Collapses into C plus a credential layer; revocation reintroduces an online correlator; no continuity mechanism |
 | **Hybrid five-concept graph** (Model E) | Complexity is the cost; §3 documents what ICN's existing parallel identity models already produce |
-| **O9 as posed** — a convergent global device-revocation model | **Provably unachievable** (§6.1). Replaced by §9.3 |
+| **O9 as posed** — a convergent global device-revocation model | Unachievable **within premises ICN has chosen** (§6.1) — a bounded argument, not a theorem. Replaced by §9.3 |
 | **Wall-clock validity windows** (`not_after` as an ingress gate) | Non-convergent (#2469); and F14 shows ICN's clock helper fails *open* |
 | **`standing_hash` in the envelope** | #2469 §14.1 — a deterministic-looking check over unauthenticated state |
 | **Carried-proof-only verification** ("carried, not resolved" as an absolute) | Over-generalizes #2469, which resolves against local durable state by design. Corrected in R4.5 |
@@ -1727,7 +1793,9 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O-N4** | Which act classes exist beyond the three in §9.3, and who assigns a new act to a class? | §9.3 is exhaustive today but the taxonomy must be governed, or class assignment becomes an unreviewed security decision |
 | **O-N5** | How is the authority log replicated and bounded? | It is per-subject and monotone, so gossip suffices in principle — but topic naming, retention, and a bound on log growth are unspecified, and ICN's topics are global-by-domain today (§3.7). **Topic naming is also a correlation surface** (§11.1) |
 | **O-N6** | What makes a governance decision point deterministic, so §9.3 class 1 can pin a log position? | #2469 §7.2 contains `ProposalClosed` because `outcome`/`tally` are attacker-supplied and the real authority entangles with the `GovernanceProofV2` signer model, an explicit #2469 non-goal. **A governance problem, not an identity one** — but class 1 degrades to class 2 until it is answered |
-| **O16′** | On detected duplicity, what happens beyond refusal? | Convergent refusal is achievable; recovery *from* a fork is a governance question. KERI's own answer concedes *"an unavoidable race condition"* |
+| **O16′** | On detected duplicity, what happens beyond refusal — and what bounds the DoS? | **Reclassified in review round 2 from a liveness question to a settlement-safety one.** A single compromised current key halts a subject unilaterally; recovery orphans the suffix; and if device compromise persists, each revealed pre-rotation generation is captured in turn. KERI concedes *"an unavoidable race condition"* |
+| **O-N7** | What makes class-2 (irreversibly settled) acts safe under a fork? | **New in review round 2.** `Live(branch A) → Live(branch B)` leaves two replicas with permanently different ledger state, because settled effects are never unwound (R5.3). Reducing exposure needs a **finality depth**, which ICN does not have and whose local evaluation reintroduces the divergence. **Until answered, this authority model is not by itself a sufficient basis for irreversible settlement** (§9.2.1) |
+| **O-N8** | What is the protocol-specified eviction rule for the durable event set? | **New in review round 2.** `admissible` is cheap, so the set is attacker-writable and grow-only; eviction is forced, and if it is implementation-chosen then "convergence over the eventual retained set" is vacuous under attack (§9.2.1) |
 | **O12** | Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture? | **Reopened on better terms.** The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise |
 | **O2** | Does a restored node keep its identifier? | §14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy |
 | **O5** | Remove or wire `public_did` institutional signing? | Depends on O12 |
@@ -1757,7 +1825,7 @@ untraced anchor↔member keying question in §15.2.
 | Item | Disposition |
 |---|---|
 | **O8** — current root after rotation | **DISSOLVED.** Replay the subject's log from a self-certifying inception (§6.2, §9.2). No external authority, no clock |
-| **O9** — convergent device revocation | **REJECTED AS POSED** (§6.1, provably unachievable). **REPLACED** by §9.3's per-act-class semantics plus position-bounded validity |
+| **O9** — convergent device revocation | **REJECTED AS POSED** — unachievable *within the premises ICN has declined to pay for* (§6.1); **not** a theorem-level impossibility. **REPLACED** by §9.3's per-act-class semantics plus position-bounded validity, which itself carries the O-N6 and O-N7 gaps |
 | **O10** — canonical `DeviceAuthorization` bytes | **STILL REQUIRED**, and widened: it now covers the log event preimage (F12: bincode, no domain separator) and the `Did` canonicalization rule (§10) |
 | **O13** — retiring `GOV_OP_V1` | **PARTIAL, and an earlier draft had this backwards.** O13 constrains **receivers**, not authors. A subject writing "v1 no longer accepted for me" binds only acts *they* author; any subject who never writes it keeps v1 alive forever — which is precisely the never-ending dual stack **R12.3 [HARD]** forbids. Per-subject declaration is a genuine improvement on a global cutover, and **receiver-side retirement remains unsolved** |
 | **O14** — total-loss recovery cannot advance the chain | **MECHANISM DISSOLVED by pre-rotation** (§12.1) — the committed-but-unused next key *is* the missing authorized key. **The custody question remains**: pre-rotation presupposes the backup survived, and "lost devices *and* backup" is answered only by guardians |
@@ -1797,8 +1865,11 @@ untraced anchor↔member keying question in §15.2.
    │
    ├──► N6  mobile: subject + device split + pre-rotation backup   [F19]
    │
-   └──► N7  threshold SIGNING (FROST-class) for guardian recovery path (b)
-              ICN has a threshold PRF, not threshold signing (F7).
+   └──► N7  threshold SIGNING (FROST-class) — a HARD PREREQUISITE of guardian
+              recovery, not an upgrade.  ICN has a threshold PRF, not threshold
+              signing (F7).  Without N7, independent M-of-N signatures give any
+              M guardians a KILL SWITCH (two quorums => two authorized bodies at
+              one position => permanent halt), so path (b) must not ship first.
               Without N7, R9.1 [HARD] is met only by the backup-phrase path.
 
   independent, and should not wait:
@@ -1836,8 +1907,12 @@ wiring, no gateway change, no `SignedGovernanceOp` change**.
      must collapse to one element (the `event_id` rule);
   4. **permutation-invariant durable state** — every delivery permutation of one
      event multiset yields the same `S`;
-  5. `admissible` is state-independent — classifying an event never consults other
-     events (assert by construction: the function takes only the event).
+  5. **`admissible` is state-independent — as a differential property, not a
+     signature observation.** Classify one event under many randomly generated
+     surrounding contexts and require an identical verdict every time. *(An earlier
+     draft said "assert by construction: the function takes only the event"; that is
+     unfalsifiable — `fn admissible(&self, e: &Event)` on a struct holding the store
+     satisfies it while consulting state.)*
 
   *Derived view (determinism):*
   6. **deterministic authority view** — `derive` over equal `S` yields equal
@@ -1855,8 +1930,29 @@ wiring, no gateway change, no `SignedGovernanceOp` change**.
   12. **superseding recovery** — a legitimate `rotate` at the disputed position
       supersedes the forked non-establishment event and advances (case 10). **Two
       authorized establishment events at one position must halt, not choose**;
-  13. **no branch selection by content** — assert no lowest-hash, first-seen, or
-      longest-chain rule exists anywhere in the module.
+  13. **no branch selection by content — as two falsifiable properties.**
+      (a) `derive`'s verdict is invariant under any **injective relabeling of
+      `event_id`s**, which no lowest-hash or ordering-based tiebreak can survive;
+      (b) for every generated set with `|C| ≥ 2` after `supersede`, `derive` returns
+      `Halted`. *(An earlier draft asserted "no such rule exists anywhere", an
+      absence claim over an unbounded space that nothing can fail.)*
+
+  *Cases the first draft of this list could not fail — added after review round 2:*
+  16. **re-signed identical body collapses to one element** and does **not** produce
+      `Halted`; the witness set grows instead;
+  17. **deterministic rotation body** — deriving the same rotation twice from the
+      same state yields one `event_id`; a non-deterministic construction that yields
+      two authorized rotations at one position is rejected at construction time,
+      because at `derive` time it is already an unrecoverable halt;
+  18. **digest consistency** — `σ`, `prev_digest` and dedup all use
+      `event_id = H(canonical_body)`; a child naming a whole-event digest fails;
+  19. **fork behind the frontier** — bodies at 0–5 and 8–9 with a fork at 3 must halt
+      at 3, and a superseding rotation at 3 must be shown to **orphan** 4, 5, 8, 9
+      (the test asserts the loss, so it cannot be discovered later as a surprise);
+  20. **unilateral self-equivocation** — one authorized key emitting two distinct
+      bodies at one position halts the subject with no second party involved;
+  21. **authority principals are raw `Did`s** — an event naming a `SubjectId` as a
+      device or guardian is rejected, so `derive` cannot become mutually recursive.
 
   *Encoding and hygiene:*
   14. encode/decode round trip over a **versioned, domain-separated,
@@ -1899,12 +1995,22 @@ PRINCIPAL_MODEL §15.1 identified:
 1. **The canonical preimage** — version, domain separator, field order, encoding,
    and the `Did` canonicalization rule (§10). Absorbs O10; must not repeat F12's
    bare-bincode signing domain.
-2. **The pre-rotation commitment scheme** — what is committed (a digest of what,
-   over which key set), and how a rotation proves it. This is the load-bearing new
-   mechanism and has no precedent in the repo.
+2. **The pre-rotation commitment scheme** — what is committed, and how a rotation
+   proves it. This is the load-bearing new mechanism and has no precedent in the
+   repo. **It must additionally make the whole rotation body re-derivable** (e.g.
+   `K_{p+1} = KDF(root ‖ p+1)` with every other field determined), because
+   pre-rotation commits to the *next key set* and not to the *body* — so a
+   non-deterministic construction lets one honest signer author two authorized
+   rotations at one position and halt the subject permanently, with no attacker
+   present (§9.2.1, constraint 2).
 3. **The event taxonomy** — inception / rotate / authorize / revoke / recover;
    which are **establishment** events (and so eligible for `supersede`); and which
-   may carry a validity span (O-N1).
+   may carry a validity span (O-N1). Two invariants are normative, not stylistic:
+   **an event is establishment iff `authorized` requires a pre-rotation pre-image
+   reveal** — never a capability flag, and no delegation path may mint one, which
+   explicitly bars §9.5's generic attenuating delegation from establishment
+   authority; and **every authority principal named inside an event is a raw `Did`**,
+   never a `SubjectId`, or `derive` stops being a pure function.
 4. **The replicated state model must be taken from §9.2.1, not re-invented.** This
    was added after review round 2 found that two successive drafts had specified a
    merge that does not form a join. The N1 session inherits, and must not redesign:
@@ -1933,11 +2039,15 @@ Everything else in §19.2 is testable once those four are fixed.
 | Recency is the acceptor's decision (§6.3) | **ESTABLISHED** (Rivest, FC'98) |
 | No deployed system achieves decentralized global revocation convergence (§6.1) | **ESTABLISHED** (survey of primary specs) |
 | Model C — context-scoped identity with a private continuity root (§9) | **RECOMMENDED** |
-| Durable state = set of `admissible` events keyed by `H(canonical_body)`, joined by union (§9.2.1) | **ESTABLISHED** — join laws follow from set union once `admissible` is state-independent |
+| Durable state = two grow-only sets whose elements are canonical **bodies** (signatures held separately and never compared), joined by union (§9.2.1) | **ESTABLISHED** — join laws follow from set union once `admissible` is state-independent |
 | `admissible` must be state-independent, or the filter does not commute with union (§9.2.1) | **ESTABLISHED** |
 | Derived authority view as a pure function; halt on `\|C\| ≥ 2` (§9.2.1) | **RECOMMENDED** |
 | `supersede`: establishment over non-establishment, with establishment eligibility defined by pre-committed material and **never** by a capability flag (§9.2.1) | **RECOMMENDED** — the constraint is load-bearing; violating it makes the selector a privilege-escalation path |
-| Late fork detection diverges for class-2 acts (§9.2.1) | **OPEN / irreducible** — stated, bounded by fork-propagation latency, unfixable without rollback |
+| Class-2 settlement is not convergent under a fork (§9.2.1) | **OPEN — O-N7.** Not merely late detection: `Live(A) → Live(B)` leaves permanently different settled state. **This model is not a sufficient basis for irreversible settlement until answered** |
+| Rotation bodies must be deterministic; threshold recovery must emit one body (§9.2.1) | **RECOMMENDED, normative for N1** — without them a crash-retry or a second quorum halts the subject with no attacker |
+| Authority principals inside events must be raw `Did`s, never `SubjectId`s (§9.2.1) | **RECOMMENDED, normative for N1** — otherwise `derive` is not a pure function |
+| Superseding recovery orphans the suffix (§9.2.1) | **ESTABLISHED consequence** — a stated cost of recovery, growing with fork depth |
+| N7 (threshold signing) is a hard prerequisite of guardian recovery (§12.2) | **RECOMMENDED** — otherwise any `M` guardians hold a kill switch |
 | Fork monitoring is a client obligation ("responsive controller") (§9.2.2) | **RECOMMENDED**, inherited from KERI |
 | `Did` narrowed to "cryptographic principal" (§10) | **RECOMMENDED** |
 | No global Person identifier (§10) | **RECOMMENDED** |
