@@ -1,0 +1,2154 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>The Principal Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PRINCIPAL MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/PRINCIPAL_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>The Principal Model</h1>
+<p>Who ICN can honestly say did something: which actors are independently
+identifiable, what each may sign for, and why an identity must never silently
+become another identity merely because it runs on, controls, hosts, or belongs
+to it.</p>
+<blockquote>
+<p><strong>Truth status.</strong> §2 (<em>What ICN implements today</em>) is verified against
+<code>74c832f1</code> with file:line citations and is descriptive. Everything from §4
+onward is <strong>proposed architecture</strong> — design, not implementation. No claim
+here asserts production operation, pilot readiness, or institutional
+adoption. Where a proposal contradicts shipping code, §11 names the conflict
+rather than papering over it.</p>
+</blockquote>
+<p><strong>Related, deferred to, not restated:</strong>
+<a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt</a>
+(vocabulary doctrine) ·
+<a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a> (authority types) ·
+<a href="/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">ADR-0019</a>
+(grant minting) ·
+<a href="/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model">ADR-0020</a>
+(institution bootstrap) ·
+<a href="/docs/adr/ADR-0035-entity-aware-request-authorization">ADR-0035</a> (what a
+principal proves today) ·
+<a href="/docs/design/institutional-structure-spec">institutional-structure-spec</a>
+(Layer A/B/C) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/MEMBER_STANDING">MEMBER_STANDING</a> (the read model) ·
+<a href="/docs/design/authenticated-governance-replication">authenticated-governance-replication</a>
+(#2469) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION</a> (Meaning Firewall)</p>
+<hr>
+<h2>1. The invariant</h2>
+<pre><code>Person != Device != Node != Institution
+</code></pre>
+<p>Each is independently identifiable. Relationships between them are explicit,
+scoped, and revocable — never implicit inheritance.</p>
+<p>Five consequences, stated as tests any design must pass:</p>
+<ol>
+<li>Replacing a phone must not create a new human.</li>
+<li>Replacing a node must not create a new cooperative.</li>
+<li>Hosting a cooperative must not make the host the cooperative.</li>
+<li>Assigning a personal node to a cooperative must not rewrite the node&#39;s identity.</li>
+<li>Running one institution&#39;s workloads on a node must not change the node&#39;s species.</li>
+</ol>
+<p>This document exists because <strong>ICN currently fails test 1 and test 2 in
+shipping code</strong>, and cannot express tests 3–5 at all. §2 shows where.</p>
+<h3>1.1 Principles</h3>
+<ul>
+<li><strong>The DID is the anchor; institutions are changing contexts.</strong> Cooperatives,
+communities and federations are co-equal — never a ladder. (Already binding
+doctrine: <code>.claude/rules/design.md</code>.)</li>
+<li><strong>Authority is proven, not asserted.</strong> <em>A token is not a mandate</em> — and it is not
+uniformly an authorship proof either. Whether a bearer token evidences key control
+<strong>depends on which issuance path minted it</strong> (§2.4a): the challenge/response paths
+verify an Ed25519 signature over a server nonce, while invite redemption does not.
+A consumer must never read <code>claims.sub</code> as &quot;this requester controls that DID&#39;s key&quot;
+without knowing the mint path.</li>
+<li><strong>An authenticated session is not a cryptographic content author.</strong> A session says
+the gateway is willing to act for a subject; authorship says a key signed these bytes.
+Collapsing the two is the root of §2.4 and §2.5.</li>
+<li><strong>Proof travels with the claim.</strong> A receiver must be able to verify authorship
+from the bytes in front of it, without consulting distributed state whose own
+authenticity it cannot establish. (Derived from #2469 §14.1.)</li>
+<li><strong>Custody defines identity.</strong> Whoever holds a key <em>is</em> that principal. Any
+design that hands principal A&#39;s key to principal B has merged them, whatever
+the documentation says.</li>
+<li><strong>The kernel holds keys, DIDs and opaque scopes. It never holds meanings.</strong>
+<code>Person</code>, <code>member</code>, <code>cooperative</code>, <code>role</code> are app-layer concepts and must stay
+above the Meaning Firewall.</li>
+</ul>
+<hr>
+<h2>2. What ICN implements today</h2>
+<p>Verified at <code>74c832f1</code>. This section is descriptive.</p>
+<h3>2.1 One opaque, key-derived identifier for everything</h3>
+<p><code>pub struct Did(String)</code> (<code>icn/crates/icn-identity/src/lib.rs:177</code>).
+<code>Did::from_str</code> (<code>:209-244</code>) requires the <code>did:icn:</code> prefix, a decodable
+<strong>multibase</strong> payload of exactly 32 bytes, and a valid Ed25519 public key.</p>
+<blockquote>
+<p><strong>Correction (review round 10): it does <em>not</em> pin the multibase alphabet.</strong>
+<code>let (_base, decoded_bytes) = multibase::decode(encoded_part)</code> discards the base
+(<code>:223</code>) and the constructor retains the <strong>original string</strong>, <code>Ok(Did(s.to_string()))</code>
+(<code>:243</code>). <code>from_public_key</code> always <em>emits</em> Base58Btc (<code>:194</code>), but <code>from_str</code>
+<em>accepts</em> any multibase encoding of the same key — and since <code>Did</code> derives
+<code>PartialEq, Eq, Hash</code> over the inner <code>String</code> (<code>:174</code>), <strong>two encodings of one key
+are two unequal, differently-hashing DIDs</strong>.</p>
+<p>So <code>Did</code> equality is <em>string</em> equality, not <em>key</em> equality. In practice most paths
+fail closed, because membership matching and storage keys are string comparisons and
+the canonical producer is base58btc — a non-canonical author simply fails to match.</p>
+</blockquote>
+<blockquote>
+<p><strong>Correction (review round 18): not every Person DID embeds a key at all.</strong>
+The SDIS path bypasses <code>from_str</code> entirely. <code>Anchor.id</code> is <code>H(VUI || genesis_random)</code>
+— a hash, not a public key (<code>anchor.rs:53-54</code>) — and <code>Anchor::to_did()</code> (<code>:157</code>)
+hands it to <code>from_anchor_id</code>, which base58-encodes it and calls
+<strong><code>Did::new_unchecked</code></strong> (<code>:194-196</code>, <code>lib.rs:284</code>). No Ed25519 validation runs.</p>
+<p>For such a Person, <code>to_verifying_key()</code> either <strong>fails</strong> or yields a key <strong>nobody
+controls</strong>. <code>is_anchor_did</code> further notes <em>&quot;Both legacy and anchor DIDs have the
+same format&quot;</em> (<code>anchor.rs:203-204</code>), so the two classes are not distinguishable by
+inspection.</p>
+<p><strong>This is load-bearing for §6 and A0.</strong> A root-signed <code>DeviceAuthorization</code> and a
+chain &quot;anchored at the genesis key the DID encodes&quot; are both unusable for an
+anchor-derived Person, and that is an <em>existing</em> identity path, not a hypothetical.
+Recorded as <strong>O18</strong>: anchor-based Persons must be explicitly modelled or migrated —
+the model may not assume every Person DID embeds its root key.
+But the invariant &quot;one key ⇒ one identifier&quot; is <strong>not enforced by the type</strong>, and
+any design that assumes it must normalize explicitly. That includes this document:
+§6&#39;s authorization binds <code>person</code> and <code>device</code> as DIDs, and O9 shape (b) hashes a
+<em>set</em> of signing methods — both require a canonicalization rule, now folded into O10.</p>
+</blockquote>
+<p><strong>A DID <em>is</em> an Ed25519 public key.</strong> There is no method namespace, no role tag,
+and structurally no room for one. The same <code>Did</code> names a node
+(<code>icn-core/src/node.rs:339</code>), a member (<code>icn-coop/src/types.rs:354</code>), a recovery
+trustee (<code>icn-identity/src/multi_device.rs:108</code>), and a ledger author
+(<code>icn-ledger/src/entry.rs:62</code>).</p>
+<p>Genesis is already self-sovereign and offline: <code>KeyPair::generate()</code> (<code>:341</code>) →
+<code>Did::from_public_key</code> (<code>:191</code>). No registry, no network call. <strong>This part of
+the goal is already met.</strong></p>
+<h3>2.2 A device roster, not a device authority model</h3>
+<p><code>icn/crates/icn-identity/src/multi_device.rs</code> (772 lines) implements
+<code>DidDocument</code>(:19), <code>VerificationMethod</code>(:43), <code>Capability</code>(:78),
+<code>RecoveryConfig</code>(:100), <code>RotationEvent</code>(:135), <code>RecoveryProof</code>(:237),
+<code>can_sign</code>(:308), <code>add_device</code>(:320), <code>revoke_device</code>(:426), <code>rotate_key</code>(:450).</p>
+<p><code>Capability = { Sign, AddDevice, RevokeDevice, RotateKey, Recover, Encrypt }</code>.</p>
+<p>Device add/revoke is signature-gated: <code>identity_mgr.rs:161</code> checks
+<code>Capability::AddDevice</code> and <code>:188-197</code> verifies an Ed25519 signature from an
+existing method before mutating the roster (<code>:295</code> for revoke; <code>icnctl</code> mirrors at
+<code>main.rs:6254,6383</code>).</p>
+<blockquote>
+<p><strong>But the signature does not cover what is enrolled.</strong>
+<code>build_add_device_message</code> (<code>identity_mgr.rs:488-490</code>) signs exactly
+<code>ICN_ADD_DEVICE:{did}:{device_id}:{label}</code>. The <code>public_key</code>,
+<code>encryption_public_key</code> and <code>capabilities</code> from the request are parsed and
+applied <em>after</em> verification (<code>:200-228</code>) <strong>without being covered by that
+signature</strong>. A captured or replayed authorization can therefore be altered to
+enrol a <em>different key</em> with <em>different capabilities</em> under the same device id.
+Revoke has the same shape (<code>:493</code>, covering only did + device id).</p>
+<p>Raised in review on PR #2586 and verified at <code>74c832f1</code>. <strong>This is a live
+defect in shipping code, not merely a design gap</strong>, and slice B must fix the
+signed message to cover the full enrolment payload before treating this
+machinery as sufficient for §5.2. Tracked as <strong>#2588</strong>.</p>
+</blockquote>
+<blockquote>
+<p><strong>And signing the field would not be enough — capabilities are not attenuated.</strong>
+<code>identity_mgr.rs:160-165</code> checks only that the signing device holds
+<code>Capability::AddDevice</code>, then <code>:199</code> applies <code>request.capabilities</code> verbatim.
+A device holding <em>only</em> <code>AddDevice</code> can therefore enrol a key carrying
+<code>Recover</code>, <code>RotateKey</code> and <code>RevokeDevice</code> — <strong>strictly more authority than the
+signer possesses</strong>. <code>RotationEvent::verify</code> applies the same rule
+(<code>multi_device.rs:541-552</code>), so this survives into any replicated chain: once A0
+replicates these events, a local escalation becomes a network-identity takeover.
+This is <strong>privilege escalation by design, not by tampering</strong>, and it is a
+<em>separate</em> defect from #2588 with a separate fix — enrolment must attenuate to
+capabilities the signer may delegate, or require root approval.</p>
+</blockquote>
+<p><strong>But:</strong></p>
+<ul>
+<li><code>DidDocument::can_sign</code> has <strong>zero production callers.</strong> All 18 references are
+tests.</li>
+<li><code>Capability::Sign</code> is <strong>checked nowhere in production.</strong> The only production
+capability checks are <code>AddDevice</code>, <code>RevokeDevice</code> (4 sites) and
+<code>RotationEvent::verify</code> (<code>multi_device.rs:550</code>).</li>
+<li>A device is a <strong>string id</strong> inside one person&#39;s document
+(<code>multi_device.rs:259</code>), not an identity. It cannot be a token subject.</li>
+</ul>
+<p>So devices can be enrolled and revoked, but <strong>no device key can sign anything
+the network verifies.</strong> The capability model governs roster mutation only.</p>
+<p>One thing already works in our favour: the <code>Did</code> is derived from the <em>original</em>
+key and is <strong>stable across rotation</strong> (<code>multi_device.rs:21-22</code>). Identity
+continuity is designed in.</p>
+<h3>2.3 Two contradictory definitions of &quot;who may sign as DID X&quot;</h3>
+<table>
+<thead>
+<tr>
+<th>Definition</th>
+<th>Site</th>
+<th>Rule</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Document-mediated, multi-key</td>
+<td><code>multi_device.rs:308</code> <code>can_sign</code></td>
+<td>any non-revoked method with <code>Capability::Sign</code></td>
+<td><strong>dead code</strong></td>
+</tr>
+<tr>
+<td>Self-certifying, single-key</td>
+<td><code>replication.rs:373</code> <code>verify</code> → <code>author.to_verifying_key()</code></td>
+<td>only the key the DID derives from</td>
+<td><strong>live</strong></td>
+</tr>
+</tbody></table>
+<p><code>SignedGovernanceOp::sign</code> (<code>replication.rs:300-315</code>) returns <code>AuthorKeyMismatch</code>
+unless <code>Did::from_public_key(signing_key) == author</code>.</p>
+<p><strong>Therefore a device key can never produce a valid <code>SignedGovernanceOp</code> for its
+person.</strong> This is the precise mechanism behind #2469 §7.0.2&#39;s custody boundary.</p>
+<h3>2.4 Authorship is assumed, not proven</h3>
+<ul>
+<li><p><code>CastVote { voter: Did, .. }</code> (<code>apps/governance/src/actor.rs:171-180</code>) carries
+a doc-comment reading &quot;DID of the voter (authenticated caller)&quot;. The handler
+(<code>:2151-2168</code>) does <code>Vote::new(pid, voter, choice)</code> → <code>save_vote</code> → <code>publish</code>
+with <strong>no check that the submitter controls <code>voter</code></strong> and no signature. <code>Vote</code>
+(<code>icn-governance/src/vote.rs:23-40</code>) has no signature field.</p>
+</li>
+<li><p>Authorship is the token subject: <code>voter_did = parse_did(&amp;claims.sub, ..)</code>
+(<code>apps/governance/src/http/handlers.rs:1822</code>); same for proposer (<code>:851</code>) and
+delegator (<code>:2530</code>); same on RPC (<code>icn-rpc/src/server.rs:654-660</code>).</p>
+</li>
+<li><p>What binds a token to a DID is an <strong>HMAC over the gateway&#39;s symmetric secret</strong>
+(<code>icn-gateway/src/auth.rs:184</code>), not the DID&#39;s key. The intended trusted
+issuance gate <code>TokenAuthority</code> is <code>DenyUntilWired</code> with &quot;no production caller&quot;
+(<code>token_authority.rs:32,150-176</code>).</p>
+</li>
+<li><p><strong>Invite redemption mints a token for an unproven subject</strong> (<code>api/invites.rs:258-261,280</code>):
+<code>req.did</code> comes from the request body with form validation only, and
+<code>join_via_invite</code> takes no <code>HttpRequest</code>, so it inspects neither the caller&#39;s
+claims nor any scope. Preconditions are narrower than &quot;unauthenticated&quot; — the
+route sits behind <code>.wrap(auth)</code> (<code>server.rs:2433-2442</code>), so an attacker needs
+<em>some</em> valid bearer token plus an invite code (and <code>coop:read</code> reaches
+<code>list_invites</code>, <code>:206</code>). Given both, they mint a token naming <strong>any DID</strong>.
+Tracked as #2589.</p>
+<p>What that token actually reaches, traced to live guards rather than inferred
+from scope names: <code>create_coop</code> (<code>api/coops.rs:44</code>, which notably has <strong>no</strong>
+<code>require_coop_access</code>, so the new coop id escapes the invite&#39;s coop binding),
+<code>create_listing</code> (<code>api/listings.rs:616</code>), listing update/delete/status
+(<code>:756</code>, <code>:826</code>, <code>:871</code>), and <code>express_interest</code> (<code>:937</code>) — all attributed to
+the impersonated DID — plus ledger and coop <strong>reads</strong> confined to the invite&#39;s
+coop.</p>
+<p><strong>Correction (review round 8).</strong> An earlier revision said this permitted
+&quot;acting on settlement authority&quot;. It does not. <code>ledger:transact</code> has <strong>zero
+handler guards repo-wide</strong> — its only non-test occurrences are this grant and
+the session <em>ceiling</em> at <code>api/sessions.rs:42</code> — while both ledger mutation
+routes require <code>ledger:write</code> (<code>api/ledger.rs:68</code>, <code>:557</code>), which this token
+lacks. No value moves. The finding is narrower than first stated and still
+security-relevant, because identity attribution and cooperative creation are
+reachable under a DID the requester cannot sign for.</p>
+</li>
+<li><p><code>GovernanceProof</code> binds <em>what was recorded</em>, not <em>who authorized it</em>;
+<code>icn-governance/src/verify.rs:22-27</code> states authorization is explicitly out of
+scope.</p>
+</li>
+</ul>
+<h3>2.4a Token issuance taxonomy — what a bearer token actually evidences</h3>
+<p>All gateway and RPC tokens are <strong>HMAC HS256 over a shared secret</strong>
+(<code>auth.rs:415-419</code>, <code>:190-192</code>) — there is no asymmetric issuer key, so a token
+proves only that <em>something holding the gateway secret</em> emitted these claims.
+What it says about the <strong>subject</strong> varies by path:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Who picks <code>sub</code></th>
+<th>Key-control proof</th>
+<th>Production-reachable</th>
+<th>Evidences</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/auth/verify</code> (<code>auth.rs:368</code>)</td>
+<td>client, <strong>pinned by signature</strong></td>
+<td><strong>yes</strong> — Ed25519 over server nonce (<code>auth.rs:315</code>)</td>
+<td>dev + loopback only (<code>server.rs:197-199</code>)</td>
+<td>custody of <code>sub</code>&#39;s key; <code>coop_id</code>/scopes self-asserted</td>
+</tr>
+<tr>
+<td><strong><code>/invites/join</code></strong> (<code>invites.rs:280</code>)</td>
+<td><strong>client, body field</strong></td>
+<td><strong>NONE</strong></td>
+<td><strong>yes — always mounted</strong></td>
+<td>issuer assertion only</td>
+</tr>
+<tr>
+<td>SDIS enrolment complete (<code>simple_enrollment.rs:782</code>)</td>
+<td>client, pinned by signature</td>
+<td>yes (<code>:587</code>)</td>
+<td>only if <code>ICN_ENABLE_SELF_SERVE_ENROLLMENT</code></td>
+<td>custody + steward authorization</td>
+</tr>
+<tr>
+<td>session approve (<code>sessions.rs:225</code>)</td>
+<td><strong>server</strong>, from approver&#39;s verified claims</td>
+<td>none fresh; inherited</td>
+<td>yes</td>
+<td>attenuated authorization</td>
+</tr>
+<tr>
+<td><code>icnctl --local-mint</code> (<code>bins/icnctl/src/main.rs:7692</code>)</td>
+<td>caller</td>
+<td>none — authority <em>is</em> the HMAC secret</td>
+<td>operator-local</td>
+<td>issuer assertion only</td>
+</tr>
+<tr>
+<td>RPC <code>auth.verify</code> (<code>icn-rpc/auth.rs:672</code>; <code>handler/auth.rs:235</code>)</td>
+<td>client, pinned by signature</td>
+<td>yes (<code>icn-rpc/auth.rs:651</code>); the coop variant also checks membership (<code>handler/auth.rs:190</code>)</td>
+<td>yes</td>
+<td>custody (+ membership)</td>
+</tr>
+<tr>
+<td><code>TokenAuthority</code> (<code>token_authority.rs:212</code>)</td>
+<td>—</td>
+<td>—</td>
+<td><strong>no — test-only, no production caller</strong></td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p><strong>The load-bearing row is <code>/invites/join</code></strong>: the only always-mounted production
+path whose subject is fully client-chosen and unproven. <code>allow_self_asserted_coop</code>
+does not help — it gates <code>coop_id</code> and scopes on <code>/auth/verify</code>, never <code>sub</code>,
+and that path&#39;s <code>sub</code> is cryptographically proven regardless.</p>
+<p><strong>Consequence for this model.</strong> &quot;Authenticated&quot; is not one predicate. Any design
+that consumes <code>claims.sub</code> as authorship must name which modes it trusts; §6
+exists precisely so that governance authorship stops depending on this table at
+all.</p>
+<h3>2.5 The node already stands in for the person — in production</h3>
+<p><code>manager.rs:3480</code> accepts <code>proposer: Did</code>. In the actor-backed branch
+(<code>:3486-3497</code>) it calls <code>create_proposal_with_actions(..)</code> and <strong>never passes
+it</strong> — the argument is silently dropped. Downstream, <code>actor.rs:1925-1927</code> does
+<code>Proposal::new(domain_id, self.did.clone(), ..)</code>, stamping <strong>the node&#39;s DID as
+the proposal author</strong>. The non-actor fallback (<code>manager.rs:3512</code>) uses the human
+caller.</p>
+<p><strong>The same endpoint attributes authorship differently by deployment mode.</strong> This
+is invariant test 2 failing today, not hypothetically.</p>
+<h3>2.6 An institution is a slug, and never signs</h3>
+<p><code>EntityId(String)</code> = <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code> (<code>icn-entity/src/entity.rs:43,61</code>).
+<code>to_did()</code> returns <code>Some</code> <strong>only for individuals</strong> (<code>:159</code>). Organization slugs
+are human-chosen and unbound to any key.</p>
+<p>Institutional signing is modelled but unwired: <code>federation/types.rs:22</code>
+(<code>public_did</code>, &quot;signs on behalf of the coop&quot;) and <code>federation/gossip.rs:625</code>
+exist, but <code>gossip.rs:548</code> records in-source that
+<code>FederationGossip::set_keypair</code> <strong>has no caller in the workspace</strong>.
+<code>coop/lifecycle.rs:22</code> <code>derive_treasury_did</code> mints
+<code>did:icn:treasury:{bs58(hash(coop_id))}</code> — a string with <strong>no keypair behind
+it</strong>, and one that would not satisfy <code>Did::from_str</code> (it is typed
+<code>Option&lt;String&gt;</code>, which is why it compiles).</p>
+<p>The only wired signer is the node keypair (<code>init_federation.rs:314</code>).</p>
+<p>Institutional authority is instead <strong>authorization-record shaped</strong>:
+<code>AuthorityGrant</code> (<code>icn-governance/src/authority.rs:269</code>) with
+<code>GrantorEntityId(String)</code> (<code>:201</code>), <code>Mandate</code> (<code>mandate.rs:175</code>), enforced by
+<code>DefaultMandateGate::require</code> (<code>apps/governance/src/mandate_gate.rs:441,612</code>).
+<code>icn-authz::SubjectId</code> must start with <code>did:</code> (<code>model/ids.rs:19,24</code>), so <strong>an
+institution cannot currently be an authorization subject at all</strong>; entities
+appear only as resources (<code>ids.rs:110</code>).</p>
+<p>Membership <em>is</em> already a first-class relationship with a bidirectional index:
+<code>membership:{parent}:{member}</code> + <code>member_of:{member}:{parent}</code>
+(<code>icn-entity/src/sled_registry.rs:9-12</code>). <code>RoleAssignment</code>
+(<code>icn-governance/src/structure.rs:173</code>) states in-source that &quot;Roles carry
+delegated authority scopes but do NOT grant sovereignty.&quot;</p>
+<p>There is <strong>no verifiable-credential layer</strong> anywhere in the entity or governance
+crates.</p>
+<h3>2.7 Nodes are self-issued; no claiming exists</h3>
+<p><code>icnd --init</code> generates a keypair locally and refuses only if a keystore already
+exists (<code>icn/bins/icnd/src/main.rs:398-419</code>). <strong>Nothing authorizes a node into
+existence</strong>; the network treats self-issued DIDs as cheap by design
+(<code>icn-net/src/handlers/mod.rs:272-275</code>).</p>
+<p>Transport identity is TOFU at the TLS layer (<code>icn-net/src/tls.rs:276-279</code>);
+the DID becomes real only when the Hello handshake&#39;s three-fact cert binding
+passes (<code>handlers/hello.rs:62-97</code>), and the result lives in
+<code>ConnectionContext::authenticated_peer</code> — <strong>per connection, not per peer</strong>
+(<code>handlers/mod.rs:76-78</code>). Configured bootstrap DIDs are <em>expectations, not
+pins</em>: divergence warns and counts, keeps the connection, penalizes nobody
+(<code>handlers/mod.rs:296-340</code>).</p>
+<p><code>operator_did</code> exists (<code>icn-core/src/node.rs:341</code>) but is wired to the node&#39;s own
+DID: <code>create_node_profile(did.clone(), did.clone(), // For now, operator is same as node DID</code> (<code>supervisor/lifecycle.rs:371-374</code>).</p>
+<p><strong>Node claiming, pairing, and enrollment are ABSENT.</strong> (SDIS <code>enrollment.rs</code> is
+<em>person</em> enrollment.) An administrator today is a DID holding a JWT scope minted
+by the node&#39;s own gateway (<code>middleware.rs:84-95</code>).</p>
+<p><code>SignedEnvelope</code> authenticates the <strong>hop, not the author</strong> — stated verbatim at
+<code>icn-governance/src/replication.rs:16-18</code>.</p>
+<h3>2.8 Hosting: the data model allows it, the identity model forbids it</h3>
+<p>Node config carries exactly one <code>[federation].coop_id: String</code>
+(<code>icn-core/src/config/federation.rs:18</code>); <code>init_federation.rs:71-85</code> builds one
+<code>own_coop_info</code> bound to the node DID. But the entity store is multi-entity
+(<code>entity_mgr.rs:65,196</code>), and <code>docs/spec/institutional-domain.md:39</code> asserts &quot;a
+single node may serve many domains.&quot;</p>
+<p><strong>Runtime is singular; spec is plural. They conflict.</strong></p>
+<p>Authorization is per-<em>token</em>, not per-node (<code>middleware.rs:150-158</code> compares
+<code>claims.coop_id</code>); the <code>entity_id</code> claim is documented non-enforcing
+(<code>auth.rs:120</code>). A hosting operator&#39;s gateway could therefore mint tokens for any
+tenant today with no structural check.</p>
+<p>Multi-tenancy is otherwise ABSENT — the only <code>tenant</code> token in the codebase is a
+prohibition (<code>icn-governance/src/program.rs:97</code>). The doctrinal firewall is
+already stated verbatim: <em>&quot;Operator scope is not institutional authority. The
+appliance image must never collapse them.&quot;</em>
+(<code>deploy/appliance/appliance.manifest.example.yaml:161</code>;
+<code>DEBIAN_APPLIANCE_MODEL.md:187</code>).</p>
+<p>Institution genesis is an API call authorized by a <strong>bearer token</strong>, and nothing
+signs the genesis content at all. <code>icnctl institution bootstrap apply</code> obtains a
+JWT via challenge/response using whichever identity <code>--data-dir</code> selects, then
+<code>POST /v1/entities</code> sends a plain JSON body (<code>identifier</code>, <code>name</code>, <code>description</code>,
+<code>parent_id</code>) under that token
+(<code>icn/bins/icnctl/src/institution_bootstrap.rs:965-972</code>); with <code>--local-mint</code> even
+the challenge is skipped and the gateway secret mints the token directly.</p>
+<p><em>Correction (2026-08-14, raised in review on PR #2586): an earlier revision of this
+section said the node&#39;s key signs institution genesis. It does not. The node key
+may complete a challenge to obtain a token, but no key signs the genesis payload.</em>
+<strong>The consequence is stronger, not weaker: institutional genesis carries no
+authorship binding whatsoever</strong>, so the §7.3 remedy — genesis signed by the
+founding Persons — is closing a hole that is currently fully open.</p>
+<h3>2.9 Clients</h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Holds a private key?</th>
+<th>CI</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sdk/typescript</code></td>
+<td>No — JWT only; <code>SignatureProvider</code> interface whose only in-repo impl is a mock (<code>examples/basic-auth.ts:35</code>)</td>
+<td>yes</td>
+<td>shipping</td>
+</tr>
+<tr>
+<td><code>sdk/react-native</code></td>
+<td><strong>Yes</strong> — Ed25519 (<code>src/wallet.ts:93</code>) + hybrid ML-DSA-65 (<code>hybrid-crypto.ts:145</code>), Keychain/Keystore custody</td>
+<td><strong>none</strong></td>
+<td>unshipped</td>
+</tr>
+<tr>
+<td><code>web/member-shell</code></td>
+<td>No — the member pastes a bearer credential (<code>shell.js:1566-1578</code>)</td>
+<td>yes</td>
+<td>rehearsal-grade</td>
+</tr>
+<tr>
+<td><code>web/pilot-ui</code></td>
+<td>Yes — WebCrypto Ed25519 (<code>crypto.js:118</code>)</td>
+<td>yes</td>
+<td>superseded</td>
+</tr>
+</tbody></table>
+<p><code>SignedGovernanceOp</code> appears in <strong>zero</strong> client files. Device registration exists
+in both SDKs, but <code>sdk/typescript/src/index.ts:2059</code> requires the request be
+signed by an existing device holding <code>AddDevice</code> — so <strong>the first device is
+unbootstrappable from client code</strong>.</p>
+<p>The RN surface already names itself correctly: &quot;Device Keyring implementation
+(legacy-named &#39;wallet&#39;)&quot; (<code>wallet.ts:55</code>).</p>
+<hr>
+<h2>3. Historical design intent, classified</h2>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Claim</th>
+<th>Classification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>design/passport-keyring-position-receipt.md</code></td>
+<td>Splits the client god-object into Member Passport / Device Keyring / Position / Receipt; &quot;a DID is not a wallet&quot;</td>
+<td><strong>CURRENT</strong> (Accepted doctrine; governs vocabulary here)</td>
+</tr>
+<tr>
+<td><code>design/wallet-did-migration-boundary.md</code></td>
+<td>Canonical names for two <code>wallet</code>-rooted DID surfaces</td>
+<td><strong>CURRENT — executed</strong> (RN → <code>icn_keyring_*</code> #1970; Rust <code>wallet_did</code> → <code>operator_did</code> 2026-06-02)</td>
+</tr>
+<tr>
+<td><code>design/multi-device-identity-design.md</code></td>
+<td>One DID, many devices, capability hierarchy, rotation, social recovery</td>
+<td><strong>PARTIALLY CURRENT</strong> — implemented in <code>multi_device.rs</code>; registry still <code>draft</code>; the <em>signing</em> half was never wired (§2.2)</td>
+</tr>
+<tr>
+<td><code>design/social-recovery-design.md</code></td>
+<td>M-of-N trustee recovery with delay and cancellation</td>
+<td><strong>PARTIALLY CURRENT</strong> — <code>icn-identity/src/recovery.rs</code> implements the exact 7-step flow</td>
+</tr>
+<tr>
+<td><code>architecture/CLIENT_MODEL.md</code></td>
+<td>Full / <strong>Personal</strong> / Light node types</td>
+<td><strong>PARTIALLY CURRENT</strong> (self-labelled target-state; best repo source for <em>personal node</em> intent)</td>
+</tr>
+<tr>
+<td><code>architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md</code></td>
+<td>Individual identity independent of infrastructure nodes</td>
+<td><strong>PARTIALLY CURRENT</strong> (registry <code>living</code>, 1265 lines, dated 2025-12-25)</td>
+</tr>
+<tr>
+<td><code>design/institutional-structure-spec.md</code></td>
+<td>Layer A sovereign entities / Layer B structures / Layer C activities</td>
+<td><strong>PARTIALLY CURRENT</strong> — Layer A matches <code>EntityType</code>, Layer B matches <code>structure.rs</code>; self-marked DRAFT</td>
+</tr>
+<tr>
+<td><code>mobile/icn-mobile-ux-spec-v1.md</code></td>
+<td>&quot;organized around a persistent member, not an organization&quot;; on-device Ed25519</td>
+<td><strong>PARTIALLY CURRENT / largely ASPIRATIONAL</strong> — strongest statement of member-first multi-org identity</td>
+</tr>
+<tr>
+<td><code>ADR-0014 / 0019 / 0020 / 0035</code></td>
+<td>Authority types, grant minting, bootstrap, entity-aware authz</td>
+<td><strong>PARTIALLY CURRENT</strong> — all four self-report <code>implementation_status: partial</code></td>
+</tr>
+<tr>
+<td><code>architecture/DEBIAN_APPLIANCE_MODEL.md</code></td>
+<td>Node lifecycle <code>unclaimed → claimed</code></td>
+<td><strong>ASPIRATIONAL</strong> — states the dev image has <em>no claim flow</em>; the only substantive repo source on node claiming</td>
+</tr>
+<tr>
+<td><code>ADR-0083</code></td>
+<td>Institutional domain as runtime authority root</td>
+<td><strong>ASPIRATIONAL</strong> (<code>proposed</code> / <code>not-started</code>)</td>
+</tr>
+<tr>
+<td><code>design/MINIMAL-VIABLE-COOP.md</code></td>
+<td>13-week co-op launch program</td>
+<td><strong>SUPERSEDED</strong> — timeline elapsed; <code>VISION.md</code> names the Rehearsal Node as the current wedge</td>
+</tr>
+</tbody></table>
+<p><strong>Not recoverable from repo sources</strong> — stated explicitly rather than invented:
+personal/household cells; QR-based <em>device enrollment</em> (only QR proof
+<em>presentation</em> exists); org-owned vs member-contributed infrastructure as a
+designed distinction; offline signing (referenced as a property, no design doc).</p>
+<hr>
+<h2>4. The principal taxonomy (proposed)</h2>
+<p>Four principal classes. A fifth is deliberately <strong>not</strong> created.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Person</th>
+<th>Device</th>
+<th>Node</th>
+<th>Institution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Has a <code>Did</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes (today)</td>
+<td><strong>no — <code>EntityId</code></strong></td>
+</tr>
+<tr>
+<td>Root authority</td>
+<td>the human</td>
+<td>the Person that authorized it</td>
+<td>the Person(s) administering it</td>
+<td>its charter + governance process</td>
+</tr>
+<tr>
+<td>Holds a key</td>
+<td>yes (root)</td>
+<td>yes (device key)</td>
+<td>yes (node key)</td>
+<td><strong>never</strong></td>
+</tr>
+<tr>
+<td>Survives hardware replacement</td>
+<td>yes</td>
+<td>no (a new device is a new principal)</td>
+<td>identity is per-instance</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Authenticates by</td>
+<td>root-key signature</td>
+<td>device-key signature + carried authorization</td>
+<td>DID-TLS binding at Hello</td>
+<td>it does not authenticate; it is <em>invoked</em> via mandate</td>
+</tr>
+<tr>
+<td>May delegate</td>
+<td>to Devices; to Institutions via membership</td>
+<td>nothing (leaf)</td>
+<td>nothing (leaf)</td>
+<td>scoped authority via <code>AuthorityGrant</code></td>
+</tr>
+<tr>
+<td>Must never impersonate</td>
+<td>—</td>
+<td>its Person</td>
+<td>any Person; any Institution</td>
+<td>any Person</td>
+</tr>
+</tbody></table>
+<h3>4.1 Why an Institution gets no DID and no key</h3>
+<p>This is the load-bearing asymmetry, and it is not aesthetic.</p>
+<p><code>Did</code> is structurally an Ed25519 public key (§2.1). Giving an institution a DID
+therefore means giving it a <strong>keypair</strong>, which means someone holds that keypair.
+Whoever holds it <em>is</em> the institution — which is precisely invariant test 3
+(&quot;hosting a cooperative must not make the host the cooperative&quot;) failing at the
+cryptographic level. A hosted cooperative whose key sits on the host&#39;s disk has
+been merged with its host, whatever the org chart says.</p>
+<p>An institution is not a thing that signs. It is a thing that <strong>decides</strong>. Its
+acts are legitimate because a governed procedure produced them — recorded as a
+<code>Mandate</code> carrying <code>AuthorityGrant</code>s, executed by a named Person or Node
+principal — not because a key attested them. ICN already models this
+(ADR-0014/0019, §2.6); the unwired <code>public_did</code> fields are the vestige of a
+different, weaker idea.</p>
+<p><strong>Consequence.</strong> Cross-context proof of an institutional act is a <em>chain</em>, not a
+signature: charter → governed decision → mandate → grant → executing principal&#39;s
+signature. This is heavier than a single institutional signature, and honestly
+so. §11.3 records what this costs.</p>
+<p>What an institution <em>does</em> need is a <strong>non-squattable, stable identifier</strong>.
+Today&#39;s human-chosen slug (§2.6) is neither. §7.1 proposes binding it to its
+genesis decision.</p>
+<h4>4.1.1 The options, tested against the invariants</h4>
+<p><em>Re-evaluated in review round 8, deliberately not for symmetry with Person/Device/Node.</em></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>A. Key-derived Institution DID</th>
+<th>A′. Same, threshold-held</th>
+<th>B. Stable identifier + governed mandates</th>
+<th>C. Today&#39;s <code>EntityId</code> unchanged</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Host replacement doesn&#39;t replace the institution</td>
+<td>only if custody is off-host</td>
+<td>yes</td>
+<td><strong>yes</strong> — identifier is infra-independent</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>No key-holder becomes the institution</td>
+<td><strong>fails</strong> — custody <em>is</em> the institution</td>
+<td>partly: the current share-holders are</td>
+<td><strong>yes</strong> — there is no key to hold</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Legitimacy derives from governance</td>
+<td>bolted on</td>
+<td>bolted on</td>
+<td><strong>yes</strong> — mandate chain <em>is</em> the provenance</td>
+<td>weak — no binding</td>
+</tr>
+<tr>
+<td>Independently addressable</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes, if resolvable</td>
+<td><strong>fails</strong> — squattable slug</td>
+</tr>
+<tr>
+<td>Can authenticate its own statements</td>
+<td><strong>yes, directly</strong></td>
+<td>yes</td>
+<td><strong>no</strong> — requires a chain</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Federations don&#39;t collapse into operators</td>
+<td>only with custody discipline</td>
+<td>yes</td>
+<td><strong>yes</strong></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Hosted institution keeps sovereignty</td>
+<td>only with custody discipline</td>
+<td>yes</td>
+<td><strong>yes</strong></td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<p><strong>A′ was taken seriously, but ICN cannot express it today.</strong> <em>(Corrected in review
+round 11 — an earlier revision cited the steward primitives as evidence that A′ was
+already buildable. That was wrong.)</em> What exists is a threshold <strong>PRF</strong>, not
+threshold <strong>signing</strong>: <code>threshold.rs</code> computes HMAC partials that a user combines to
+derive a VUI, and its own header lists <em>&quot;(Future) FROST threshold signatures&quot;</em>
+(<code>threshold.rs:6</code>); <code>shamir.rs</code> provides secret <strong>reconstruction</strong>
+(<code>interpolate_at_zero</code>, <code>:168</code>). Neither can produce an Ed25519 signature without
+reassembling the whole private key at one site — which recreates precisely the
+single-custodian problem A′ exists to avoid. A′ therefore requires a <strong>new threshold
+signature protocol</strong> (FROST or equivalent), not configuration of what is already
+there.</p>
+<p>It also loses on a second axis. <code>Did</code> is <strong>definitionally a public key</strong>
+(<code>icn-identity/src/lib.rs:210-235</code>: <code>did:icn:</code> + multibase base58btc + exactly 32
+bytes + a valid Ed25519 key). A public key is a <em>static</em> fact. Institutional
+authority is a <strong>time-varying governed relation</strong> — who may act for a cooperative
+changes by election, suspension and dissolution. Encoding it as a keypair means
+every governance change becomes a key-custody ceremony, and it inherits O8 wholesale:
+the DID would still derive the <em>genesis</em> key, so institutional rotation needs exactly
+the chain machinery §6.3 is blocked on, at institutional scale and with a re-sharing
+ceremony on top.</p>
+<p><strong>Conclusion — the repo&#39;s <code>Did</code> is the wrong abstraction for institutional identity</strong>,
+not because institutions don&#39;t deserve identity, but because <code>Did</code> models custody and
+institutions are constituted by governance. B keeps the two separable: identity is an
+identifier, authority is a mandate chain, and the two are joined by evidence rather
+than by a secret.</p>
+<p><strong>The cost is real and is not hidden:</strong> under B an institution <strong>cannot make a
+self-authenticating statement</strong>. Every institutional claim is a chain a verifier must
+walk (charter → decision → mandate → grant → signature). Where an institution must
+appear as an authorization <em>subject</em>, ICN cannot express it today at all —
+<code>icn-authz::SubjectId</code> requires a <code>did:</code> prefix (<code>model/ids.rs:19,24</code>), so entities
+appear only as resources.</p>
+<p><strong>Status: PROPOSED</strong>, not established. It is a design recommendation with a named
+cost, resting on the ESTABLISHED source facts that no institution signs in production
+(§2.6) and that <code>Did</code> is structurally a public key (§2.1). Reopening it is legitimate
+if institutions turn out to need self-authenticating statements — that is the decisive
+test, and it is recorded as <strong>O12</strong>.</p>
+<h3>4.2 Why Device gets a DID</h3>
+<p>A device already holds an Ed25519 keypair (§2.2, <code>wallet.ts:93</code>), and a
+<code>did:icn:</code> <em>is</em> a base58 Ed25519 public key — so a device DID costs nothing new
+cryptographically. It buys three things a string id cannot:</p>
+<ol>
+<li>a nameable <strong>subject</strong> for a delegation proof (§6);</li>
+<li>a nameable <strong>target</strong> for revocation independent of document rewriting;</li>
+<li>a correlation boundary (§10) — a device identifier that is not the person&#39;s.</li>
+</ol>
+<p>The device DID <strong>never appears as a governance author.</strong> It appears as the
+<em>acting</em> principal alongside the authoring Person.</p>
+<h3>4.3 Why there is no separate Service/Agent principal</h3>
+<p>A background service, scheduler, or automation runs on a Node and acts under a
+scoped <code>AuthorityGrant</code>. It needs no new identity class: the Node DID names <em>who
+is running</em>, and the grant names <em>what it may do</em>. Creating a fifth class would
+add a key custody problem without adding an authority distinction.</p>
+<hr>
+<h2>5. Lifecycles</h2>
+<h3>5.1 Person</h3>
+<pre><code>generate root keypair locally  ──►  Person DID exists
+        (offline, no network)          (self-certifying)
+                                            │
+                                            ▼
+                              authorize first Device (§5.2)
+                                            │
+                                            ▼
+                          join Institutions as a relationship (§7.2)
+</code></pre>
+<p><strong>Genesis is offline and complete.</strong> No network interaction is required for the
+Person DID to exist — this already holds (§2.1) and must be preserved. The
+network <em>recognizes</em> a person; it never manufactures one. There is deliberately
+no identity registrar: a Person DID becomes resolvable to others only as a
+side-effect of the person acting (membership, authorization proofs), never by
+registration.</p>
+<p><strong>Root key custody.</strong> The root key is <strong>recovery-oriented, not operational.</strong>
+It authorizes devices, rotates, and participates in recovery. It should not be
+the key used to sign day-to-day operations, and on a phone-only setup it should
+be backed up (recovery phrase) and otherwise kept out of the hot path. The
+device key does the routine work.</p>
+<p><em>Open:</em> whether the root key may live on the first phone at all, or must be
+generated to backup material from the outset. See §13.</p>
+<h3>5.2 Device</h3>
+<pre><code>device generates its own keypair  ──►  Device DID
+              │
+              ▼
+Person signs a DeviceAuthorization{person, device, scopes, not_before, not_after}
+              │
+              ▼
+   device may act for Person, within scopes
+   (no deterministic end today — see §6.5)
+</code></pre>
+<ul>
+<li>The device <strong>never receives the Person&#39;s root key.</strong> This is the whole point.</li>
+<li>Authorization is scoped and time-bounded by default (least authority).</li>
+<li>Adding a second device: the existing roster machinery (§2.2) lets a device
+holding <code>AddDevice</code> mutate the <strong>roster</strong>. But issuing a <code>DeviceAuthorization</code>
+is a different act: §6.1 requires <code>sig_P</code> verifiable under
+<code>P.to_verifying_key()</code>, which an existing device cannot produce.
+<strong>For v1, issuing a device authorization is root-only</strong>; roster add/revoke
+stays device-capable. Allowing an existing device to authorize another would
+require a carried delegation chain, which is the same unresolved problem as
+O8 (§6.3). <em>(Contradiction raised in review on PR #2586: §5.2 previously said
+an existing device could sign the authorization, which §6.1 forbids.)</em></li>
+<li>Revocation: roster revoke (<code>revoke_device</code>) mutates the <strong>local</strong> document.
+It has <strong>no protocol effect today</strong> — see §6.5. <code>not_after</code> is custody hygiene
+on an honest device, <strong>not</strong> revocation: a compromised device holds the key and
+ignores it, and §6.4 forbids receivers from enforcing it.</li>
+<li>Hardware backing (Secure Enclave / Android Keystore / passkey) is a property of
+the device key, not a new principal class. Absent in Rust today (§2.1).</li>
+</ul>
+<h3>5.3 Node</h3>
+<pre><code>first boot ──► node generates its own keypair ──► Node DID (per instance)
+                                                        │
+                                                        ▼
+                                        claim: Person P proves administration
+                                                        │
+                                                        ▼
+                              P holds NodeAdmin grant; may delegate to others
+</code></pre>
+<p>Node DID genesis already works (§2.7). What is missing is <strong>claiming</strong>: the step
+that binds a running node instance to an administering Person.</p>
+<p>The claim must bind <strong>the running instance</strong>, not the image — an image is copied,
+an instance is not.</p>
+<blockquote>
+<p><strong>Challenge-response over the node&#39;s key is necessary and badly insufficient.</strong>
+<em>(Raised in review round 8.)</em> A challenge signed by the node proves that the
+responder controls the <strong>node</strong> key — which the node always does. It says nothing
+about why the requesting Person is entitled to become the first administrator.
+If an unclaimed node is network-reachable, <strong>the first caller to arrive wins</strong>,
+binds their own DID, and locks out the intended operator. A slice-E test suite
+built only around the node&#39;s signature would pass against exactly that attack.</p>
+</blockquote>
+<p><strong>Required invariant.</strong> <em>Network reachability alone MUST NOT confer first-claim
+authority.</em> First claim must require a factor the network cannot supply.</p>
+<p><strong>Proposed ceremony.</strong> At first boot the node generates, in addition to its
+keypair, a high-entropy one-time <strong>claim capability</strong>, emitted only through a
+channel that already implies physical or provisioning control — console output,
+an attached display, or a root-only file. This is the same operator-scope channel
+the appliance model already relies on, and the same boundary it already insists is
+not institutional authority (<code>DEBIAN_APPLIANCE_MODEL.md:187</code>).</p>
+<p>The claim transcript binds <strong>both</strong> principals and is signed <strong>twice</strong>:</p>
+<pre><code>transcript = { node_did, claimant_person_did, node_nonce,
+               claim_capability_proof, intended_capability, session_id }
+
+  node signs transcript      -&gt; proves this instance issued this nonce
+  claimant signs transcript  -&gt; proves control of the Person key being bound
+</code></pre>
+<p>Neither signature alone is sufficient: the node&#39;s proves liveness of the
+instance, the claimant&#39;s proves custody of the Person key, and the
+<code>claim_capability_proof</code> supplies the out-of-band factor that a remote attacker
+lacks. Because both DIDs are inside the signed transcript, neither signature can
+be replayed to bind a different pair.</p>
+<p><strong>The transcript above is a field list, not a wire format.</strong> Node and claimant are
+separate implementations, so without a version, a domain separator, an explicit
+field order and encoding, and a stated rule for how the two signatures and the
+capability proof are incorporated, the two sides can sign different serializations
+of the same logical transcript — and an ad-hoc encoding invites cross-protocol
+reuse. A canonical preimage plus interoperability and tamper vectors are required
+before slice E can treat the dual signature as an invariant. Recorded as <strong>O15</strong>,
+the same class of obligation as O10.</p>
+<p><strong>Bearer-sensitivity.</strong> If the capability is delivered as a QR, <strong>that QR is
+bearer-sensitive</strong> — possession is authority until first use. This is the opposite
+of the #2569 QR, which carried a <em>destination</em> and was dangerous precisely because
+it was mistaken for inert data (<code>advertised_origin.rs:5-9</code>). A claim QR must never
+be logged, screenshotted into support channels, or embedded in an image.</p>
+<p><strong>Invalidation.</strong> The capability is consumed on first successful claim and MUST
+be single-use; it should also carry an expiry so an abandoned unclaimed node does
+not remain claimable indefinitely from a stale photograph.</p>
+<p><strong>Headless and hosted nodes.</strong> There is no display, so the capability must surface
+through the provisioning channel that already implies control — cloud-init output,
+the hypervisor console, or a file readable only by the operator account. This
+makes explicit what hosting already means: <strong>the host can always claim the node it
+boots.</strong> That is not a leak in the ceremony; it is why §7.3 keeps institutional
+authority off the node key entirely.</p>
+<p><strong>Reset.</strong> An unclaimed node whose capability expired, or a node being
+re-provisioned, must regenerate the capability — and that regeneration must itself
+require local access. A remote reset path would reintroduce the very attack this
+ceremony exists to prevent.</p>
+<p>A restored or migrated node is a <strong>new instance</strong>. Whether it keeps its Node DID
+is a genuine open question (§13) with a real security cost either way: keeping it
+makes backup-restore-twice indistinguishable from a clone; rotating it breaks
+every peer expectation and hosting assignment.</p>
+<h3>5.4 Institution</h3>
+<pre><code>people agree  ──►  genesis decision (signed by founding Persons)
+                              │
+                              ▼
+              Institution EntityId bound to that decision (§7.1)
+                              │
+                              ▼
+                    charter adopted; governance active
+                              │
+                              ▼
+   founder authority EXPIRES into ordinary governed authority
+</code></pre>
+<p>The final arrow is the one that matters: no founder&#39;s device or node may remain
+the institution&#39;s sovereign. Today, entity genesis requires only the JWT scope
+<code>entity:write</code> and auto-installs the creator as <code>Founder</code>
+(<code>icn-gateway/src/api/entity.rs:296,404-408</code>) — with no mandate, charter, or
+governed decision. That is the gap.</p>
+<hr>
+<h2>6. Member-origin signing</h2>
+<p>This is the load-bearing mechanism, and it is what unblocks the honest version of
+#2469 slice 7.</p>
+<h3>6.1 The shape</h3>
+<pre><code>Person P                                (root key — offline / backup)
+   │ signs once
+   ▼
+DeviceAuthorization{ person: P, device: D, scopes, not_before, not_after, sig_P }
+   │            (not_before/not_after are honest-signer hygiene — NOT verified
+   │             by receivers; see §6.4. The revocation-anchor field O9 will add
+   │             is not yet chosen, so this field set is NOT final.)
+   │ carried with every op
+   ▼
+Device D signs the governance operation with D&#39;s key
+   │
+   ▼
+gateway / node RELAYS  ── holds no key of P, asserts no authorship ──►  peers
+   │
+   ▼
+receiver verifies, using ONLY the bytes received:
+   1. sig_P over the DeviceAuthorization        [current-root discovery is OPEN — O8, §6.3]
+   2. op signature under D.to_verifying_key()
+   3. scope admits this operation class
+   4. authorization not revoked                 [anchor is OPEN — O9, §6.5]
+</code></pre>
+<blockquote>
+<p><strong>This recipe is deliberately incomplete, and the two gaps are the design&#39;s
+unfinished work.</strong> Step 1 cannot simply read <code>P.to_verifying_key()</code>, because that
+recovers the <em>genesis</em> key and so cannot survive rotation (§6.3). Step 4 has no
+deterministic anchor in the repo today (§6.5). An earlier revision listed a
+wall-clock <code>now within [not_before, not_after]</code> check here; that was <strong>wrong</strong>
+and is removed — §6.4 explains why a receiver must not evaluate it.</p>
+</blockquote>
+<p><strong>Author remains the Person DID.</strong> The device is the <em>acting</em> principal, carried
+alongside. A gateway can relay this without ever holding P&#39;s key — which is
+exactly what §7.0.2 of #2469 says is impossible today.</p>
+<h3>6.2 Why carried, not resolved</h3>
+<p>The alternative — having the receiver resolve P&#39;s DID document and call
+<code>can_sign</code> — recreates precisely the flaw #2469 §14.1 rejected when it declined to
+add a <code>standing_hash</code>: the receiver would compare against distributed state whose
+own authenticity it cannot establish, producing <em>&quot;the appearance of a
+deterministic check over non-deterministic data — worse than having no field,
+because it would look like the hole was closed.&quot;</em></p>
+<p>A carried proof is self-certifying. Both signatures verify against keys recovered
+from the DIDs in the envelope itself. No resolution, no external state, no
+ingress-path dependency.</p>
+<h3>6.3 The rotation problem — a blocking flaw in this design</h3>
+<p><em>Raised in review on PR #2586; it is real and it is load-bearing.</em></p>
+<p>Because a DID <strong>is</strong> its genesis public key (§2.1), <code>P.to_verifying_key()</code> always
+recovers the <strong>original</strong> key, even after the Person rotates or recovers. A verifier
+that checks the carried authorization against <code>P.to_verifying_key()</code> therefore:</p>
+<ul>
+<li><strong>rejects</strong> authorizations signed by the <em>replacement</em> root, and</li>
+<li><strong>keeps accepting</strong> authorizations signed by a <em>compromised original</em> root, indefinitely.</li>
+</ul>
+<p>That inverts the recovery guarantee in §7: rotation would break the person&#39;s ability
+to authorize devices while leaving the attacker&#39;s ability intact. A carried,
+self-contained proof cannot resolve this on its own, because deciding <em>which</em> root is
+current is exactly a question about state the receiver does not hold. Both obvious
+repairs are unsatisfying:</p>
+<ul>
+<li><strong>A carried rotation chain</strong> (each new root signed by its predecessor, walked from
+the DID-embedded genesis key) restores the new root — but an attacker holding the
+compromised original can mint a <em>competing</em> chain, and &quot;longest chain wins&quot; is not a
+security argument.</li>
+<li><strong>An authenticated current-root source</strong> resolves it correctly but reintroduces the
+external-state dependency §6.2 exists to avoid.</li>
+</ul>
+<p><strong>Candidate resolution — and it is the same primitive as §6.5.</strong> A <em>signature-chained</em>
+key history is not the unauthenticated external state §6.2 rejects. <code>RotationEvent</code>
+(<code>multi_device.rs:135</code>) is signed by a key authorized in the <em>previous</em> document version
+and enforces <code>new_version == version + 1</code> (<code>:527</code>), so the chain is anchored at the
+genesis key the DID already encodes and every step verifies forward. A receiver holding
+any prefix can derive the current root <strong>without trusting anyone&#39;s assertion</strong> — which
+is categorically different from resolving a bare <code>can_sign</code> lookup.</p>
+<p>A compromised original root can then only <strong>fork</strong> the chain, producing two events at
+the same version. That is detectable — but <em>detecting</em> a fork is not <em>resolving</em> it.</p>
+<blockquote>
+<p><strong>Convergence is not correctness.</strong> <em>(Raised in review round 12.)</em> If the genesis
+key is compromised <strong>after</strong> a legitimate rotation, the attacker signs a competing
+successor at the same version. <strong>Both branches verify from genesis</strong>, because both
+are signed by a key that was authorized at that point in the chain. A content-only
+tie-breaker (lowest hash, say) makes every peer pick the <em>same</em> branch, which is
+convergence — and it may well be the attacker&#39;s branch. Agreeing on the wrong root
+is not a fix.</p>
+<p>Selecting the legitimate branch requires an <strong>authenticated</strong> fork-selection
+mechanism: a threshold-approved checkpoint, a governed decision, or another
+authority outside the chain itself. Recorded as <strong>O16</strong>, with an adversarial fork
+test required before A0 can be said to unblock anything.</p>
+</blockquote>
+<p><strong>Recovery is the exception, and it does not fit this rule.</strong> <em>(Raised in review
+round 9.)</em> <code>RotationEvent::verify</code> requires <code>signed_by</code> to be an existing,
+non-revoked method holding the required capability (<code>multi_device.rs:541-552</code>), and
+verifies the proof under <strong>that old key</strong>. In total-loss recovery there is no old
+key by definition, so the ordinary chain rule cannot advance the document — the one
+case recovery exists to serve is the one it cannot express. A separately
+authenticated <strong>threshold-recovery transition</strong> is required, verified against the
+<code>RecoveryConfig</code> trustee set rather than against a prior device key. Today that
+verification does not exist: <code>sync.rs:262-268</code> counts trustee DIDs and carries the
+in-source admission <em>&quot;In production, verify the cryptographic signature here / For
+now, accept if trustee is in the list&quot;</em>.</p>
+<p><strong>The same loop is also un-thresholded.</strong> It increments <code>valid_proofs</code> for every
+entry without deduplicating <code>proof.trustee</code>, so <strong>one</strong> trustee&#39;s proof repeated M
+times satisfies an M-of-N threshold — collapsing it to 1-of-N. Authenticating each
+proof is therefore necessary but not sufficient; the transition must also enforce
+<strong>distinct</strong> trustees. Recorded as <strong>O14</strong>, which must carry a signature-verification requirement, a
+duplicate-proof adversarial test, <strong>and a defined preimage</strong>. The existing
+attestation signs only <code>ICN_RECOVERY_ATTESTATION:{old_did}:{new_did}:{timestamp}</code>
+(<code>recovery.rs:317-325</code>) — binding neither the source document version, nor the
+recovery configuration or checkpoint, nor a transition identifier. Reusing it would
+leave captured proofs <strong>replayable across a later transition</strong> by changing the event
+version, and independent implementations free to serialize incompatible messages.
+O14 requires a domain-separated canonical preimage over the <em>complete</em> transition,
+with field-tamper and stale-proof replay vectors.</p>
+<p><strong>O8 has the same shape as O9, and that is the deepest result of this review.</strong>
+<em>(Raised in review round 19.)</em> Suppose root R0 legitimately authorized device D, and P
+later rotates to R1. Verifying against R1 alone <strong>retroactively rejects</strong> operations
+some peers already applied; accepting <em>any</em> historically valid root lets an attacker
+retaining a compromised R0 <strong>mint new authorizations after the rotation</strong>. Deciding
+between them requires positioning the authorization relative to the rotation — and A0
+orders identity events only, so it cannot place an authorization at all.</p>
+<p>Rotation and revocation are therefore <strong>not two problems</strong>. Both ask the same question:
+<em>where does this authorization sit relative to a change in the authority that issued
+it?</em> ICN has no order spanning authorizations and identity state changes, so <strong>both O8
+and O9 reduce to that single missing primitive.</strong></p>
+<p><strong>The required order is wider than &quot;operations and revocations&quot;.</strong> <em>(Sharpened in
+review round 20.)</em> An implementation could satisfy an operations-plus-revocations
+order and still leave a <strong>forged post-rotation R0 authorization indistinguishable from
+one legitimately issued before R1</strong>, because authorization <em>issuance</em> would have no
+position in that order. The order must therefore span <strong>governance operations,
+identity revocations, root rotations, and authorization issuance</strong> — or the rollback
+alternative must cover all four.</p>
+<p><strong>Still unresolved (O8, §13), and it blocks slice A</strong>, which must not freeze an
+authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
+§7 say about identity continuity holds only for the pre-rotation case.</p>
+<h3>6.4 Expiry is not order-independent — a second constraint on slice D</h3>
+<p><em>Raised in review on PR #2586.</em></p>
+<p><code>not_after</code> evaluated against each receiver&#39;s local clock is <strong>not</strong> a
+convergent predicate: an operation delivered before the deadline at peer A and
+after it at peer B is accepted by A and permanently rejected by B. That directly
+contradicts #2469, which gives wall-clock no ordering authority and carries no
+timestamp field precisely so that late delivery stays safe (§5.1 of that design).</p>
+<p>So the expiry window in §5.2 is sound as <em>custody hygiene</em> on an honest signing
+device — it bounds how long a cooperative device keeps reusing an authorization —
+but it <strong>must not be an ingress validity gate</strong>, and it is <strong>not a revocation
+mechanism at all</strong>. A compromised device holds the private key: it will not honour
+<code>not_after</code>, and if no receiver may reject on wall-clock, its authorization stays
+acceptable <strong>indefinitely</strong>. Expiry bounds only behaviour an attacker has no
+reason to exhibit.</p>
+<p>What would actually revoke a device is the subject of §6.5.</p>
+<h3>6.5 Device revocation — no deterministic anchor exists today</h3>
+<p><em>Reworked in review round 8. The previous text called short expiry &quot;the primary
+control&quot;, which §6.4 had already invalidated.</em></p>
+<p>For a receiver to reject a compromised device&#39;s operation, it needs replicated,
+authenticated state that two honest nodes agree on. <strong>ICN has none today.</strong>
+Verified at <code>74c832f1</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Replicated</th>
+<th>Authenticated</th>
+<th>Monotonic</th>
+<th>Live</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DidDocument.version</code> + <code>RotationEvent</code> (<code>multi_device.rs:24,154,527</code>)</td>
+<td>no</td>
+<td>by construction</td>
+<td><strong>yes</strong>, <code>+1</code> enforced</td>
+<td><strong><code>verify()</code> has zero production callers</strong></td>
+</tr>
+<tr>
+<td><code>RevocationRegistry</code> (<code>revocation_store.rs:17</code>)</td>
+<td>no — in-process maps</td>
+<td>no signature field</td>
+<td>no — wall-clock <code>is_effective()</code></td>
+<td>node-local only; no device-key revocation type</td>
+</tr>
+<tr>
+<td><code>identity:recovery</code> topic (<code>recovery.rs:366</code>)</td>
+<td>—</td>
+<td>attestations never verified</td>
+<td>—</td>
+<td><strong>subscribed (<code>init_gossip.rs:258</code>) but never declared, so the subscribe fails and is warn-swallowed</strong></td>
+</tr>
+<tr>
+<td><code>DidDocumentCache</code> (<code>sync.rs</code>)</td>
+<td>—</td>
+<td>accepts documents with <strong>no signature check</strong></td>
+<td>version-LWW</td>
+<td><strong>no production caller</strong></td>
+</tr>
+<tr>
+<td><code>membership_hash</code> (<code>replication.rs:253</code>)</td>
+<td>carried, not the set</td>
+<td>binding is authenticated; the set is not</td>
+<td><strong>no — a set hash cannot sequence</strong></td>
+<td>live (emission)</td>
+</tr>
+</tbody></table>
+<p>The closest mechanism is the <strong>first row, and every hard part of it already
+exists</strong> — capability check, Ed25519 verification, strict <code>+1</code> monotonicity. What
+is missing is the whole replication path, plus a correctness bug: <code>icnctl device revoke</code> signs an ad-hoc string (<code>bins/icnctl/src/main.rs:6410</code>) that is not
+<code>signing_message()</code>&#39;s preimage, so an icnctl-minted event would fail the very
+verifier it is meant to satisfy.</p>
+<p><strong>Two reachable shapes</strong>, and they differ in what they can prove:</p>
+<ul>
+<li><p><strong>(a) Ordering — and it does <em>not</em> work as first described.</strong> <em>(Corrected in
+review round 9.)</em> The idea was that the authorization carries the issuing
+<code>DidDocument.version</code> and the receiver compares <code>carried_version &lt; revocation_version</code>. But the authorization is signed <strong>once</strong>, so every operation
+the device ever produces carries the <strong>same</strong> version — including operations
+signed after revocation. The comparison therefore says nothing about <em>when the
+operation</em> was signed. It degenerates into either rejecting every operation ever
+made under that authorization (which is shape (b) with extra steps) or letting a
+peer that applied an operation before learning of the revocation diverge from one
+that learned first.</p>
+</li>
+<li><p><strong>(a′) Per-operation causal marker.</strong> Genuine before/after discrimination needs
+the <em>operation</em> — not the authorization — to carry a signed position in a
+replicated total order, <strong>and the revocation must occupy a position in that
+<em>same</em> order</strong>. This is the demanding part, and it is easy to under-state: an
+order over <em>identity events alone</em> is not enough, because it gives a governance
+operation no position at all and therefore cannot place it relative to a
+revocation. What is required is a <strong>shared</strong> order spanning both governance
+operations and identity revocations. ICN has no such order, and #2469
+deliberately declined to create one for governance (<code>seq</code> is a comparator,
+never a gate). This is the expensive option and is not recommended without a
+much stronger reason. <strong>Note this is <em>not</em> what slice A0 provides</strong> — A0 orders
+identity events against each other only (§15.1).</p>
+</li>
+<li><p><strong>(b) Snapshot invalidation.</strong> Bind a canonical hash of the DID&#39;s non-revoked
+signing methods into the authorization. Any revocation changes the hash and
+every authorization against the stale hash fails closed. Needs no clock and no
+ordering — this is precisely the shape #2469 already accepted for membership.
+<strong>It cannot distinguish before from after: it invalidates the device&#39;s past
+authorizations too</strong>, which is a real semantic cost, not a rounding error.</p>
+</li>
+</ul>
+<p><strong>(b) is not convergent either, and the earlier recommendation of it is withdrawn.</strong>
+<em>(Review round 10.)</em> Suppose peer A applies a device-signed operation and only then
+learns of the revocation, while peer B learns of the revocation first. B rejects the
+operation; A has already recorded its effect. Acceptance depends on <strong>the order in
+which a receiver learned two independent facts</strong>, which is the same divergence class
+§6.4 rejects for wall-clock. Restoring convergence would need deterministic rollback
+or revalidation of already-applied operations, and #2469 has no such path — its
+applied-set only <em>deduplicates</em> <code>op_id</code>s. Retroactive invalidation is not merely a
+semantic cost; without rollback semantics it is a correctness bug.</p>
+<p><strong>Honest conclusion: no convergent device-revocation model is available today.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(a) carried authorization version</td>
+<td><strong>refuted</strong> — the authorization is signed once, so it cannot order operations</td>
+</tr>
+<tr>
+<td>(a′) per-operation causal marker in a replicated total order</td>
+<td>theoretically sound; <strong>no such order exists</strong>, and #2469 deliberately declined to create one</td>
+</tr>
+<tr>
+<td>(b) snapshot invalidation</td>
+<td><strong>not convergent without rollback/revalidation semantics</strong>, which do not exist</td>
+</tr>
+</tbody></table>
+<p><strong>O9 is therefore a genuine open architecture problem, not a choice between two
+ready options.</strong> It requires either a replicated total order <strong>spanning both
+governance operations and identity revocations</strong> — an order over identity events
+alone is insufficient, since it gives the operation no position relative to the
+revocation — or deterministic rollback/revalidation semantics for already-applied
+operations. Each is a substantial design in its own right. Recording it as &quot;pick (a)
+or (b)&quot; would have been inventing an answer.</p>
+<p>Until O9 is resolved, the honest statement stands: <strong>a device authorization, once
+issued, is acceptable to every receiver indefinitely</strong>, and roster revocation is local
+bookkeeping with no protocol effect. <strong>The field set cannot be frozen before O9 is
+answered</strong>, because every candidate implies different carried fields.</p>
+<p>Until then the honest statement is: <strong>a device authorization, once issued, is
+acceptable to every receiver for as long as the format is valid.</strong> Roster
+revocation is a local bookkeeping act with no protocol effect.</p>
+<h3>6.6 Implications for <code>SignedGovernanceOp</code> — <strong>not changed here</strong></h3>
+<p>Per the session constraint, nothing in <code>SignedGovernanceOp</code> is modified. Recording
+implications only:</p>
+<ul>
+<li>The current field set cannot express this. <code>verify()</code> recovers exactly one key,
+from <code>author</code> (<code>replication.rs:373</code>), and <code>sign()</code> refuses any key that does not
+derive <code>author</code> (<code>:308</code>).</li>
+<li>#2469 §14 designates the extension point: unknowns &quot;resolve into either a <strong>new
+<code>ReplicationAuthority</code> variant</strong> or a <strong>version bump</strong>.&quot; A carried device
+authorization needs the <strong>version bump</strong> (<code>GOV_OP_V2</code>), because the <em>signature
+verification branch</em> changes, not merely the authority description.</li>
+<li><code>op_id = SHA-256(canonical_body())</code> must cover the authorization, or a device
+proof could be swapped between ops.</li>
+<li>The canonical encoding&#39;s length-prefixed discipline (§5.2) extends naturally;
+the authorization is one more length-prefixed field.</li>
+<li><strong>Migration:</strong> additive in form, but <strong>v1 must be retired, not indefinitely
+coexist</strong>. <em>(Corrected in review round 11.)</em> &quot;v1 remains valid for node-authored
+ops&quot; is not enforceable: ingress cannot distinguish a node DID from a Person DID
+(§2.1), so while v1 is accepted a compromised pre-rotation Person root bypasses
+every v2 device-authorization and revocation rule. See <strong>O13</strong>.</li>
+</ul>
+<h3>6.7 Layer boundary</h3>
+<p>Device authorization is a <strong>principal-authentication</strong> primitive, not a governance
+one. It belongs in <code>icn-identity</code> (§6.7) and must be usable by any subsystem that needs
+&quot;principal A authorized principal B to act in class X&quot; — settlement, membership,
+compute. #2469 consumes it; #2469 does not own it.</p>
+<hr>
+<h2>7. Institutions, membership, and hosting</h2>
+<h3>7.1 Institution identity</h3>
+<p>An institution keeps <code>EntityId</code>, but the identifier must become <strong>bound rather
+than squattable</strong>. Proposed: bind the <code>EntityId</code> to the hash of its genesis
+decision, so that claiming a slug requires producing the decision that created
+it. The human-readable slug remains a label; the binding is what makes it
+non-forgeable.</p>
+<p><em>This is a proposal, and it is incomplete until O11 is answered:</em> binding an id
+to a decision hash requires a <strong>domain-separated canonical encoding</strong> and explicit
+normalization, or two nodes serializing the same decision with different map or
+founder-signature ordering will derive different ids for the same institution.
+The hashed field set must also be stated, so a decision cannot be rebound to a
+different slug. The current <code>EntityId</code> is an unbound human-chosen string (§2.6),
+and <code>derive_treasury_did</code> compounds this by minting DID-shaped strings with no key
+and no <code>Did</code> validation.</p>
+<h3>7.2 Membership is a relationship, never inheritance</h3>
+<p>Person P being a member of Institution I grants P <em>standing within I&#39;s context</em>.
+It does not merge identities, and it does not require a separate account.</p>
+<p>ICN&#39;s existing membership record with its bidirectional index
+(<code>sled_registry.rs:9-12</code>) is the right shape and needs no redesign. A person is
+simultaneously a member of Coop A, a member of Coop B, a participant in Community
+C, and a delegate from A to Federation F by holding <strong>four relationship records
+against one Person DID</strong> — which the current schema already supports.</p>
+<p>Cooperatives, communities and federations are <strong>co-equal contexts</strong>, not a
+hierarchy. This is binding doctrine, not a proposal.</p>
+<p>What is missing is <strong>portability</strong>: relationships live in a local sled registry
+with no credential form, so standing cannot be proven to a party that does not
+already hold the registry (§2.6). A membership credential — a signed, verifiable
+statement of standing — is the gap. It is <em>not</em> required for slice-7 governance,
+because membership there is evaluated against the receiver&#39;s own domain state.</p>
+<h3>7.3 Hosted and shared infrastructure</h3>
+<p>The symmetry that makes this tractable:</p>
+<blockquote>
+<p>Person identity survives device replacement.
+Institution identity survives node replacement.</p>
+</blockquote>
+<p>Both hold for the same reason: <strong>neither principal&#39;s identity is its key
+custody.</strong> A person is not their phone; an institution is not its server.</p>
+<p>Proposed separation:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Held by</th>
+<th>Never held by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Institution identity + charter</td>
+<td>the institution&#39;s governed record</td>
+<td>the hosting operator</td>
+</tr>
+<tr>
+<td>Node keys</td>
+<td>the node instance</td>
+<td>the institution</td>
+</tr>
+<tr>
+<td>Hosting assignment</td>
+<td>an explicit, revocable record naming node + institution + scope + term</td>
+<td>implied by config</td>
+</tr>
+<tr>
+<td>Institutional acts</td>
+<td>mandate chain executed by authorized Persons</td>
+<td>the host&#39;s node key</td>
+</tr>
+</tbody></table>
+<p>A malicious host is removed by <strong>revoking the hosting assignment and
+re-materializing state elsewhere</strong> — possible only if institutional state is
+portable and institutional authority never depended on the host&#39;s key.</p>
+<p>This requires changing one thing in particular: institution genesis is currently
+authorized by a <strong>bearer token and signed by nobody</strong> (§2.8) — the request body is
+plain JSON. Under this model, genesis must be signed by the founding <strong>Persons</strong>,
+with the node merely relaying — the same relay/authorship split as §6. Note the
+remedy is not about taking custody away from the node key, because the node key
+never signed the genesis payload in the first place; it is about introducing an
+authorship binding where there is none.</p>
+<p>Five deployment shapes must all work without changing anyone&#39;s identity: phone
+only; person + personal node; institution on a hosted node; institution on its own
+node; federation across many nodes. Moving between them is a change of <em>hosting
+assignment</em>, not of identity.</p>
+<hr>
+<h2>8. Mobile onboarding and the NYCN acceptance vertical</h2>
+<p>The reference flow, and what each step needs that does not exist yet:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Needs</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>install app, &quot;create my identity&quot;</td>
+<td>local keygen</td>
+<td><strong>exists</strong> (<code>wallet.ts:93</code>) — unshipped, no CI</td>
+</tr>
+<tr>
+<td>phone becomes authorized device</td>
+<td>first-device bootstrap</td>
+<td><strong>missing</strong> — <code>index.ts:2059</code> requires an existing <code>AddDevice</code> device</td>
+</tr>
+<tr>
+<td>receive and accept an invitation</td>
+<td>invite → membership without DID assertion</td>
+<td><strong>exists but unsound</strong> (§2.4)</td>
+</tr>
+<tr>
+<td>see coop + federation context</td>
+<td><code>/me/standing</code></td>
+<td><strong>partial</strong> (shipped subset, PR #1627)</td>
+</tr>
+<tr>
+<td>create / vote on a proposal</td>
+<td>member-origin signing</td>
+<td><strong>missing</strong> (§6)</td>
+</tr>
+<tr>
+<td>device signs locally; node relays</td>
+<td>v2 envelope</td>
+<td><strong>missing</strong> (§6.6); blocked on O8/O9</td>
+</tr>
+<tr>
+<td>network verifies; state converges</td>
+<td>slice 7 + authority</td>
+<td><strong>blocked on the above</strong></td>
+</tr>
+</tbody></table>
+<p>NYCN is used here strictly as an <strong>acceptance test for generic primitives</strong> — a
+federation with member cooperatives, organizers, stewards, delegates, committees,
+and later-joining coops, some hosted and some self-hosted. Nothing about NYCN may
+enter the kernel; per <code>.claude/rules/design.md</code>, NYCN vocabulary belongs only in
+institution packages. If the generic primitives cannot express NYCN, the
+primitives are wrong — not NYCN.</p>
+<hr>
+<h2>9. Threat model</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Threat</th>
+<th>Required invariant</th>
+<th>Mitigation</th>
+<th>Residual</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1</td>
+<td>Stolen phone</td>
+<td>device compromise ≠ person compromise</td>
+<td>device key ≠ root key, so the <em>person</em> is not compromised</td>
+<td><strong>exposure is unbounded in time</strong> — no deterministic revocation anchor exists (§6.5); expiry does not bind an attacker</td>
+</tr>
+<tr>
+<td>T2</td>
+<td>Compromised device</td>
+<td>blast radius bounded by scope</td>
+<td>least-authority scopes; high-consequence classes require the root key</td>
+<td>full in-scope authority, <strong>indefinitely</strong>, until O9 is answered</td>
+</tr>
+<tr>
+<td>T3</td>
+<td>Malicious node operator</td>
+<td>node key cannot author member acts</td>
+<td>authorship = carried device proof; relay asserts nothing</td>
+<td>operator can withhold/delay relay</td>
+</tr>
+<tr>
+<td>T4</td>
+<td>Malicious hosting provider</td>
+<td>host key ≠ institution authority</td>
+<td>mandate chain; revocable hosting assignment</td>
+<td>host can deny service; state portability required</td>
+</tr>
+<tr>
+<td>T5</td>
+<td>Compromised institution admin</td>
+<td>admin ≠ sovereign</td>
+<td>roles carry scopes, not sovereignty (<code>structure.rs:167-170</code>)</td>
+<td>scoped damage until governed revocation</td>
+</tr>
+<tr>
+<td>T6</td>
+<td>Lost root key</td>
+<td>recovery preserves Person P</td>
+<td><strong>missing — O14-blocked.</strong> In total loss the ordinary transition needs an unavailable old key (<code>multi_device.rs:541-552</code>), and trustee attestations are not cryptographically verified (<code>sync.rs:261-267</code>)</td>
+<td>recovery cannot advance the authenticated chain, so P is <strong>not</strong> preserved for other receivers; trustee collusion is a <em>further</em> risk once it works</td>
+</tr>
+<tr>
+<td>T7</td>
+<td>Revoked device operating offline</td>
+<td>a revoked device must stop being accepted</td>
+<td><strong>none today</strong> — roster revocation has no protocol effect (§6.5)</td>
+<td><strong>open (O9), and no candidate works.</strong> Shape (a) is <strong>refuted</strong> — every operation carries the same once-signed authorization version, so it cannot order anything; (a′) needs a per-operation position in a replicated total order that does not exist; (b) needs rollback/revalidation semantics that do not exist</td>
+</tr>
+<tr>
+<td>T8</td>
+<td>Cloned node / restore-twice</td>
+<td>one instance, one identity</td>
+<td>unresolved — see §13</td>
+<td><strong>open</strong></td>
+</tr>
+<tr>
+<td>T9</td>
+<td>Gateway impersonates a member</td>
+<td>a relay cannot author</td>
+<td>§6; and today, #2469 §7.0.2 fallback already prevents <em>signed</em> forgery</td>
+<td>today the unsigned legacy path carries it</td>
+</tr>
+<tr>
+<td>T10</td>
+<td>Federation overreach</td>
+<td>member sovereignty</td>
+<td>co-equal scopes, not a ladder</td>
+<td>requires authority checks not yet enforced</td>
+</tr>
+<tr>
+<td>T11</td>
+<td>Correlation / profiling</td>
+<td>institutional life not trivially linkable</td>
+<td><strong>unmitigated</strong> — see §10</td>
+<td><strong>open</strong></td>
+</tr>
+<tr>
+<td>T12</td>
+<td>Token minted for an arbitrary DID</td>
+<td>authorship = key control</td>
+<td>challenge/response path does this; invite path does not (§2.4)</td>
+<td>live gap, flagged</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>10. Privacy and correlation</h2>
+<p><strong>Honest statement of the tradeoff, as the brief requires.</strong></p>
+<p>A single permanent Person DID used everywhere makes a person&#39;s entire
+institutional life trivially linkable: the same 32-byte identifier appears in
+every membership record, every vote key
+(<code>gov:vote:{pid}:{voter}</code> — the one author-bound storage key, #2469 §1.4 fact 13),
+and every gossiped operation.</p>
+<p><strong>Correction (review round 13): this does not require changing <code>Did</code>.</strong> An earlier
+revision said pairwise identifiers were inexpressible without altering the type. They
+are not. Nothing binds a human to a single DID — <code>KeyPair::generate()</code> is free to call
+and each fresh keypair yields an ordinary <code>Did</code>, so a person can already hold a
+distinct DID per institution today.</p>
+<p>What is missing is not an <em>identifier form</em> but the <strong>relationship semantics</strong> around
+a set of them: a private linkage secret joining them to one person, recovery that
+covers every pairwise identity rather than one anchor, and membership proofs that
+establish standing without revealing the linkage. Those are new mechanisms, not a
+change to a type every crate depends on.</p>
+<p>Directions, none free:</p>
+<ul>
+<li><strong>Pairwise Person DIDs per institution</strong>, linked by a private linkage secret.
+Strong unlinkability; breaks the &quot;one anchor&quot; model, complicates recovery
+(each pairwise identity needs recovery), and requires membership proofs that
+do not reveal the anchor.</li>
+<li><strong>Device DIDs as the public surface</strong> (§4.2) — reduces root-key exposure and
+gives a rotation boundary, but does not unlink institutional memberships.</li>
+<li><strong>Selective disclosure over membership credentials</strong> (§7.2) — proves standing
+without revealing the full relationship set; needs the credential layer that
+does not exist.</li>
+</ul>
+<p>ICN has <code>icn-privacy</code> and <code>icn-zkp</code> crates and a <code>Vui</code> commitment primitive that
+may be relevant. <strong>This document does not resolve the privacy model.</strong> It records
+that the current architecture optimizes for verifiability over unlinkability, and
+that this was not an explicit decision — it is a consequence of <code>Did</code> being a raw
+public key.</p>
+<hr>
+<h2>11. Architectural conflicts discovered</h2>
+<ol>
+<li><strong>Two contradictory signing authorities</strong> (§2.3). <code>can_sign</code> (multi-key,
+document-mediated) is dead; <code>to_verifying_key()</code> (single-key, self-certifying)
+is live. Resolve by making the carried authorization the one sanctioned
+multi-key path and either wiring or deleting <code>can_sign</code>.</li>
+<li><strong>Two <code>DidDocument</code> types.</strong> <code>icn-identity/src/multi_device.rs:19</code> (live) and
+<code>icn-kernel-api/src/identity.rs:33</code> (spec-only; <code>IdentityService</code> has <strong>zero
+implementations</strong>). One must be retired or explicitly scoped.</li>
+<li><strong>Institutional signing is modelled but unwired</strong> (§2.6). Under §4.1 it should
+be <em>removed</em>, not completed — but that is a decision, and <code>public_did</code> +
+<code>federation_accept</code> verification currently assume the opposite.</li>
+<li><strong>Runtime is single-institution; spec is multi-institution</strong> (§2.8).</li>
+<li><strong>Authorship differs by deployment mode</strong> (§2.5) — a correctness bug, not just
+an architectural gap.</li>
+<li><strong><code>derive_treasury_did</code> mints DID-shaped strings with no key</strong> and would fail
+<code>Did::from_str</code>; it survives only because the field is <code>Option&lt;String&gt;</code>.</li>
+<li><strong>Three entity models</strong> (<code>icn-entity</code>, <code>icn-coop</code>, <code>icn-federation</code>) plus
+verbatim duplicates in <code>apps/membership/*_core/</code>, glued by ~3,900 lines of
+reconciliation code.</li>
+<li><strong><code>icn-authz::SubjectId</code> requires <code>did:</code></strong>, so institutions cannot be
+authorization subjects — consistent with §4.1, but currently by accident.</li>
+</ol>
+<hr>
+<h2>12. Explicit non-properties</h2>
+<p>This model does <strong>not</strong> provide, and must not be read as providing:</p>
+<ul>
+<li>anonymity or unlinkability (§10);</li>
+<li>institutional signing keys (§4.1 — deliberately);</li>
+<li><strong>applicability to anchor-derived (SDIS) Person DIDs</strong> — those embed a hash, not a
+key, so §6 and A0 do not cover them (§2.1, O18);</li>
+<li><strong>enforcement of the &quot;V1 is node-authored only&quot; migration rule</strong> — it is not
+checkable at ingress (§16, O13);</li>
+<li><strong>a recovery path that advances the identity chain</strong> — the ordinary rotation rule
+cannot express total key loss (§6.3, O14);</li>
+<li><strong>any device revocation with protocol effect</strong> — roster revoke is local bookkeeping;
+a compromised device&#39;s authorization is acceptable to every receiver indefinitely (§6.5);</li>
+<li>expiry as a security bound — <code>not_after</code> is custody hygiene on an honest device only (§6.4);</li>
+<li>consensus, finality, or double-vote prevention beyond #2469&#39;s own mechanisms;</li>
+<li>proof that a hosting operator will not deny service (only that it cannot
+<em>become</em> the institution);</li>
+<li>a solution to node cloning (§13);</li>
+<li>support for Person root-key rotation or recovery in the carried authorization
+format — see §6.3; until O8 is resolved, rotation breaks device authorization
+while leaving a compromised original root able to authorize (§6.3);</li>
+<li>any change to #2470 containment, which remains in force.</li>
+</ul>
+<hr>
+<h2>13. Open design decisions</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Why it is open</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>O1</td>
+<td>May the Person root key live on the first phone, or must it be generated to backup material?</td>
+<td>Usability vs. custody; determines whether phone-only onboarding is complete or degraded</td>
+</tr>
+<tr>
+<td>O2</td>
+<td>Does a restored/migrated node keep its Node DID?</td>
+<td>Keeping it makes restore-twice indistinguishable from a clone; rotating it breaks peer expectations and hosting assignments (T8)</td>
+</tr>
+<tr>
+<td>O3</td>
+<td>Pairwise identifiers — adopt, and at what cost to recovery and the single-anchor model? (§10)</td>
+<td><strong>Not a type change</strong> (a person may already hold many ordinary DIDs). The open work is managing and <em>proving relationships among</em> multiple DIDs: private linkage, recovery spanning all of them, and membership proofs that do not reveal the linkage</td>
+</tr>
+<tr>
+<td>O4</td>
+<td>Is <code>EntityId</code>-bound-to-genesis-hash sufficient, or does an institution need a resolvable record? (§7.1)</td>
+<td>Affects federation-scale name resolution</td>
+</tr>
+<tr>
+<td>O5</td>
+<td>Remove or wire <code>public_did</code> institutional signing? (§11.3)</td>
+<td>§4.1 implies remove; existing federation-accept verification implies wire</td>
+</tr>
+<tr>
+<td>O6</td>
+<td>Does the membership credential layer belong in this arc or a later one? (§7.2)</td>
+<td>Not required for slice 7; required for portable standing</td>
+</tr>
+<tr>
+<td>O7</td>
+<td>Which operation classes may a device sign, and which require the root key?</td>
+<td>Determines the default scope set in §5.2</td>
+</tr>
+<tr>
+<td><strong>O8</strong></td>
+<td><strong>How does a verifier learn the <em>current</em> root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?</strong> (§6.3)</td>
+<td><strong>BLOCKS slice A.</strong> A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2</td>
+</tr>
+<tr>
+<td><strong>O9</strong></td>
+<td><strong>How is a device revoked convergently at all?</strong> All three candidate shapes fail today: (a) is refuted, (a′) needs a replicated total order <strong>spanning governance operations <em>and</em> identity revocations</strong> (an identity-event-only order does not suffice), (b) needs rollback/revalidation semantics #2469 does not have (§6.5)</td>
+<td><strong>BLOCKS slices A and D, and is a genuine open architecture problem</strong> — not a choice between ready options. Requires either a total order spanning <strong>all four</strong> of governance operations, identity revocations, root rotations and authorization issuance (§6.3) — narrower orders leave a forged post-rotation authorization indistinguishable from a legitimate pre-rotation one — or deterministic rollback covering the same four. Every candidate implies different carried fields, so the format cannot be frozen first</td>
+</tr>
+<tr>
+<td>O10</td>
+<td>What is the canonical byte encoding of <code>DeviceAuthorization</code> — field order, version, domain separator, <strong>and the canonicalization rule for DID strings</strong>, given that <code>from_str</code> accepts any multibase while <code>Did</code> equality is string equality (§2.1)? (§6.1)</td>
+<td>Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary</td>
+</tr>
+<tr>
+<td><strong>O13</strong></td>
+<td><strong>How is <code>GOV_OP_V1</code> retired <em>convergently</em>, or how does a receiver cryptographically classify a V1 author as a node?</strong> (§16)</td>
+<td><strong>BLOCKS the migration story.</strong> <code>Did</code> has no type tag and <code>verify</code> recovers one key, so &quot;V1 is for node-authored ops&quot; is unenforceable. Note an unspecified retirement <em>point</em> is not sufficient: under a delayed V1 operation or a rolling upgrade, one peer applies it before its local cutoff while another rejects it after upgrading — <strong>permanently diverging, exactly like the wall-clock failure in §6.4</strong>. Retirement needs a replicated cutover ordered with operations, or deterministic rollback/revalidation</td>
+</tr>
+<tr>
+<td><strong>O14</strong></td>
+<td><strong>How does a total-loss recovery advance the identity chain, when <code>RotationEvent::verify</code> requires an existing non-revoked method with the needed capability (<code>multi_device.rs:541-552</code>)?</strong></td>
+<td><strong>BLOCKS slice A0&#39;s recovery path.</strong> There is no old key to sign with. <code>sync.rs:261-267</code> currently <em>counts</em> trustee DIDs without verifying signatures — its own comment says &quot;In production, verify the cryptographic signature here&quot;</td>
+</tr>
+<tr>
+<td><strong>O18</strong></td>
+<td><strong>How are anchor-derived Person DIDs modelled or migrated?</strong> <code>Anchor::to_did</code> produces a DID over `H(VUI</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>O17</strong></td>
+<td><strong>What is the authenticated genesis document (or genesis event), and how does a first-contact peer obtain and verify it?</strong> (§15.1)</td>
+<td><strong>A0 cannot be genesis-anchored without it.</strong> The DID carries only the genesis key, <code>verify</code> needs a prior document, and the cache accepts unauthenticated documents — so the chain has no trustworthy starting point</td>
+</tr>
+<tr>
+<td><strong>O16</strong></td>
+<td><strong>How is a legitimate chain branch selected when a compromised genesis key forks it?</strong> Both branches verify from genesis; a content-only tie-breaker converges but may converge on the attacker (§6.3)</td>
+<td><strong>A0 resolves O8 only partially without this.</strong> Needs an authenticated selector — threshold checkpoint, governed decision, or equivalent — plus an adversarial fork test</td>
+</tr>
+<tr>
+<td>O15</td>
+<td>What is the canonical preimage of the node-claim transcript — version, domain separator, field order/encoding, and how the two signatures plus capability proof are incorporated? (§5.3)</td>
+<td>Node and claimant are separate implementations; without it they can sign different serializations, and an ad-hoc encoding invites cross-protocol reuse. Blocks slice E&#39;s dual-signature invariant</td>
+</tr>
+<tr>
+<td>O12</td>
+<td>Do institutions ever need to make a <strong>self-authenticating</strong> statement — one a verifier can check without walking a mandate chain? (§4.1.1)</td>
+<td>This is the decisive test for Institution-DID vs identifier-plus-mandates. If yes, option A′ (threshold-held key) returns and inherits O8 at institutional scale</td>
+</tr>
+<tr>
+<td>O11</td>
+<td>What is the canonical encoding and normalization of a genesis decision before hashing to an <code>EntityId</code>? (§7.1)</td>
+<td>Different map or founder-signature ordering yields different ids for the same institution, defeating the stable binding; the field set must also prevent rebinding a decision to another slug</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>14. Implementation gap matrix</h2>
+<p>Legend: <strong>I</strong> implemented · <strong>P</strong> partial · <strong>M</strong> missing · <strong>C</strong> conflicting ·
+<strong>D</strong> needs design decision</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Current repo</th>
+<th>Intended</th>
+<th>Gap</th>
+<th>Sev</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Person DID</td>
+<td><strong>C</strong> — key-derived DIDs are self-sovereign and offline (<code>lib.rs:177,191,341</code>), <strong>but SDIS anchor-derived Person DIDs embed a hash, not a key</strong> (<code>anchor.rs:157,194-196</code> via <code>new_unchecked</code>), and the two are indistinguishable by format</td>
+<td>one Person-DID model, or an explicit migration</td>
+<td><strong>O18</strong> — §6 and A0 do not work for the anchor class</td>
+<td><strong>critical</strong></td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Device keypair + roster</td>
+<td><strong>I</strong> — <code>multi_device.rs</code>, gateway + icnctl</td>
+<td>unchanged</td>
+<td>none</td>
+<td>—</td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Device DID as principal</td>
+<td><strong>M</strong> — device is a string id (<code>:259</code>)</td>
+<td>first-class DID</td>
+<td>new type usage</td>
+<td>high</td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Device authorization proof</td>
+<td><strong>M</strong> — <code>Capability::Sign</code> never checked; no nested signature type</td>
+<td>carried, signed, scoped</td>
+<td>new primitive, <strong>blocked on O8+O9</strong></td>
+<td><strong>critical</strong></td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Deterministic device revocation</td>
+<td><strong>M</strong> — no replicated authenticated anchor; roster revoke is node-local (§6.5)</td>
+<td>a replicated order spanning <strong>both</strong> governance operations and identity revocations, <strong>or</strong> deterministic rollback/revalidation</td>
+<td><strong>decision O9 — NOT solved by A0</strong>, which orders identity events only and excludes revocation policy; &quot;ordering or snapshot invalidation&quot; was refuted (§6.5)</td>
+<td><strong>critical</strong></td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Identity-document replication</td>
+<td><strong>C</strong> — <code>RotationEvent::verify</code> has zero production callers; <code>identity:recovery</code> subscribed but never declared; <code>icnctl</code> revoke preimage ≠ <code>signing_message()</code></td>
+<td>verifiable monotonic chain</td>
+<td>slice A0</td>
+<td><strong>critical</strong></td>
+<td>icn-identity / icn-core</td>
+</tr>
+<tr>
+<td>Node first-claim ceremony</td>
+<td><strong>M</strong> — no claiming at all; node-key challenge alone would let the first remote caller win (§5.3)</td>
+<td>out-of-band one-time capability + dual-signed transcript</td>
+<td>slice E</td>
+<td>high</td>
+<td>icn-core</td>
+</tr>
+<tr>
+<td>Device enrolment integrity</td>
+<td><strong>C</strong> — add/revoke signature covers only did+device_id+label; key and capabilities are unsigned (<code>identity_mgr.rs:488-493</code>)</td>
+<td>signature covers full payload</td>
+<td>live defect, <strong>#2588</strong></td>
+<td><strong>critical</strong></td>
+<td>icn-gateway</td>
+</tr>
+<tr>
+<td>Device capability attenuation</td>
+<td><strong>C</strong> — an <code>AddDevice</code> signer may grant <code>Recover</code>/<code>RotateKey</code>/<code>RevokeDevice</code>, i.e. more authority than it holds (<code>identity_mgr.rs:160-165</code>, <code>:199</code>; same rule in <code>multi_device.rs:541-552</code>)</td>
+<td>enrolment attenuates to the signer&#39;s delegable set, or requires root approval</td>
+<td>live defect, <strong>separate from #2588</strong> — signing the field prevents tampering, not escalation</td>
+<td><strong>critical</strong></td>
+<td>icn-gateway / icn-identity</td>
+</tr>
+<tr>
+<td>Member-origin signing</td>
+<td><strong>M</strong> — <code>SignedGovernanceOp</code> is root-key-only (<code>:308,373</code>)</td>
+<td>device-signed, person-authored</td>
+<td>v2 envelope</td>
+<td><strong>critical</strong></td>
+<td>icn-governance</td>
+</tr>
+<tr>
+<td>Client-side governance signing</td>
+<td><strong>M</strong> — zero client references</td>
+<td>device signs locally</td>
+<td>SDK + CI</td>
+<td>high</td>
+<td>sdk/react-native</td>
+</tr>
+<tr>
+<td>First-device bootstrap</td>
+<td><strong>C</strong> — <code>index.ts:2059</code> needs a prior <code>AddDevice</code> device, while <code>IdentityManager::get_or_create_document</code> (<code>identity_mgr.rs:62-96</code>) accepts an arbitrary <code>did</code> and <code>initial_key</code> <strong>without checking the key derives that DID</strong></td>
+<td>first entry authorized by a Person-root signature</td>
+<td>exposing that helper to close the gap would let an arbitrary-subject token (#2589) seed P&#39;s document with an attacker key</td>
+<td><strong>critical</strong></td>
+<td>sdk + gateway</td>
+</tr>
+<tr>
+<td>Mobile identity genesis</td>
+<td><strong>P</strong> — real, but zero CI (<code>wallet.ts:93</code>)</td>
+<td>shipped + tested</td>
+<td>CI + release</td>
+<td>med</td>
+<td>sdk/react-native</td>
+</tr>
+<tr>
+<td>Multi-device</td>
+<td><strong>P</strong> — roster only (§2.2)</td>
+<td>roster + authority</td>
+<td>wire signing</td>
+<td>high</td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td><strong>C</strong> — the 7-step flow exists, but total-loss recovery <strong>cannot advance the authenticated chain</strong>: <code>RotationEvent::verify</code> needs an unavailable old authorized key (<code>multi_device.rs:541-552</code>) and <code>sync.rs:261-267</code> counts trustee DIDs without verifying signatures</td>
+<td>authenticated threshold-recovery transition</td>
+<td><strong>new cryptographic work, O14-blocked</strong> — not merely reconciliation or UI</td>
+<td><strong>critical</strong></td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Key rotation preserving DID</td>
+<td><strong>I</strong> — stable across rotation (<code>:21-22</code>)</td>
+<td>unchanged</td>
+<td>none</td>
+<td>—</td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Node DID</td>
+<td><strong>I</strong> — first-boot generated</td>
+<td>unchanged</td>
+<td>none</td>
+<td>—</td>
+<td>icnd</td>
+</tr>
+<tr>
+<td>Node claiming</td>
+<td><strong>M</strong> — ABSENT; <code>operator_did = node_did</code> (<code>lifecycle.rs:371-374</code>)</td>
+<td>Person claims instance</td>
+<td>ceremony + grant</td>
+<td>high</td>
+<td>icn-core</td>
+</tr>
+<tr>
+<td>Node admin delegation</td>
+<td><strong>M</strong> — admin is a JWT scope</td>
+<td>NodeAdmin grant</td>
+<td>authority wiring</td>
+<td>med</td>
+<td>icn-gateway</td>
+</tr>
+<tr>
+<td>Hosted nodes</td>
+<td><strong>M</strong> — only a <em>prohibition</em> on tenancy</td>
+<td>explicit assignment</td>
+<td>new record</td>
+<td>high</td>
+<td>icn-core</td>
+</tr>
+<tr>
+<td>Institution identity</td>
+<td><strong>C</strong> — unbound slug; keyless <code>derive_treasury_did</code></td>
+<td>genesis-bound <code>EntityId</code></td>
+<td>binding</td>
+<td>high</td>
+<td>icn-entity</td>
+</tr>
+<tr>
+<td>Institution signing</td>
+<td><strong>C</strong> — modelled, unwired, contradicts §4.1</td>
+<td>never signs</td>
+<td>decision O5</td>
+<td>med</td>
+<td>icn-federation</td>
+</tr>
+<tr>
+<td>Institution genesis</td>
+<td><strong>P</strong> — needs only <code>entity:write</code>; body is unsigned JSON under a bearer token, no key signs it</td>
+<td>governed, person-signed</td>
+<td>authorship binding + relay split</td>
+<td>high</td>
+<td>icn-gateway</td>
+</tr>
+<tr>
+<td>Institution migration</td>
+<td><strong>M</strong> — restoration is an ADR-0086 open blocker</td>
+<td>state portable</td>
+<td>portability</td>
+<td>high</td>
+<td>deploy</td>
+</tr>
+<tr>
+<td>Membership relationship</td>
+<td><strong>I</strong> — bidirectional index</td>
+<td>unchanged</td>
+<td>none</td>
+<td>—</td>
+<td>icn-entity</td>
+</tr>
+<tr>
+<td>Membership credential</td>
+<td><strong>M</strong> — no VC layer at all</td>
+<td>portable standing</td>
+<td>new layer (O6)</td>
+<td>med</td>
+<td>icn-entity</td>
+</tr>
+<tr>
+<td>Coop / community / federation identity</td>
+<td><strong>P</strong> — three models + glue</td>
+<td>one primitive</td>
+<td>consolidation</td>
+<td>med</td>
+<td>icn-entity</td>
+</tr>
+<tr>
+<td>Pairwise / privacy identifiers</td>
+<td><strong>M</strong> — <code>Did</code> permits one form</td>
+<td>undecided</td>
+<td>decision O3</td>
+<td>med</td>
+<td>icn-identity</td>
+</tr>
+<tr>
+<td>Offline operation</td>
+<td><strong>P</strong> — property claimed, no design</td>
+<td>explicit model</td>
+<td>design</td>
+<td>med</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Gateway relay semantics</td>
+<td><strong>P</strong> — §7.0.2 fallback prevents signed forgery; unsigned path unaffected</td>
+<td>relay asserts nothing</td>
+<td>v2 + slice 7</td>
+<td>high</td>
+<td>icn-governance</td>
+</tr>
+<tr>
+<td>Token → principal binding</td>
+<td><strong>C</strong> — HMAC-based; invite path unproven (§2.4)</td>
+<td>proven key control</td>
+<td>fix invite path</td>
+<td>high</td>
+<td>icn-gateway</td>
+</tr>
+<tr>
+<td>Authorship by deployment mode</td>
+<td><strong>C</strong> — node DID overwrites proposer (§2.5)</td>
+<td>caller is author</td>
+<td>correctness fix</td>
+<td>high</td>
+<td>apps/governance</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>15. Proposed implementation slices</h2>
+<p>Derived from source dependencies. <strong>None are implemented in this session.</strong></p>
+<p>Ordering rationale: A is the primitive everything else consumes; B and C are
+independent of each other once A lands; D is the #2469 join point; E–G are the
+node/institution arc, which does not block D.</p>
+<table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Invariant</th>
+<th>Source seam</th>
+<th>Tests</th>
+<th>Non-goals</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A0. Authenticated identity-document chain</strong> <em>(new — precedes A)</em></td>
+<td>A DID&#39;s key history is a verifiable, monotonic chain anchored at the genesis key the DID encodes, and <strong>two honest nodes applying the same events derive byte-identical documents</strong></td>
+<td>declare an identity topic (<code>icn-core/src/supervisor/init_*</code>); call <code>RotationEvent::verify</code> on receive (<code>multi_device.rs:526</code>, <strong>zero production callers</strong>); fix <strong>both</strong> <code>icnctl</code> preimages — add/approve (<code>bins/icnctl/src/main.rs:6302-6308</code>) and revoke (<code>:6410</code>) — to match <code>signing_message()</code>; make <code>apply_event</code> derive <code>added_at</code>/<code>revoked_at</code>/<code>updated_at</code> from <strong>signed event data</strong> instead of local <code>current_timestamp()</code>/<code>SystemTime::now()</code> (<code>sync.rs:126,148,286,338</code>; <code>multi_device.rs:270,279,344</code>); a separately authenticated <strong>threshold-recovery transition</strong> (see non-goals); <strong>a specified authenticated genesis document/event with a first-contact acquisition path</strong> (O17); <strong>authenticated buffering or missing-prefix retrieval</strong> — <code>RotationEvent::verify</code>&#39;s strict <code>new_version == version + 1</code> rule (<code>multi_device.rs:527</code>) <em>rejects</em> a version delivered ahead of its predecessor, so a gap-fill path is required or a node that saw v3 before v2 halts at v2 while an in-order peer reaches v3; durable applied-set</td>
+<td>chain verifies from genesis forward; <code>new_version != version + 1</code> rejected; unauthorized signer rejected; <strong>both</strong> icnctl event kinds round-trip through the verifier; <strong>identical documents across skewed clocks</strong>; <strong>an adversarial fork resolves to the LEGITIMATE branch</strong> — convergence alone is insufficient, since a content-hash tie-breaker converges while letting a compromised genesis key win (O16); adversarial recovery proofs rejected; <strong>every delivery permutation of a given event set yields the same document</strong></td>
+<td>no governance wiring; no device-authorization format; no revocation policy</td>
+</tr>
+<tr>
+<td><strong>A. Device principal + authorization</strong></td>
+<td>A device key may act for a Person only within a signed, scoped authorization, over a <strong>specified canonical encoding</strong></td>
+<td><code>icn-identity</code> — new type beside <code>multi_device.rs</code></td>
+<td>sign/verify round trip; tamper each field; scope mismatch; wrong signer; revoked device; <strong>pre- and post-rotation authorization</strong>; <strong>encode/decode round trip and cross-implementation vectors</strong></td>
+<td>no governance wiring; no envelope change. <strong>BLOCKED on O8 (§6.3) AND O9 (§6.5)</strong> — both change the field set, so freezing the format first would be premature. Must also settle O10 (canonical bytes, version, domain separator). v1 issues authorizations <strong>root-only</strong> (§5.2). See §15.1: slice A is no longer the correct first slice</td>
+</tr>
+<tr>
+<td><strong>B. Device enrolment + LOCAL roster management</strong></td>
+<td>The <strong>first device is enrolled under a Person-root signature binding P to that device</strong> — not &quot;self-bootstrapped&quot;, since no key is otherwise authorized to create the first roster entry, and the enrolled key remains <strong>D&#39;s own</strong> (§5.2: the device generates its own key and never receives the root) — and <strong>the enrolment signature covers the enrolled key and capabilities</strong> (closes #2588)</td>
+<td><code>icn-gateway/src/identity_mgr.rs</code> (incl. <code>build_add_device_message</code> and <code>build_revoke_device_message</code>), <code>api/devices.rs</code>, SDKs. <strong>&quot;Covers the key and capabilities&quot; is not yet a specification</strong> — the current delimiter-framed preimage, capability aliases/case/ordering and the optional encryption key admit incompatible encodings, so this needs a <strong>versioned, domain-separated, length-prefixed preimage with canonical capability normalization</strong> before two implementations can interoperate</td>
+<td>first-device path; add second; revoke updates the local document; <strong>tampering with <code>public_key</code>, <code>encryption_public_key</code> or <code>capabilities</code> under a valid signature is rejected</strong>; <strong>an <code>AddDevice</code>-only signer cannot enrol a key holding <code>Recover</code>/<code>RotateKey</code>/<code>RevokeDevice</code></strong>; <strong>the request key is validated against the enrolled Device D — <em>not</em> P — while the enrolment signature verifies under P&#39;s root</strong>; a request whose key does not derive D, or whose signature does not verify under P&#39;s root, is rejected; <strong>cross-implementation vectors between the React Native client and the Rust gateway</strong></td>
+<td>no QR (inherits #2569 rules — separate). <strong>Scope narrowed in review round 14:</strong> these seams mutate only the gateway&#39;s <em>local</em> document, so B must NOT claim provable or end-to-end revocation — a revoked device is rejected <em>by that node only</em>. Any cross-node rejection criterion is <strong>blocked on O9</strong> (§6.5)</td>
+</tr>
+<tr>
+<td><strong>C. Person genesis on mobile, shipped</strong></td>
+<td>Genesis is local, offline, and CI-covered</td>
+<td><code>sdk/react-native</code></td>
+<td><strong>key generation is random and unique per identity</strong> (<code>wallet.ts:94-106</code> uses <code>randomSecretKey()</code>; existing tests already require distinct keypairs) — determinism applies <strong>only</strong> to deriving the public key and DID <em>from a fixed private key</em>, never to generating one; secure-storage custody; CI added</td>
+<td>no new crypto — it exists</td>
+</tr>
+<tr>
+<td><strong>D. Member-origin signing (<code>GOV_OP_V2</code>)</strong></td>
+<td>Authorship is provable without the relay holding the author&#39;s key, <strong>without a non-convergent validity predicate</strong></td>
+<td><code>icn-governance/src/replication.rs</code> — version bump per #2469 §14</td>
+<td>v1/v2 coexistence; device-signed op verifies; wrong device rejected; <code>op_id</code> covers the authorization; <strong>delayed delivery and clock-skew tests showing two honest peers reach the same verdict</strong></td>
+<td><strong>does not lift #2470 containment</strong>. <strong>BLOCKED on O9 (§6.5)</strong> — no wall-clock predicate may become an ingress gate and the revocation check must be deterministic — <strong>and on O13 (§16)</strong>: shipping v2 while v1 stays indefinitely acceptable leaves a compromised pre-rotation Person root able to emit indistinguishable v1 operations and bypass every v2 device-authorization and revocation check. D must either land behind an enforceable v1 retirement/classification step or carry one</td>
+</tr>
+<tr>
+<td><strong>E. Node claim + admin grant</strong></td>
+<td>A Person administers a node instance; node ≠ operator; <strong>network reachability alone confers no first-claim authority</strong> (§5.3)</td>
+<td><code>icn-core</code> claim ceremony; <code>operator_did</code> unwired from <code>node_did</code></td>
+<td>claim binds instance not image; re-claim rejected; admin delegation; <strong>canonical-transcript interoperability and tamper vectors</strong>, and a remote caller without the out-of-band capability is rejected</td>
+<td>no hosting semantics. <strong>BLOCKED on O15</strong> — separate node and claimant implementations could otherwise pass the claim tests while signing incompatible or cross-protocol-reusable encodings</td>
+</tr>
+<tr>
+<td><strong>F. Institution genesis, governed</strong></td>
+<td>Genesis is person-signed and governed, not <code>entity:write</code>, and the <code>EntityId</code> binds to a <strong>canonically encoded</strong> decision</td>
+<td><code>icn-gateway/src/api/entity.rs</code>; <code>institution_bootstrap.rs</code></td>
+<td>founder authority expires; genesis body carries an authorship binding; <strong>same decision yields the same id under reordered maps and founder signatures</strong></td>
+<td>no institutional signing key (§4.1). Requires O11</td>
+</tr>
+<tr>
+<td><strong>G. Hosting assignment</strong></td>
+<td>Hosting is explicit, scoped, revocable; host ≠ institution</td>
+<td>node config → assignment record</td>
+<td>host cannot act as institution; revoke and re-host</td>
+<td>no billing/accounting</td>
+</tr>
+<tr>
+<td><strong>H. Mobile member vertical</strong></td>
+<td>The §8 flow works end to end</td>
+<td>SDK + member shell</td>
+<td>full vertical</td>
+<td>not a UI project</td>
+</tr>
+<tr>
+<td><strong>I. NYCN acceptance</strong></td>
+<td>Generic primitives express a real federation</td>
+<td>institution package only</td>
+<td>no NYCN semantics in kernel</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3>15.1 Slice A is no longer the correct first slice</h3>
+<p><em>Conclusion of review round 8.</em> Slice A is blocked twice over — <strong>O8</strong> (rotation) and
+<strong>O9</strong> (revocation anchor) — and both change the <em>carried field set</em>, not merely the
+policy around it. Freezing a <code>DeviceAuthorization</code> encoding before either is answered
+would bake in a format that cannot express the two things that make it safe.</p>
+<p><strong>A0 resolves O8 only.</strong> <em>(Corrected in review round 11 — an earlier revision of this
+section claimed it resolved both.)</em></p>
+<ul>
+<li><strong>O8 — partially, and only once the chain can be <em>started</em>.</strong> A verifiable,
+monotonic, signature-chained identity document lets a receiver derive the
+<strong>current root</strong> from the genesis key the DID encodes (§6.3) in the
+non-adversarial case. Two things it does not settle:<ul>
+<li>which branch is legitimate when a compromised genesis key forks the chain —
+<strong>O16</strong>;</li>
+<li><strong>how a first-contact peer obtains a trustworthy starting document at all</strong> —
+<strong>O17</strong>. <code>RotationEvent::verify</code> needs a prior <code>DidDocument</code> containing the named
+<code>signed_by</code> method and its capability (<code>multi_device.rs:541-552</code>), but a DID
+carries only the genesis Ed25519 key; <code>DidDocument::new</code> additionally wants an
+X25519 key and stamps local timestamps (<code>:250</code>), and <code>DidDocumentCache::update</code>
+accepts whole documents with <strong>no authentication</strong>. A verifier meeting a Person
+after several rotations must therefore either trust an unsigned starting document
+or fail to verify the first event — and cannot derive the byte-identical document
+A0 promises.</li>
+</ul>
+</li>
+<li><strong>O9 — no.</strong> A0 orders <em>identity-document events relative to each other</em>; it says
+nothing about whether a governance <strong>operation</strong> was signed before or after a
+revocation, because the authorization carries one fixed version for its whole life
+(§6.5) and no rollback path exists. <strong>Slice A therefore remains blocked after A0
+completes</strong>, until operations and revocations share a replicated total order, or
+deterministic rollback/revalidation is designed.</li>
+</ul>
+<p>Some of it is cheap: capability checking, Ed25519 verification and strict <code>+1</code>
+monotonicity already exist in <code>multi_device.rs</code>, so the declared topic, the receive
+path calling <code>RotationEvent::verify</code> (<strong>zero production callers today</strong>), the
+corrected <code>icnctl</code> preimages and deterministic event application are wiring.</p>
+<p><strong>But A0 is not merely wiring, and an earlier revision of this paragraph said so
+wrongly.</strong> <em>(Corrected after O14/O16/O17 were added.)</em> A0&#39;s own acceptance criteria
+now require an <strong>authenticated fork selector</strong> (O16), an <strong>authenticated
+threshold-recovery transition</strong> (O14), and an <strong>authenticated genesis document</strong>
+(O17). Those are new protocol design with security-critical failure modes, not
+configuration. Scheduling A0 as a wiring task — or declaring it complete once the
+topic is declared and the preimages match — would ship exactly the gaps it exists to
+close. <strong>O14, O16 and O17 are prerequisites of A0, not follow-ups.</strong></p>
+<p><strong>Revised order: [A0 and B blocked on O18] → A0 → (B ∥ C) → [A blocked on O9; D blocked on O9 + O13] → (E blocked on O15 → F → G) → H → I.</strong>
+O18 precedes A0 because an anchor-derived Person has no genesis key to anchor a chain
+at, and no root key to authorize a first device with — so both A0 and B are undefined
+for that identity class until it is modelled or migrated.
+B and C do not depend on the authorization format and can proceed — but <strong>B is
+enrolment and local roster management only</strong>. Its seams touch a single node&#39;s
+document, so &quot;a revoked device is rejected&quot; holds only at that node; any
+cross-node revocation guarantee is part of O9, not of B. A and D cannot start
+until O9 has an answer.</p>
+<p>A0 is proof-bearing on its own: it either converges on two nodes under a forked
+rotation event, or it does not, and that is testable without governance, without
+mobile, and without touching <code>SignedGovernanceOp</code>.</p>
+<h3>Dependency on #2469</h3>
+<table>
+<thead>
+<tr>
+<th>#2469 slice</th>
+<th>Relationship</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>4</strong> quarantine</td>
+<td><strong>Independent.</strong> Bounded store + steward release valve needs nothing here. Should proceed.</td>
+</tr>
+<tr>
+<td><strong>5</strong> <code>op_id</code> / order state</td>
+<td><strong>Independent</strong>, with one forward constraint: <code>op_id</code> must be derived over the full canonical body so that adding a v2 authorization field changes it.</td>
+</tr>
+<tr>
+<td><strong>6</strong> lifecycle guard</td>
+<td><strong>Independent.</strong> Unconditional monotonicity is orthogonal to authorship.</td>
+</tr>
+<tr>
+<td><strong>7</strong> verify + authority + apply</td>
+<td><strong>Depends on slice A + D.</strong> Slice 7 restores <code>VoteCast</code> application, but per §7.0.2 gateway deployments <em>emit nothing to converge on</em> — the node cannot sign a member&#39;s vote. Slice 7 without member-origin signing is honest only for the composition where each voter runs their own daemon. <strong>To truthfully claim member-governance convergence, A and D must land first.</strong></td>
+</tr>
+</tbody></table>
+<p>Slices 4–6 are explicitly <strong>not blocked</strong> by this work.</p>
+<hr>
+<h2>16. Migration and evolution</h2>
+<ul>
+<li><strong>Additive — but V1 must be retired, not merely coexist.</strong> <em>(Raised in review
+round 9.)</em> The intent was that <code>GOV_OP_V1</code> remains valid for node-authored
+operations. <strong>A receiver cannot enforce that restriction.</strong> <code>Did</code> carries no
+principal-type tag (§2.1) and <code>SignedGovernanceOp::verify</code> recovers exactly one
+key from <code>author</code> (<code>replication.rs:373</code>), so nothing at ingress can distinguish
+a node-authored V1 op from a Person-authored one. While V1 is accepted, a
+compromised <strong>pre-rotation Person root</strong> can sign V1 operations and bypass V2&#39;s
+device authorization, current-root discovery <em>and</em> revocation entirely — the
+V2 protections become optional for exactly the attacker they exist to stop.
+Recorded as <strong>O13</strong>: either define a cryptographically checkable principal
+classification at ingress, or set a V1 retirement point. A dual-stack that never
+ends is not a migration.</li>
+<li><strong>Containment holds.</strong> Nothing here lifts #2470; slice D is a signing capability,
+not an application capability.</li>
+<li><strong>One primitive, many consumers.</strong> Device authorization lands in <code>icn-identity</code>
+(§6.5) so settlement, membership and compute can consume it without depending
+on governance.</li>
+<li><strong>Retire dead paths deliberately.</strong> <code>can_sign</code> and the unwired institutional
+signing surfaces should be either wired or deleted, with the decision recorded
+— not left as ambiguous half-truths.</li>
+<li><strong>Order:</strong> <strong>[O18 first]</strong> → <strong>A0</strong> → (B ∥ C) → <strong>[A blocked on O9; D blocked on
+O9 + O13]</strong> → (<strong>E blocked on O15</strong> → F → G) → H → I. A0 and B are undefined for
+anchor-derived Persons until O18 is settled. A0 precedes everything, but it resolves <strong>O8 only, and only partially</strong>
+(fork selection is O16). It explicitly excludes revocation policy, so it cannot
+order governance operations against revocations or roll back applied effects —
+scheduling A and D after it would freeze the authorization format and the v2
+envelope before deterministic revocation exists (§15.1).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
