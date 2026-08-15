@@ -30,6 +30,22 @@ for humans.
 > they accumulated (O8, O9, O13, O16, O17, O18) turned out to be six symptoms of
 > one structural choice, which §5 identifies and §6 removes.
 
+> **Adversarial review, and what it changed.** This document was attacked on ten
+> axes before publication (hidden clocks, hidden arrival-order dependence, hidden
+> correlation, hidden permanent root, hidden registry, claims-vs-source,
+> proposed-as-current, invented protocol, internal contradiction, unmet HARD
+> requirements). It found **nine blocking errors**, all of which are corrected
+> in place with the correction marked rather than silently removed. The four that
+> most changed the result:
+> **(1)** pre-rotation constrains rotations only, so a compromised current key can
+> still fork a non-establishment event (§6.2);
+> **(2)** the impossibility claim was overstated and is downgraded from ESTABLISHED
+> to a bounded argument (§6.1);
+> **(3)** under the default recovery path, continuity-root compromise is a
+> **takeover and is unrecoverable** (§12.2);
+> **(4)** the class-1 fallback is a known R5.1 violation, not a safe default (§9.3).
+> §9.6 lists every shortfall the model does not discharge.
+
 **Related, deferred to, not restated:**
 [authenticated-governance-replication](../design/authenticated-governance-replication.md)
 (#2469 — the convergence doctrine this design must satisfy) ·
@@ -76,13 +92,17 @@ document:
    changes"); §6 shows what it generalizes to, and that generalization dissolves
    five of the six open blockers.
 
-3. **There is no convergent global device revocation, and there cannot be one.**
-   That is not a gap to close; it is a consequence of asking an asynchronous
-   partition-tolerant system with no consensus to agree on a time-varying
-   predicate. The correct move is to stop asking. Revocation must be scoped to a
-   *relying party that has an authoritative view* — which is exactly why ICN's
-   one working revocation mechanism (RPC/gateway token revocation,
-   [AUTHORITY_SPINE](AUTHORITY_SPINE.md) §2) works today.
+3. **There is no convergent global device revocation, and there cannot be one
+   without paying a price ICN has declined to pay.** Agreeing on a time-varying
+   predicate across an asynchronous partition-tolerant network requires a
+   synchrony assumption, randomization, or an ordering authority — ICN rejects all
+   three (§6.1). The correct move is to stop asking. Revocation must be scoped to a
+   *relying party that has an authoritative view* — which is why ICN's one
+   revocation mechanism that is designed this way (RPC/gateway token revocation,
+   scoped to a single gateway with a durable store and a fail-closed read,
+   [AUTHORITY_SPINE](AUTHORITY_SPINE.md) §2) has a coherent story where identity
+   revocation does not. *(That is an architectural observation about its shape,
+   not a re-verification of its runtime behaviour this pass.)*
 
 The recommended architecture is **Model C** of §7 — *context-scoped identity with
 a private continuity root* — and §9 states it precisely.
@@ -457,23 +477,44 @@ it is not a consequence of the choice — it is a consequence of physics. §6.1.
 
 ## 6. The reframe: three moves, two of them forced
 
-### 6.1 Move 1 — stop asking for global convergent revocation. It is impossible.
+### 6.1 Move 1 — stop asking for global convergent revocation
 
-**ESTABLISHED (external, primary sources).**
+**Classification: RECOMMENDED, on a bounded formal argument — not ESTABLISHED.**
+*(An earlier draft called this "provably unachievable" and classified it
+ESTABLISHED. That was an overstatement, corrected in adversarial review; the
+correction is recorded here rather than quietly removed.)*
+
+The argument has two steps and one honest caveat.
 
 1. Requiring all peers to agree on whether an act preceded a revocation is
    requiring **atomic broadcast**. Chandra & Toueg, *Unreliable Failure Detectors
    for Reliable Distributed Systems*, JACM 43(2), 1996: *"Consensus and Atomic
    Broadcast are equivalent in asynchronous systems with crash failures… a
    solution for one automatically yields a solution for the other."*
-2. Consensus is unsolvable in that model. Fischer, Lynch & Paterson, JACM 32(2),
-   1985: *"every protocol for this problem has the possibility of nontermination,
-   even with only one faulty process."*
+2. **Deterministic** consensus is unsolvable in the **pure asynchronous** model
+   with crash faults. Fischer, Lynch & Paterson, JACM 32(2), 1985: *"every
+   protocol for this problem has the possibility of nontermination, even with only
+   one faulty process."*
+
+> **The caveat, stated because omitting it would be misuse.** FLP is routinely
+> circumvented — by randomization (Ben-Or), by partial synchrony (DLS, PBFT), and
+> by unreliable failure detectors. Chandra & Toueg is itself a **positive** result:
+> it shows ◊W suffices to solve consensus. Citing only its equivalence half while
+> suppressing its solution half would be quoting a paper against its own thesis.
+>
+> So the correct claim is **not** "global convergent revocation is impossible." It
+> is: **global convergent revocation requires adopting a synchrony assumption,
+> randomization, or an ordering authority — and ICN declines all three.** #2469
+> excludes consensus by design; R4.1 forbids clock-based synchrony; and
+> `icn-kernel-api::Coordination` is a Raft-shaped trait with **zero implementors**
+> (§3.7). That is a *design choice with a cost*, and it is reopenable by paying the
+> cost, not a theorem that forecloses it.
 
 ⇒ **O9, as posed — "how is a device revoked convergently *at all*" across the
-network — has no solution.** PRINCIPAL_MODEL was right that all three candidate
-shapes fail; it stopped one step short of the reason, which is that the target is
-unreachable rather than unbuilt.
+network — has no solution within ICN's stated model.** PRINCIPAL_MODEL was right
+that all three candidate shapes fail; it stopped one step short of the reason,
+which is that the target is unreachable *given premises ICN has chosen*, rather
+than merely unbuilt.
 
 The survey confirms it empirically: **no deployed system achieves decentralized
 global convergence on revocation.** Every one either supplies an ordering
@@ -490,8 +531,19 @@ one for that validator"* — so partitioned validators diverge **by design**.
 Seredinschi, *The Consensus Number of a Cryptocurrency*, PODC 2019: *"the
 consensus number of an asset transfer object is 1… a more general k-shared asset
 transfer object where up to k processes can atomically withdraw from the same
-account… has consensus number k."* Consensus number 1 means **reliable broadcast
-suffices — no consensus needed.**
+account… has consensus number k."*
+
+Consensus number 1 means the object is **wait-free implementable without
+consensus** — but be precise about what that buys:
+
+- The primitive it needs is **Byzantine reliable broadcast (BRB)**, not "gossip".
+  BRB guarantees non-equivocation *among receivers of a delivered message*; it
+  does **not** stop a Byzantine single writer from authoring two conflicting
+  events in the first place. That residual is exactly the duplicity case §9.2 has
+  to handle explicitly.
+- **ICN does not have BRB.** `GossipEntry` carries no signature field at all
+  (§3.7), so building the log's replication path is "implement Byzantine reliable
+  broadcast", not "add a topic". §19.1 slice N3 is costed accordingly.
 
 > **This gives the design its single most important constraint:**
 > **keep the authority log single-writer.** The moment two devices can
@@ -511,13 +563,36 @@ Two consequences fall out immediately:
 
 - **O17 dissolves.** The genesis document *is* the thing the identifier commits
   to. There is no bootstrap problem and no trusted starting document to obtain.
-- **O16 is largely defused by pre-rotation.** KERI's inception commits a *digest*
-  of the next key set; rotation reveals it. A compromised **current** key
-  therefore cannot rotate, because it does not hold the pre-committed next keys.
-  Forking requires compromising cold, never-used key material. The residual case
-  — genuine duplicity — is *detectable by every honest validator*, which can then
-  independently refuse; that is convergent refusal, which is achievable, unlike
-  convergent branch selection, which is not.
+- **O16 is narrowed by pre-rotation — for rotations only.** KERI's inception
+  commits a *digest* of the next key set; rotation reveals it. A compromised
+  **current** key therefore cannot *rotate*, because it does not hold the
+  pre-committed next keys.
+
+> **Pre-rotation does not prevent forking in general, and an earlier draft of
+> this section wrongly said it did.** *(Corrected in adversarial review.)* It
+> constrains **establishment** events only. A compromised current key can still
+> author a competing **non-establishment** event — an `authorize` or a `revoke` —
+> at the next position, because those are signed by a currently-authorized key and
+> commit to nothing held in cold storage.
+>
+> This matters twice over. First, the fork is real. Second, and worse, a naive
+> "every honest holder refuses to advance past the fork" rule turns a key
+> compromise into **permanent denial of identity**: the victim can never publish
+> the revocation that would remove the attacker, because the log is wedged.
+>
+> The mitigation is KERI's **superseding recovery**, and it is adopted here:
+> *"a rotation event overrides or supersedes an interaction event with the same
+> event sequence number"*, after which the witness *"will no longer accept any new
+> events of any type into the disputed branch."* So the victim recovers by
+> **rotating at the disputed position** using pre-rotated material the attacker
+> does not hold. KERI's own honest concession applies unchanged: *"Recovery may
+> create an unavoidable race condition but the special rule minimizes the extent of
+> that race condition."*
+>
+> Net: forking a **rotation** requires cold-key compromise; forking a
+> **non-establishment** event requires only current-key compromise and is
+> *recoverable but racy*. Residual policy is **O16′** (§17), and it is a liveness
+> question, not only a selection question.
 
 ### 6.3 Move 3 — let the acceptor set recency, and let the subject own the order
 
@@ -645,6 +720,24 @@ needs a nullifier, and ICN's ZK stack cannot currently provide one (F16). "Who i
 this person, globally?" becomes unanswerable — which is usually correct and
 occasionally inconvenient.
 
+> **Two costs an earlier draft omitted, both found in adversarial review, and both
+> worse than the ones above.**
+>
+> 1. **The continuity root has a larger blast radius than Model A's genesis key.**
+>    It is the person's index of their own subjects *plus* the material that
+>    recovers each one, so compromising it is simultaneously takeover of **every
+>    context** and **full cross-context deanonymization** — it hands the attacker
+>    exactly the linkage map §11 exists to prevent anyone else from building.
+>    Model A's rejected genesis key compromises **one** identity. This model
+>    concentrates what Model A distributes, and §12.2 path (b) exists because of it.
+> 2. **Availability is a per-subject dependency, not zero infrastructure.** A
+>    verifier needs the subject's log prefix; when it is missing, *someone
+>    reachable must serve it*. Model B was rejected partly for needing one global
+>    directory; Model C needs **N per-subject availability paths**. They are
+>    materially different — a relying party can serve the logs of its own members,
+>    so the dependency is per-relationship rather than global and universal — but
+>    "no centralization dependence" is too clean, and the matrix below is corrected.
+
 ### Model D — Credential-centric, no person identifier at all
 
 The person holds keys; institutions issue verifiable credentials; every
@@ -690,11 +783,11 @@ Qualitative, with reasons rather than false precision.
 | Criterion | A key-as-person | B global anchor | **C context-scoped** | D credential-only | E hybrid |
 |---|---|---|---|---|---|
 | Self-sovereignty (R1.1–R1.3) | ✔ | ~ needs directory | **✔** | ✔ | ✔ |
-| No centralization dependence | ✔ | ✘ global directory | **✔** | ~ status lists | ~ |
+| No centralization dependence | ✔ | ✘ global directory | **~ per-subject log availability** | ~ status lists | ~ |
 | Offline genesis (R7.1) | ✔ | ~ claim race | **✔** | ✔ | ✔ |
-| Device compromise bounded (R3.2) | ~ | ~ | **~** bounded, not eliminated | ~ | ~ |
-| **Root compromise survivable (R2.4)** | **✘ permanent master** | ✔ | **✔ pre-rotation** | n/a | ~ |
-| Total-loss recovery (R9.1) | ✘ O14 — chain cannot advance | ~ | **~** per-context | ✘ nothing persists | ✔ |
+| Device compromise bounded (R3.2) | ~ | ~ | **~** bounded only while ≥1 key survives (§9.3) | ~ | ~ |
+| **Root compromise survivable (R2.4)** | **✘ permanent master** | ✔ | **✘ path (a) — and unrecoverable; ✔ path (b)** | n/a | ~ |
+| Total-loss recovery (R9.1 **[HARD]**) | ✘ O14 — chain cannot advance | ~ | **~ admitted shortfall** — (a) fails if the backup is lost; (b) needs threshold **signing** ICN lacks (F7) and which is **absent from §19.1** | ✘ nothing persists | ✔ |
 | Multi-device (R3) | ~ roster only | ~ | **✔** | ~ | ✔ |
 | Least privilege (R3.2) | ✘ #2590 | ~ | **✔** attenuated | ✔ | ✔ |
 | Deterministic verdict (R4.3) | ~ | ✘ split view | **✔** single-writer | ✘ fetch may fail | ~ |
@@ -713,7 +806,12 @@ Qualitative, with reasons rather than false precision.
 | Auditability (R9.2) | ~ | ~ | **✔** append-only log | ~ | ~ |
 | Meaning Firewall (R13.1) | ✘ `Person` in kernel | ✘ | **✔** §9.5 | ✔ | ✘ |
 
-**Selected: Model C.**
+**Selected: Model C** — on the balance of the table, not on a clean sweep. Three
+cells above are shortfalls the model does **not** discharge: R2.4 under the
+default recovery path, R9.1 [HARD] under both recovery paths, and per-subject log
+availability. §9.6 carries them forward; a reader who weighs R9.1 above
+correlation resistance should reach a different answer, and that is a legitimate
+reading of the same evidence.
 
 ---
 
@@ -726,13 +824,13 @@ answer is marked **OPEN** and appears in §17 — none are silently absorbed.
 | # | Scenario | Model C outcome | Where A/B/D/E differ |
 |---|---|---|---|
 | 1 | Genesis key compromised 5 yrs after a legitimate rotation | **Contained.** The identifier commits to the inception *event*, not to a key, and rotation revealed pre-committed next keys. A stolen genesis key can sign nothing current and cannot rotate — it does not hold the pre-rotated material. | **A fails catastrophically** — the genesis key is the chain anchor forever (O16). |
-| 2 | Attacker and user each create a same-generation successor | **Requires cold-key compromise**, since rotation must reveal the pre-committed digest. If it happens: duplicity is detectable by every honest validator from two events at one position, and all refuse. **Convergent refusal, not convergent selection.** Residual policy = **OPEN (O16′, §17)**. | A: both branches verify from genesis; a content tiebreak converges *on the attacker*. |
+| 2 | Attacker and user each create a same-generation successor | **Split.** Forking a *rotation* requires cold-key compromise. Forking a *non-establishment* event (`authorize`/`revoke`) requires only current-key compromise (§6.2). Duplicity is detected; the victim recovers by **superseding rotation** at the disputed position. Racy, and **OPEN as O16′** — which is a *liveness* question, not only a selection one | A: both branches verify from genesis; a content tiebreak converges *on the attacker*. |
 | 3 | Two concurrent recovery attempts | Recovery is per-context (§12). Each institution runs its own delay-and-veto and reaches one outcome. Contexts **can** diverge — the person may recover Coop A while an attacker takes Coop B. That is a real cost, and it is *bounded blast radius* rather than a global race. **Stated, not hidden.** | A/B: one global race decides everything at once. |
 | 4 | One trustee submits the same proof M times | Rejected — thresholds count **distinct authenticated** participants (R9.4). Today this fails: `sync.rs:263-269` has neither signature check nor dedup (#2591), and SDIS's `approve_by_steward()` is a bare `+= 1`. | same for all models; a requirement, not a differentiator |
 | 5 | Threshold trustees collude | **Not fully mitigated, by design.** Mitigations: per-context recovery means colluding guardians must pass *each* institution's procedure; delay + subject veto (R9.6); recovery is a logged event, never silent (R9.2). **Residual risk stated.** | E claims more; the extra machinery does not remove the trust |
-| 6 | Phone stolen while disconnected two weeks | The thief can act **within the device's attenuated scope** until the subject's log advances past the authorization. The window is bounded by §9.3's staleness rule, **not** by wall-clock. | A: unbounded — PRINCIPAL_MODEL T1 records exposure as indefinite |
+| 6 | Phone stolen while disconnected two weeks | The thief acts **within the device's attenuated scope** until the log advances past the authorization. Bounded by position, not wall-clock — **but only if the subject retains another authorized key.** For a sole-device person the bound is recovery latency, and **R5.1 is not met** (§9.3) | A: unbounded and with no recovery path at all |
 | 7 | Revoked phone signs a governance action and delivers it late | **Per act class (§9.3).** Deferred-decision acts (votes): the decision pins a log position, so the act is evaluated against converged state and does not count. Settled acts: revocation is **prospective only**; the act stands and the bound is scope, not retroaction. | **No model solves this globally — §6.1 proves it impossible.** A/B claim to and cannot |
-| 8 | User loses every device | Recovery from the continuity root, per context (§12). | A: **impossible today** — `RotationEvent::verify` needs an existing non-revoked key (O14). D: nothing persists |
+| 8 | User loses every device | Recovery from the continuity root, per context (§12) — **if the backup survived**. Lost devices *and* backup is answered only by guardians, which need threshold signing ICN lacks (F7). **R9.1 [HARD] is not fully met** | A: **impossible today** — `RotationEvent::verify` needs an existing non-revoked key (O14). D: nothing persists |
 | 9 | Replacing a ten-year-old phone | Ordinary device authorization + revocation in the subject's log. Invariant test **T1 passes**. | all pass |
 | 10 | Signature algorithm deprecated | Rotate to a new suite; the identifier is a hash of an event, not of a key, so it is unchanged (R12.1). | **A fails** — the DID *is* an Ed25519 key |
 | 11 | Gateway compromised | It relays; it holds no subject key and cannot author (R8.1/R8.4). It **can** withhold or delay — unmitigated and stated. | all models that separate relay from authorship |
@@ -801,18 +899,33 @@ revoke     { device: D1 }                                position 3
 
 Four properties, and each does specific work:
 
-- **Single-writer ⇒ consensus number 1** (§6.1). Merging is *"take the longest
-  verified prefix"* — a monotone join, i.e. a CRDT. No consensus, no total order,
-  no clock. This is the formal licence for the whole design.
-- **Pre-rotation** means a compromised *current* key cannot rotate: it does not
-  hold the pre-committed next material. Scenario 1 contained; scenario 2 reduced
-  to cold-key compromise.
+- **Single-writer ⇒ consensus number 1** (§6.1), given Byzantine reliable
+  broadcast underneath — which ICN does not have yet (§6.1, §19.1 N3).
+- **Pre-rotation** means a compromised *current* key cannot **rotate**. It does
+  **not** prevent that key forking a non-establishment event — see §6.2. Scenario 1
+  contained; scenario 2 narrowed, not eliminated.
 - **`+1` monotonicity** makes out-of-order delivery **buffer**, never reject
-  (R4.6) — which is precisely the gap-fill obligation PRINCIPAL_MODEL's A0 already
-  identified, now with a reason it is safe.
-- **Duplicity ⇒ convergent refusal.** Two events at one position are detectable by
-  everyone holding both; every honest holder refuses to advance past the fork.
-  Convergent *refusal* is achievable; convergent *selection* is not (§6.1).
+  (R4.6) — precisely the gap-fill obligation PRINCIPAL_MODEL's A0 identified, now
+  with a reason it is safe.
+- **Duplicity is detected, and recovered from by superseding rotation** (§6.2).
+
+> **The merge state must be defined carefully, and "longest verified prefix" alone
+> is not a lattice.** *(Corrected in adversarial review — an earlier draft called
+> the merge "a monotone join, i.e. a CRDT" while also saying honest holders
+> "refuse to advance past the fork". Those cannot both hold: refusing retracts
+> state a node already applied, which is non-monotone, and it would break §19.2's
+> permutation-invariance test on any event set containing duplicity.)*
+>
+> The state that *is* a join-semilattice is the pair
+> **`(longest verified prefix, set of positions at which duplicity was observed)`**
+> — the second component grows monotonically and never retracts, and the first
+> advances only through positions not in the second. Merging two such states is a
+> genuine join, and it is permutation-invariant including duplicate events.
+>
+> **Refusal is then a statement about *effect*, not about *state*.** A node still
+> records everything it saw; what it declines is to treat a disputed position as
+> conferring authority, until a superseding rotation resolves it. §19.2 test 2
+> must be stated over this pair, or it will fail by construction.
 
 > **Do not let two devices write this log.** The instant two devices can
 > independently author authority events for one subject, k > 1 and consensus is
@@ -826,9 +939,23 @@ Because §6.1 forbids a single global answer, the semantics is stated per class.
 
 | Class | Examples | Admission | Effect | Revocation reaches back? |
 |---|---|---|---|---|
-| **1 — deferred-decision** | votes, nominations, anything tallied at a decision point | monotone: well-formed **and** authored by a key authorized at the referenced log position. Never depends on revocation state. | computed at the decision point against the log prefix **the decision pins**. Deterministic function of converged state. | **yes, within the open window** — and the cost is small because votes are keyed `gov:vote:{pid}:{voter}`, i.e. **by subject**, so the person re-casts from a new device and loses nothing |
+| **1 — deferred-decision** *(currently degraded — see the O-N6 note below)* | votes, nominations, anything tallied at a decision point | monotone: well-formed **and** authored by a key authorized at the referenced log position. Never depends on revocation state. | computed at the decision point against the log prefix **the decision pins**. Deterministic function of converged state. | **yes, within the open window** — and the cost is small **under this model**, because the vote key would be keyed by the *subject*, so re-casting from a new device overwrites and the person loses nothing. **This is not true today** — see the note below |
 | **2 — immediately settled** | ledger entries, receipts, anything with irreversible external effect | authority checked once, at admission, and **finalized** | fixed at admission | **no — prospective only.** Bounded by *scope*, not by retroaction (R5.3). Honest analogue: a stolen card is stopped going forward, not unwound |
 | **3 — authority events** | the log's own events | ordered by the log itself | — | n/a — self-ordering |
+
+> **The vote key is keyed by a `Did`, not by a subject — verified.**
+> `vote_key(proposal_id, voter: &Did)` (`apps/governance/src/state_store.rs:222-224`)
+> takes a **key**, which is concept 7 of §4's conflation table. `save_vote`
+> (`:379-384`) is an unconditional `put`, `list_votes` (`:386-`) scans the prefix,
+> and `AlreadyVoted` (`icn-governance/src/error.rs:33`) is **declared and never
+> constructed**. So today: re-casting under the *same* DID overwrites (#2469 fact
+> 15), but a person acting under a *second* DID — which is what a second device
+> means today (F19) — writes a **second tallied row**.
+>
+> That is the sybil surface subject/device separation exists to close, and it is a
+> reason to prefer this model rather than evidence for it. *(An earlier draft
+> asserted the present-tense claim "votes are keyed by subject"; corrected in
+> adversarial review.)*
 
 **Bounding the window without a clock (R5.1).** A device authorization carries
 validity expressed in **log positions**, not wall-clock: valid for acts
@@ -838,9 +965,24 @@ computes the same answer, with no clock anywhere (R4.1, and it avoids F14's
 fail-open entirely). This is Let's Encrypt's short-lived-credential strategy
 translated into a counter.
 
-*Cost, stated:* a subject who never advances their log leaves authorizations
-valid, and a subject who advances too aggressively can strand an offline device.
-**Choosing `k` and the re-authorization cadence is OPEN (§17, O-N1).**
+*Cost, stated:* a subject who advances too aggressively can strand an offline
+device. **Choosing `k` and the re-authorization cadence is OPEN (§17, O-N1).**
+
+> **This does not bound the case it looks like it bounds, and R5.1 is not fully
+> met.** *(Corrected in adversarial review.)* The window closes only because *the
+> subject advances the log*. In the scenario the mechanism exists for — the
+> attacker holds the person's device — the subject may have **no surviving
+> authorized key with which to advance**, so the window does not close at all until
+> recovery completes.
+>
+> The Let's Encrypt analogy is therefore **false in the compromise case** and is
+> withdrawn: a certificate lifetime expires autonomously with time, whereas a log
+> position advances only if the victim can act.
+>
+> Honest statement: **R5.1 [HARD] is met for a subject retaining at least one
+> authorized key, and is not met for sole-device compromise.** In that case the
+> bound is not staleness but *recovery latency* (§12), and sole-device compromise
+> should be treated as a recovery problem, not a cadence-tuning problem.
 
 > **Class 1 has a dependency this document does not discharge.** "Evaluated at the
 > decision point against the log prefix the decision pins" is deterministic *only
@@ -854,10 +996,22 @@ valid, and a subject who advances too aggressively can strand an offline device.
 >
 > So class 1 is **convergent conditional on deterministic proposal closure**, which
 > is a governance problem with a known shape and a named owner — not an identity
-> problem, and not one this document solves. Recorded as **O-N6** (§17). Until it
-> is answered, class 1 degrades to class 2 semantics: authority fixed at admission,
-> revocation prospective only. That degradation is safe, and it is what a receiver
-> should do in the absence of a pinned position.
+> problem, and not one this document solves. Recorded as **O-N6** (§17).
+>
+> **The fallback is not safe, and an earlier draft wrongly said it was.**
+> *(Corrected in adversarial review.)* Without a pinned position there are exactly
+> two options, and both break a [HARD] requirement:
+>
+> | Fallback | Breaks |
+> |---|---|
+> | evaluate revocation against the receiver's local prefix **at arrival** | **R4.2/R4.3** — a node learning vote-then-revocation tallies differently from one learning revocation-then-vote. This is the arrival-order divergence #2469 §8 withdrew |
+> | ignore revocation for class 1 entirely (consistent with "never depends on revocation state") | **R5.1** — a stolen device's votes count indefinitely |
+>
+> **This document picks the second**, because divergence is a correctness failure
+> while indefinite exposure is a bounded, *stateable* security cost — and because
+> it degrades to exactly today's behaviour rather than introducing a new failure
+> mode. It is a **known R5.1 violation held open until O-N6 is answered**, not a
+> safe default, and it must be described that way wherever class 1 is claimed.
 
 ### 9.4 Governance authorship
 
@@ -896,13 +1050,24 @@ is exactly what #2469 says is impossible today.
 > position `N+1` will act before slow receivers hold `N+1`, and rejecting it
 > would permanently discard a legitimate act, violating R4.6.
 >
-> The correct shape is the one #2469 slice 4 already specifies: a **bounded**
-> quarantine store with eviction and a steward release valve, where an evicted
-> entry is recovered by **anti-entropy re-delivery** once the log prefix catches
-> up. Convergence therefore depends on gossip re-delivery being reliable over
-> time, which is a property of the replication layer rather than of this design.
-> Stating it as "never reject" without that qualification would be an unbounded
-> memory claim. Folded into **O-N5**.
+> The correct shape has **two** bounds, not one:
+>
+> 1. **Bound the position.** Accept an act into quarantine only for
+>    `N ≤ (highest verified position) + C` for a protocol constant `C`. Without
+>    this, an attacker cites position 2⁶³ and the receiver can never resolve it —
+>    it cannot distinguish "not yet replicated" from "will never exist", and §9.4
+>    forbids fetching the log over the act's channel (I9). Alternatively, require
+>    the act to carry a hash-chain inclusion witness for `N`; **carrying is not
+>    fetching**, so R4.4/I9 permits it.
+> 2. **Bound the store.** #2469 slice 4's bounded quarantine with eviction and a
+>    steward release valve, where an evicted entry is recovered by **anti-entropy
+>    re-delivery** once the prefix catches up.
+>
+> Convergence therefore depends on re-delivery being reliable over time — a
+> property of the replication layer, not of this design. Stating "never reject"
+> without both bounds would be an unbounded-memory claim, and the position bound in
+> particular was **missing from an earlier draft** (found in adversarial review).
+> Folded into **O-N5**.
 
 Note what is *not* claimed: this does not make the production gateway composition
 converge on its own. #2469 §7.0.1's second barrier — a receiver cannot
@@ -924,6 +1089,12 @@ A **subject** is meaning-free: it is any entity with an evolving authorized key
 set. A person, a treasury and a node are all subjects. That is why this model
 satisfies R13.1 where a `Person` principal class cannot.
 
+> **One leak to watch.** §9.1 says the log is "replicated to that subject's
+> relying parties", and knowing *which* parties those are is context knowledge
+> sitting inside the identity layer. Keep the identity layer's interface to an
+> opaque destination set supplied from above, or R13.1 erodes here first. Flagged
+> in adversarial review; folded into **O-N5**.
+
 ### 9.6 What this does not solve — read this before building on it
 
 1. **The per-subject authority log does not exist.** §3.7. `RotationEvent` has the
@@ -940,6 +1111,16 @@ satisfies R13.1 where a `Person` principal class cannot.
    here lifts it.
 5. **Guardian collusion and relay withholding remain unmitigated** (scenarios 5, 11).
 6. **Cross-context divergence under concurrent recovery is a real cost** (scenario 3).
+7. **The continuity root concentrates what Model A distributes** — its compromise is
+   takeover of every context *plus* full deanonymization, and under path (a) it is
+   **unrecoverable** (§12.2).
+8. **R9.1 [HARD] is not fully met.** Path (a) fails if the backup is lost; path (b)
+   needs threshold **signing** ICN does not have (F7) and which appears nowhere in
+   §19.1's slice graph.
+9. **Per-subject log availability is a real dependency** (§7, Model C costs).
+10. **Byzantine reliable broadcast is a prerequisite and does not exist** — gossip
+    entries carry no signature at all (§3.7, §6.1).
+11. **Class 1 currently degrades to a known R5.1 violation** until O-N6 (§9.3).
 
 ---
 
@@ -975,22 +1156,39 @@ global genesis bootstrap — is cost with no corresponding requirement.
 | Observer | Learns | Does not learn |
 |---|---|---|
 | unrelated network peer | that some key signed something on a topic | which subject, which person, which contexts |
-| node operator / gateway | the subjects and device keys it relays for | the continuity root; other contexts' subjects |
+| node operator / gateway | the subjects and device keys it relays for — **including, in the common hosted-only case, several of one person's contexts and therefore their linkage** | the continuity root |
 | a cooperative | its own `S_A`, its authorized device keys, its acts | `S_B`; that `S_A` and `S_B` are one human |
 | a federation | the federation-scoped subject of a delegate | the delegate's coop-scoped subject, unless the coop discloses it |
 | recovery guardian | that they are a guardian for one subject | the person's other contexts (if guardians are per-context) |
 
 **Device keys must be per-context too.** If one device key appears in two
 contexts, the identifier separation is defeated. Per-context device keys are a
-deterministic derivation from the device's own secret — bookkeeping, not custody
-burden.
+deterministic derivation from the device's own secret.
 
-**Residual correlation, stated honestly.** Unlinkability is *across* contexts, not
-*within* one: everyone in Coop A can correlate `S_A`'s activity in Coop A, which
-is both unavoidable and correct. Two coops with overlapping human membership can
-correlate through social knowledge, timing and network metadata. This is
-**protocol-level unlinkability, not anonymity**, and nothing here should be
-described as the latter.
+> **That derivation is itself a correlation oracle, and an earlier draft called it
+> "bookkeeping, not custody burden".** *(Corrected in adversarial review.)* Anyone
+> holding the device secret can *recompute* the per-context key for any candidate
+> `SubjectId` and so **confirm or deny** membership in any context they can guess.
+> Device-secret compromise therefore deanonymizes **every** context, not just the
+> one the device was stolen for. A non-derived (independently random, stored) key
+> per context removes the oracle at the cost of backup complexity. **OPEN — folded
+> into O-N3.**
+
+**Residual correlation, stated honestly.** Four channels, none of them closed:
+
+1. **Within a context** — everyone in Coop A correlates `S_A`'s activity there.
+   Unavoidable and correct.
+2. **Shared infrastructure** — a gateway relaying two of a person's contexts sees
+   both. This is the *default* hosted deployment (R11.1), not an edge case.
+3. **Recovery timing** — recovery is a logged event visible to every relying party
+   (R9.2). A person recovering after device loss rotates in every context within
+   one window, and an observer of two coops' logs correlates on timing. **R6.4 is
+   weakened by the very auditability R9.2 requires** — a genuine tension between
+   two requirements, not an oversight.
+4. **Social knowledge, timing and network metadata** generally.
+
+This is **protocol-level unlinkability against a passive observer of distinct
+contexts, not anonymity**, and nothing here should be described as the latter.
 
 ### 11.2 Sybil resistance without identification
 
@@ -1042,8 +1240,23 @@ bolted beside the chain rule — it **is** the chain rule.
 |---|---|---|
 | Pre-rotation commits to | keys derived from the continuity root (recovery phrase) | a **threshold** key set held by M-of-N guardians |
 | Total-loss recovery | restore phrase → rotate | M distinct guardians co-sign → rotate |
-| Root/backup compromise | **takeover** | insufficient alone |
+| Root/backup compromise | **takeover, and *unrecoverable*** — see below | insufficient alone |
+| Produced offline? | **yes** | **no** — needs an online M-of-N quorum |
 | UX cost | one phrase at onboarding | guardian setup + coordination |
+
+> **Path (a) root compromise is not a race the victim can win.** An attacker
+> holding the continuity root derives the pre-committed keys, rotates first, **and
+> commits a fresh `next` digest the victim does not hold**. From that point the
+> victim cannot rotate even though they still know the root — pre-rotation has
+> handed the attacker the same one-way advantage it was meant to give the
+> legitimate holder. Worse, the attacker can do this silently from a backup copy,
+> at leisure, with no need to touch a device.
+>
+> So pre-rotation makes root compromise **more** decisive, not less. It is an
+> excellent defence against *device* compromise and no defence at all against
+> *backup* compromise. That asymmetry is the entire argument for path (b), and an
+> earlier draft's matrix cell claiming "root compromise survivable ✔ pre-rotation"
+> was simply wrong.
 
 **Default is (a), upgradeable to (b).** That answers PRINCIPAL_MODEL's **O1**
 ("may the root live on the first phone?"): the *operational* keys live on the
@@ -1059,10 +1272,21 @@ degraded — at the cost of exactly one irreversible user decision (R10.3).
   sibling, and it is a precondition for (b), not a follow-up.
 - **R9.2 — recovery is a logged event.** It is an ordinary event in the subject's
   authority log, visible to every relying party. Never a silent substitution.
-- **R9.6 — contestable.** A relying party may apply a notice-and-veto window
-  before honouring a recovery rotation. Per Rivest Proposition 1 this is the
-  *acceptor's* policy, so it need not be globally uniform — and during the window
-  institutions may legitimately hold different views. **Stated, not hidden.**
+- **R9.6 — contestable, and this is a named exception to R4.1/R4.3.** A relying
+  party may apply a notice-and-veto window before honouring a recovery rotation.
+  It **cannot** be position-denominated: in a takeover the attacker controls log
+  advancement and would simply advance past any positional window. So it is a
+  **wall-clock** window, and deciding whether to honour a rotation *is* a validity
+  decision.
+  > **Consequence, stated rather than finessed** *(found in adversarial review)*:
+  > two nodes **of the same institution** with identical durable state but skewed
+  > clocks can reach different verdicts during the window. That violates R4.1 and
+  > R4.3, both [HARD]. It is accepted here as a **bounded, deliberate exception**
+  > confined to recovery-rotation acceptance — never to ordinary act admission —
+  > because the alternative (no contest window) makes R9.6 unimplementable and
+  > hands a stolen backup an uncontested takeover. A deployment that cannot
+  > tolerate the exception must set the window to zero and accept that instead.
+  > This is the only place in the design where a receiver's clock decides anything.
 - **R9.5 and R2.4 — path (a) does not meet them, and that is a deliberate trade.**
   The continuity root in path (a) *is* a permanent secret, and an attacker holding
   it can rotate the subject away. Recovery from that is a race the legitimate
@@ -1085,13 +1309,16 @@ degraded — at the cost of exactly one irreversible user decision (R10.3).
 | Genesis (inception) | **fully** | self-addressing; nothing to contact (R7.1) |
 | Signing an act | **fully** | references a log position the device already holds (R7.2) |
 | Authorizing a device | **fully** | an event in the subject's own log |
-| Recovery rotation | **fully** to produce; relying parties apply on receipt | log event |
+| Recovery rotation, path (a) | **fully** to produce | log event |
+| Recovery rotation, path (b) | **no** — needs an online M-of-N guardian quorum, and the R9.6 veto needs a notification channel bound to the subject, which total loss removes and takeover captures | §12.2 |
 | Verifying an act | needs the log prefix | shorter prefix ⇒ **quarantine**, never reject (R4.6) |
 | Two devices acting concurrently while partitioned | **yes** | acts are unordered; only the *authority log* is single-writer (R7.4) |
 | Two devices *authorizing* concurrently | **no — forbidden** | k > 1 ⇒ consensus (§6.1). A correctness boundary |
 
-**No wall clock anywhere in a validity decision.** Positions replace timestamps
-(§9.3), which also removes F14's fail-open failure mode.
+**No wall clock in *act admission*.** Positions replace timestamps (§9.3), which
+also removes F14's fail-open failure mode. **One validity decision does use a
+clock** — recovery-rotation acceptance (§12.3) — and it is declared an exception
+rather than hidden.
 
 > **Where clocks legitimately remain — and why they are not R4.1 violations.**
 > R4.1 forbids a *receiver's* clock from deciding *validity*. Three clock-shaped
@@ -1100,12 +1327,13 @@ degraded — at the cost of exactly one irreversible user decision (R10.3).
 > | Thing | Whose clock | What it decides |
 > |---|---|---|
 > | "the subject **periodically** advances the log" (§9.3) | the **subject's**, on their own device | when *they* re-authorize. A liveness schedule, not a verdict. Every receiver still decides positionally |
-> | a relying party's **notice-and-veto window** before honouring a recovery (§12.3) | the **acceptor's** | its own local policy, per Rivest Proposition 1. Two institutions may legitimately differ, and §12.3 says so |
+> | a relying party's **notice-and-veto window** before honouring a recovery (§12.3) | the **acceptor's** | **whether to honour a recovery rotation — a genuine validity decision, and a named R4.1/R4.3 exception**, not an exempt case. See §12.3 |
 > | quarantine **eviction** (§9.4) | the receiver's | when to *forget* and rely on re-delivery — never whether an act is valid |
 >
 > The test to apply to any future addition: *if two honest receivers with identical
 > durable state could reach different verdicts because their clocks differ, it is an
-> R4.1 violation.* None of the three above can.
+> R4.1 violation.* The first and third above cannot. **The second can, and is
+> therefore declared an exception in §12.3 rather than defended as compliant.**
 
 ---
 
@@ -1249,9 +1477,9 @@ pass. **A correct OPEN is better than an invented answer.**
 
 | # | Question | Why open |
 |---|---|---|
-| **O-N1** | What are the device-authorization validity span `k` and the re-authorization cadence (§9.3)? | Too small strands offline devices; too large widens the compromise window. Needs empirical UX input, not a derivation |
+| **O-N1** | What are the device-authorization validity span `k` and the re-authorization cadence (§9.3)? | Too small strands offline devices; too large widens the compromise window. Needs empirical UX input, not a derivation. **Does not bound sole-device compromise at all** (§9.3) |
 | **O-N2** | How is per-context sybil resistance built, given F16? | A nullifier needs working ZK. Interim is steward attestation against a registry that is itself a correlation surface (§11.2) |
-| **O-N3** | Are recovery guardians per-context or shared across contexts? | Shared is far better UX and worse privacy (a guardian learns the linkage); per-context is the reverse (R6.4) |
+| **O-N3** | Are recovery guardians per-context or shared? And are per-context device keys *derived* or *independently random*? | Shared guardians are better UX and worse privacy (the guardian learns the linkage); per-context is the reverse (R6.4). Derived device keys are a **confirm-or-deny oracle** on context membership for anyone holding the device secret (§11.1); independent keys remove the oracle and complicate backup |
 | **O-N4** | Which act classes exist beyond the three in §9.3, and who assigns a new act to a class? | §9.3 is exhaustive today but the taxonomy must be governed, or class assignment becomes an unreviewed security decision |
 | **O-N5** | How is the authority log replicated and bounded? | It is per-subject and monotone, so gossip suffices in principle — but topic naming, retention, and a bound on log growth are unspecified, and ICN's topics are global-by-domain today (§3.7). **Topic naming is also a correlation surface** (§11.1) |
 | **O-N6** | What makes a governance decision point deterministic, so §9.3 class 1 can pin a log position? | #2469 §7.2 contains `ProposalClosed` because `outcome`/`tally` are attacker-supplied and the real authority entangles with the `GovernanceProofV2` signer model, an explicit #2469 non-goal. **A governance problem, not an identity one** — but class 1 degrades to class 2 until it is answered |
@@ -1263,9 +1491,20 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O11** | Canonical encoding of a genesis decision before hashing to an `EntityId`? | §14.2 makes this the *same* mechanism as `SubjectId`, so it should be solved once, not twice |
 | **O15** | Canonical preimage of the node-claim transcript | Unchanged from PRINCIPAL_MODEL §5.3 |
 
-**Closed by this document:** O1 (§12.2), O3 (§11 — adopted, with costs stated),
-O8, O9, O10, O13, O14, O17, O18 (§18), O7 (§9.3's class table answers "which
-operation classes may a device sign").
+**Closed by this document:** O1 (§12.2); O7 (§9.3's class table answers "which
+operation classes may a device sign"); O8 (§18); O9 (§18 — *rejected as posed*,
+which is a disposition, not a solution).
+
+**Decided in principle, mechanism still open:** O3 — pairwise identity is adopted
+with costs stated (§11), but the mechanism that would complete it is O-N2, and F16
+says it cannot be built today. Calling O3 "closed" would be relabelling.
+
+**NOT closed, contrary to an earlier draft of this list** *(corrected in
+adversarial review, which caught it contradicting §18)*: **O10** — still required
+and widened; **O13** — partial, receiver-side retirement unsolved; **O14** —
+mechanism only, custody remains; **O16** — narrowed to O16′; **O17** — partial,
+authenticity ≠ acquisition; **O18** — closed as an identity class, but see the
+untraced anchor↔member keying question in §15.2.
 
 ---
 
@@ -1276,10 +1515,10 @@ operation classes may a device sign").
 | **O8** — current root after rotation | **DISSOLVED.** Replay the subject's log from a self-certifying inception (§6.2, §9.2). No external authority, no clock |
 | **O9** — convergent device revocation | **REJECTED AS POSED** (§6.1, provably unachievable). **REPLACED** by §9.3's per-act-class semantics plus position-bounded validity |
 | **O10** — canonical `DeviceAuthorization` bytes | **STILL REQUIRED**, and widened: it now covers the log event preimage (F12: bincode, no domain separator) and the `Did` canonicalization rule (§10) |
-| **O13** — retiring `GOV_OP_V1` | **DISSOLVED.** Retirement becomes an event in the subject's own single-writer log ("v1 no longer accepted for me"). Per-subject, ordered, convergent — replacing an unenforceable global cutover |
+| **O13** — retiring `GOV_OP_V1` | **PARTIAL, and an earlier draft had this backwards.** O13 constrains **receivers**, not authors. A subject writing "v1 no longer accepted for me" binds only acts *they* author; any subject who never writes it keeps v1 alive forever — which is precisely the never-ending dual stack **R12.3 [HARD]** forbids. Per-subject declaration is a genuine improvement on a global cutover, and **receiver-side retirement remains unsolved** |
 | **O14** — total-loss recovery cannot advance the chain | **MECHANISM DISSOLVED by pre-rotation** (§12.1) — the committed-but-unused next key *is* the missing authorized key. **The custody question remains**: pre-rotation presupposes the backup survived, and "lost devices *and* backup" is answered only by guardians |
-| **O16** — fork selection under genesis compromise | **LARGELY DEFUSED** by pre-rotation; residual is convergent *refusal*. Policy beyond refusal is **O16′** |
-| **O17** — authenticated genesis document | **DISSOLVED.** The identifier *is* the commitment to the inception event (§6.2) |
+| **O16** — fork selection under genesis compromise | **NARROWED, not defused.** Pre-rotation covers *rotations* only; a current-key compromise still forks a non-establishment event (§6.2). Recovery is by **superseding rotation**, which is racy. **O16′** is now a liveness question, not only a selection one |
+| **O17** — authenticated genesis document | **PARTIAL.** Self-addressing proves the inception event is *genuine*; it does not prove the prefix you were handed is *complete*. A truncated-but-valid prefix verifies perfectly and yields a stale authority state — the split-view problem Model B was rejected for. KERI covers this with **witnesses and watchers**, which this model does not adopt. **Availability/completeness is open** (§7 Model C costs, O-N5) |
 | **O18** — anchor-derived Persons | **DISSOLVED**, at far lower cost than estimated (§15.2, F4/F5/F20) |
 | **Slice A0** (identity-document chain) | **REDIRECTED, not deleted.** Becomes the per-subject authority log with self-addressing inception and pre-rotation. Its hard prerequisites change: O17 and O14 are answered by construction; O16 shrinks; and it gains one new requirement — pre-rotation — that did not exist before |
 | **Slice A** (device principal + authorization) | **UNBLOCKED in principle**, because O8 and O9 no longer gate it — but its field set now depends on O-N1 (validity span) and O10 (canonical bytes) |
@@ -1302,7 +1541,9 @@ operation classes may a device sign").
    │
    ├──► N2  narrow `Did`               [F1, F2 — removes from_anchor_id]
    │
-   ├──► N3  log replication + quarantine/buffer      [needs O-N5]
+   ├──► N3  log replication  ==  BUILD BYZANTINE RELIABLE BROADCAST
+   │          gossip entries carry no signature at all (F17/§3.7), so this is
+   │          a new primitive, not a new topic.  + bounded quarantine [O-N5]
    │          │
    │          └──► N4  device authorization + attenuation
    │                     [folds #2588, #2590; needs O-N1]
@@ -1310,7 +1551,11 @@ operation classes may a device sign").
    │                          └──► N5  GOV_OP_V2 member-origin signing
    │                                    [still bounded by #2469 §7.0.1]
    │
-   └──► N6  mobile: subject + device split + pre-rotation backup   [F19]
+   ├──► N6  mobile: subject + device split + pre-rotation backup   [F19]
+   │
+   └──► N7  threshold SIGNING (FROST-class) for guardian recovery path (b)
+              ICN has a threshold PRF, not threshold signing (F7).
+              Without N7, R9.1 [HARD] is met only by the backup-phrase path.
 
   independent, and should not wait:
      X1  #2589 invite-mint fix
@@ -1369,6 +1614,7 @@ Listed, **not filed** — filing is a separate decision for the maintainer.
 | **F1** — ~50% of hash-derived DIDs fail deserialization | Data-integrity defect masked by hand-picked test fixtures |
 | **F14** — `current_timestamp_secs()` returns 0 on clock error | Every expiry check in the identity stack fails **open** |
 | **F8** — the gateway multi-device path is unreachable | Not a defect; a **truth correction** — `docs/status.toml` and the PRINCIPAL_MODEL gap matrix rate this capability as implemented |
+| **`AlreadyVoted` is declared and never constructed** (`icn-governance/src/error.rs:33`), while `save_vote` is an unconditional put keyed by a `Did` | Not new behaviour (#2469 fact 15 records the overwrite), but the *sybil* consequence — one human with two device DIDs writes two tallied rows — is worth its own decision |
 
 ### 19.4 Entry conditions for the N1 session
 
@@ -1397,19 +1643,20 @@ Everything else in §19.2 is testable once those three are fixed.
 | A durable human subject identifier must not be a public key (§4) | **ESTABLISHED** (proof from R1.2/R2.1/R2.2, exhibited in `multi_device.rs:21-22`) |
 | `Did` is a key identifier; every non-key use is unsupported type reuse (§3.1) | **ESTABLISHED** (F1, F2, F11) |
 | ICN has no replicated authenticated ordered log a governance op lands on (§3.7) | **ESTABLISHED** (source-traced) |
-| Global convergent revocation is unachievable (§6.1) | **ESTABLISHED** (FLP 1985 + Chandra–Toueg 1996) |
-| A single-writer authority log needs no consensus (§6.1) | **ESTABLISHED** (Guerraoui et al., PODC 2019) |
+| Global convergent revocation is unachievable **within premises ICN has chosen** (§6.1) | **RECOMMENDED** — a bounded argument, *not* ESTABLISHED. FLP forbids only *deterministic* consensus in *pure asynchrony*, and is circumvented by randomization, partial synchrony and failure detectors; Chandra–Toueg is itself a positive result. *(Downgraded from ESTABLISHED in adversarial review.)* |
+| A single-writer authority log needs no consensus, **given Byzantine reliable broadcast** (§6.1) | **ESTABLISHED** (Guerraoui et al., PODC 2019) — with the caveat that BRB does not prevent a Byzantine writer equivocating, which is why §9.2 handles duplicity explicitly, and that **ICN has no BRB today** |
 | Recency is the acceptor's decision (§6.3) | **ESTABLISHED** (Rivest, FC'98) |
 | No deployed system achieves decentralized global revocation convergence (§6.1) | **ESTABLISHED** (survey of primary specs) |
 | Model C — context-scoped identity with a private continuity root (§9) | **RECOMMENDED** |
 | `Did` narrowed to "cryptographic principal" (§10) | **RECOMMENDED** |
 | No global Person identifier (§10) | **RECOMMENDED** |
 | Per-act-class revocation semantics (§9.3) | **RECOMMENDED** |
-| Pre-rotation as the recovery mechanism (§12.1) | **RECOMMENDED** |
+| Pre-rotation as the recovery mechanism (§12.1) | **RECOMMENDED** — solves O14's *mechanism*; makes **backup** compromise more decisive, not less (§12.2) |
 | Per-context subjects and per-context device keys (§11.1) | **RECOMMENDED** |
 | Institutions hold no signing key (§14.2) | **RECOMMENDED**, with O12 reopened |
 | Anchors retained as labels; `to_did` removed (§15.2) | **RECOMMENDED** |
 | Key-derived Person DIDs unchanged (§15.1) | **RECOMMENDED** |
-| O-N1…O-N5, O16′, O12, O2, O5, O6, O11, O15 (§17) | **OPEN** |
+| O-N1…O-N6, O16′, O12, O2, O5, O6, O10, O11, O13 (receiver-side), O15, O17 (acquisition) (§17) | **OPEN** |
+| R9.1 [HARD] total-loss recovery; R5.1 [HARD] under sole-device compromise and under the class-1 fallback; R4.1/R4.3 during the recovery veto window | **ADMITTED SHORTFALLS** — named in §9.6, not discharged |
 | Anchor-derived `Did`s; `new_unchecked`; `is_anchor_did`; kernel-api `DidDocument`; `did_mapping` recovery indirection | **LEGACY** — compatibility only, then removed |
 | Model A key-as-person; Model B global anchor; Model D credential-only; Model E hybrid; O9 as posed; wall-clock validity; `standing_hash`; carried-proof-only as an absolute; threshold-held institution DID (for now); near-term ZK selective disclosure | **REJECTED** (§16) |
