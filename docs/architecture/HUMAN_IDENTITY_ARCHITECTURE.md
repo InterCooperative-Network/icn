@@ -81,6 +81,16 @@ for humans.
 > inception admission requires `σ == event_id(b)` — migration must allocate a new
 > subject naming that DID as its initial key, plus a membership bridge (§15.1).
 >
+> **Round 4** refuted two more claims:
+> **(14)** the position validity window **bounded nothing as specified** — the signer
+> chooses the position an act references, so a compromised device keeps referencing
+> its original position forever. It binds only against an evaluation position the
+> signer does not control, which exists for class 1 (once O-N6 lands) and **not at
+> all for class 2** (§9.3);
+> **(15)** superseding recovery **orphans historical authorization evidence**, so
+> **R2.3 is qualified**: receipts from orphaned positions keep a verifying signature
+> but degrade from "authorized" to "authored on a superseded branch" (**O-N9**).
+>
 > §9.6 lists every shortfall the model does not discharge.
 
 **Related, deferred to, not restated:**
@@ -182,6 +192,10 @@ another HARD/STRONG, explicitly · **[SOFT]** a goal whose cost may exceed benef
 - **R2.3 [HARD] Validity of history.** An act validly authored when made stays
   *verifiable as having been made*, forever, independent of later authority
   changes. (Verifiable ≠ still-effective — see R5.)
+  > **Not fully met by the recommended model.** Superseding recovery orphans the
+  > suffix, so receipts from positions after a fork retain a verifying signature but
+  > lose their authorization proof (§9.2.1, O-N9). R2.3 holds unconditionally only
+  > for positions preceding the earliest fork.
 - **R2.4 [STRONG]** Subject continuity must not require a permanent master secret
   whose compromise is unrecoverable.
 
@@ -873,7 +887,7 @@ answer is marked **OPEN** and appears in §17 — none are silently absorbed.
 | 3 | Two concurrent recovery attempts | Recovery is per-context (§12). Each institution runs its own delay-and-veto and reaches one outcome. Contexts **can** diverge — the person may recover Coop A while an attacker takes Coop B. That is a real cost, and it is *bounded blast radius* rather than a global race. **Stated, not hidden.** | A/B: one global race decides everything at once. |
 | 4 | One trustee submits the same proof M times | Rejected — thresholds count **distinct authenticated** participants (R9.4). Today this fails: `sync.rs:263-269` has neither signature check nor dedup (#2591), and SDIS's `approve_by_steward()` is a bare `+= 1`. | same for all models; a requirement, not a differentiator |
 | 5 | Threshold trustees collude | **Not fully mitigated, by design.** Mitigations: per-context recovery means colluding guardians must pass *each* institution's procedure; delay + subject veto (R9.6); recovery is a logged event, never silent (R9.2). **Residual risk stated.** | E claims more; the extra machinery does not remove the trust |
-| 6 | Phone stolen while disconnected two weeks | The thief acts **within the device's attenuated scope** until the log advances past the authorization. Bounded by position, not wall-clock — **but only if the subject retains another authorized key.** For a sole-device person the bound is recovery latency, and **R5.1 is not met** (§9.3) | A: unbounded and with no recovery path at all |
+| 6 | Phone stolen while disconnected two weeks | The thief acts **within the device's attenuated scope**. For **class 1** the window binds once decisions pin an evaluation position (O-N6); for **class 2 it does not bind at all** — the thief keeps referencing the original position, so the authorization stays acceptable indefinitely. **R5.1 is not met for class 2** (§9.3); the real controls are scope limits and the acceptor's own freshness bar | A: unbounded, and with no recovery path at all |
 | 7 | Revoked phone signs a governance action and delivers it late | **Per act class (§9.3).** Deferred-decision acts (votes): the decision pins a log position, so the act is evaluated against converged state and does not count. Settled acts: revocation is **prospective only**; the act stands and the bound is scope, not retroaction. | **No model solves this globally — §6.1 proves it impossible.** A/B claim to and cannot |
 | 8 | User loses every device | Recovery from the continuity root, per context (§12) — **if the backup survived**. Lost devices *and* backup is answered only by guardians, which need threshold signing ICN lacks (F7). **R9.1 [HARD] is not fully met** | A: **impossible today** — `RotationEvent::verify` needs an existing non-revoked key (O14). D: nothing persists |
 | 9 | Replacing a ten-year-old phone | Ordinary device authorization + revocation in the subject's log. Invariant test **T1 passes**. | all pass |
@@ -890,7 +904,7 @@ answer is marked **OPEN** and appears in §17 — none are silently absorbed.
 | 20 | User signs while partitioned | Works: signing is offline (R7.2); the act references a log position the device already holds. | — |
 | 21 | Device authorization arrives before/after a root rotation, in different orders | Both are events in **one single-writer log** with `+1` monotonicity, so their relative order is fixed by the log, not by arrival. Out-of-order delivery **buffers**, never rejects (R4.6). | **A cannot place them at all** — this is exactly O8's collapse into O9 |
 | 22 | Revocation and a member act arrive in opposite orders | Admission is monotone and order-independent; **effect** is computed from converged state at a pinned position (§9.3). Two honest nodes agree. | A/B: arrival-order divergence — PRINCIPAL_MODEL §6.5 refutes both shapes |
-| 23 | An old receipt must stay verifiable after recovery | **Yes.** The act names the log position at which its signing key was authorized; the log is append-only and hash-chained, so "K was authorized at position N" is a permanent fact. R2.3. | A: recovery replaces the root and history becomes ambiguous |
+| 23 | An old receipt must stay verifiable after recovery | **Only before the earliest fork.** For positions preceding any fork, "K was authorized at N" is permanent (append-only, hash-chained) and R2.3 holds. **After a superseding rotation at `p`, receipts from orphaned positions `> p` keep a verifying signature but lose their authorization proof** — they degrade to "authored on a superseded branch" (§9.2.1, **O-N9**). *(An earlier draft claimed an unqualified yes.)* | A: recovery replaces the root and history becomes ambiguous everywhere |
 | 24 | Migrating an SDIS anchor identity | Near-free. F5 (the anchor was never the acting principal) and F20 (mutating routes disabled) mean **no deployed anchor carries authority**; F4 shows the VUI feeding it is `SHA256(did)`, so none carries uniqueness either. §15.2. | A: O18 is listed as **critical** precisely because it assumed otherwise |
 | 25 | An existing key-derived DID holder must not "become a new person" | **Their key, custody and signing ability are untouched** — no ceremony, no re-enrollment. A **new `SubjectId` is allocated** whose inception names their existing `Did` as initial authorized key; the identifier changes, the person does not, and membership rows keyed by `Did` need a documented bridge (§15.1). | B/D/E require a full cutover |
 
@@ -1159,7 +1173,7 @@ attack:
 | Does any rule silently select a branch? | **No.** `supersede` is explicit and authority-based; every other `\|C\| ≥ 2` halts |
 | Does BRB prevent equivocation? | **No**, and nothing here assumes it. BRB gives non-equivocating *delivery* among receivers; a Byzantine writer can still author two conflicting signed bodies — which is why `derive` must handle `\|C\| ≥ 2` |
 | Can one compromised current key halt a subject unilaterally? | **Yes.** It authors `authorize{D₁}@p` and `authorize{D₂}@p`, both authorized ⇒ `Halted(p)` with **no victim action**. Current-key compromise is an instant DoS whose only cure is a cold rotation, and if device compromise persists each revealed generation is captured in turn, burning one pre-rotation generation per round. **O16′** |
-| What does superseding recovery cost? | **It orphans the suffix.** Rotating at a disputed `p` changes `chosen(p)`, so every honest later body whose `prev_digest` names the old `chosen(p)` can never enter `C` — events at `p+1 … frontier` are lost and must be re-authored. Recovery destroys legitimate later authority events, and a fork deep in the log is far more expensive than one at the frontier |
+| What does superseding recovery cost? | **It orphans the suffix, and that also costs historical *authorization* evidence.** Rotating at a disputed `p` changes `chosen(p)`, so every honest later body whose `prev_digest` names the old `chosen(p)` can never enter `C` — events at `p+1 … frontier` are lost and must be re-authored. A fork deep in the log is far more expensive than one at the frontier. See the R2.3 note below |
 | Are class-2 settled acts convergent under a fork? | **No — and this is a settlement-safety problem, not a liveness one.** See below |
 
 > **Class-2 settlement is not convergent under a fork, and the earlier framing
@@ -1202,6 +1216,24 @@ the same eventual event set.**
 | 9 | compromised current key forks a non-establishment event at `n` | both bodies in `Bodies(σ)` | **A single compromised key needs no victim to fork.** It authors `authorize{D₁}@n` *and* `authorize{D₂}@n` — both authorized, distinct bodies ⇒ `Halted(n)` **unilaterally**. (If it authors only one, `derive` advances on it: a stolen-key action, not a fork.) | ✔ converges — on a halted subject. Current-key compromise is an **instant DoS**; cure is a cold rotation |
 | 10 | legitimate rotation recovers from case 9 | attacker's `authorize@n` and victim's `rotate@n` both present | `supersede` filters to the establishment event ⇒ `\|C\| = 1` ⇒ advance, rotating the attacker out | ✔ **defined and deterministic — but it orphans the suffix.** Changing `chosen(n)` strands every honest body at `> n` whose `prev_digest` names the old `chosen(n)`; those must be re-authored (§9.2.1) |
 | 11 | fork **behind** the frontier: bodies at 0–5 and 8–9, fork at 3 | all present | `Halted(3)`. Bodies at 4, 5, 8, 9 are unreachable — `derive` never evaluates past 3. Rotating at 3 recovers the subject and **permanently orphans 4, 5, 8, 9** | ✔ converges; the cost grows with fork depth. Case 10 alone would not have caught this |
+
+> **Suffix orphaning breaks R2.3 for the orphaned range, and §8 scenario 23 was
+> too strong.** *(Refuted in review round 4.)* If key `K` was first authorized at
+> position `N > p` and a superseding rotation lands at `p`, the derived view no
+> longer establishes that `K` was ever authorized — so a receipt signed by `K`
+> keeps a verifying **signature** but loses its **authorization** proof.
+>
+> What survives, and it is not nothing: `Bodies(σ)` is grow-only, so the orphaned
+> bodies are still there. A verifier can still show *"this body at `N` was signed by
+> `K` and chained to the pre-fork prefix"* — i.e. **provably authored on a branch
+> that was later superseded**. That is strictly weaker than "authorized", and the
+> difference is exactly what a receipt needs.
+>
+> **R2.3 must therefore be qualified: it holds unconditionally for positions before
+> the earliest fork, and for later positions it degrades from "authorized" to
+> "authored on a superseded branch."** Preserving full accepted-at evidence across
+> recovery would need durable per-branch endorsement records, which this model does
+> not define. Recorded as **O-N9**.
 
 **Two operational consequences that are easy to get wrong.**
 
@@ -1257,32 +1289,46 @@ Because §6.1 forbids a single global answer, the semantics is stated per class.
 > asserted the present-tense claim "votes are keyed by subject"; corrected in
 > adversarial review.)*
 
-**Bounding the window without a clock (R5.1).** A device authorization carries
-validity expressed in **log positions**, not wall-clock: valid for acts
-referencing positions in `[N, N+k]`. The subject periodically advances the log, so
-stale authorizations age out **deterministically** — every holder of the log
-computes the same answer, with no clock anywhere (R4.1, and it avoids F14's
-fail-open entirely). This is Let's Encrypt's short-lived-credential strategy
-translated into a counter.
+**Bounding the window without a clock — and the mechanism as first specified does
+not work.** A device authorization carries validity expressed in **log positions**,
+not wall-clock: valid for acts evaluated at positions in `[N, N+k]`. No clock is
+read anywhere, which is the property worth keeping (R4.1; it also avoids F14's
+fail-open entirely).
+
+> **The window as originally written bounded nothing, and R5.1 is weaker than two
+> earlier drafts claimed.** *(Refuted in review round 4.)* The first draft checked
+> the window against **the position the act itself references**. But the signer
+> chooses that field: a compromised device simply keeps referencing `N`, which is
+> inside `[N, N+k]` forever, no matter how far the subject advances the log.
+> Advancing does not age the device out; neither does revoking. A second draft
+> narrowed the failure to sole-device compromise; that was also wrong — **the hole
+> is general**.
+>
+> The window is only meaningful when checked against an **evaluation position the
+> signer does not control**. That exists for exactly one act class:
+>
+> | Class | Evaluation position | Does the window bind? |
+> |---|---|---|
+> | **1 — deferred-decision** | the position **the decision pins** | **Yes** — the decision, not the signer, chooses it, so advancing past `N+k` does age the device out. **Conditional on O-N6**, which supplies the deterministic decision point |
+> | **2 — immediately settled** | none exists | **No.** There is no decision point, so the only candidates are the *acceptor's own current frontier* — receiver-local, therefore divergent (R4.2/R4.3) — or freshness evidence the attacker controls |
+>
+> **Honest statement, replacing both earlier ones: R5.1 [HARD] is met for class 1
+> once O-N6 lands, and is *not met at all* for class 2.** For class 2 a compromised
+> device's authorization stays acceptable indefinitely; the only real controls are
+> **scope limits** (a device may not settle above some bound) and a relying party's
+> own freshness bar, which is the acceptor's risk decision under Rivest Proposition 1
+> and does not converge between acceptors.
+>
+> Anchoring each act *in* the log — KERI's `ixn` — would close it, and is rejected
+> here for a stated reason: it makes every act an authority event, so two devices
+> acting concurrently means two writers, `k > 1`, and consensus is required again
+> (§6.1).
+>
+> The Let's Encrypt analogy is **withdrawn**: a certificate lifetime advances
+> autonomously with time; a log position advances only if someone acts.
 
 *Cost, stated:* a subject who advances too aggressively can strand an offline
 device. **Choosing `k` and the re-authorization cadence is OPEN (§17, O-N1).**
-
-> **This does not bound the case it looks like it bounds, and R5.1 is not fully
-> met.** *(Corrected in adversarial review.)* The window closes only because *the
-> subject advances the log*. In the scenario the mechanism exists for — the
-> attacker holds the person's device — the subject may have **no surviving
-> authorized key with which to advance**, so the window does not close at all until
-> recovery completes.
->
-> The Let's Encrypt analogy is therefore **false in the compromise case** and is
-> withdrawn: a certificate lifetime expires autonomously with time, whereas a log
-> position advances only if the victim can act.
->
-> Honest statement: **R5.1 [HARD] is met for a subject retaining at least one
-> authorized key, and is not met for sole-device compromise.** In that case the
-> bound is not staleness but *recovery latency* (§12), and sole-device compromise
-> should be treated as a recovery problem, not a cadence-tuning problem.
 
 > **Class 1 has a dependency this document does not discharge.** "Evaluated at the
 > decision point against the log prefix the decision pins" is deterministic *only
@@ -1435,6 +1481,11 @@ satisfies R13.1 where a `Person` principal class cannot.
     pressure (**O-N8**).
 16. **Existing key-derived DIDs need a new `SubjectId` and a documented membership
     bridge** — the DID cannot be the subject identifier (§15.1).
+17. **R5.1 [HARD] is not met for class 2 at all**, and is met for class 1 only once
+    O-N6 lands. The position window binds only when checked against an evaluation
+    position the signer does not control, and class 2 has none (§9.3).
+18. **R2.3 [HARD] is qualified** — receipts from positions orphaned by a superseding
+    rotation lose their authorization proof (**O-N9**).
 
 ---
 
@@ -1851,6 +1902,7 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O-N6** | What makes a governance decision point deterministic, so §9.3 class 1 can pin a log position? | #2469 §7.2 contains `ProposalClosed` because `outcome`/`tally` are attacker-supplied and the real authority entangles with the `GovernanceProofV2` signer model, an explicit #2469 non-goal. **A governance problem, not an identity one** — but class 1 degrades to class 2 until it is answered |
 | **O16′** | On detected duplicity, what happens beyond refusal — and what bounds the DoS? | **Reclassified in review round 2 from a liveness question to a settlement-safety one.** A single compromised current key halts a subject unilaterally; recovery orphans the suffix; and if device compromise persists, each revealed pre-rotation generation is captured in turn. KERI concedes *"an unavoidable race condition"* |
 | **O-N7** | What makes class-2 (irreversibly settled) acts safe under a fork? | **New in review round 2.** `Live(branch A) → Live(branch B)` leaves two replicas with permanently different ledger state, because settled effects are never unwound (R5.3). Reducing exposure needs a **finality depth**, which ICN does not have and whose local evaluation reintroduces the divergence. **Until answered, this authority model is not by itself a sufficient basis for irreversible settlement** (§9.2.1) |
+| **O-N9** | How is historical **authorization** evidence preserved across a superseding rotation? | **New in review round 4.** Orphaning the suffix means a receipt signed by a key first authorized after the fork keeps a verifying signature but loses its authorization proof, degrading R2.3 to "authored on a superseded branch". Preserving it needs durable per-branch endorsement records this model does not define (§9.2.1) |
 | **O-N8** | What is the protocol-specified **admission and compaction** rule for the durable event set? | **New in review round 2, widened in round 3.** `admissible` is cheap, so the set is attacker-writable and grow-only; eviction is forced, and if implementation-chosen then "convergence over the eventual retained set" is vacuous under attack. Authority-aware eviction (retain authorized before unauthorized) handles spam at or below the frontier; the **gap region beyond the frontier is unsolved**, so **R4.6 and permutation-invariant convergence hold only absent adversarial storage pressure** (§9.2.1) |
 | **O12** | Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture? | **Reopened on better terms.** The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise |
 | **O2** | Does a restored node keep its identifier? | §14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy |
@@ -2114,6 +2166,6 @@ Everything else in §19.2 is testable once those four are fixed.
 | Anchors retained as labels; `to_did` removed (§15.2) | **RECOMMENDED** |
 | Key-derived Person DIDs unchanged (§15.1) | **RECOMMENDED** |
 | O-N1…O-N6, O16′, O12, O2, O5, O6, O10, O11, O13 (receiver-side), O15, O17 (acquisition) (§17) | **OPEN** |
-| R9.1 [HARD] total-loss recovery; R5.1 [HARD] under sole-device compromise and under the class-1 fallback; R4.1/R4.3 during the recovery veto window | **ADMITTED SHORTFALLS** — named in §9.6, not discharged |
+| R9.1 [HARD] total-loss recovery; **R5.1 [HARD] not met for class 2 at all**, and for class 1 only once O-N6 lands; **R2.3 [HARD] qualified** — orphaned positions lose their authorization proof; R4.1/R4.3 during the recovery veto window | **ADMITTED SHORTFALLS** — named in §9.6, not discharged |
 | Anchor-derived `Did`s; `new_unchecked`; `is_anchor_did`; kernel-api `DidDocument`; `did_mapping` recovery indirection | **LEGACY** — compatibility only, then removed |
 | Model A key-as-person; Model B global anchor; Model D credential-only; Model E hybrid; O9 as posed; wall-clock validity; `standing_hash`; carried-proof-only as an absolute; threshold-held institution DID (for now); near-term ZK selective disclosure | **REJECTED** (§16) |
