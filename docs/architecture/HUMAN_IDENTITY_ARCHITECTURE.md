@@ -846,7 +846,7 @@ Qualitative, with reasons rather than false precision.
 | User experience (R10) | ✔ one identity | ✔ | **~** many contexts, hidden by the app | ~ | ✘ |
 | Implementation complexity | ~ | ✘ directory | **~** | ~ | ✘ |
 | Protocol complexity | ~ | ✘ | **~** | ~ | ✘ |
-| **Migration complexity** | ✔ none | ✘ | **✔ near-zero — see §15** | ✘ | ✘ |
+| **Migration complexity** | ✔ none | ✘ | **~ low, not zero** — keys and custody are untouched, but every existing DID needs a new `SubjectId` plus a membership bridge (§15.1). *(Was scored "near-zero" before review round 3 showed a DID cannot be a subject identifier.)* | ✘ | ✘ |
 | Cryptographic agility (R12.1) | ✘ DID pins the suite | ✔ | **✔** | ✔ | ✔ |
 | Auditability (R9.2) | ~ | ~ | **✔** append-only log | ~ | ~ |
 | Meaning Firewall (R13.1) | ✘ `Person` in kernel | ✘ | **✔** §9.5 | ✔ | ✘ |
@@ -1715,9 +1715,9 @@ restore-twice is detectable as duplicity rather than indistinguishable from a cl
 Classification per mechanism: **KEEP · MIGRATE · DEPRECATE · REMOVE ·
 COMPATIBILITY-ONLY**.
 
-### 15.1 Key-derived Person DIDs — KEEP, and no user-visible event
+### 15.1 Key-derived Person DIDs — KEEP the key, allocate a new subject
 
-This is the largest deployed class and it **does not change**. An existing
+This is the largest deployed class, and the **key** does not change. An existing
 `did:icn:<key>` is already exactly what §10 says a `Did` should be: a
 cryptographic principal. Two consequences:
 
