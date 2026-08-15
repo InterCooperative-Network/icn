@@ -72,6 +72,15 @@ for humans.
 > **(11)** the durable set is attacker-writable, so eviction must be
 > protocol-specified or convergence-under-attack is vacuous (**O-N8**).
 >
+> **Round 3** found **two more**:
+> **(12)** a position bound does not stop spam at `frontier + 1` from evicting the
+> legitimate next event — eviction must be **authority-aware**, and the gap region
+> beyond the frontier remains unsolved, so R4.6 and permutation-invariant
+> convergence hold only absent adversarial storage pressure (§9.2.1, **O-N8**);
+> **(13)** an existing `did:icn:<key>` **cannot serve as a `SubjectId`**, because
+> inception admission requires `σ == event_id(b)` — migration must allocate a new
+> subject naming that DID as its initial key, plus a membership bridge (§15.1).
+>
 > §9.6 lists every shortfall the model does not discharge.
 
 **Related, deferred to, not restated:**
@@ -883,7 +892,7 @@ answer is marked **OPEN** and appears in §17 — none are silently absorbed.
 | 22 | Revocation and a member act arrive in opposite orders | Admission is monotone and order-independent; **effect** is computed from converged state at a pinned position (§9.3). Two honest nodes agree. | A/B: arrival-order divergence — PRINCIPAL_MODEL §6.5 refutes both shapes |
 | 23 | An old receipt must stay verifiable after recovery | **Yes.** The act names the log position at which its signing key was authorized; the log is append-only and hash-chained, so "K was authorized at position N" is a permanent fact. R2.3. | A: recovery replaces the root and history becomes ambiguous |
 | 24 | Migrating an SDIS anchor identity | Near-free. F5 (the anchor was never the acting principal) and F20 (mutating routes disabled) mean **no deployed anchor carries authority**; F4 shows the VUI feeding it is `SHA256(did)`, so none carries uniqueness either. §15.2. | A: O18 is listed as **critical** precisely because it assumed otherwise |
-| 25 | An existing key-derived DID holder must not "become a new person" | **They do not change at all.** Their `Did` remains their principal; their initial context subject may simply *be* that DID. Migration is opt-in and incremental. §15.1. | B/D/E require a cutover |
+| 25 | An existing key-derived DID holder must not "become a new person" | **Their key, custody and signing ability are untouched** — no ceremony, no re-enrollment. A **new `SubjectId` is allocated** whose inception names their existing `Did` as initial authorized key; the identifier changes, the person does not, and membership rows keyed by `Did` need a documented bridge (§15.1). | B/D/E require a full cutover |
 
 **Scenarios Model C does not fully answer, carried to §17:** 2 (residual duplicity
 policy), 3 (cross-context divergence under concurrent recovery), 5 (guardian
@@ -1036,7 +1045,31 @@ an absolute constant.
 > **protocol-specified rather than implementation-chosen**, so that two honest
 > replicas under the same attack retain the same set; and per-signer admission cost
 > belongs in the replication layer (N3), where it may be state-dependent without
-> touching the join. Recorded as **O-N5**.
+> touching the join.
+>
+> **Eviction must be authority-aware, or spam evicts legitimate authority events.**
+> *(Raised in review round 3 and correct.)* A position bound alone does not help:
+> an attacker floods `frontier + 1` with self-signed bodies that correctly name the
+> verified prefix, and since `admissible` is state-independent it cannot tell them
+> from the legitimate next event. A naive bounded store then discards the real one,
+> and anti-entropy cannot restore it while the cap stays full — so receipt order
+> would decide which replicas ever derive it.
+>
+> The distinguishing predicate exists, just not in `admissible`: **`authorized` in
+> the derived view separates them perfectly**, because spam is signed by keys the
+> log never authorized. Eviction may therefore consult derived state — it is a
+> lossy local operation, not part of the join — and the rule is **retain authorized
+> bodies before unauthorized ones**, which makes spam at or below the frontier
+> harmless.
+>
+> **The residual is the gap region and it is not solved here.** Beyond the frontier,
+> with intervening positions missing, `authorized` cannot yet be evaluated, so
+> far-future spam is indistinguishable from legitimate future events. Retention
+> should prefer proximity to the frontier and a carried chain-inclusion witness
+> makes the far-future case decidable — but until that rule is specified,
+> **R4.6 and permutation-invariant convergence hold only absent adversarial storage
+> pressure**, and this document does not claim otherwise. Recorded as **O-N8**
+> (which now covers admission *and* compaction), with **O-N5** for the topology.
 
 #### Derived view — a pure function of `Bodies(σ)`
 
@@ -1396,8 +1429,12 @@ satisfies R13.1 where a `Person` principal class cannot.
 14. **Guardian recovery needs threshold *signing* (N7) to avoid being a kill
     switch** — independent M-of-N signatures make any `M` guardians able to halt the
     subject permanently (§12.2).
-15. **The durable set is attacker-writable**; eviction must be protocol-specified or
-    convergence-under-attack is vacuous (**O-N8**).
+15. **The durable set is attacker-writable**; eviction must be protocol-specified and
+    authority-aware, and **beyond the frontier the gap region is unsolved** — so
+    R4.6 and permutation-invariant convergence hold only absent adversarial storage
+    pressure (**O-N8**).
+16. **Existing key-derived DIDs need a new `SubjectId` and a documented membership
+    bridge** — the DID cannot be the subject identifier (§15.1).
 
 ---
 
@@ -1684,11 +1721,30 @@ This is the largest deployed class and it **does not change**. An existing
 `did:icn:<key>` is already exactly what §10 says a `Did` should be: a
 cryptographic principal. Two consequences:
 
-- Nobody "becomes a new person" (scenario 25). No cutover, no re-enrollment.
-- A person's **first** context subject may simply *be* their existing DID, with an
-  inception event that names it as the initial authorized key. Adopting distinct
-  per-context subjects is then **opt-in and incremental** — a privacy upgrade the
-  person elects, not a migration the protocol forces.
+- Nobody "becomes a new person" (scenario 25). No cutover, no re-enrollment, and
+  **no key ceremony**: the person keeps signing with the key they already hold.
+
+> **But the existing DID cannot itself serve as the `SubjectId`, and an earlier
+> draft said it could.** *(Corrected in review round 3.)* `SubjectId = event_id(inception body)`
+> and inception admission checks `σ == event_id(b)`, whereas `did:icn:<key>` encodes
+> an Ed25519 public key. Barring an accidental preimage the two cannot coincide, so
+> such an inception is **inadmissible** and the derived view stays `Unknown`.
+>
+> The honest migration is therefore: **allocate a new `SubjectId`, whose inception
+> event names the person's existing `Did` as its initial authorized key.** What is
+> preserved is what actually matters — the key, custody, and the ability to sign —
+> and what changes is the *context identifier*.
+>
+> That is a smaller cost than a re-enrollment and a larger one than "no event". In
+> particular, **membership rows keyed by the member's `Did` need a documented bridge
+> to the new `SubjectId`**, which is the same shape as the bridge `icn-commons`
+> already maintains for enrollment-DID → anchor (§15.2). Specifying that bridge is a
+> migration prerequisite, not a detail.
+>
+> Rejected alternative: a "legacy inception" rule admitting `σ == did_of(initial_key)`.
+> It preserves the identifier but destroys inception uniqueness — two different
+> inception bodies could then claim one `σ`, producing duplicity at position 0, which
+> §9.2.1 relies on being impossible.
 
 ### 15.2 SDIS anchor-derived DIDs — DEPRECATE, at near-zero cost
 
@@ -1752,7 +1808,7 @@ a uniqueness or unlinkability property.** Migration is therefore:
 | `DidDocument` (`icn-kernel-api`) | **REMOVE** | zero implementors; a parallel unimplemented sketch over `pub type Did = String` |
 | `RotationEvent` | **MIGRATE** | right shape; needs a domain-separated canonical preimage (F12) and a signer/verifier that agree (F10) |
 | device rosters | **MIGRATE** | fix #2588 (binding) and #2590 (attenuation) **as part of** the migration, never after |
-| memberships | **KEEP**, extended | the bidirectional index (`sled_registry.rs:9-12`) is the right shape; add the subject and its log reference. Signing and replication remain #2441's (F17) |
+| memberships | **MIGRATE** (was "KEEP, extended") | the bidirectional index (`sled_registry.rs:9-12`) is the right shape, but rows keyed by the member's `Did` need a documented bridge to the new `SubjectId` (§15.1). Signing and replication remain #2441's (F17) |
 | governance state | **KEEP** | class 1 becomes cheap **once votes key on the subject**; today `vote_key(proposal_id, voter: &Did)` (`apps/governance/src/state_store.rs:222`) keys on a **`Did`**, so re-casting from a new device writes a second tallied row (§9.3) |
 | historical signatures / receipts | **KEEP — permanently verifiable** | "key K was authorized at position N" is an append-only fact (R2.3) |
 | gateway challenge auth | **MIGRATE** | add a domain separator and bind `coop_id`/`scopes` into the signed payload (§3.4) |
@@ -1795,7 +1851,7 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O-N6** | What makes a governance decision point deterministic, so §9.3 class 1 can pin a log position? | #2469 §7.2 contains `ProposalClosed` because `outcome`/`tally` are attacker-supplied and the real authority entangles with the `GovernanceProofV2` signer model, an explicit #2469 non-goal. **A governance problem, not an identity one** — but class 1 degrades to class 2 until it is answered |
 | **O16′** | On detected duplicity, what happens beyond refusal — and what bounds the DoS? | **Reclassified in review round 2 from a liveness question to a settlement-safety one.** A single compromised current key halts a subject unilaterally; recovery orphans the suffix; and if device compromise persists, each revealed pre-rotation generation is captured in turn. KERI concedes *"an unavoidable race condition"* |
 | **O-N7** | What makes class-2 (irreversibly settled) acts safe under a fork? | **New in review round 2.** `Live(branch A) → Live(branch B)` leaves two replicas with permanently different ledger state, because settled effects are never unwound (R5.3). Reducing exposure needs a **finality depth**, which ICN does not have and whose local evaluation reintroduces the divergence. **Until answered, this authority model is not by itself a sufficient basis for irreversible settlement** (§9.2.1) |
-| **O-N8** | What is the protocol-specified eviction rule for the durable event set? | **New in review round 2.** `admissible` is cheap, so the set is attacker-writable and grow-only; eviction is forced, and if it is implementation-chosen then "convergence over the eventual retained set" is vacuous under attack (§9.2.1) |
+| **O-N8** | What is the protocol-specified **admission and compaction** rule for the durable event set? | **New in review round 2, widened in round 3.** `admissible` is cheap, so the set is attacker-writable and grow-only; eviction is forced, and if implementation-chosen then "convergence over the eventual retained set" is vacuous under attack. Authority-aware eviction (retain authorized before unauthorized) handles spam at or below the frontier; the **gap region beyond the frontier is unsolved**, so **R4.6 and permutation-invariant convergence hold only absent adversarial storage pressure** (§9.2.1) |
 | **O12** | Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture? | **Reopened on better terms.** The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise |
 | **O2** | Does a restored node keep its identifier? | §14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy |
 | **O5** | Remove or wire `public_did` institutional signing? | Depends on O12 |
