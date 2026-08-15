@@ -843,6 +843,19 @@ version, and independent implementations free to serialize incompatible messages
 O14 requires a domain-separated canonical preimage over the *complete* transition,
 with field-tamper and stale-proof replay vectors.
 
+**O8 has the same shape as O9, and that is the deepest result of this review.**
+*(Raised in review round 19.)* Suppose root R0 legitimately authorized device D, and P
+later rotates to R1. Verifying against R1 alone **retroactively rejects** operations
+some peers already applied; accepting *any* historically valid root lets an attacker
+retaining a compromised R0 **mint new authorizations after the rotation**. Deciding
+between them requires positioning the authorization relative to the rotation — and A0
+orders identity events only, so it cannot place an authorization at all.
+
+Rotation and revocation are therefore **not two problems**. Both ask the same question:
+*where does this authorization sit relative to a change in the authority that issued
+it?* ICN has no order spanning authorizations and identity state changes, so **both O8
+and O9 reduce to that single missing primitive.**
+
 **Still unresolved (O8, §13), and it blocks slice A**, which must not freeze an
 authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
 §7 say about identity continuity holds only for the pre-rotation case.
@@ -1212,7 +1225,7 @@ This model does **not** provide, and must not be read as providing:
 | O6 | Does the membership credential layer belong in this arc or a later one? (§7.2) | Not required for slice 7; required for portable standing |
 | O7 | Which operation classes may a device sign, and which require the root key? | Determines the default scope set in §5.2 |
 | **O8** | **How does a verifier learn the *current* root key for a Person after rotation or recovery, given that the DID encodes only the genesis key?** (§6.3) | **BLOCKS slice A.** A carried chain is forgeable by a compromised original root; an authenticated current-root source breaks the no-external-state property of §6.2 |
-| **O9** | **How is a device revoked convergently at all?** All three candidate shapes fail today: (a) is refuted, (a′) needs a replicated total order **spanning governance operations *and* identity revocations** (an identity-event-only order does not suffice), (b) needs rollback/revalidation semantics #2469 does not have (§6.5) | **BLOCKS slices A and D, and is a genuine open architecture problem** — not a choice between ready options. Requires either a total order for identity events or deterministic rollback for applied operations. Every candidate implies different carried fields, so the format cannot be frozen first |
+| **O9** | **How is a device revoked convergently at all?** All three candidate shapes fail today: (a) is refuted, (a′) needs a replicated total order **spanning governance operations *and* identity revocations** (an identity-event-only order does not suffice), (b) needs rollback/revalidation semantics #2469 does not have (§6.5) | **BLOCKS slices A and D, and is a genuine open architecture problem** — not a choice between ready options. Requires either a total order **spanning governance operations *and* identity revocations**, or deterministic rollback for applied operations. Every candidate implies different carried fields, so the format cannot be frozen first |
 | O10 | What is the canonical byte encoding of `DeviceAuthorization` — field order, version, domain separator, **and the canonicalization rule for DID strings**, given that `from_str` accepts any multibase while `Did` equality is string equality (§2.1)? (§6.1) | Independent Rust and SDK implementations will otherwise produce incompatible proofs, and the signature has no cross-protocol separation boundary |
 | **O13** | **How is `GOV_OP_V1` retired, or how does a receiver cryptographically classify a V1 author as a node?** (§16) | **BLOCKS the migration story.** `Did` has no type tag and `verify` recovers one key, so "V1 is for node-authored ops" is unenforceable; while V1 is accepted a compromised pre-rotation Person root bypasses every V2 protection |
 | **O14** | **How does a total-loss recovery advance the identity chain, when `RotationEvent::verify` requires an existing non-revoked method with the needed capability (`multi_device.rs:541-552`)?** | **BLOCKS slice A0's recovery path.** There is no old key to sign with. `sync.rs:261-267` currently *counts* trustee DIDs without verifying signatures — its own comment says "In production, verify the cryptographic signature here" |
