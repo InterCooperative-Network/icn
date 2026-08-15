@@ -1660,7 +1660,7 @@ bolted beside the chain rule — it **is** the chain rule.
 | Pre-rotation commits to | keys derived from the continuity root (recovery phrase) | a **threshold** key set held by M-of-N guardians |
 | Total-loss recovery | restore phrase → rotate | M distinct guardians co-sign → rotate |
 | Root/backup compromise | **takeover, and *unrecoverable*** — see below | insufficient alone |
-| Any M guardians can... | — | **halt the subject permanently**, unless (b) uses a single group key — see below |
+| Any M guardians can... | — | **halt the subject permanently.** Closing this needs a single group key (N7) **and** `authorized` enforcing canonical body derivation **and** exactly one next authority per position — **N7 alone is not sufficient**; see below |
 | Produced offline? | **yes** | **no** — needs an online M-of-N quorum |
 | UX cost | one phrase at onboarding | guardian setup + coordination |
 
@@ -1921,7 +1921,7 @@ a uniqueness or unlinkability property.** Migration is therefore:
 | device rosters | **MIGRATE** | fix #2588 (binding) and #2590 (attenuation) **as part of** the migration, never after |
 | memberships | **MIGRATE** (was "KEEP, extended") | the bidirectional index (`sled_registry.rs:9-12`) is the right shape, but rows keyed by the member's `Did` need a documented bridge to the new `SubjectId` (§15.1). Signing and replication remain #2441's (F17) |
 | governance state | **KEEP** | class 1 becomes cheap **once votes key on the subject**; today `vote_key(proposal_id, voter: &Did)` (`apps/governance/src/state_store.rs:222`) keys on a **`Did`**, so re-casting from a new device writes a second tallied row (§9.3) |
-| historical signatures / receipts | **KEEP — permanently verifiable** | "key K was authorized at position N" is an append-only fact (R2.3) |
+| historical signatures / receipts | **KEEP — the signature is permanently verifiable; the *authorization* is not** | Pre-fork positions: "key K was authorized at position N" is an append-only fact and R2.3 holds. After a superseding rotation at `p`, a key first authorized at `N > p` is no longer established by the derived view — the receipt still proves *"K signed these bytes"*, and with the orphaned bodies retained *"this body existed on a branch later superseded"*, but **not** that K remained authorized (§9.2.2). Migration must therefore keep the orphaned bodies and their chaining, **not the raw receipts alone**; full historical authorization needs the per-branch endorsement evidence **O-N9** leaves undefined |
 | gateway challenge auth | **MIGRATE** | add a domain separator and bind `coop_id`/`scopes` into the signed payload (§3.4) |
 | invite redemption | **REMOVE the unproven-subject mint** | #2589 |
 | React Native wallet | **MIGRATE** | today one key per install *is* the person (F19); needs subject/device separation and off-device pre-rotation backup |
@@ -2038,6 +2038,11 @@ untraced anchor↔member keying question in §15.2.
               signing (F7).  Without N7, independent M-of-N signatures give any
               M guardians a KILL SWITCH (two quorums => two authorized bodies at
               one position => permanent halt), so path (b) must not ship first.
+              NECESSARY BUT NOT SUFFICIENT: N7 alone leaves the halt attack
+              intact — a group key authenticates a quorum, it does not bind that
+              quorum to ONE message.  Path (b) is safe only with N7 PLUS
+              `authorized` ENFORCING canonical body derivation PLUS exactly ONE
+              next authority armed per position (§9.2.1 constraint 3).
               Without N7, R9.1 [HARD] is met only by the backup-phrase path.
 
   independent, and should not wait:
@@ -2218,7 +2223,7 @@ Everything else in §19.2 is testable once those four are fixed.
 | Rotation bodies must be deterministic; threshold recovery must emit one body (§9.2.1) | **RECOMMENDED, normative for N1** — without them a crash-retry or a second quorum halts the subject with no attacker |
 | Authority principals inside events must be raw `Did`s, never `SubjectId`s (§9.2.1) | **RECOMMENDED, normative for N1** — otherwise `derive` is not a pure function |
 | Superseding recovery orphans the suffix (§9.2.1) | **ESTABLISHED consequence** — a stated cost of recovery, growing with fork depth |
-| N7 (threshold signing) is a hard prerequisite of guardian recovery (§12.2) | **RECOMMENDED** — otherwise any `M` guardians hold a kill switch |
+| N7 (threshold signing) is a hard prerequisite of guardian recovery (§12.2) | **RECOMMENDED** — **necessary, not sufficient**. Without it any `M` guardians hold a kill switch; with it the switch closes only alongside enforced canonical body derivation and exactly one next-authority commitment per position (§9.2.1 constraint 3) |
 | Fork monitoring is a client obligation ("responsive controller") (§9.2.2) | **RECOMMENDED**, inherited from KERI |
 | `Did` narrowed to "cryptographic principal" (§10) | **RECOMMENDED** |
 | No global Person identifier (§10) | **RECOMMENDED** |
