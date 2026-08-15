@@ -1664,7 +1664,8 @@ bolted beside the chain rule — it **is** the chain rule.
 | Produced offline? | **yes** | **no** — needs an online M-of-N quorum |
 | UX cost | one phrase at onboarding | guardian setup + coordination |
 
-> **Path (b) is a kill switch unless it uses a single group key.** With `M`-of-`N`
+> **Path (b) is a kill switch, and a single group key is necessary but not
+> sufficient to close it.** With `M`-of-`N`
 > guardians signing **independently**, two different quorums produce two different
 > authorized establishment bodies at the same position, so `supersede` cannot
 > choose and the subject **halts permanently** (§9.2.1, constraint 3). That means
