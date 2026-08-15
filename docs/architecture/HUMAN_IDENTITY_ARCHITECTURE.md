@@ -971,6 +971,25 @@ Global state is the pointwise map `σ ↦ S(σ)`.
 classifies a given event identically, so the filter commutes with union —
 `filter(A) ∪ filter(B) = filter(A ∪ B)`.
 
+> **`admissible` is cheap to satisfy, so `S(σ)` needs an admission bound that the
+> join definition deliberately does not contain.** Anyone can mint unlimited
+> admissible events for any `σ`: sign arbitrary bytes with a key they generated and
+> set `subject = σ`. Those are well-formed and self-signed, so they enter `S(σ)`
+> and grow it without limit. They can never *fork* anything (they are unauthorized,
+> so they never enter `C` — case 7), but they are a storage and bandwidth attack.
+>
+> The bound must therefore live **outside** the lattice, as receiver-local resource
+> policy — the same position bound and bounded store as §9.4: admit only
+> `position ≤ (highest verified) + C`, cap the per-subject retained set, and prefer
+> events that chain to the verified prefix. Putting the bound *inside* `admissible`
+> would break state-independence and therefore the join.
+>
+> The honest consequence: **two replicas applying different resource policies hold
+> different sets.** That is the same liveness-not-safety trade as retention — a
+> replica missing an event is indistinguishable from one that has not received it —
+> and it means convergence is stated over *the eventual retained set*, never over
+> "all events ever authored". Folded into **O-N5**.
+
 **Representation of the awkward cases falls out for free:**
 
 | Case | Representation |
@@ -1064,6 +1083,7 @@ is **O16′**.
 |---|---|
 | Can later events become usable after a fork? | **Yes, and only** via a superseding establishment event at the disputed position. Nothing else unblocks it |
 | Does any rule silently select a branch? | **No.** `supersede` is explicit and authority-based; every other case with `\|C\| ≥ 2` halts |
+| Is the `chosen(p−1)` recursion well-founded? | **Yes.** `derive` advances strictly one position at a time and only after `\|C\| = 1`, so `chosen(p−1)` is defined whenever `C` at `p` is computed. If `p−1` halts, `derive` has already returned and `p` is never evaluated — which is also why a fork at position 3 makes events at 8 and 9 unreachable until the fork is superseded, no matter how many later events are held |
 | Does BRB prevent equivocation? | **No** — and nothing here assumes it does. BRB gives non-equivocating *delivery* among receivers; a Byzantine writer can still author two conflicting signed events. That is exactly why `derive` must handle `\|C\| ≥ 2` |
 | What about already-applied effects when a fork appears? | Acts referencing positions `< p` remain evaluable (that authority is undisputed). Acts at or after `p` are not. Class-2 settled effects are **not** unwound (§9.3, R5.3) — **and that leaves a stated non-convergence, below** |
 
