@@ -30,9 +30,9 @@
 //! LP(x)  := u32be(x.len()) || x
 //! b32(x) := 32 raw bytes, no prefix
 //! P(k)   := u8(0x01) || b32(ed25519_public_key)        -- a principal, tagged
-//! PS(S)  := u32be(|S|) || P(k1) || ...                 -- strictly ascending, non-empty
+//! PS(k)  := u32be(1) || P(k)                           -- exactly one logical writer
 //! CS(C)  := u32be(|C|) || u8(tag) || ...               -- strictly ascending, may be empty
-//! SPAN   := u8(0x00) | u8(0x01) || u64be(from) || u64be(until)
+//! SPAN   := u8(0x00) OR (u8(0x01) || u64be(from) || u64be(until))
 //!
 //! canonical_body := LP(DOMAIN) || u16be(PROTOCOL_VERSION) || u8(kind) || payload
 //!
@@ -53,10 +53,11 @@
 //! * The inception body carries no subject, position or prev field: its subject is
 //!   self-addressing, its position is the protocol constant `0`, and it has no parent. Every
 //!   other kind rejects `position == 0`.
-//! * Decoding is strict — trailing bytes, non-ascending sets, duplicate members and an inception
-//!   signer outside `initial_authority` are all rejected. Together with the fixed field order
-//!   this makes the encoding a bijection on well-formed bodies: one logical body has exactly one
-//!   canonical encoding, and one canonical encoding denotes exactly one logical body.
+//! * Decoding is strict — trailing bytes, a writer-set cardinality other than one, duplicate
+//!   capability members and an inception signer outside `initial_authority` are all rejected.
+//!   Together with the fixed field order this makes the encoding a bijection on well-formed
+//!   bodies: one logical body has exactly one canonical encoding, and one canonical encoding
+//!   denotes exactly one logical body.
 //!
 //! Digests, stated once and used everywhere (§9.2.1):
 //!
@@ -90,7 +91,7 @@
 //!
 //! 1. `state.next_commitment != TERMINAL_COMMITMENT`;
 //! 2. `SHA-256(COMMITMENT_DOMAIN ‖ kind ‖ PS(revealed) ‖ next_commitment) == state.next_commitment`;
-//! 3. `body.signer == min(revealed)` — the canonical signer rule, which pins the last field the
+//! 3. `body.signer == sole(revealed)` — the singleton-writer rule, which pins the last field the
 //!    signer would otherwise be free to choose.
 //!
 //! The derived state pins `subject`, `position` and `prev_digest`. Every field of the body is
@@ -137,9 +138,10 @@
 //!   would stop being a closed pure function. There is no conversion from `SubjectId` into
 //!   `PrincipalKey` anywhere in this module, and the wire format tags the two differently.
 //!
-//! Devices are **not** log writers. Only the authority set writes the log, so the single-writer
-//! property (§9.2, consensus number 1) is preserved. Validity spans are position-denominated and
-//! never wall-clock (O-N1 stays inside the pure model).
+//! Devices are **not** log writers. Each authority set contains exactly one logical writer, so the
+//! single-writer property (§9.2, consensus number 1) is preserved. A future threshold/group key
+//! remains one [`PrincipalKey`]. Validity spans are position-denominated and never wall-clock
+//! (O-N1 stays inside the pure model).
 //!
 //! # 4. The replicated state model (§9.2.1, inherited — not redesigned)
 //!

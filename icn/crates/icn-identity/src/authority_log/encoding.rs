@@ -63,6 +63,17 @@ pub enum CodecError {
         /// Name of the offending set field.
         field: &'static str,
     },
+    /// A log-writing authority set contained more than one independently signing principal.
+    ///
+    /// The authority log has exactly one logical writer per establishment generation. Future
+    /// threshold custody remains representable as one group public key.
+    #[error("authority field '{field}' must contain exactly one logical writer, found {count}")]
+    MultipleAuthorityPrincipals {
+        /// Name of the offending authority field.
+        field: &'static str,
+        /// Number of distinct principals supplied.
+        count: usize,
+    },
     /// A capability tag is not a defined capability.
     #[error("unknown device capability tag 0x{0:02x}")]
     UnknownCapability(u8),

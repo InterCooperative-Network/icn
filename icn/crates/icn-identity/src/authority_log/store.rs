@@ -8,7 +8,8 @@
 //! tiebreak that destroys commutativity and idempotence.
 //!
 //! With bodies as elements, re-signings collapse automatically and `Witness` simply accumulates.
-//! **Nothing in this module ever compares two signatures.**
+//! Signature bytes may be compared for deterministic collection ordering and equality, but are
+//! **never compared to select a body or branch**.
 
 use std::collections::BTreeSet;
 

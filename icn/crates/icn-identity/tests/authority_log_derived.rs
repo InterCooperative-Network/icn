@@ -18,9 +18,9 @@ use authority_log_support::{
 };
 use icn_identity::authority_log::{
     authorize_event, derive, resolve, sign_body, supersede, AuthorityBody, AuthorityStore,
-    AuthorityView, Commitment, ContextNonce, ContinuityRoot, DeviceCapability, EstablishmentBody,
-    EstablishmentKind, EventHeader, EventId, PrincipalKey, PrincipalSet, Resolution,
-    SignedAuthorityEvent, SubjectId, ValiditySpan, WitnessSignature,
+    AuthorityView, CodecError, Commitment, ContextNonce, ContinuityRoot, DeviceCapability,
+    EstablishmentBody, EstablishmentKind, EventHeader, EventId, PrincipalKey, PrincipalSet,
+    Resolution, SignedAuthorityEvent, SubjectId, ValiditySpan, WitnessSignature,
 };
 
 fn view(store: &AuthorityStore, s: SubjectId) -> AuthorityView {
@@ -491,30 +491,16 @@ fn two_authorized_establishment_bodies_are_unconstructible() {
     };
     cannot_compete(sign_body(other_kind, &signing_key), "alternate kind");
 
-    // (c) A non-canonical signer drawn from the revealed set is rejected even though it is
-    //     legitimately part of that set's material.
+    // (c) Multiple independently signing writers are rejected at public construction, before
+    //     they can become an establishment body or enter the admitted store.
     let extra_key = SigningKey::from_bytes(&[3u8; 32]);
     let extra = principal(&extra_key);
     let mut widened: BTreeSet<PrincipalKey> = revealed.members().clone();
     widened.insert(extra);
-    let widened_set = PrincipalSet::new(widened, "revealed_authority").expect("non-empty");
-    let widened_body = AuthorityBody::Rotate(EstablishmentBody {
-        header: EventHeader {
-            subject: alpha.subject,
-            position: 1,
-            prev_digest: alpha.genesis(),
-            signer,
-        },
-        revealed_authority: widened_set,
-        next_commitment: match &canonical.body {
-            AuthorityBody::Rotate(e) => e.next_commitment,
-            other => panic!("expected Rotate, got {other:?}"),
-        },
-    });
-    cannot_compete(
-        sign_body(widened_body, &signing_key),
-        "widened authority set",
-    );
+    assert!(matches!(
+        PrincipalSet::new(widened, "revealed_authority"),
+        Err(CodecError::MultipleAuthorityPrincipals { count: 2, .. })
+    ));
 
     // (d) The construction API itself is deterministic and refuses off-chain generations.
     let retry = alpha

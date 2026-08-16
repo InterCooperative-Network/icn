@@ -14,10 +14,9 @@ use authority_log_support::{
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use icn_identity::authority_log::{
     admissible, admissible_bytes, authorize_event, sign_body, AdmissionError, AuthorityBody,
-    AuthorityStore, AuthorizeBody, CapabilitySet, CodecError, Commitment, ContextNonce,
-    ContinuityRoot, DeviceCapability, EstablishmentBody, EventHeader, EventId, PrincipalKey,
-    PrincipalSet, SubjectId, ValiditySpan, WitnessSignature, DOMAIN, PROTOCOL_VERSION,
-    SIGNATURE_DOMAIN,
+    AuthorityStore, AuthorizeBody, CapabilitySet, CodecError, ContextNonce, ContinuityRoot,
+    DeviceCapability, EventHeader, EventId, PrincipalKey, PrincipalSet, SubjectId, ValiditySpan,
+    WitnessSignature, DOMAIN, PROTOCOL_VERSION, SIGNATURE_DOMAIN,
 };
 
 /// Every body kind, built deterministically, for round-trip and vector coverage.
@@ -68,6 +67,33 @@ fn corpus() -> Vec<(&'static str, AuthorityBody)> {
         ("revoke", revoke),
         ("recover", recover),
     ]
+}
+
+fn with_second_writer(body: &AuthorityBody, extra: PrincipalKey) -> Vec<u8> {
+    let canonical = body.canonical_bytes();
+    let payload_at = 4 + DOMAIN.len() + 2 + 1;
+    let count_at = match body {
+        AuthorityBody::Inception(_) => payload_at + 33 + 32,
+        AuthorityBody::Rotate(_) | AuthorityBody::Recover(_) => payload_at + 32 + 8 + 32 + 33,
+        other => panic!("expected writer-bearing body, got {other:?}"),
+    };
+    assert_eq!(&canonical[count_at..count_at + 4], &1u32.to_be_bytes());
+
+    let member_at = count_at + 4;
+    let existing = canonical[member_at..member_at + 33].to_vec();
+    let mut additional = Vec::with_capacity(33);
+    additional.push(0x01);
+    additional.extend_from_slice(&extra.as_bytes());
+
+    let mut members = [existing, additional];
+    members.sort();
+
+    let mut widened = canonical[..count_at].to_vec();
+    widened.extend_from_slice(&2u32.to_be_bytes());
+    widened.extend_from_slice(&members[0]);
+    widened.extend_from_slice(&members[1]);
+    widened.extend_from_slice(&canonical[member_at + 33..]);
+    widened
 }
 
 /// Obligation 20a — encode/decode round trip over every body kind.
@@ -156,59 +182,116 @@ fn decoding_rejects_non_canonical_input() {
     assert!(AuthorityBody::decode(&[]).is_err());
 }
 
-/// Non-ascending or duplicated set members are rejected, so a set has one encoding.
 #[test]
-fn decoding_rejects_unordered_and_duplicate_sets() {
-    let alpha = subject(201, 2);
-    let a_key = ed25519_dalek::SigningKey::from_bytes(&[1u8; 32]);
-    let b_key = ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]);
-    let a = principal(&a_key);
-    let b = principal(&b_key);
-    let (low, high) = if a.as_bytes() < b.as_bytes() {
-        (a, b)
-    } else {
-        (b, a)
+fn multi_key_inception_authority_is_rejected() {
+    let first = device(11);
+    let second = device(12);
+    assert!(matches!(
+        PrincipalSet::new([first, second], "initial_authority"),
+        Err(CodecError::MultipleAuthorityPrincipals {
+            field: "initial_authority",
+            count: 2
+        })
+    ));
+}
+
+#[test]
+fn multi_key_rotate_authority_is_rejected() {
+    let first = device(13);
+    let second = device(14);
+    assert!(matches!(
+        PrincipalSet::new([first, second], "rotate.revealed_authority"),
+        Err(CodecError::MultipleAuthorityPrincipals {
+            field: "rotate.revealed_authority",
+            count: 2
+        })
+    ));
+}
+
+#[test]
+fn multi_key_recover_authority_is_rejected() {
+    let first = device(15);
+    let second = device(16);
+    assert!(matches!(
+        PrincipalSet::new([first, second], "recover.revealed_authority"),
+        Err(CodecError::MultipleAuthorityPrincipals {
+            field: "recover.revealed_authority",
+            count: 2
+        })
+    ));
+}
+
+#[test]
+fn canonical_decoder_rejects_multi_key_writer_sets() {
+    let alpha = subject(205, 2);
+    let rotate = alpha
+        .root
+        .establish(1, alpha.subject, 1, alpha.genesis())
+        .expect("rotate")
+        .body;
+    let recover = match &rotate {
+        AuthorityBody::Rotate(establishment) => AuthorityBody::Recover(establishment.clone()),
+        other => panic!("expected Rotate, got {other:?}"),
     };
 
-    let body = AuthorityBody::Rotate(EstablishmentBody {
-        header: EventHeader {
-            subject: alpha.subject,
-            position: 1,
-            prev_digest: alpha.genesis(),
-            signer: low,
-        },
-        revealed_authority: PrincipalSet::new([low, high], "revealed_authority").expect("set"),
-        next_commitment: Commitment::from_bytes([9u8; 32]),
-    });
-    let canonical = body.canonical_bytes();
-    assert_eq!(AuthorityBody::decode(&canonical).expect("decodes"), body);
+    for body in [&alpha.inception.body, &rotate, &recover] {
+        let widened = with_second_writer(body, device(17));
+        assert!(matches!(
+            AuthorityBody::decode(&widened),
+            Err(CodecError::MultipleAuthorityPrincipals { count: 2, .. })
+        ));
+    }
+}
 
-    // Swap the two members so the set is descending.
-    let first_at = canonical
-        .windows(33)
-        .position(|w| w[0] == 0x01 && w[1..] == low.as_bytes())
-        .expect("low key present");
-    // The set members are the last two principals before the 32-byte commitment.
-    let set_start = canonical.len() - 32 - 66;
-    let mut swapped = canonical.clone();
-    let (left, right) = canonical[set_start..set_start + 66].split_at(33);
-    swapped[set_start..set_start + 33].copy_from_slice(right);
-    swapped[set_start + 33..set_start + 66].copy_from_slice(left);
+#[test]
+fn multi_key_writer_sets_cannot_reach_public_admission() {
+    let alpha = subject(206, 2);
+    let widened = with_second_writer(&alpha.inception.body, device(18));
+    let witness = WitnessSignature::from_bytes([0u8; 64]);
+
     assert!(matches!(
-        AuthorityBody::decode(&swapped),
-        Err(CodecError::UnorderedSet { .. })
+        admissible_bytes(&widened, &witness),
+        Err(AdmissionError::Codec(
+            CodecError::MultipleAuthorityPrincipals { count: 2, .. }
+        ))
     ));
+}
 
-    // Duplicate the same member twice.
-    let mut duplicated = canonical.clone();
-    duplicated[set_start + 33..set_start + 66]
-        .copy_from_slice(&canonical[set_start..set_start + 33]);
+#[test]
+fn singleton_writer_authority_remains_canonical() {
+    let writer = device(19);
+    let constructed = PrincipalSet::new([writer], "initial_authority").expect("singleton writer");
+    assert_eq!(constructed, PrincipalSet::single(writer));
+
+    for (_, body) in corpus() {
+        assert_eq!(
+            AuthorityBody::decode(&body.canonical_bytes()).expect("singleton body decodes"),
+            body
+        );
+    }
+}
+
+/// Duplicate authority members cannot bypass the exactly-one logical-writer boundary.
+#[test]
+fn decoding_rejects_duplicate_authority_members() {
+    let alpha = subject(201, 2);
+    let rotate = alpha
+        .root
+        .establish(1, alpha.subject, 1, alpha.genesis())
+        .expect("rotate")
+        .body;
+    let writer = match &rotate {
+        AuthorityBody::Rotate(establishment) => establishment
+            .revealed_authority
+            .canonical_signer()
+            .expect("singleton writer"),
+        other => panic!("expected Rotate, got {other:?}"),
+    };
+    let duplicated = with_second_writer(&rotate, writer);
     assert!(matches!(
         AuthorityBody::decode(&duplicated),
-        Err(CodecError::UnorderedSet { .. })
+        Err(CodecError::MultipleAuthorityPrincipals { count: 2, .. })
     ));
-
-    let _ = first_at;
 }
 
 /// A `Did` is canonicalized to its decoded key, so two DID string encodings of one key produce

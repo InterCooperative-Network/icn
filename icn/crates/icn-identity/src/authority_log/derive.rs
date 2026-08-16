@@ -45,7 +45,10 @@ impl DeviceGrant {
 /// The authority state produced by folding a chain of chosen bodies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityState {
-    /// The keys authorized to **write** this log. Only establishment events change this set.
+    /// The exactly-one logical writer of this log. Only establishment events change this set.
+    ///
+    /// The set representation mirrors the canonical body, but every admitted establishment body
+    /// is required to contain one principal.
     pub authority: BTreeSet<PrincipalKey>,
     /// The pre-rotation commitment for the next establishment.
     pub next_commitment: Commitment,
@@ -138,8 +141,8 @@ pub(crate) fn commitment_for(
 ///
 /// * the recomputed commitment must equal `state.next_commitment`, which pins the kind, the
 ///   revealed authority set and the next commitment;
-/// * the signer must be the canonically first revealed principal, which pins the last remaining
-///   free field.
+/// * the signer must be the sole revealed authority principal, which pins the last remaining free
+///   field.
 ///
 /// `subject`, `position` and `prev_digest` are pinned by the caller's position in the chain.
 /// Every field is therefore determined, so **at most one authorized establishment body can exist
@@ -171,8 +174,12 @@ fn authorized_by_state(body: &AuthorityBody, state: &AuthorityState) -> bool {
             }
             establishment.revealed_authority.canonical_signer() == Some(establishment.header.signer)
         }
-        AuthorityBody::Authorize(authorize) => state.authority.contains(&authorize.header.signer),
-        AuthorityBody::Revoke(revoke) => state.authority.contains(&revoke.header.signer),
+        AuthorityBody::Authorize(authorize) => {
+            state.authority.len() == 1 && state.authority.contains(&authorize.header.signer)
+        }
+        AuthorityBody::Revoke(revoke) => {
+            state.authority.len() == 1 && state.authority.contains(&revoke.header.signer)
+        }
     }
 }
 

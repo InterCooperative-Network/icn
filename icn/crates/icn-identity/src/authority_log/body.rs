@@ -251,15 +251,17 @@ impl std::fmt::Debug for PrincipalKey {
     }
 }
 
-/// A non-empty, canonically ordered set of principals.
+/// The exactly-one logical writer for an establishment generation.
 ///
-/// Canonical ordering is a *representation* rule that removes encoding ambiguity. It is never a
-/// selection rule: nothing in [`super::derive`] compares members to choose a winner.
+/// The counted-set wire shape is retained by the N1 encoding, but cardinality is a protocol
+/// invariant: several independently signing keys would be several writers and would reintroduce
+/// consensus at ordinary-event positions. A future threshold/group public key is still one
+/// [`PrincipalKey`] here.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PrincipalSet(BTreeSet<PrincipalKey>);
 
 impl PrincipalSet {
-    /// Build a principal set, rejecting an empty one.
+    /// Build an authority set, requiring exactly one logical writer.
     pub fn new(
         members: impl IntoIterator<Item = PrincipalKey>,
         field: &'static str,
@@ -267,6 +269,12 @@ impl PrincipalSet {
         let set: BTreeSet<PrincipalKey> = members.into_iter().collect();
         if set.is_empty() {
             return Err(CodecError::EmptySet { field });
+        }
+        if set.len() != 1 {
+            return Err(CodecError::MultipleAuthorityPrincipals {
+                field,
+                count: set.len(),
+            });
         }
         Ok(PrincipalSet(set))
     }
@@ -283,18 +291,11 @@ impl PrincipalSet {
         &self.0
     }
 
-    /// The canonically first member.
+    /// The sole logical writer.
     ///
-    /// Used only as the **canonical signer rule** for establishment bodies — a body-construction
-    /// constraint that pins the last otherwise-free field, not a choice between competing
-    /// candidates. For a multi-key set, construction therefore requires custody of the
-    /// lowest-encoded member. That is an explicit construction-time liveness constraint, not an
-    /// inference that the lowest key has greater authority; current [`super::ContinuityRoot`]
-    /// construction emits singleton authority sets.
-    ///
-    /// A `PrincipalSet` is non-empty by construction, so this is always `Some`; it returns an
-    /// `Option` rather than unwrapping because this is a protocol path and the crate forbids
-    /// panics there.
+    /// Used as the signer rule for establishment bodies: the only revealed writer must be the
+    /// inline signer. This is not key ordering and never chooses between candidates. It returns an
+    /// `Option` rather than unwrapping because protocol paths do not rely on panics.
     pub fn canonical_signer(&self) -> Option<PrincipalKey> {
         self.0.iter().next().copied()
     }
@@ -311,6 +312,12 @@ impl PrincipalSet {
         let count = r.count(33, field)?;
         if count == 0 {
             return Err(CodecError::EmptySet { field });
+        }
+        if count != 1 {
+            return Err(CodecError::MultipleAuthorityPrincipals {
+                field,
+                count: count as usize,
+            });
         }
         let mut set = BTreeSet::new();
         let mut previous: Option<[u8; 32]> = None;
@@ -490,11 +497,11 @@ impl EventHeader {
 /// The root of a subject's authority log. Its digest **is** the subject identifier.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InceptionBody {
-    /// The key that signed this body. Must be a member of `initial_authority`.
+    /// The key that signed this body. Must be the sole member of `initial_authority`.
     pub signer: PrincipalKey,
     /// The pre-subject context nonce that breaks the genesis fixed point.
     pub context_nonce: ContextNonce,
-    /// The initial authority set `A_0` — the keys authorized to write this log.
+    /// The initial authority set `A_0`, containing exactly one logical log writer.
     pub initial_authority: PrincipalSet,
     /// The pre-rotation commitment `C_1` to the next establishment.
     pub next_commitment: Commitment,
@@ -505,7 +512,7 @@ pub struct InceptionBody {
 pub struct EstablishmentBody {
     /// Common header.
     pub header: EventHeader,
-    /// The revealed pre-committed authority set `A_g`.
+    /// The revealed pre-committed authority set `A_g`, containing one logical log writer.
     pub revealed_authority: PrincipalSet,
     /// The pre-rotation commitment `C_{g+1}` to the establishment after this one.
     pub next_commitment: Commitment,
