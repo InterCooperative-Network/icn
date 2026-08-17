@@ -5,6 +5,13 @@
 
 <style>
   .theme-toggle {
+    /* 44x44 is the touch-target floor in docs/design-language/accessibility.md
+       §3.7. The icon stays 20px; the hit area around it is what grows. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--target-min);
+    min-height: var(--target-min);
     background: transparent;
     border: none;
     cursor: pointer;

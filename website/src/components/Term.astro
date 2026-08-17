@@ -54,9 +54,12 @@ const publicLabel = capitalize
   ? c.public.charAt(0).toUpperCase() + c.public.slice(1)
   : c.public.charAt(0).toLowerCase() + c.public.slice(1);
 
-// The glossary is a generated docs page; anchor on the canonical id so the
-// link keeps working if the heading text is reworded.
-const glossaryHref = `/docs/glossary#${c.canonical}`;
+// /glossary is generated from the same concept map as these labels, and its
+// entry anchors are the canonical concept ids — so a Term link survives a
+// rewording of the public label. (docs/glossary is the technical glossary and
+// has no anchor for most of these concepts; linking there produced dead
+// fragments, which scripts/check-links.mjs caught.)
+const glossaryHref = `/glossary#${c.canonical}`;
 ---
 
 {

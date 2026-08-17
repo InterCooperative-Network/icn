@@ -629,6 +629,9 @@ pre code {
 .nav-logo {
   display: flex;
   align-items: center;
+  /* The logo is a link home and is tapped as often as anything in the nav; it
+     needs the same 44px vertical target as the other controls. */
+  min-height: var(--target-min);
   gap: var(--space-sm);
   font-family: var(--font-heading);
   font-weight: 700;
@@ -709,6 +712,11 @@ pre code {
 }
 .nav-toggle {
   display: none;
+  align-items: center;
+  justify-content: center;
+  /* The mobile menu button is the single most important target on a phone. */
+  min-width: var(--target-min);
+  min-height: var(--target-min);
   background: none;
   border: none;
   color: var(--text-secondary);
