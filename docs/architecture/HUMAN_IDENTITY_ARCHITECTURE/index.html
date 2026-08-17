@@ -2262,11 +2262,14 @@ in adversarial review; folded into <strong>O-N5</strong>.</p>
 </blockquote>
 <h3>9.6 What this does not solve — read this before building on it</h3>
 <ol>
-<li><strong>The per-subject authority log does not exist.</strong> §3.7. <code>RotationEvent</code> has the
-right shape (signed, <code>+1</code> monotone) and is unwired, unverified on apply, and
-signed with a different preimage than it verifies (F9, F10). This is real work.</li>
-<li><strong>Pre-rotation does not exist</strong> anywhere in ICN. It is the load-bearing new
-cryptographic mechanism, and it is the reason scenarios 1 and 2 are contained.</li>
+<li><strong>The N1 per-subject authority-log primitive exists as additive library code in
+<code>icn-identity</code>, but is not production-integrated.</strong> Its canonical bodies, durable join and
+pure derived view are implemented and tested; replication, gateway/runtime wiring and
+migration remain absent. The legacy <code>RotationEvent</code> path described in §3.7 remains unwired and
+is not replaced in production by N1.</li>
+<li><strong>N1 implements deterministic backward-chained pre-rotation as a library primitive, but no
+production path uses it.</strong> It remains load-bearing cryptographic machinery whose operational
+custody, replication and recovery integration are later slices.</li>
 <li><strong>Selective disclosure does not exist and cannot be wired today.</strong> F16: blind
 signatures are not blind, the accumulator uses a 32-bit test modulus, the
 trusted-issuer check passes on an empty list, and the default build can neither
