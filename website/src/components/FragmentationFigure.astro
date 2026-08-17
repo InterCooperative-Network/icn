@@ -168,15 +168,20 @@ const CONNECTED: Fragment[] = [
 
   /* Today's tiles are detached: a dashed edge and a slight stagger, so the
      "these do not connect" claim is legible in grayscale and at a glance.
-     The stagger is a transform, not a margin, so it does not affect layout
-     width and cannot cause horizontal overflow. */
+     Dashed vs solid is a border-style, so the distinction also survives
+     grayscale and forced-colors. */
   .frag-today .frag-item {
     border-style: dashed;
     border-color: var(--border-default);
   }
 
+  /* The stagger was originally `transform: translateX(6%)`, which moves the
+     painted box outside its layout box and pushed the page's scrollWidth past
+     the viewport at 768px. A plain left margin indents the tile and narrows it
+     by the same amount, so the right edge stays on the container's — the
+     stagger reads identically and cannot cause horizontal overflow. */
   .frag-today .frag-item:nth-child(even) {
-    transform: translateX(6%);
+    margin-left: 6%;
   }
 
   /* The ICN column is a single connected spine. The connector is a

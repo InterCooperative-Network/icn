@@ -241,7 +241,10 @@ a:hover {
 }
 code {
   font-family: var(--font-mono);
-  font-size: 0.875em;
+  /* Relative sizing keeps inline code proportional to its surroundings, but
+     inside a 12px note that lands at 10.5px. The max() floors it at the scale
+     minimum without flattening it everywhere else. */
+  font-size: max(0.875em, var(--text-xs));
   background: var(--bg-code);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
@@ -255,6 +258,12 @@ pre {
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
   overflow-x: auto;
+  /* `overflow-x: auto` alone does not stop a <pre> from setting a min-content
+     width on a flex or grid parent, so a long clone URL inside a list item was
+     still widening the page at 320px. The pair below caps it at the parent's
+     width and lets the code scroll inside itself instead. */
+  max-width: 100%;
+  min-width: 0;
   font-size: 0.875rem;
   line-height: 1.7;
 }
@@ -322,7 +331,7 @@ pre code {
   display: inline-block;
   margin-bottom: var(--space-sm);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -390,7 +399,11 @@ pre code {
 .eyebrow {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  /* 12px. docs/design-language/accessibility.md §3.9 allows 11px for mono
+     eyebrows but says 12+ is preferable, and the type scale's own floor
+     (--text-xs) is 12px. Uppercase mono at 11px with 0.14em tracking is the
+     hardest text on the site to read; there is no reason to sit at the floor. */
+  font-size: var(--text-xs);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -407,7 +420,7 @@ pre code {
 .station-number {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0.12em;
   color: var(--accent-teal);
@@ -432,7 +445,7 @@ pre code {
   margin: var(--space-3xl) 0;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.14em;
 }
@@ -473,7 +486,7 @@ pre code {
 }
 .inst-card-eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -786,7 +799,15 @@ pre code {
   border: none;
   text-decoration: none;
   transition: all var(--duration-normal) var(--ease-out);
-  white-space: nowrap;
+  /* `nowrap` alone made a long button label set a min-content width wider than
+     a 320px viewport, pushing the whole page sideways. Buttons should stay on
+     one line whenever they fit and wrap rather than overflow when they do not —
+     which is what `balance` plus a width cap gives, without needing a
+     narrow-viewport override per button. */
+  white-space: normal;
+  text-wrap: balance;
+  max-width: 100%;
+  min-width: 0;
 }
 .btn-primary {
   background: var(--accent-amber);
@@ -1138,6 +1159,19 @@ pre code {
 .prose h2:first-child {
   margin-top: 0;
 }
+.prose {
+  /* Rendered markdown carries long paths, URLs, DIDs and hashes. Any one of
+     them can set a min-content width wider than a narrow viewport and force
+     the page to scroll horizontally. `anywhere` breaks only when there is no
+     better opportunity, so ordinary prose is unaffected. */
+  overflow-wrap: anywhere;
+}
+.prose a,
+.prose code,
+.prose td,
+.prose th {
+  overflow-wrap: anywhere;
+}
 .prose p {
   margin-bottom: 1.25em;
   max-width: 100%;
@@ -1182,6 +1216,9 @@ pre code {
   font-style: italic;
 }
 .prose table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
   width: 100%;
   border-collapse: collapse;
   margin: 1.5em 0;
@@ -1226,7 +1263,7 @@ pre code {
   margin-bottom: var(--space-xl);
 }
 .docs-nav-section h4 {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
@@ -1657,4 +1694,20 @@ pre code {
   .badge-dot {
     background: CanvasText;
   }
+}
+
+/* ─── Narrow-viewport wrapping ──────────────────────────────────────────────
+   Long unbroken strings — file paths, URLs, DIDs, hashes, kebab-case document
+   titles — set a min-content width that can exceed a 320px viewport and force
+   the whole page to scroll sideways. These rules were added after a mechanical
+   audit (scripts/audit-layout.mjs) found the failure on four pages; they are
+   the smallest set that fixes it without affecting ordinary prose. */
+.docs-section-card li a,
+.archive-section li a,
+.gi-surfaces li a,
+.wrn-links li a,
+.footer-col a,
+.path-section li,
+.primitive p {
+  overflow-wrap: anywhere;
 }

@@ -24,7 +24,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <div class="truth-grid truth-grid-2">
         <div class="truth-note truth-note-teal">
           <span class="truth-note-label">Practical proposition</span>
-          <h3>A shared foundation for governance, records, and coordination</h3>
+          <h2 class="intro-card-title">A shared foundation for governance, records, and coordination</h2>
           <p>
             ICN gives democratic organizations a technical foundation for identity,
             governance, rules, records, and inter-organizational coordination.
@@ -32,7 +32,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         </div>
         <div class="truth-note truth-note-amber">
           <span class="truth-note-label">Long-term direction</span>
-          <h3>Sector-governable infrastructure instead of platform tenancy</h3>
+          <h2 class="intro-card-title">Sector-governable infrastructure instead of platform tenancy</h2>
           <p>
             The direction is a shared digital foundation that cooperatives, communities,
             and federations can rely on, help govern, and improve together.
@@ -153,6 +153,13 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 </Layout>
 
 <style>
+  /* Promoted from h3 to h2 so the outline does not skip a level after the
+     page h1. Visual weight is unchanged — level and appearance are separate
+     concerns, and the outline is the one screen readers navigate by. */
+  .intro-card-title {
+    font-size: var(--text-xl);
+  }
+
   /* Sets the reader's expectation for the bracketed ICN terms that follow, so
      the first one is not a surprise. #1740: plain language first, ICN term
      second, deeper meaning on demand. */

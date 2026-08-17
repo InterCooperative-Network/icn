@@ -692,7 +692,7 @@ cargo test --workspace --lib</code></pre>
 }
 .path-nav-num {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--accent-teal);
@@ -786,9 +786,19 @@ cargo test --workspace --lib</code></pre>
   overflow-x: auto;
   font-size: 0.875rem;
   margin: var(--space-sm) 0;
+  /* A clone URL in here was setting the list item's min-content width and
+     pushing the whole page to 595px at a 320px viewport. `overflow-x: auto`
+     alone does not prevent that inside a flex or grid item — the width cap
+     and min-width:0 are what make the block scroll itself instead. */
+  max-width: 100%;
+  min-width: 0;
+}
+.path-steps li {
+  min-width: 0;
 }
 .path-steps code {
-  font-size: 0.85em;
+  /* 0.85em of the surrounding 14px is 11.9px — under the 12px floor. */
+  font-size: max(0.85em, var(--text-xs));
   font-family: var(--font-mono);
 }
 .path-steps pre code {
@@ -839,7 +849,7 @@ cargo test --workspace --lib</code></pre>
 }
 .contribution-next strong { color: var(--text-body); }
 .contribution-card code {
-  font-size: 0.85em;
+  font-size: max(0.85em, var(--text-xs));
   background: var(--bg-surface);
   padding: 0.1em 0.4em;
   border-radius: 4px;
@@ -861,7 +871,7 @@ cargo test --workspace --lib</code></pre>
 .partner-stage-label {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
