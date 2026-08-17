@@ -192,7 +192,8 @@ npm run dev  # python3 -m http.server 8080
 | **React Native SDK** (`sdk/react-native/`) | `npm test && npm run build` |
 | **Pilot UI** (`web/pilot-ui/`) | `npm run test && npm run test:e2e && npm run test:a11y` |
 | **Deploy manifests** (`deploy/`) | Ensure no secrets committed; keep placeholders; update deploy docs if behavior changes |
-| **Documentation** (`docs/`) | Verify links, check terminology consistency, run the doc-control commands below |
+| **Documentation** (`docs/`) | Run the doc-control commands below. If the change touches `docs/status.toml`, `docs/registry.toml`, or `docs/design-language/concept-map.md`, also run `just website-verify` — the public site projects all three |
+| **Website** (`website/`) | `just website-verify` — build, type check, public-state projection, docs publication boundary, internal links, walkthrough fixture safety, claim linting, rendered layout/accessibility audit |
 
 **Doc-control commands (exact forms — run from the monorepo root, not from `docs/`):**
 
@@ -202,6 +203,34 @@ python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status
 python3 .github/scripts/compliance_linter.py --repo-root .
 python3 .github/scripts/readiness_overclaim_linter.py --repo-root .
 ```
+
+### Website commands
+
+`just website-verify` runs everything CI runs for a website change, in CI's
+order, so a CI failure reproduces locally with one command. The individual
+steps, when you want to iterate on one:
+
+```bash
+just website-install       # once, per checkout
+just website-build         # build (runs the five state generators first)
+just website-check         # types, public-state, docs boundary, links, fixtures
+just website-claims        # readiness overclaim linter, scoped to website/
+just website-audit         # rendered audit, 7 pages x 3 widths (needs Chrome)
+just website-audit-full    # the deep matrix, 12 pages x 5 widths
+```
+
+**What each check protects, so a failure is legible:**
+
+| Check | Invariant |
+|-------|-----------|
+| `check:state` | The public maturity page is a projection of `docs/status.toml`, not a second tracker. Catches unmapped status values, operator-only fields leaking into public output, a missing claim axis, a build timestamp posing as a verification date, and non-deterministic generation. |
+| `check:docs` | The public documentation boundary is a security boundary. Catches withheld material (internal, partner, session logs) reaching the site, published material failing to build, archive pages without `noindex` or a banner, and current pages wrongly carrying `noindex`. Writes `public-docs-manifest.json`. |
+| `check:links` | Every internal link resolves and every compatibility redirect still works. Stale fragments inside rendered markdown are reported, not blocking. |
+| `check:fixtures` | `/see-it-work` stays fictional, labelled, deterministic, offline, and read-only. |
+| `audit` | Rendered pages have no horizontal overflow, one `h1`, an unbroken heading outline, landmarks, no sub-12px text, and labelled images and SVGs. |
+
+**Generated files are never edited.** `website/src/data/*.generated.json` are
+projections; each names its source. Change the source and rebuild.
 
 ---
 

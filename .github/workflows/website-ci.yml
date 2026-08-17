@@ -1,0 +1,226 @@
+name: Website CI
+
+# ─── Why this exists ─────────────────────────────────────────────────────────
+#
+# Before this workflow, nothing built, type-checked, or tested `website/` on a
+# pull request. `website-deploy.yml` runs on push to main only, so a broken
+# build failed *after* merge, in a deploy nobody watches, and the live site
+# stayed on the last good version with no signal that anything was wrong.
+#
+# Everything here mirrors `just website-verify`, in the same order, so a
+# contributor or agent can reproduce a CI failure exactly with one command.
+#
+# ─── Cost ────────────────────────────────────────────────────────────────────
+#
+# Path-filtered to website/ and docs/ (the site renders repo-root docs, so a
+# docs change can break it). A Rust-only pull request does not run this at all.
+# Measured on this workspace: build 20s, non-browser checks 23s, full rendered
+# audit 20s. With install and checkout the job lands near two minutes, which is
+# cheap enough to run the COMPLETE audit matrix on every pull request rather
+# than a reduced one — the `pr` profile exists for fast local iteration, not
+# because CI needs the shortcut.
+
+on:
+  pull_request:
+    paths:
+      # docs/** already covers status.toml, registry.toml and the concept
+      # map — the three canonical files the site projects from. Listed as one
+      # glob rather than five so the filter cannot drift out of sync with them.
+      - 'website/**'
+      - 'docs/**'
+      - '.github/workflows/website-ci.yml'
+      - '.github/claim-lint-website.json'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/**'
+      - '.github/workflows/website-ci.yml'
+  # Weekly drift watch — see the `drift` job. Not a second copy of the PR
+  # checks: those already run the full matrix.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# A superseded run has nothing useful left to say.
+concurrency:
+  group: website-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  website:
+    name: Build and verify
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The generators read git history for the build log, and the site
+          # reads repo-root docs/. A shallow clone breaks the first and a
+          # sparse one breaks the second.
+          fetch-depth: 50
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        working-directory: website
+        run: npm ci
+
+      # ─── Build ───────────────────────────────────────────────────────────
+      # `prebuild` runs the five generators. Each fails closed, so a broken
+      # projection of canonical state stops here rather than shipping empty.
+      - name: Build site
+        working-directory: website
+        run: npm run build
+
+      # ─── Non-browser checks ──────────────────────────────────────────────
+      # Split into named steps so the GitHub UI shows which invariant broke
+      # without anyone opening the log.
+
+      - name: Type check
+        working-directory: website
+        run: npm run lint
+
+      - name: Public state projection matches canonical state
+        working-directory: website
+        run: npm run check:state
+
+      - name: Documentation publication boundary
+        working-directory: website
+        run: npm run check:docs
+
+      - name: Internal links and compatibility redirects
+        working-directory: website
+        run: npm run check:links
+
+      - name: Walkthrough fixture safety
+        working-directory: website
+        run: npm run check:fixtures
+
+      # ─── Claim discipline ────────────────────────────────────────────────
+      # The repository's own readiness linter, scoped to website/ by config
+      # rather than reimplemented. Blocking here: a public page is exactly
+      # where an unsupported readiness claim does damage.
+      - name: Readiness overclaim (public content)
+        run: |
+          python3 .github/scripts/readiness_overclaim_linter.py \
+            --repo-root . --config .github/claim-lint-website.json
+
+      # ─── Rendered audit ──────────────────────────────────────────────────
+      # The audit serves dist/ itself on an ephemeral port and drives the
+      # Chrome that ubuntu-latest already ships — no preview server to
+      # orchestrate, no fixed port to collide on, no browser to download.
+      - name: Rendered layout and accessibility audit
+        working-directory: website
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/audit-layout.mjs --profile full --json layout-audit.json
+
+      # ─── Artifacts ───────────────────────────────────────────────────────
+      # Failure-only, and small. The docs manifest is the reviewable answer to
+      # "what does this change actually publish?"; the audit report is the
+      # machine-readable form of the rendered findings.
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-reports
+          path: |
+            website/layout-audit.json
+            website/public-docs-manifest.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: How to reproduce
+        if: failure()
+        run: |
+          echo "::notice title=Reproduce locally::just website-verify"
+          echo "Runs the same steps in the same order. Individual steps:"
+          echo "  just website-build         # build"
+          echo "  just website-check         # types, state, docs boundary, links, fixtures"
+          echo "  just website-claims        # readiness overclaim linter"
+          echo "  just website-audit         # rendered audit (needs Chrome)"
+
+  # ─── Weekly drift watch ────────────────────────────────────────────────────
+  #
+  # NOT a repeat of the PR checks — those already run the full audit matrix on
+  # every change. This job watches what goes wrong with the passage of time
+  # rather than with a diff, and which therefore no pull request would catch:
+  #
+  #   · docs/status.toml going stale, so the public maturity page shows
+  #     verification dates nobody has revisited;
+  #   · the published/withheld documentation split drifting from its recorded
+  #     baseline as documentation is added elsewhere in the repo;
+  #   · stale in-document anchors accumulating across the docs corpus.
+  #
+  # Reports, never blocks. A weekly red cross that gates nobody is a signal;
+  # making it blocking would only mean someone disables it.
+  drift:
+    name: Weekly drift watch
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build site
+        working-directory: website
+        run: npm run build
+
+      # Each prints its own NOTE lines when something has drifted.
+      # `continue-on-error` so one noisy signal does not hide the others.
+      - name: Public-state freshness
+        working-directory: website
+        continue-on-error: true
+        run: npm run check:state
+
+      - name: Documentation boundary drift vs baseline
+        working-directory: website
+        continue-on-error: true
+        run: npm run check:docs
+
+      - name: Internal links and stale anchors across the whole corpus
+        working-directory: website
+        continue-on-error: true
+        run: npm run check:links
+
+      - name: Full rendered audit
+        working-directory: website
+        continue-on-error: true
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: node scripts/audit-layout.mjs --profile full --json layout-audit-full.json
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-drift-watch
+          path: |
+            website/layout-audit-full.json
+            website/public-docs-manifest.json
+          retention-days: 30
+          if-no-files-found: ignore

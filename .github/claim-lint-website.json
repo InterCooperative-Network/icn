@@ -1,0 +1,4 @@
+{
+  "scan_dirs": ["website"],
+  "exclude_dirs": ["dist", "node_modules", "generated"]
+}

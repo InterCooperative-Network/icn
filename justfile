@@ -119,3 +119,47 @@ bootstrap:
 audit:
     cd {{workspace}} && cargo audit
     cd {{workspace}} && cargo deny check
+
+# ─── Website ─────────────────────────────────────────────────────────
+# The public site at intercooperative.network. Everything below runs
+# from `website/` and needs `npm ci` there once.
+#
+# Before pushing a website or docs change, run `just website-verify`.
+# It is what CI runs, in the same order.
+
+# Install website dependencies (respects the lockfile)
+website-install:
+    cd website && npm ci
+
+# Regenerate the projections of canonical repo state
+website-generate:
+    cd website && npm run generate
+
+# Build the static site
+website-build:
+    cd website && npm run build
+
+# Non-browser checks: types, public-state projection, docs boundary,
+# internal links, walkthrough fixture safety. Requires a build first.
+website-check:
+    cd website && npm run check
+
+# Rendered-page audit: overflow, heading outline, landmarks, text size,
+# image/SVG labelling. Representative matrix (7 pages x 3 widths).
+# Serves dist/ itself on an ephemeral port — no preview server to manage.
+website-audit:
+    cd website && npm run audit
+
+# The full audit matrix (12 pages x 5 widths). Slower; used by the
+# scheduled workflow.
+website-audit-full:
+    cd website && npm run audit:full
+
+# Readiness/claim linting over public-facing content
+website-claims:
+    python3 .github/scripts/readiness_overclaim_linter.py --repo-root . --config .github/claim-lint-website.json
+
+# Everything CI runs for a website change, in CI's order and at CI's depth.
+# Use `just website-audit` on its own for a faster loop while iterating.
+website-verify: website-build website-check website-claims website-audit-full
+    @echo "website-verify: all checks passed"

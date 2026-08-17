@@ -22,9 +22,24 @@ npm run format            # Prettier formatting (all files)
 npm run deploy            # Build + deploy to GitHub Pages via gh-pages
 ```
 
-**No CI check builds or type-checks `website/` on a pull request.** The deploy
-workflow runs on push to `main` only, so a broken build fails *after* merge.
-`npm run build && npm run lint` locally is the entire safety net — run both.
+## Before you push
+
+```bash
+just website-verify
+```
+
+from the repository root. It runs exactly what `.github/workflows/website-ci.yml`
+runs, in the same order, so a CI failure reproduces locally in one command.
+
+| Command | What it protects |
+|---------|------------------|
+| `just website-build` | The build, including the five state generators (each fails closed) |
+| `just website-check` | Types · public-state projection · docs publication boundary · internal links · walkthrough fixture safety |
+| `just website-claims` | Readiness overclaim linter, scoped to `website/` |
+| `just website-audit` | Rendered pages: overflow, heading outline, landmarks, text size, image/SVG labelling |
+
+`just website-audit-full` runs the deep 12-page × 5-width matrix; the weekly
+scheduled CI job runs the same thing.
 
 ## Generated projections of canonical state
 

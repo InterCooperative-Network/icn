@@ -51,8 +51,18 @@ jobs:
         id: filter
         with:
           filters: |
+            # Renamed in spirit but not in name: this is "changes that cannot
+            # affect the Rust workspace", and `website/**` qualifies. A
+            # website-only pull request was previously paying for a full
+            # Clippy + Test + Build Release cycle it could not possibly break.
+            # Website changes have their own gate in website-ci.yml.
+            #
+            # Safe because of the `has_rust` counter-signal below: paths-filter
+            # uses a some-quantifier, so a mixed website+Rust PR sets both, and
+            # every consumer requires `docs_only && !has_rust` before skipping.
             docs_only:
               - 'docs/**'
+              - 'website/**'
               - '*.md'
               - '.github/**/*.md'
             # Counter-signal: if any Rust sources changed, never skip required checks
