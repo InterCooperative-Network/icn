@@ -24,21 +24,12 @@
 
 import MaturityBadge from "./MaturityBadge.astro";
 import EvidenceBadge from "./EvidenceBadge.astro";
-import type { Band } from "./MaturityBadge.astro";
-import type { EvidenceId } from "./EvidenceBadge.astro";
-
-interface Subsystem {
-  id: string;
-  name: string;
-  band: Band;
-  bandLabel: string;
-  internalStatus: string;
-  evidence: { id: EvidenceId; label: string; detail: string };
-  lastVerified: string;
-  gaps: string[];
-  evidenceNotes: string[];
-  crates: string[];
-}
+// The row shape is defined once, in the typed accessor for the generated
+// projection. Re-declaring it here let the two drift: when `evidenceNotes` was
+// dropped from the projection (it was leaking a deployment-liveness claim),
+// this file still declared it and the build failed with a mismatch nobody
+// could act on. One definition, imported.
+import type { Subsystem } from "../lib/projectState";
 
 export interface Props {
   subsystems: Subsystem[];

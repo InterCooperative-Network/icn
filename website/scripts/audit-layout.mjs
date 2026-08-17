@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 // audit-layout.mjs — mechanical accessibility and responsive checks.
 //
-//   node scripts/audit-layout.mjs [baseUrl]     default http://localhost:4321
+//   node scripts/audit-layout.mjs [--profile pr|full] [--json <path>] [--base <url>]
 //
-// Run against `npm run preview`. Exits non-zero if any check fails.
+// Serves `dist/` itself on an ephemeral port and audits that. Pass --base to
+// audit an already-running server instead. Exits non-zero if any check fails.
+//
+// Serving in-process rather than orchestrating `astro preview` in the shell is
+// deliberate: a backgrounded preview needs a readiness poll, a trap to clean
+// up, and a fixed port that conflicts with whatever the developer already has
+// running. One process that owns its own server has none of those problems and
+// behaves identically on a laptop and on a CI runner.
+//
+//   --profile pr     7 pages x 3 widths — the PR gate. ~15s.
+//   --profile full   12 pages x 5 widths — the deep sweep. ~40s. (default)
+//   --json <path>    also write a machine-readable report, for CI artifacts
+//                    and for agents that would rather parse than read.
 //
 // ─── Why this exists ─────────────────────────────────────────────────────────
 //
@@ -38,29 +50,126 @@
 // It does NOT replace a human pass. Contrast, focus visibility, screen-reader
 // comprehension, and whether the page makes sense are not checkable here.
 
+import fs from "node:fs";
+import http from "node:http";
+import path from "node:path";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const BASE = process.argv[2] ?? "http://localhost:4321";
+const websiteRootDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
-/** Representative pages, per the tranche's validation list. */
-const PAGES = [
-  "/",
-  "/what-is-icn",
-  "/why-icn",
-  "/how-it-works",
-  "/see-it-work",
-  "/whats-real-now",
-  "/for-cooperatives",
-  "/get-involved",
-  "/docs",
-  "/docs/archive",
-  "/docs/glossary",
-  "/docs/archive/README",
-];
+const argv = process.argv.slice(2);
+function flag(name, fallback) {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 ? argv[i + 1] : fallback;
+}
 
-/** Narrow mobile, mobile, tablet, laptop, wide desktop. */
-const WIDTHS = [320, 375, 768, 1280, 1600];
+const EXPLICIT_BASE = flag("base", null);
+const PROFILE = flag("profile", "full");
+const JSON_OUT = flag("json", null);
+const SERVE_DIR = path.resolve(websiteRootDir, flag("serve", "dist"));
+
+/**
+ * Two matrices.
+ *
+ * `pr` is the subset that covers every distinct layout archetype on the site —
+ * a marketing page, a long-form narrative, the walkthrough, the generated
+ * state table, the docs landing, an archive page, and a rendered markdown
+ * document — at the three widths where the layout actually changes. Adding the
+ * remaining pages mostly re-tests the same CSS.
+ *
+ * `full` is the complete sweep, for the scheduled run.
+ */
+const PAGE_SETS = {
+  pr: [
+    "/",
+    "/what-is-icn",
+    "/how-it-works",
+    "/see-it-work",
+    "/whats-real-now",
+    "/docs",
+    "/docs/archive",
+  ],
+  full: [
+    "/",
+    "/what-is-icn",
+    "/why-icn",
+    "/how-it-works",
+    "/see-it-work",
+    "/whats-real-now",
+    "/for-cooperatives",
+    "/get-involved",
+    "/glossary",
+    "/docs",
+    "/docs/archive",
+    "/docs/archive/README",
+  ],
+};
+
+const WIDTH_SETS = {
+  // 320 catches min-width failures, 768 catches the tablet breakpoint edge
+  // (where several grids change), 1280 catches the desktop layout.
+  pr: [320, 768, 1280],
+  full: [320, 375, 768, 1280, 1600],
+};
+
+if (!PAGE_SETS[PROFILE]) {
+  console.error(`[audit] unknown profile "${PROFILE}". Use pr or full.`);
+  process.exit(2);
+}
+
+const PAGES = PAGE_SETS[PROFILE];
+const WIDTHS = WIDTH_SETS[PROFILE];
+
+/**
+ * Minimal static server for the built site. Enough for an audit: index.html
+ * resolution for directory routes, correct content types for the handful of
+ * asset kinds Astro emits, and nothing else.
+ */
+function serveDist(root) {
+  const TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".woff2": "font/woff2",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+  };
+  const server = http.createServer((req, res) => {
+    const url = decodeURIComponent((req.url ?? "/").split("?")[0]);
+    let filePath = path.join(root, url);
+    try {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(filePath, "index.html");
+      }
+      // Never serve outside the build directory.
+      if (!path.resolve(filePath).startsWith(path.resolve(root))) {
+        res.writeHead(403).end();
+        return;
+      }
+      const body = fs.readFileSync(filePath);
+      res.writeHead(200, {
+        "content-type":
+          TYPES[path.extname(filePath)] ?? "application/octet-stream",
+      });
+      res.end(body);
+    } catch {
+      res.writeHead(404, { "content-type": "text/plain" }).end("not found");
+    }
+  });
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () =>
+      resolve({ server, port: server.address().port }),
+    );
+  });
+}
 
 const CHROME =
   process.env.CHROME_BIN ??
@@ -234,8 +343,26 @@ const AUDIT_EXPR = `(() => {
 
 // ─── Run ─────────────────────────────────────────────────────────────────────
 
+let staticServer = null;
+let BASE = EXPLICIT_BASE;
+if (!BASE) {
+  if (!fs.existsSync(SERVE_DIR)) {
+    console.error(
+      `[audit] FAIL: ${path.relative(websiteRootDir, SERVE_DIR)} not found. Run \`npm run build\` first.`,
+    );
+    process.exit(1);
+  }
+  const served = await serveDist(SERVE_DIR);
+  staticServer = served.server;
+  BASE = `http://127.0.0.1:${served.port}`;
+}
+
 const chrome = launchChrome();
-process.on("exit", () => chrome.kill());
+function cleanup() {
+  chrome.kill();
+  staticServer?.close();
+}
+process.on("exit", cleanup);
 
 const target = await cdpTarget();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -247,8 +374,32 @@ const session = new Session(ws);
 await session.send("Page.enable");
 await session.send("Runtime.enable");
 
-const failures = [];
+/** Structured findings, for the JSON report and for concise output. */
+const findings = [];
 const notes = [];
+
+/**
+ * Remediation hints keyed by finding kind. CI output that says what to do is
+ * the difference between a check people fix and a check people re-run.
+ */
+const HINTS = {
+  overflow:
+    "an element is wider than the viewport. Usual causes: white-space:nowrap on a long label, a transform that moves a box outside its layout box, a <pre> or table inside a flex/grid item without min-width:0, or a long unbroken string needing overflow-wrap:anywhere.",
+  h1: "each page needs exactly one <h1>.",
+  "heading-skip":
+    "heading levels must not skip. Change the element level; visual weight is a separate concern set by CSS.",
+  landmark: "the page is missing a required landmark or the skip link.",
+  "text-size":
+    "text below 12px. Use var(--text-xs) as the floor; for relative sizes use max(<em value>, var(--text-xs)).",
+  "img-alt":
+    "every <img> needs an alt attribute (empty alt for decorative images).",
+  "svg-label":
+    'decorative SVGs need aria-hidden="true" focusable="false"; meaningful ones need aria-label or a <title>.',
+};
+
+function record(kind, page, width, detail) {
+  findings.push({ kind, page, width, detail });
+}
 
 for (const path of PAGES) {
   for (const width of WIDTHS) {
@@ -272,37 +423,33 @@ for (const path of PAGES) {
     try {
       r = await session.evaluate(AUDIT_EXPR);
     } catch (err) {
-      failures.push(`${path} @${width}: audit threw — ${err.message}`);
+      record("error", path, width, err.message);
       continue;
     }
 
-    const where = `${path} @${width}`;
     if (r.overflow.length) {
-      failures.push(
-        `${where}: horizontal overflow (scrollWidth ${r.sw} > ${r.vw}) — ${r.overflow.join("; ")}`,
+      record(
+        "overflow",
+        path,
+        width,
+        `+${r.sw - r.vw}px \u2014 ${r.overflow[0]}`,
       );
     }
     if (width === WIDTHS[0]) {
-      if (r.h1Count !== 1)
-        failures.push(`${path}: expected exactly one h1, found ${r.h1Count}`);
+      if (r.h1Count !== 1) record("h1", path, null, `found ${r.h1Count}`);
       if (r.skips.length)
-        failures.push(`${path}: heading level skipped — ${r.skips.join(", ")}`);
+        record("heading-skip", path, null, r.skips.join(", "));
       for (const [k, present] of Object.entries(r.landmarks)) {
-        if (!present) failures.push(`${path}: missing ${k}`);
+        if (!present) record("landmark", path, null, `missing ${k}`);
       }
       if (r.minFont < 12)
-        failures.push(
-          `${path}: text below 12px — ${r.minFont}px on ${r.minFontEl}`,
-        );
-      if (r.imgNoAlt)
-        failures.push(`${path}: ${r.imgNoAlt} image(s) without alt`);
+        record("text-size", path, null, `${r.minFont}px on ${r.minFontEl}`);
+      if (r.imgNoAlt) record("img-alt", path, null, `${r.imgNoAlt} image(s)`);
       if (r.svgUnlabelled)
-        failures.push(
-          `${path}: ${r.svgUnlabelled} svg(s) neither aria-hidden nor labelled`,
-        );
+        record("svg-label", path, null, `${r.svgUnlabelled} svg(s)`);
       if (r.smallTargets.length) {
         notes.push(
-          `${path}: non-prose targets under 44px — ${r.smallTargets.join("; ")}`,
+          `${path}: non-prose targets under 44px \u2014 ${r.smallTargets.join("; ")}`,
         );
       }
     }
@@ -312,25 +459,63 @@ for (const path of PAGES) {
 
 process.stdout.write("\n\n");
 
+if (JSON_OUT) {
+  fs.writeFileSync(
+    JSON_OUT,
+    JSON.stringify(
+      {
+        schema: "icn-website-layout-audit/v1",
+        profile: PROFILE,
+        base: BASE,
+        pages: PAGES,
+        widths: WIDTHS,
+        pass: findings.length === 0,
+        findings,
+        notes,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  console.log(`[audit] report \u2192 ${JSON_OUT}`);
+}
+
 if (notes.length) {
-  console.log(`${notes.length} note(s):`);
-  for (const n of notes) console.log("  · " + n);
+  console.log(`[audit] ${notes.length} note(s), not failures:`);
+  for (const n of notes.slice(0, 3)) console.log("        \u00b7 " + n);
+  if (notes.length > 3)
+    console.log(
+      `        \u00b7 \u2026and ${notes.length - 3} more (see the --json report)`,
+    );
   console.log("");
 }
 
-if (failures.length) {
+if (findings.length) {
   console.error(
-    `FAIL — ${failures.length} problem(s) across ${PAGES.length} pages × ${WIDTHS.length} widths:`,
+    `[audit] FAIL \u2014 ${findings.length} problem(s) across ${PAGES.length} pages \u00d7 ${WIDTHS.length} widths (profile: ${PROFILE})\n`,
   );
-  for (const f of failures) console.error("  ✗ " + f);
-  chrome.kill();
+  // Grouped by kind so each remediation hint prints once rather than after
+  // every occurrence.
+  const byKind = new Map();
+  for (const f of findings) {
+    if (!byKind.has(f.kind)) byKind.set(f.kind, []);
+    byKind.get(f.kind).push(f);
+  }
+  for (const [kind, list] of byKind) {
+    for (const f of list) {
+      const at = f.width ? ` @ ${f.width}px` : "";
+      console.error(`  FAIL ${f.page}${at}\n       ${kind}: ${f.detail}`);
+    }
+    if (HINTS[kind]) console.error(`       \u2192 ${HINTS[kind]}\n`);
+  }
+  cleanup();
   process.exit(1);
 }
 
 console.log(
-  `PASS — ${PAGES.length} pages × ${WIDTHS.length} widths: no horizontal overflow, ` +
-    `single h1 and unbroken heading outline, landmarks present, no sub-12px text, ` +
-    `images and SVGs labelled.`,
+  `[audit] PASS \u2014 ${PAGES.length} pages \u00d7 ${WIDTHS.length} widths (profile: ${PROFILE}): ` +
+    `no horizontal overflow, single h1 and unbroken heading outline, landmarks present, ` +
+    `no sub-12px text, images and SVGs labelled.`,
 );
-chrome.kill();
+cleanup();
 process.exit(0);

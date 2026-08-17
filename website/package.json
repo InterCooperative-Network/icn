@@ -14,7 +14,15 @@
     "deploy": "astro build && npx gh-pages -d dist",
     "lint": "astro check",
     "format": "prettier --write .",
-    "format:check:changed": "bash scripts/format-check-changed.sh"
+    "format:check:changed": "bash scripts/format-check-changed.sh",
+    "format:check": "prettier --check src scripts",
+    "check:state": "node scripts/check-public-state.mjs",
+    "check:docs": "node scripts/check-docs-boundary.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:fixtures": "node scripts/check-fixture-safety.mjs",
+    "audit": "node scripts/audit-layout.mjs --profile pr",
+    "audit:full": "node scripts/audit-layout.mjs --profile full",
+    "check": "npm run lint && npm run check:state && npm run check:docs && npm run check:links && npm run check:fixtures"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",

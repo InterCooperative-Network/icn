@@ -190,8 +190,16 @@ for (const [key, raw] of Object.entries(status.subsystems)) {
     // gaps[] is the honesty budget: what the repo says is missing. Publishing
     // it is the point — ADR-0032 rule 7 requires gaps be named, not buried.
     gaps: Array.isArray(raw.gaps) ? raw.gaps.map(String) : [],
-    // A short evidence list helps a reader check the claim themselves.
-    evidenceNotes: Array.isArray(raw.evidence) ? raw.evidence.map(String) : [],
+    // `evidence[]` is deliberately NOT projected. It reads like a harmless
+    // list of what was checked, but the entries are free text written for
+    // maintainers and two of them currently carry deployment-liveness claims
+    // ("K3s deployment running 2+ months") that
+    // docs/reference/project-index/show-readiness-map.md § red lines forbids
+    // on a public surface. check-public-state.mjs caught it here.
+    //
+    // Projecting a field no page renders is pure leak surface. If a future
+    // page wants evidence detail, add it back with an explicit filter and a
+    // decision about each entry — not as a bulk copy.
     crates: Array.isArray(raw.crates) ? raw.crates.map(String) : [],
   });
 }

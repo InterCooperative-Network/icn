@@ -33,7 +33,6 @@ export interface Subsystem {
   lastVerified: string;
   /** The project's own record of what is missing. Published, not summarised. */
   gaps: string[];
-  evidenceNotes: string[];
   crates: string[];
 }
 
