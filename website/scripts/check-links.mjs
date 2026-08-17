@@ -86,6 +86,12 @@ const REQUIRED_REDIRECTS = [
  */
 const DOCS_FRAGMENTS_BLOCKING = false;
 
+/** Optional structured output, for the weekly drift report. */
+const REPORT_JSON = (() => {
+  const i = process.argv.indexOf("--report-json");
+  return i >= 0 ? process.argv[i + 1] : null;
+})();
+
 const errors = [];
 const reported = [];
 
@@ -238,6 +244,27 @@ for (const [target, why] of brokenByTarget) {
 }
 
 // ─── Report ──────────────────────────────────────────────────────────────────
+
+if (REPORT_JSON) {
+  fs.writeFileSync(
+    REPORT_JSON,
+    JSON.stringify(
+      {
+        schema: "icn-website-link-check/v1",
+        checkedLinks,
+        pages: routeFile.size,
+        redirects: REQUIRED_REDIRECTS.length,
+        blocking: errors.length,
+        staleDocFragments: reported.length,
+        staleDocFragmentSamples: reported
+          .slice(0, 20)
+          .map((r) => r.split("\n")[0]),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+}
 
 if (reported.length > 0) {
   console.log(

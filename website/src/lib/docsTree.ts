@@ -45,6 +45,20 @@ const ACRONYMS: Array<[RegExp, string]> = [
   [/\bCi\b/g, "CI"],
 ];
 
+/**
+ * Strip inline markdown from an extracted title. A doc whose H1 is
+ * `# **ALL TESTS FIXED**` was rendering its asterisks in the navigation.
+ */
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\*\*([^*]*)\*\*/g, "$1")
+    .replace(/(^|\s)\*([^*]+)\*/g, "$1$2")
+    .replace(/(^|\s)_([^_]+)_/g, "$1$2")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .trim();
+}
+
 export function titleFromFilename(filename: string): string {
   let out = filename
     .replace(/\.md$/, "")
@@ -72,7 +86,7 @@ function titleForDoc(absPath: string, doc: PublishedDoc): string {
             .trim()
             .replace(/^["']([\s\S]*)["']$/, "$1")
             .trim();
-          if (unquoted.length > 0) return unquoted;
+          if (unquoted.length > 0) return stripInlineMarkdown(unquoted);
         }
       }
     }
@@ -83,7 +97,7 @@ function titleForDoc(absPath: string, doc: PublishedDoc): string {
       if (end > 0) body = content.slice(end + 4);
     }
     const h1 = body.match(/^#\s+(.+?)\s*$/m);
-    if (h1) return h1[1].trim();
+    if (h1) return stripInlineMarkdown(h1[1]);
   } catch {
     // fall through
   }
@@ -106,20 +120,28 @@ function toEntry(doc: PublishedDoc, docsRoot: string): DocEntry {
 }
 
 /**
- * Group one layer's documents into sections by their top-level directory.
- * Root-level files land in a section named `rootSectionName`.
+ * Group one layer's documents into sections by directory.
+ *
+ * `depth` controls how many path segments form the section name. The archive
+ * needs 2: at depth 1 every one of its ~89 documents lands in a single
+ * "Archive" section, which rendered as one enormous column beside two nearly
+ * empty ones. Grouping by year balances the layout and is more useful to read.
  */
 export function sectionsForLayer(
   layer: DocLayer,
   rootSectionName = "Overview",
+  depth = 1,
 ): DocSection[] {
   const docsRoot = resolveRepoDocsRoot();
   const byDir = new Map<string, DocEntry[]>();
 
   for (const doc of publishedDocs(layer)) {
     const parts = doc.slug.split("/");
-    const dir = parts.length > 1 ? parts[0] : "";
-    const key = dir === "" ? rootSectionName : titleFromFilename(dir);
+    const dirs = parts.slice(0, Math.min(depth, parts.length - 1));
+    const key =
+      dirs.length === 0
+        ? rootSectionName
+        : dirs.map(titleFromFilename).join(" \u00b7 ");
     if (!byDir.has(key)) byDir.set(key, []);
     byDir.get(key)!.push(toEntry(doc, docsRoot));
   }

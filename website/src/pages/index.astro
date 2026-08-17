@@ -431,6 +431,22 @@ const PARTICIPATION = [
     margin-bottom: var(--space-lg);
   }
 
+  /* At 62ch a 56px display face broke the headline into four short lines with
+     half the viewport empty beside it. A wider measure for the headline only —
+     the body copy underneath stays at a readable width — lets it set as the
+     two lines the markup's line break assumes. */
+  @media (min-width: 900px) {
+    .hero-home-inner {
+      max-width: 74ch;
+    }
+    .hero-home .hero-lede {
+      max-width: 58ch;
+    }
+    .hero-home .hero-qualifier {
+      max-width: 58ch;
+    }
+  }
+
   /* The second line of the headline is the claim that does the work, so it
      carries the accent. A single accent colour on one clause — not gradient
      text, which MUST_NOT_SHIP item 8 rejects on anything but the brand name. */

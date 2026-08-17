@@ -60,10 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # The generators read git history for the build log, and the site
-          # reads repo-root docs/. A shallow clone breaks the first and a
-          # sparse one breaks the second.
-          fetch-depth: 50
+          # gen-build-log.mjs scans up to 400 commits to find 12 that
+          # correspond to a public state change. A shallower clone silently
+          # produces a shorter build log rather than failing, so the depth is
+          # matched to the scan.
+          fetch-depth: 400
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -120,10 +121,11 @@ jobs:
       # The audit serves dist/ itself on an ephemeral port and drives the
       # Chrome that ubuntu-latest already ships — no preview server to
       # orchestrate, no fixed port to collide on, no browser to download.
+      # audit-layout.mjs finds Chrome on PATH (ubuntu runners ship it) and
+      # reports exactly what it tried if it cannot. No CHROME_BIN pin, and no
+      # browser download.
       - name: Rendered layout and accessibility audit
         working-directory: website
-        env:
-          CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/audit-layout.mjs --profile full --json layout-audit.json
 
       # ─── Artifacts ───────────────────────────────────────────────────────
@@ -174,7 +176,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 50
+          fetch-depth: 400
 
       - uses: actions/setup-node@v6
         with:
@@ -190,30 +192,29 @@ jobs:
         working-directory: website
         run: npm run build
 
-      # Each prints its own NOTE lines when something has drifted.
-      # `continue-on-error` so one noisy signal does not hide the others.
+      # These run to completion regardless; drift-report.mjs is what decides
+      # whether the run is red, after every artifact has been collected.
       - name: Public-state freshness
         working-directory: website
         continue-on-error: true
         run: npm run check:state
 
-      - name: Documentation boundary drift vs baseline
+      - name: Documentation boundary (writes the manifest)
         working-directory: website
         continue-on-error: true
         run: npm run check:docs
 
-      - name: Internal links and stale anchors across the whole corpus
+      - name: Internal links across the whole corpus
         working-directory: website
         continue-on-error: true
-        run: npm run check:links
+        run: node scripts/check-links.mjs --report-json link-report.json
 
       - name: Full rendered audit
         working-directory: website
         continue-on-error: true
-        env:
-          CHROME_BIN: /usr/bin/google-chrome
         run: node scripts/audit-layout.mjs --profile full --json layout-audit-full.json
 
+      # Artifacts first, so a red result never costs anyone the evidence.
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -222,5 +223,14 @@ jobs:
           path: |
             website/layout-audit-full.json
             website/public-docs-manifest.json
+            website/link-report.json
           retention-days: 30
           if-no-files-found: ignore
+
+      # Writes the job summary and ::warning annotations, then exits non-zero
+      # if anything drifted. This job gates no merge, so a red cross is free —
+      # and it is the only thing that stops a maintenance workflow from sitting
+      # permanently green with its findings buried in a log.
+      - name: Drift summary
+        working-directory: website
+        run: node scripts/drift-report.mjs

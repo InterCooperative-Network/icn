@@ -17,7 +17,9 @@ import Search from '../../components/Search.astro';
 import { sectionsForLayer, entriesForLayers } from '../../lib/docsTree';
 import { DOCS_COUNTS } from '../../lib/docsClassification';
 
-const sections = sectionsForLayer('archive', 'Older root documents');
+// Depth 2 so the archive groups by year rather than collapsing into a
+// single ~89-item column. See sectionsForLayer.
+const sections = sectionsForLayer('archive', 'Older root documents', 2);
 const searchable = entriesForLayers(['archive']);
 ---
 

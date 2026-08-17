@@ -419,12 +419,20 @@ const description =
     display: flex;
     gap: var(--space-md);
     align-items: baseline;
-    flex-wrap: wrap;
     margin-bottom: var(--space-lg);
+  }
+
+  /* The number stays beside its title. Previously the head wrapped, so a long
+     title (step 04) pushed its own number onto a separate line while short
+     titles kept theirs inline — the numbering read as inconsistent. Letting
+     the title shrink instead keeps every step identical. */
+  .wt-step-head .station-number {
+    flex: none;
   }
 
   .wt-step-title {
     font-size: var(--text-2xl);
+    flex: 1;
     min-width: 0;
   }
 

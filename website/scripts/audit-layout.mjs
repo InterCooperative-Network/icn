@@ -46,6 +46,15 @@
 //      are exempt, since padding a link inside a sentence breaks the line box).
 //   5. No text below 12px (§3.9).
 //   6. Every image has alt text; every meaningful SVG is labelled or hidden.
+//   7. Under prefers-reduced-motion, nothing is left animating and no content
+//      is stranded invisible.
+//
+// Check 7 is here rather than in the manual pass because the failure it
+// catches is not a comfort preference — it is content loss. The reveal system
+// hides elements at opacity 0 and reveals them from script; if reduced-motion
+// handling regresses, a reader who has asked for less motion gets a page with
+// missing sections and no indication anything is wrong. Computed styles under
+// an emulated media feature are deterministic, so the check is stable.
 //
 // It does NOT replace a human pass. Contrast, focus visibility, screen-reader
 // comprehension, and whether the page makes sense are not checkable here.
@@ -171,15 +180,71 @@ function serveDist(root) {
   });
 }
 
-const CHROME =
-  process.env.CHROME_BIN ??
-  ["/opt/google/chrome/chrome", "/usr/bin/google-chrome"].find(Boolean);
+/**
+ * Find a Chrome or Chromium binary.
+ *
+ * The previous implementation was `[pathA, pathB].find(Boolean)`, which
+ * returns the first truthy *string* rather than the first path that exists —
+ * so it always resolved to one hardcoded location whether or not anything was
+ * there, and failed opaquely everywhere else.
+ *
+ * Order: an explicit CHROME_BIN, then names on PATH (which is how a developer
+ * machine and most CI images actually expose it), then the usual install
+ * locations. GitHub's ubuntu runners ship Chrome, so nothing is downloaded.
+ */
+function findChrome() {
+  if (process.env.CHROME_BIN) {
+    if (fs.existsSync(process.env.CHROME_BIN)) return process.env.CHROME_BIN;
+    throw new Error(
+      `CHROME_BIN is set to "${process.env.CHROME_BIN}" but no file exists there.`,
+    );
+  }
+
+  const names = [
+    "google-chrome-stable",
+    "google-chrome",
+    "chromium-browser",
+    "chromium",
+    "chrome",
+  ];
+  const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  for (const name of names) {
+    for (const dir of dirs) {
+      const candidate = path.join(dir, name);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch {
+        /* keep looking */
+      }
+    }
+  }
+
+  const wellKnown = [
+    "/opt/google/chrome/chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ];
+  for (const candidate of wellKnown) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(
+    "No Chrome or Chromium binary found.\n" +
+      `  Tried on PATH: ${names.join(", ")}\n` +
+      `  Tried directly: ${wellKnown.join(", ")}\n` +
+      "  Set CHROME_BIN to an explicit path, or install Chrome. This audit\n" +
+      "  deliberately does not download a browser.",
+  );
+}
 
 const PORT = 9333;
 
 function launchChrome() {
   const child = spawn(
-    CHROME,
+    findChrome(),
     [
       "--headless=new",
       `--remote-debugging-port=${PORT}`,
@@ -395,6 +460,8 @@ const HINTS = {
     "every <img> needs an alt attribute (empty alt for decorative images).",
   "svg-label":
     'decorative SVGs need aria-hidden="true" focusable="false"; meaningful ones need aria-label or a <title>.',
+  "reduced-motion":
+    "with prefers-reduced-motion, content must be fully visible and nothing may still be animating. Usual cause: a new component animates opacity without inheriting the global reduced-motion rule in global.css, so a reader who asked for less motion loses the content entirely.",
 };
 
 function record(kind, page, width, detail) {
@@ -457,6 +524,88 @@ for (const path of PAGES) {
   process.stdout.write(".");
 }
 
+// ─── Reduced motion ──────────────────────────────────────────────────────────
+//
+// One extra pass at a single width. The site's global rule collapses animation
+// and transition durations to 0.01ms under prefers-reduced-motion, so anything
+// still above 50ms has bypassed it (an !important, an inline style, or a new
+// component that never inherited the rule).
+
+await session.send("Emulation.setEmulatedMedia", {
+  features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+});
+await session.send("Emulation.setDeviceMetricsOverride", {
+  width: WIDTHS[WIDTHS.length - 1],
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
+
+const REDUCED_MOTION_EXPR = `(() => {
+  let stranded = 0, animating = 0, transitioning = 0, firstStranded = '';
+  for (const el of document.body.querySelectorAll('*')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    if (parseFloat(cs.opacity) === 0) {
+      stranded++;
+      if (!firstStranded) firstStranded = el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\\s+/)[0] : '');
+    }
+    if (cs.animationName !== 'none' && parseFloat(cs.animationDuration) > 0.05) animating++;
+    if (parseFloat(cs.transitionDuration) > 0.05) transitioning++;
+  }
+  return { stranded, animating, transitioning, firstStranded,
+           unrevealed: document.querySelectorAll('.reveal:not(.revealed)').length };
+})()`;
+
+for (const path of PAGES) {
+  await session.send("Page.navigate", { url: BASE + path });
+  for (let i = 0; i < 40; i++) {
+    const state = await session.evaluate("document.readyState");
+    if (state === "complete" || state === "interactive") break;
+    await sleep(100);
+  }
+  await sleep(150);
+  try {
+    const r = await session.evaluate(REDUCED_MOTION_EXPR);
+    if (r.stranded > 0) {
+      record(
+        "reduced-motion",
+        path,
+        null,
+        `${r.stranded} element(s) left at opacity 0 (first: ${r.firstStranded})`,
+      );
+    }
+    if (r.unrevealed > 0) {
+      record(
+        "reduced-motion",
+        path,
+        null,
+        `${r.unrevealed} .reveal element(s) never revealed`,
+      );
+    }
+    if (r.animating > 0) {
+      record(
+        "reduced-motion",
+        path,
+        null,
+        `${r.animating} element(s) still animating`,
+      );
+    }
+    if (r.transitioning > 0) {
+      record(
+        "reduced-motion",
+        path,
+        null,
+        `${r.transitioning} element(s) with transitions over 50ms`,
+      );
+    }
+  } catch (err) {
+    record("error", path, null, `reduced-motion pass: ${err.message}`);
+  }
+  process.stdout.write("~");
+}
+
 process.stdout.write("\n\n");
 
 if (JSON_OUT) {
@@ -515,7 +664,7 @@ if (findings.length) {
 console.log(
   `[audit] PASS \u2014 ${PAGES.length} pages \u00d7 ${WIDTHS.length} widths (profile: ${PROFILE}): ` +
     `no horizontal overflow, single h1 and unbroken heading outline, landmarks present, ` +
-    `no sub-12px text, images and SVGs labelled.`,
+    `no sub-12px text, images and SVGs labelled, reduced-motion leaves nothing hidden.`,
 );
 cleanup();
 process.exit(0);
