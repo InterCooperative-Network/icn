@@ -1,0 +1,233 @@
+---
+// src/pages/docs/archive.astro — the historical documentation index.
+//
+// PRIMARY JOB: keep old documentation reachable and searchable on purpose,
+// while making it impossible to mistake for current guidance.
+//
+// #2609 is explicit that history is preserved, not deleted: "No deletion of
+// historical documentation merely because it is old" and "Preserve direct
+// links and intentional archive discovery." So this is a real index with its
+// own search, not a hidden directory. What it is not is part of the default
+// docs search, and its pages carry noindex — the goal is that finding this
+// material requires deciding to, rather than stumbling into it from a search
+// engine while looking for how ICN works today.
+
+import Layout from '../../layouts/Layout.astro';
+import Search from '../../components/Search.astro';
+import { sectionsForLayer, entriesForLayers } from '../../lib/docsTree';
+import { DOCS_COUNTS } from '../../lib/docsClassification';
+
+const sections = sectionsForLayer('archive', 'Older root documents');
+const searchable = entriesForLayers(['archive']);
+---
+
+<Layout
+  title="Documentation archive"
+  description="Historical ICN documentation, kept for the record. These pages describe the project as it was at the time they were written and are not current project state."
+  activeNav="docs"
+  robots="noindex, follow"
+>
+  <section class="section archive-page">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/docs">Docs</a>
+        <span class="breadcrumb-sep" aria-hidden="true">/</span>
+        <span class="breadcrumb-current">Archive</span>
+      </nav>
+
+      <header class="archive-head">
+        <span class="eyebrow">Historical material</span>
+        <h1>The archive.</h1>
+        <p class="lede">
+          {DOCS_COUNTS.archive} documents that were accurate when written and have
+          not been maintained since — old plans, completed phases, superseded
+          decisions, and records of work that has moved on.
+        </p>
+      </header>
+
+      <div class="callout callout-archive">
+        <span class="callout-label">Read this before using anything below</span>
+        <p>
+          Nothing on these pages should be treated as a statement about how ICN
+          works today. Implementation details, status claims, timelines, and
+          architecture described here have in many cases been superseded — in
+          some cases by decisions that are themselves in this archive.
+        </p>
+        <p>
+          These documents are kept because deleting them would make the
+          project's reasoning unreconstructable. They are useful as
+          archaeology, not as reference.
+        </p>
+        <p class="archive-cta">
+          For current material: <a href="/docs">the documentation index</a>.
+          For what is actually built and how well it is evidenced:
+          <a href="/whats-real-now">What's real now</a>.
+        </p>
+      </div>
+
+      <section class="archive-browse" aria-labelledby="archive-browse-heading">
+        <h2 id="archive-browse-heading">Search the archive</h2>
+        <p class="measure archive-browse-note">
+          This search covers only historical documents. Current documentation is
+          searched from <a href="/docs">the main documentation page</a>.
+        </p>
+
+        <Search searchList={searchable} />
+
+        <div class="archive-grid" id="docs-grid">
+          {sections.map((section) => (
+            <div class="docs-section-card archive-section" data-section>
+              <h3>{section.name}</h3>
+              <ul>
+                {section.docs.map((doc) => (
+                  <li data-slug={doc.slug}>
+                    <a href={doc.path}>{doc.title}</a>
+                    {doc.archiveReason && (
+                      <span class="archive-reason">{doc.archiveReason}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <script>
+    const sections = document.querySelectorAll<HTMLElement>('[data-section]');
+
+    document.addEventListener('search-filter', (event) => {
+      const detail = (event as CustomEvent<{ matches: string[] }>).detail;
+      const matches = new Set(detail.matches);
+
+      sections.forEach((section) => {
+        let visible = 0;
+        section.querySelectorAll<HTMLElement>('li[data-slug]').forEach((item) => {
+          const slug = item.getAttribute('data-slug');
+          const isMatch = slug !== null && matches.has(slug);
+          item.hidden = !isMatch;
+          if (isMatch) visible += 1;
+        });
+        section.hidden = visible === 0;
+      });
+    });
+
+    document.addEventListener('search-clear', () => {
+      sections.forEach((section) => {
+        section.hidden = false;
+        section
+          .querySelectorAll<HTMLElement>('li[data-slug]')
+          .forEach((item) => {
+            item.hidden = false;
+          });
+      });
+    });
+  </script>
+</Layout>
+
+<style>
+  .archive-page {
+    padding-top: calc(64px + var(--space-2xl));
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb-sep {
+    color: var(--text-muted);
+  }
+
+  .breadcrumb-current {
+    color: var(--text-primary);
+  }
+
+  .archive-head {
+    max-width: var(--measure-wide);
+  }
+
+  .archive-head h1 {
+    margin: var(--space-md) 0 var(--space-lg);
+  }
+
+  .archive-cta {
+    margin-bottom: 0;
+  }
+
+  .archive-browse {
+    margin-top: var(--space-4xl);
+  }
+
+  .archive-browse-note {
+    margin: var(--space-md) 0 var(--space-xl);
+    font-size: var(--text-sm);
+  }
+
+  .archive-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-xl);
+    margin-top: var(--space-xl);
+  }
+
+  .archive-section h3 {
+    font-size: var(--text-md);
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .archive-section ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .archive-section li {
+    min-width: 0;
+  }
+
+  .archive-section li a {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .archive-section li a:hover,
+  .archive-section li a:focus-visible {
+    color: var(--accent-amber);
+  }
+
+  /* The reason each document is classified historical, shown inline. It is the
+     difference between "this list is old" and "this document is old, and here
+     is what said so". */
+  .archive-reason {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  @media (min-width: 640px) {
+    .archive-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .archive-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

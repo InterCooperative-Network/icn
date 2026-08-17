@@ -4663,3 +4663,40 @@ total_entries = 363
 categories_covered = ["architecture", "design", "strategy", "guide", "reference", "operations", "security"]
 maintained_by = "matt"
 note = "Comprehensive registry of ICN documentation. Status indicates authority level: canonical (authoritative), living (actively maintained), draft (in development), archived (historical reference only)."
+
+# ─── Public-site information architecture (#2608 / #1740 / #1369) ───────────
+# Both documents are normative: they define public claims and the vocabulary
+# mapping behind them, so their prefix defaults (descriptive / canonical=no)
+# are overridden here deliberately.
+
+[docs."docs/design/PUBLIC_SITE_IA.md"]
+category = "design"
+status = "canonical"
+title = "Public site information architecture"
+description = "One primary job per public page, homepage narrative order, reduced top-level navigation, and the plain-language-first convention for introductory surfaces"
+last_updated = "2026-08-17"
+owner = "matt"
+audiences = ["contributors", "public", "designers"]
+truth_class = "normative"
+role = "design"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["website", "design", "accessibility"]
+recommended_action = "keep"
+last_reviewed = "2026-08-17"
+
+[docs."docs/reference/project-index/public-state-projection.md"]
+category = "reference"
+status = "canonical"
+title = "Public state projection"
+description = "How canonical repository state is projected onto the public website, including the status.toml to ADR-0032 maturity band mapping and the evidence-class mapping"
+last_updated = "2026-08-17"
+owner = "matt"
+audiences = ["contributors", "architects"]
+truth_class = "normative"
+role = "reference"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["website", "truth", "claims"]
+recommended_action = "keep"
+last_reviewed = "2026-08-17"

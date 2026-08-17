@@ -438,7 +438,7 @@ pre code {
 }
 .system-divider::before,
 .system-divider::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
   background: var(--border-default);
@@ -520,29 +520,65 @@ pre code {
    alone — every card also carries a text category label and a concept
    icon with its own silhouette. Color is reinforcement, not source of
    truth. */
-.inst-card.acc-teal { border-left-color: var(--accent-teal); }
-.inst-card.acc-teal:hover { border-color: var(--accent-teal); }
-.inst-card.acc-teal .inst-card-icon { color: var(--accent-teal); }
+.inst-card.acc-teal {
+  border-left-color: var(--accent-teal);
+}
+.inst-card.acc-teal:hover {
+  border-color: var(--accent-teal);
+}
+.inst-card.acc-teal .inst-card-icon {
+  color: var(--accent-teal);
+}
 
-.inst-card.acc-amber { border-left-color: var(--accent-amber); }
-.inst-card.acc-amber:hover { border-color: var(--accent-amber); }
-.inst-card.acc-amber .inst-card-icon { color: var(--accent-amber); }
+.inst-card.acc-amber {
+  border-left-color: var(--accent-amber);
+}
+.inst-card.acc-amber:hover {
+  border-color: var(--accent-amber);
+}
+.inst-card.acc-amber .inst-card-icon {
+  color: var(--accent-amber);
+}
 
-.inst-card.acc-green { border-left-color: var(--accent-green); }
-.inst-card.acc-green:hover { border-color: var(--accent-green); }
-.inst-card.acc-green .inst-card-icon { color: var(--accent-green); }
+.inst-card.acc-green {
+  border-left-color: var(--accent-green);
+}
+.inst-card.acc-green:hover {
+  border-color: var(--accent-green);
+}
+.inst-card.acc-green .inst-card-icon {
+  color: var(--accent-green);
+}
 
-.inst-card.acc-blue { border-left-color: var(--accent-blue); }
-.inst-card.acc-blue:hover { border-color: var(--accent-blue); }
-.inst-card.acc-blue .inst-card-icon { color: var(--accent-blue); }
+.inst-card.acc-blue {
+  border-left-color: var(--accent-blue);
+}
+.inst-card.acc-blue:hover {
+  border-color: var(--accent-blue);
+}
+.inst-card.acc-blue .inst-card-icon {
+  color: var(--accent-blue);
+}
 
-.inst-card.acc-purple { border-left-color: var(--accent-purple); }
-.inst-card.acc-purple:hover { border-color: var(--accent-purple); }
-.inst-card.acc-purple .inst-card-icon { color: var(--accent-purple); }
+.inst-card.acc-purple {
+  border-left-color: var(--accent-purple);
+}
+.inst-card.acc-purple:hover {
+  border-color: var(--accent-purple);
+}
+.inst-card.acc-purple .inst-card-icon {
+  color: var(--accent-purple);
+}
 
-.inst-card.acc-rose { border-left-color: var(--accent-rose); }
-.inst-card.acc-rose:hover { border-color: var(--accent-rose); }
-.inst-card.acc-rose .inst-card-icon { color: var(--accent-rose); }
+.inst-card.acc-rose {
+  border-left-color: var(--accent-rose);
+}
+.inst-card.acc-rose:hover {
+  border-color: var(--accent-rose);
+}
+.inst-card.acc-rose .inst-card-icon {
+  color: var(--accent-rose);
+}
 
 /* Section frame — container that gives a section an institutional
    "panel" feel with a subtle top hairline and eyebrow label. Used
@@ -936,44 +972,14 @@ pre code {
   letter-spacing: 0.08em;
   margin-top: var(--space-xs);
 }
-.gradient-text {
-  background: linear-gradient(
-    135deg,
-    var(--accent-teal) 0%,
-    var(--accent-amber) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.gradient-text-warm {
-  background: linear-gradient(
-    135deg,
-    var(--accent-amber) 0%,
-    var(--accent-green) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.shimmer-text {
-  background: linear-gradient(
-    90deg,
-    var(--accent-teal) 0%,
-    var(--accent-amber) 50%,
-    var(--accent-teal) 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 4s linear infinite;
-}
-@keyframes shimmer {
-  to {
-    background-position: 200% center;
-  }
-}
+/* `.gradient-text`, `.gradient-text-warm`, `.shimmer-text` and their keyframes
+   were removed here. docs/design/MUST_NOT_SHIP.md item 8 rejects "shimmer
+   effects" and "gradient text on copy that isn't the brand name" outright.
+   They had no remaining callers, but leaving them defined is an invitation to
+   use them, and a gradient-clipped heading also drops its computed colour in
+   forced-colors mode. Emphasis is carried by scale, weight and space instead —
+   see the editorial primitives at the end of this file. */
+
 .animate-in {
   opacity: 0;
   transform: translateY(16px);
@@ -1304,4 +1310,351 @@ pre code {
 .primitive p {
   font-size: 0.875rem;
   margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PUBLIC DESIGN SYSTEM — shared primitives
+   ───────────────────────────────────────────────────────────────────────────
+   Added for #2612. Everything below is a primitive that more than one page
+   needs. The rule that motivated the block: before adding a style to a page's
+   scoped <style>, check whether it belongs here instead. Page-scoped styles
+   are for genuinely page-specific composition, not for another spelling of
+   "a card" or "a callout".
+
+   Ordering: utilities → type scale → editorial → components → responsive.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Utilities ─────────────────────────────────────────────────────────── */
+
+/* Screen-reader-only text. Four components previously declared their own
+   private copy of this (loop-sr-only, hiw-sr-only, …); they now use this one.
+   Standard WAI clip pattern — must not use display:none, which removes the
+   text from the accessibility tree entirely. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Any element that can legitimately be wider than its column — a wide table,
+   a diagram, a long code sample — scrolls inside itself. The page body must
+   never scroll horizontally (#1740). Keyboard users need to reach the scroll
+   container, hence tabindex="0" on the element that carries this class. */
+.scroll-x {
+  overflow-x: auto;
+  max-width: 100%;
+  /* Momentum scrolling on touch, and a visible focus ring when tabbed to. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Constrain a text block to a comfortable measure. `p` already caps at 70ch;
+   this is for wrappers that contain mixed content. */
+.measure {
+  max-width: 70ch;
+}
+.measure-wide {
+  max-width: 88ch;
+}
+
+/* ─── Type scale ────────────────────────────────────────────────────────────
+   A named scale so pages stop inventing one-off font sizes. Values are rem so
+   they respond to the user's browser font size; the two display sizes use
+   clamp() so they reflow at 200% zoom without horizontal scroll.
+
+   Floor: --text-xs is 0.75rem = 12px, which is the minimum
+   docs/design-language/accessibility.md §3.9 permits for mono labels and
+   eyebrows. Nothing smaller is defined, deliberately. */
+:root {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.375rem;
+  --text-2xl: clamp(1.5rem, 2.5vw, 1.875rem);
+  --text-3xl: clamp(1.875rem, 3.5vw, 2.5rem);
+  --text-display: clamp(2.25rem, 5vw, 3.5rem);
+
+  /* Content column widths, named so pages stop hardcoding max-width. */
+  --measure-prose: 70ch;
+  --measure-wide: 88ch;
+  --page-max: 1200px;
+  --page-narrow: 760px;
+
+  /* Minimum interactive target. accessibility.md §3.7 requires 44×44 CSS px. */
+  --target-min: 44px;
+}
+
+/* ─── Editorial primitives ──────────────────────────────────────────────────
+   #2612 asks for stronger editorial hierarchy rather than a site built out of
+   equally weighted cards. These are the three weights a section can carry. */
+
+/* The opening statement of a page or a major section. One per section, and it
+   should be readable on its own if everything around it were removed. */
+.lede {
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: var(--text-primary);
+  max-width: var(--measure-prose);
+}
+
+/* Secondary supporting paragraph under a lede. */
+.sublede {
+  font-size: var(--text-md);
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: var(--measure-prose);
+}
+
+/* A single sentence pulled out of the flow to carry a section. Not a
+   blockquote — nobody is being quoted — so it is a <p>, styled by weight and
+   a rule rather than by quotation marks. */
+.pull {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-heading);
+  max-width: 40ch;
+  border-left: 3px solid var(--accent-teal);
+  padding-left: var(--space-lg);
+  margin: var(--space-2xl) 0;
+}
+
+/* A quiet note beneath a figure, table, or generated block. Carries provenance
+   ("generated from X on Y"), never new information. */
+.figure-note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: var(--measure-prose);
+  margin-top: var(--space-sm);
+}
+
+/* ─── Callouts ──────────────────────────────────────────────────────────────
+   One component, four intents. Each intent has a text label as its first
+   child, so the intent survives grayscale and is announced by a screen reader
+   — colour never carries it (MUST_NOT_SHIP item 4). */
+.callout {
+  border: 1px solid var(--border-default);
+  border-left: 4px solid var(--text-muted);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: var(--space-lg);
+  margin: var(--space-xl) 0;
+  max-width: var(--measure-wide);
+}
+.callout > :last-child {
+  margin-bottom: 0;
+}
+.callout-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+}
+.callout p {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  margin-bottom: var(--space-sm);
+}
+.callout-note {
+  border-left-color: var(--accent-teal);
+}
+.callout-note .callout-label {
+  color: var(--accent-teal);
+}
+.callout-caution {
+  border-left-color: var(--accent-amber);
+}
+.callout-caution .callout-label {
+  color: var(--accent-amber);
+}
+/* Used for archive/historical banners on docs pages. Heavier than the others
+   because it has to interrupt a reader who arrived from a search engine. */
+.callout-archive {
+  border-left-color: var(--accent-amber);
+  border-color: var(--border-accent);
+  background: var(--bg-card);
+}
+.callout-archive .callout-label {
+  color: var(--accent-amber);
+}
+
+/* ─── Links and buttons ─────────────────────────────────────────────────── */
+
+/* Promoted from index.astro's scoped styles — five pages want this. */
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-weight: 500;
+  font-size: var(--text-sm);
+  /* Meets the 44px target floor without visually inflating an inline link. */
+  min-height: var(--target-min);
+}
+.link-arrow::after {
+  content: "→";
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.link-arrow:hover::after {
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-arrow:hover::after {
+    transform: none;
+  }
+}
+
+/* Promoted from index.astro. Decorative only — the badge's text carries the
+   meaning, so this is aria-hidden by being a bare span with no content. */
+.badge-dot {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.5em;
+  vertical-align: baseline;
+}
+
+/* Every button already had padding that cleared 44px at default font size,
+   but .btn-sm did not. Floor it explicitly rather than relying on line-height. */
+.btn,
+.btn-sm {
+  min-height: var(--target-min);
+}
+
+/* ─── Dense data ────────────────────────────────────────────────────────────
+   Project-state and reference tables. Wrap in <div class="scroll-x"> so a wide
+   table scrolls itself instead of the page. */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+.data-table th {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.data-table td {
+  color: var(--text-secondary);
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ─── Progressive disclosure ────────────────────────────────────────────────
+   The site's one mechanism for "deeper technical detail on demand" (#1740).
+   A real <details>, so it works without JavaScript, is keyboard-operable for
+   free, and is announced correctly. */
+.disclosure {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  margin: var(--space-lg) 0;
+  max-width: var(--measure-wide);
+}
+.disclosure > summary {
+  cursor: pointer;
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-height: var(--target-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border-radius: var(--radius-md);
+}
+.disclosure > summary:hover {
+  color: var(--accent-teal);
+}
+.disclosure[open] > summary {
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.disclosure-body {
+  padding: var(--space-lg);
+}
+.disclosure-body > :last-child {
+  margin-bottom: 0;
+}
+.disclosure-body p,
+.disclosure-body li {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+/* ─── Chips ─────────────────────────────────────────────────────────────────
+   A wrapping row of small labels. `min-width: 0` on the items is what keeps a
+   long German or Finnish label from forcing horizontal overflow
+   (MUST_NOT_SHIP item 5). */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.chip-row > * {
+  min-width: 0;
+}
+
+/* ─── Editorial section rhythm ──────────────────────────────────────────────
+   Sections alternate weight rather than all sitting at the same visual
+   volume. `.band-feature` is the one-per-page emphasis band. */
+.band-feature {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* A narrow single-column reading section, for long-form explanation that
+   should not stretch to the full grid. */
+.container-reading {
+  max-width: var(--page-narrow);
+  margin: 0 auto;
+  padding: 0 var(--space-xl);
+}
+
+/* ─── Forced colors ─────────────────────────────────────────────────────────
+   Windows High Contrast strips backgrounds and custom borders. Anything whose
+   meaning is carried by a border needs an explicit forced-colors fallback or
+   the distinction disappears. */
+@media (forced-colors: active) {
+  .callout,
+  .disclosure,
+  .card,
+  .data-table th,
+  .data-table td {
+    border-color: CanvasText;
+  }
+  .badge-dot {
+    background: CanvasText;
+  }
 }

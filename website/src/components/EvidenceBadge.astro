@@ -1,0 +1,122 @@
+---
+// EvidenceBadge.astro — "how do we know?", as a first-class public label.
+//
+// ICN's public claims run on two orthogonal axes, and
+// docs/reference/project-index/claim-boundaries.md requires both to travel
+// together:
+//
+//   maturity  — how far along the capability is   → <MaturityBadge>
+//   evidence  — what backs the claim              → this component
+//
+// Keeping them separate is the mechanism that stops "merged code" from reading
+// as "ready to depend on". A subsystem can sit in the `strong` maturity band
+// and still be `fixture-backed` on this axis, and a reader sees both at once
+// instead of inferring readiness from the first.
+//
+// The class ids come from scripts/gen-project-state.mjs, which derives them
+// from docs/status.toml's `evidence_type` vocabulary. Nothing here invents a
+// classification.
+//
+// ─── Colour discipline ───────────────────────────────────────────────────────
+//
+// This badge is deliberately monochrome. The accent palette already carries
+// maturity; giving evidence its own colour ramp would produce two competing
+// colour systems on the same row and would tempt a reader to rank evidence by
+// hue. Each class is distinguished by its glyph shape and its text — which is
+// also what keeps it legible in grayscale, per MUST_NOT_SHIP item 4.
+
+export type EvidenceId = 'test-backed' | 'ci-backed' | 'fixture-backed' | 'reviewed' | 'asserted';
+
+export interface Props {
+  evidence: EvidenceId;
+  label: string;
+  /** The one-line explanation of what this class of evidence means. */
+  detail?: string;
+  /** Render the detail as visible helper text rather than only for AT. */
+  showDetail?: boolean;
+}
+
+const { evidence, label, detail, showDetail = false } = Astro.props;
+
+// Distinct silhouettes at 14px. Shape carries the distinction; colour does not.
+const GLYPHS: Record<EvidenceId, string[]> = {
+  // check inside a square — an automated assertion passed
+  "test-backed": ["M3 3h14v14H3z", "M6.5 10.2l2.6 2.6 4.4-5"],
+  // check inside a square, repeated arrow — enforced on every change
+  "ci-backed": ["M3 3h14v14H3z", "M6.5 10.2l2.6 2.6 4.4-5", "M17 3v3h-3"],
+  // flask — demonstrated against prepared data, not live use
+  "fixture-backed": ["M8 2v6L3.5 16a1.5 1.5 0 001.3 2h10.4a1.5 1.5 0 001.3-2L12 8V2", "M7 2h6"],
+  // eye — established by a person reading the implementation
+  reviewed: ["M1.5 10S5 4.5 10 4.5 18.5 10 18.5 10 15 15.5 10 15.5 1.5 10 1.5 10z", "M10 12.2a2.2 2.2 0 100-4.4 2.2 2.2 0 000 4.4z"],
+  // speech mark — a maintainer says so; no automated check proves it
+  asserted: ["M4 15.5V6a2 2 0 012-2h8a2 2 0 012 2v5a2 2 0 01-2 2H7.5L4 15.5z"],
+};
+
+const paths = GLYPHS[evidence];
+---
+
+<span class:list={["evidence-badge", `ev-${evidence}`]}>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {paths.map((d) => <path d={d} />)}
+  </svg>
+  <span class="evidence-badge-label">{label}</span>
+  {detail && !showDetail && <span class="sr-only"> — {detail}</span>}
+</span>
+{detail && showDetail && <span class="evidence-badge-detail">{detail}</span>}
+
+<style>
+  .evidence-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.25em 0.6em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    vertical-align: middle;
+    /* Long evidence labels must wrap rather than push a card sideways. */
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .evidence-badge svg {
+    flex: none;
+  }
+
+  .evidence-badge-label {
+    min-width: 0;
+  }
+
+  /* `asserted` is the weakest class on the axis, so it is the one that is
+     visually quietest — a dashed border reads as provisional in grayscale
+     without needing a colour. */
+  .evidence-badge.ev-asserted {
+    border-style: dashed;
+    color: var(--text-muted);
+  }
+
+  .evidence-badge-detail {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-top: var(--space-xs);
+  }
+</style>

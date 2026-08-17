@@ -1,0 +1,653 @@
+---
+// see-it-work.astro — the guided, fixture-backed public walkthrough (#2610).
+//
+// PRIMARY JOB: let a non-technical visitor watch one institutional act travel
+// from "who counts as a member" to "durable record of why this was allowed",
+// with no terminal, no account, and no live institution.
+//
+// ─── Why this page has no stepper ────────────────────────────────────────────
+//
+// The obvious build is a step-through wizard with prev/next and one step
+// visible at a time. Every step is rendered at once instead, for four reasons:
+//
+//   - it works with JavaScript disabled or still loading, which is the
+//     accessibility baseline's rule that "JS adds, never gates";
+//   - it is readable on a phone by scrolling, the interaction people already
+//     have;
+//   - it needs no ARIA tab/panel wiring, which is the most commonly
+//     mis-implemented pattern on the web;
+//   - a reader can see the whole shape at once, which is the actual point —
+//     the argument is about how the six pieces connect, and hiding five of
+//     them to show one works against that.
+//
+// The "guided" part is carried by the numbered sequence, the step index, and
+// the explicit link from each step to the next.
+//
+// ─── Motion ──────────────────────────────────────────────────────────────────
+//
+// None. No reveal, no auto-advance, no scroll effects. #2612 permits motion
+// that explains progression, but here the progression is already carried by
+// numbering and layout, so motion would be decoration.
+
+import Layout from '../layouts/Layout.astro';
+import DemoLabel from '../components/DemoLabel.astro';
+import Term from '../components/Term.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+import {
+  WALKTHROUGH_STEPS,
+  WALKTHROUGH_BOUNDARIES,
+  WALKTHROUGH_TRUTH_LABEL,
+  RECEIPT_CHAIN,
+  SCENARIO_SCOPES,
+} from '../data/walkthrough';
+
+const description =
+  'A short fictional walkthrough of one decision inside a cooperative — from who counts as a member, through the rule that authorized an action, to the durable record of why it happened. Fixture data, no account required.';
+---
+
+<Layout
+  title="See it work"
+  description={description}
+  activeNav="see-it-work"
+>
+  <section class="section wt-hero">
+    <div class="container">
+      <div class="wt-hero-inner">
+        <span class="eyebrow">A worked example</span>
+        <h1>One decision, followed all the way through.</h1>
+        <p class="lede">
+          Most explanations of institutional software stop at the diagram. This one
+          follows a single piece of work inside a fictional cooperative — from
+          who is recognized as a member, through the rule that let them act, to
+          the record that can still answer <em>why was this allowed?</em> a year later.
+        </p>
+        <p class="sublede">
+          Nothing here needs an account, a download, or a command line. Read it
+          top to bottom in about four minutes.
+        </p>
+
+        <DemoLabel
+          scope="surface"
+          label={WALKTHROUGH_TRUTH_LABEL}
+          detail={`${SCENARIO_SCOPES.cooperative.name} is invented for this page, as are the people, the identifiers, and the hashes. No live institution or partner data is involved, and nothing is fetched when this page loads.`}
+        />
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ THE CAST ══════════════════════════════════════════════════════════ -->
+  <section class="section-alt section wt-cast-section">
+    <div class="container">
+      <h2 class="wt-h2">The situation</h2>
+      <p class="measure">
+        Two fictional institutions and one piece of work. Everything that follows
+        happens inside the first of them.
+      </p>
+
+      <div class="wt-cast">
+        <article class="wt-cast-item">
+          <span class="wt-cast-kind">Cooperative</span>
+          <h3>{SCENARIO_SCOPES.cooperative.name}</h3>
+          <p>{SCENARIO_SCOPES.cooperative.blurb}</p>
+        </article>
+        <article class="wt-cast-item">
+          <span class="wt-cast-kind">Federation</span>
+          <h3>{SCENARIO_SCOPES.federation.name}</h3>
+          <p>{SCENARIO_SCOPES.federation.blurb}</p>
+        </article>
+        <article class="wt-cast-item wt-cast-item-work">
+          <span class="wt-cast-kind">The work</span>
+          <h3>A failing extraction fan</h3>
+          <p>
+            The fan that clears fumes from the finishing room is failing.
+            Replacing it costs real money and affects everyone who works that
+            room.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ THE SIX STEPS ═════════════════════════════════════════════════════ -->
+  <div class="wt-body">
+    <div class="container wt-layout">
+      <!-- Step index. A real <nav> with anchor links, so it works without
+           JavaScript and is reachable by keyboard like any other list. -->
+      <nav class="wt-index" aria-labelledby="wt-index-heading">
+        <h2 id="wt-index-heading" class="wt-index-heading">The six steps</h2>
+        <ol class="wt-index-list">
+          {WALKTHROUGH_STEPS.map((step) => (
+            <li>
+              <a href={`#${step.id}`}>
+                <span class="wt-index-n">{step.n}</span>
+                <span class="wt-index-label">{step.title}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <div class="wt-steps">
+        {WALKTHROUGH_STEPS.map((step, i) => {
+          const next = WALKTHROUGH_STEPS[i + 1];
+          return (
+            <section class="wt-step" id={step.id} aria-labelledby={`${step.id}-heading`}>
+              <div class="wt-step-head">
+                <span class="station-number">{step.n}</span>
+                <h2 id={`${step.id}-heading`} class="wt-step-title">{step.title}</h2>
+              </div>
+
+              {/* Plain language first, always. The ICN term for this step is
+                  named underneath, never before. */}
+              <p class="wt-step-plain">{step.plain}</p>
+
+              <p class="wt-step-concept">
+                In ICN's vocabulary this step is about{' '}
+                <Term id={step.conceptId} variant="inline" />.
+              </p>
+
+              {step.narrative.map((para) => (
+                <p class="wt-step-narrative">{para}</p>
+              ))}
+
+              {/* The technical layer. A real <details>: keyboard-operable,
+                  announced correctly, and closed by default so the plain
+                  reading path is never interrupted by field names. */}
+              <details class="disclosure wt-detail">
+                <summary>
+                  Show the underlying record — {step.technical.recordName}
+                </summary>
+                <div class="disclosure-body">
+                  <p class="wt-detail-source">
+                    Shape defined in <code>{step.technical.definedIn}</code>.
+                    The values below are fictional.
+                  </p>
+
+                  <div class="scroll-x" tabindex="0" role="region" aria-label={`${step.technical.recordName} fields`}>
+                    <table class="data-table wt-fields">
+                      <thead>
+                        <tr>
+                          <th scope="col">Field</th>
+                          <th scope="col">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {step.technical.fields.map((f) => (
+                          <tr>
+                            <th scope="row"><code>{f.key}</code></th>
+                            <td>
+                              <code class="wt-field-value">{f.value}</code>
+                              {f.note && <span class="wt-field-note">{f.note}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {step.technical.note && (
+                    <p class="wt-detail-note">{step.technical.note}</p>
+                  )}
+                </div>
+              </details>
+
+              {/* The receipt chain diagram belongs to the last step. It is a
+                  list first and a diagram second, so the text equivalent is
+                  the markup rather than an alt attribute bolted on after. */}
+              {step.id === 'memory' && (
+                <figure class="wt-chain">
+                  <figcaption class="wt-chain-caption">
+                    Each record carries the previous record's hash
+                  </figcaption>
+                  <ol class="wt-chain-list">
+                    {RECEIPT_CHAIN.map((link, ci) => (
+                      <li class="wt-chain-item">
+                        <span class="wt-chain-n">{String(ci + 1).padStart(2, '0')}</span>
+                        <span class="wt-chain-body">
+                          <b>{link.label}</b>
+                          {link.carries ? (
+                            <span class="wt-chain-carries">carries {link.carries}</span>
+                          ) : (
+                            <span class="wt-chain-carries">the start of the chain</span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p class="figure-note">
+                    Read upward and each record points at the one that authorized
+                    it. That backward path is what lets a cooperative answer
+                    “why were we allowed to do this?” without relying on anyone's
+                    memory.
+                  </p>
+                </figure>
+              )}
+
+              {next && (
+                <a class="link-arrow wt-next" href={`#${next.id}`}>
+                  Next: {next.title}
+                </a>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ WHAT THIS DID AND DID NOT SHOW ════════════════════════════════════ -->
+  <section class="section band-feature">
+    <div class="container">
+      <h2 class="wt-h2">What this walkthrough does and does not show</h2>
+      <p class="measure">
+        A demonstration that does not draw its own boundaries is a sales pitch.
+        Here are ours.
+      </p>
+
+      <div class="wt-boundaries">
+        <article class="wt-boundary">
+          <h3>What is real in the implementation</h3>
+          <ul>
+            {WALKTHROUGH_BOUNDARIES.real.map((item) => <li>{item}</li>)}
+          </ul>
+        </article>
+        <article class="wt-boundary">
+          <h3>What is invented for this page</h3>
+          <ul>
+            {WALKTHROUGH_BOUNDARIES.fixture.map((item) => <li>{item}</li>)}
+          </ul>
+        </article>
+        <article class="wt-boundary">
+          <h3>What is still ahead</h3>
+          <ul>
+            {WALKTHROUGH_BOUNDARIES.future.map((item) => <li>{item}</li>)}
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout callout-note">
+        <span class="callout-label">Where to check this yourself</span>
+        <p>
+          Every record shape named above is defined in the repository, and the
+          file is cited on each step. The per-subsystem maturity account — which
+          parts carry test evidence, which are demonstrated against fixtures, and
+          which are still asserted — is on <a href="/whats-real-now">What's real now</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <ReadingLadder current="see-it-work" />
+</Layout>
+
+<style>
+  .wt-hero {
+    padding-top: calc(64px + var(--space-3xl));
+  }
+
+  .wt-hero-inner {
+    max-width: var(--measure-wide);
+  }
+
+  .wt-hero h1 {
+    margin: var(--space-md) 0 var(--space-lg);
+  }
+
+  .wt-hero .sublede {
+    margin-top: var(--space-md);
+  }
+
+  .wt-h2 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-md);
+  }
+
+  /* ─── The cast ─────────────────────────────────────────────────────────── */
+
+  .wt-cast {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    margin-top: var(--space-xl);
+  }
+
+  .wt-cast-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+
+  /* The work is the thing the story is about, so it gets the accent. The two
+     institutions are context. */
+  .wt-cast-item-work {
+    border-left: 3px solid var(--accent-teal);
+  }
+
+  .wt-cast-kind {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .wt-cast-item h3 {
+    font-size: var(--text-xl);
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .wt-cast-item p {
+    font-size: var(--text-sm);
+    margin: 0;
+  }
+
+  /* ─── Steps ────────────────────────────────────────────────────────────── */
+
+  .wt-body {
+    padding: var(--space-4xl) 0;
+  }
+
+  .wt-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2xl);
+    align-items: start;
+  }
+
+  .wt-index {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    padding: var(--space-lg);
+  }
+
+  .wt-index-heading {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-md);
+  }
+
+  .wt-index-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .wt-index-list a {
+    display: flex;
+    gap: var(--space-md);
+    align-items: baseline;
+    padding: var(--space-sm) 0;
+    /* 44px target floor for a tappable index entry. */
+    min-height: var(--target-min);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .wt-index-list a:hover,
+  .wt-index-list a:focus-visible {
+    color: var(--accent-teal);
+  }
+
+  .wt-index-n {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    flex: none;
+  }
+
+  .wt-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4xl);
+    min-width: 0;
+  }
+
+  .wt-step {
+    /* Anchor links land below the fixed nav rather than under it. */
+    scroll-margin-top: 88px;
+    min-width: 0;
+  }
+
+  .wt-step-head {
+    display: flex;
+    gap: var(--space-md);
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-lg);
+  }
+
+  .wt-step-title {
+    font-size: var(--text-2xl);
+    min-width: 0;
+  }
+
+  /* The plain-language sentence is the loudest text in the step. Everything
+     technical is quieter than this, on purpose (#2612 §5). */
+  .wt-step-plain {
+    font-size: var(--text-lg);
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-width: var(--measure-prose);
+    margin-bottom: var(--space-md);
+  }
+
+  .wt-step-concept {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-bottom: var(--space-lg);
+  }
+
+  .wt-step-narrative {
+    margin-bottom: var(--space-md);
+  }
+
+  .wt-detail {
+    margin-top: var(--space-lg);
+  }
+
+  .wt-detail-source {
+    color: var(--text-muted);
+    margin-bottom: var(--space-md);
+  }
+
+  .wt-fields th[scope='row'] {
+    font-family: var(--font-mono);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .wt-fields th[scope='row'] code,
+  .wt-field-value {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--text-xs);
+  }
+
+  .wt-field-value {
+    color: var(--accent-teal);
+    /* Long DIDs and hashes wrap instead of forcing the table wider. */
+    overflow-wrap: anywhere;
+  }
+
+  .wt-field-note {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-top: var(--space-xs);
+    max-width: 52ch;
+  }
+
+  .wt-detail-note {
+    color: var(--text-secondary);
+    margin-top: var(--space-md);
+    border-left: 2px solid var(--border-teal);
+    padding-left: var(--space-md);
+  }
+
+  .wt-next {
+    margin-top: var(--space-lg);
+  }
+
+  /* ─── Receipt chain ────────────────────────────────────────────────────── */
+
+  .wt-chain {
+    margin: var(--space-xl) 0;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    padding: var(--space-lg);
+    max-width: var(--measure-wide);
+  }
+
+  .wt-chain-caption {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-lg);
+  }
+
+  .wt-chain-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .wt-chain-item {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+    padding: var(--space-sm) 0;
+    position: relative;
+  }
+
+  /* The connecting line between chain entries. Drawn with a border on a
+     pseudo-element rather than an SVG so it survives text zoom and reflows
+     with the list. Purely decorative — the words "carries …" carry the
+     relationship. */
+  .wt-chain-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 0.6rem;
+    top: 2rem;
+    bottom: -0.35rem;
+    width: 1px;
+    background: var(--border-teal);
+  }
+
+  .wt-chain-n {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-teal);
+    background: var(--bg-card);
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 1.2rem;
+  }
+
+  .wt-chain-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .wt-chain-body b {
+    color: var(--text-heading);
+    font-size: var(--text-sm);
+  }
+
+  .wt-chain-carries {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  /* ─── Boundaries ───────────────────────────────────────────────────────── */
+
+  .wt-boundaries {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    margin: var(--space-xl) 0;
+  }
+
+  .wt-boundary {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+
+  .wt-boundary h3 {
+    font-size: var(--text-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .wt-boundary ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .wt-boundary li {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.7;
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .wt-boundary li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--text-muted);
+  }
+
+  /* ─── Wider viewports ──────────────────────────────────────────────────── */
+
+  @media (min-width: 640px) {
+    .wt-cast {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .wt-boundaries {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .wt-cast,
+    .wt-boundaries {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .wt-layout {
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: var(--space-4xl);
+    }
+    /* The index follows the reader down the page. `position: sticky` needs no
+       JavaScript and degrades to static if the browser does not support it. */
+    .wt-index {
+      position: sticky;
+      top: 88px;
+    }
+  }
+</style>

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "prebuild": "node scripts/gen-stats.mjs",
+    "generate": "node scripts/gen-stats.mjs && node scripts/gen-concepts.mjs && node scripts/gen-project-state.mjs && node scripts/gen-docs-classification.mjs && node scripts/gen-build-log.mjs",
+    "prebuild": "npm run generate",
+    "predev": "npm run generate",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -21,6 +23,7 @@
     "astro": "^5.16.5",
     "fuse.js": "^7.1.0",
     "marked": "^17.0.3",
+    "smol-toml": "^1.8.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {

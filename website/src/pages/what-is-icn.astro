@@ -2,6 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import ClosureLoop from '../components/ClosureLoop.astro';
 import ScopeModel from '../components/ScopeModel.astro';
+import Term from '../components/Term.astro';
+import PublicLoop from '../components/PublicLoop.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
 ---
 
@@ -72,14 +74,19 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
       <h2>What ICN models directly</h2>
       <p>Most software models users and accounts. ICN models institutions.</p>
+      <p class="plain-first-note">
+        Each item below leads with what it means in ordinary language. The word
+        in brackets is what ICN calls it — useful once you are reading the
+        documentation, not something you need on a first pass.
+      </p>
       <ul>
-        <li><strong>Members</strong> — people with cryptographic identity and real, provable standing inside the institutions they belong to.</li>
-        <li><strong>Scopes</strong> — cooperatives, communities, federations, and commons, each modeled as a first-class institutional entity with its own rules, members, and history.</li>
-        <li><strong>Authority</strong> — not handed down from a platform owner, but derived from the scope's rules and the decisions its members have made under them.</li>
+        <li><strong><Term id="standing" variant="plain" capitalize /></strong> — who counts as a member here, provable by the institution itself rather than asserted by a platform (<Term id="standing" variant="inline" />).</li>
+        <li><strong><Term id="scope" variant="plain" capitalize /></strong> — cooperatives, communities, federations, and commons, each a first-class institutional entity with its own rules, members, and history (<Term id="scope" variant="inline" />).</li>
+        <li><strong><Term id="authority" variant="plain" capitalize /></strong> — not handed down from a platform owner, but derived from the scope's rules and the decisions its members have made under them (<Term id="authority" variant="inline" />).</li>
         <li><strong>Governance and policy</strong> — proposals, deliberation, and the rules those decisions produce — rules that shape what can happen next.</li>
         <li><strong>Economic life</strong> — obligations, treasury with budgets and approvals, mutual-credit positions, patronage settlement, usage-rights. Social accounting denominated in obligations between real parties, not payment rails.</li>
         <li><strong>Execution</strong> — the step where an accepted decision turns into a concrete operational effect, so decisions do not die in meeting minutes.</li>
-        <li><strong>Receipts and provenance</strong> — durable records that trace every outcome back through the rule that shaped it, the decision that authorized it, and the members who held standing.</li>
+        <li><strong>Proof of why something happened</strong> — durable records that trace every outcome back through the rule that shaped it, the decision that authorized it, and the members who held standing (<Term id="provenance" variant="inline" />).</li>
         <li><strong>Federation</strong> — formal agreements, attestations, and cross-institutional clearing between distinct scopes. Coordination without merger.</li>
       </ul>
       <p>
@@ -93,7 +100,19 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <p>
         The defining idea behind ICN is that institutional life should not be scattered
         across unrelated tools. The loop that matters is specific, and the system is built
-        to carry every station of it. Read the nine stations in order:
+        to carry every station of it.
+      </p>
+      <p>
+        There are two views of that loop. The short one is enough to follow the
+        rest of this site:
+      </p>
+
+      <PublicLoop />
+
+      <p>
+        The longer view is what the implementation actually models — nine
+        stations rather than six, because several of the plain-language stages
+        above are two distinct things underneath. Read them in order:
       </p>
 
       <ClosureLoop variant="full" title="The nine-station closure" showTruthLabelChip />
@@ -134,6 +153,16 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 </Layout>
 
 <style>
+  /* Sets the reader's expectation for the bracketed ICN terms that follow, so
+     the first one is not a surprise. #1740: plain language first, ICN term
+     second, deeper meaning on demand. */
+  .plain-first-note {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    border-left: 2px solid var(--border-teal);
+    padding-left: var(--space-md);
+  }
+
 .narrow { max-width: 760px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }
