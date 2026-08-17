@@ -1483,11 +1483,14 @@ satisfies R13.1 where a `Person` principal class cannot.
 
 ### 9.6 What this does not solve — read this before building on it
 
-1. **The per-subject authority log does not exist.** §3.7. `RotationEvent` has the
-   right shape (signed, `+1` monotone) and is unwired, unverified on apply, and
-   signed with a different preimage than it verifies (F9, F10). This is real work.
-2. **Pre-rotation does not exist** anywhere in ICN. It is the load-bearing new
-   cryptographic mechanism, and it is the reason scenarios 1 and 2 are contained.
+1. **The N1 per-subject authority-log primitive exists as additive library code in
+   `icn-identity`, but is not production-integrated.** Its canonical bodies, durable join and
+   pure derived view are implemented and tested; replication, gateway/runtime wiring and
+   migration remain absent. The legacy `RotationEvent` path described in §3.7 remains unwired and
+   is not replaced in production by N1.
+2. **N1 implements deterministic backward-chained pre-rotation as a library primitive, but no
+   production path uses it.** It remains load-bearing cryptographic machinery whose operational
+   custody, replication and recovery integration are later slices.
 3. **Selective disclosure does not exist and cannot be wired today.** F16: blind
    signatures are not blind, the accumulator uses a 32-bit test modulus, the
    trusted-issuer check passes on an empty list, and the default build can neither

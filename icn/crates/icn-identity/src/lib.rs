@@ -16,6 +16,8 @@
 //! - VUI (Verifiable Unique Identifier) types
 
 pub mod anchor;
+/// N1 — the human-subject authority-log primitive (library-only, unwired).
+pub mod authority_log;
 pub mod backend_factory;
 pub mod batch_verify;
 pub mod bundle;
