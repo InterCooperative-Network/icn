@@ -1023,15 +1023,15 @@ depends_on = [
 
 [docs."docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md"]
 category = "architecture"
-status = "draft"
+status = "living"
 title = "Human Identity in ICN — a first-principles architecture"
 description = "Re-derives ICN's human-identity model from requirements rather than from the existing Did abstraction. Records the verified current state at b26bf681 including twenty findings that correct or extend PRINCIPAL_MODEL §2 (the gateway multi-device path is unreachable because IdentityManager::get_or_create_document has zero production callers; ~50% of hash-derived DIDs fail Ed25519 deserialization; icn-zkp silently substitutes an all-zero issuer key; two independent production sites compute the VUI as a plain hash of the public DID, so no deployed anchor carries the uniqueness or unlinkability SDIS claims for it, while the acting principal in enrollment is already the device key; icn_time returns 0 on clock error so every expiry fails open; RPC recovery lets a caller name an arbitrary victim while the node signs the trustee attestation). Establishes that a durable human subject identifier must not be a public key, and argues -- as a bounded claim, explicitly NOT a theorem-level impossibility -- that global convergent device revocation is unavailable under ICN's currently chosen premises, since achieving it would require adopting a synchrony assumption, randomization/failure detectors, or an ordering authority, all of which ICN declines (FLP 1985 forbids only deterministic consensus in pure asynchrony; Chandra-Toueg 1996 is itself a positive result). The escape adopted is single-writer logs, whose consensus number is 1 (Guerraoui et al. PODC 2019), given Byzantine reliable broadcast that ICN does not yet have. Compares five candidate models against 25 adversarial scenarios and recommends context-scoped identity with a private continuity root: Did narrowed to a cryptographic principal, per-context self-addressing subject identifiers, a per-subject single-writer authority log with pre-rotation, and revocation semantics stated per act class. Supersedes PRINCIPAL_MODEL §4-§16; retains its §1-§3. The architecture remains proposed; the N1 library primitive is implemented but not production-wired."
-last_updated = "2026-08-15"
+last_updated = "2026-08-18"
 owner = "matt"
 audiences = ["developers", "architects"]
 truth_class = "descriptive"
 canonical = "no"
-last_reviewed = "2026-08-15"
+last_reviewed = "2026-08-18"
 recommended_action = "keep"
 freshness = "current"
 depends_on = [
@@ -1041,7 +1041,29 @@ depends_on = [
   "icn/crates/icn-governance/src/replication.rs",
   "icn/crates/icn-zkp/src/**",
   "docs/architecture/PRINCIPAL_MODEL.md",
+  "docs/architecture/IDENTITY_SEMANTICS.md",
   "docs/design/authenticated-governance-replication.md",
+]
+
+[docs."docs/architecture/IDENTITY_SEMANTICS.md"]
+category = "architecture"
+status = "canonical"
+title = "Identity Semantics - the N2 semantic contract"
+description = "CANONICAL FOR THE NARROW identity_semantics DOMAIN ONLY (see ops/state/truth/sources.json): the seven semantic identity classes (Principal, human Subject, Institution, Node, ContinuityRoot, ContextNonce, Device Principal), the identifier domain each class draws from, the exhaustive allowed/forbidden substitution matrix whose default is category error, context-scope and correlation constraints, genesis-AUTHORITY semantics (not the genesis protocol, which is GEN/#2602), the legacy did:icn:<key> bridge invariants and migration terminus, institution and node prohibitions, the ContinuityRoot/ContextNonce secret-vs-public split with the ContextNonce freshness rule, invariants I1-I12 that implementation must enforce, the account/treasury boundary, and the bounded N2 implementation DAG. Settled output of #2597 after three design passes and two independent adversarial reviews; the second returned N2 CONTRACT CLOSED with zero blocking findings. Semantic contract only: it does NOT supersede HUMAN_IDENTITY_ARCHITECTURE.md as the broader architecture note, and it makes no implementation, migration, deployment, federation or pilot claim. N1 remains a merged library primitive with production integration ABSENT; the N2 migration/integration and every downstream protocol are unimplemented."
+last_updated = "2026-08-18"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "normative"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-08-18"
+depends_on = [
+  "icn/crates/icn-identity/src/authority_log/**",
+  "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md",
+  "ops/state/truth/sources.json",
 ]
 
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
@@ -1146,12 +1168,20 @@ audiences = ["architects", "developers"]
 
 [docs."docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md"]
 category = "architecture"
-status = "living"
+status = "superseded"
+superseded_by = "docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md"
 title = "Identity and Membership Architecture"
-description = "Design of identity primitives, membership verification, and member lifecycle"
-last_updated = "2026-03-10"
+description = "HISTORICAL PREDECESSOR (2025-12-25). Retained for rationale, not as current truth. Its IDENTITY portions are superseded: it documents anchor-derived DIDs as first-class person identifiers, which HUMAN_IDENTITY_ARCHITECTURE.md dispositions for removal, and it predates the N1 authority-log primitive and the N2 semantic contract entirely. For the semantic identity classes, identifier domains, substitution rules and legacy-DID bridge invariants, docs/architecture/IDENTITY_SEMANTICS.md is canonical; for the broader identity architecture, threat model and derivation, HUMAN_IDENTITY_ARCHITECTURE.md controls. Its membership-lifecycle and federation-recognition rationale is not superseded by N2 but is not current truth either - that work is downstream (#2605 N5, blocked). Registry status corrected 2026-08-18: it was `living`, which ranked a superseded predecessor above the documents that supersede it. Retained in place rather than archived so its inbound references stay resolvable; a future move to docs/archive/ is the open follow-up."
+last_updated = "2026-08-18"
 owner = "matt"
 audiences = ["architects", "developers"]
+truth_class = "historical"
+role = "architecture"
+canonical = "no"
+freshness = "stale"
+domain_tags = ["architecture", "identity"]
+recommended_action = "keep"
+last_reviewed = "2026-08-18"
 
 [docs."docs/architecture/GOVERNANCE_STATE_MACHINE.md"]
 category = "architecture"

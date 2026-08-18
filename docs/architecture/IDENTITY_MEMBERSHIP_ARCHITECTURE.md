@@ -1,8 +1,57 @@
+---
+Status: historical
+Canonical: no
+Last Reviewed: 2026-08-18
+---
+
 # Identity and Membership Architecture for ICN
 
-**Status**: Design Document
+**Original status**: Design Document
 **Date**: 2025-12-25
 **Author**: Architecture Review
+
+> ## Truth status — HISTORICAL PREDECESSOR. Do not build from this document.
+>
+> Written 2025-12-25, **before** the N1 authority-log primitive and before the N2
+> semantic contract. It is retained for its rationale and problem framing, and
+> **is not current truth**. Its registry status was corrected from `living` to
+> `superseded` on 2026-08-18: `living` ranked this predecessor *above* the
+> documents that supersede it.
+>
+> **Where to go instead**
+>
+> | For | Read |
+> |---|---|
+> | The semantic identity classes, identifier domains, allowed/forbidden substitutions, context-scope rules, legacy-DID bridge invariants, type-level invariants | **`docs/architecture/IDENTITY_SEMANTICS.md` — canonical** |
+> | Identity requirements, first-principles derivation, threat model, N1 architecture | `docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md` |
+> | The evidence map of what the code actually did | `docs/architecture/PRINCIPAL_MODEL.md` §1–§3 |
+>
+> **Superseded — do not implement from this document**
+>
+> - **Anchor-derived DIDs as first-class person identifiers.** This document
+>   treats them as durable identity; the current architecture dispositions them
+>   for **removal**, and the semantic contract forbids a key- or hash-derived
+>   `Did` from becoming a `SubjectId`.
+> - **A public key as a durable human identity.** Superseded: a durable human
+>   subject is a self-addressing `SubjectId`, context-scoped, and a Principal is
+>   fully correlatable by construction and therefore unfit as a human identifier.
+> - **Any globally resolvable person identifier.** Superseded: human subjects are
+>   **per institutional context**, and no global public Person identifier exists
+>   or may be introduced.
+> - **Person-as-Entity framing.** Dispositioned as legacy semantic debt.
+> - **Node and institution identity drawn from the same identifier space as a
+>   person.** Now explicit **category errors**.
+>
+> **Not superseded, but not current truth either**
+>
+> - The membership-lifecycle, federation-recognition and node-topology
+>   *rationale* — the problems it identifies remain real. The mechanisms are
+>   downstream and unbuilt: member-origin institutional action is **#2605 (N5,
+>   blocked)**, and authenticated institutional standing is **#2441**.
+> - Nothing in this document is implemented as described. N1 is a merged
+>   **library primitive** with production integration **absent**.
+>
+> Retained in place rather than archived so inbound references stay resolvable.
 
 ## Executive Summary
 

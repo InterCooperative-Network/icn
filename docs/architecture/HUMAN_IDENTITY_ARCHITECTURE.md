@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-08-15
+Last Reviewed: 2026-08-18
 ---
 
 # Human Identity in ICN — a first-principles architecture
@@ -9,6 +9,17 @@ Last Reviewed: 2026-08-15
 What a human identity *should* be in ICN, how cryptographic authority over it
 should evolve, what institutions and peers should observe, and how devices act
 for humans.
+
+> **Canonical precedence.** For the **semantic identity contract** — the classes,
+> the identifier domains, the allowed/forbidden substitution matrix, context-scope
+> semantics, the legacy-DID bridge invariants and the type-level invariants —
+> **`docs/architecture/IDENTITY_SEMANTICS.md` is canonical** and owns the
+> `identity_semantics` domain in `ops/state/truth/sources.json`. This document
+> remains the broader architecture note (requirements, derivation, threat model,
+> N1 architecture, rationale) and is deliberately **not** canonical, so that two
+> sources never claim the same facts. Where the two address the same fact,
+> `IDENTITY_SEMANTICS.md` controls. Sections amended by that contract are marked
+> **[AMENDED by IDENTITY_SEMANTICS]** in place.
 
 > **Truth status, section by section.** No section is left unclassified; §20 is
 > the full per-result index.
@@ -934,10 +945,17 @@ forced conclusion. §17 lists what would reopen it.
 
 | Object | Definition | Layer | Public? |
 |---|---|---|---|
-| **Principal** | a keypair. Its public key **is** a `Did`. | kernel | yes, to whoever verifies a signature |
-| **Subject** | `SubjectId = H(inception_event)` — a **self-addressing identifier**, not a key. One per context. | identity | to that context only |
+| **Principal** | a **cryptographic actor identified by a validated public/verifying key**; its public key **is** a `Did`. Secret signing material is *not* part of the identity object, and a threshold group verifying key is **one** Principal with no single local keypair. | kernel | yes, to whoever verifies a signature |
+| **Subject** | `SubjectId = H(inception_event)` — a **self-addressing identifier**, not a key. One per context. **Names a *human* subject only** — see §9.5 and the substitution matrix. | identity | to that context only |
 | **Authority log** | a per-subject, **single-writer**, hash-chained, `+1`-monotone log of authority events, with **pre-rotation** | identity | replicated to that subject's relying parties |
 | **Continuity root** | a private client-side secret: the person's index of their own subjects, plus the pre-rotation material that lets them recover each one | **client only — never published, never sent** | **no** |
+
+> **[AMENDED by IDENTITY_SEMANTICS]** The Principal row previously read "a
+> keypair". That is a semantic defect: it places secret material inside a public
+> identity object, and it excludes a threshold group key, which is one Principal
+> even though no participant can sign alone. The Subject row is scoped to human
+> subjects; read it with §9.5's amendment, which separates *mechanism* generality
+> from *identifier* interchangeability.
 
 The person is not an object in the protocol. That is the point. `Person` is an
 app-layer word for *the human who holds a continuity root*, and no kernel type
@@ -1463,7 +1481,16 @@ unauthenticated (F17) — is untouched by anything here, and remains #2441's.
 ### 9.5 Where the Meaning Firewall falls
 
 PRINCIPAL_MODEL §1.1 forbids `Person` in the kernel and §4 then proposes it as a
-principal class. This model has no such tension:
+principal class. This model resolves that tension **as a required invariant** —
+the table below states the target, not the measured present:
+
+> **[AMENDED by IDENTITY_SEMANTICS]** This table was previously asserted in the
+> present tense, closing with "This model has no such tension." Measured on
+> `origin/main`, `icn-kernel-api` carries **49 public type/function declarations
+> using app-layer vocabulary**, plus 188 whole-word `member`, 163 `federation`,
+> 84 `cooperative` and 79 `steward`. **R13.1 [HARD] is already violated in the
+> crate meant to enforce it.** Read the table as the invariant to reach, and the
+> gap as open debt.
 
 | Layer | Holds | Never holds |
 |---|---|---|
@@ -1471,9 +1498,21 @@ principal class. This model has no such tension:
 | **identity** (`icn-identity`) | `SubjectId`, the authority log, pre-rotation | why a subject exists, or what it is a subject *of* |
 | **app** (`apps/*`, governance, membership) | `Person`, `member`, `role`, standing, recovery policy, act-class rules | key custody |
 
-A **subject** is meaning-free: it is any entity with an evolving authorized key
-set. A person, a treasury and a node are all subjects. That is why this model
-satisfies R13.1 where a `Person` principal class cannot.
+A **subject** is meaning-free *as a mechanism*: the hash-chained log, `+1`
+monotonicity, pre-rotation commitment and state-independent admission are
+properties of an append-only authenticated log, and none of them mentions humans.
+That mechanism generality is why this model satisfies R13.1 where a `Person`
+principal class cannot.
+
+> **[AMENDED by IDENTITY_SEMANTICS]** This paragraph previously read "A person, a
+> treasury and a node are all subjects." **That is a statement about mechanism,
+> not about types, and it must not be read as licensing identifier reuse.**
+> `SubjectId` is the **human-subject** identifier N1 produces. `NodeId ↔ SubjectId`
+> and `InstitutionId ↔ SubjectId` are **category errors** in both directions, and a
+> treasury is an institution-governed **account**, not an identity class at all.
+> Generalizing N1's machinery beyond human subjects requires an explicit
+> generalized abstraction, designed and reviewed as such; no slice may perform
+> that generalization implicitly by widening `SubjectId`'s meaning.
 
 > **One leak to watch.** §9.1 says the log is "replicated to that subject's
 > relying parties", and knowing *which* parties those are is context knowledge
@@ -1548,7 +1587,7 @@ concepts into it, and to make the type enforce what it claims.
 | `Did` = an Ed25519 (or successor) public key. No other construction. | §3.1; F1 and F2 are the current alternative failing in production | RECOMMENDED |
 | **Remove `Did::from_anchor_id` and `new_unchecked`** | Their only effect today is to mint values that ~50% of the time cannot be read back (F1) and that a ZK prover silently replaces with an all-zero key (F2) | RECOMMENDED |
 | **Canonicalize the encoding** — pin base58btc at parse, or compare by decoded key bytes | `Did` equality is string equality (§3.1), so two encodings of one key are two unequal DIDs. Folds in PRINCIPAL_MODEL O10 | RECOMMENDED |
-| Treasury identifiers become `EntityId`-shaped, not `Did`-shaped | A treasury holds no key; `derive_treasury_did` mints a string that would fail `Did::from_str` and a *second, different* one via `from_anchor_id` (`icn-coop/src/actor.rs:493`) — already flagged in `docs/status.toml:77` | RECOMMENDED |
+| Treasury identifiers must not be `Did`-shaped. The replacement is **an account/resource domain, to be determined** — *not* `EntityId` | A treasury holds no key; `derive_treasury_did` mints a string that would fail `Did::from_str` and a *second, different* one via `from_anchor_id` (`icn-coop/src/actor.rs:493`) — already flagged in `docs/status.toml:77`. **[AMENDED by IDENTITY_SEMANTICS]** the `EntityId` target is **WITHDRAWN**: `EntityId` names the *owning institution*, and an account is not its owner. `Treasury` already records both separately (`entity_id` beside `treasury_did`), so the owner slot is filled and only the *account* slot is open | FINDING RETAINED · TARGET WITHDRAWN |
 | A durable subject is a `SubjectId`, never a `Did` | §4's proof | ESTABLISHED (the proof), RECOMMENDED (the type) |
 
 **Should a global Person ID exist? No.** Not because privacy outranks
@@ -1786,8 +1825,19 @@ rather than hidden.
 > durable subject ≠ current authority
 
 holds for humans (subject ≠ device keys), for institutions (charter ≠ current
-stewards) and for nodes (instance ≠ operator). All three are **subjects** in the
-§9.1 sense, which is why the identity layer can stay meaning-free.
+stewards) and for nodes (instance ≠ operator). The **same mechanism** — a durable
+identifier over an evolving authority set — fits all three, which is why the
+identity layer can stay meaning-free.
+
+> **[AMENDED by IDENTITY_SEMANTICS]** This section previously concluded that all
+> three "are **subjects** in the §9.1 sense". **That is a mechanism observation,
+> not a type identity.** Identifier types remain **non-interchangeable**: a node
+> and an institution do not draw identifiers from the human-subject domain, and
+> `NodeId ↔ SubjectId` / `InstitutionId ↔ SubjectId` are category errors.
+> A generic "durable identifier over an evolving authority set" abstraction
+> **does not exist** — N1's API is concretely typed to human-subject inception —
+> and creating one is explicit, reviewable work, not a side effect of a later
+> slice.
 
 ### 14.2 Institutions: PRINCIPAL_MODEL §4.1 is upheld, with a caveat
 
@@ -1797,12 +1847,31 @@ strengthens the reasoning**: `Did` is *only* a key here, so it is even more clea
 the wrong type for a governed entity.
 
 But the caveat matters. The argument's premise was "an institution's identity
-would have to be a key." Under §9.1 that premise is false: an institution could be
-a **subject** with an authority log whose authorized keys are its current
-stewards, and no single person would "be" the institution. **O12 therefore
-reopens on better terms** — the question is no longer "key or mandate chain" but
-"does an institution need a self-authenticating statement, given that a subject
-log now makes one possible without single-custodian capture?" Recorded in §17.
+would have to be a key." That premise is false — an institution's identity need
+not be a key at all — and **O12 therefore reopens on better terms**: the question
+is no longer "key or mandate chain" but **"does an institution need a
+self-authenticating statement?"** Recorded in §17.
+
+> **[AMENDED by IDENTITY_SEMANTICS — proposal WITHDRAWN]** This section previously
+> answered that question by proposing that "an institution could be a **subject**
+> with an authority log whose authorized keys are its current stewards". **That
+> proposal is withdrawn as a `SubjectId`-sharing construction.**
+> `InstitutionId ↔ SubjectId` is a **category error** in both directions: a person
+> is not a governed collective, and mechanism reuse does not license identifier
+> reuse (§9.5, §14.1). An institution is constituted by **governance**, and its
+> authority is a governance decision evidenced against authenticated state — never
+> a signature by any single key, and never a borrowed human identifier.
+>
+> **What survives:** the underlying question is still open as **O12**, and may be
+> answered by a **distinct institution domain** carrying its own self-authenticating
+> statement. What is forbidden is answering it by reusing the human-subject
+> identifier. Note also that a threshold (FROST) group is **one Principal**, and
+> `Principal → Institution` is forbidden — threshold custody removes
+> single-custodian capture but does not manufacture governance.
+>
+> **What this costs:** O12 is left open rather than answered. That is deliberate;
+> the positive construction additionally waits on authenticated institutional
+> standing (#2441), which does not exist today.
 
 `FounderSignature` (F18) is the existing primitive to build on: an institution's
 inception event, signed by its founding persons, is a natural `EntityId` binding
@@ -1817,11 +1886,32 @@ connection, not per peer** (`handlers/mod.rs:76-78`). Nothing here changes it.
 Two facts worth carrying forward: `operator_did` is populated as `did.clone(),
 did.clone()` (`supervisor/lifecycle.rs:371-375`), so node and operator are the
 same principal today; and node key rotation produces a new DID and **is never
-persisted** (`keystore.rs:1224-1257` does not call `save_v4`). Under §9.1 a node
-becomes a subject whose authority log survives key rotation — which is the
-principled fix for both, and which also gives **O2** (does a restored node keep
-its DID?) a cleaner answer: the *subject* persists, the *keys* rotate, and
-restore-twice is detectable as duplicity rather than indistinguishable from a clone.
+persisted** (`keystore.rs:1224-1257` does not call `save_v4`). Both remain live
+defects.
+
+> **[AMENDED by IDENTITY_SEMANTICS — proposal WITHDRAWN]** This section previously
+> proposed that "under §9.1 a node becomes a subject whose authority log survives
+> key rotation", presented as the principled fix for node key rotation and
+> node/operator conflation **and as part of O2's answer** (does a restored node
+> keep its DID?). **Node-as-human-Subject is withdrawn.** `NodeId ↔ SubjectId` is a
+> **category error**: a node is a running instance of infrastructure, not a human
+> subject, and it does not draw an identifier from the human-subject domain.
+>
+> **What this costs — stated explicitly rather than hidden.** Withdrawing
+> node-as-Subject **also withdraws the proposed O2/rotation solution**, and the
+> semantic contract **does not replace it with a finished node lifecycle
+> protocol**. Node key rotation remains unpersisted; `operator_did == node_did`
+> remains unfixed; **O2 and O15 remain downstream and open.** Trading a stated gap
+> for a hidden one would be worse than leaving it open.
+>
+> **What N2 does establish:** Node ≠ Subject, Node ≠ Institution, Operator ≠ Node,
+> and that **authenticating a host does not establish institutional authority**. A
+> durable node identifier relates to its current transport Principal only through
+> an **explicit binding object** — never a conversion — and that binding **cannot
+> be written merely because an operator possesses the machine**. Who may write it
+> is itself the open O2/O15 question. `NetworkMessage.from` is the **current
+> sending Principal**, which is what lets #2480 proceed without node-subject
+> machinery that does not exist.
 
 ---
 
@@ -1849,6 +1939,30 @@ cryptographic principal. Two consequences:
 > event names the person's existing `Did` as its initial authorized key.** What is
 > preserved is what actually matters — the key, custody, and the ability to sign —
 > and what changes is the *context identifier*.
+>
+> ---
+>
+> **[SUPERSEDED IN PART by IDENTITY_SEMANTICS — rewrite deliberately HELD]**
+> The clause "**names the person's existing `Did` as its initial authorized key**"
+> **does not survive** the semantic contract. N1's `InceptionBody` carries the
+> signer and initial authority **in cleartext**, and admission requires the whole
+> body, so the initial authority **cannot be withheld** — one legacy `Did` seeding
+> two contexts therefore places the same key in both institutions' hands, defeating
+> the very unlinkability this migration is meant to preserve.
+>
+> The **binding rule is `IDENTITY_SEMANTICS.md` §7**: each context gets a fresh
+> `SubjectId` under **fresh context-specific initial authority**, and the legacy
+> `Did` acts **as a Principal only**, authorizing a **context-scoped
+> bridge-evidence object** disclosed only to a context that already holds that
+> legacy `Did`. Migration also requires two distinct facts — **FACT A** personal
+> continuity and **FACT B** institutional recognition — and a signature by the old
+> principal proves **FACT A only**.
+>
+> **This section's full rewrite is HELD** until the bridge-evidence object is
+> specified (N2-E2). Inventing that object's shape here would be guessing at a
+> protocol the contract deliberately leaves downstream. Until then, **§7 of
+> `IDENTITY_SEMANTICS.md` controls** and the clause above must not be implemented
+> as written.
 >
 > That is a smaller cost than a re-enrollment and a larger one than "no event". In
 > particular, **membership rows keyed by the member's `Did` need a documented bridge
@@ -1968,7 +2082,7 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O-N7** | What makes class-2 (irreversibly settled) acts safe under a fork? | **New in review round 2.** `Live(branch A) → Live(branch B)` leaves two replicas with permanently different ledger state, because settled effects are never unwound (R5.3). Reducing exposure needs a **finality depth**, which ICN does not have and whose local evaluation reintroduces the divergence. **Until answered, this authority model is not by itself a sufficient basis for irreversible settlement** (§9.2.1) |
 | **O-N9** | How is historical **authorization** evidence preserved across a superseding rotation? | **New in review round 4.** Orphaning the suffix means a receipt signed by a key first authorized after the fork keeps a verifying signature but loses its authorization proof, degrading R2.3 to "authored on a superseded branch". Preserving it needs durable per-branch endorsement records this model does not define (§9.2.1) |
 | **O-N8** | What is the protocol-specified **admission and compaction** rule for the durable event set? | **New in review round 2, widened in round 3.** `admissible` is cheap, so the set is attacker-writable and grow-only; eviction is forced, and if implementation-chosen then "convergence over the eventual retained set" is vacuous under attack. Authority-aware eviction (retain authorized before unauthorized) handles spam at or below the frontier; the **gap region beyond the frontier is unsolved**, so **R4.6 and permutation-invariant convergence hold only absent adversarial storage pressure** (§9.2.1) |
-| **O12** | Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture? | **Reopened on better terms.** The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise |
+| **O12** | Do institutions need self-authenticating statements? | **Reopened on better terms, and still open.** The original rejection assumed institution-identity ⇒ institution-keypair, and that premise is false. **[AMENDED by IDENTITY_SEMANTICS]** §14.2's proposed answer — an institution as a *subject* with an authority log over its stewards — is **withdrawn**: `InstitutionId ↔ SubjectId` is a category error, so any answer must come from a **distinct institution domain**, not the human-subject identifier. The positive construction also waits on authenticated institutional standing (#2441) |
 | **O2** | Does a restored node keep its identifier? | §14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy |
 | **O5** | Remove or wire `public_did` institutional signing? | Depends on O12 |
 | **O6** | Does the membership-credential layer belong in this arc? | Needed for portable standing (Model D's genuine contribution); not needed for §9.4 |
