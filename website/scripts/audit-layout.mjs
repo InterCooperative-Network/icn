@@ -60,11 +60,12 @@
 // comprehension, and whether the page makes sense are not checkable here.
 
 import fs from "node:fs";
-import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+
+import { serveDist } from "./lib/serve-dist.mjs";
 
 const websiteRootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -133,52 +134,6 @@ if (!PAGE_SETS[PROFILE]) {
 
 const PAGES = PAGE_SETS[PROFILE];
 const WIDTHS = WIDTH_SETS[PROFILE];
-
-/**
- * Minimal static server for the built site. Enough for an audit: index.html
- * resolution for directory routes, correct content types for the handful of
- * asset kinds Astro emits, and nothing else.
- */
-function serveDist(root) {
-  const TYPES = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".svg": "image/svg+xml",
-    ".json": "application/json",
-    ".xml": "application/xml",
-    ".woff2": "font/woff2",
-    ".png": "image/png",
-    ".ico": "image/x-icon",
-  };
-  const server = http.createServer((req, res) => {
-    const url = decodeURIComponent((req.url ?? "/").split("?")[0]);
-    let filePath = path.join(root, url);
-    try {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-        filePath = path.join(filePath, "index.html");
-      }
-      // Never serve outside the build directory.
-      if (!path.resolve(filePath).startsWith(path.resolve(root))) {
-        res.writeHead(403).end();
-        return;
-      }
-      const body = fs.readFileSync(filePath);
-      res.writeHead(200, {
-        "content-type":
-          TYPES[path.extname(filePath)] ?? "application/octet-stream",
-      });
-      res.end(body);
-    } catch {
-      res.writeHead(404, { "content-type": "text/plain" }).end("not found");
-    }
-  });
-  return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () =>
-      resolve({ server, port: server.address().port }),
-    );
-  });
-}
 
 /**
  * Find a Chrome or Chromium binary.

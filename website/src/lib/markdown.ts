@@ -4,6 +4,7 @@ import path from "node:path";
 import { marked } from "marked";
 import { resolveRepoDocsRoot } from "./paths";
 import { isPublished } from "./docsClassification";
+import { createHeadingSlugger } from "./headingSlug";
 
 /**
  * Strip a leading YAML frontmatter block from a markdown source.
@@ -55,46 +56,10 @@ export function renderMarkdown(content: string): string {
   // Custom renderer.
   const renderer = new marked.Renderer();
 
-  /**
-   * GitHub-compatible heading slug.
-   *
-   * `marked` does not add `id` attributes to headings, which meant every
-   * in-page anchor in the entire documentation corpus was broken on the public
-   * site — a table of contents linking to `#configuration` scrolled nowhere,
-   * and cross-page deep links landed at the top of the target document.
-   * scripts/check-links.mjs found 700 of these at once.
-   *
-   * The algorithm matches GitHub's so that anchors written for the repository
-   * view keep working here, and so that a link copied from GitHub resolves on
-   * the website: lowercase, strip anything that is not alphanumeric, space,
-   * or hyphen, then convert spaces to hyphens. Duplicate slugs on one page get
-   * a numeric suffix, again matching GitHub.
-   */
-  const slugCounts = new Map<string, number>();
-  function headingSlug(text: string): string {
-    const base = text
-      .replace(/<[^>]*>/g, "")
-      // Decode the entities `marked` emits before slugging. Without this,
-      // "Storage & Replication" arrives as "Storage &amp; Replication" and the
-      // literal letters "amp" end up in the slug.
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim()
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      // Each space becomes one hyphen — NOT a collapsed run. GitHub does the
-      // same, which is why "5. Storage & Replication" slugs to
-      // "5-storage--replication" with a double hyphen: removing "&" leaves two
-      // adjacent spaces. Collapsing them here broke every TOC anchor in the
-      // corpus that contained an ampersand or a similar stripped character.
-      .replace(/\s/g, "-");
-    const seen = slugCounts.get(base) ?? 0;
-    slugCounts.set(base, seen + 1);
-    return seen === 0 ? base : `${base}-${seen}`;
-  }
+  // GitHub-compatible heading slugs, scoped to this page so duplicate
+  // headings get the same numeric suffix GitHub gives them. The algorithm
+  // and the reasoning behind it live in ./headingSlug.
+  const headingSlug = createHeadingSlugger();
 
   renderer.heading = function ({
     tokens,

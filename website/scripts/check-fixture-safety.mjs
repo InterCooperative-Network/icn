@@ -40,6 +40,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { extractInlineScripts } from "./lib/html-scripts.mjs";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const websiteRoot = path.resolve(here, "..");
 
@@ -160,13 +162,26 @@ for (const name of PARTNER_NAMES) {
 
 // ─── 4 · Live data ───────────────────────────────────────────────────────────
 
-// Only inspect the page's own inline scripts; the theme/nav scripts in the
-// shared layout are not walkthrough behaviour.
-const inlineScripts = [
-  ...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi),
-]
-  .map((m) => m[1])
-  .join("\n");
+// Inspect the bodies of the inline scripts the page actually ships, external
+// `<script src=...>` references excluded. Extraction goes through a real HTML5
+// parser rather than a regexp: the pattern this replaced did not match
+// `</script >`, so a block closed with a space before the `>` was never
+// extracted and this check passed without having read it (CodeQL alert 106,
+// js/bad-tag-filter). See scripts/lib/html-scripts.mjs.
+let inlineScripts;
+try {
+  inlineScripts = extractInlineScripts(html).join("\n");
+} catch (err) {
+  // Fail closed. "Could not parse" must never read as "found no scripts": that
+  // is the same silent pass the regexp gave us. Record a blocking error and
+  // scan the whole document, which over-reports rather than under-reports.
+  errors.push(
+    `dist/see-it-work/index.html could not be parsed to inspect its inline scripts` +
+      ` (${err.message})\n` +
+      `      check 4 is reported as failing rather than evaluated on unparsed HTML`,
+  );
+  inlineScripts = html;
+}
 
 for (const { re, why } of LIVE_DATA_PATTERNS) {
   if (re.test(inlineScripts) || re.test(fixture)) {

@@ -96,6 +96,13 @@ jobs:
         working-directory: website
         run: npm run lint
 
+      # The unit suite for the checkers themselves. It runs before them so a
+      # broken checker is reported as a broken checker, rather than as whatever
+      # the checker then fails to notice.
+      - name: Checker unit tests
+        working-directory: website
+        run: npm test
+
       - name: Public state projection matches canonical state
         working-directory: website
         run: npm run check:state

@@ -20,9 +20,10 @@
     "check:docs": "node scripts/check-docs-boundary.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:fixtures": "node scripts/check-fixture-safety.mjs",
+    "test": "node --test \"scripts/tests/*.test.mjs\"",
     "audit": "node scripts/audit-layout.mjs --profile pr",
     "audit:full": "node scripts/audit-layout.mjs --profile full",
-    "check": "npm run lint && npm run check:state && npm run check:docs && npm run check:links && npm run check:fixtures"
+    "check": "npm run lint && npm run test && npm run check:state && npm run check:docs && npm run check:links && npm run check:fixtures"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",
+    "parse5": "^7.3.0",
     "prettier": "^3.0.0",
     "prettier-plugin-astro": "^0.12.0"
   }
