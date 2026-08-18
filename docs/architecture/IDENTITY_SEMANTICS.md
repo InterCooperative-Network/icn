@@ -44,24 +44,38 @@ Where HIA and this document address the same fact, this document controls.
 | Layer | Status |
 |---|---|
 | **This semantic contract** | **Canonical.** Independently reviewed twice; zero blocking findings. |
-| **N1 authority-log primitive** (`icn-identity/src/authority_log/`) | **Implemented, tested, merged** as `7c28876d`. **A library primitive only.** |
+| **N1 authority-log primitive** (`icn/crates/icn-identity/src/authority_log/`) | **Implemented, tested, merged** as `7c28876d`. **A library primitive only.** |
 | **N2 migration / integration** | **Absent.** Nothing in this document is built. |
-| **Production integration** | **Absent.** `authority_log` has zero references outside `icn-identity`. |
+| **Production integration** | **Absent.** `authority_log` has **zero references outside the `icn-identity` crate**. |
 | **Downstream protocols** (§13) | **Not implemented, and not implemented by this document.** |
 
 No deployment, federation, pilot, migration or production-readiness claim follows
 from this document or from N1's merge. N2 is a **boundary** slice, not a
-type-introduction slice: all seven classes already exist as Rust types inside one
-crate and reach none of the other 37.
+type-introduction slice: all seven classes **already exist as Rust types inside a
+single crate and reach no other crate in the workspace** — `authority_log` has zero
+references outside `icn-identity`. (Stated as a boundary fact rather than a crate
+count, which would drift.)
 
 ---
 
 ## 2. The semantic classes
 
-Seven normative contracts. #2597 enumerates six; `ContinuityRoot` and
-`ContextNonce` are stated separately because one is secret and one is public
-protocol data (§10). That is a correction, not a seventh identity class — a
-`ContextNonce` names nothing.
+**Seven normative contracts, of which six are identity-bearing classes and one is a
+protocol-data contract.** #2597 enumerates six classes. `ContinuityRoot` and
+`ContextNonce` get separate contracts because one is secret and the other is public
+protocol data (§10) — but only `ContinuityRoot` sits on the identity side.
+
+To be unambiguous about what "seven" counts:
+
+| | Contracts |
+|---|---|
+| **Identity-bearing** — names an actor, a human, a collective, an instance, or the secret material behind one | Principal · Human Subject · Institution · Node · ContinuityRoot · Device Principal |
+| **Protocol data — names nothing** | **ContextNonce** |
+
+Splitting the previously conflated continuity material in two is a **correction to a
+boundary, not the addition of a seventh identity class.** A `ContextNonce` identifies
+nothing whatsoever, and treating it as an identifier of anything is a category
+error (§4).
 
 ### 2.1 Principal
 
