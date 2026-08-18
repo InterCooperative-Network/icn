@@ -928,7 +928,7 @@ answer is marked **OPEN** and appears in §17 — none are silently absorbed.
 | 22 | Revocation and a member act arrive in opposite orders | Admission is monotone and order-independent; **effect** is computed from converged state at a pinned position (§9.3). Two honest nodes agree. | A/B: arrival-order divergence — PRINCIPAL_MODEL §6.5 refutes both shapes |
 | 23 | An old receipt must stay verifiable after recovery | **Only before the earliest fork.** For positions preceding any fork, "K was authorized at N" is permanent (append-only, hash-chained) and R2.3 holds. **After a superseding rotation at `p`, receipts from orphaned positions `> p` keep a verifying signature but lose their authorization proof** — they degrade to "authored on a superseded branch" (§9.2.1, **O-N9**). *(An earlier draft claimed an unqualified yes.)* | A: recovery replaces the root and history becomes ambiguous everywhere |
 | 24 | Migrating an SDIS anchor identity | Near-free. F5 (the anchor was never the acting principal) and F20 (mutating routes disabled) mean **no deployed anchor carries authority**; F4 shows the VUI feeding it is `SHA256(did)`, so none carries uniqueness either. §15.2. | A: O18 is listed as **critical** precisely because it assumed otherwise |
-| 25 | An existing key-derived DID holder must not "become a new person" | **Their key, custody and signing ability are untouched** — no ceremony, no re-enrollment. A **new `SubjectId` is allocated** whose inception names their existing `Did` as initial authorized key; the identifier changes, the person does not, and membership rows keyed by `Did` need a documented bridge (§15.1). | B/D/E require a full cutover |
+| 25 | An existing key-derived DID holder must not "become a new person" | **Their key, custody and signing ability are untouched as a Principal** — no ceremony, no re-enrollment. A **new `SubjectId` is allocated**; the identifier changes, the person does not, and membership rows keyed by `Did` need a documented bridge (§15.1). **[AMENDED by IDENTITY_SEMANTICS]** the clause "whose inception names their existing `Did` as initial authorized key" is **withdrawn** — each context takes fresh initial authority and the legacy key acts only as bridge evidence (§7 there). | B/D/E require a full cutover |
 
 **Scenarios Model C does not fully answer, carried to §17:** 2 (residual duplicity
 policy), 3 (cross-context divergence under concurrent recovery), 5 (guardian
@@ -1922,12 +1922,30 @@ COMPATIBILITY-ONLY**.
 
 ### 15.1 Key-derived Person DIDs — KEEP the key, allocate a new subject
 
+> **[SUPERSEDED IN PART by IDENTITY_SEMANTICS — read this first.]** This section's
+> *direction* survives: the legacy key remains a cryptographic principal, and a new
+> `SubjectId` is allocated rather than derived from it. Its **mechanism does not**.
+> Two statements below are superseded and **must not be read as current guidance**:
+> (a) that the person simply "keeps signing with the key they already hold" in the
+> new model, and (b) that the new inception **names the existing `Did` as its
+> initial authorized key** (see the held note further down). Under the semantic
+> contract each context gets **fresh context-specific initial authority**, and the
+> legacy key acts **only** as the Principal authorizing a context-scoped
+> bridge-evidence object — signing that evidence is **not** an enrolment and does
+> **not** make the legacy key an authorized Principal in the new Subject's log.
+> **`IDENTITY_SEMANTICS.md` §7 controls.** The full rewrite is **HELD** until
+> N2-E2 specifies the bridge-evidence object.
+
 This is the largest deployed class, and the **key** does not change. An existing
 `did:icn:<key>` is already exactly what §10 says a `Did` should be: a
 cryptographic principal. Two consequences:
 
-- Nobody "becomes a new person" (scenario 25). No cutover, no re-enrollment, and
-  **no key ceremony**: the person keeps signing with the key they already hold.
+- Nobody "becomes a new person" (scenario 25). No cutover and no re-enrollment.
+  *(Superseded in part: the original text added "**no key ceremony**: the person
+  keeps signing with the key they already hold." What is preserved is that the
+  person's legacy key, custody and signing ability are untouched **as a
+  Principal**; what does not survive is the implication that this key carries
+  their authority in the new context. See the note above.)*
 
 > **But the existing DID cannot itself serve as the `SubjectId`, and an earlier
 > draft said it could.** *(Corrected in review round 3.)* `SubjectId = event_id(inception body)`
@@ -2086,7 +2104,7 @@ pass. **A correct OPEN is better than an invented answer.**
 | **O2** | Does a restored node keep its identifier? | **Fully open. [AMENDED by IDENTITY_SEMANTICS]** This row previously credited §14.3 with improving O2 ("subject persists, keys rotate"). That improvement rested on node-as-subject, which is **withdrawn**, so it is withdrawn with it — and N2 supplies **no** replacement node lifecycle protocol. Node key rotation remains unpersisted and restore-twice detection remains unsettled. O2 and O15 are downstream |
 | **O5** | Remove or wire `public_did` institutional signing? | Depends on O12 |
 | **O6** | Does the membership-credential layer belong in this arc? | Needed for portable standing (Model D's genuine contribution); not needed for §9.4 |
-| **O11** | Canonical encoding of a genesis decision before hashing to an `EntityId`? | §14.2 makes this the *same* mechanism as `SubjectId`, so it should be solved once, not twice |
+| **O11** | Canonical encoding of a genesis decision before hashing to an `EntityId`? | **Mechanism only.** The self-addressing/canonical-hash *technique* is the same one `SubjectId` uses, so the encoding problem should be solved once, not twice. **[AMENDED by IDENTITY_SEMANTICS]** this is **not** a claim that an institution is a Subject or shares its identifier domain — §14.2's institution-as-subject proposal is **withdrawn**, and `InstitutionId ↔ SubjectId` is a category error. Reusing a hashing technique is not reusing an identifier type |
 | **O15** | Canonical preimage of the node-claim transcript | Unchanged from PRINCIPAL_MODEL §5.3 |
 
 **Closed by this document:** O1 (§12.2); O7 (§9.3's class table answers "which
@@ -2123,7 +2141,7 @@ untraced anchor↔member keying question in §15.2.
 | **Slice B** (device enrolment) | **KEEP, with #2588 + #2590 folded in.** F8 shows the path is unreachable today, so this is a "fix before wiring" job, not a live-incident response |
 | **Slice C** (mobile genesis) | **KEEP, widened** — must now also produce a subject and off-device pre-rotation backup (F19, §12.2) |
 | **Slice D** (`GOV_OP_V2`) | **UNBLOCKED from O9/O13**, still bounded by #2469 §7.0.1: the receiver cannot evaluate standing/suspension because that state is unauthenticated (F17). That barrier is #2441's, not this document's |
-| **Slices E/F/G** (node claim, institution genesis, hosting) | **KEEP.** §14.2 makes F's `EntityId` binding the same mechanism as `SubjectId` — solve once |
+| **Slices E/F/G** (node claim, institution genesis, hosting) | **KEEP.** F's `EntityId` binding can reuse the same self-addressing **mechanism** as `SubjectId` — solve the encoding once. **[AMENDED by IDENTITY_SEMANTICS]** mechanism only: §14.2's institution-as-subject proposal is withdrawn, and the identifier domains stay distinct |
 | **#2469 slices 4–6** | **Still independent.** Nothing here blocks them |
 
 ---
@@ -2350,7 +2368,7 @@ Everything else in §19.2 is testable once those four are fixed.
 | Per-context subjects and per-context device keys (§11.1) | **RECOMMENDED** |
 | Institutions hold no signing key (§14.2) | **RECOMMENDED**, with O12 reopened |
 | Anchors retained as labels; `to_did` removed (§15.2) | **RECOMMENDED** |
-| Key-derived Person DIDs unchanged (§15.1) | **RECOMMENDED** |
+| Key-derived Person DIDs unchanged (§15.1) | **SUPERSEDED IN PART · REWRITE HELD.** Direction retained (key stays a Principal; a new `SubjectId` is allocated); the initial-authority mechanism is superseded by `IDENTITY_SEMANTICS.md` §7. Held until N2-E2 |
 | O-N1…O-N6, O16′, O12, O2, O5, O6, O10, O11, O13 (receiver-side), O15, O17 (acquisition) (§17) | **OPEN** |
 | R9.1 [HARD] total-loss recovery; **R5.1 [HARD] not met for class 2 at all**, and for class 1 only once O-N6 lands; **R2.3 [HARD] qualified** — orphaned positions lose their authorization proof; R4.1/R4.3 during the recovery veto window | **ADMITTED SHORTFALLS** — named in §9.6, not discharged |
 | Anchor-derived `Did`s; `new_unchecked`; `is_anchor_did`; kernel-api `DidDocument`; `did_mapping` recovery indirection | **LEGACY** — compatibility only, then removed |

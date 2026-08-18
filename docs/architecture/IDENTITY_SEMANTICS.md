@@ -11,8 +11,8 @@ which substitutions are permitted, and what a legacy `did:icn:<key>` may and may
 not become. This document is the settled output of #2597.
 
 > **Truth status.** This document is **canonical for the narrow
-> `identity_semantics` domain only** — semantic classes, identifier domains,
-> substitution rules, context-scope semantics, bridge invariants, and the
+> `identity_semantics` domain only** — the seven semantic contracts, identifier
+> domains, substitution rules, context-scope semantics, bridge invariants, and the
 > type-level requirements implementation must satisfy. It is **not** a claim that
 > any of it is implemented, deployed, migrated, or wired into production. See §1.
 
@@ -27,8 +27,8 @@ file. Within that domain this file wins. The domain is deliberately narrow:
 
 | Owned here | Not owned here |
 |---|---|
-| The semantic classes and what each means | Identity requirements, derivation and threat model — `HUMAN_IDENTITY_ARCHITECTURE.md` |
-| Which identifier domain names each class | Session-authority attenuation lifecycle — `AUTHORITY_SPINE.md` |
+| The seven semantic contracts and what each means | Identity requirements, derivation and threat model — `HUMAN_IDENTITY_ARCHITECTURE.md` |
+| Which identifier domain names each identity-bearing class | Session-authority attenuation lifecycle — `AUTHORITY_SPINE.md` |
 | Allowed and forbidden substitutions | Historical evidence map — `PRINCIPAL_MODEL.md` §1–§3 |
 | Context-scope and correlation constraints | Every downstream protocol in §13 |
 | Legacy-DID bridge invariants | The bridge *evidence object* (N2-E2) |
@@ -62,13 +62,15 @@ would drift.)
 The two remaining contracts are **not** in that position, and this document does not
 pretend otherwise: **Institution** is carried by `EntityId` in a *different* crate
 (`icn-entity`, and a verbatim duplicate under `apps/membership`), and **Node** has
-**no durable identity type at all** — only the unused `NodeId = String` alias in
-`icn-kernel-api` (§3). So the work N2 names is moving meaning across boundaries that
-already exist, and supplying the one domain that does not.
+**no durable identity domain at all** — `icn-kernel-api` declares
+`pub type NodeId = String`, which that crate *does* use in its own
+coordination/lease API, but which has no known consumer outside it and carries no
+durable node-identity semantics (§3). So the work N2 names is moving meaning across
+boundaries that already exist, and supplying the one domain that does not.
 
 ---
 
-## 2. The semantic classes
+## 2. The semantic contracts
 
 **Seven normative contracts, of which six are identity-bearing classes and one is a
 protocol-data contract.** #2597 enumerates six classes. `ContinuityRoot` and
@@ -115,21 +117,35 @@ can sign alone.
 
 ### 2.2 Human Subject
 
-**A human being, named within one institutional context.**
+**A human being, named within one context — institutional or otherwise.**
 
 `SubjectId` is produced by N1's human-subject authority-log primitive and names a
 **human subject only**.
 
+> **On "context".** The examples throughout this document are institutional
+> (membership in a cooperative, a community, a federation), because that is what
+> ICN builds today. **The identifier construction does not impose that
+> restriction**, and this document does not narrow it by prose: a context may
+> later be bilateral, informal, community-level, federation-level, or another
+> relationship **GEN (#2602) defines**. What is normative here is that a human
+> Subject is scoped to *one* context and is never global — not what kinds of
+> context may exist.
+
 - **Domain** — `SubjectId = event_id(inception_body)`, 32 bytes, self-addressing
-  over an event. **One subject per institutional context, never global.** Nodes,
-  institutions and accounts do not draw identifiers from this domain.
+  over an event. **One subject per context, never global.** Nodes, institutions
+  and accounts do not draw identifiers from this domain.
 - **Genesis** — the human's own client/device (§6). Admission requires
   `σ == event_id(b)`.
 - **Authority** — replay the authority log from inception. A Principal may act
   iff the derived view authorizes it at the referenced position. Never a
   resolver, never a registry, never a clock.
 - **Lifetime** — survives key rotation, device replacement, total device loss and
-  algorithm change.
+  algorithm change. **Architecturally**: the identifier is fixed at inception and
+  never depends on any live key, so none of those events can change it.
+  **Surviving total device loss in practice additionally requires the person's
+  continuity material to be recoverable**, and the protected backup / recovery /
+  threshold-share protocol that would deliver that is **N7 (#2603) — not built**
+  (§2.5). The property is a property of the design, not a shipped capability.
 - **Publicity** — public **to that context only**.
 - **Correlation** — never canonically. Linking two subjects to one human is
   voluntary and subject-initiated. No protocol party may hold the linkage.
@@ -169,8 +185,15 @@ it hosts, not the humans whose data it carries. Not a Human Subject; does not
 take a `SubjectId`. See §9.
 
 - **Domain** — its own durable node-identity domain, distinct from the node's
-  current transport Principal. **It does not exist today**: `NodeId = String` is
-  an unused alias.
+  current transport Principal. **It does not exist today.** `icn-kernel-api`
+  declares `pub type NodeId = String` and **uses it within its own
+  coordination/lease API** — as a lease `holder`, and as a group `leader` and
+  `members` — but it has **no known consumer outside that crate** and carries **no
+  durable node-identity semantics**. It is a `String` alias standing where a domain
+  should be, not an unused one. Its confinement to a single crate bounds the blast
+  radius of defining that domain; it does **not** by itself make renaming or
+  removing the alias safe, and the coordination API that uses it is a real
+  consumer to be considered.
 - **Genesis** — the node operator, offline, at first boot.
 - **Authority** — per connection, via the Hello three-fact certificate check.
   That authenticates a *Principal on a connection*. Relating that Principal to a
@@ -235,7 +258,7 @@ Five distinct domains. A value from one is never a value from another.
 | **Cryptographic principal** | Principal, Device Principal | `PrincipalKey`; `Did` from `from_public_key` | `Did` from `from_str` / `from_anchor_id`; `icn-kernel-api` `Did = String` |
 | **Context subject** | Human Subject | `authority_log::SubjectId` | `DidDocument.id`; `Anchor` / `Anchor::to_did`; `member_did`; vote-key voter; `Membership.member_id: EntityId` |
 | **Governed entity** | Institution | `EntityId` | `coop_id: String`; `org_did: Did`; `EntityKind::Individual` |
-| **Infrastructure / node** | Node | *(none yet — a durable node domain is undefined)* | `node_did: Did`; `operator_did` set equal to `node_did`; `NodeId = String` |
+| **Infrastructure / node** | Node | *(none yet — a durable node domain is undefined)* | `node_did: Did`; `operator_did` set equal to `node_did`; `NodeId = String` (used inside `icn-kernel-api`'s coordination/lease API; no known consumer outside it; no durable node-identity semantics) |
 | **Account / resource** | Treasury and other governed accounts | *(none selected — see §12)* | `treasury_did` (`String`-shaped at 15 of 21 fields); `AccountId`; account keying by `Did` |
 
 **Legacy marker.** `Did(String)` is a stringly-typed newtype that today stands in
@@ -391,9 +414,15 @@ must:
    `SubjectId`.
 2. **Use fresh context-specific principal material as that context's initial
    authority.** The legacy key is *not* the new subject's initial authority.
-3. **Use legacy authority only as bridge evidence**, where appropriate: the
-   legacy `Did` is treated as a **Principal only**, and authorizes a
-   transition/bridge-evidence object.
+3. **Use legacy authority only as bridge evidence.** The legacy `Did` is treated
+   as a **Principal only**, and its sole role in the migration is to authorize a
+   transition/bridge-evidence object. **It does not thereby become an authorized
+   Principal in the new Subject's authority log.** Prior existence of the key
+   confers nothing: if that key is ever to act for the new Subject, it must be
+   authorized by an ordinary `authorize` event carrying its own capabilities and
+   validity span, on exactly the same terms as any other device Principal
+   (§2.7) — and the default is that it is **not** so authorized. Signing the
+   bridge evidence is **not** an enrolment.
 4. **Bound disclosure.** That evidence is context-bounded and may be disclosed
    only to a context that *already holds* that legacy `Did` — then it reveals
    nothing new, and the historical correlation leak is **inherited rather than
@@ -598,7 +627,9 @@ the account slot is occupied by a legacy key-shaped mechanism.
 
 **No target type is prescribed.** The candidate account domains each fail for a
 stated reason — the existing `AccountId` union is a migration union with blanket
-conversions both ways and an `is_individual()` that returns true for any `Did`;
+conversions **into** `AccountId` from **both** `Did` and `EntityId` (there is no
+blanket conversion back out of `AccountId`), and an `is_individual()` that returns
+true for any `Did`;
 the capability-graph resource type is kind-tagged but scoped to addressing and
 name-collides with a kernel `String` alias; and account keying by `Did` **is the
 defect itself**. **Do not select an account domain merely because a type exists.**
