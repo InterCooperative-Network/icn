@@ -50,11 +50,21 @@ Where HIA and this document address the same fact, this document controls.
 | **Downstream protocols** (§13) | **Not implemented, and not implemented by this document.** |
 
 No deployment, federation, pilot, migration or production-readiness claim follows
-from this document or from N1's merge. N2 is a **boundary** slice, not a
-type-introduction slice: all seven classes **already exist as Rust types inside a
-single crate and reach no other crate in the workspace** — `authority_log` has zero
-references outside `icn-identity`. (Stated as a boundary fact rather than a crate
-count, which would drift.)
+from this document or from N1's merge.
+
+**N2 is a boundary slice, not a type-introduction slice.** The N1 vocabulary
+already exists as Rust types — `PrincipalKey`, `SubjectId`, `ContinuityRoot`,
+`ContextNonce`, `DeviceGrant` — and every one of them sits **inside `icn-identity`
+and reaches no other crate in the workspace**: `authority_log` has zero references
+outside that crate. (Stated as a boundary fact rather than a crate count, which
+would drift.)
+
+The two remaining contracts are **not** in that position, and this document does not
+pretend otherwise: **Institution** is carried by `EntityId` in a *different* crate
+(`icn-entity`, and a verbatim duplicate under `apps/membership`), and **Node** has
+**no durable identity type at all** — only the unused `NodeId = String` alias in
+`icn-kernel-api` (§3). So the work N2 names is moving meaning across boundaries that
+already exist, and supplying the one domain that does not.
 
 ---
 
@@ -322,10 +332,11 @@ above. It does **not** define the establishment protocol. In particular:
 ## 6. Genesis authority — semantics only
 
 > **Genesis authority semantics ≠ genesis protocol.** This section records *who
-> or what may establish each class*. It does not specify how. The protocol is
-> GEN (#2602).
+> or what may establish each contract* — all seven, including `ContextNonce`, whose
+> establishment rule is a freshness obligation rather than an identity question
+> (§10). It does not specify **how**. The protocol is GEN (#2602).
 
-| Class | Who may establish it |
+| Contract | Who may establish it |
 |---|---|
 | Principal | Anyone, offline, no registrar. |
 | Human Subject | **The human's own client/device**, under fresh context-specific material. |
@@ -607,7 +618,7 @@ Every boundary N2 sets, and who owns what remains.
 | **#2605** | **N5** — member-origin envelope | Institution ≠ Principal; account ≠ institution; the FACT A / FACT B shape; the historical-authorization limit (§2.2) it **must not inherit implicitly** | The canonical member-origin action envelope and authority proof. **Blocked** |
 | **#2600** | **G1** — process admission / commit | Institutions cannot sign; institutional authority is governance-derived and evidenced against authenticated state (§8) | Deterministic process admission, input closure, and **conflict-safe institutional commit**. G1 is *not* N3 branch selection |
 | **#2601** | **TIME** — temporal evidence | Subject authority is resolved by **log replay, never a clock** (§2.2) | Deadlines, leases, causal vs wall-clock semantics. TIME is *not* a sovereign ordering service |
-| **#2602** | **GEN** — genesis / establishment | **Genesis *authority* semantics for all seven classes** (§6): who may establish each, and that an institution never mints a person's subject | **The genesis/context-establishment *protocol*** — including the unresolved question of **what structurally binds a new Subject to its institutional context** (§5), and the institutional-recognition (FACT B) evidence object. GEN is *not* a global person registry |
+| **#2602** | **GEN** — genesis / establishment | **Genesis *authority* semantics for all seven N2 semantic contracts** (§6): who may establish each, and that an institution never mints a person's subject | **The genesis/context-establishment *protocol*** — including the unresolved question of **what structurally binds a new Subject to its institutional context** (§5), and the institutional-recognition (FACT B) evidence object. GEN is *not* a global person registry |
 | **#2603** | **N7** — recovery | The `ContinuityRoot` contract, including that protected export and threshold sharing are **permitted** (§10) | The protected backup / recovery / threshold-share protocol, and the continuity-secret-compromise shortfall (§2.5) |
 | **#2604** | **O-N5/O-N8** — replication topology | Subjects are per-context; topic naming is a correlation surface (§5) | Authority-log replication topology and adversarial storage bounds |
 | **#2606** | **O-N7** — finality under forks | The historical-authorization limit across superseding transitions (§2.2) — the precise fact O-N7 must reason about | **Policy-scoped finality evidence for irreversible effects under authority forks.** N2 states the limit; it does not bound it |
