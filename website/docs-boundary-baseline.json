@@ -4,11 +4,11 @@
   "recordedAt": "2026-08-18",
   "counts": {
     "total": 967,
-    "published": 683,
-    "withheld": 284,
+    "published": 681,
+    "withheld": 286,
     "byLayer": {
       "decisions": 47,
-      "reference": 435,
+      "reference": 433,
       "archive": 89,
       "learn": 112
     }

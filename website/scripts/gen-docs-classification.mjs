@@ -128,7 +128,7 @@ const WITHHELD_PREFIXES = [
  */
 const WITHHELD_PATTERNS = [
   {
-    pattern: /\/[^/]*(MEETING_BRIEF|MEETING_PREP|ONE_PAGE_AID)[^/]*\.md$/i,
+    pattern: /\/[^/]*(MEETING_BRIEF|MEETING_PREP|ONE_PAGE_AID|SCREEN_DECK)[^/]*\.md$/i,
     reason:
       "Per-conversation meeting packets naming real people and external organisations. Preparation material for one conversation is not public documentation.",
   },
@@ -138,6 +138,22 @@ const WITHHELD_PATTERNS = [
       "Names a real external partner organisation. `.claude/rules/design.md` confines NYCN/Summit material to that institution's own package — ICN's public surface describes generic substrate. The documents stay in the repository and on GitHub.",
   },
 ];
+
+/**
+ * Last resort: the document says of itself that it is not public.
+ *
+ * Names are an unreliable handle on a content class — the same packet shipped
+ * as MEETING_PREP, ONE_PAGE_AID, SCREEN_DECK and DISCOVERY_BRIEF. These
+ * phrases are self-declarations, so a document carrying one is withheld
+ * wherever it lives and whatever it is called.
+ *
+ * Matched against the head of the file only. An index that *lists* such a
+ * document quotes the phrase in its body; the document that *is* one says so
+ * at the top. Scanning whole bodies withheld docs/INDEX.generated.md.
+ */
+const SELF_DECLARED_INTERNAL =
+  /internal prep doc|private prep|intentionally\s+\*{0,2}not\*{0,2}\s+committed/i;
+const SELF_DECLARED_HEAD_BYTES = 1200;
 
 /** Roles that are never published regardless of location. */
 const WITHHELD_ROLES = new Set(["internal", "development_session"]);
@@ -244,6 +260,19 @@ function mergedRecord(relPath) {
 
 // ─── Walk docs/ and classify ─────────────────────────────────────────────────
 
+/** Read the head of a file as text, for self-declaration markers. */
+function readHead(absPath, n) {
+  try {
+    const fd = fs.openSync(absPath, "r");
+    const buf = Buffer.alloc(n);
+    const bytes = fs.readSync(fd, buf, 0, n, 0);
+    fs.closeSync(fd);
+    return buf.subarray(0, bytes).toString("utf-8");
+  } catch {
+    return "";
+  }
+}
+
 /** Read just the frontmatter block, for `superseded_by` and status hints. */
 function readFrontmatter(absPath) {
   let head;
@@ -307,6 +336,12 @@ function walk(dir) {
     if (withheldRule) {
       publish = false;
       withheldReason = withheldRule.reason;
+    } else if (
+      SELF_DECLARED_INTERNAL.test(readHead(abs, SELF_DECLARED_HEAD_BYTES))
+    ) {
+      publish = false;
+      withheldReason =
+        "The document declares itself internal or single-conversation preparation material.";
     } else if (record.role && WITHHELD_ROLES.has(record.role)) {
       publish = false;
       withheldReason = `registry role="${record.role}"`;
