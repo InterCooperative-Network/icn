@@ -69,7 +69,11 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          # 22, not 20: audit-layout.mjs drives Chrome over the DevTools
+          # Protocol with a global `WebSocket`, which Node 20 does not define.
+          # On 20 the audit dies with `ReferenceError: WebSocket is not
+          # defined` after the build has already passed.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: website/package-lock.json
 
@@ -180,7 +184,9 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          # 22 for the same reason as the build job: the audit needs a global
+          # WebSocket to speak CDP, and Node 20 has none.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: website/package-lock.json
 
