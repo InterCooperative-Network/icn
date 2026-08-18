@@ -40,7 +40,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { findMutationControls } from "./lib/html-controls.mjs";
 import { extractInlineScripts } from "./lib/html-scripts.mjs";
+import { parseHtml } from "./lib/html-tree.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const websiteRoot = path.resolve(here, "..");
@@ -91,18 +93,6 @@ const CREDENTIAL_PATTERNS = [
   { re: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\./, why: "JWT" },
 ];
 
-/** Controls that would make the read-only walkthrough mutating. */
-const MUTATION_PATTERNS = [
-  { re: /<form\b/i, why: "<form> element" },
-  {
-    re: /<button[^>]*>\s*(confirm|submit|approve|vote|send)\b/i,
-    why: "confirm/submit control",
-  },
-  { re: /<input[^>]*type="submit"/i, why: "submit input" },
-];
-
-const errors = [];
-
 for (const [label, p] of [
   ["dist/see-it-work/index.html", pagePath],
   ["src/data/walkthrough.ts", fixturePath],
@@ -115,8 +105,30 @@ for (const [label, p] of [
   }
 }
 
+const errors = [];
+
 const html = fs.readFileSync(pagePath, "utf-8");
 const fixture = fs.readFileSync(fixturePath, "utf-8");
+
+// ─── One parse, shared by the two structural checks ──────────────────────────
+//
+// Checks 4 and 7 both ask questions about the document's structure, and both
+// used to ask them of raw markup. Parsing once here means each asks parse5
+// instead, and means a parse failure is handled in exactly one place.
+//
+// Fail closed. If the page cannot be parsed, neither structural check has
+// looked at anything, and "found no problems" would be a lie of the same shape
+// as the regexps they replaced — a PASS emitted by a check that read nothing.
+let parsedPage = null;
+try {
+  parsedPage = parseHtml(html);
+} catch (err) {
+  errors.push(
+    `dist/see-it-work/index.html could not be parsed (${err.message})\n` +
+      `      checks 4 and 7 are reported as failing rather than evaluated on` +
+      ` unparsed HTML`,
+  );
+}
 
 // ─── 1 · Truth label ─────────────────────────────────────────────────────────
 
@@ -169,17 +181,13 @@ for (const name of PARTNER_NAMES) {
 // extracted and this check passed without having read it (CodeQL alert 106,
 // js/bad-tag-filter). See scripts/lib/html-scripts.mjs.
 let inlineScripts;
-try {
-  inlineScripts = extractInlineScripts(html).join("\n");
-} catch (err) {
-  // Fail closed. "Could not parse" must never read as "found no scripts": that
-  // is the same silent pass the regexp gave us. Record a blocking error and
-  // scan the whole document, which over-reports rather than under-reports.
-  errors.push(
-    `dist/see-it-work/index.html could not be parsed to inspect its inline scripts` +
-      ` (${err.message})\n` +
-      `      check 4 is reported as failing rather than evaluated on unparsed HTML`,
-  );
+if (parsedPage) {
+  inlineScripts = extractInlineScripts(parsedPage).join("\n");
+} else {
+  // The parse failure above is already blocking. Scan the whole document as
+  // well rather than nothing: LIVE_DATA_PATTERNS match plain source text
+  // (`fetch(`, `WebSocket`, an API URL) rather than tag structure, so a raw
+  // scan here over-reports instead of under-reporting.
   inlineScripts = html;
 }
 
@@ -219,11 +227,22 @@ for (const { re, why } of NONDETERMINISM_PATTERNS) {
 }
 
 // ─── 7 · No mutation affordance ──────────────────────────────────────────────
-
-for (const { re, why } of MUTATION_PATTERNS) {
-  if (re.test(html)) {
+//
+// Structural, not textual. `<input type='submit'>` with single quotes,
+// `<input type=submit>` unquoted, and `<button><span>Confirm</span></button>`
+// with the label nested are all working controls that the three regexps this
+// replaced did not match — see scripts/lib/html-controls.mjs for the full list.
+//
+// No raw-text fallback when the parse failed: a mutation control is defined by
+// element and attribute structure, so there is nothing honest to scan for
+// without a tree. The blocking parse error above stands on its own.
+if (parsedPage) {
+  const reported = new Set();
+  for (const { why, detail } of findMutationControls(parsedPage)) {
+    if (reported.has(why)) continue;
+    reported.add(why);
     errors.push(
-      `the read-only walkthrough contains a mutation affordance (${why})\n` +
+      `the read-only walkthrough contains a mutation affordance (${why}: ${detail})\n` +
         `      ADR-0027 requires any action producing a receipt to declare mandate,` +
         ` reversibility and the receipt before the confirm step`,
     );
