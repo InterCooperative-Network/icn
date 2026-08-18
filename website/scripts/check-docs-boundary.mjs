@@ -95,6 +95,32 @@ const FORBIDDEN_PATH_CLASSES = [
   },
 ];
 
+/**
+ * The same prohibition, expressed as names rather than directories.
+ *
+ * A prefix list can only ever restate the generator's own prefix list, so on
+ * its own Check 5 cannot catch material of a forbidden class that happens to
+ * live somewhere else — which is exactly how dated organizer-meeting packets
+ * naming real people reached the public site as "current reference". These
+ * patterns are an independent statement of the rule in
+ * `.claude/rules/design.md`: no NYCN/Summit material, and no per-conversation
+ * meeting packet, on a surface that is not an institution package.
+ */
+const FORBIDDEN_NAME_CLASSES = [
+  {
+    pattern: /\/[^/]*(MEETING_BRIEF|MEETING_PREP|ONE_PAGE_AID)[^/]*\.md$/i,
+    why: "per-conversation meeting packets name real people and external organisations",
+  },
+  {
+    pattern: /\/[^/]*NYCN[^/]*\.md$/i,
+    why: "NYCN/Summit material belongs to that institution's package, not the generic public surface",
+  },
+  {
+    pattern: /\/(handoff|session-handoff)-\d{4}-\d{2}-\d{2}[^/]*\.md$/i,
+    why: "dated per-session handoffs are working continuity notes, not documentation",
+  },
+];
+
 function fail(list, msg) {
   list.push(msg);
 }
@@ -238,6 +264,20 @@ for (const forbidden of FORBIDDEN_PATH_CLASSES) {
       `forbidden path class published: ${row.publicPath}\n` +
         `      source: ${row.source}\n` +
         `      ${forbidden.prefix} must never be public — ${forbidden.why}`,
+    );
+  }
+}
+
+for (const forbidden of FORBIDDEN_NAME_CLASSES) {
+  const leaked = rows.filter(
+    (r) => r.published && forbidden.pattern.test(`/${r.source}`),
+  );
+  for (const row of leaked) {
+    fail(
+      errors,
+      `forbidden name class published: ${row.publicPath}\n` +
+        `      source: ${row.source}\n` +
+        `      must never be public — ${forbidden.why}`,
     );
   }
 }
