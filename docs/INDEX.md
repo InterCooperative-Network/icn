@@ -133,7 +133,9 @@ Comprehensive architectural reviews and design decisions:
 - [FEDERATION_INTEROP_CONTRACT.md](architecture/FEDERATION_INTEROP_CONTRACT.md) - Federation protocols
 - [CLIENT_MODEL.md](architecture/CLIENT_MODEL.md) - Client architecture patterns
 - [GOVERNANCE_STATE_MACHINE.md](architecture/GOVERNANCE_STATE_MACHINE.md) - Governance flow design
-- [IDENTITY_MEMBERSHIP_ARCHITECTURE.md](architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md) - Identity & membership
+- [IDENTITY_SEMANTICS.md](architecture/IDENTITY_SEMANTICS.md) - **Canonical** for the `identity_semantics` domain (#2597): the seven N2 semantic contracts (six identity-bearing classes plus ContextNonce protocol data), identifier domains, the allowed/forbidden substitution matrix, context-scope rules, legacy-DID bridge invariants, and the type-level invariants implementation must enforce. Semantic contract only - no implementation, migration or production-integration claim
+- [HUMAN_IDENTITY_ARCHITECTURE.md](architecture/HUMAN_IDENTITY_ARCHITECTURE.md) - Broader human-identity architecture: requirements, first-principles derivation, threat model, N1 authority-log design. Living, deliberately not canonical - IDENTITY_SEMANTICS.md owns the semantic contract
+- [IDENTITY_MEMBERSHIP_ARCHITECTURE.md](architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md) - **Superseded** historical predecessor (2025-12-25), retained for rationale. Its identity portions are superseded by the two documents above; its membership-lifecycle material is downstream and unbuilt (#2605)
 - [NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md](architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md) - Downstream demand signal from NYCN's fake airlock rehearsals: what ICN must provide (Tool Commons / GovernedServiceBinding / ToolManifest / receipts) before a governed bridge can move real rows into custody (requirements note, not doctrine)
 - Plus audit reports and gap analyses
 
