@@ -59,7 +59,16 @@ jobs:
             #
             # Safe because of the `has_rust` counter-signal below: paths-filter
             # uses a some-quantifier, so a mixed website+Rust PR sets both, and
-            # every consumer requires `docs_only && !has_rust` before skipping.
+            # every required check requires `docs_only && !has_rust` before
+            # skipping.
+            #
+            # One consumer is deliberately not dual-signal: `coverage` (Test
+            # Coverage) gates on `docs_only` alone, so a mixed website+Rust PR
+            # skips it. That job is observational — `continue-on-error: true`,
+            # not a required check — and the single-signal gate predates the
+            # `website/**` entry here. Widening it would change behaviour for
+            # non-website PRs, so it is left alone rather than quietly altered
+            # by a website change.
             docs_only:
               - 'docs/**'
               - 'website/**'
