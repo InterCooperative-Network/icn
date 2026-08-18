@@ -39,9 +39,64 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IDENTITY MEMBERSHIP ARCHITECTURE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Identity and Membership Architecture for ICN</h1>
-<p><strong>Status</strong>: Design Document
+<p><strong>Original status</strong>: Design Document
 <strong>Date</strong>: 2025-12-25
 <strong>Author</strong>: Architecture Review</p>
+<blockquote>
+<h2>Truth status — HISTORICAL PREDECESSOR. Do not build from this document.</h2>
+<p>Written 2025-12-25, <strong>before</strong> the N1 authority-log primitive and before the N2
+semantic contract. It is retained for its rationale and problem framing, and
+<strong>is not current truth</strong>. Its registry status was corrected from <code>living</code> to
+<code>superseded</code> on 2026-08-18: <code>living</code> ranked this predecessor <em>above</em> the
+documents that supersede it.</p>
+<p><strong>Where to go instead</strong></p>
+<table>
+<thead>
+<tr>
+<th>For</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The semantic identity classes, identifier domains, allowed/forbidden substitutions, context-scope rules, legacy-DID bridge invariants, type-level invariants</td>
+<td><strong><code>docs/architecture/IDENTITY_SEMANTICS.md</code> — canonical</strong></td>
+</tr>
+<tr>
+<td>Identity requirements, first-principles derivation, threat model, N1 architecture</td>
+<td><code>docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md</code></td>
+</tr>
+<tr>
+<td>The evidence map of what the code actually did</td>
+<td><code>docs/architecture/PRINCIPAL_MODEL.md</code> §1–§3</td>
+</tr>
+</tbody></table>
+<p><strong>Superseded — do not implement from this document</strong></p>
+<ul>
+<li><strong>Anchor-derived DIDs as first-class person identifiers.</strong> This document
+treats them as durable identity; the current architecture dispositions them
+for <strong>removal</strong>, and the semantic contract forbids a key- or hash-derived
+<code>Did</code> from becoming a <code>SubjectId</code>.</li>
+<li><strong>A public key as a durable human identity.</strong> Superseded: a durable human
+subject is a self-addressing <code>SubjectId</code>, context-scoped, and a Principal is
+fully correlatable by construction and therefore unfit as a human identifier.</li>
+<li><strong>Any globally resolvable person identifier.</strong> Superseded: human subjects are
+<strong>per institutional context</strong>, and no global public Person identifier exists
+or may be introduced.</li>
+<li><strong>Person-as-Entity framing.</strong> Dispositioned as legacy semantic debt.</li>
+<li><strong>Node and institution identity drawn from the same identifier space as a
+person.</strong> Now explicit <strong>category errors</strong>.</li>
+</ul>
+<p><strong>Not superseded, but not current truth either</strong></p>
+<ul>
+<li>The membership-lifecycle, federation-recognition and node-topology
+<em>rationale</em> — the problems it identifies remain real. The mechanisms are
+downstream and unbuilt: member-origin institutional action is <strong>#2605 (N5,
+blocked)</strong>, and authenticated institutional standing is <strong>#2441</strong>.</li>
+<li>Nothing in this document is implemented as described. N1 is a merged
+<strong>library primitive</strong> with production integration <strong>absent</strong>.</li>
+</ul>
+<p>Retained in place rather than archived so inbound references stay resolvable.</p>
+</blockquote>
 <h2>Executive Summary</h2>
 <p>This document proposes a unified identity and membership architecture for ICN that addresses:</p>
 <ul>

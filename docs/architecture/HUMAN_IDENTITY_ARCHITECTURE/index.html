@@ -43,6 +43,18 @@ View source on GitHub →
 should evolve, what institutions and peers should observe, and how devices act
 for humans.</p>
 <blockquote>
+<p><strong>Canonical precedence.</strong> For the <strong>semantic identity contract</strong> — the classes,
+the identifier domains, the allowed/forbidden substitution matrix, context-scope
+semantics, the legacy-DID bridge invariants and the type-level invariants —
+<strong><code>docs/architecture/IDENTITY_SEMANTICS.md</code> is canonical</strong> and owns the
+<code>identity_semantics</code> domain in <code>ops/state/truth/sources.json</code>. This document
+remains the broader architecture note (requirements, derivation, threat model,
+N1 architecture, rationale) and is deliberately <strong>not</strong> canonical, so that two
+sources never claim the same facts. Where the two address the same fact,
+<code>IDENTITY_SEMANTICS.md</code> controls. Sections amended by that contract are marked
+<strong>[AMENDED by IDENTITY_SEMANTICS]</strong> in place.</p>
+</blockquote>
+<blockquote>
 <p><strong>Truth status, section by section.</strong> No section is left unclassified; §20 is
 the full per-result index.</p>
 <table>
@@ -1542,7 +1554,7 @@ answer is marked <strong>OPEN</strong> and appears in §17 — none are silently
 <tr>
 <td>25</td>
 <td>An existing key-derived DID holder must not &quot;become a new person&quot;</td>
-<td><strong>Their key, custody and signing ability are untouched</strong> — no ceremony, no re-enrollment. A <strong>new <code>SubjectId</code> is allocated</strong> whose inception names their existing <code>Did</code> as initial authorized key; the identifier changes, the person does not, and membership rows keyed by <code>Did</code> need a documented bridge (§15.1).</td>
+<td><strong>Their key, custody and signing ability are untouched as a Principal</strong> — no ceremony, no re-enrollment. A <strong>new <code>SubjectId</code> is allocated</strong>; the identifier changes, the person does not, and membership rows keyed by <code>Did</code> need a documented bridge (§15.1). <strong>[AMENDED by IDENTITY_SEMANTICS]</strong> the clause &quot;whose inception names their existing <code>Did</code> as initial authorized key&quot; is <strong>withdrawn</strong> — each context takes fresh initial authority and the legacy key acts only as bridge evidence (§7 there).</td>
 <td>B/D/E require a full cutover</td>
 </tr>
 </tbody></table>
@@ -1565,13 +1577,13 @@ forced conclusion. §17 lists what would reopen it.</p>
 </thead>
 <tbody><tr>
 <td><strong>Principal</strong></td>
-<td>a keypair. Its public key <strong>is</strong> a <code>Did</code>.</td>
+<td>a <strong>cryptographic actor identified by a validated public/verifying key</strong>; its public key <strong>is</strong> a <code>Did</code>. Secret signing material is <em>not</em> part of the identity object, and a threshold group verifying key is <strong>one</strong> Principal with no single local keypair.</td>
 <td>kernel</td>
 <td>yes, to whoever verifies a signature</td>
 </tr>
 <tr>
 <td><strong>Subject</strong></td>
-<td><code>SubjectId = H(inception_event)</code> — a <strong>self-addressing identifier</strong>, not a key. One per context.</td>
+<td><code>SubjectId = H(inception_event)</code> — a <strong>self-addressing identifier</strong>, not a key. One per context. <strong>Names a <em>human</em> subject only</strong> — see §9.5 and the substitution matrix.</td>
 <td>identity</td>
 <td>to that context only</td>
 </tr>
@@ -1588,6 +1600,14 @@ forced conclusion. §17 lists what would reopen it.</p>
 <td><strong>no</strong></td>
 </tr>
 </tbody></table>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS]</strong> The Principal row previously read &quot;a
+keypair&quot;. That is a semantic defect: it places secret material inside a public
+identity object, and it excludes a threshold group key, which is one Principal
+even though no participant can sign alone. The Subject row is scoped to human
+subjects; read it with §9.5&#39;s amendment, which separates <em>mechanism</em> generality
+from <em>identifier</em> interchangeability.</p>
+</blockquote>
 <p>The person is not an object in the protocol. That is the point. <code>Person</code> is an
 app-layer word for <em>the human who holds a continuity root</em>, and no kernel type
 needs to know it exists (R13.1).</p>
@@ -2225,7 +2245,17 @@ deterministically evaluate standing/suspension because that state is
 unauthenticated (F17) — is untouched by anything here, and remains #2441&#39;s.</p>
 <h3>9.5 Where the Meaning Firewall falls</h3>
 <p>PRINCIPAL_MODEL §1.1 forbids <code>Person</code> in the kernel and §4 then proposes it as a
-principal class. This model has no such tension:</p>
+principal class. This model resolves that tension <strong>as a required invariant</strong> —
+the table below states the target, not the measured present:</p>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS]</strong> This table was previously asserted in the
+present tense, closing with &quot;This model has no such tension.&quot; Measured on
+<code>origin/main</code>, <code>icn-kernel-api</code> carries <strong>49 public type/function declarations
+using app-layer vocabulary</strong>, plus 188 whole-word <code>member</code>, 163 <code>federation</code>,
+84 <code>cooperative</code> and 79 <code>steward</code>. <strong>R13.1 [HARD] is already violated in the
+crate meant to enforce it.</strong> Read the table as the invariant to reach, and the
+gap as open debt.</p>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -2250,9 +2280,22 @@ principal class. This model has no such tension:</p>
 <td>key custody</td>
 </tr>
 </tbody></table>
-<p>A <strong>subject</strong> is meaning-free: it is any entity with an evolving authorized key
-set. A person, a treasury and a node are all subjects. That is why this model
-satisfies R13.1 where a <code>Person</code> principal class cannot.</p>
+<p>A <strong>subject</strong> is meaning-free <em>as a mechanism</em>: the hash-chained log, <code>+1</code>
+monotonicity, pre-rotation commitment and state-independent admission are
+properties of an append-only authenticated log, and none of them mentions humans.
+That mechanism generality is why this model satisfies R13.1 where a <code>Person</code>
+principal class cannot.</p>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS]</strong> This paragraph previously read &quot;A person, a
+treasury and a node are all subjects.&quot; <strong>That is a statement about mechanism,
+not about types, and it must not be read as licensing identifier reuse.</strong>
+<code>SubjectId</code> is the <strong>human-subject</strong> identifier N1 produces. <code>NodeId ↔ SubjectId</code>
+and <code>InstitutionId ↔ SubjectId</code> are <strong>category errors</strong> in both directions, and a
+treasury is an institution-governed <strong>account</strong>, not an identity class at all.
+Generalizing N1&#39;s machinery beyond human subjects requires an explicit
+generalized abstraction, designed and reviewed as such; no slice may perform
+that generalization implicitly by widening <code>SubjectId</code>&#39;s meaning.</p>
+</blockquote>
 <blockquote>
 <p><strong>One leak to watch.</strong> §9.1 says the log is &quot;replicated to that subject&#39;s
 relying parties&quot;, and knowing <em>which</em> parties those are is context knowledge
@@ -2342,9 +2385,9 @@ concepts into it, and to make the type enforce what it claims.</p>
 <td>RECOMMENDED</td>
 </tr>
 <tr>
-<td>Treasury identifiers become <code>EntityId</code>-shaped, not <code>Did</code>-shaped</td>
-<td>A treasury holds no key; <code>derive_treasury_did</code> mints a string that would fail <code>Did::from_str</code> and a <em>second, different</em> one via <code>from_anchor_id</code> (<code>icn-coop/src/actor.rs:493</code>) — already flagged in <code>docs/status.toml:77</code></td>
-<td>RECOMMENDED</td>
+<td>Treasury identifiers must not be <code>Did</code>-shaped. The replacement is <strong>an account/resource domain, to be determined</strong> — <em>not</em> <code>EntityId</code></td>
+<td>A treasury holds no key; <code>derive_treasury_did</code> mints a string that would fail <code>Did::from_str</code> and a <em>second, different</em> one via <code>from_anchor_id</code> (<code>icn-coop/src/actor.rs:493</code>) — already flagged in <code>docs/status.toml:77</code>. <strong>[AMENDED by IDENTITY_SEMANTICS]</strong> the <code>EntityId</code> target is <strong>WITHDRAWN</strong>: <code>EntityId</code> names the <em>owning institution</em>, and an account is not its owner. <code>Treasury</code> already records both separately (<code>entity_id</code> beside <code>treasury_did</code>), so the owner slot is filled and only the <em>account</em> slot is open</td>
+<td>FINDING RETAINED · TARGET WITHDRAWN</td>
 </tr>
 <tr>
 <td>A durable subject is a <code>SubjectId</code>, never a <code>Did</code></td>
@@ -2680,20 +2723,50 @@ therefore declared an exception in §12.3 rather than defended as compliant.</st
 <p>durable subject ≠ current authority</p>
 </blockquote>
 <p>holds for humans (subject ≠ device keys), for institutions (charter ≠ current
-stewards) and for nodes (instance ≠ operator). All three are <strong>subjects</strong> in the
-§9.1 sense, which is why the identity layer can stay meaning-free.</p>
+stewards) and for nodes (instance ≠ operator). The <strong>same mechanism</strong> — a durable
+identifier over an evolving authority set — fits all three, which is why the
+identity layer can stay meaning-free.</p>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS]</strong> This section previously concluded that all
+three &quot;are <strong>subjects</strong> in the §9.1 sense&quot;. <strong>That is a mechanism observation,
+not a type identity.</strong> Identifier types remain <strong>non-interchangeable</strong>: a node
+and an institution do not draw identifiers from the human-subject domain, and
+<code>NodeId ↔ SubjectId</code> / <code>InstitutionId ↔ SubjectId</code> are category errors.
+A generic &quot;durable identifier over an evolving authority set&quot; abstraction
+<strong>does not exist</strong> — N1&#39;s API is concretely typed to human-subject inception —
+and creating one is explicit, reviewable work, not a side effect of a later
+slice.</p>
+</blockquote>
 <h3>14.2 Institutions: PRINCIPAL_MODEL §4.1 is upheld, with a caveat</h3>
 <p>Its conclusion — an institution holds no signing key, because <code>Did</code> models custody
 and institutions are constituted by governance — <strong>stands, and this model
 strengthens the reasoning</strong>: <code>Did</code> is <em>only</em> a key here, so it is even more clearly
 the wrong type for a governed entity.</p>
 <p>But the caveat matters. The argument&#39;s premise was &quot;an institution&#39;s identity
-would have to be a key.&quot; Under §9.1 that premise is false: an institution could be
-a <strong>subject</strong> with an authority log whose authorized keys are its current
-stewards, and no single person would &quot;be&quot; the institution. <strong>O12 therefore
-reopens on better terms</strong> — the question is no longer &quot;key or mandate chain&quot; but
-&quot;does an institution need a self-authenticating statement, given that a subject
-log now makes one possible without single-custodian capture?&quot; Recorded in §17.</p>
+would have to be a key.&quot; That premise is false — an institution&#39;s identity need
+not be a key at all — and <strong>O12 therefore reopens on better terms</strong>: the question
+is no longer &quot;key or mandate chain&quot; but <strong>&quot;does an institution need a
+self-authenticating statement?&quot;</strong> Recorded in §17.</p>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS — proposal WITHDRAWN]</strong> This section previously
+answered that question by proposing that &quot;an institution could be a <strong>subject</strong>
+with an authority log whose authorized keys are its current stewards&quot;. <strong>That
+proposal is withdrawn as a <code>SubjectId</code>-sharing construction.</strong>
+<code>InstitutionId ↔ SubjectId</code> is a <strong>category error</strong> in both directions: a person
+is not a governed collective, and mechanism reuse does not license identifier
+reuse (§9.5, §14.1). An institution is constituted by <strong>governance</strong>, and its
+authority is a governance decision evidenced against authenticated state — never
+a signature by any single key, and never a borrowed human identifier.</p>
+<p><strong>What survives:</strong> the underlying question is still open as <strong>O12</strong>, and may be
+answered by a <strong>distinct institution domain</strong> carrying its own self-authenticating
+statement. What is forbidden is answering it by reusing the human-subject
+identifier. Note also that a threshold (FROST) group is <strong>one Principal</strong>, and
+<code>Principal → Institution</code> is forbidden — threshold custody removes
+single-custodian capture but does not manufacture governance.</p>
+<p><strong>What this costs:</strong> O12 is left open rather than answered. That is deliberate;
+the positive construction additionally waits on authenticated institutional
+standing (#2441), which does not exist today.</p>
+</blockquote>
 <p><code>FounderSignature</code> (F18) is the existing primitive to build on: an institution&#39;s
 inception event, signed by its founding persons, is a natural <code>EntityId</code> binding
 and resolves PRINCIPAL_MODEL&#39;s O11 by construction (the id commits to the event).</p>
@@ -2703,22 +2776,61 @@ and resolves PRINCIPAL_MODEL&#39;s O11 by construction (the id commits to the ev
 connection, not per peer</strong> (<code>handlers/mod.rs:76-78</code>). Nothing here changes it.</p>
 <p>Two facts worth carrying forward: <code>operator_did</code> is populated as <code>did.clone(), did.clone()</code> (<code>supervisor/lifecycle.rs:371-375</code>), so node and operator are the
 same principal today; and node key rotation produces a new DID and <strong>is never
-persisted</strong> (<code>keystore.rs:1224-1257</code> does not call <code>save_v4</code>). Under §9.1 a node
-becomes a subject whose authority log survives key rotation — which is the
-principled fix for both, and which also gives <strong>O2</strong> (does a restored node keep
-its DID?) a cleaner answer: the <em>subject</em> persists, the <em>keys</em> rotate, and
-restore-twice is detectable as duplicity rather than indistinguishable from a clone.</p>
+persisted</strong> (<code>keystore.rs:1224-1257</code> does not call <code>save_v4</code>). Both remain live
+defects.</p>
+<blockquote>
+<p><strong>[AMENDED by IDENTITY_SEMANTICS — proposal WITHDRAWN]</strong> This section previously
+proposed that &quot;under §9.1 a node becomes a subject whose authority log survives
+key rotation&quot;, presented as the principled fix for node key rotation and
+node/operator conflation <strong>and as part of O2&#39;s answer</strong> (does a restored node
+keep its DID?). <strong>Node-as-human-Subject is withdrawn.</strong> <code>NodeId ↔ SubjectId</code> is a
+<strong>category error</strong>: a node is a running instance of infrastructure, not a human
+subject, and it does not draw an identifier from the human-subject domain.</p>
+<p><strong>What this costs — stated explicitly rather than hidden.</strong> Withdrawing
+node-as-Subject <strong>also withdraws the proposed O2/rotation solution</strong>, and the
+semantic contract <strong>does not replace it with a finished node lifecycle
+protocol</strong>. Node key rotation remains unpersisted; <code>operator_did == node_did</code>
+remains unfixed; <strong>O2 and O15 remain downstream and open.</strong> Trading a stated gap
+for a hidden one would be worse than leaving it open.</p>
+<p><strong>What N2 does establish:</strong> Node ≠ Subject, Node ≠ Institution, Operator ≠ Node,
+and that <strong>authenticating a host does not establish institutional authority</strong>. A
+durable node identifier relates to its current transport Principal only through
+an <strong>explicit binding object</strong> — never a conversion — and that binding <strong>cannot
+be written merely because an operator possesses the machine</strong>. Who may write it
+is itself the open O2/O15 question. <code>NetworkMessage.from</code> is the <strong>current
+sending Principal</strong>, which is what lets #2480 proceed without node-subject
+machinery that does not exist.</p>
+</blockquote>
 <hr>
 <h2>15. Migration</h2>
 <p>Classification per mechanism: <strong>KEEP · MIGRATE · DEPRECATE · REMOVE ·
 COMPATIBILITY-ONLY</strong>.</p>
 <h3>15.1 Key-derived Person DIDs — KEEP the key, allocate a new subject</h3>
+<blockquote>
+<p><strong>[SUPERSEDED IN PART by IDENTITY_SEMANTICS — read this first.]</strong> This section&#39;s
+<em>direction</em> survives: the legacy key remains a cryptographic principal, and a new
+<code>SubjectId</code> is allocated rather than derived from it. Its <strong>mechanism does not</strong>.
+Two statements below are superseded and <strong>must not be read as current guidance</strong>:
+(a) that the person simply &quot;keeps signing with the key they already hold&quot; in the
+new model, and (b) that the new inception <strong>names the existing <code>Did</code> as its
+initial authorized key</strong> (see the held note further down). Under the semantic
+contract each context gets <strong>fresh context-specific initial authority</strong>, and the
+legacy key acts <strong>only</strong> as the Principal authorizing a context-scoped
+bridge-evidence object — signing that evidence is <strong>not</strong> an enrolment and does
+<strong>not</strong> make the legacy key an authorized Principal in the new Subject&#39;s log.
+<strong><code>IDENTITY_SEMANTICS.md</code> §7 controls.</strong> The full rewrite is <strong>HELD</strong> until
+N2-E2 specifies the bridge-evidence object.</p>
+</blockquote>
 <p>This is the largest deployed class, and the <strong>key</strong> does not change. An existing
 <code>did:icn:&lt;key&gt;</code> is already exactly what §10 says a <code>Did</code> should be: a
 cryptographic principal. Two consequences:</p>
 <ul>
-<li>Nobody &quot;becomes a new person&quot; (scenario 25). No cutover, no re-enrollment, and
-<strong>no key ceremony</strong>: the person keeps signing with the key they already hold.</li>
+<li>Nobody &quot;becomes a new person&quot; (scenario 25). No cutover and no re-enrollment.
+<em>(Superseded in part: the original text added &quot;<strong>no key ceremony</strong>: the person
+keeps signing with the key they already hold.&quot; What is preserved is that the
+person&#39;s legacy key, custody and signing ability are untouched <strong>as a
+Principal</strong>; what does not survive is the implication that this key carries
+their authority in the new context. See the note above.)</em></li>
 </ul>
 <blockquote>
 <p><strong>But the existing DID cannot itself serve as the <code>SubjectId</code>, and an earlier
@@ -2730,6 +2842,26 @@ such an inception is <strong>inadmissible</strong> and the derived view stays <c
 event names the person&#39;s existing <code>Did</code> as its initial authorized key.</strong> What is
 preserved is what actually matters — the key, custody, and the ability to sign —
 and what changes is the <em>context identifier</em>.</p>
+<hr>
+<p><strong>[SUPERSEDED IN PART by IDENTITY_SEMANTICS — rewrite deliberately HELD]</strong>
+The clause &quot;<strong>names the person&#39;s existing <code>Did</code> as its initial authorized key</strong>&quot;
+<strong>does not survive</strong> the semantic contract. N1&#39;s <code>InceptionBody</code> carries the
+signer and initial authority <strong>in cleartext</strong>, and admission requires the whole
+body, so the initial authority <strong>cannot be withheld</strong> — one legacy <code>Did</code> seeding
+two contexts therefore places the same key in both institutions&#39; hands, defeating
+the very unlinkability this migration is meant to preserve.</p>
+<p>The <strong>binding rule is <code>IDENTITY_SEMANTICS.md</code> §7</strong>: each context gets a fresh
+<code>SubjectId</code> under <strong>fresh context-specific initial authority</strong>, and the legacy
+<code>Did</code> acts <strong>as a Principal only</strong>, authorizing a <strong>context-scoped
+bridge-evidence object</strong> disclosed only to a context that already holds that
+legacy <code>Did</code>. Migration also requires two distinct facts — <strong>FACT A</strong> personal
+continuity and <strong>FACT B</strong> institutional recognition — and a signature by the old
+principal proves <strong>FACT A only</strong>.</p>
+<p><strong>This section&#39;s full rewrite is HELD</strong> until the bridge-evidence object is
+specified (N2-E2). Inventing that object&#39;s shape here would be guessing at a
+protocol the contract deliberately leaves downstream. Until then, <strong>§7 of
+<code>IDENTITY_SEMANTICS.md</code> controls</strong> and the clause above must not be implemented
+as written.</p>
 <p>That is a smaller cost than a re-enrollment and a larger one than &quot;no event&quot;. In
 particular, <strong>membership rows keyed by the member&#39;s <code>Did</code> need a documented bridge
 to the new <code>SubjectId</code></strong>, which is the same shape as the bridge <code>icn-commons</code>
@@ -3008,13 +3140,13 @@ pass. <strong>A correct OPEN is better than an invented answer.</strong></p>
 </tr>
 <tr>
 <td><strong>O12</strong></td>
-<td>Do institutions need self-authenticating statements — now that §14.2 makes one possible without single-custodian capture?</td>
-<td><strong>Reopened on better terms.</strong> The original rejection assumed institution-identity ⇒ institution-keypair; §9.1 falsifies that premise</td>
+<td>Do institutions need self-authenticating statements?</td>
+<td><strong>Reopened on better terms, and still open.</strong> The original rejection assumed institution-identity ⇒ institution-keypair, and that premise is false. <strong>[AMENDED by IDENTITY_SEMANTICS]</strong> §14.2&#39;s proposed answer — an institution as a <em>subject</em> with an authority log over its stewards — is <strong>withdrawn</strong>: <code>InstitutionId ↔ SubjectId</code> is a category error, so any answer must come from a <strong>distinct institution domain</strong>, not the human-subject identifier. The positive construction also waits on authenticated institutional standing (#2441)</td>
 </tr>
 <tr>
 <td><strong>O2</strong></td>
 <td>Does a restored node keep its identifier?</td>
-<td>§14.3 improves it (subject persists, keys rotate) but does not settle restore-twice detection policy</td>
+<td><strong>Fully open. [AMENDED by IDENTITY_SEMANTICS]</strong> This row previously credited §14.3 with improving O2 (&quot;subject persists, keys rotate&quot;). That improvement rested on node-as-subject, which is <strong>withdrawn</strong>, so it is withdrawn with it — and N2 supplies <strong>no</strong> replacement node lifecycle protocol. Node key rotation remains unpersisted and restore-twice detection remains unsettled. O2 and O15 are downstream</td>
 </tr>
 <tr>
 <td><strong>O5</strong></td>
@@ -3029,7 +3161,7 @@ pass. <strong>A correct OPEN is better than an invented answer.</strong></p>
 <tr>
 <td><strong>O11</strong></td>
 <td>Canonical encoding of a genesis decision before hashing to an <code>EntityId</code>?</td>
-<td>§14.2 makes this the <em>same</em> mechanism as <code>SubjectId</code>, so it should be solved once, not twice</td>
+<td><strong>Mechanism only.</strong> The self-addressing/canonical-hash <em>technique</em> is the same one <code>SubjectId</code> uses, so the encoding problem should be solved once, not twice. <strong>[AMENDED by IDENTITY_SEMANTICS]</strong> this is <strong>not</strong> a claim that an institution is a Subject or shares its identifier domain — §14.2&#39;s institution-as-subject proposal is <strong>withdrawn</strong>, and <code>InstitutionId ↔ SubjectId</code> is a category error. Reusing a hashing technique is not reusing an identifier type</td>
 </tr>
 <tr>
 <td><strong>O15</strong></td>
@@ -3112,7 +3244,7 @@ untraced anchor↔member keying question in §15.2.</p>
 </tr>
 <tr>
 <td><strong>Slices E/F/G</strong> (node claim, institution genesis, hosting)</td>
-<td><strong>KEEP.</strong> §14.2 makes F&#39;s <code>EntityId</code> binding the same mechanism as <code>SubjectId</code> — solve once</td>
+<td><strong>KEEP.</strong> F&#39;s <code>EntityId</code> binding can reuse the same self-addressing <strong>mechanism</strong> as <code>SubjectId</code> — solve the encoding once. <strong>[AMENDED by IDENTITY_SEMANTICS]</strong> mechanism only: §14.2&#39;s institution-as-subject proposal is withdrawn, and the identifier domains stay distinct</td>
 </tr>
 <tr>
 <td><strong>#2469 slices 4–6</strong></td>
@@ -3459,7 +3591,7 @@ longest chain.</li>
 </tr>
 <tr>
 <td>Key-derived Person DIDs unchanged (§15.1)</td>
-<td><strong>RECOMMENDED</strong></td>
+<td><strong>SUPERSEDED IN PART · REWRITE HELD.</strong> Direction retained (key stays a Principal; a new <code>SubjectId</code> is allocated); the initial-authority mechanism is superseded by <code>IDENTITY_SEMANTICS.md</code> §7. Held until N2-E2</td>
 </tr>
 <tr>
 <td>O-N1…O-N6, O16′, O12, O2, O5, O6, O10, O11, O13 (receiver-side), O15, O17 (acquisition) (§17)</td>
