@@ -214,18 +214,18 @@ mod tests {
     // -- CapabilitySubjectId ----------------------------------------------------------
 
     #[test]
-    fn subject_id_valid_did() {
+    fn capability_subject_id_valid_did() {
         let sid = CapabilitySubjectId::new("did:icn:abc123").unwrap();
         assert_eq!(sid.as_str(), "did:icn:abc123");
     }
 
     #[test]
-    fn subject_id_rejects_non_did() {
+    fn capability_subject_id_rejects_non_did() {
         assert!(CapabilitySubjectId::new("not-a-did").is_err());
     }
 
     #[test]
-    fn subject_id_rejects_empty() {
+    fn capability_subject_id_rejects_empty() {
         assert!(CapabilitySubjectId::new("").is_err());
     }
 
@@ -320,7 +320,7 @@ mod tests {
     // -- Serde roundtrips ---------------------------------------------------
 
     #[test]
-    fn subject_id_serde_roundtrip() {
+    fn capability_subject_id_serde_roundtrip() {
         let sid = CapabilitySubjectId::new("did:icn:abc").unwrap();
         let json = serde_json::to_string(&sid).unwrap();
         let back: CapabilitySubjectId = serde_json::from_str(&json).unwrap();
