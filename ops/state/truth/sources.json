@@ -26,6 +26,16 @@
     },
     "agent_operating_contract": {
       "owner": "AGENTS.md",
+      "sections": [
+        "1. Start from the question, then resolve its owner",
+        "2. Bootstrap before non-trivial work",
+        "4. Scope and mutation discipline",
+        "5. Verification is path- and claim-specific",
+        "6. Memory is not authority",
+        "7. Generated artifacts are projections",
+        "8. Specialist agents and provider adapters are thin overlays",
+        "9. Completion report"
+      ],
       "stability": "constant",
       "description": "Provider-neutral agent bootstrap, scope/mutation discipline, verification posture, memory-not-authority rule, generated-projection rule, specialist/provider boundaries, and completion reporting. Protocol invariants are registered separately under invariants."
     },
@@ -64,6 +74,17 @@
       "owner": "docs/adr/",
       "stability": "slow-changing",
       "description": "Architecture Decision Records. Canonical under docs/adr/. Naming: ADR-NNNN-kebab-case-title.md. Never delete; use status: superseded."
+    },
+    "documentation_classification": {
+      "owner": "docs/registry.toml",
+      "stability": "slow-changing",
+      "description": "Per-document category, status, truth_class, owner, audience, and last_updated for docs/**. Enforced by docs/scripts/doc_control_check.py. Classification only: it records what kind of document a file is and who owns it, and never establishes the domain facts inside that document — those belong to the domain owners registered here. When a document's front matter and this registry disagree, reconcile them; do not treat either as the domain's semantic owner."
+    },
+    "deployment_runtime_state": {
+      "owner": "private-network-ops",
+      "query": "resolve host/service values from the private network-ops repo when authorized, then observe the live cluster/service directly",
+      "stability": "volatile",
+      "description": "What is actually deployed and running in a named environment. NO PUBLIC OWNER EXISTS IN THIS REPO BY DESIGN: repo-map.json#infrastructure carries roles only, and code, docs, manifests, status.toml, and generated projections are all evidence of intent, never of liveness. Never infer deployment or runtime liveness from this repository; report the access boundary instead of guessing."
     },
     "cluster_topology": {
       "owner": "ops/state/config/repo-map.json#infrastructure",

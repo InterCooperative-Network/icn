@@ -27,8 +27,10 @@ import re
 import sys
 from pathlib import Path
 
-# Owners that are not files in this repo: live git/API state or downstream repos.
-NONFILE_OWNERS = {"git", "github-api", "downstream-repos"}
+# Owners that legitimately are not a path inside this repo: live queries and
+# external/private sources. A domain registered here is exempt from the on-disk
+# existence check, never from needing an owner at all.
+NONFILE_OWNERS = {"git", "github-api", "downstream-repos", "private-network-ops"}
 
 # Staleness warning thresholds by declared stability class (days).
 STALENESS_DAYS = {"volatile": 14, "slow-changing": 120}
@@ -289,7 +291,7 @@ def main() -> int:
     today = datetime.date.today()
 
     # 1. Every file-owner must exist; machine_view files must exist and parse.
-    seen_owners: dict[str, str] = {}
+    seen_owners: dict[str, list[tuple[str, frozenset[str]]]] = {}
     for name, dom in domains.items():
         owner = dom.get("owner", "")
         # Classify the owner once; only genuine path owners get existence,
@@ -313,14 +315,29 @@ def main() -> int:
         # Duplicate-owner rule applies to path owners only: live-query and
         # descriptive owners legitimately serve multiple domains, and blank
         # owners were already warned above.
+        #
+        # The invariant is one owner per CLAIM, not one domain per file. Two
+        # domains may share a file when both scope themselves to `sections` and
+        # those scopes are disjoint. A registration with no `sections` claims the
+        # whole file and therefore collides with any sibling on that path, and
+        # overlapping section scopes collide too — neither case was expressible
+        # while the rule keyed on the path alone.
         if is_path_owner:
-            if owner in seen_owners:
-                warn(
-                    f"duplicate owner: {name} and {seen_owners[owner]} both claim {owner!r} "
-                    "(one source per domain — sources.json's own rule)"
-                )
-            else:
-                seen_owners[owner] = name
+            sections = frozenset(dom.get("sections") or ())
+            for other_name, other_sections in seen_owners.get(owner, []):
+                if not sections or not other_sections:
+                    warn(
+                        f"duplicate owner: {name} and {other_name} both claim {owner!r} "
+                        "and at least one claims the whole file "
+                        "(one source per claim — sources.json's own rule)"
+                    )
+                elif sections & other_sections:
+                    warn(
+                        f"overlapping owner: {name} and {other_name} both claim "
+                        f"{owner!r} sections {sorted(sections & other_sections)} "
+                        "(one source per claim — sources.json's own rule)"
+                    )
+            seen_owners.setdefault(owner, []).append((name, sections))
 
         mv = dom.get("machine_view")
         if mv:
