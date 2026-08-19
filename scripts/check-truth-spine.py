@@ -323,21 +323,28 @@ def main() -> int:
         # overlapping section scopes collide too — neither case was expressible
         # while the rule keyed on the path alone.
         if is_path_owner:
-            sections = frozenset(dom.get("sections") or ())
-            for other_name, other_sections in seen_owners.get(owner, []):
+            # Key on the base path, never the raw owner string: `f` and
+            # `f#infrastructure` are the same file, and keying on the raw string
+            # would hide that collision behind the fragment. A `#fragment` is
+            # itself a scope, so fold it into the declared sections.
+            base, _, fragment = owner.partition("#")
+            sections = frozenset(dom.get("sections") or ()) | (
+                {fragment} if fragment else set()
+            )
+            for other_name, other_sections in seen_owners.get(base, []):
                 if not sections or not other_sections:
                     warn(
-                        f"duplicate owner: {name} and {other_name} both claim {owner!r} "
+                        f"duplicate owner: {name} and {other_name} both claim {base!r} "
                         "and at least one claims the whole file "
                         "(one source per claim — sources.json's own rule)"
                     )
                 elif sections & other_sections:
                     warn(
                         f"overlapping owner: {name} and {other_name} both claim "
-                        f"{owner!r} sections {sorted(sections & other_sections)} "
+                        f"{base!r} sections {sorted(sections & other_sections)} "
                         "(one source per claim — sources.json's own rule)"
                     )
-            seen_owners.setdefault(owner, []).append((name, sections))
+            seen_owners.setdefault(base, []).append((name, sections))
 
         mv = dom.get("machine_view")
         if mv:

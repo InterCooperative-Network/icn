@@ -10,9 +10,9 @@
     },
     "repo_topology": {
       "owner": "ops/state/config/repo-map.json",
-      "sections": ["repos", "org_repos", "worktrees", "relationships", "infrastructure"],
+      "sections": ["repos", "org_repos", "worktrees", "relationships"],
       "stability": "slow-changing",
-      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster ROLES (concrete addresses are private — network-ops). org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), and worktree root. The .infrastructure section is owned by cluster_topology, not here. org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
     },
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
