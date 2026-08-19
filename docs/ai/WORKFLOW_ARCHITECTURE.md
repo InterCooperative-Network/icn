@@ -1,64 +1,229 @@
 ---
 Status: normative
-Authority: process architecture
-Canonical: no
-Last verified: 2026-04-15
+Authority: agent workflow architecture
+Canonical: yes
+Last verified: 2026-08-19
 ---
 
 # ICN Agent Workflow Architecture
 
-This document explains the four-document architecture that governs agent reasoning and session management in the ICN project. Future agents and contributors should read this first to understand which file to consult for which purpose.
+This document owns the **agent workflow architecture**: how an agent finds truth, loads context, uses memory, performs work, and promotes durable discoveries.
 
-## Document Roles
+It does not own protocol semantics, project status, implementation state, merge policy, agent routing, or repository topology. Those have separate owners.
 
-| Purpose | File | When edited |
-|---------|------|-------------|
-| Stable reasoning rules | `docs/ai/ICN_CONSTITUTIONAL_CORE.md` | Rarely. Changes are governance-level edits requiring explicit ratification. |
-| Refreshable project state | `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md` | Template is stable. Agent fills it fresh each session from canonical docs + latest handoff. |
-| Per-session grounding | `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` | Template is stable. Agent fills it before non-trivial work each session. |
-| End-of-session record | `docs/dev/HANDOFF_TEMPLATE.md` | Template is stable. Agent writes a concrete handoff at session end. |
+## Design goal
 
-## How They Relate
+An agent should be able to enter the repository with no private conversation history and answer four questions safely:
 
-```
-Constitutional Core (stable reasoning foundation)
-        │
-        ▼
-Live State Overlay (session-refreshed from canonical docs)
-        │
-        ▼
-Session Frame (filled before non-trivial work)
-        │
-        ▼
-    [ Work ]
-        │
-        ▼
-Handoff (written at session end, becomes input to next session's overlay)
-```
+1. What question am I actually trying to answer?
+2. Which source owns that kind of fact?
+3. What is live right now?
+4. What evidence would justify changing or claiming anything?
 
-## Key Rules
+The old four-document pipeline treated broad state documents plus the latest handoff as the normal session input. That architecture is superseded. Handoffs are useful memory, but feeding one forward as state creates a self-reinforcing stale-context loop.
 
-1. **Constitutional Core is not restated elsewhere.** Skills, commands, project_rules, and agent definitions link to it. They do not copy its language.
+## The context stack
 
-2. **Live State Overlay is refreshed, not cached.** The template tells the agent which files to load. The loaded content — not the template itself — is the live state.
+The modern stack is layered by function, not by a single universal precedence order.
 
-3. **Session Frame is mandatory for non-trivial work.** Trivial = single-file typo fix. Everything else gets a frame.
+### Layer 0: operating contract
 
-4. **Handoffs use truth-plane labeling.** Each section identifies whether its content is verified fact, execution state, open work, or an unsafe assumption.
+`AGENTS.md`
 
-## Canonical State vs. This Architecture
+Owns stable agent behavior and the five cross-cutting ICN invariants. It contains no current project state.
 
-This architecture governs agent workflow. It does not replace canonical state documents:
+### Layer 1: truth ownership map
 
-- `docs/STATE.md` — declared project state (canonical)
-- `docs/PHASE_PROGRESS.md` — phase tracking (canonical)
-- `CLAUDE.md` — root operational guidance (unchanged by this architecture)
+`ops/state/truth/sources.json`
 
-The constitutional core supplements CLAUDE.md; it does not replace it.
+Answers **where a fact of this kind is owned**. The agent resolves the question to a domain before loading broad docs.
 
-## Edit Classification
+Supporting registries:
 
-Any edit to these workflow documents falls into one of two categories:
+- `ops/state/truth/policy.json` owns merge-policy data.
+- `ops/state/truth/agents.json` owns agent routing.
+- `ops/state/truth/skills.json` owns skill routing/canonical paths.
+- `ops/state/config/repo-map.json` owns repository/worktree topology.
+- `docs/registry.toml` classifies documentation truth/status where applicable.
 
-- **Process edit**: Changes how agents work (template structure, loading order, required steps). Normal PR review.
-- **Governance edit**: Changes what agents believe about project truth (phase meaning, completion criteria, constitutional principles). Must be surfaced explicitly and ratified separately.
+### Layer 2: domain owners
+
+The owner named by `sources.json` defines normative or operational truth for that domain.
+
+Examples change over time and therefore are not duplicated here. Read the map live.
+
+A domain owner answers what the system is **supposed to mean or record** in that domain. It does not prove that implementation has caught up.
+
+### Layer 3: implementation evidence
+
+Current code, tests, schemas, generated bytes, and reproducible behavior answer what the checked-out implementation actually does.
+
+Implementation evidence does not silently rewrite a normative contract. A mismatch is a first-class truth conflict.
+
+### Layer 4: live execution state
+
+Git and GitHub own facts that can change between two model turns:
+
+- branch/head/dirty state;
+- PR open/closed/mergeable state;
+- reviews and unresolved threads;
+- CI/check results;
+- issue/control-plane state;
+- live branch-protection requirements.
+
+These are queried, not copied into foundational docs.
+
+### Layer 5: generated orientation
+
+The Agent Context Spine, live-state overlay, repo record, public-state projections, and indexes answer **where to look and how pieces relate**.
+
+They are projections. Their source wins on disagreement.
+
+### Layer 6: memory
+
+Handoffs, session notes, model memory, chat summaries, and historical working documents preserve rationale and resume clues.
+
+Memory is never a current-state authority. It expires as soon as live evidence or a domain owner disagrees with it.
+
+## Question-specific resolution
+
+There is deliberately no rule saying "file X always outranks file Y." Ask what kind of claim is being made.
+
+### Intended/allowed semantics
+
+Use the registered domain owner and accepted ADRs.
+
+### Implemented behavior
+
+Inspect current code and tests. If that behavior violates the registered semantic owner, report the conflict rather than averaging the two.
+
+### Current work selection
+
+Use the live issue/control surface and live PR state. A handoff may point to the control surface but cannot substitute for querying it.
+
+### Merge readiness
+
+Use live checks/reviews plus `policy.json` and branch protection. A prompt that lists a fixed set of required checks is stale by construction.
+
+### Historical rationale
+
+Use ADRs, git/PR/issue history, and handoffs. Preserve the distinction between a historical decision and a current rule.
+
+## Bootstrap protocol
+
+For non-trivial work:
+
+1. Resolve the repository root and inspect branch/dirty state.
+2. State the task and explicit scope boundary.
+3. Read `ops/state/truth/sources.json`.
+4. Load only the domain owners needed for the task.
+5. Query the relevant live issue/PR/review/CI state.
+6. Generate an Agent Context Spine brief for the paths likely to be touched.
+7. Verify the claimed gap with the smallest relevant evidence.
+8. Record a compact session frame.
+9. Plan the bounded mutation and verification.
+10. For architectural/security-sensitive/cross-cutting work, brief the maintainer before mutation.
+
+The on-demand live-state overlay may automate steps 1, 3, 4-navigation, and 5. It is not required when direct queries are clearer.
+
+## Memory and handoffs
+
+A handoff is a **timestamped evidence and resume packet**.
+
+It may include:
+
+- the exact head observed at session end;
+- commands and outputs that support a conclusion;
+- rationale that would be expensive to rediscover;
+- links to issues/PRs/owners;
+- unresolved assumptions;
+- a recommended resume point.
+
+It must also say that volatile state must be rechecked.
+
+A handoff must not become the only place a durable fact exists. Before ending a session, ask whether each important discovery belongs in:
+
+- a test;
+- an ADR or registered domain owner;
+- a machine-readable state owner;
+- an issue/control surface;
+- a registry/index source.
+
+If yes, promote it there. The handoff then references the durable surface.
+
+## Context minimization
+
+Agents should not read the whole repository's documentation at startup.
+
+Load context progressively:
+
+1. operating contract;
+2. truth map;
+3. relevant owner(s);
+4. path brief;
+5. live execution state;
+6. only then deeper design/history needed to resolve the task.
+
+This reduces both token waste and stale-context contamination.
+
+## Specialist-agent contract
+
+Specialist prompts are adapters, not encyclopedias.
+
+A specialist should contain only:
+
+- routing/scope;
+- truth domains it must resolve;
+- stable review questions;
+- stable verification hints;
+- explicit out-of-scope boundaries.
+
+A specialist should **not** contain copied current architecture, current issue lists, crate counts, merge-check lists, deployment topology, identity taxonomy, or other facts already owned elsewhere.
+
+When a specialist needs a stable fact that currently has no owner, create or identify the owner before teaching the fact to the specialist.
+
+## Provider adapters
+
+`CLAUDE.md`, `docs/ai/CODEX_WORKFLOW.md`, `.claude/**`, `.agents/**`, and plugin packages adapt this workflow to particular tools.
+
+Provider adapters may specify tool invocation and UX conventions. They may not redefine project truth or the operating invariants in `AGENTS.md`.
+
+Canonical skill and agent locations come from their registries, not from whichever directory a provider happens to load.
+
+## Promotion lifecycle
+
+Every non-trivial session should end by classifying discoveries:
+
+- **Observed once:** leave in the handoff with evidence.
+- **Reproducible implementation fact:** encode in a test or generated evidence where possible.
+- **Durable semantic/architectural fact:** update the registered owner or ADR through review.
+- **Current task/control fact:** update the issue/control surface.
+- **Volatile execution fact:** do not persist as doctrine; query it next time.
+- **Navigation fact:** update the registry/source and regenerate projections.
+
+The purpose is to make repository memory improve over time without converting yesterday's session into tomorrow's authority.
+
+## Conflict protocol
+
+When two surfaces disagree:
+
+1. classify the disputed claim;
+2. resolve its registered owner;
+3. verify implementation/live evidence if relevant;
+4. name the conflict explicitly;
+5. do not mutate unrelated surfaces to manufacture agreement;
+6. fix the stale layer or open a bounded reconciliation issue.
+
+A missing owner is itself a finding. Do not solve it by declaring the nearest convenient document canonical.
+
+## Definition of a healthy foundation
+
+The agent foundation is healthy when:
+
+- foundational prompts contain no volatile project facts;
+- each durable fact domain has one explicit owner;
+- generated context is reproducible from owners;
+- live state is queried live;
+- handoffs can be deleted without losing project truth;
+- specialists can become stale without corrupting canon because they are required to load domain owners;
+- a fresh agent can reproduce the prior session's conclusions from repository evidence rather than private memory.
