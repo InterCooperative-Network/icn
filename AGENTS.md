@@ -92,6 +92,15 @@ General examples:
 - Website changes use `just website-verify`.
 - API changes must preserve generated OpenAPI/type consistency.
 
+The universal documentation-control entrypoints are intentionally recorded **once here**, not duplicated across provider adapters:
+
+```bash
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+python3 .github/scripts/compliance_linter.py --repo-root .
+python3 .github/scripts/readiness_overclaim_linter.py --repo-root .
+```
+
 These are navigation rules, not frozen CI policy. `ops/state/truth/policy.json` and live CI own merge requirements.
 
 ## 6. Memory is not authority
