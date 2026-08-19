@@ -11,7 +11,7 @@
 //! | Constraint | Contract | Enforcement reachable at this layer |
 //! |---|---|---|
 //! | A legacy key-derived `Did` must not silently become a human `SubjectId` | §7.2.1, **I1** | **Yes — structural.** Absence of `From` impls, plus the fact that a subject that is not `event_id` of an inception body derives to `Unknown`. |
-//! | Signing bridge evidence is not enrolment | §7.2.3, **I5** | **Yes — behavioural.** A key that signs anything gains no standing; only an ordinary `authorize` event authorized by the current authority grants it. |
+//! | Signing bridge evidence is not enrollment | §7.2.3, **I5** | **Yes — behavioural.** A key that signs anything gains no standing; only an ordinary `authorize` event authorized by the current authority grants it. |
 //! | No global or service-visible forward index `legacy Did -> subjects it seeded` | §7.2.7, **I10** | **Partly — structural.** The store's keyed lookup surface is subject-keyed and event-keyed only; there is no principal-keyed reverse direction. |
 //! | Disclosure stays bounded to the relevant context | §7.2.4 | **Partly.** Derivation is context-local: one subject's fold reads only its own bodies. |
 //! | Retention / erasability stay possible | §7.3 | **Partly — structural.** Subjects are separable: a store built without a subject's events derives that subject to `Unknown` and leaves every other subject intact. No global index has to be torn down first. |
@@ -146,7 +146,7 @@ fn a_subject_is_the_digest_of_an_inception_body_not_a_key() {
 }
 
 // ---------------------------------------------------------------------------
-// I5 — signing evidence is not enrolment
+// I5 — signing evidence is not enrollment
 // ---------------------------------------------------------------------------
 
 /// §7.2.3 / I5 — a legacy key that signs valid bridge evidence gains no standing.
@@ -155,7 +155,7 @@ fn a_subject_is_the_digest_of_an_inception_body_not_a_key() {
 /// undefined; what matters is that producing a valid signature over anything at all leaves the
 /// signer outside both the authority set and the device grants.
 #[test]
-fn signing_evidence_does_not_enrol_the_legacy_key() {
+fn signing_evidence_does_not_enroll_the_legacy_key() {
     let alpha = subject(0x21, 2);
     let (legacy_key, legacy) = stranger(0x79);
 
@@ -203,7 +203,7 @@ fn only_an_ordinary_authorize_event_grants_the_legacy_key_standing() {
 
     assert!(
         after.devices.contains_key(&legacy),
-        "an authorize event from the current authority is the ordinary enrolment route"
+        "an authorize event from the current authority is the ordinary enrollment route"
     );
     assert!(
         !after.authority.contains(&legacy),
@@ -211,7 +211,7 @@ fn only_an_ordinary_authorize_event_grants_the_legacy_key_standing() {
     );
 }
 
-/// A legacy key cannot enrol itself: an `authorize` event it signs is not authorized.
+/// A legacy key cannot enroll itself: an `authorize` event it signs is not authorized.
 #[test]
 fn the_legacy_key_cannot_authorize_itself() {
     let alpha = subject(0x23, 2);
