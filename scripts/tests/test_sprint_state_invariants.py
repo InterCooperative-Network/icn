@@ -3,7 +3,7 @@
 
 Both guards exist to stop a specific, observed failure: `ops/state/sprint/current.json`
 stood as the registered answer to "what is being worked on" while describing a sprint
-closed five months earlier, and `.claude/settings.json`'s SessionStart hook greped two
+closed five months earlier, and `.claude/settings.json`'s SessionStart hook grepped two
 planning files that were absent from the repo.
 
 A guard that cannot fail is not a guard, so every MUST-FAIL case below is a

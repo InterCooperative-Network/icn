@@ -305,7 +305,7 @@ def scan_public_docs_boundary(root: Path) -> None:
 # ---------------------------------------------------------------------------
 # SessionStart source-existence guard (icn#2634). An unconditional startup hook
 # runs before any agent reasoning, so a path it names is an orientation claim the
-# agent cannot check. Before this guard, `.claude/settings.json` greped two
+# agent cannot check. Before this guard, `.claude/settings.json` grepped two
 # planning files that were absent from the repo (one had NEVER existed in its
 # history) and the session banner emitted an empty current-work claim for months.
 #
