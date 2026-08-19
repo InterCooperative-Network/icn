@@ -633,8 +633,8 @@ last_reviewed = "2026-06-14"
 category = "reference"
 status = "living"
 title = "ICN Ecosystem Atlas"
-description = "Top-level front door composing the project-index map family and the truth spine; cross-repo map (incl. private ops/provider repos), boundary/claims guardrail, and agent preflight. Index, not a source of truth."
-last_updated = "2026-06-16"
+description = "Thin ecosystem router: classifies a question, then points at the registered owner in ops/state/truth/sources.json. Carries cross-repo/privacy boundary rules and claim-level distinctions. Index, not a source of truth."
+last_updated = "2026-08-19"
 owner = "matt"
 audiences = ["all", "agents"]
 truth_class = "descriptive"
@@ -643,7 +643,55 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["navigation", "index", "ecosystem"]
 recommended_action = "keep"
-last_reviewed = "2026-06-16"
+last_reviewed = "2026-08-19"
+
+[docs."docs/ai/ICN_CONSTITUTIONAL_CORE.md"]
+category = "guide"
+status = "canonical"
+title = "ICN Constitutional Core"
+description = "CANONICAL FOR THE agent_reasoning_constitution DOMAIN ONLY (see ops/state/truth/sources.json): stable agent reasoning principles — mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, authority/role boundary, and the durable-memory rule. Deliberately carries no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence; those have their own registered owners."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents", "developers"]
+truth_class = "normative"
+role = "internal"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+
+[docs."docs/ai/WORKFLOW_ARCHITECTURE.md"]
+category = "guide"
+status = "canonical"
+title = "ICN Agent Workflow Architecture"
+description = "CANONICAL FOR THE agent_workflow DOMAIN ONLY (see ops/state/truth/sources.json): how an agent resolves a question to its truth owner, loads context in layers, treats implementation and live execution evidence, uses generated projections, bounds memory, bootstraps a session, and promotes durable discoveries. Owns no protocol semantics, project status, merge policy, agent routing, or repository topology."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents", "developers"]
+truth_class = "normative"
+role = "internal"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+
+[docs."docs/ai/CODEX_WORKFLOW.md"]
+category = "guide"
+status = "living"
+title = "Codex Workflow for ICN"
+description = "Codex provider adapter for the provider-neutral agent workflow. Normative for Codex-specific tool usage only; explicitly NOT canonical for project truth, which stays with AGENTS.md and the owners registered in ops/state/truth/sources.json."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents"]
+truth_class = "normative"
+role = "internal"
+canonical = "no"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
 
 [docs."docs/DESIGN_PRINCIPLES.md"]
 category = "architecture"
@@ -2940,8 +2988,8 @@ last_reviewed = "2026-06-20"
 category = "reference"
 status = "living"
 title = "Current Truth Map"
-description = "One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record."
-last_updated = "2026-07-28"
+description = "Routes a current claim to the source that can establish it — registered domain owner, current code/tests, or live Git/GitHub. STATE.md and PHASE_PROGRESS.md are historical narrative here, not truth roots."
+last_updated = "2026-08-19"
 owner = "matt"
 audiences = ["all"]
 truth_class = "descriptive"
@@ -2950,7 +2998,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "phase"]
 recommended_action = "keep"
-last_reviewed = "2026-07-28"
+last_reviewed = "2026-08-19"
 
 [docs."docs/reference/project-index/source-tree-map.md"]
 category = "reference"

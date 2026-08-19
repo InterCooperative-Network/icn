@@ -1,86 +1,116 @@
 ---
 name: handoff
-description: Write a session handoff to docs/dev/ using the structured template with truth-plane labeling.
+description: Write a non-authoritative session memory/evidence packet for expensive-to-reconstruct context.
 argument-hint: "[--push]"
 user-invocable: true
 allowed-tools: "Bash, Read, Write, Grep"
 truth_contract:
   canonical_sources:
-    - docs/dev/HANDOFF_TEMPLATE.md        # structured handoff template
-    - docs/ai/ICN_SESSION_FRAME_TEMPLATE.md  # session frame (include in handoff)
+    - docs/dev/HANDOFF_TEMPLATE.md
+    - ops/state/truth/sources.json
   live_load_required:
+    - "git rev-parse --show-toplevel"
     - "git branch --show-current"
-    - "git log --oneline -10"
-    - "gh pr list --json number,title,headRefName --limit 5"
+    - "git rev-parse HEAD"
+    - "git status --short"
   examples_only: []
   never_hardcode:
     - sprint number
-    - PR numbers or branch names
-    - session date (read from system)
+    - current PR/issue state
+    - required check set
+    - session date
 ---
 
-Write a session handoff note so the next session (or next agent) can resume without context loss.
+Write a handoff only when this session contains rationale, evidence, or partially completed work that would be expensive to reconstruct from durable repository surfaces.
 
-## Steps
+A handoff is **memory, not authority**. It may record the state observed at session end as provenance, but the next session must requery every volatile fact before acting.
 
-### 1. Gather state
+## 1. Decide whether a handoff is useful
 
-Run in parallel:
+Skip the handoff if Git/GitHub already preserve everything that matters, for example: "PR opened, checks green, merge pending." Do not create documentary churn just to restate queryable state.
+
+Write one when the session contains at least one of:
+
+- non-obvious reasoning or rejected alternatives;
+- experiment/mutation evidence not otherwise persisted;
+- unfinished local work or a multi-step investigation;
+- unsafe assumptions the next session must know;
+- a resume path spanning several durable surfaces.
+
+## 2. Gather end-of-session provenance
+
 ```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 git branch --show-current
-git log --oneline -10
+git rev-parse HEAD
 git status --short
-git stash list
+git rev-parse origin/main 2>/dev/null || true
+date --iso-8601=seconds
 ```
 
-Also:
-```bash
-# Open PRs on this branch (if gh available)
-gh pr list --head $(git branch --show-current) --json number,title,state 2>/dev/null || echo "gh not available"
-# Uncommitted TODOs added in this session
-git diff origin/main...HEAD 2>/dev/null | grep '^+.*// TODO' | head -20
+If a specific PR/issue is relevant, query **that item** live. Do not dump the whole repository's PR list into the handoff.
+
+## 3. Check durable promotion before writing memory
+
+For each important discovery, ask whether it belongs in a durable surface:
+
+- executable invariant/behavior -> test;
+- semantic/architectural truth -> registered domain owner or ADR;
+- defect/follow-up/control state -> issue/control surface;
+- machine-readable operational state -> its registered owner;
+- navigation/routing fact -> registry/source followed by regeneration.
+
+Promote it first when appropriate. The handoff then links to that durable surface.
+
+If something important exists only in the handoff, mark it explicitly as context-loss risk.
+
+## 4. Write using the template
+
+Use `docs/dev/HANDOFF_TEMPLATE.md`.
+
+Preferred path:
+
+```text
+docs/dev/handoff-YYYY-MM-DD-<topic>.md
 ```
 
-### 2. Identify open threads
+The opening warning that the file is historical/non-authoritative is mandatory.
 
-- List any tests that are failing or skipped
-- Note any `// TODO`, `// FIXME`, or `// HACK` lines added on this branch
-- Note any files edited but not committed
-- Note any decisions made this session (summarize from recent tool use context)
+At minimum include:
 
-### 3. Write the handoff file
+- Session scope and boundary
+- Observed checkout at handoff time
+- Durable truth consulted
+- Evidence produced/inspected
+- Work completed / not completed
+- Unsafe assumptions
+- Durable promotion check
+- Suggested resume point with mandatory revalidation
+- Reverification targets
+- Closing classification
 
-Target: `docs/dev/handoff-YYYY-MM-DD.md`
+## 5. Do not encode false authority
 
-Where `YYYY-MM-DD` = today's date (`date +%Y-%m-%d`).
+Do not write statements like:
 
-If a file for today already exists, use suffix: `handoff-YYYY-MM-DD-b.md`.
+- "main is currently X" without an observation timestamp;
+- "the next task is Y" as doctrine;
+- "CI is green, merge it next session" without revalidation/authorization;
+- "issue X remains open" as a future fact.
 
-**Use the structured template from `docs/dev/HANDOFF_TEMPLATE.md`.** Each section explicitly labels its truth type. At minimum include:
+Write instead that these were **observed** at handoff time and name what must be requeried.
 
-- **Final State (Verified)** — only facts confirmed by commands
-- **What Changed** — execution truth from this session
-- **What's Open** — known incomplete work
-- **Unsafe Assumptions** — anything relied on but not verified (do NOT skip this)
-- **Next Move** — exact sequence for next session
-- **Truth-Plane Notes** — which truth types were relied on, any known conflicts
+## 6. Push behavior
 
-### 4. Clean up
+Do not commit the handoff automatically.
 
-- Remind: `git stash list` should be empty — stash or commit before ending
-- If `$ARGUMENTS` includes `--push` AND working tree is clean: run `/push` to push the branch
+If `$ARGUMENTS` includes `--push`, the user has still authorized only the existing push workflow, not a merge/deploy. Follow the repository's canonical push skill/policy and do not include unrelated dirty files.
 
-### 5. Report
+## Report
 
-Print:
-```
-Handoff written to docs/dev/handoff-YYYY-MM-DD.md
-Branch: <name> | Commits: <n> | Open PRs: <n> | Open threads: <n>
-```
+Report the handoff path plus:
 
-## Important
-
-- Do NOT commit the handoff file automatically. User decides.
-- If `docs/dev/` doesn't exist, create it.
-- Keep notes concise — this is for the next session, not a full PR description.
-- The "Unsafe Assumptions" section is the most important section. If you skip one, do not skip that one.
+- observed branch/HEAD;
+- number of unsafe assumptions;
+- any important discovery that could not be promoted to a durable surface;
+- the volatile facts the next session must reverify.

@@ -1,97 +1,96 @@
-# CLAUDE.md
+# ops/CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
+Claude-specific scoped guidance for work under `ops/`.
 
-## What This Directory Is
+Read root `AGENTS.md` first. This file owns only stable **ops-directory mechanics**. Current sprint, repository topology, agent/skill routing, merge policy, infrastructure roles, and other mutable facts are owned by the machine-readable sources under `ops/state/`; do not restate them here.
 
-`ops/` is the orchestration plane for ICN development. It lives inside the ICN monorepo and
-coordinates work across all subdirectories and worktrees. It is **not** substrate code — it's
-the operational layer that observes, coordinates, and automates.
+## What `ops/` is
 
-## Directory Map
+`ops/` is ICN's development-orchestration and operational coordination plane. It observes, coordinates, validates, and automates work around the monorepo; it is not Rust substrate/runtime code.
 
-| Directory | What lives there |
-|-----------|----------------|
-| `mcp/` | TypeScript MCP server — build with `npm run build`, runs via stdio transport |
-| `automation/skills/` | Cross-repo skill definitions (SKILL.md format) |
-| `automation/hooks/` | Shared hook scripts used by root `.claude/settings.json` |
-| `automation/scripts/` | Orchestration shell scripts |
-| `ci/workflows/` | Reusable GitHub Actions workflow fragments |
-| `monitoring/dashboards/` | Grafana JSON dashboards |
-| `monitoring/alerts/` | Prometheus alert rules YAML |
-| `monitoring/runbooks/` | Operational runbooks (Markdown) |
-| `state/decisions/` | Retired — ADRs are canonical under `docs/adr/`. This dir holds only a redirect README. |
-| `state/sprint/` | Sprint plans: `current.json` is the active sprint |
-| `state/config/` | `repo-map.json` (repo locations/relationships), `conventions.md` |
-| `state/truth/` | **Canonical truth spine** — sources.json, policy.json, agents.json, skills.json |
-| `docs/plans/` | Design documents (dated: `YYYY-MM-DD-<topic>-design.md`) |
-| `scripts/` | Operational scripts — `what-matters-now.sh`, `drift-check.sh`, `setup-skill-symlinks.sh` |
+Useful areas:
 
-## MCP Server Commands
+| Path | Role |
+|---|---|
+| `mcp/` | TypeScript MCP server and tests |
+| `automation/skills/` | Canonical shared operational skills where `skills.json` assigns ownership here |
+| `automation/hooks/` | Shared hook implementations |
+| `automation/scripts/` | Shared orchestration scripts |
+| `monitoring/` | Dashboards, alerts, runbooks |
+| `state/sprint/` | Machine-readable sprint state/history |
+| `state/config/` | Repository/worktree/infrastructure-role metadata |
+| `state/truth/` | Truth-owner, merge-policy, agent, and skill registries |
+| `coordination/` | Cross-repo coordination manifests/protocols |
+| `scripts/` | Operational validation/orientation scripts |
+
+If this table and the current tree disagree, the tree plus the relevant registry wins. Update this routing table rather than treating it as a hidden second inventory.
+
+## MCP server
+
+From `ops/mcp/`:
 
 ```bash
-cd mcp && npm install          # Install dependencies
-cd mcp && npm run build        # Compile TypeScript → dist/
-cd mcp && npm run dev          # Watch mode for development
-cd mcp && npm test             # Run tests
+npm install
+npm run build
+npm run dev
+npm test
 ```
 
-The MCP server uses **stdio transport** — Claude Code starts and manages its lifecycle via the `mcpServers` config in the root `.claude/settings.json`. The SQLite DB lives at `mcp/data/icn-ops.db` (gitignored, auto-created on first run).
+The MCP server uses stdio transport. Runtime/cache/session databases are ephemeral unless a registered source says otherwise; do not infer durable project truth from an MCP cache.
 
-## State Management Rules
+## Truth and state
 
-### Ephemeral state (MCP server / SQLite)
-- Sessions, file claims, health cache, task claims
-- Safe to delete `mcp/data/icn-ops.db` — it rebuilds from scratch
-- Do not commit `mcp/data/` to git
+Resolve mutable facts from their owners:
 
-### Durable state (git-tracked files)
-- ADRs in `docs/adr/` (canonical) — never delete, use `superseded` status
-- Sprint state in `state/sprint/current.json` — update in place, archive to `history/` on close
-- Repo map in `state/config/repo-map.json` — keep in sync with actual repo locations
+- fact/domain owner: `state/truth/sources.json`
+- merge/CI policy: `state/truth/policy.json` plus live branch protection
+- agent routing: `state/truth/agents.json`
+- skill ownership/routing: `state/truth/skills.json`
+- sprint/task state: `state/sprint/current.json`
+- repository/worktree/infrastructure-role metadata: `state/config/repo-map.json`
+- live branch/PR/review/CI state: Git/GitHub
 
-## Writing ADRs
+Do not make `what-matters-now.sh`, an MCP response, a handoff, or this file into a replacement owner. Use synthesis scripts when their summary is useful for the current ops task, then verify consequential claims against their sources.
 
-Copy `docs/adr/template.md`, increment the number from the last ADR in that directory.
-Use the `log_decision` MCP tool if available — it writes the file and updates the SQLite index atomically.
+## Skill ownership
 
-Format: `ADR-NNNN-kebab-case-title.md` under `docs/adr/`.
+Before editing a skill, resolve its canonical source through `state/truth/skills.json`.
 
-## What Stays Out of ops/
+Provider-facing copies/symlinks are compatibility surfaces. Do not repair drift by independently editing both copies unless the registry explicitly defines them as separate owners.
 
-- Rust/Cargo code → `icn/` (Cargo workspace root)
-- Website content or Astro components → `website/`
-- K8s deployment manifests → `deploy/k8s/`
-- Homelab infrastructure mutations → external `homelab-inventory` repo
+Run the repository's drift tooling after agent/skill/truth-registry changes:
 
-## Anti-Drift Truth Architecture
+```bash
+bash ops/scripts/drift-check.sh
+bash scripts/check-preflight-consistency.sh
+```
 
-The `state/truth/` directory is the canonical truth spine. It owns the authoritative answer for:
+## Repository topology
 
-| Question | Canonical Source |
-|----------|----------------|
-| What is the repo layout? | `state/config/repo-map.json` |
-| What are the required CI checks? | `state/truth/policy.json` |
-| What agents exist and what do they route to? | `state/truth/agents.json` |
-| What skills exist and where are they canonical? | `state/truth/skills.json` |
-| What is the current sprint? | `state/sprint/current.json` |
-| What is the canonical source for fact X? | `state/truth/sources.json` |
+Never rely on a memorized local worktree path. Resolve the current checkout with Git and consult `state/config/repo-map.json` when canonical worktree/repository relationships matter.
 
-**Critical rules:**
-- Never hardcode sprint numbers, PR numbers, branch names, or blockers in skills or agents.
-- Never hardcode cluster IPs in agent files — `repo-map.json#infrastructure` lists ROLES only; concrete addresses are private (network-ops), never in this public repo.
-- `ops/automation/skills/` is the canonical source for shared operational skills.
-- `.claude/skills/{status,sync-and-build,worktree}` must be symlinks to `ops/automation/skills/` — run `bash ops/scripts/setup-skill-symlinks.sh` to create/verify.
-- Run `bash ops/scripts/what-matters-now.sh` at session start for live truth synthesis.
-- Run `bash ops/scripts/drift-check.sh` to detect drift before committing changes to agent files.
-- The `Agent Drift Check` CI workflow enforces these rules automatically on every push.
+Concrete private provider addresses and secrets do not belong in this public file. Public topology metadata should use roles/boundaries; resolve private operational values from the registered private source when authorized and needed.
 
-## Monorepo Layout
+## ADRs and durable decisions
 
-See `state/config/repo-map.json` for the authoritative map. Key relationships:
-- `docs/` at repo root is the canonical documentation source
-- `website/` reads docs directly via path.resolve (no sync script)
-- `icn/` is the Cargo workspace root (not repo root)
-- Worktrees live under `~/icn-dev/worktrees/<repo>/` on the dev VM (root of record:
-  `state/config/repo-map.json#worktrees.root`; the older repo-adjacent `../icn-wt/` layout is retired/legacy)
-- K3s cluster: roles `role:k3s-control-plane` + `role:k3s-worker` ×2 (concrete addresses are private — network-ops; VLAN 30 post Feb 2026 migration)
+Architecture decisions live under root `docs/adr/`. Use the registered ADR lifecycle/template and available decision tooling rather than creating an ops-local competing decision store.
+
+A session note, MCP record, or ops plan does not become an architectural decision merely because it is durable in Git.
+
+## Scope boundary
+
+Keep out of `ops/` unless a registered architecture says otherwise:
+
+- Rust/Cargo runtime implementation -> `icn/`
+- website implementation -> `website/`
+- generic documentation truth -> the appropriate root `docs/` owner
+- institution-local/private meaning -> the institution/private source
+- concrete provider secrets/topology -> the authorized private ops source
+
+## Verification
+
+Derive checks from the files changed and their owners. Typical ops work may require MCP TypeScript tests, JSON/schema validation, drift checks, shell lint/smoke tests, or workflow inspection. Do not run unrelated whole-workspace Rust verification just because the task lives in the monorepo.
+
+## Conflict rule
+
+If this scoped adapter conflicts with root `AGENTS.md`, `state/truth/sources.json`, current code/tool behavior, or live Git/GitHub state, this adapter is stale. Fix the scoped guidance rather than propagating its old assumption.

@@ -1,94 +1,92 @@
 ---
-description: Sync sprint state, docs, and ops/mcp after a work session — update STATE.md, flag stale docs, note what changed
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git:*, cargo metadata:*)
+description: Reconcile durable project truth after work by updating the actual domain owner, not a universal state document.
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git:*, python3:*)
 ---
 
-Sync the ICN project state documents after a work session. This command keeps STATE.md, sprint docs, and ADRs aligned with what actually changed in code.
+Reconcile durable truth after a meaningful change.
 
-**Input:** Optional — the user can describe what changed this session. If not provided, use git log to discover changes.
+This command does **not** assume `docs/STATE.md` is the owner of every project fact. It resolves ownership through `ops/state/truth/sources.json`, updates only the relevant owner(s), and regenerates downstream projections where appropriate.
 
-**Step 1: Discover what changed**
+## 1. Establish what actually changed
 
 ```bash
-# In the ICN repo
-git log --oneline -20
-git diff --name-only HEAD~5..HEAD
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
 git status --short
+git log --oneline -20
+git diff --name-status origin/main...HEAD 2>/dev/null || true
 ```
 
-Identify:
-- Which crates were modified
-- Which PRs were merged
-- Which issues were closed
-- Any new files added (new crates, new docs, new migrations)
+If reconciling already-merged work, fetch/review the actual landed commit(s) instead of relying on session memory.
 
-**Step 2: Check the current state document**
+Separate:
 
-Read `docs/STATE.md` (canonical declared project state).
+- implementation behavior changed;
+- normative semantics changed;
+- only tests/evidence changed;
+- only generated/projection files changed;
+- issue/control state changed;
+- no durable truth changed.
 
-Compare what changed in Step 1 against what the state doc says. Note:
-- What the state doc claims is the current phase
-- What the state doc says is blocked
-- Whether any blockers were resolved this session
-- Whether new blockers emerged
+## 2. Resolve the affected fact domain(s)
 
-**Step 3: Check for stale docs**
+Read `ops/state/truth/sources.json`.
 
-For each crate that was modified, check if its documentation is current:
-```bash
-git log --oneline docs/ | head -5
-git log --oneline crates/<modified-crate>/ | head -5
+For every claim that needs synchronization, identify its registered owner. Examples of claim classes include semantic contracts, sprint/task state, merge policy, repository topology, agent/skill routing, deployment roles, or other registered domains.
+
+Do not choose an owner because a familiar document happens to mention the fact.
+
+If no domain owns an important durable claim, report **MISSING TRUTH OWNER**. Do not solve the ambiguity by silently declaring a convenient file canonical.
+
+## 3. Verify before synchronizing
+
+For each proposed sync edit, gather evidence from the correct plane:
+
+- implementation claim -> current code/test/schema or landed commit;
+- merge/PR/issue claim -> live GitHub;
+- operational/runtime claim -> the registered operational source;
+- semantic decision -> ratified owner/ADR/maintainer decision.
+
+Do not upgrade implementation maturity, deployment status, phase meaning, or public claims merely because a primitive landed.
+
+## 4. Update the owner, not every mention
+
+Apply the smallest accurate update to the registered owner.
+
+Classify it:
+
+- **sync/process edit**: aligns a stale owner/projection with already-established facts;
+- **semantic/governance proposal**: changes what the project means, permits, or claims. Surface separately for review.
+
+Do not mechanically rewrite historical documents to match current terminology. Historical accuracy is also truth.
+
+## 5. Regenerate projections
+
+After an owner changes, identify generated/indexed dependents from repository tooling and regenerate only the affected projections.
+
+Examples may include documentation indexes, the Agent Context Spine, website projections, or other generated artifacts. Use the generators named by those artifacts; never hand-edit their output.
+
+## 6. Check memory/control promotion
+
+If the session discovered:
+
+- a defect -> ensure an issue/control surface owns it;
+- a new invariant -> ensure it has an executable test and/or registered semantic owner;
+- important rationale -> ADR/owner/issue where appropriate;
+- only a resume clue -> handoff may be enough, clearly non-authoritative.
+
+Do not create a handoff to compensate for failing to update durable truth.
+
+## 7. Report
+
+```text
+ICN truth reconciliation
+  changed behavior: <summary>
+  affected domains: <domain -> owner>
+  owner edits: <paths or none>
+  generated projections: <regenerated / none>
+  semantic/governance proposals: <none or explicit list>
+  missing owners: <none or explicit list>
+  historical docs intentionally untouched: <paths/reason if relevant>
 ```
 
-If the docs were last updated more than 2 weeks before the crate code, flag as stale.
-
-**Step 4: Check for missing ADRs**
-
-For each significant architectural change (new crate, changed public trait, new message type, modified wire format), check if an ADR exists:
-```bash
-ls docs/architecture/ | grep adr
-```
-
-If a change needed an ADR and doesn't have one, flag it.
-
-**Step 5: Update state document**
-
-Update `docs/STATE.md` directly (the canonical project state file).
-
-**Label each update** per the edit classification in `docs/ai/ICN_CONSTITUTIONAL_CORE.md`:
-- `[sync edit]` — aligning canon to verified reality
-- `[governance edit proposal]` — changing project status classification (must be reviewed separately)
-
-Include:
-- Current phase
-- What was completed this session
-- Current blockers (updated list)
-- Next recommended actions
-- Open PRs and issues count
-
-**Step 6: Report**
-
-Present a summary:
-```
-## ICN State Sync — <date>
-
-### What Changed This Session
-- Crates modified: ...
-- PRs merged: ...
-- Issues closed: ...
-
-### State Document
-- Updated: docs/STATE.md
-- Edit type: [sync edit] / [governance edit proposal]
-- Phase: ...
-- Status: ...
-
-### Stale Docs
-- docs/xxx.md — last updated Y days before latest crate change (flag)
-
-### Missing ADRs
-- Change: ... (needs ADR)
-
-### Recommended Before Ending Session
-1. ...
-```
+If no durable truth owner needs changing, say so and stop. A session ending is not itself a reason to edit project state.

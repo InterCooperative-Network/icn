@@ -1,47 +1,80 @@
 ---
 name: preflight
-description: ICN session preflight. This skill should be used when the user explicitly invokes "/icn-agent-pack:preflight", or asks to "run preflight", "orient me on ICN", or "check the ICN session environment". Loads canonical docs and the latest handoff, then verifies branch, gh auth, ports, toolchain, and a light cargo check. Read-only; reports, never fixes.
+description: Portable ICN session grounding. Verifies checkout, loads the truth-owner map, optionally queries live GitHub state, and points to task-specific context without treating handoffs as authority.
 disable-model-invocation: true
 user-invocable: true
 allowed-tools: "Bash, Read"
 ---
 
-Plugin-namespaced session preflight. Load canonical truth, then verify the environment. Report only — do not fix anything, do not run `cargo build`. Stop on a fatal mismatch (wrong repo, no auth).
+Portable companion to the repository-local `/icn-preflight` workflow.
 
-This is the portable companion to the project-local `/icn-preflight` skill in `.claude/skills/icn-preflight/`. It does not replace it. When both are present, either is fine; this one ships with the plugin so it works from any checkout.
+This skill reports only. It does not fix, merge, build the whole workspace, or infer current project state from a handoff.
 
-## Step 0 — Load canonical truth (read, do not restate)
+## 1. Resolve the repository
 
-1. Read `docs/STATE.md` and `docs/PHASE_PROGRESS.md` (declared project state — canonical).
-2. If present, read `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation — scan).
-3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md 2>/dev/null | head -1`. If none exists (fresh clone), note "no prior handoff found" and continue.
-4. Note any divergence between declared state and the handoff's execution state.
-5. Generate and **read** the bounded **live-state overlay** — a bird's-eye, whole-repo orientation layer (source/freshness-bound, no overclaims): `python3 scripts/generate-live-state-overlay.py --no-gh` (drop `--no-gh` to add live issue-lane OPEN/CLOSED state). Use it to:
-   - understand the **whole repo/project** at a glance (`project_map`, `subsystem_overview`);
-   - **identify systems that already exist** (`repo_systems`) so you do not reinvent the spine, generators, route inventory, doc control, worktree-OS, plugin, MCP, or CI lanes;
-   - understand **how subsystems interact** and the **required validation commands** for what you will touch (`system_interactions`, `subsystem_overview` checks, `development_safety_map`);
-   - confirm what must **not** be claimed (`claim_boundaries`).
-   Then, for the specific files you will touch, read the **Agent Context Spine path brief** (`python3 scripts/generate-agent-context-spine.py --brief <paths>`). Read the overlay before planning repo work; do not cache it across sessions. Details: `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md`.
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
+git branch --show-current
+git rev-parse HEAD
+git status --short
+git rev-parse origin/main 2>/dev/null || true
+```
 
-## Step 1 — Verify environment (one line per check, prefix pass/warn/fail)
+Do not compare against a hardcoded machine path. When topology matters, read `ops/state/config/repo-map.json`.
 
-1. **Repo**: confirm `pwd` is the ICN monorepo root or a worktree of it. Print branch: `git branch --show-current`.
-2. **gh auth**: `gh auth status` — FAIL and stop if not authenticated.
-3. **Ports**: `ss -tlnp 2>/dev/null | grep -E ':8080|:8000'` — report whether the gateway is listening on 8080. WARN if anything is on 8000 (the gateway binds 8080, never 8000).
-4. **Toolchain**: `rustc --version`, compared against `icn/rust-toolchain.toml` (read it; do not hardcode the version). WARN on mismatch.
-5. **Light compile**: from the Rust workspace, `cargo check --workspace 2>&1 | tail -1`. The Rust workspace is `icn/` inside the monorepo root — `cd "$(git rev-parse --show-toplevel)/icn"` first. Report pass/fail from the last line.
+## 2. Load the operating contract and truth map
+
+Read:
+
+- `AGENTS.md`
+- `ops/state/truth/sources.json`
+
+Resolve only the fact domains relevant to the user's task. Do not automatically load `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, or the latest handoff.
+
+## 3. Generate orientation
+
+If available:
+
+```bash
+python3 scripts/generate-live-state-overlay.py
+```
+
+The overlay is owner-derived orientation. It is not canonical truth.
+
+When target paths are known:
+
+```bash
+python3 scripts/generate-agent-context-spine.py --brief <paths>
+```
+
+Read the source/owner paths the tools point to rather than treating generated summaries as stronger evidence.
+
+## 4. Live GitHub
+
+When the task concerns an issue, PR, review, or CI state:
+
+```bash
+gh auth status
+```
+
+Then query the specific item live. Do not trust a handoff's old state.
+
+## 5. Environment checks only when relevant
+
+For Rust work, compare the active toolchain to `icn/rust-toolchain.toml` and run the smallest package-level check needed to establish the starting state.
+
+Do not run a whole-workspace compile merely because preflight was invoked. Do not probe gateway ports unless the task concerns a live gateway/runtime.
 
 ## Output
 
-```
+```text
 /icn-agent-pack:preflight
-  branch: <branch>
-  gh: authenticated as <user>
-  port 8080: <listening | not listening>
-  port 8000: <clear | WARN occupied>
-  toolchain: <version> (<matches | MISMATCH> rust-toolchain.toml)
-  cargo check: <ok | fail>
-  state: <one line on STATE.md / handoff divergence, if any>
+  checkout: <root> @ <head> (<branch>, clean/dirty)
+  origin/main: <sha or not checked>
+  truth domains: <owners relevant to task>
+  live state: <specific item checked / not required / unavailable>
+  path context: <brief paths / not required>
+  evidence next: <smallest starting verification>
 ```
 
-Do NOT run `cargo build`. Do NOT modify anything. Report only.
+If the checkout, truth ownership, or required live access is materially ambiguous, stop and report the ambiguity before mutation.

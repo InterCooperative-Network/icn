@@ -1,143 +1,115 @@
 ---
 Status: template
-Authority: process
+Authority: agent process
 Canonical: no
-Last verified: 2026-06-21
+Last verified: 2026-08-19
 ---
 
 # ICN Live State Overlay
 
-Bounded, on-demand **whole-repo orientation + session-start grounding** for agents and humans working on the ICN repo. It is a **bird's-eye comprehension layer for the whole project**, not just a current-status readout. Before planning any work it answers:
+The live-state overlay is an **on-demand orientation report**, generated from registered truth owners plus live Git/GitHub state.
 
-- **What is the integrated system?** (`project_map`) — the core dependency flow identity → trust → entity/membership → networking/federation → state/storage → governance → economics → applications/interfaces.
-- **What subsystems exist and where is their code/docs/checks?** (`subsystem_overview`) — derived from the Agent Context Spine where possible.
-- **Which systems already exist so I do NOT reinvent them?** (`repo_systems`) — the spine, generators, route inventory, doc control, worktree-OS, plugin, MCP, CI lanes, each classified canonical / generated-reference / advisory / operational / tooling.
-- **How do those systems interact?** (`system_interactions`).
-- **How do I change the repo safely?** (`development_safety_map`).
+It is not a project-state document, not a committed snapshot, and not a new truth root.
 
-…and the session-start essentials: current repo/project state, which facts are canonical vs generated-reference, what recently changed, what must **not** be claimed (`claim_boundaries` — NYCN is one boundary item among several, not the focus), which lanes own the next work, and what checks to run.
+## Why it exists
 
-This is **not** canonical truth — canonical state is `docs/STATE.md` + `docs/PHASE_PROGRESS.md`. It is **not** a new truth root, **not** a dashboard, and **not** a committed snapshot (a committed "live snapshot" rots); it is generated on demand and never cached across sessions.
+A fresh agent often needs a quick answer to:
 
----
+- Which checkout am I in?
+- Where are important fact domains owned?
+- What is live in Git/GitHub right now?
+- What merge policy and agent/skill registries apply?
+- Which generated navigation aids are available?
+- Is there a recent handoff that may contain useful history?
 
-## Generate it (recommended)
+The overlay answers those questions without copying a permanent "current state" narrative into agent prompts.
 
-Run the generator at session start; read its output, do not cache it:
+## Generate it
+
+From the repository root:
 
 ```bash
-python3 scripts/generate-live-state-overlay.py                 # markdown to stdout (default)
-python3 scripts/generate-live-state-overlay.py --format json   # json to stdout
-python3 scripts/generate-live-state-overlay.py --no-gh         # no GitHub calls (offline-safe)
-python3 scripts/generate-live-state-overlay.py --check         # self-validate, exit 0/1
+python3 scripts/generate-live-state-overlay.py
+python3 scripts/generate-live-state-overlay.py --format json
+python3 scripts/generate-live-state-overlay.py --no-gh
+python3 scripts/generate-live-state-overlay.py --check --no-gh
 ```
 
-- **On-demand, not committed.** Default output is stdout. Use `--output PATH` to write a local copy you will **not** commit. There is intentionally no committed snapshot file.
-- **No network required for a useful overlay.** It reads canonical docs, the generated grounding artifacts, the latest `docs/dev/` handoff, and git locally. `gh` is consulted **only** for the live OPEN/CLOSED state of the curated issue lanes (`gh issue view …`) and is labeled `live-reconfirmed` at generation time; without it (or with `--no-gh`) those fields are marked `NEEDS_LIVE_RECONFIRMATION`, never guessed.
-- **Every line is source- or freshness-bound.** Nothing exceeds canonical state; the overlay carries an explicit `claim_boundaries` section.
+The default output is Markdown to stdout. Do not commit generated overlay output.
 
-### Sources it reads
+## Sources
 
-- `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, `docs/ai/ICN_CONSTITUTIONAL_CORE.md` — canonical / reasoning state, each with its own freshness date.
-- `docs/reference/project-index/generated/agent-context-spine.json`, `…/icn-file-record.json`, `…/route-inventory.md` — generated-reference grounding artifacts (orientation, not truth roots).
-- the latest `docs/dev/handoff-*.md`; `git` HEAD / branch / working-tree; and `gh` issue state for the curated active lanes (optional, labeled when used).
+The generator reads or queries:
 
-### What it means / does not mean
+- `ops/state/truth/sources.json` for fact ownership;
+- `ops/state/truth/policy.json` for merge-policy data;
+- `ops/state/truth/agents.json` for agent routing metadata;
+- `ops/state/truth/skills.json` for skill ownership;
+- `ops/state/config/repo-map.json` for repository/worktree topology metadata;
+- `git` for branch, HEAD, working-tree status, and `origin/main` when present;
+- `gh` for open PR/issue state when available and not disabled;
+- the generated Agent Context Spine metadata when present;
+- the newest handoff **path only** as an optional memory pointer.
 
-- **Means:** a fast, honest orientation so you do not re-derive (or mis-derive) current state, reinvent existing systems, miss required checks, confuse planned/demo/private with implemented/public/canonical, or overclaim readiness.
-- **Does NOT mean:** canonical truth, a runtime service, a dashboard, a Forge/receipt integration, or a new truth root. It is a thin grounding layer that can later feed those once the truth layer is reliable.
+It does **not** treat the body of a handoff as current state.
 
-### How to use it
+It does **not** contain a hardcoded list of active issue numbers, PRs, phases, identity assumptions, subsystem maturity claims, or deployment facts.
 
-Agents: run it, then follow the overlay's own `agent_start_rules` (read overlay → read the relevant Agent Context Spine path brief → identify canonical vs generated-reference → identify required checks → identify claim hazards → only then plan; never merge without explicit per-PR authorization). Humans: skim sections 1–6 to orient, then 7–8 for what to do next. The `claim_boundaries` section lists what must never be claimed.
+## Overlay sections
 
-The self-check (`--check`) verifies the thirteen required sections exist (including the whole-repo `project_map`, `subsystem_overview`, `repo_systems`, `system_interactions`, and `development_safety_map`); that `subsystem_overview` covers the major subsystems and each entry carries paths/check/status; that every `repo_systems` entry has a repo-relative path and a valid classification (canonical / generated-reference / advisory / operational / tooling); that the structured entries in the canonical-state, grounding-artifact, and lane sections carry source/freshness (or `NEEDS_LIVE_RECONFIRMATION`) markers; that the `claim_boundaries` cover the required hazards; that **NYCN appears only as a single claim-boundary item — never first, never a top-level section, never dominant**; that the JSON round-trips and the markdown carries caveats; and that no production-readiness / live-federation / formal-pilot / entity-auth-enforced overclaim appears in the fact-bearing sections.
+A valid overlay contains:
 
----
+1. **provenance**: generation time and repository root;
+2. **checkout**: branch, HEAD, dirty state, observed `origin/main`;
+3. **truth_owners**: the domains currently registered in `sources.json`;
+4. **merge_policy**: source path and policy summary read from `policy.json`;
+5. **live_pull_requests**: queried from GitHub or marked unavailable;
+6. **live_issues**: queried from GitHub or marked unavailable;
+7. **agent_registry**: registry path and agent count/names;
+8. **skill_registry**: registry path and canonical-source map;
+9. **generated_context**: Agent Context Spine presence/metadata;
+10. **memory_pointer**: newest handoff path, clearly labeled non-authoritative;
+11. **agent_start_rules**: the bootstrap sequence from the modern workflow.
 
-## Manual fallback — what the overlay contains
+## Interpretation rules
 
-If the generator is unavailable, fill the overlay by hand from the same sources. The sections below mirror the generated overlay's intent.
+### Owner map, not owner content
 
-## Files to Load First
+The overlay can tell an agent that `identity_semantics` is owned by some path. The agent must still read that owner before making an identity claim.
 
-Load these files and extract current state before beginning work:
+### Live GitHub is a snapshot
 
-1. `docs/ai/ICN_CONSTITUTIONAL_CORE.md` — reasoning foundation (stable, rarely changes)
-2. `docs/STATE.md` — declared project state
-3. `docs/PHASE_PROGRESS.md` — phase tracking and metrics
-4. Latest handoff in `docs/dev/` (find by date: `ls -t docs/dev/handoff-*.md | head -1`)
-5. Active tranche/execution docs relevant to current task (if any)
+A PR list is current only at the overlay's generation time. Query the specific PR again before merge/review decisions.
 
----
+### Memory is historical
 
-## Declared Project State
+The newest handoff may be useful when resuming prior work. Its branch/PR/CI/issue claims must be reverified before use.
 
-<!-- Fill from docs/STATE.md and docs/PHASE_PROGRESS.md -->
+### Generated context is navigation
 
-**Current phase:** <from PHASE_PROGRESS.md>
+The Agent Context Spine can point to likely crates, docs, and checks. Its source files win on disagreement.
 
-**Phase status:** <complete / in-progress / blocked — with blocker if any>
+## Manual fallback
 
-**Strongest landed core:** <which subsystems are shipped and real>
+If the generator is unavailable:
 
-**Weakest / most partial areas:** <which subsystems are incomplete or aspirational>
+1. run `git rev-parse --show-toplevel`, `git branch --show-current`, `git status --short`, and `git rev-parse HEAD`;
+2. read `ops/state/truth/sources.json`;
+3. resolve and read only the domain owner(s) needed for the task;
+4. query relevant GitHub state live;
+5. read `ops/state/truth/policy.json` when merge readiness matters;
+6. generate a path brief with `scripts/generate-agent-context-spine.py` when useful;
+7. consult a handoff only as historical/resume context.
 
-**Major project risk:** <the recurring risk named in canonical docs>
+## Self-check contract
 
----
+`--check` verifies structural properties of the overlay generator, including:
 
-## Current Execution Direction
+- all required sections are present;
+- every registered truth domain has an owner;
+- no hardcoded active issue/PR list exists in generated output;
+- memory is labeled non-authoritative;
+- offline mode never invents GitHub state;
+- JSON output round-trips.
 
-<!-- Fill from latest handoff and any active tranche/execution docs -->
-
-**Latest handoff:** `docs/dev/handoff-YYYY-MM-DD.md`
-
-**Current branch:** <from git>
-
-**Open PRs:** <from gh pr list>
-
-**Merge order / next steps:** <from handoff "Next Move" section>
-
-**Active tranche docs:** <paths to any NYCN-Execution-Tranches.md or similar, if relevant>
-
----
-
-## Current Ontology / Model Direction
-
-<!-- Fill from architectural decisions in latest handoff or strategy docs -->
-
-<Summarize the current entity/structure/activity model, naming conventions, authority model, and any locked architectural decisions relevant to the current task.>
-
----
-
-## Conventions to Preserve
-
-<!-- Fill from handoff, CLAUDE.md, and project conventions -->
-
-- Events: <naming pattern>
-- Storage keys: <primary and secondary key patterns>
-- HTTP routes: <scope and path conventions>
-- Kernel boundary: <what is forbidden in kernel crates>
-- Domain-specific content: <where it belongs>
-
----
-
-## Workspace Notes
-
-<!-- Fill from CLAUDE.md and verified environment -->
-
-- Rust workspace: `icn/` (all `cargo` commands run from here)
-- Key verification commands:
-  ```bash
-  <from handoff or CLAUDE.md>
-  ```
-
----
-
-## Divergences Discovered
-
-<!-- If current repo state differs from what canonical docs claim, note it here -->
-
-- <divergence description — e.g., "STATE.md says X but code shows Y">
-- <or "None discovered" if everything aligns>
+The self-check does not prove that every domain owner is substantively correct. That is what domain-specific review and drift tooling are for.

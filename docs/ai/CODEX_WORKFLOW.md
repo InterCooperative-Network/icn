@@ -1,82 +1,70 @@
 ---
 Status: normative
-Authority: process
+Authority: Codex adapter process
 Canonical: no
-Last verified: 2026-04-15
+Last verified: 2026-08-19
 ---
 
 # Codex Workflow for ICN
 
-This guide aligns Codex usage with existing ICN agent guidance from `CLAUDE.md` and the
-constitutional core (`docs/ai/ICN_CONSTITUTIONAL_CORE.md`).
+Codex adapter for the provider-neutral ICN agent workflow.
 
-## Goals
+Read `AGENTS.md` first. The workflow architecture is `docs/ai/WORKFLOW_ARCHITECTURE.md`. This file describes Codex-specific usage only and does not own project truth.
 
-- Keep Codex behavior consistent with ICN invariants and change-routing rules.
-- Reuse existing specialization model from `.github/agents/`.
-- Provide a repeatable workflow for planning, implementation, verification, and shipping.
+## Start
 
-## Required Inputs for Every Task
+For non-trivial work:
 
-Before coding, load in this order:
+1. verify the checkout and dirty state;
+2. read `ops/state/truth/sources.json` and resolve the domain owner(s) needed for the task;
+3. query relevant GitHub state live;
+4. use the Agent Context Spine path brief when useful;
+5. record the compact session frame from `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md`;
+6. verify the claimed gap before mutation.
 
-1. `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation)
-2. `AGENTS.md` (operating mode and change routing)
-3. `CLAUDE.md` (repo architecture and workflows)
-4. Latest handoff in `docs/dev/` (execution state)
-5. `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` (fill before non-trivial work)
-6. Relevant path instruction from `.github/instructions/` (if applicable)
+Do not load the latest handoff or a universal project-state narrative by default. Use a handoff only when resuming history that is relevant to the task, and reverify its volatile claims.
 
-See `docs/ai/WORKFLOW_ARCHITECTURE.md` for the full four-doc architecture.
+## Tool use
 
-## Codex Task Flow
+Prefer repository-native and structured tools:
 
-1. Classify scope:
-   - Single-scope: one subsystem (for example, only Rust crate changes).
-   - Multi-scope: multiple subsystems (for example, Rust + gateway + docs).
-2. Plan first:
-   - Goal and success criteria.
-   - Files/crates to touch.
-   - Verification commands by change-routing rules.
-3. Execute with small diffs:
-   - Preserve invariants: adversarial-by-default, determinism, canonical encodings, no protocol panics, clean layering.
-4. Verify:
-   - Run only the checks required by touched areas.
-   - Never claim success without command output.
-5. Ship:
-   - Update docs/specs when semantics change.
-   - Ensure branch is clean, commit, push, and open/update PR.
+- Git for checkout/history/diffs;
+- GitHub/`gh` for current PR, issue, review, and CI state;
+- `rg`/repository search for implementation discovery;
+- scripts in this repository for generated truth/orientation;
+- Cargo/SDK/tooling only for affected paths.
 
-## Skill Mapping (Codex)
+Do not hardcode machine paths, toolchain versions, current branches, active issues, or required check sets in Codex prompts.
 
-If `.codex/skills/` exists in the repo, use those skills. Otherwise, fall back to
-`.claude/skills/` which provide equivalent functionality for Claude Code sessions.
+## Skills and routing
 
-## MCP Server Configuration
+Canonical skill locations are registered in `ops/state/truth/skills.json`. Agent routing is registered in `ops/state/truth/agents.json`.
 
-Use `.codex/mcp/servers.example.json` as the baseline template.
+If `.codex/skills/` or a Codex-specific adapter exists, treat it as a provider surface unless the registry explicitly names it canonical. Do not create a second editable copy of ICN semantics inside Codex configuration.
 
-Recommended baseline servers:
+## Planning and execution
 
-- `filesystem` for code/docs access in this repository.
-- `git` for history and diffs.
-- `github` for PR/issue context.
-- `ripgrep` for fast indexed search across the workspace.
+- State the requested outcome and stop boundary.
+- Read only the registered owners and path context relevant to that outcome.
+- Prefer one bounded semantic change per PR.
+- Inspect exact CI failures before changing code.
+- Preserve the five invariants in `AGENTS.md`.
+- If implementation appears to require changing a settled contract, stop and report the contract conflict.
 
-Copy the template into your local Codex MCP config path and fill in tokens/paths specific to your environment.
+## Verification
 
-## Routing Rules (Practical)
+Verification is derived from changed paths, relevant owners, the Agent Context Spine, and live merge policy.
 
-- Rust crates (`icn/crates/**`): run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and targeted tests.
-- Gateway API (`icn-gateway`): run `cargo test -p icn-gateway --features sled-storage`; regenerate OpenAPI and TS types if API changed.
-- TypeScript SDK (`sdk/typescript/`): `npm ci && npm run build && npm test && npm run lint`.
-- React Native SDK (`sdk/react-native/`): `npm test && npm run build`.
-- Pilot UI (`web/pilot-ui/`): `npm run test && npm run test:e2e && npm run test:a11y`.
-- Docs-only changes: validate links and terminology consistency.
+Do not keep a permanent command matrix here. In particular, do not assume every Rust task requires whole-workspace clippy/test/build or that a docs-only task can never affect generated/public surfaces.
 
-## Non-Negotiables
+Before a merge-readiness claim, read `ops/state/truth/policy.json` and live branch protection/check state.
 
-- Do not weaken security, trust gates, signatures, or encoding requirements to make tests pass.
-- Do not add new tooling unless explicitly requested.
-- Keep docs in `docs/` (never repo root).
-- Prefer multiple focused PRs over large mixed diffs.
+## Shipping boundary
+
+Committing/pushing a branch, opening/updating a PR, merging, deploying, releasing, and migrating are distinct actions. Authorization for one does not silently authorize the others.
+
+A final report should distinguish analysis/test/library-only implementation/integration/migration/deployment and name unresolved external failures or assumptions.
+
+## Conflict rule
+
+If this file or any Codex-specific prompt conflicts with `AGENTS.md`, a registered domain owner, current implementation evidence, or live Git/GitHub state, the Codex adapter is the stale layer. Repair it rather than teaching the repository the adapter's old belief.
