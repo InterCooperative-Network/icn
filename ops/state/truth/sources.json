@@ -24,6 +24,21 @@
       "stability": "slow-changing",
       "description": "Required CI checks, merge strategy, readiness definition, admin bypass rules"
     },
+    "agent_operating_contract": {
+      "owner": "AGENTS.md",
+      "stability": "constant",
+      "description": "Provider-neutral agent bootstrap, scope/mutation discipline, verification posture, memory-not-authority rule, generated-projection rule, specialist/provider boundaries, and completion reporting. Protocol invariants are registered separately under invariants."
+    },
+    "agent_reasoning_constitution": {
+      "owner": "docs/ai/ICN_CONSTITUTIONAL_CORE.md",
+      "stability": "constant",
+      "description": "Stable agent reasoning principles: mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, and durable-memory rule. Contains no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence."
+    },
+    "agent_workflow": {
+      "owner": "docs/ai/WORKFLOW_ARCHITECTURE.md",
+      "stability": "slow-changing",
+      "description": "Agent context architecture: question-specific truth resolution, domain-owner loading, implementation/live evidence, generated navigation, memory semantics, bootstrap order, specialist/provider adapter contract, durable promotion lifecycle, and conflict protocol."
+    },
     "agent_registry": {
       "owner": "ops/state/truth/agents.json",
       "stability": "slow-changing",
@@ -57,9 +72,9 @@
     },
     "invariants": {
       "owner": "AGENTS.md",
-      "sections": ["ICN Invariants"],
+      "sections": ["3. ICN invariants"],
       "stability": "constant",
-      "description": "The 5 non-negotiable protocol invariants. Never override."
+      "description": "The five non-negotiable agent/protocol invariants: adversarial-by-default, determinism, canonical encodings, no panics in protocol paths, and Meaning Firewall/kernel-app boundary. Never override."
     },
     "identity_semantics": {
       "owner": "docs/architecture/IDENTITY_SEMANTICS.md",
@@ -94,6 +109,8 @@
     "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
     "Do NOT hardcode PR numbers or branch lists — query via gh",
     "Do NOT hardcode cluster IPs — repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
+    "Do NOT treat a handoff, chat summary, model memory, or generated overlay as current project authority — reverify volatile claims and load registered owners",
+    "Do NOT duplicate registered domain semantics inside specialist/provider prompts — load the owner at runtime",
     "Do NOT use icn-ops/state paths — canonical is ops/state/ (inside monorepo)",
     "Do NOT use icn-website/ paths — canonical is website/ (inside monorepo)",
     "Do NOT reference sync-from-icn.sh — the website reads docs directly"
