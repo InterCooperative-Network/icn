@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -55,6 +56,28 @@ REQUIRED_SECTIONS = {
     "memory_pointer",
     "agent_start_rules",
 }
+
+# Module-level constants this generator is allowed to hold. Anything else is a
+# frozen-worldview regression: curated issue lists, subsystem maturity tables,
+# identity models, and deployment claims all entered the old overlay that way.
+# The scan in validate() is anchored to column 0, so it matches real assignments
+# and never this allowlist's own entries. (The previous two-name substring
+# blocklist matched its own search terms and could therefore never pass.)
+ALLOWED_MODULE_CONSTANTS = frozenset(
+    {
+        "ROOT",
+        "REQUIRED_SECTIONS",
+        "AGENT_START_RULES",
+        "ALLOWED_MODULE_CONSTANTS",
+        "HANDOFF_DATE_RE",
+    }
+)
+
+# Handoffs are named handoff-YYYY-MM-DD-<topic>.md. The embedded date is the only
+# checkout-independent ordering signal: git does not preserve mtimes, so in a
+# fresh clone or worktree every handoff shares one mtime and "newest by mtime"
+# is arbitrary.
+HANDOFF_DATE_RE = re.compile(r"^handoff-(\d{4}-\d{2}-\d{2})-")
 
 AGENT_START_RULES = [
     "Verify repo root, branch, HEAD, working-tree state, and origin/main when freshness matters.",
@@ -96,6 +119,17 @@ def load_json(relative: str) -> dict[str, Any]:
 def git_value(*args: str) -> str | None:
     rc, out, _ = run(["git", *args])
     return out if rc == 0 and out else None
+
+
+def git_status_lines() -> list[str] | None:
+    """Working-tree entries, or None when git could not answer.
+
+    `git status --short` prints nothing for a clean tree, so a helper that
+    collapses "empty output" and "command failed" into None would report an
+    unknown tree as clean. Keep the two apart.
+    """
+    rc, out, _ = run(["git", "status", "--short"])
+    return out.splitlines() if rc == 0 else None
 
 
 def github_list(kind: str, no_gh: bool) -> dict[str, Any]:
@@ -160,6 +194,12 @@ def github_list(kind: str, no_gh: bool) -> dict[str, Any]:
     }
 
 
+def _handoff_order(path: Path) -> tuple[str, str]:
+    """Order handoffs by their filename date, then name. Never by mtime."""
+    match = HANDOFF_DATE_RE.match(path.name)
+    return (match.group(1) if match else "", path.name)
+
+
 def newest_handoff() -> dict[str, Any]:
     paths = list((ROOT / "docs" / "dev").glob("handoff-*.md"))
     if not paths:
@@ -169,11 +209,14 @@ def newest_handoff() -> dict[str, Any]:
             "instruction": "No handoff found. Nothing is inferred from absence.",
         }
 
-    newest = max(paths, key=lambda path: path.stat().st_mtime)
+    newest = max(paths, key=_handoff_order)
+    dated = HANDOFF_DATE_RE.match(newest.name)
     return {
         "path": str(newest.relative_to(ROOT)),
         "authority": "memory-only",
-        "selected_by": "filesystem mtime",
+        "selected_by": (
+            "handoff filename date" if dated else "filename order (no date in filename)"
+        ),
         "instruction": (
             "Historical/resume context only. Reverify branch, PR, CI, issue, blocker, "
             "runtime, and next-work claims before acting."
@@ -241,7 +284,7 @@ def collect(no_gh: bool) -> dict[str, Any]:
 
     branch_name = git_value("branch", "--show-current")
     head = git_value("rev-parse", "HEAD")
-    status = git_value("status", "--short")
+    status_lines = git_status_lines()
     origin_main = git_value("rev-parse", "origin/main")
 
     registered_agents = agents.get("agents", []) if "_error" not in agents else []
@@ -266,8 +309,14 @@ def collect(no_gh: bool) -> dict[str, Any]:
             "source": "git",
             "branch": branch_name,
             "head": head,
-            "working_tree": "dirty" if status else "clean",
-            "working_tree_entries": status.splitlines() if status else [],
+            "working_tree": (
+                "unavailable"
+                if status_lines is None
+                else "dirty"
+                if status_lines
+                else "clean"
+            ),
+            "working_tree_entries": status_lines or [],
             "origin_main": origin_main,
         },
         "truth_owners": {
@@ -464,9 +513,12 @@ def validate(data: dict[str, Any], no_gh: bool) -> list[str]:
         errors.append(f"JSON round-trip failed: {exc}")
 
     source = Path(__file__).read_text(encoding="utf-8")
-    for banned in ("ACTIVE_LANES =", "CLAIM_BOUNDARIES ="):
-        if banned in source:
-            errors.append(f"legacy hardcoded overlay doctrine remains: {banned}")
+    declared = set(re.findall(r"^([A-Z][A-Z0-9_]*)\s*=", source, re.MULTILINE))
+    for name in sorted(declared - ALLOWED_MODULE_CONSTANTS):
+        errors.append(
+            "unregistered module-level constant may freeze doctrine into the "
+            f"generator: {name}"
+        )
 
     return errors
 
