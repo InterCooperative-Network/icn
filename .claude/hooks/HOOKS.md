@@ -42,6 +42,7 @@ still use their own hardcoded lists — centralizing those is deferred.
 | File | Trigger | Effect |
 |------|---------|--------|
 | hook-health.sh | Any tool (once per session) | BLOCKS if jq or git missing; WARNS otherwise |
+| session-orient.sh | SessionStart (startup) | Prints branch, sprint cadence (resolved via the registered `sprint_state` owner), skills, invariants. Never blocks |
 | firewall-guard.sh | Edit/Write .rs in kernel crates | BLOCKS domain imports in kernel |
 | panic-guard.sh | Edit/Write .rs in non-test files | BLOCKS panic!(), WARNS unwrap() |
 | scope-guard.sh | Edit/Write any file | WARNS if edit is outside branch scope |

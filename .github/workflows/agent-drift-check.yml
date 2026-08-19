@@ -50,6 +50,19 @@ jobs:
       - name: Public docs address-boundary guard tests (Refs icn#2393)
         run: python3 scripts/tests/test_public_docs_boundary.py
 
+      - name: Sprint-state currency + SessionStart source guard tests (Refs icn#2634)
+        run: python3 scripts/tests/test_sprint_state_invariants.py
+
+      - name: SessionStart hook runs and degrades honestly (Refs icn#2634)
+        run: |
+          set -euo pipefail
+          out="$(CLAUDE_PROJECT_DIR="$PWD" ./.claude/hooks/session-orient.sh)"
+          echo "$out"
+          echo "$out" | grep -q '^ICN Session | branch: ' \
+            || { echo "session-orient.sh did not emit the orientation line"; exit 1; }
+          echo "$out" | grep -qE 'sprint: (none active|[0-9]+ \(|unresolved)' \
+            || { echo "session-orient.sh emitted no resolvable sprint state"; exit 1; }
+
       - name: Validate JSON truth files are parseable
         run: |
           set -e
