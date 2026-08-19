@@ -128,8 +128,19 @@ WORKTREES=$(git -C "${REPO_ROOT}" worktree list 2>/dev/null | awk '{print $1, $3
 
 # ─── Phase 5: sprint state ──────────────────────────────────────────────────
 
+# sprint_state owns the CADENCE (is a sprint running), never "what is being worked
+# on now" — that is a live issue/PR query (Refs icn#2634). A dormant cadence is a
+# truthful answer and must be reported as such, not as a stale sprint number.
 SPRINT_FILE="${REPO_ROOT}/ops/state/sprint/current.json"
-SPRINT_NUM=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); print(d.get('sprint','?'))" 2>/dev/null || echo "?")
+SPRINT_SUMMARY=$(python3 -c "
+import json
+d = json.load(open('${SPRINT_FILE}'))
+if d.get('cadence') == 'dormant' or d.get('active_sprint') is None:
+    print('no active sprint (cadence dormant)')
+else:
+    print('Sprint %s (%s)' % (d.get('active_sprint'), d.get('status','?')))
+" 2>/dev/null || echo "unresolved (sprint owner unreadable)")
+SPRINT_ACTIVE=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); v=d.get('active_sprint'); print(repr(v) if isinstance(v,(int,type(None))) else repr(str(v)))" 2>/dev/null || echo "None")
 SPRINT_STATUS=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); print(d.get('status','?'))" 2>/dev/null || echo "?")
 SPRINT_TASKS=$(python3 -c "
 import json
@@ -137,7 +148,7 @@ d = json.load(open('${SPRINT_FILE}'))
 tasks = d.get('tasks', [])
 from collections import Counter
 counts = Counter(t.get('status','unknown') for t in tasks)
-print(', '.join(f'{v} {k}' for k,v in sorted(counts.items())))
+print(', '.join(f'{v} {k}' for k,v in sorted(counts.items())) or 'none')
 " 2>/dev/null || echo "unavailable")
 
 # ─── Phase 6: open PRs (if gh available) ────────────────────────────────────
@@ -173,7 +184,8 @@ data = {
   "workspace_root": "${REPO_ROOT}/icn",
   "branch": "${BRANCH}",
   "working_tree": "${DIRTY_STATUS}",
-  "sprint": {"number": "${SPRINT_NUM}", "status": "${SPRINT_STATUS}", "tasks": "${SPRINT_TASKS}"},
+  "sprint": {"summary": "${SPRINT_SUMMARY}", "active_sprint": ${SPRINT_ACTIVE}, "status": "${SPRINT_STATUS}", "tasks": "${SPRINT_TASKS}"},
+  "current_work_owner": "live issue/PR query — see live_issue_state / live_pr_state in ops/state/truth/sources.json",
   "open_prs": "${PR_STATE}",
   "merge_policy": "${POLICY_CHECKS} (read ops/state/truth/policy.json)",
   "drift_errors": ${DRIFT_ERRORS},
@@ -218,10 +230,11 @@ while IFS= read -r line; do
   echo "  ${line}"
 done <<< "${WORKTREES}"
 
-section "Sprint"
-echo "  Sprint ${SPRINT_NUM} (${SPRINT_STATUS})"
-echo "  Tasks: ${SPRINT_TASKS}"
-echo "  Full state: ops/state/sprint/current.json"
+section "Sprint cadence"
+echo "  ${SPRINT_SUMMARY}"
+echo "  Tasks on board: ${SPRINT_TASKS}"
+echo "  Cadence record: ops/state/sprint/current.json"
+echo "  Current work is NOT here — query live issues/PRs (live_issue_state, live_pr_state)"
 
 section "Open PRs"
 echo "  ${PR_STATE}"

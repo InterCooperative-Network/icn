@@ -17,7 +17,7 @@
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
       "stability": "volatile",
-      "description": "Active sprint number, tasks, status, blockers. Changes every 1-2 weeks."
+      "description": "NARROW DOMAIN: sprint-cadence state only — whether a sprint is running (cadence/active_sprint), the board's own lineage, and the pointer to the closed-sprint archive. It does NOT own \"what is being worked on now\": current work selection is a live query owned by live_issue_state + live_pr_state, per docs/ai/WORKFLOW_ARCHITECTURE.md (\"Current work selection\"). The cadence may be dormant; when it is, \"no active sprint\" is the truthful current answer, not a stale one, and must never be \"refreshed\" by opening a sprint that does not exist. Read the owner for the current value — this map routes the question, it does not answer it."
     },
     "merge_policy": {
       "owner": "ops/state/truth/policy.json",
@@ -119,6 +119,12 @@
       "stability": "volatile",
       "description": "Open PRs and their CI state. NEVER hardcode."
     },
+    "live_issue_state": {
+      "owner": "github-api",
+      "query": "gh issue list --repo InterCooperative-Network/icn --state open --json number,title,labels",
+      "stability": "volatile",
+      "description": "The live issue/control-plane surface: open issues, control issues, epic grouping, and issue-DAG dependencies. This is where ACTIVE WORK SELECTION is answered (docs/ai/WORKFLOW_ARCHITECTURE.md, Layer 4 and \"Current work selection\"), not sprint_state, which owns only the sprint cadence. Distinct claim from live_pr_state, which owns pull requests. NEVER hardcode an issue list, and never reconstruct it from a handoff or a sprint record."
+    },
     "live_ci_state": {
       "owner": "github-api",
       "query": "gh run list --branch main --limit 5 --json status,conclusion,name",
@@ -128,6 +134,8 @@
   },
   "forbidden": [
     "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
+    "Do NOT answer \"what is being worked on now\" from ops/state/sprint/current.json — that file owns the sprint cadence only; resolve live_issue_state / live_pr_state instead",
+    "Do NOT open a sprint, or assume the next sprint number, to make a dormant sprint_state record look fresh — when no sprint is running, saying so IS the current answer",
     "Do NOT hardcode PR numbers or branch lists — query via gh",
     "Do NOT hardcode cluster IPs — repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
     "Do NOT treat a handoff, chat summary, model memory, or generated overlay as current project authority — reverify volatile claims and load registered owners",

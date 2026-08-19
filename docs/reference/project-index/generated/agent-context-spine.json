@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-08-19T16:46:44+00:00",
-  "source_commit": "81c03e6c74f36b5ed60382e7015cabde0bcec14f",
+  "generated": "2026-08-19T18:10:07+00:00",
+  "source_commit": "798c8d54422d9916bca8261d0540fd0755a1fc1f",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,7 +35,7 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 140,
+    "nodes": 141,
     "edges": 92
   },
   "nodes": [
@@ -2756,6 +2756,22 @@
       ]
     },
     {
+      "id": "truth_source:live_issue_state",
+      "type": "truth_source",
+      "name": "live_issue_state",
+      "owner": "github-api",
+      "description": "The live issue/control-plane surface: open issues, control issues, epic grouping, and issue-DAG dependencies. This is where ACTIVE WORK SELECTION is answered (docs/ai/WORKFLOW_ARCHITECTURE.md, Layer 4 and \"Current work selection\"), not sprint_state, which owns only the sprint cadence. Distinct claim from live_pr_state, which owns pull requests. NEVER hardcode an issue list, and never reconstruct it from a handoff or a sprint record.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        }
+      ]
+    },
+    {
       "id": "truth_source:live_pr_state",
       "type": "truth_source",
       "name": "live_pr_state",
@@ -2836,7 +2852,7 @@
       "type": "truth_source",
       "name": "sprint_state",
       "owner": "ops/state/sprint/current.json",
-      "description": "Active sprint number, tasks, status, blockers. Changes every 1-2 weeks.",
+      "description": "NARROW DOMAIN: sprint-cadence state only — whether a sprint is running (cadence/active_sprint), the board's own lineage, and the pointer to the closed-sprint archive. It does NOT own \"what is being worked on now\": current work selection is a live query owned by live_issue_state + live_pr_state, per docs/ai/WORKFLOW_ARCHITECTURE.md (\"Current work selection\"). The cadence may be dormant; when it is, \"no active sprint\" is the truthful current answer, not a stale one, and must never be \"refreshed\" by opening a sprint that does not exist. Read the owner for the current value — this map routes the question, it does not answer it.",
       "stability": "volatile",
       "source_of_truth": "ops/state/truth/sources.json",
       "status": "present",

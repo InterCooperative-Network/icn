@@ -10,10 +10,14 @@ ecosystem index (ops/state/ecosystem.json).
 Warning-mode by default: exits 0 with warnings printed unless --strict is passed
 (future ratchet, mirroring the readiness-overclaim linter's warning->blocking path).
 Unconditional (HARD, independent of --strict) failures: an unreadable/unparseable
-sources.json; and the public-map boundary guard — the public icn machine-readable
+sources.json; the public-map boundary guard — the public icn machine-readable
 maps (repo-map.json, ecosystem.json) must carry NO concrete host addresses or
-operational values (docs/ATLAS.md §5; icn-infra ADR-0005). Those live only in the
-private network-ops repo; this map lists infrastructure ROLES only.
+operational values (docs/ATLAS.md §5; icn-infra ADR-0005), which live only in the
+private network-ops repo (this map lists infrastructure ROLES only); the volatile-
+currency invariant — a `volatile` domain must not serve a terminal (closed/expired)
+record as its current answer without explicitly declaring dormancy; and the
+SessionStart source guard — an unconditional startup hook must not name a
+repo-relative file that does not exist (both icn#2634).
 
 Deliberately NOT checked (v1): content freshness of downstream lock files (needs
 private-repo access — VM-session concern, not CI).
@@ -37,6 +41,40 @@ STALENESS_DAYS = {"volatile": 14, "slow-changing": 120}
 
 # Date-ish keys we look for in JSON owner files, in preference order.
 DATE_KEYS = ("last_reviewed", "reviewed_at", "start_date")
+
+# --- Volatile-owner currency semantics (icn#2634) ------------------------------
+# A `volatile` domain claims to answer "what is true RIGHT NOW". Two failure modes
+# are possible and only one of them is a defect:
+#
+#   (a) the owner presents a TERMINAL record (a closed sprint, an expired window)
+#       as if it were the domain's current answer  -> DEFECT, hard fail;
+#   (b) the owner truthfully reports that nothing is active right now
+#       -> CORRECT, and it must not be nagged for being "old".
+#
+# The rule therefore encodes semantics, not the calendar: a terminal record is
+# allowed only when the owner ALSO declares dormancy explicitly and machine-
+# readably. "There is no active sprint" is a valid current answer; "here is a
+# five-month-old closed sprint" is not. Correspondingly, the staleness threshold
+# below is applied only to owners that claim something IS active — dating a
+# dormant record would be exactly the calendar superstition this replaces.
+TERMINAL_STATES = {
+    "closed", "done", "archived", "expired", "superseded",
+    "complete", "completed", "cancelled", "canceled",
+}
+DORMANT_VALUES = {"dormant", "inactive", "none", "paused"}
+DORMANCY_KEYS = ("cadence", "lifecycle")
+
+
+def declares_dormancy(data: dict) -> bool:
+    """True if a domain owner explicitly, machine-readably says 'nothing is active
+    right now'. Requires a positive declaration — a missing key is not dormancy,
+    or every malformed owner would pass by omission."""
+    for key in DORMANCY_KEYS:
+        if str(data.get(key, "")).strip().lower() in DORMANT_VALUES:
+            return True
+    # `active_<thing>: null` is the other accepted spelling, but the key must be
+    # PRESENT: `.get()` returning None for an absent key would fail open.
+    return any(k.startswith("active_") and data[k] is None for k in data)
 
 # Public-map boundary guard (docs/ATLAS.md §5; icn-infra ADR-0005): the PUBLIC
 # icn repo's machine-readable maps must never carry concrete host addresses or
@@ -264,6 +302,107 @@ def scan_public_docs_boundary(root: Path) -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# SessionStart source-existence guard (icn#2634). An unconditional startup hook
+# runs before any agent reasoning, so a path it names is an orientation claim the
+# agent cannot check. Before this guard, `.claude/settings.json` greped two
+# planning files that were absent from the repo (one had NEVER existed in its
+# history) and the session banner emitted an empty current-work claim for months.
+#
+# Rule: every repo-relative file a SessionStart command names must exist. The
+# same rule is applied one level deep, to path literals inside the hook scripts
+# those commands invoke — otherwise the guard is defeated by moving the dead path
+# from the JSON into the script it calls.
+SETTINGS_FILE = ".claude/settings.json"
+_PATH_TOKEN_RE = re.compile(r"[\w./-]*\.(?:md|json|sh|py|ya?ml|toml|txt|conf)\b")
+_PROJECT_DIR_FORMS = (
+    '"$CLAUDE_PROJECT_DIR"', "'$CLAUDE_PROJECT_DIR'",
+    "${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR",
+)
+
+
+def repo_relative_paths(text: str, root: Path) -> list[str]:
+    """Extract repo-relative file paths named in a shell command or script.
+
+    Scoped deliberately: a token counts only when its first segment is an
+    existing top-level entry of the repo. That catches the real recurrence case
+    (`docs/strategy/ICN-Active-Sprint.md`) while never mistaking a system path
+    (`/tmp/...`, `/usr/bin/...`) for a missing repo file."""
+    for form in _PROJECT_DIR_FORMS:
+        text = text.replace(form, "")
+    out: list[str] = []
+    for m in _PATH_TOKEN_RE.finditer(text):
+        tok = m.group(0).lstrip("/").strip()
+        if not tok or "/" not in tok or "$" in tok or "*" in tok or "?" in tok:
+            continue
+        first = tok.split("/", 1)[0]
+        if not first or not (root / first).exists():
+            continue
+        if tok not in out:
+            out.append(tok)
+    return out
+
+
+def scan_sessionstart_sources(root: Path) -> None:
+    """HARD-fail if a SessionStart hook names a repo-relative file that does not
+    exist. Fails closed on an unreadable/unparseable settings file: a startup
+    surface that cannot be inspected must not be assumed healthy."""
+    settings_path = root / SETTINGS_FILE
+    if not settings_path.is_file():
+        return  # not every checkout carries provider settings
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+        err(
+            f"{SETTINGS_FILE}: present but unreadable/unparseable "
+            f"({type(e).__name__}) — cannot verify SessionStart sources; failing closed."
+        )
+        return
+
+    groups = ((settings.get("hooks") or {}).get("SessionStart")) or []
+    commands: list[str] = []
+    for group in groups:
+        for hook in (group or {}).get("hooks") or []:
+            cmd = hook.get("command")
+            if isinstance(cmd, str):
+                commands.append(cmd)
+    if not commands:
+        ok("SessionStart: no hook commands to verify")
+        return
+
+    checked = 0
+    for cmd in commands:
+        for rel in repo_relative_paths(cmd, root):
+            checked += 1
+            if not (root / rel).exists():
+                err(
+                    f"{SETTINGS_FILE}: SessionStart hook names {rel!r}, which does "
+                    f"not exist. An unconditional startup surface must not point at "
+                    f"a missing file or synthesise current state from one (icn#2634)."
+                )
+                continue
+            # One level deep: path literals inside an invoked hook script.
+            script = root / rel
+            if script.suffix not in (".sh", ".py") or not script.is_file():
+                continue
+            try:
+                body = script.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as e:
+                err(
+                    f"{rel}: SessionStart hook script is unreadable "
+                    f"({type(e).__name__}) — failing closed."
+                )
+                continue
+            for inner in repo_relative_paths(body, root):
+                checked += 1
+                if not (root / inner).exists():
+                    err(
+                        f"{rel}: SessionStart hook script names {inner!r}, which "
+                        f"does not exist (icn#2634)."
+                    )
+    ok(f"SessionStart: {checked} repo-relative source path(s) verified present")
+
+
 def parse_date(value: str) -> datetime.date | None:
     try:
         return datetime.date.fromisoformat(str(value)[:10])
@@ -357,18 +496,44 @@ def main() -> int:
                 except json.JSONDecodeError as e:
                     warn(f"{name}: machine_view unparseable: {mv} ({e})")
 
-        # 2. Staleness by stability class, where the owner file carries a date.
-        # An unparseable date must not suppress the check — fall through to the
-        # next candidate key, and say so.
-        threshold = STALENESS_DAYS.get(dom.get("stability", ""))
-        if threshold and is_path_owner:
+        # 2. Currency semantics + staleness, for path owners that are JSON.
+        stability = dom.get("stability", "")
+        threshold = STALENESS_DAYS.get(stability)
+        dormant = False
+        if is_path_owner:
             owner_file = root / owner.split("#", 1)[0]
             if owner_file.is_file() and owner_file.suffix == ".json":
                 try:
                     data = json.loads(owner_file.read_text())
                 except json.JSONDecodeError:
                     data = None
-                if isinstance(data, dict):
+
+                # 2a. A volatile domain must not present a TERMINAL record as its
+                # current answer (icn#2634). Declaring dormancy is the honest way
+                # to say "nothing is active"; silently serving a closed object is
+                # not. HARD failure — this is what let a closed March sprint stand
+                # as the registered answer to "what is being worked on" for months.
+                if stability == "volatile" and isinstance(data, dict):
+                    state = str(data.get("status", "")).strip().lower()
+                    dormant = declares_dormancy(data)
+                    if state in TERMINAL_STATES and not dormant:
+                        err(
+                            f"{name}: volatile domain owner {owner} has "
+                            f"status={state!r} (terminal) but does not declare "
+                            f"dormancy — a closed/expired record must not stand as "
+                            f"a volatile domain's current answer. Either register "
+                            f"the live object, or declare dormancy explicitly "
+                            f"(e.g. cadence: \"dormant\" / active_*: null). "
+                            f"(icn#2634)"
+                        )
+                    elif dormant:
+                        ok(f"{name}: volatile owner declares dormancy explicitly")
+
+                # 2b. Staleness applies ONLY to an owner claiming something is
+                # active. Dating a record that truthfully reports "nothing is
+                # running" is calendar superstition, and nagging it invites the
+                # exact bad fix (opening a sprint that does not exist).
+                if threshold and not dormant and isinstance(data, dict):
                     for key in DATE_KEYS:
                         if key not in data:
                             continue
@@ -430,11 +595,16 @@ def main() -> int:
     # 5. Public docs/agent/test address boundary guard (icn#2393) — HARD fail.
     scan_public_docs_boundary(root)
 
+    # 6. SessionStart source-existence guard (icn#2634) — HARD fail.
+    scan_sessionstart_sources(root)
+
     # Result
     if errors:
         print(
-            f"check-truth-spine: {len(errors)} boundary error(s) — FAIL "
-            f"(public-map must not carry concrete host addresses / operational values)"
+            f"check-truth-spine: {len(errors)} hard error(s) — FAIL "
+            f"(public maps/docs must not carry concrete host addresses or "
+            f"operational values; a volatile domain must not serve a terminal "
+            f"record as current; SessionStart must not name a missing file)"
         )
         return 1
     if warnings:

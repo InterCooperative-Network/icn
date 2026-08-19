@@ -16,7 +16,8 @@ This map routes a **current claim** to the source that can actually establish it
 |---|---|
 | What branch/HEAD/dirty state am I on? | Live Git: `git branch --show-current`, `git rev-parse HEAD`, `git status --short` |
 | What PRs/issues/checks are live? | Live GitHub API/`gh` for the specific item |
-| What is the active sprint/task board? | `ops/state/sprint/current.json` |
+| What is being worked on right now? | Live GitHub issue/PR surface via `gh`. The sprint cadence is not the current-work plane |
+| Is a sprint cadence running? | `ops/state/sprint/current.json` (cadence state + board lineage only) |
 | What merge policy applies? | `ops/state/truth/policy.json` plus live branch protection |
 | What does the current checkout implement? | Current code, tests, schemas, and reproducible behavior |
 | What semantics are allowed for a domain? | Resolve the domain owner through `ops/state/truth/sources.json`, then read that owner |

@@ -1,23 +1,35 @@
 {
+  "schema": "icn-sprint-state/v2",
+  "domain": "sprint_state",
+  "domain_scope": "Sprint-cadence state ONLY: whether a sprint is running, and the board's own lineage. This file does NOT own 'what is being worked on now' — see current_work_pointer.",
+  "cadence": "dormant",
+  "active_sprint": null,
   "sprint": 26,
-  "theme": "TBD",
-  "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
-  "start_date": "2026-03-23",
   "status": "closed",
-  "spine": [],
-  "shipped": [],
-  "notes": "CLOSED RETROACTIVELY 2026-07-13 by the ecosystem truth audit: the sprint cadence lapsed after 2026-03; work from 2026-04 onward has been lane-based and is recorded in docs/STATE.md + docs/PHASE_PROGRESS.md (canonical). There is NO active sprint; if the cadence resumes, the next sprint starts at 27. The full frozen Sprint 26 record (spine, shipped, task list) is archived in-tree at ops/state/sprint/sprint-26-closed.json.",
-  "closed_sprint": {
-    "sprint": 25,
-    "theme": "Pre-Execution Commons Credit Reservation",
-    "start_date": "2026-03-24",
-    "closed_date": "2026-03-23",
-    "status": "done",
-    "shipped": [
-      "#1404 — pre-execution commons credit reservation: two-phase commit via CommonsReserveCallback + CommonsReleaseCallback (PR #1405)"
-    ],
-    "notes": "Fix pass extended reservation lifecycle coverage to all task termination paths: on_task_cancelled, cancel_task, complete_task_result (quorum path), on_task_result legacy inline path, WasmRef early exits, and check_timeouts for pending (never-claimed) tasks. Timeout path structural fix: task_scope_map only covers claimed tasks; added direct scope lookup from TaskManager for pending tasks. 6th test added: test_reservation_released_on_timeout. TriggerTimeoutSweep test hook added to ComputeHandle."
-  },
   "tasks": [],
-  "closed_date": "2026-07-13"
+  "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
+  "current_work_pointer": {
+    "note": "NON-OWNING POINTER, not a second owner. Current work selection is a LIVE query — see docs/ai/WORKFLOW_ARCHITECTURE.md 'Current work selection' and the live_issue_state / live_pr_state domains in ops/state/truth/sources.json. Never answer 'what is being worked on now' from this file.",
+    "resolve": "gh issue list --repo InterCooperative-Network/icn --state open"
+  },
+  "board_lineage": {
+    "last_recorded_sprint": 26,
+    "board_start_date": "2026-03-23",
+    "board_closed_date": "2026-07-13",
+    "archive": "ops/state/sprint/sprint-26-closed.json",
+    "prior_sprint_record": {
+      "sprint": 25,
+      "theme": "Pre-Execution Commons Credit Reservation",
+      "start_date": "2026-03-24",
+      "closed_date": "2026-03-23",
+      "status": "done",
+      "shipped": [
+        "#1404 — pre-execution commons credit reservation: two-phase commit via CommonsReserveCallback + CommonsReleaseCallback (PR #1405)"
+      ],
+      "notes": "Fix pass extended reservation lifecycle coverage to all task termination paths: on_task_cancelled, cancel_task, complete_task_result (quorum path), on_task_result legacy inline path, WasmRef early exits, and check_timeouts for pending (never-claimed) tasks. Timeout path structural fix: task_scope_map only covers claimed tasks; added direct scope lookup from TaskManager for pending tasks. 6th test added: test_reservation_released_on_timeout. TriggerTimeoutSweep test hook added to ComputeHandle."
+    }
+  },
+  "next_sprint_number": null,
+  "next_sprint_number_note": "UNDETERMINED — do not assume 27. Two numbering planes disagree and this file cannot resolve them: (a) this board never advanced past Sprint 26 (its last advance was 92de849e 'close sprint 25, open sprint 26', 2026-03-23); (b) the narrated cadence continued to 27 and 28 in docs/strategy/ICN-Roadmap-Live.md and in commit subjects b1ba40c7 'feat(sprint-27)' (2026-03-23) and 4ae8401f 'feat(sprint-28)' (2026-03-24, PR #1419). Note 1600a1fb, which the roadmap cites as a Sprint 27 commit, edits this file while it still reads sprint 26. A human must reconcile the two planes before any sprint is opened; picking a number here would fabricate a lineage.",
+  "notes": "NO SPRINT IS ACTIVE. The sprint cadence lapsed after 2026-03; work from 2026-04 onward is lane-based, tracked on the live GitHub issue/PR control surface (live_issue_state / live_pr_state) with narrative state in docs/STATE.md + docs/PHASE_PROGRESS.md. Sprint 26 was closed retroactively 2026-07-13 by the ecosystem truth audit; its full frozen record (spine, shipped, task list) is archived in-tree at ops/state/sprint/sprint-26-closed.json. This record is deliberately dormant, not stale: 'dormant' is the truthful answer to 'is a sprint running', and it must not be 'refreshed' by opening a sprint that does not exist (Refs #2634)."
 }
