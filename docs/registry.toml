@@ -1114,6 +1114,27 @@ depends_on = [
   "ops/state/truth/sources.json",
 ]
 
+[docs."docs/architecture/n2-a0-stored-key-inventory.md"]
+category = "architecture"
+status = "living"
+title = "N2-A0 Stored-Key Inventory Before Did Canonicalization"
+description = "Measured inventory of every durable and durability-adjacent keyspace that would be affected if Did equality moved from inner-string equality to decoded-key equality (IDENTITY_SEMANTICS I7). Produced by the N2-A0 tranche (#2623), the HARD GATE on N2-A (#2627), and re-verified by a fresh-context adversarial review. Records 142 inspected candidate stores with mechanically defined verdicts SAFE / SILENT-MERGE RISK / NEEDS MIGRATION (24 rows NEEDS MIGRATION, folding to 13 live keyspaces plus one dormant shape; 0 UNRESOLVED), a re-runnable fourteen-class search methodology, per-store collision mechanics and liveness, identifier-domain classification, legacy compatibility paths, the surface N2-A must design against, and explicit coverage limits. Establishes by measurement that Did::from_str accepts 23 multibase spellings of every key unconditionally (24 declared bases), that the envelope signature binds the key but not the spelling so any party can re-spell and replay a captured envelope, and that about half of anchor-derived DIDs fail a serde round trip today. INVESTIGATION ONLY: changes no code, canonicalizes nothing, migrates nothing, and does not by itself make I7 safe - it makes I7 attemptable. Does not select an account domain (N2-C-prime) and asserts no implementation, migration or deployment status."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "no"
+freshness = "current"
+domain_tags = ["architecture", "identity", "security", "storage"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+depends_on = [
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "icn/crates/icn-identity/src/lib.rs",
+  "icn/crates/icn-store/src/lib.rs",
+]
+
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
 category = "architecture"
 status = "living"
