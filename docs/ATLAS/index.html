@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Top-level front door composing the project-index map family and the truth spine; cross-repo map (incl. private ops/provider repos), boundary/claims guardrail, and agent preflight. Index, not a source of truth."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Ecosystem Atlas | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Thin ecosystem router: classifies a question, then points at the registered owner in ops/state/truth/sources.json. Carries cross-repo/privacy boundary rules and claim-level distinctions. Index, not a source of truth."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Ecosystem Atlas | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -35,249 +35,166 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ATLAS</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-06-16</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-ecosystem-atlas">ICN Ecosystem Atlas</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ATLAS</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-19</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-ecosystem-atlas">ICN Ecosystem Atlas</h1>
 <blockquote>
-<p><strong>Top-level front door to the whole ICN ecosystem — for humans and for agent/LLM sessions.</strong></p>
-<p>This file is an <strong>index, not a source of truth.</strong> It <em>composes</em> the orientation system that
-already exists (see <a href="#2-the-maps-already-exist--route-here-first">§2</a>) and adds only the
-cross-repo + boundary layer that nothing else owns. When this file disagrees with a canonical
-owner, <strong>the owner wins</strong> (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a> is
-the spine). Never restate volatile facts (status, phases, PR/sprint numbers, IPs) here — link them.</p>
+<p><strong>Ecosystem index for humans and agents.</strong> This file routes questions to owners. It does not own project state, protocol semantics, repo-local operating detail, deployment liveness, active partnerships, sprint state, or readiness claims.</p>
 </blockquote>
-<p>If you read nothing else: ICN is the generic civic/institutional <strong>substrate</strong>. NYCN is the
-<strong>first institution package</strong> built on it. The two are deliberately kept apart by the <em>meaning
-firewall</em> (<a href="#5-boundaries--guardrails">§5</a>). Everything below routes you to where the real truth lives.</p>
-<hr>
-<h2 id="1-what-is-icn--what-is-nycn">1. What is ICN / What is NYCN</h2>
-<p><strong>ICN (InterCooperative Network)</strong> is institutional infrastructure for democratic organizations
-— a substrate daemon (the &quot;constraint engine&quot;: apps translate meaning into constraints; the
-kernel enforces them without understanding meaning) so cooperatives, communities, and
-federations can prove decisions, operate on infrastructure they control, and coordinate across
-boundaries without a platform landlord. Canonical: <a href="https://github.com/InterCooperative-Network/icn/blob/main/VISION">`VISION.md`</a>, <a href="/docs/README">`README.md`</a>,
-<a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a>.</p>
-<p><strong>NYCN (New York Cooperative Network)</strong> is the <strong>first institution ecosystem package / reference
-federation</strong> built beside ICN — federation + organizing cooperative + community + committees + a
-Summit 2026 activity, with accessibility commitments and support-institution patterns. <strong>NYCN is
-not a fork of ICN and contains no ICN primitives.</strong> Its substantive package truth and all private
-operating detail live in the <strong>private <code>nycn</code> repo</strong> — not in this public repo. ICN core only
-knows <em>that NYCN exists</em>, <em>what kind of package it is</em>, <em>which ICN surfaces it depends on</em>, and
-<em>which primitives it pressures upstream</em>.</p>
-<p><strong>The civic-runtime loop (ICN&#39;s core arc):</strong></p>
-<pre><code>identity → standing → authority → action card → authorized action
-  → CCL/runtime evaluation → storage/compute/governance/economic transition
-  → receipt → sync/federation/replication → member shell + steward cockpit
-  → challenge/repair/next action
-</code></pre>
-<hr>
-<h2 id="2-the-maps-already-exist--route-here-first">2. The maps already exist — route here first</h2>
-<p>ICN has a <strong>show-ready orientation layer</strong> at <a href="/docs/reference/project-index/README">`docs/reference/project-index/`</a>
-plus a machine-readable <strong>truth spine</strong> at <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/">`ops/state/truth/`</a>. This atlas does
-<strong>not</strong> duplicate them — start there:</p>
+<p>Machine-readable fact ownership lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a>. Repository/worktree coordination metadata lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/config/repo-map.json">`ops/state/config/repo-map.json`</a>. Cross-repo machine orientation lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/ecosystem.json">`ops/state/ecosystem.json`</a>.</p>
+<p>If this Atlas disagrees with a registered owner, <strong>the owner wins</strong>.</p>
+<h2 id="1-what-this-repository-is">1. What this repository is</h2>
+<p>ICN is the generic substrate/runtime for democratic institutions and cooperative coordination. Its architectural boundary is the <strong>Meaning Firewall</strong>: generic substrate enforces structure, cryptographic evidence, scope, constraints, and protocol state; institution-specific meaning belongs in governed applications/packages/policy.</p>
+<p>Use <a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a> for the five provider-neutral invariants and <a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a> for system architecture. Do not derive current implementation/readiness from this paragraph.</p>
+<p>Institution packages such as NYCN consume ICN primitives while retaining institution-local meaning and private operating detail outside generic core. Resolve the current package/repository boundary from the registered sources and relevant boundary documents rather than from a copied status summary here.</p>
+<h2 id="2-start-by-classifying-the-question">2. Start by classifying the question</h2>
 <table>
 <thead>
 <tr>
-<th>You want…</th>
-<th>Go to (canonical owner)</th>
+<th>You need to know…</th>
+<th>Start here</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>&quot;What is real right now?&quot;</td>
-<td><a href="/docs/reference/project-index/current-truth-map">`current-truth-map.md`</a> → defers to <a href="/docs/STATE">`docs/STATE.md`</a> + <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a></td>
+<td>Which source owns this kind of fact?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a></td>
 </tr>
 <tr>
-<td>Which source outranks which on conflict</td>
-<td><a href="/docs/reference/project-index/source-of-truth-map">`source-of-truth-map.md`</a> (human hierarchy) + <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a> (machine spine)</td>
+<td>What is real/current for a specific claim?</td>
+<td><a href="/docs/reference/project-index/current-truth-map">`current-truth-map.md`</a>, then the claim&#39;s owner/live evidence</td>
 </tr>
 <tr>
-<td>What may be shown / red lines (no laundering)</td>
-<td><a href="/docs/reference/project-index/show-readiness-map">`show-readiness-map.md`</a></td>
+<td>How should conflicting sources be interpreted?</td>
+<td><a href="/docs/reference/project-index/source-of-truth-map">`source-of-truth-map.md`</a></td>
 </tr>
 <tr>
-<td>Subsystem readiness scorecard</td>
-<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/status.toml">`docs/status.toml`</a> + <a href="/docs/reference/project-index/project-coverage-matrix">`project-coverage-matrix.md`</a></td>
+<td>What repository/worktree/repo-family metadata exists?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/config/repo-map.json">`ops/state/config/repo-map.json`</a> + <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/ecosystem.json">`ops/state/ecosystem.json`</a></td>
 </tr>
 <tr>
-<td>Proof-level claim vocabulary (L0–L8)</td>
-<td><a href="/docs/reference/project-index/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a></td>
+<td>What does this checkout implement?</td>
+<td>Current source/tests/schemas; use project-index maps for navigation</td>
 </tr>
 <tr>
-<td>Org-repo map (icn/nycn/icn-learn/bridge)</td>
-<td><a href="/docs/reference/project-index/repository-map">`repository-map.md`</a> — <strong>this atlas extends it</strong> with the private ops/provider layer (<a href="#3-repositories--full-cross-repo-view">§3</a>)</td>
+<td>What semantics are allowed for a domain?</td>
+<td>Resolve that domain&#39;s owner in <code>sources.json</code></td>
 </tr>
 <tr>
-<td>Repo internals (tree / Rust workspace)</td>
-<td><a href="/docs/reference/project-index/source-tree-map">`source-tree-map.md`</a>, <a href="/docs/reference/project-index/rust-workspace-map">`rust-workspace-map.md`</a>, <a href="/docs/reference/project-index/repo-atlas">`repo-atlas.md`</a></td>
+<td>What decisions were accepted?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/">`docs/adr/`</a> / RFC status plus the affected domain owner</td>
 </tr>
 <tr>
-<td>Runtime surfaces a member touches today</td>
-<td><a href="/docs/reference/project-index/runtime-surface-map">`runtime-surface-map.md`</a></td>
+<td>What is the current PR/CI/issue state?</td>
+<td>Live GitHub; never this Atlas</td>
 </tr>
 <tr>
-<td>Decisions / design</td>
-<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/">`docs/adr/`</a> (index <a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index">`ADR-0018`</a>) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/rfcs/">`docs/rfcs/`</a> (<a href="/docs/rfcs/README">`README`</a>)</td>
+<td>What merge policy applies?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/policy.json">`ops/state/truth/policy.json`</a> plus live branch protection</td>
 </tr>
 <tr>
-<td>&quot;Start here by role&quot; hub</td>
-<td><a href="/docs/reference/project-index/README">`docs/reference/project-index/README.md`</a> (has an Agent/Claude row) · <a href="/docs/INDEX">`docs/INDEX.md`</a></td>
+<td>Which specialist/skill should an agent use?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/agents.json">`ops/state/truth/agents.json`</a> / <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/skills.json">`ops/state/truth/skills.json`</a></td>
+</tr>
+<tr>
+<td>Where is a source file/crate/runtime surface?</td>
+<td><a href="/docs/reference/project-index/README">`docs/reference/project-index/`</a></td>
+</tr>
+<tr>
+<td>What can safely be claimed publicly?</td>
+<td><a href="/docs/reference/project-index/show-readiness-map">`show-readiness-map.md`</a> + current evidence/registered owners</td>
 </tr>
 </tbody></table>
-<p><strong>What this atlas adds that the family does not:</strong> the <strong>cross-repo view including the private
-<code>icn-infra</code> / <code>network-ops</code> ops &amp; provider layers</strong> (<a href="#3-repositories--full-cross-repo-view">§3</a>),
-a consolidated public-safe <strong>boundary + claims guardrail</strong> (<a href="#5-boundaries--guardrails">§5</a>), the
-<strong>NYCN-home reconciliation flag</strong> (<a href="#4-nycn--icn-the-package-boundary">§4</a>), a top-level <strong>agent
-preflight</strong> (<a href="#6-agent--llm-session-preflight--read-in-order">§6</a>), and the machine-readable
-companion <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/ecosystem.json">`ops/state/ecosystem.json`</a>.</p>
-<hr>
-<h2 id="3-repositories--full-cross-repo-view">3. Repositories — full cross-repo view</h2>
-<p>Extends <a href="/docs/reference/project-index/repository-map">`repository-map.md`</a> (which covers
-<code>icn</code>/<code>nycn</code>/<code>icn-learn</code>/<code>icn-community-bridge</code>) with the <strong>private ops &amp; provider layers</strong>. This
-public atlas <strong>names</strong> private repos and their <em>role only</em>; it does not reproduce their content.</p>
-<table>
-<thead>
-<tr>
-<th>Repo</th>
-<th>Visibility</th>
-<th>Responsible for (canonical-for)</th>
-<th>Must NOT contain</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong><code>icn</code></strong> (this repo)</td>
-<td>public</td>
-<td>Generic primitives &amp; runtime, public substrate docs, architecture, ADRs/RFCs, <code>docs/STATE.md</code>, <code>docs/status.toml</code>, truth spine (<code>ops/state/truth/</code>). Public truth surface.</td>
-<td>Institution-local meaning; private operating detail; secrets; real personal/partner data</td>
-</tr>
-<tr>
-<td><strong><code>nycn</code></strong></td>
-<td>private</td>
-<td>NYCN institution package: Summit 2026 structure, committees, accessibility commitments, support-institution patterns, sponsor lifecycle examples, package manifest, <strong>private-overlay templates</strong></td>
-<td>ICN primitives; product/substrate truth; real PII/sponsor/attendee data in git</td>
-</tr>
-<tr>
-<td><strong><code>icn-infra</code></strong></td>
-<td>private</td>
-<td>Org <strong>operating contracts</strong>, runbooks, the cross-repo <strong>boundary contract</strong> (<code>docs/boundary.md</code>), <strong>public-claims gates</strong> (<code>docs/PUBLIC-CLAIMS.md</code>), <strong>source classification</strong> (<code>docs/SOURCE-CLASSIFICATION.md</code>), host roles, service contracts</td>
-<td>Secrets (referenced by name only); product/substrate truth</td>
-</tr>
-<tr>
-<td><strong><code>network-ops</code></strong></td>
-<td>private</td>
-<td>Concrete <strong>provider reality</strong>: personal/homelab topology, raw configs, <strong>secrets</strong>. Most-private layer.</td>
-<td>Anything that should be product or org truth</td>
-</tr>
-<tr>
-<td><strong><code>icn-learn</code></strong></td>
-<td>private</td>
-<td>ICN Academy — role-based learning/onboarding. <strong>Teaches from canonical; is not canonical.</strong></td>
-<td>Canonical definitions of ICN</td>
-</tr>
-<tr>
-<td><strong><code>icn-community-bridge</code></strong></td>
-<td>private</td>
-<td>Discord→Matrix onboarding bridge — scaffold/docs-first, <strong>not deployed</strong>. Outreach/routing.</td>
-<td>Governance authority; canonical truth</td>
-</tr>
-<tr>
-<td><strong><code>org-github</code> / <code>.github</code></strong></td>
-<td>public</td>
-<td>Org profile + shared community-health files</td>
-<td>Product/architecture truth</td>
-</tr>
-<tr>
-<td><strong><code>homelab-inventory</code></strong></td>
-<td>private (personal)</td>
-<td>Infra the homelab runs on; observed <strong>read-only</strong> from <code>ops/</code>.</td>
-<td>ICN code/product truth</td>
-</tr>
-</tbody></table>
-<p><strong>Public vs private:</strong> public = <code>icn</code>, <code>.github</code>. Private = <code>nycn</code>, <code>icn-infra</code>, <code>icn-learn</code>,
-<code>icn-community-bridge</code>. Provider/personal (most private) = <code>network-ops</code>, <code>homelab-inventory</code>.
-Private repos&#39; docs are access-gated; read them in-repo if you have access.</p>
-<p>The three-layer <strong>product / org-ops / provider</strong> split (<code>icn</code> / <code>icn-infra</code> / <code>network-ops</code>) is
-defined canonically in <code>icn-infra/docs/boundary.md</code> <em>(private)</em>. The institution-package boundary
-(ICN ↔ NYCN) is canonical in
-<a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a>.</p>
-<hr>
-<h2 id="4-nycn--icn-the-package-boundary">4. NYCN ↔ ICN: the package boundary</h2>
+<h2 id="3-the-map-family">3. The map family</h2>
+<p>The project-index directory contains <strong>navigation projections</strong>, not higher-order truth.</p>
+<p>Useful maps include:</p>
 <ul>
-<li><strong>NYCN package truth</strong> (structure, templates, fixtures, mappings, private overlays) lives in the
-<strong>private <code>nycn</code> repo</strong>. Real names/emails/phones/addresses/sponsor amounts/real DIDs <strong>never
-enter git</strong> — overlays are git-ignored; only <code>*.private.example.yaml</code> templates ship.</li>
-<li><strong>NYCN→ICN dependency contract</strong> is owned by <code>nycn/docs/sync/ICN_DEPENDENCY_STATUS.md</code> <em>(private)</em>.</li>
-<li><strong>Primitives NYCN pressures upstream on ICN</strong> (track as ICN work, not NYCN work):<ul>
-<li><strong>Obligation / allocation / settlement primitives</strong> — <a href="/docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives">`RFC-0001`</a> (draft). Blocks NYCN&#39;s sponsor obligation lifecycle.</li>
-<li>Organizer/operating-body model (RFC-0012, candidate); external settlement bridge (RFC-0013, candidate); support-institution pattern (RFC-0014, candidate); public maturity-claim convention (ADR-0033, proposed); public-surface/learning-repo arch (<a href="/docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture">`RFC-0015`</a>).</li>
+<li><a href="/docs/reference/project-index/README">`README.md`</a> — role/task navigation;</li>
+<li><a href="/docs/reference/project-index/current-truth-map">`current-truth-map.md`</a> — current-claim routing;</li>
+<li><a href="/docs/reference/project-index/source-of-truth-map">`source-of-truth-map.md`</a> — conflict/claim classification;</li>
+<li><a href="/docs/reference/project-index/source-tree-map">`source-tree-map.md`</a> — source-tree navigation;</li>
+<li><a href="/docs/reference/project-index/rust-workspace-map">`rust-workspace-map.md`</a> — Rust workspace navigation;</li>
+<li><a href="/docs/reference/project-index/runtime-surface-map">`runtime-surface-map.md`</a> — runtime-surface inventory/orientation;</li>
+<li><a href="/docs/reference/project-index/show-readiness-map">`show-readiness-map.md`</a> — public-claim guardrails;</li>
+<li>generated records under <code>docs/reference/project-index/generated/</code> — mechanical snapshots/projections.</li>
 </ul>
-</li>
-<li><strong>Activation model (3 layers):</strong> public package export → private overlay (git-ignored, binds real
-DIDs/contacts) → live ICN-node state. Real holder-label → DID activation requires consent +
-role-named authority + steward/operator + privacy-reviewer signoff.</li>
-</ul>
-<blockquote>
-<p><strong>Open reconciliation question (flag, do not resolve here):</strong> there are currently <strong>two NYCN
-homes</strong> with <em>divergent self-descriptions</em>. The in-core tree <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/institutions/nycn/">`institutions/nycn/`</a>
-(created earlier) calls itself <em>&quot;the operational home for institution-owned artifacts going
-forward&quot;</em> with conditions for a later split; the separate <code>nycn</code> repo calls the in-core tree a
-<em>&quot;canonical test fixture … not produced by, or owned by, this NYCN repo.&quot;</em> The in-core tree
-carries placeholder data only (no PII observed). <strong>Canonical ownership needs an explicit
-decision</strong> — reconcile against
-<a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a>
-and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md">`docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md`</a>.
-Until then, treat the <strong>private <code>nycn</code> repo</strong> as the substantive package home and
-<code>institutions/nycn/</code> as the in-core, public-safe fixture/shape.</p>
-</blockquote>
-<hr>
-<h2 id="5-boundaries--guardrails">5. Boundaries &amp; guardrails</h2>
-<p><strong>The meaning firewall (load-bearing):</strong> ICN owns generic primitives and runtime; institution
-packages own local meaning; the kernel/substrate stays meaning-blind. Local meanings must not be
-welded into substrate primitive types. Canonical: <a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a> and the
-5 invariants in <a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a>.</p>
-<p><strong>Readiness vocabulary — no laundering.</strong> Never restate a lower tier as a higher one: <em>planned ≠
-done · rehearsed ≠ live · private ≠ public · fixture ≠ real.</em> The maturity tiers — <code>shipped/runtime</code>,
-<code>local/demo/rehearsal</code>, <code>fixture-only</code>, <code>package-declared planned</code>, <code>blocked on ICN primitives</code>,
-<code>future/speculative</code>, <code>explicitly not true</code> — align with <a href="/docs/reference/project-index/show-readiness-map">`show-readiness-map.md`</a>,
-the <a href="https://github.com/InterCooperative-Network/icn/blob/main/status.toml">`status.toml`</a> enum (<code>exceeds-spec</code>→<code>foundation-only</code>), and the proof-level
-taxonomy (L0–L8). CI enforces parts of this: <em>Readiness Overclaim Check</em>, <em>Regulatory Compliance
-Linter</em>, <em>Meaning Firewall Check</em>, <em>Firewall Contract Enforcement</em>, <em>Secrets Placeholder Check</em>,
-<em>Pilot Provenance Invariant</em>.</p>
-<p><strong>Never claim publicly without gates</strong> (owned by <code>icn-infra/docs/PUBLIC-CLAIMS.md</code>, private):
-production readiness, live federation, a formal pilot/partner, a running Forge (Forgejo is a
-<em>component</em>, not the Forge — icn-infra ADR-0004), or a live Matrix/community bridge.</p>
-<p><strong>Never copy across these boundaries:</strong></p>
+<p>When a map cites a code path, owner, or live state, inspect that source before making a consequential claim.</p>
+<h2 id="4-repository-and-privacy-boundaries">4. Repository and privacy boundaries</h2>
+<p>Do not duplicate a mutable cross-repo inventory in this file. Resolve repo relationships from <code>ops/state/config/repo-map.json</code> and <code>ops/state/ecosystem.json</code>.</p>
+<p>The durable boundary rules are:</p>
 <ul>
-<li>NYCN private operating detail (Summit fixtures, private overlays, real PII/sponsor/attendee data) → <strong>never</strong> into public <code>icn</code>. Reference at boundary level only.</li>
-<li><code>icn-infra</code> / <code>network-ops</code> operational values, host addresses, secrets → never into public <code>icn</code> (extraction requires the icn-infra scrub gate, ADR-0005, private).</li>
-<li>ICN primitives → never copied <em>into</em> <code>nycn</code> (NYCN depends, doesn&#39;t fork).</li>
-<li><code>icn-learn</code> / <code>icn-community-bridge</code> → never become canonical; they consume/route.</li>
+<li><strong>ICN core:</strong> generic primitives/runtime/public substrate truth.</li>
+<li><strong>Institution packages:</strong> institution-local meaning, governed configuration, fixtures/templates appropriate to that package.</li>
+<li><strong>Private operations/provider sources:</strong> concrete topology, credentials/secrets, real partner/member/attendee data, and provider-specific operating detail.</li>
+<li><strong>Learning/outreach/integration repos:</strong> consumers/translators of canonical ICN truth, not automatic owners of it.</li>
 </ul>
-<hr>
-<h2 id="6-agent--llm-session-preflight--read-in-order">6. Agent / LLM session preflight — read in order</h2>
+<p>Never move private operating detail or real personal/partner data into this public repository just to make an agent self-contained. An agent that lacks access must report the boundary rather than hallucinate or copy sensitive context into public docs.</p>
+<h2 id="5-claim-boundaries">5. Claim boundaries</h2>
+<p>A few distinctions matter across the ecosystem regardless of subsystem:</p>
+<ul>
+<li>normative contract ≠ implementation;</li>
+<li>implementation ≠ runtime integration;</li>
+<li>integration ≠ deployment;</li>
+<li>deployment ≠ production readiness/adoption;</li>
+<li>fixture/demo/rehearsal ≠ live institutional use;</li>
+<li>cryptographic authorship ≠ authority/legitimacy;</li>
+<li>service dependency/custody ≠ sovereignty;</li>
+<li>generated projection ≠ source truth;</li>
+<li>handoff/session memory ≠ current state.</li>
+</ul>
+<p>For a concrete claim, resolve the relevant owner/evidence rather than treating this list as proof.</p>
+<h2 id="6-agent--llm-entrypoint">6. Agent / LLM entrypoint</h2>
+<p>A fresh agent should <strong>not</strong> read the entire Atlas before doing anything. Use it only when cross-repo/ecosystem orientation is relevant.</p>
+<p>Normal non-trivial startup is:</p>
 <ol>
-<li><strong>This file</strong> (<code>docs/ATLAS.md</code>) — ecosystem orientation + where truth lives.</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a> (the 5 invariants) + <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">`CLAUDE.md`</a> (Claude-specific rules).</li>
-<li><a href="/docs/reference/project-index/current-truth-map">`docs/reference/project-index/current-truth-map.md`</a> → <a href="/docs/STATE">`docs/STATE.md`</a> + <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a> — what&#39;s real now.</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/status.toml">`docs/status.toml`</a> — before claiming any subsystem works.</li>
-<li><a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a> — system truth + meaning firewall.</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a> — the spine; resolve any conflict here.</li>
-<li><strong>Live state:</strong> <code>git branch --show-current</code>, <code>gh pr list</code>, <code>gh run list</code> — never hardcode volatile facts.</li>
-<li>Boundary/claims/private-ops work → the access-gated docs named in <a href="#3-repositories--full-cross-repo-view">§3</a>/<a href="#5-boundaries--guardrails">§5</a> (in <code>icn-infra</code> / <code>nycn</code>).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a> — provider-neutral operating contract;</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/state/truth/sources.json">`ops/state/truth/sources.json`</a> — resolve the relevant fact domain(s);</li>
+<li>read only the registered owner(s) needed for the task;</li>
+<li>query live Git/GitHub if the question is volatile;</li>
+<li>inspect current code/tests if the claim concerns implementation;</li>
+<li>use the Agent Context Spine path brief/project-index maps for navigation;</li>
+<li>consult this Atlas for ecosystem/private-boundary/cross-repo routing;</li>
+<li>consult handoffs/history only when resume/rationale context is actually needed.</li>
 </ol>
-<hr>
-<h2 id="7-keeping-this-atlas-current">7. Keeping this atlas current</h2>
-<p>Manually maintained and intentionally thin (an index). Review when:</p>
+<p>Provider adapters (<code>CLAUDE.md</code>, Codex workflow, plugins) may add tool mechanics but do not change this ownership model.</p>
+<h2 id="7-nycn-and-other-institution-packages">7. NYCN and other institution packages</h2>
+<p>Do not encode a mutable statement here about which package is &quot;the first partner,&quot; whether a pilot is formal, which summit/committee is active, or which repo is currently operationally primary.</p>
+<p>For institution-package work:</p>
+<ol>
+<li>resolve the package/boundary owner through <code>sources.json</code>, repo-map, and current boundary docs;</li>
+<li>inspect the package&#39;s own source when access is available;</li>
+<li>use live issues/PRs for current coordination state;</li>
+<li>keep real PII/private overlays/private operating detail out of public ICN docs;</li>
+<li>route generic primitive pressure upstream as ICN work rather than copying ICN implementation into the package.</li>
+</ol>
+<p>If package ownership itself is disputed, treat that as a boundary/ownership finding and resolve it explicitly. Do not let this index decide it by prose.</p>
+<h2 id="8-readiness-and-status-material">8. Readiness and status material</h2>
+<p><code>docs/status.toml</code>, status reports, phase narratives, and historical state docs can be valuable descriptive evidence. They are not universal current-state roots.</p>
+<p>Before using a readiness/status assertion:</p>
 <ul>
-<li><input disabled="" type="checkbox"> A repo is added/removed/changes visibility → update <a href="#3-repositories--full-cross-repo-view">§3</a> + <code>ops/state/ecosystem.json</code> (and <code>docs/reference/project-index/repository-map.md</code> for the org-repo subset).</li>
-<li><input disabled="" type="checkbox"> A canonical map/owner moves or is created → update the <a href="#2-the-maps-already-exist--route-here-first">§2</a> routing + <code>ecosystem.json</code>.</li>
-<li><input disabled="" type="checkbox"> The readiness <strong>enum</strong> changes (not its values) → update <a href="#5-boundaries--guardrails">§5</a>.</li>
-<li><input disabled="" type="checkbox"> A NYCN→ICN dependency/RFC pressure appears or lands → update <a href="#4-nycn--icn-the-package-boundary">§4</a>.</li>
-<li><input disabled="" type="checkbox"> The NYCN-home reconciliation is decided → resolve the open question in <a href="#4-nycn--icn-the-package-boundary">§4</a>.</li>
-<li><input disabled="" type="checkbox"> <strong>Do not</strong> record status/phase/PR/sprint values here — link their owners. If you&#39;re copying a value in, link instead.</li>
+<li>inspect its <code>last_verified</code>/evidence metadata;</li>
+<li>inspect the cited implementation/runtime evidence when material;</li>
+<li>distinguish code evidence from operational liveness;</li>
+<li>requery live systems when the claim is volatile;</li>
+<li>do not let an old high-level score override a newer domain contract or source finding.</li>
 </ul>
-<blockquote>
-<p><strong>Do-not-leak reminder:</strong> this file is in the <strong>public</strong> <code>icn</code> repo. Never add NYCN private
-detail, <code>icn-infra</code>/<code>network-ops</code> operational values, host addresses, secrets, or real
-personal/partner data. Reference private repos by name and role only.</p>
-</blockquote>
+<h2 id="9-keeping-the-atlas-healthy">9. Keeping the Atlas healthy</h2>
+<p>Update this file only when <strong>routing/boundary structure</strong> changes:</p>
+<ul>
+<li>a registered owner/map moves;</li>
+<li>a repository/boundary role changes materially;</li>
+<li>a new project-index navigation surface becomes the preferred route;</li>
+<li>the agent bootstrap/ownership architecture changes.</li>
+</ul>
+<p>Do <strong>not</strong> update it for:</p>
+<ul>
+<li>sprint numbers;</li>
+<li>active PR/issue lists;</li>
+<li>current main SHA;</li>
+<li>phase completion;</li>
+<li>subsystem maturity values;</li>
+<li>partner/pilot status;</li>
+<li>deployment liveness;</li>
+<li>machine addresses/ports.</li>
+</ul>
+<p>Those belong to their owners/live sources. Linking instead of copying is the mechanism that keeps the Atlas useful.</p>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ATLAS.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
 </a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>

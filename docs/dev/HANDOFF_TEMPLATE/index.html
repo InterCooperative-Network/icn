@@ -36,104 +36,112 @@
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HANDOFF TEMPLATE</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>template</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-handoff-template">ICN Handoff Template</h1>
-<p>Use this template when writing session handoffs to <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>.</p>
-<p>Each section explicitly labels its truth type. Do not blend verified facts with assumptions.</p>
-<hr>
-<pre><code class="language-markdown"># Session Handoff — YYYY-MM-DD
+<p>A handoff is a <strong>timestamped memory and evidence packet</strong> for resuming work. It is not a current-state document and must never be treated as one by a later session.</p>
+<p>Use a handoff when rationale, experiment results, or a partially completed sequence would be expensive to rediscover. Do not create one merely to restate GitHub or the current branch.</p>
+<pre><code class="language-markdown"># Session Handoff — YYYY-MM-DD — &lt;topic&gt;
 
-## Session Goal
-&lt;one-sentence statement of what this session set out to accomplish&gt;
+&gt; **Memory status:** historical session evidence only. Reverify every branch, PR, CI, issue, and blocker claim before acting on it.
 
-## Decisive Test
-&lt;the institutional operability question this work is measured against&gt;
+## Session scope
 
----
+**Goal:** &lt;what this session attempted&gt;
 
-## Final State (Verified)
-&lt;!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection --&gt;
+**Boundary:** &lt;what was deliberately not attempted&gt;
 
-### `main` HEAD
-`&lt;sha&gt; &lt;commit message&gt;`
+## Observed checkout at handoff time
 
-### Open PRs
-| PR | Branch | State | CI Status | Blocker |
-|----|--------|-------|-----------|---------|
+- repo root: `&lt;path or repo identifier&gt;`
+- branch: `&lt;branch&gt;`
+- HEAD: `&lt;sha&gt;`
+- observed `origin/main`: `&lt;sha or not checked&gt;`
+- working tree: `&lt;clean / concise dirty state&gt;`
+- observed at: `&lt;timestamp&gt;`
 
-### Branches
-- `&lt;branch&gt;` — &lt;status, head sha&gt;
+These values are provenance for this handoff, not instructions for the next session.
 
----
+## Durable truth consulted
 
-## What Changed
-&lt;!-- TRUTH TYPE: Execution truth — actions taken this session --&gt;
+| Domain/question | Owner consulted | Relevant conclusion |
+|---|---|---|
+| &lt;domain&gt; | &lt;registered owner path&gt; | &lt;bounded conclusion&gt; |
 
-### 1. &lt;change summary&gt;
-&lt;what was done, which commits, which PRs&gt;
+## Evidence produced or inspected
 
-### 2. &lt;change summary&gt;
-...
+- `&lt;command/test/query&gt;` → `&lt;result&gt;`
+- `&lt;code/path inspection&gt;` → `&lt;result&gt;`
 
----
+Include exact artifacts, SHAs, test names, or issue/PR links when they make the conclusion reproducible.
 
-## What&#39;s Open
-&lt;!-- TRUTH TYPE: Execution truth — known incomplete work --&gt;
+## Work completed
 
-- [ ] &lt;description of unfinished work&gt;
-- [ ] &lt;decision that needs follow-up&gt;
-
----
-
-## Unsafe Assumptions
-&lt;!-- Explicitly name anything this session relied on that was not verified --&gt;
-
-- &lt;assumption about X — not confirmed because Y&gt;
-- &lt;assumption about Z — believed true but not tested&gt;
-
----
-
-## Next Move
-&lt;!-- TRUTH TYPE: Execution truth — the exact sequence for the next session --&gt;
-
-1. &lt;first action&gt;
-2. &lt;second action&gt;
-3. ...
-
----
-
-## Architectural Decisions
-&lt;!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) --&gt;
-
-1. &lt;decision and rationale&gt;
+1. &lt;change, commit, PR, issue update, or analysis result&gt;
 2. ...
 
----
+## Work not completed
 
-## Verification Commands
-&lt;!-- Commands the next session should run to confirm starting state --&gt;
+- &lt;unfinished item and why&gt;
+- &lt;external dependency or decision still required&gt;
 
-```bash
-&lt;exact commands&gt;
-```
+## Decisions and rationale
 
----
+Record only reasoning that would otherwise be lost.
 
-## Truth-Plane Notes
-&lt;!-- Which truth types were relied on? Any known conflicts between layers? --&gt;
+- &lt;decision&gt; — &lt;why, alternatives rejected, evidence&gt;
 
-- Declared project truth: &lt;loaded from STATE.md / PHASE_PROGRESS.md — current as of?&gt;
-- Implementation truth: &lt;what was verified from code?&gt;
-- Execution truth: &lt;branch/PR/CI state confirmed?&gt;
-- Narrative truth: &lt;any strategy doc claims that may be stale?&gt;
-- Known conflicts: &lt;any divergence between layers discovered this session?&gt;
+If the decision is durable project truth, also name the ADR/domain owner/issue where it was promoted. A handoff alone does not ratify it.
+
+## Unsafe assumptions
+
+- &lt;claim relied on but not independently verified&gt;
+- &lt;environment or external-state assumption&gt;
+
+Write `None known` only after considering this explicitly.
+
+## Durable promotion check
+
+For every important discovery, answer where it now lives:
+
+| Discovery | Durable surface | Promoted? |
+|---|---|---|
+| &lt;invariant/defect/decision/current-control fact&gt; | &lt;test / owner / ADR / issue / registry / none&gt; | &lt;yes/no + why&gt; |
+
+Anything important whose durable surface is `none` is context-loss risk.
+
+## Suggested resume point
+
+This is a **recommendation, not current truth**.
+
+1. Reverify checkout and `origin/main`.
+2. Requery the linked issue/PR/reviews/checks.
+3. Re-resolve the relevant truth owner(s).
+4. If the premise still holds, &lt;suggested next action&gt;.
+
+## Reverification targets
+
+The next session must recheck at least:
+
+- `&lt;PR / issue / branch / CI / runtime claim&gt;`
+- `&lt;other volatile dependency&gt;`
+
+## Files and surfaces touched
+
+- `&lt;path&gt;` — &lt;why&gt;
+
+## Closing classification
+
+- Work level: &lt;analysis-only / docs / test/library-only / implementation / integration / migration / deployment&gt;
+- Semantic contract changed: &lt;yes/no; owner or proposal if yes&gt;
+- Merge performed: &lt;yes/no&gt;
+- Deploy/release/migration performed: &lt;yes/no&gt;
 </code></pre>
-<hr>
-<h2 id="usage-notes">Usage Notes</h2>
+<h2 id="rules">Rules</h2>
 <ul>
-<li>Handoff files go in <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>. Use a descriptive topic suffix (e.g., <code>handoff-2026-05-15-compute-placement-policy.md</code>); this matches the convention used across the recent architecture-spec sprint (#1814, #1819 – #1826).</li>
-<li>If multiple handoffs cover the same topic on the same day, append an alphabetical suffix to disambiguate: <code>handoff-YYYY-MM-DD-&lt;topic&gt;-b.md</code>.</li>
-<li>Do NOT commit the handoff file automatically — the user decides.</li>
-<li>Keep notes concise. This is for the next session, not a PR description.</li>
-<li>The &quot;Unsafe Assumptions&quot; section is the most important section. If you skip one section, do not skip that one.</li>
+<li>Prefer <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code> with a descriptive topic.</li>
+<li>Do not automatically commit or push a handoff unless the maintainer&#39;s workflow explicitly asks for it.</li>
+<li>Never copy a live PR table or sprint board merely to make the handoff look complete. Link/queryable state is better than a stale snapshot unless the snapshot is evidence for a specific conclusion.</li>
+<li>Never say &quot;next session should merge&quot; without the required revalidation and merge authorization caveat.</li>
+<li>If the only useful content is &quot;PR is open, CI is green,&quot; skip the handoff. GitHub already remembers that better.</li>
+<li>Handoffs are deliberately safe to archive or delete without destroying project truth.</li>
 </ul>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/HANDOFF_TEMPLATE.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
