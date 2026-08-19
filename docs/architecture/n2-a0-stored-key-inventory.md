@@ -104,8 +104,8 @@ serialization.** That distinction decides every row below:
 | In-memory `HashMap<Did,_>` / `HashSet<Did>` / `Vec<Did>::contains` | **Yes** | Collapses to one entry, last-writer-wins |
 | `Vec<String>` de-duplication over DID strings | **No** | Unaffected — stays N |
 | Wrapper deriving `Eq`/`Hash` over a `Did` field | **Yes** (inherited) | Moves silently, invisible to a `Did` type search |
-| Wrapper with hand-written `Ord` over the string | **No** | Diverges from its own derived `Eq` — see #10 |
-| `EntityId(String)` embedding a DID spelling | **No** | Diverges from `Did` after I7 — see #33 |
+| Wrapper with hand-written `Ord` over the string | **No** | Diverges from its own derived `Eq` — see #52 / §10.5 |
+| `EntityId(String)` embedding a DID spelling | **No** | Diverges from `Did` after I7 — see #33–#35 / §10.6 |
 | Kernel `type Did = String` | **No** | Diverges from `icn-identity::Did` after I7 |
 
 **The migration surface is therefore not "everything containing a DID".** It is precisely the
