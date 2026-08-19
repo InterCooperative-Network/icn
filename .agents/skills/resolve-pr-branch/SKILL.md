@@ -81,5 +81,6 @@ PR #1391 · feat/s22-compute-policy-config → main  [OPEN]
 
 - Sprint plan docs (`ops/state/sprint/current.json`) store branch names that can drift between
   plan-time and execution-time. Always verify against `gh pr view`.
-- Worktrees in `icn-wt/` hold their own branch refs; a branch that appears absent may just be
-  checked out in a worktree.
+- Sibling worktrees hold their own branch refs; a branch that appears absent may just be checked
+  out in one. Resolve the worktree root from `ops/state/config/repo-map.json#worktrees.root`
+  (relative to the monorepo root) or with `git worktree list` — never assume a fixed layout.

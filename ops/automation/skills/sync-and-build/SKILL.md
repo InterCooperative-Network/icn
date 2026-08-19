@@ -1,6 +1,6 @@
 ---
 name: sync-and-build
-description: Build and verify the ICN website. The website reads docs directly from icn/docs/ — no sync step needed.
+description: Build and verify the ICN website. The website reads docs directly from the monorepo's docs/ — no sync step needed.
 disable-model-invocation: true
 truth_contract:
   canonical_sources:
@@ -16,10 +16,10 @@ truth_contract:
 
 Run the ICN website build pipeline. Execute each step and report results.
 
-> **Architecture note**: `icn/website/` reads `../docs/` directly via `path.resolve` at Astro build time.
+> **Architecture note**: `website/` reads `../docs/` directly via `path.resolve` at Astro build time.
 > There is no sync script and no content to copy. Edits to `docs/` are live on the next build.
 
-## Step 1: Check what changed in icn/docs/
+## Step 1: Check what changed in docs/
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"

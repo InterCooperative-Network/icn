@@ -10,12 +10,14 @@ truth_contract:
   examples_only: []
 ---
 
-Manage ICN git worktrees. Worktrees live at `<REPO_ROOT>/../icn-wt/` (from `repo-map.json#worktrees.root`).
+Manage ICN git worktrees. The worktree root is owned by
+`ops/state/config/repo-map.json#worktrees.root` and is stored relative to the monorepo root.
+The older repo-adjacent `../icn-wt` layout is retired — do not assume it.
 
-**Always resolve paths dynamically — never assume an absolute path:**
+**Always resolve the root dynamically — never assume a fixed layout or an absolute path:**
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+WORKTREE_ROOT="$(python3 -c "import json,os,sys; r=json.load(open(sys.argv[1]))['worktrees']['root']; print(os.path.normpath(os.path.join(sys.argv[2], r)))" "${REPO_ROOT}/ops/state/config/repo-map.json" "${REPO_ROOT}")"
 ```
 
 Parse the argument to determine the subcommand. If no argument or unrecognized, default to `status`.
@@ -44,14 +46,13 @@ Flag ⚠️ if behind main > 10 commits.
 
 If MCP unavailable, fall back to:
 ```bash
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+# WORKTREE_ROOT resolved as above (repo-map.json#worktrees.root)
 ls "${WORKTREE_ROOT}/" 2>/dev/null || echo "no worktrees"
 ```
 Then for each directory:
 ```bash
-git -C "${WORKTREE_ROOT}/<name>/icn" rev-parse --abbrev-ref HEAD 2>/dev/null
-git -C "${WORKTREE_ROOT}/<name>/icn" log -1 --format="%cr: %s" 2>/dev/null
+git -C "${WORKTREE_ROOT}/<name>" rev-parse --abbrev-ref HEAD 2>/dev/null
+git -C "${WORKTREE_ROOT}/<name>" log -1 --format="%cr: %s" 2>/dev/null
 ```
 
 ---
@@ -61,9 +62,8 @@ git -C "${WORKTREE_ROOT}/<name>/icn" log -1 --format="%cr: %s" 2>/dev/null
 Creates a new worktree and branch for feature work.
 
 ```bash
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
-git -C "${REPO_ROOT}" worktree add "${WORKTREE_ROOT}/<name>/icn" -b feat/<name>
+# WORKTREE_ROOT resolved as above (repo-map.json#worktrees.root)
+git -C "${REPO_ROOT}" worktree add "${WORKTREE_ROOT}/<name>" -b feat/<name>
 ```
 
 On success, report:
@@ -100,7 +100,7 @@ git -C "${REPO_ROOT}" branch --merged origin/main | grep feat/
 
 If confirmed:
 ```bash
-git -C "${REPO_ROOT}" worktree remove "${WORKTREE_ROOT}/<name>/icn"
+git -C "${REPO_ROOT}" worktree remove "${WORKTREE_ROOT}/<name>"
 ```
 
 **Step 4**: Prune stale references:
@@ -119,10 +119,9 @@ Report: N worktrees removed, N pruned.
 Rebase a worktree's branch onto latest origin/main.
 
 ```bash
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
-git -C "${WORKTREE_ROOT}/<name>/icn" fetch origin
-git -C "${WORKTREE_ROOT}/<name>/icn" rebase origin/main
+# WORKTREE_ROOT resolved as above (repo-map.json#worktrees.root)
+git -C "${WORKTREE_ROOT}/<name>" fetch origin
+git -C "${WORKTREE_ROOT}/<name>" rebase origin/main
 ```
 
 Report:
@@ -131,6 +130,6 @@ Report:
 
 If the worktree has uncommitted changes, warn and stop:
 ```bash
-git -C "${WORKTREE_ROOT}/<name>/icn" status --porcelain
+git -C "${WORKTREE_ROOT}/<name>" status --porcelain
 ```
 "⚠️ Worktree has uncommitted changes — stash or commit before rebasing."

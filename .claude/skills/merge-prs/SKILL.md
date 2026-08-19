@@ -24,6 +24,17 @@ merge ordering, post-merge rebases, local verification, and main sync.
 For single quick merges when you already know the state is clean, this still works. For sprint
 batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output).
 
+## Merge authorization boundary (non-negotiable)
+
+**Never merge without explicit, per-PR maintainer authorization.** Green required checks are a
+precondition for merging, not permission to merge. Authorization for one PR never carries to
+another, and never survives a change of scope. If you have not been told to merge *this* PR,
+stop after reporting readiness.
+
+`ops/state/truth/policy.json` owns the merge strategy, the required-check set, and the admin-bypass
+rules; live branch protection is the second authority. This skill owns neither — read both at run
+time and never restate their contents or their count here.
+
 ## Step 0 — Preflight (run first, always)
 
 ```bash
@@ -58,7 +69,8 @@ the tooling you're running may itself be unreliable.
 
    - `UNSTABLE` mergeStateStatus + all required conclusions `SUCCESS` → treat as GREEN, safe to merge
    - Any required conclusion empty/pending → use `--auto` or wait
-   - `claude-review`, `Compare Against Base`, `Test Coverage` failures → **never block**, ignore
+   - A failure whose check name is in `merge.non_blocking_checks` (read from `policy.json`,
+     never from memory) → **never blocks**; ignore it
 
 4. **Merge** (in order provided; smallest/safest first for batch). This repo uses **squash merge**:
    ```bash
@@ -87,9 +99,9 @@ the tooling you're running may itself be unreliable.
 ## Output format
 
 ```
-#1389 merged · rebased [feat/s22-compute-policy-config, feat/s22-obs-attestation-config]
-#1391 merged · rebased [feat/s22-obs-attestation-config]
-#1390 merged · rebased []
+#<first>  merged · rebased [<branch-b>, <branch-c>]
+#<second> merged · rebased [<branch-c>]
+#<third>  merged · rebased []
 ```
 
 ## Rules
@@ -100,9 +112,9 @@ the tooling you're running may itself be unreliable.
 - **Always resolve head branch from GitHub.** Never use plan-doc branch names directly.
 - **After each merge, rebase remaining branches.** Verify locally before force-push.
 
-## Required checks reference (illustrative — canonical source is policy.json)
+## Resolving the required-check set
 
-<!-- examples_only: this list is a snapshot. Always read ops/state/truth/policy.json for authoritative list. -->
+This skill deliberately contains no required-check list and no check count. Resolve both at run time.
 
 Verify live: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
 

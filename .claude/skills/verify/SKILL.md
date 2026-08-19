@@ -31,17 +31,19 @@ If drift-check reports FAIL → note it before running verification checks.
 
 ### Repo topology reminder
 
-| Root | Path | Cargo commands |
-|------|------|----------------|
-| Monorepo root | `/home/ubuntu/projects/icn` | SDK, docs, deploy |
-| **Rust workspace** | `/home/ubuntu/projects/icn/icn` | **All `cargo` commands run here** |
+Resolve both roots at runtime — never hardcode a machine path:
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"   # monorepo root: SDK, docs, deploy
+CARGO_ROOT="${REPO_ROOT}/icn"                  # Cargo workspace root: all cargo commands
+```
 
 ### Change Routing Matrix
 
 | Changed files | Required checks |
 |---|---|
 | `icn/crates/**/*.rs` or `icn/apps/**/*.rs` | `cd icn && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test -p <touched-crates>` |
-| `icn/crates/icn-gateway/**` | Also run: `cargo test -p icn-gateway` |
+| `icn/crates/icn-gateway/**` | Also run: `cargo test -p icn-gateway --features sled-storage` (matches the CI gateway job) |
 | `icn/crates/icn-kernel-api/**` | Also run: `cargo test -p icn-kernel-api` |
 | `sdk/typescript/**` | `cd sdk/typescript && npm ci && npm run build && npm test && npm run lint` |
 | `web/pilot-ui/**` | `cd web/pilot-ui && npm run test && npm run test:e2e` |
@@ -54,7 +56,8 @@ If drift-check reports FAIL → note it before running verification checks.
 
 ## Important
 
-- **Rust commands run from `icn/`** (the Cargo workspace root, contains `Cargo.toml`), not from the repo root.
+- **Rust commands run from `${CARGO_ROOT}`** (the Cargo workspace root, contains `Cargo.toml`), not from the repo root.
+- The command ladder above mirrors `ops/state/truth/policy.json#validation_ladder`. If the two disagree, `policy.json` wins — reread it rather than editing this list from memory.
 - `sdk/typescript/` and `web/pilot-ui/` commands run from the monorepo root's subdirectories.
 - If gateway API behavior changed, remind about OpenAPI + TS type regeneration (`cd sdk/typescript && npm run generate-types`).
 - Never weaken checks to make them pass.

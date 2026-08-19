@@ -83,20 +83,27 @@ for c in "${DOC_COMMANDS[@]}"; do
 done
 [ "$missing" -eq 0 ] && pass "AGENTS.md owns all four universal doc-control command forms"
 
-if ! grep -q 'AGENTS.md' CLAUDE.md; then
-  fail "CLAUDE.md must route provider-neutral operating guidance to AGENTS.md"
-else
-  pass "CLAUDE.md routes provider-neutral operating guidance to AGENTS.md"
-fi
-
-claude_dupes=0
-for c in "${DOC_COMMANDS[@]}"; do
-  if grep -qF "$c" CLAUDE.md; then
-    claude_dupes=1
-    fail "CLAUDE.md duplicates provider-neutral doc-control command owned by AGENTS.md: $c"
+# Every ACTIVE provider adapter must route to AGENTS.md rather than restate the command
+# doctrine. Historical/archive documents are deliberately not scanned: they record what was
+# true when written and are not active doctrine (icn#2633).
+ADAPTERS=(CLAUDE.md ops/CLAUDE.md .claude/project_rules.md docs/ai/CODEX_WORKFLOW.md)
+adapter_dupes=0
+for f in "${ADAPTERS[@]}"; do
+  if [ ! -f "$f" ]; then
+    fail "active provider adapter missing: $f"
+    continue
   fi
+  if ! grep -q 'AGENTS.md' "$f"; then
+    fail "$f must route provider-neutral operating guidance to AGENTS.md"
+  fi
+  for c in "${DOC_COMMANDS[@]}"; do
+    if grep -qF "$c" "$f"; then
+      adapter_dupes=1
+      fail "$f duplicates provider-neutral doc-control command owned by AGENTS.md: $c"
+    fi
+  done
 done
-[ "$claude_dupes" -eq 0 ] && pass "CLAUDE.md does not duplicate AGENTS.md doc-control command doctrine"
+[ "$adapter_dupes" -eq 0 ] && pass "no active provider adapter duplicates AGENTS.md doc-control command doctrine"
 
 # ── 4. Registries must point at files that exist and foundation owners must bind ─
 python3 - <<'PYEOF' || FAILS=$((FAILS + 1))
@@ -135,19 +142,21 @@ if bad:
 print("  ok  agent/skill registry paths exist and foundation truth owners are registered")
 PYEOF
 
-# ── 5. Provider skill mirrors: warn when canonical .agents/ copy diverges ─────
-# skills.json declares .agents/skills/ authoritative for ICN-level skills.
-for skill in preflight icn-preflight handoff; do
-  a=".agents/skills/${skill}/SKILL.md"
-  c=".claude/skills/${skill}/SKILL.md"
-  if [ -f "$a" ] && [ -f "$c" ]; then
-    if ! diff -q "$a" "$c" >/dev/null 2>&1; then
-      warn "skill copies diverge: $a vs $c (skills.json says .agents/ is authoritative; reconcile deliberately)"
-    else
-      pass "skill copies in sync: ${skill}"
-    fi
+# ── 5. Skill ownership is enforced from the registry, not from a name list here ─
+#
+# icn#2633: this used to diff three hardcoded skill names and only warn, so twelve
+# divergences and one unregistered skill were invisible. Scope, mirror policy and
+# per-skill assertions are now data in ops/state/truth/skills.json; the checker below
+# derives everything from it and FAILS. Adding a skill never edits this file.
+if [ -f scripts/check-skill-registry.py ]; then
+  if python3 scripts/check-skill-registry.py; then
+    pass "skill registry: canonical/mirror ownership is mechanically true"
+  else
+    fail "skill registry: canonical/mirror ownership is not true (see check-skill-registry output above)"
   fi
-done
+else
+  fail "scripts/check-skill-registry.py missing — skill ownership is unenforced"
+fi
 
 # ── 6. Environment checks (dev-VM only; skipped silently where paths absent) ───
 LEGACY_CLONE="${HOME}/projects/icn"

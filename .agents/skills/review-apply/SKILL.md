@@ -4,6 +4,18 @@ description: Apply PR review feedback with no scope drift. Fetches comments, app
 argument-hint: "[PR number]"
 user-invocable: true
 allowed-tools: "Bash, Read, Edit, Write, Grep, Glob"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # validation_ladder, required gates
+    - ops/state/config/repo-map.json    # workspace root
+  live_load_required:
+    - "gh pr view <N> --json reviews,reviewRequests,comments,statusCheckRollup"
+    - "gh pr diff <N> --stat"
+    - "git branch --show-current"
+  examples_only: []
+  never_hardcode:
+    - PR number
+    - review comment content (fetch live via gh api)
 ---
 
 Apply PR review feedback. No scope drift - only address what reviewers asked for.
