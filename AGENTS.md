@@ -19,7 +19,8 @@ Use this rule:
 | What does the current checkout implement? | Current code, tests, schemas, and generated behavior in this checkout |
 | What semantics are allowed or intended for a domain? | The domain owner named by `ops/state/truth/sources.json`, plus applicable accepted ADRs |
 | What is the repository/worktree topology? | `ops/state/config/repo-map.json` |
-| What is the current sprint/task board? | `ops/state/sprint/current.json` |
+| What is being worked on right now? | The live issue/PR control surface via `gh`. Never a sprint file, a handoff, or a cached prompt |
+| Is a sprint cadence running, and what is the sprint board lineage? | `ops/state/sprint/current.json` |
 | What are the merge requirements? | `ops/state/truth/policy.json` plus live branch protection |
 | Which agent or skill owns a workflow? | `ops/state/truth/agents.json` and `ops/state/truth/skills.json` |
 | What is the current branch, PR, review, or CI state? | Live `git` and GitHub data. Never a handoff or cached prompt |
