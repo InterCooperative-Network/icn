@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::hash::hash_edge_set;
-use super::ids::{Action, BlockHeight, Constraint, EdgeSource, ResourceId, SubjectId};
+use super::ids::{Action, BlockHeight, CapabilitySubjectId, Constraint, EdgeSource, ResourceId};
 
 // ---------------------------------------------------------------------------
 // CapabilityEdge
@@ -20,7 +20,7 @@ use super::ids::{Action, BlockHeight, Constraint, EdgeSource, ResourceId, Subjec
 /// Constraints are always sorted and deduplicated (canonicalized in constructor).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct CapabilityEdge {
-    pub subject: SubjectId,
+    pub subject: CapabilitySubjectId,
     pub action: Action,
     pub resource: ResourceId,
     /// INVARIANT: always sorted and deduplicated.
@@ -32,7 +32,7 @@ pub struct CapabilityEdge {
 impl CapabilityEdge {
     /// Create a new edge, sorting and deduplicating constraints.
     pub fn new(
-        subject: SubjectId,
+        subject: CapabilitySubjectId,
         action: Action,
         resource: ResourceId,
         mut constraints: Vec<Constraint>,
@@ -100,7 +100,12 @@ impl CapabilityGraph {
     ///
     /// Returns a [`Decision`] with matching edge indices. In B0, a match
     /// requires exact equality on subject, action, and resource.
-    pub fn query(&self, subject: &SubjectId, action: &Action, resource: &ResourceId) -> Decision {
+    pub fn query(
+        &self,
+        subject: &CapabilitySubjectId,
+        action: &Action,
+        resource: &ResourceId,
+    ) -> Decision {
         let matching_edges: Vec<usize> = self
             .edges
             .iter()
@@ -128,8 +133,8 @@ mod tests {
     use super::*;
     use crate::model::ids::{EdgeSource, ResourceKind};
 
-    fn make_subject() -> SubjectId {
-        SubjectId::new("did:icn:alice").unwrap()
+    fn make_subject() -> CapabilitySubjectId {
+        CapabilitySubjectId::new("did:icn:alice").unwrap()
     }
 
     fn make_action() -> Action {
@@ -188,7 +193,7 @@ mod tests {
     #[test]
     fn query_denied_when_no_matching_edge() {
         let graph = CapabilityGraph::from_edges(vec![make_edge(vec![])]);
-        let other_subject = SubjectId::new("did:icn:bob").unwrap();
+        let other_subject = CapabilitySubjectId::new("did:icn:bob").unwrap();
         let decision = graph.query(&other_subject, &make_action(), &make_resource());
         assert!(!decision.allowed);
         assert!(decision.matching_edges.is_empty());
