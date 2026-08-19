@@ -153,7 +153,7 @@ function isFork(
 
   .ladder-eyebrow {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -179,6 +179,11 @@ function isFork(
   .ladder-step-inner {
     display: flex;
     align-items: center;
+    /* The "you are here" badge is nowrap and does not shrink, so a long step
+       label used to push it past the viewport edge (caught at 768px on
+       /for-cooperatives). Wrapping is the right answer rather than truncating:
+       the label is the navigational content and the badge is the state. */
+    flex-wrap: wrap;
     gap: var(--space-md);
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-card);
@@ -243,7 +248,10 @@ function isFork(
 
   .ladder-here {
     font-family: var(--font-mono);
-    font-size: 0.625rem;
+    /* Was 10px, below the 11px floor in accessibility.md §3.9 and below the
+       type scale's own 12px minimum. This is the "you are here" marker — the
+       one label in the ladder a reader most needs to be able to read. */
+    font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -295,6 +303,7 @@ function isFork(
   }
 
   .ladder-fork-opt {
+    flex-wrap: wrap;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -361,6 +370,7 @@ function isFork(
       align-self: flex-start;
     }
     .ladder-fork-opt {
+    flex-wrap: wrap;
       align-items: flex-start;
     }
     .ladder-fork-opt .ladder-label {
@@ -399,7 +409,7 @@ function isFork(
 
   .ladder-nav-eyebrow {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.12em;

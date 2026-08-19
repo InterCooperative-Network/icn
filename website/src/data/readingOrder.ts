@@ -31,50 +31,63 @@ export interface LadderFork {
   options: LadderStep[];
 }
 
-/** The five steps of the public narrative ladder.
-    Step 5 is a fork — see LADDER_FORK below. */
+/** The linear steps of the public narrative ladder.
+    The final step is a fork — see LADDER_FORK below.
+
+    "See it work" was inserted at 04 for #2610. Its position is deliberate:
+    it comes after the reader has a conceptual model (03) and before the
+    maturity account (05), because a visitor who has watched a decision
+    become a receipt can read the maturity claims with something concrete in
+    mind, and a visitor who has not is being asked to evaluate honesty about
+    a system they cannot yet picture. */
 export const LADDER_STEPS: LadderStep[] = [
   {
-    n: '01',
-    slug: 'what-is-icn',
-    label: 'What is ICN',
-    href: '/what-is-icn',
+    n: "01",
+    slug: "what-is-icn",
+    label: "What is ICN",
+    href: "/what-is-icn",
   },
   {
-    n: '02',
-    slug: 'why-icn',
-    label: 'Why ICN',
-    href: '/why-icn',
+    n: "02",
+    slug: "why-icn",
+    label: "Why ICN",
+    href: "/why-icn",
   },
   {
-    n: '03',
-    slug: 'how-it-works',
-    label: 'How It Works',
-    href: '/how-it-works',
+    n: "03",
+    slug: "how-it-works",
+    label: "How it works",
+    href: "/how-it-works",
   },
   {
-    n: '04',
-    slug: 'whats-real-now',
-    label: "What's Real Now",
-    href: '/whats-real-now',
+    n: "04",
+    slug: "see-it-work",
+    label: "See it work",
+    href: "/see-it-work",
+  },
+  {
+    n: "05",
+    slug: "whats-real-now",
+    label: "What's real now",
+    href: "/whats-real-now",
   },
 ];
 
-/** Step 5 is a fork: a reader picks an audience, not a sequence. */
+/** The last step is a fork: a reader picks an audience, not a sequence. */
 export const LADDER_FORK: LadderFork = {
-  n: '05',
+  n: "06",
   options: [
     {
-      n: '05',
-      slug: 'for-cooperatives',
-      label: 'For Cooperatives',
-      href: '/for-cooperatives',
+      n: "06",
+      slug: "for-cooperatives",
+      label: "For cooperatives and institutions",
+      href: "/for-cooperatives",
     },
     {
-      n: '05',
-      slug: 'for-developers',
-      label: 'For Developers',
-      href: '/for-developers',
+      n: "06",
+      slug: "for-developers",
+      label: "For developers",
+      href: "/for-developers",
     },
   ],
 };

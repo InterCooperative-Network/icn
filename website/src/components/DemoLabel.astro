@@ -1,0 +1,123 @@
+---
+// DemoLabel.astro — the "this is fixture data" marker.
+//
+// docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md §3 makes the truth label
+// non-optional and says it travels with the asset: "A visual without a label
+// is not shippable", and "If a visual sits between two labels, it carries the
+// less optimistic one."
+//
+// The walkthrough uses record shapes that are real but assembles them into a
+// guided surface that is not a shipped product. That sits between
+// "repo-grounded public explainer" and "illustrative direction", so it takes
+// the less optimistic of the two.
+//
+// `scope="inline"` marks a single block of fixture values inside a larger
+// page. `scope="surface"` is the banner form for the top of a page whose
+// entire content is fixture-backed.
+//
+// The label is real text, not a background colour or an icon — a reader using
+// a screen reader, a grayscale display, or a text-only browser gets the same
+// warning as everyone else.
+
+export interface Props {
+  label?: string;
+  scope?: 'inline' | 'surface';
+  /** Extra sentence explaining what specifically is fictional here. */
+  detail?: string;
+}
+
+const {
+  label = 'illustrative direction',
+  scope = 'inline',
+  detail,
+} = Astro.props;
+---
+
+{
+  scope === 'surface' ? (
+    <aside class="demo-label demo-label-surface" aria-label="Demonstration notice">
+      <span class="demo-label-chip">
+        <span class="demo-label-key">Truth label</span>
+        <span class="demo-label-value">{label}</span>
+      </span>
+      <p class="demo-label-text">
+        <b>Everything below is invented for this walkthrough.</b>{' '}
+        {detail ??
+          'The cooperative, the people, the identifiers, and the hashes are fictional. No live institution or partner data is involved, and nothing is fetched when this page loads.'}
+      </p>
+    </aside>
+  ) : (
+    <span class="demo-label demo-label-inline">
+      <span class="demo-label-key">Truth label</span>
+      <span class="demo-label-value">{label}</span>
+      {detail && <span class="sr-only"> — {detail}</span>}
+    </span>
+  )
+}
+
+<style>
+  .demo-label-chip,
+  .demo-label-inline {
+    display: inline-flex;
+    align-items: stretch;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.6;
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    /* Long localized labels wrap rather than overflow their container. */
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .demo-label-key {
+    background: var(--accent-amber);
+    color: var(--bg-primary);
+    padding: 0.2em 0.6em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  .demo-label-value {
+    background: var(--bg-surface);
+    color: var(--accent-amber);
+    padding: 0.2em 0.6em;
+    font-weight: 500;
+    min-width: 0;
+  }
+
+  .demo-label-surface {
+    display: block;
+    border: 1px solid var(--border-accent);
+    border-left: 4px solid var(--accent-amber);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    padding: var(--space-lg);
+    margin: var(--space-xl) 0;
+    max-width: var(--measure-wide);
+  }
+
+  .demo-label-text {
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-top: var(--space-md);
+  }
+
+  .demo-label-text b {
+    color: var(--text-heading);
+  }
+
+  /* In forced-colors mode the amber fill is dropped; the border and the
+     literal words "Truth label" still carry the meaning. */
+  @media (forced-colors: active) {
+    .demo-label-chip,
+    .demo-label-inline,
+    .demo-label-surface {
+      border-color: CanvasText;
+    }
+  }
+</style>

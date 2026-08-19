@@ -5,14 +5,25 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "prebuild": "node scripts/gen-stats.mjs",
+    "generate": "node scripts/gen-stats.mjs && node scripts/gen-concepts.mjs && node scripts/gen-project-state.mjs && node scripts/gen-docs-classification.mjs && node scripts/gen-build-log.mjs",
+    "prebuild": "npm run generate",
+    "predev": "npm run generate",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
     "deploy": "astro build && npx gh-pages -d dist",
     "lint": "astro check",
     "format": "prettier --write .",
-    "format:check:changed": "bash scripts/format-check-changed.sh"
+    "format:check:changed": "bash scripts/format-check-changed.sh",
+    "format:check": "prettier --check src scripts",
+    "check:state": "node scripts/check-public-state.mjs",
+    "check:docs": "node scripts/check-docs-boundary.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:fixtures": "node scripts/check-fixture-safety.mjs",
+    "test": "node --test \"scripts/tests/*.test.mjs\"",
+    "audit": "node scripts/audit-layout.mjs --profile pr",
+    "audit:full": "node scripts/audit-layout.mjs --profile full",
+    "check": "npm run lint && npm run test && npm run check:state && npm run check:docs && npm run check:links && npm run check:fixtures"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",
@@ -21,10 +32,12 @@
     "astro": "^5.16.5",
     "fuse.js": "^7.1.0",
     "marked": "^17.0.3",
+    "smol-toml": "^1.8.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",
+    "parse5": "^7.3.0",
     "prettier": "^3.0.0",
     "prettier-plugin-astro": "^0.12.0"
   }

@@ -1,27 +1,53 @@
 ---
-// src/pages/docs/[...slug].astro — Dynamic doc page renderer
+// src/pages/docs/[...slug].astro — dynamic doc page renderer.
+//
+// ─── What changed here for #2609 ─────────────────────────────────────────────
+//
+// This route used to walk docs/ and emit a page for every .md file it found —
+// 965 of them, with no filter and no status. That published docs/internal/
+// (whose own README says it is not public), partner-specific operational
+// material, and 156 agent session logs, and it rendered a 2025 sprint report
+// with exactly the same chrome as the current architecture document.
+//
+// Now getStaticPaths() consults the classification generated from
+// docs/registry.toml, and only emits pages for documents the repository's own
+// control plane says are publishable. Each page carries a status banner, and
+// archived pages are additionally marked noindex so search engines stop
+// surfacing them as if they were current.
+
 import Layout from '../../layouts/Layout.astro';
+import DocStatusBanner from '../../components/DocStatusBanner.astro';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveRepoDocsRoot } from '../../lib/paths';
+import { classify, type PublishedDoc } from '../../lib/docsClassification';
+import { renderMarkdown } from '../../lib/markdown';
 
 export async function getStaticPaths() {
   const docsRoot = resolveRepoDocsRoot();
-  const paths: { params: { slug: string }; props: { filePath: string } }[] = [];
+  const paths: {
+    params: { slug: string };
+    props: { filePath: string; doc: PublishedDoc };
+  }[] = [];
 
   function scanDir(dir: string, prefix: string = '') {
-    const entries = fs.readdirSync(dir);
-    for (const entry of entries) {
+    for (const entry of fs.readdirSync(dir)) {
       const fullPath = path.join(dir, entry);
       if (fs.statSync(fullPath).isDirectory()) {
         scanDir(fullPath, `${prefix}${entry}/`);
-      } else if (entry.endsWith('.md')) {
-        const slug = `${prefix}${entry.replace('.md', '')}`;
-        paths.push({
-          params: { slug },
-          props: { filePath: fullPath }
-        });
+        continue;
       }
+      if (!entry.endsWith('.md')) continue;
+
+      const slug = `${prefix}${entry.replace(/\.md$/, '')}`;
+      const record = classify(slug);
+
+      // Not classified, or classified as withheld → no public page. A missing
+      // record means the generator and this walk disagree, which is a bug; we
+      // fail closed by not publishing rather than open by publishing.
+      if (!record || record.publish !== true) continue;
+
+      paths.push({ params: { slug }, props: { filePath: fullPath, doc: record } });
     }
   }
 
@@ -30,60 +56,97 @@ export async function getStaticPaths() {
 }
 
 const { slug } = Astro.params;
-const { filePath } = Astro.props;
+const { filePath, doc } = Astro.props;
 
 const rawContent = fs.readFileSync(filePath, 'utf-8');
 
-// Extract title from first heading or filename
+// Title: the document's own H1 wins, then the registry title, then the
+// filename. The registry title is a useful fallback because a handful of docs
+// open with a frontmatter block and no H1.
 const titleMatch = rawContent.match(/^#\s+(.+)$/m);
-const title = titleMatch ? titleMatch[1] : slug!.split('/').pop()!.replace(/[-_]/g, ' ');
+const title =
+  titleMatch?.[1] ??
+  doc.registryTitle ??
+  slug!.split('/').pop()!.replace(/[-_]/g, ' ');
 
-// Render markdown with link rewriting
-import { renderMarkdown } from '../../lib/markdown';
 const htmlContent = renderMarkdown(rawContent);
-
-// Build breadcrumb
 const segments = slug!.split('/');
+
+const isArchive = doc.layer === 'archive';
+
+// #2609: "Prevent clearly historical/archive material from being treated as
+// ordinary current pages by external search engines." noindex, not disallow —
+// the page stays reachable by direct link and by the archive index, it just
+// stops competing with current documentation in search results.
+const robots = isArchive ? 'noindex, follow' : undefined;
+
+const description =
+  doc.registryDescription ??
+  (isArchive
+    ? `Historical document, kept for the record. Not current ICN project state.`
+    : undefined);
 ---
 
-<Layout title={title} activeNav="docs">
-  <section class="section" style="padding-top: calc(64px + var(--space-2xl));">
+<Layout
+  title={isArchive ? `${title} (archived)` : title}
+  description={description}
+  activeNav="docs"
+  robots={robots}
+>
+  <section class="section docs-page">
     <div class="container-narrow">
-      <!-- Breadcrumb -->
-      <nav class="breadcrumb">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/docs">Docs</a>
+        {isArchive && (
+          <>
+            <span class="breadcrumb-sep" aria-hidden="true">/</span>
+            <a href="/docs/archive">Archive</a>
+          </>
+        )}
         {segments.length > 1 && segments.slice(0, -1).map((seg) => (
-          <span class="breadcrumb-sep">/</span>
-          <span class="breadcrumb-dir">{seg.replace(/[-_]/g, ' ')}</span>
+          <>
+            <span class="breadcrumb-sep" aria-hidden="true">/</span>
+            <span class="breadcrumb-dir">{seg.replace(/[-_]/g, ' ')}</span>
+          </>
         ))}
-        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-sep" aria-hidden="true">/</span>
         <span class="breadcrumb-current">{segments[segments.length - 1].replace(/[-_]/g, ' ')}</span>
       </nav>
 
-      <!-- Source link -->
-      <div class="doc-meta">
-        <a href={`https://github.com/InterCooperative-Network/icn/blob/main/docs/${slug}.md`} target="_blank" class="source-link">
-          View source on GitHub →
-        </a>
-      </div>
+      {/* Status first, before the document's own content. A reader who lands
+          mid-corpus from a search engine needs to know what they are reading
+          before they start reading it. */}
+      <DocStatusBanner doc={doc} />
 
-      <!-- Rendered markdown -->
       <article class="prose" set:html={htmlContent} />
 
-      <!-- Footer nav -->
       <div class="doc-footer">
-        <a href="/docs" class="btn btn-ghost">← Back to Docs</a>
+        <a
+          href={`https://github.com/InterCooperative-Network/icn/blob/main/${doc.rel}`}
+          target="_blank"
+          rel="noopener"
+          class="source-link"
+        >
+          View source on GitHub ↗
+        </a>
+        <a href={isArchive ? '/docs/archive' : '/docs'} class="btn btn-ghost">
+          ← Back to {isArchive ? 'archive' : 'docs'}
+        </a>
       </div>
     </div>
   </section>
 </Layout>
 
 <style>
+  .docs-page {
+    padding-top: calc(64px + var(--space-2xl));
+  }
+
   .breadcrumb {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-    font-size: 0.8125rem;
+    font-size: var(--text-xs);
     margin-bottom: var(--space-lg);
     flex-wrap: wrap;
   }
@@ -106,24 +169,27 @@ const segments = slug!.split('/');
     text-transform: capitalize;
   }
 
-  .doc-meta {
-    margin-bottom: var(--space-xl);
-    padding-bottom: var(--space-md);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .source-link {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-  }
-
-  .source-link:hover {
-    color: var(--accent-teal);
-  }
-
   .doc-footer {
     margin-top: var(--space-3xl);
     padding-top: var(--space-xl);
     border-top: 1px solid var(--border-subtle);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .source-link {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    min-height: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .source-link:hover {
+    color: var(--accent-teal);
   }
 </style>

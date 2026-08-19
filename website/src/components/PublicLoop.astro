@@ -1,0 +1,229 @@
+---
+// PublicLoop.astro — the simplified public closure loop (#1740, #2612 §3).
+//
+// The full ClosureLoop component renders nine stations using ICN's own
+// vocabulary: identity, standing, authority, governance, policy, accounting,
+// execution, provenance, member experience. That is the right diagram for a
+// reader who already has a model of the system, and the wrong one for a
+// visitor in their first thirty seconds — nine unfamiliar nouns is a wall.
+//
+// This is the introductory layer: six plain-language stages, each naming the
+// ICN stations it stands for, so the simplified loop is visibly a *view of*
+// the real architecture rather than a separate metaphor invented for
+// marketing. #1740 asks for exactly that relationship — "the simplified public
+// loop should map cleanly onto the deeper architecture" — and #2612 §3 warns
+// against the two becoming disconnected.
+//
+// The mapping is stated on the component, not buried in a design doc, so
+// anyone editing one half can see the other.
+
+import { concept } from '../lib/concepts';
+
+export interface Props {
+  /** Show the mapping back to the nine ICN stations. */
+  showMapping?: boolean;
+  /** Heading level for the stage names, so the loop fits a page's outline. */
+  headingLevel?: 3 | 4;
+}
+
+const { showMapping = true } = Astro.props;
+
+interface Stage {
+  n: string;
+  /** Plain-language stage name. */
+  label: string;
+  /** One sentence, no ICN vocabulary. */
+  plain: string;
+  /** Canonical concept ids this stage covers. */
+  covers: string[];
+}
+
+const STAGES: Stage[] = [
+  {
+    n: '01',
+    label: 'People',
+    plain: 'Who is recognized here, and what they are recognized for.',
+    covers: ['identity', 'standing'],
+  },
+  {
+    n: '02',
+    label: 'Rules',
+    plain: 'What the institution has agreed to, and who may act under it.',
+    covers: ['authority', 'policy'],
+  },
+  {
+    n: '03',
+    label: 'Decisions',
+    plain: 'What it decided, using the rules it set for itself.',
+    covers: ['governance'],
+  },
+  {
+    n: '04',
+    label: 'Action',
+    plain: 'What actually happened as a result — including what it cost.',
+    covers: ['execution', 'accounting'],
+  },
+  {
+    n: '05',
+    label: 'Proof',
+    plain: 'A durable record of what happened and why it was allowed.',
+    covers: ['provenance'],
+  },
+  {
+    n: '06',
+    label: 'Memory',
+    plain: 'All of it still connected, so the next decision starts informed.',
+    covers: ['member_experience'],
+  },
+];
+
+// Resolve now so an unknown concept id fails the build rather than rendering
+// a silently empty mapping line.
+const stagesWithConcepts = STAGES.map((stage) => ({
+  ...stage,
+  concepts: stage.covers.map((id) => concept(id)),
+}));
+---
+
+<figure class="ploop">
+  <figcaption class="sr-only">
+    The simplified ICN loop in six stages: people, rules, decisions, action,
+    proof, and memory. The sixth stage returns to the first — the record of
+    what happened becomes context for the next decision.
+  </figcaption>
+
+  <ol class="ploop-list">
+    {stagesWithConcepts.map((stage) => (
+      <li class="ploop-stage">
+        <span class="ploop-n" aria-hidden="true">{stage.n}</span>
+        <div class="ploop-body">
+          <h3 class="ploop-label">{stage.label}</h3>
+          <p class="ploop-plain">{stage.plain}</p>
+          {showMapping && (
+            <p class="ploop-mapping">
+              <span class="ploop-mapping-key">In ICN:</span>{' '}
+              {stage.concepts.map((c, i) => (
+                <>
+                  {i > 0 && <span aria-hidden="true"> · </span>}
+                  <span class="ploop-mapping-term">{c.canonical.replace(/_/g, ' ')}</span>
+                </>
+              ))}
+            </p>
+          )}
+        </div>
+      </li>
+    ))}
+  </ol>
+
+  <p class="ploop-close">
+    <span class="ploop-close-mark" aria-hidden="true">↺</span>
+    Memory feeds back into people and rules. That return is the whole point —
+    an institution that cannot remember why it decided something has to decide
+    it again from scratch.
+  </p>
+</figure>
+
+<style>
+  .ploop {
+    margin: var(--space-2xl) 0;
+  }
+
+  .ploop-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    counter-reset: stage;
+  }
+
+  .ploop-stage {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+    padding: var(--space-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-top: 3px solid var(--accent-teal);
+    border-radius: var(--radius-lg);
+    min-width: 0;
+  }
+
+  .ploop-n {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-teal);
+    flex: none;
+    padding-top: 0.25em;
+  }
+
+  .ploop-body {
+    min-width: 0;
+  }
+
+  .ploop-label {
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-xs);
+  }
+
+  /* The plain-language sentence is the primary reading path. The ICN mapping
+     underneath is deliberately smaller and quieter — #2612 §5 asks that
+     technical terminology be visually subordinate to the plain explanation on
+     introductory surfaces. */
+  .ploop-plain {
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .ploop-mapping {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .ploop-mapping-key {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .ploop-mapping-term {
+    color: var(--text-secondary);
+  }
+
+  .ploop-close {
+    display: flex;
+    gap: var(--space-md);
+    align-items: baseline;
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+    border-left: 3px solid var(--accent-teal);
+    background: var(--bg-surface);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    color: var(--text-secondary);
+    max-width: var(--measure-prose);
+  }
+
+  .ploop-close-mark {
+    font-size: var(--text-xl);
+    color: var(--accent-teal);
+    flex: none;
+    line-height: 1;
+  }
+
+  @media (min-width: 640px) {
+    .ploop-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .ploop-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>
