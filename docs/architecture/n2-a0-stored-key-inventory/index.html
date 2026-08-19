@@ -1,0 +1,2414 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Measured inventory of every durable and durability-adjacent keyspace that would be affected if Did equality moved from inner-string equality to decoded-key equality (IDENTITY_SEMANTICS I7). Produced by the N2-A0 tranche (#2623), the HARD GATE on N2-A (#2627), and re-verified by a fresh-context adversarial review. Records 142 inspected candidate stores with mechanically defined verdicts SAFE / SILENT-MERGE RISK / NEEDS MIGRATION (24 rows NEEDS MIGRATION, folding to 13 live keyspaces plus one dormant shape; 0 UNRESOLVED), a re-runnable fourteen-class search methodology, per-store collision mechanics and liveness, identifier-domain classification, legacy compatibility paths, the surface N2-A must design against, and explicit coverage limits. Establishes by measurement that Did::from_str accepts 23 multibase spellings of every key unconditionally (24 declared bases), that the envelope signature binds the key but not the spelling so any party can re-spell and replay a captured envelope, and that about half of anchor-derived DIDs fail a serde round trip today. INVESTIGATION ONLY: changes no code, canonicalizes nothing, migrates nothing, and does not by itself make I7 safe - it makes I7 attemptable. Does not select an account domain (N2-C-prime) and asserts no implementation, migration or deployment status."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A0 — stored-key inventory before `Did` canonicalization (#2623) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>n2 a0 stored key inventory</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-19</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n2-a0--stored-key-inventory-before-did-canonicalization-2623">N2-A0 — stored-key inventory before <code>Did</code> canonicalization (#2623)</h1>
+<p><strong>Status:</strong> living — investigation record for the N2-A0 tranche
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — <code>docs/architecture/IDENTITY_SEMANTICS.md</code> owns the semantic contract; this
+document owns only the <em>measured</em> stored-key surface that gates I7
+<strong>Last reviewed:</strong> 2026-08-19 — fresh-context adversarial review (second pass); every headline
+measurement re-run, verdict classes made mechanical, missed keyspaces added, #54 resolved
+<strong>Source basis:</strong> live <code>origin/main</code> at <code>798c8d54422d9916bca8261d0540fd0755a1fc1f</code> (the Rust
+workspace is byte-identical to <code>bca3dd0e</code>, the first pass&#39;s basis; only docs/scripts moved)
+<strong>Gates:</strong> N2-A / #2627 (<code>Did</code> canonicalization, I7)
+<strong>Contract:</strong> IDENTITY_SEMANTICS §3, §7.5, §11 (I7, I8), §14 (<code>N2-A0</code>, marked <code>HARD GATE</code>)</p>
+<hr>
+<h2 id="1-what-this-document-is-and-is-not">1. What this document is, and is not</h2>
+<p><strong>Is.</strong> An enumeration of every durable or durability-adjacent keyspace in the workspace in which
+a <code>Did</code>, a string representation of one, bytes derived from one, or a composite key containing one
+is used as an identity-bearing key — together with what happens to each if I7 changes <code>Did</code>
+equality from inner-string equality to decoded-key equality.</p>
+<p><strong>Is not.</strong> It changes no code. <code>Did</code>, its <code>Eq</code>, its <code>Hash</code>, its constructors and every encoding
+are untouched. Nothing is canonicalized, re-keyed, migrated or rewritten. It selects no account
+domain (that is N2-C′ / #2625) and retypes nothing. Completing it does not make I7 safe — it makes
+I7 <em>attemptable</em>, which is the whole of what §14 asks of a <code>HARD GATE</code>.</p>
+<p><strong>Do not infer production readiness, migration readiness, or deployment status from this document.</strong></p>
+<hr>
+<h2 id="2-the-hazard-measured-rather-than-assumed">2. The hazard, measured rather than assumed</h2>
+<p>§14 states the hazard as a possibility: distinct persisted rows <em>can</em> silently merge. The first
+job of this tranche was to find out whether that possibility is reachable in practice. It is, and
+by a wider margin than the contract assumes.</p>
+<h3 id="21-did-validation-accepts-any-multibase-encoding">2.1 <code>Did</code> validation accepts <em>any</em> multibase encoding</h3>
+<p><code>Did::from_str</code> (<code>icn/crates/icn-identity/src/lib.rs:211</code>) validates by calling
+<code>multibase::decode(encoded_part)</code> and stores the string <strong>as spelled</strong> (<code>Ok(Did(s.to_string()))</code>).
+Multibase is <em>self-describing</em>: <code>multibase::decode</code> reads the first character as a base code and
+dispatches across every base the crate supports. The dependency is <strong><code>multibase</code> v0.9.2</strong>, pinned
+in <code>icn/Cargo.lock</code> (<code>grep -A1 &#39;name = &quot;multibase&quot;&#39; icn/Cargo.lock</code>; direct dependency of
+<code>icn-identity</code> and <code>icn-trust</code>); its <code>multibase::Base</code> enum declares <strong>24</strong> bases (the
+<code>build_base_enum!</code> table in the crate&#39;s <code>base.rs</code>: <code>Identity</code>, <code>Base2</code>, <code>Base8</code>, <code>Base10</code>,
+<code>Base16Lower/Upper</code>, <code>Base32Lower/Upper/PadLower/PadUpper/HexLower/HexUpper/HexPadLower/HexPadUpper/Z</code>,
+<code>Base36Lower/Upper</code>, <code>Base58Flickr/Btc</code>, <code>Base64/Pad/Url/UrlPad</code>, <code>Base256Emoji</code>). Nothing in
+<code>from_str</code> pins base58btc. Only <code>Did::from_public_key</code> <em>emits</em> base58btc; nothing requires an
+incoming DID to use it.</p>
+<p><code>impl Deserialize for Did</code> (<code>lib.rs:183</code>) routes through <code>from_str</code>; <code>Serialize</code> is derived over the
+inner string. So every alternate encoding is reachable by ordinary deserialization — wire, API body,
+or persisted JSON read back off disk — and survives a round trip unchanged.</p>
+<p><strong>Measured</strong> against the real type (probe §13.4; identical at <code>bca3dd0e</code> and <code>798c8d54</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Measurement</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Multibase bases tried for one Ed25519 key</td>
+<td>24 (every base the crate declares)</td>
+</tr>
+<tr>
+<td>Accepted by <code>Did::from_str</code> unconditionally</td>
+<td><strong>23</strong></td>
+</tr>
+<tr>
+<td>Accepted conditionally</td>
+<td><strong>1</strong> — <code>Identity</code> (<code>\0</code> + raw bytes) parses when the 32 key bytes happen to be valid UTF-8 (0 of 2,000 random keys; parser path proven with a constructed ASCII-valued point)</td>
+</tr>
+<tr>
+<td>Distinct <code>Did</code> strings for one key</td>
+<td><strong>23</strong> (24 for such a key)</td>
+</tr>
+<tr>
+<td><code>HashMap&lt;Did, _&gt;</code> entries holding those 23</td>
+<td><strong>23</strong></td>
+</tr>
+<tr>
+<td>All 23 resolve to the same <code>VerifyingKey</code> bytes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Display</code>/<code>to_string</code> preserves each alternate spelling</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>serde_json</code> round-trip preserves each alternate spelling, and the 23-entry map</td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<p>So <strong>every ICN public key has at least 23 valid, storable, wire-acceptable spellings today</strong> (the
+first pass said 22 — it did not try <code>Base256Emoji</code>, which is always accepted, or <code>Identity</code>), and
+they are 23 distinct keys in every <code>Did</code>-keyed structure. Under I7 they become one. The merge
+factor for a fully exercised aliasing attack is at least 23:1, not 2:1.</p>
+<h3 id="22-the-aliasing-is-attacker-chosen-and-signatures-do-not-constrain-it">2.2 The aliasing is attacker-chosen, and signatures do not constrain it</h3>
+<p><code>SignedEnvelope::verify_classical</code> (<code>icn/crates/icn-net/src/envelope.rs:267</code>) derives the
+verifying key from <strong><code>self.from.to_verifying_key()</code></strong> — the DID <em>as spelled on the wire</em> — and
+<code>to_verifying_key</code> also uses <code>multibase::decode</code>. <code>SignedEnvelope::new</code> takes <code>from</code> as a parameter
+independent of the signing keypair. And <code>canonical_encoding()</code> (<code>envelope.rs:403</code>), the bytes that
+are actually signed, covers <code>sequence ‖ timestamp ‖ payload_type ‖ payload</code> — <strong><code>from</code> is not
+signed</strong> (already noted in #2480). The signature binds the <em>key</em>, not the <em>spelling</em>.</p>
+<p><strong>Measured</strong> (probe §13.5): a sender signed sequence <code>5</code> under its canonical DID and sequence <code>5</code>
+again under a base16 spelling of the same key — both verify, the <code>from</code> fields differ, and the
+same-sequence envelope signed by a <em>different</em> key does not verify (the control that proves the
+signature still binds the key). Then, with <strong>no key material</strong>, a captured envelope had only its
+<code>from</code> rewritten to the base16 spelling: signature bytes unchanged, still verifies.</p>
+<p>Run through the real <code>ReplayGuard</code> (<code>replay_guard.rs</code>, keyed by <code>envelope.from</code>; production caller
+<code>handlers/signed.rs:105 check_replay_only</code>): canonical seq 5 accepted; a second canonical seq 5
+<strong>rejected</strong> (&quot;Replay detected … sequence 5 already seen&quot; — the control); the alias seq 5
+<strong>accepted</strong>; <code>peer_count()</code> = 2, two independent <code>max_seq</code> floors. In persistent mode the store
+holds two <code>replay_max_seq:</code> and two <code>replay_finalized:</code> rows — one per spelling — and a fresh guard
+reloads <strong>2</strong> windows. Nothing on the <code>handle_signed</code> path requires <code>envelope.from</code> to equal the
+connection&#39;s Hello-bound DID (the connection-level <code>authenticated</code> peer is used for rate limiting
+only), and the <code>#2506</code> self-drop <code>envelope.from == self.own_did</code> is string equality too.</p>
+<p>So not only does a sender choose its own key&#39;s spelling per message — <strong>any party holding a
+captured envelope can re-spell it and replay it</strong>, up to 22 more times (23 spellings). This makes
+the aliasing surface adversarial rather than accidental, which changes the verdict for every store
+keyed off a wire-supplied DID. What the probe does <em>not</em> show is that a particular downstream
+consumer acts twice on the replayed payload (gossip payloads may be de-duplicated by content hash
+further down); it shows the sequence-number replay protection at the envelope layer is bypassable.</p>
+<h3 id="23-anchor-derived-dids-are-not-round-trippable">2.3 Anchor-derived DIDs are not round-trippable</h3>
+<p><code>Did::from_anchor_id</code> (<code>icn/crates/icn-identity/src/anchor.rs:194</code>) base58btc-encodes 32 bytes of
+<strong>SHA-256 anchor id</strong> and wraps them with <code>new_unchecked</code>, bypassing validation. The result is
+syntactically indistinguishable from a key-derived DID — <code>is_anchor_did()</code> returns <code>true</code> for both.</p>
+<p>But <code>Deserialize</code> validates as Ed25519. A uniformly random 32-byte string decompresses to a valid
+curve point with probability ≈ ½, so the expected failure rate is <strong>about half</strong> — not a corner case.</p>
+<p><strong>Measured</strong> (probe §13.4): over 200 deterministic SHA-256 anchor ids, <strong>90 round-tripped, 110
+failed</strong> (the first pass reported this as &quot;55%&quot;; that is sampling noise at n = 200). At n = 20,000
+the rate is <strong>9,949 / 20,000 = 49.7%</strong>; through the real <code>Anchor::from_vui(..).to_did()</code> path it is
+<strong>989 / 2,000 = 49.5%</strong>; and for cooperative treasury DIDs exactly as production constructs them
+(<code>icn-coop/src/actor.rs:493, :788</code> — <code>Did::from_anchor_id(derive_treasury_anchor(coop_id) ‖ [0u8; 16])</code>) it is <strong>2,459 / 5,000 = 49.2%</strong>. An anchor-derived DID can be written to durable
+storage and then fail to deserialize on read-back; <code>icn-ledger/src/treasury.rs:980 load_from_store</code> does <code>if let Ok(treasury) = serde_json::from_slice(..)</code> and <strong>silently skips</strong>
+such rows. This is a live defect independent of I7 (§10.1), owned by N2-B / #2628.</p>
+<h3 id="24-reproducing-these-measurements">2.4 Reproducing these measurements</h3>
+<p>The probes are not committed (this tranche adds no code). To reproduce, add a temporary integration
+test to <code>icn-identity</code> and <code>icn-net</code> respectively; the exact sources used are recorded verbatim in
+<strong>§13</strong>. <strong>Delete them before taking any repo-wide count</strong> — they contain <code>Did::from_str</code> and
+<code>HashMap&lt;Did, _&gt;</code> and inflate S1/S7 while present.</p>
+<hr>
+<h2 id="3-the-classification-frame--what-i7-actually-moves">3. The classification frame — what I7 actually moves</h2>
+<p>I7 changes <code>Did</code>&#39;s <code>Eq</code> and <code>Hash</code>. <strong>It does not change <code>Display</code>, <code>to_string</code>, <code>as_str</code>, or any
+serialization.</strong> That distinction decides every row below:</p>
+<table>
+<thead>
+<tr>
+<th>Construct</th>
+<th>Moved by I7?</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Durable key built via <code>format!(&quot;…{did}&quot;)</code> / <code>did.as_str().as_bytes()</code></td>
+<td><strong>No</strong></td>
+<td>Physical rows stay distinct — N aliasing rows remain N rows</td>
+</tr>
+<tr>
+<td>In-memory <code>HashMap&lt;Did,_&gt;</code> / <code>HashSet&lt;Did&gt;</code> / <code>Vec&lt;Did&gt;::contains</code></td>
+<td><strong>Yes</strong></td>
+<td>Collapses to one entry, last-writer-wins</td>
+</tr>
+<tr>
+<td><code>Vec&lt;String&gt;</code> de-duplication over DID strings</td>
+<td><strong>No</strong></td>
+<td>Unaffected — stays N</td>
+</tr>
+<tr>
+<td>Wrapper deriving <code>Eq</code>/<code>Hash</code> over a <code>Did</code> field</td>
+<td><strong>Yes</strong> (inherited)</td>
+<td>Moves silently, invisible to a <code>Did</code> type search</td>
+</tr>
+<tr>
+<td>Wrapper with hand-written <code>Ord</code> over the string, or hand-written <code>Hash</code> over the string with derived <code>Eq</code></td>
+<td><strong>No</strong></td>
+<td>Diverges from its own derived <code>Eq</code> — see #52 / §10.5 (<code>PeerId</code>), and <code>icn-ccl</code> <code>Value</code> (§10.5)</td>
+</tr>
+<tr>
+<td><code>EntityId(String)</code> / <code>StewardId</code> / <code>icn-commons</code> holder id derived from a DID spelling</td>
+<td><strong>No</strong></td>
+<td>Diverges from <code>Did</code> after I7 — see #33–#35, #62, #63, #65 / §10.6</td>
+</tr>
+<tr>
+<td>Kernel <code>type Did = String</code></td>
+<td><strong>No</strong></td>
+<td>Diverges from <code>icn-identity::Did</code> after I7</td>
+</tr>
+</tbody></table>
+<p><strong>The migration surface is therefore not &quot;everything containing a DID&quot;.</strong> It is precisely the
+stores whose <strong>durable rows are keyed by a DID string while their consumers re-key by <code>Did</code></strong> —
+where a rebuild collapses N durable rows into one map entry <em>lossily</em> — plus the constructs above
+that I7 moves out of step with a partner construct it does not move.</p>
+<p>Class labels used in the tables (from #2623):</p>
+<ul>
+<li><strong>A</strong> purely ephemeral · <strong>B</strong> ephemeral but reconstructed from durable state ·
+<strong>C</strong> serialized wholesale · <strong>D</strong> directly a durable key ·
+<strong>E</strong> externally round-tripped through API/wire, then used as a durable key</li>
+</ul>
+<p>Verdicts are exactly the three #2623 classes: <code>SAFE</code>, <code>SILENT-MERGE RISK</code>, <code>NEEDS MIGRATION</code>,
+plus an explicit <code>UNRESOLVED</code> for candidates that cannot be classified on repository evidence.
+Every row also carries a <strong>liveness</strong> note where it matters: <em>live</em> (reachable from a production
+binary), <em>dormant</em> (writer and reader exist in library code but no binary constructs the store —
+e.g. <code>icn-governance</code>&#39;s <code>SledGovernanceStore</code> and <code>StewardStore</code>, which nothing outside their own
+modules and tests instantiates; the live twins are <code>apps/governance/src/state_store.rs</code> and
+<code>icn-commons/src/store.rs</code>), or <em>dead</em> (write path unreachable from any binary). The migration list
+N2-A inherits is <strong><code>NEEDS MIGRATION</code> ∧ live</strong>; dormant <code>NEEDS MIGRATION</code>-shaped stores are listed
+separately so N2-A fixes the shape without a data migration.</p>
+<h3 id="31-verdict-classes--the-mechanical-rule">3.1 Verdict classes — the mechanical rule</h3>
+<p>The three #2623 classes are assigned by one rule, checkable per row, not by judgement of how
+bad a merge would feel. Throughout, &quot;moved by I7&quot; means <em>changes behaviour when <code>Eq</code>/<code>Hash</code>
+become key equality</em>; <code>Display</code>, <code>as_str</code>, <code>Serialize</code> and every durable byte are <strong>not</strong> moved.</p>
+<ul>
+<li><strong><code>NEEDS MIGRATION</code></strong> — I7 alone leaves the store inconsistent, so a re-key/de-dupe step must
+ship with or before it. Exactly one of:
+<strong>(a)</strong> durable rows keyed by a DID <em>spelling</em> <strong>and</strong> at least one production consumer
+re-keys those rows by <code>Did</code> (or by a wrapper whose derived <code>Eq</code>/<code>Hash</code> delegates to <code>Did</code>,
+or by <code>Vec&lt;Did&gt;::contains</code>) — so after I7 a rebuild collapses N aliasing rows into one entry
+lossily (overwrite / sum / first- or last-writer) while the N durable rows persist and are
+re-read on every start;
+<strong>(b)</strong> a structure serialized wholesale (<code>Serialize</code>/<code>Deserialize</code> derive) whose map or set is
+keyed by <code>Did</code>, so decode collapses aliasing keys silently (wire or disk);
+<strong>(c)</strong> a <code>String</code>-keyed, DID-shaped durable structure that a production path parses back into
+<code>Did</code> and inserts into a <code>Did</code>-keyed map or set;
+<strong>(d)</strong> a durable key derived from the spelling (hash or splice) that sits behind an
+authorization or identity gate which compares by <code>Did</code> — after I7 the gate and the key
+disagree and the divergence is <em>created</em> by the change.</li>
+<li><strong><code>SILENT-MERGE RISK</code></strong> — durable rows (or <code>String</code>-keyed DID-shaped structures) keyed by a
+spelling with <strong>no</strong> <code>Did</code>-re-keying production consumer. I7 leaves them physically unchanged;
+point lookups by an alternate spelling miss, as they do today. No re-key step is forced by I7
+itself, <strong>but</strong> N2-A&#39;s pre-migration scan must still enumerate their aliasing rows, and if
+N2-A chooses the <em>pin-at-parse</em> mechanism (§12) every alternate-spelled row in this class
+becomes unreachable. Also in this class: in-memory <code>Did</code>-keyed structures that I7 moves out of
+step with a partner construct it does not move (<code>PeerId</code>&#39;s <code>Ord</code>, #52).</li>
+<li><strong><code>SAFE</code></strong> — ephemeral only: no <code>Serialize</code>, no store write, no load-from-durable rebuild; or
+already key equality (#55); or a durable write path that is unreachable from any production
+binary (marked <em>dead</em> — flagged for deletion, not migration).</li>
+<li><strong><code>UNRESOLVED</code></strong> — evidence not obtainable from the repository. After this review: <strong>none</strong>.</li>
+</ul>
+<p>A row&#39;s class therefore follows from three facts a reviewer can re-check: <em>is the key durable or
+serialized; is it keyed by spelling or by <code>Did</code>; does any production path re-key it by <code>Did</code>.</em>
+Where a consumer row in §6 re-keys a keyspace row in §5, the <strong>keyspace is counted once</strong> in the
+migration list and the consumer row is the evidence of mechanism.</p>
+<hr>
+<h2 id="4-search-methodology-re-runnable">4. Search methodology (re-runnable)</h2>
+<p>Run from the repository root (counts below re-verified at <code>798c8d54</code>, <strong>with no probe files present</strong>
+— §13.4/§13.5 contain <code>Did::from_str</code> and <code>HashMap&lt;Did, _&gt;</code> and inflate S1/S7 while they exist).
+Every class was run independently; no single grep is load-bearing. S1–S10 are the first pass;
+S11–S14 are the second-pass classes that found what S1–S10 missed.</p>
+<p><strong>S1 — structural, type-driven.</strong> Collection types parameterized by <code>Did</code>:
+<code>rg -g &#39;*.rs&#39; &#39;HashMap&lt;\s*(&amp;\s*)?Did\b|BTreeMap&lt;\s*(&amp;\s*)?Did\b|DashMap&lt;\s*(&amp;\s*)?Did\b|HashSet&lt;\s*(&amp;\s*)?Did\b|BTreeSet&lt;\s*(&amp;\s*)?Did\b|IndexMap&lt;\s*(&amp;\s*)?Did\b|LruCache&lt;\s*(&amp;\s*)?Did\b&#39;</code>
+→ <strong>108</strong> sites, <strong>0</strong> under a <code>tests/</code> directory (the first pass&#39;s &quot;105 outside tests&quot; does not
+reproduce: nothing is excluded by path). One of the 108 (<code>icn-kernel-api/src/proofs.rs:490</code>) is the
+kernel <code>type Did = String</code> alias, not <code>icn_identity::Did</code> — which is why a <code>BTreeMap&lt;Did, _&gt;</code>
+can compile at all (<code>icn_identity::Did</code> has no <code>Ord</code>) — so <strong>107</strong> are real. The first pass also
+silently dropped the three <code>LruCache&lt;Did, _&gt;</code> hits from its tally (<code>icn-federation attestation_store.rs:22</code>, <code>icn-trust precompute.rs:34</code>, <code>icn-trust trust_cache.rs:39</code>); they are
+counted here (§7).</p>
+<p><strong>S2 — durable engines.</strong> <code>rg -l -g &#39;*.rs&#39; &#39;\bsled\b&#39;</code> → 174 files across 17 crates;
+<code>rg -g &#39;*.rs&#39; -g &#39;*.toml&#39; &#39;rusqlite|sqlx|rocksdb|redb|heed|lmdb|sqlite&#39;</code> → no second durable
+engine in the Rust workspace. <code>sled</code> is the only durable KV engine.</p>
+<p><strong>S3 — the store seam.</strong> <code>icn-store::Store</code> (<code>icn/crates/icn-store/src/lib.rs:312</code>) is <strong>byte-keyed</strong>
+(<code>get(&amp;self, key: &amp;[u8])</code>, <code>put(&amp;self, key: &amp;[u8], …)</code>). <em>This is why S1 alone is insufficient</em>:
+by the time a DID reaches storage it is already a <code>String</code> or <code>Vec&lt;u8&gt;</code>, so a type-driven search
+structurally cannot see it. Every later class exists because of this.</p>
+<p><strong>S4 — key-construction sites.</strong> Key-builder functions taking a <code>Did</code>:
+<code>rg -g &#39;*.rs&#39; &#39;fn [a-z_]*key[a-z_]*\([^)]*: *&amp;?Did&#39;</code> → 30 production builders.
+Plus the raw idiom <code>rg -g &#39;*.rs&#39; &#39;extend_from_slice\([a-z_]*did[a-z_]*\.as_str\(\)\.as_bytes\(\)\)&#39;</code>
+→ 23 sites.</p>
+<p><strong>S5 — durable roots.</strong> <code>rg -l -g &#39;*.rs&#39; &#39;sled::Db|sled::Tree|sled::open|sled::Config&#39;</code> → 69 files;
+ranked by identity-term density (<strong>§13.1</strong>) to order the read.</p>
+<p><strong>S6 — serialized maps.</strong> An AST-approximating pass (<strong>§13.2</strong>) matching <code>Did</code>-keyed
+collections inside <code>#[derive(…Serialize/Deserialize…)]</code> structs → class <strong>C</strong> members.</p>
+<p><strong>S7 — free-form DID parsing (class E).</strong> <code>rg -g &#39;*.rs&#39; -g &#39;!**/tests/**&#39; &#39;Did::from_str\(|\.parse::&lt;Did&gt;\(\)&#39; -c .</code>
+→ <strong>168 sites outside <code>tests/</code> directories across 20 workspace members</strong> (15 crates, 4 apps,
+1 binary; <strong>46</strong> in <code>icn-gateway</code>, 22 <code>icn-ledger</code>, 20 <code>icn-rpc</code>, 18 <code>icn-core</code>; 183 including
+<code>tests/</code>). The first pass&#39;s &quot;176 / 47&quot; does not reproduce under any exclusion tried and is
+withdrawn. Every one accepts all 23 spellings. These are <em>parse</em> sites, not sinks; the sinks they
+reach are the §5 keyspaces.</p>
+<p><strong>S8 — wrapper types.</strong> <strong>§13.3</strong> matching newtype structs over <code>Did</code>, enum variants holding a
+<code>Did</code>, and structs with a <code>Did</code> field → <strong>147 distinct structs</strong> carrying a <code>Did</code> field and <strong>5</strong>
+distinct newtype/enum-variant wrappers (<code>PeerId</code>; the <code>Did</code> / <code>Person</code> / <code>Query</code> / <code>Remote</code>
+variants). This class is invisible to S1 and produced findings #25 (<code>Grantee::Person</code>) and #52
+(<code>PeerId</code>); <code>AccountId::Did</code> led the first pass to #9, though #9&#39;s physical key turned out to be
+<code>serde_json(Did)</code>, not <code>AccountId</code>.</p>
+<p><strong>S9 — non-Rust persistence.</strong> <code>rg -g &#39;*.ts&#39; -g &#39;*.tsx&#39; -g &#39;*.js&#39; &#39;localStorage|IndexedDB|AsyncStorage|SecureStore|\.setItem\(&#39;</code>
+over <code>sdk/ web/ website/ apps/</code> → no DID-keyed durable store; see §9 coverage limits.</p>
+<p><strong>S10 — legacy/compatibility loaders.</strong> <code>rg -i &#39;migrat|legacy_|from_legacy|schema_version|LEGACY&#39;</code>
+and targeted reads of the known migration paths (§8).</p>
+<p><strong>S11 — persistence-first (second pass).</strong> Start from every durable root (S5&#39;s 69 files plus every
+<code>icn_store::Store</code> consumer and every <code>sled::Db</code> holder in <code>apps/</code> and <code>bins/</code>), enumerate its key
+builders, and ask of each key whether it embeds a DID spelling — directly or through <code>EntityId</code>,
+<code>StewardId</code>, <code>member_id</code>, <code>voter</code>, <code>author</code>, <code>owner</code>, <code>holder</code>, <code>grantee</code>, <code>assignee</code>,
+<code>treasury_did</code>, <code>claims.sub</code>. This is the pass that found §5&#39;s review additions: S1 cannot see a
+key that is already a <code>String</code> or <code>Vec&lt;u8&gt;</code> (S3), and S4&#39;s <code>fn *key*(… &amp;Did)</code> pattern misses
+builders that take <code>&amp;str</code>, <code>String</code> or a wrapper.</p>
+<p><strong>S12 — consumer-first (second pass).</strong> Every <code>scan(</code> / <code>load_*</code> / <code>restore_*</code> / <code>rebuild_*</code>
+followed by <code>Did::from_str</code> or <code>.parse::&lt;Did&gt;()</code> and an <code>insert</code> into a <code>Did</code>-keyed map or set
+(<code>rg -n -A12 &#39;fn (load|restore|rebuild)&#39; … | rg &#39;from_str|parse::&lt;Did&gt;&#39;</code>). This is what resolved
+#54 and found the <code>icn-net</code> snapshot restore (#57) — the consumer side that decides <code>NEEDS MIGRATION</code> under §3.1.</p>
+<p><strong>S13 — file-backed durable state (second pass).</strong> <code>icn-snapshot/src/lib.rs</code> field by field (every
+<code>String</code>-keyed map and what restores it), <code>save_snapshot</code>/<code>load_snapshot</code> callers, <code>std::fs::write</code>
+/ <code>File::create</code> / <code>serde_json::to_writer</code> with DID-shaped content, keystore and data-dir writers.
+The only DID-keyed file-backed state is the snapshot (§8).</p>
+<p><strong>S14 — liveness.</strong> For every store in §5/§6, whether any production binary constructs it
+(<code>rg &#39;TypeName::(new|open|with_store)&#39;</code> outside the defining module and <code>tests/</code>). This is what
+reclassified <code>icn-governance</code>&#39;s <code>SledGovernanceStore</code>/<code>StewardStore</code> rows as dormant and four
+<code>icn-ledger</code>/<code>icn-store</code>/<code>icn-gateway</code> stores as dead.</p>
+<hr>
+<h2 id="5-inventory--durable-keyspaces-class-de">5. Inventory — durable keyspaces (class D/E)</h2>
+<p>Key encoding column reads left to right as the physical byte layout. The <em>consumer</em> column is the
+§3.1 test: a production path that re-keys these rows by <code>Did</code> makes the row <code>NEEDS MIGRATION</code>;
+&quot;none&quot; means the rows stay physically separate under I7. No write path anywhere re-encodes a DID
+canonically before persisting (S11: <code>Did::from_public_key</code> has 42 non-test call sites and every one
+takes a keypair or <code>VerifyingKey</code> directly; zero re-derive from a parsed <code>Did</code>; no
+<code>canonical()</code>/<code>normalize()</code> helper exists), so the old <em>Normalization</em> column was &quot;none&quot; for
+every row and is replaced by the consumer column.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Crate</th>
+<th>Source + symbol</th>
+<th>Storage</th>
+<th>Logical key</th>
+<th>Physical key encoding</th>
+<th>Class</th>
+<th>DID enters via</th>
+<th><code>Did</code>-re-keying consumer (§3.1)</th>
+<th>Live?</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>icn-net</td>
+<td><code>replay_guard.rs:1800 make_sender_regime_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>sender regime</td>
+<td><code>b&quot;…&quot; ‖ did.as_str()</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#37 — <code>load_persisted_state :713</code> → <code>parse_sender_regime_key :1806</code> → <code>sequences.entry(did)</code></td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>icn-net</td>
+<td><code>replay_guard.rs:1812 make_max_seq_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>replay floor per sender</td>
+<td><code>b&quot;…&quot; ‖ did.as_str()</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#37 — <code>:735–760</code> → <code>parse_max_seq_key :1819</code> → <code>window.max_seq = entry.max_seq</code> (overwrite; last <code>sled</code> key wins, a <strong>lower</strong> floor can win)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>icn-net</td>
+<td><code>replay_guard.rs:1828 make_finalized_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>(sender, seq) finalized</td>
+<td><code>b&quot;…&quot; ‖ did.as_str() ‖ &#39;:&#39; ‖ seq</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#37 — <code>:1000–1013</code> → <code>parse_finalized_key :1837</code> → <code>window.finalized.insert(seq)</code> into the collapsed window</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>icn-net</td>
+<td><code>sequence_tracker.rs:325 make_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>(sender, recipient) outgoing seq</td>
+<td><code>pfx ‖ sender ‖ &quot;||&quot; ‖ recipient</code></td>
+<td>D</td>
+<td>recipient = Hello <code>from_str</code>; sender = local</td>
+<td>same module <code>:98 cache: HashMap&lt;(Did,Did),u64&gt;</code> via <code>load_and_apply_safety_gap :158–193</code> (prod <code>icn-core …/init_send_callback.rs:84</code>) — overwrite; a <strong>lower</strong> outgoing sequence can win ⇒ nonce-counter regression for that pair (tuple key, invisible to S1)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>icn-security</td>
+<td><code>misbehavior.rs:911 KEY_PREFIX_REPUTATION</code> (written <code>:927</code>)</td>
+<td>sled via <code>Store</code></td>
+<td>reputation per DID</td>
+<td><code>&quot;security:reputation:&quot; ‖ Display</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#38 — <code>load_from_store :988</code> → <code>parse::&lt;Did&gt;() :994</code> → <code>reputation_scores.insert</code> (prod <code>apps/trust-app/src/init.rs:61</code>); <code>save_to_store :925</code> then writes back only the survivor</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td>icn-security</td>
+<td><code>misbehavior.rs:912 KEY_PREFIX_BANNED</code></td>
+<td>sled via <code>Store</code></td>
+<td>ban + timestamp</td>
+<td><code>&quot;security:banned:&quot; ‖ Display</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#38 — <code>:1015</code> → <code>banned.insert</code> (overwrite; ban timestamp arbitrary)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>icn-security</td>
+<td><code>misbehavior.rs:913 KEY_PREFIX_QUARANTINE</code></td>
+<td>sled via <code>Store</code></td>
+<td>quarantine + ts</td>
+<td><code>&quot;security:quarantine:&quot; ‖ Display</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#38 — <code>:1037</code> → <code>quarantined.insert</code></td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>icn-security</td>
+<td><code>misbehavior.rs:914 KEY_PREFIX_VIOLATION</code></td>
+<td>sled via <code>Store</code></td>
+<td>violation records</td>
+<td><code>&quot;security:violation:&quot; ‖ Display</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td>#38 — <code>:1059</code> → <code>violations.insert</code> (whole <code>Vec</code> replaced, not merged)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td>icn-ledger</td>
+<td><code>ledger.rs:233 BALANCE_PREFIX</code>; writer <code>ledger_impl/balances.rs:233 save_cached_balances</code></td>
+<td>sled via <code>Store</code></td>
+<td>settlement balances per account</td>
+<td><code>&quot;ledger:balance:&quot; ‖ serde_json::to_string(&amp;Did)</code> — the <em>quoted spelling</em>; <strong>not</strong> <code>AccountId</code> (first pass was wrong: <code>icn-ledger</code> never uses <code>AccountId</code>)</td>
+<td>D</td>
+<td>API/RPC journal <code>AccountDelta.account_id: Did</code> (<code>types.rs:143</code>)</td>
+<td>#39 <code>load_cached_balances :209</code> (overwrite + orphan on save); #40 <code>compute_all_balances</code> (sum)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>10</td>
+<td>icn-ledger</td>
+<td><code>treasury.rs:1112 TREASURY_PREFIX</code></td>
+<td>sled via <code>Store</code></td>
+<td>treasury record</td>
+<td><code>&quot;ledger:treasury:&quot; ‖ treasury_did</code></td>
+<td>D</td>
+<td>local <code>Did::from_anchor_id</code> only — <code>GatewayTreasuryManager::register_treasury</code> with a caller DID has no HTTP caller</td>
+<td>#41 — <code>treasury.rs:1021 insert</code> on load (prod <code>ledger-app/init.rs:139</code>): NM-shaped, but no wire/API spelling can reach the writer today</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (flips to NM the day a wire spelling reaches the writer; its <code>treasury_did</code> is anchor-derived and ~50% unreadable, §10.1)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>icn-ledger</td>
+<td><code>patronage.rs:231 account_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>(coop, member) patronage</td>
+<td><code>pfx ‖ coop_id ‖ &#39;:&#39; ‖ did.as_str()</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>12</td>
+<td>icn-ledger</td>
+<td><code>patronage.rs:235 entry_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>(coop, member, ref) entry</td>
+<td><code>pfx ‖ coop ‖ &#39;:&#39; ‖ did ‖ &#39;:&#39; ‖ ref</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>13</td>
+<td>icn-ledger</td>
+<td><code>asset_types.rs:306 owner_index_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>assets by owner</td>
+<td><code>pfx ‖ Display ‖ &#39;:&#39;</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>14</td>
+<td>icn-ledger</td>
+<td><code>obligation.rs:291 creditor_index_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>obligations by creditor</td>
+<td><code>pfx ‖ Display ‖ &#39;:&#39;</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>15</td>
+<td>icn-ledger</td>
+<td><code>obligation.rs:295 debtor_index_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>obligations by debtor</td>
+<td><code>pfx ‖ Display ‖ &#39;:&#39;</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>16</td>
+<td>icn-ledger</td>
+<td><code>membership.rs:93 since_key</code></td>
+<td>sled via <code>Store</code></td>
+<td>member-since</td>
+<td><code>pfx ‖ Display</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>17</td>
+<td>icn-governance</td>
+<td><code>store.rs:413 vote_key</code></td>
+<td>sled (<code>SledGovernanceStore</code>)</td>
+<td>(proposal, voter) vote</td>
+<td><code>&quot;vote:&quot; ‖ proposal ‖ &#39;:&#39; ‖ Display</code></td>
+<td>D</td>
+<td>wire <code>from_str</code></td>
+<td><code>compute_tally :650</code> → <code>VoteTally::from(list_votes)</code> counts every row; #44</td>
+<td><strong>dormant</strong> — <code>SledGovernanceStore</code> is constructed nowhere outside its module and tests; live twin is #23</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant; NM-shaped)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>icn-governance</td>
+<td><code>store.rs:426 vote_index_key</code> value</td>
+<td>sled (<code>SledGovernanceStore</code>)</td>
+<td>voters per proposal</td>
+<td>value = JSON <code>Vec&lt;String&gt;</code>, <strong>string</strong> de-dupe (<code>:606–614</code>)</td>
+<td>D</td>
+<td><code>to_string</code></td>
+<td>same as #17</td>
+<td>dormant</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant)</td>
+</tr>
+<tr>
+<td>19</td>
+<td>icn-governance</td>
+<td><code>store.rs:437 delegation_from_index_key</code></td>
+<td>sled (<code>SledGovernanceStore</code>)</td>
+<td>delegations by delegator</td>
+<td><code>&quot;index:delegations:from:&quot; ‖ Display</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none (#43 is <strong>not</strong> rebuilt from these rows)</td>
+<td>dormant</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>icn-governance</td>
+<td><code>store.rs:441 delegation_to_index_key</code></td>
+<td>sled (<code>SledGovernanceStore</code>)</td>
+<td>delegations by delegate</td>
+<td><code>&quot;index:delegations:to:&quot; ‖ Display</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>dormant</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant)</td>
+</tr>
+<tr>
+<td>21</td>
+<td>icn-governance</td>
+<td><code>steward_store.rs:204 PREFIX_BY_DID</code></td>
+<td><code>StewardStoreBackend</code></td>
+<td>steward by operational DID</td>
+<td><code>pfx ‖ did.as_str()</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td><strong>dormant</strong> — no backend is constructed in production; live twin is #64 (<code>icn-commons</code>)</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant)</td>
+</tr>
+<tr>
+<td>22</td>
+<td>icn-governance</td>
+<td><code>steward_store.rs:218 PREFIX_BY_HOLDER</code></td>
+<td><code>StewardStoreBackend</code></td>
+<td>steward by holder DID</td>
+<td><code>pfx ‖ did.as_str()</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>dormant</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant)</td>
+</tr>
+<tr>
+<td>23</td>
+<td>apps/governance</td>
+<td><code>state_store.rs:222 vote_key</code></td>
+<td>sled</td>
+<td>(proposal, voter) vote</td>
+<td><code>&quot;gov:vote:&quot; ‖ proposal ‖ &#39;:&#39; ‖ Display</code></td>
+<td>D</td>
+<td>wire/HTTP <code>from_str</code></td>
+<td><code>actor.rs:3862–3864</code> <code>direct_voters: HashSet&lt;&amp;Did&gt;</code>, <code>vote_by_did: HashMap&lt;&amp;Did,&amp;Vote&gt;</code> in <code>apply_delegation_to_tally</code> (close path <code>:2277</code>) — <code>vote_by_did</code> last-writer; the direct double-count (§10.3) persists; <code>manager.rs:~4771</code> guard is string-eq</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (§7.5 gate)</td>
+</tr>
+<tr>
+<td>24</td>
+<td>apps/governance</td>
+<td><code>replication_sequence.rs:282 sequence_key</code></td>
+<td>sled</td>
+<td>(author, domain) seq</td>
+<td><code>pfx ‖ len ‖ author ‖ len ‖ domain</code></td>
+<td>D</td>
+<td>local author DID (the node&#39;s own <code>from_public_key</code>)</td>
+<td>none — state is <code>HashMap&lt;Vec&lt;u8&gt;, PairState&gt;</code> keyed by the raw key bytes (<code>:110</code>)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (first pass said NM — no <code>Did</code> re-key exists)</td>
+</tr>
+<tr>
+<td>25</td>
+<td>icn-gateway</td>
+<td><code>receipt_store.rs:1090 grant_by_grantee_key</code></td>
+<td>sled</td>
+<td>authority grants by grantee</td>
+<td><code>pfx ‖ len(tag ‖ did.as_str()) ‖ …</code> (ADR-0014 layout, §10.4)</td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>26</td>
+<td>icn-gateway</td>
+<td><code>listings_mgr.rs:699 interest_index_key</code></td>
+<td>sled</td>
+<td>interest by (listing, from)</td>
+<td><code>pfx ‖ listing ‖ from_did</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>27</td>
+<td>icn-federation</td>
+<td><code>attestation_store.rs:38 attestation_key</code></td>
+<td><code>Store</code></td>
+<td>(member, source coop) attestation</td>
+<td><code>pfx ‖ did.as_str() ‖ &#39;/&#39; ‖ coop_id</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>#59 <code>LruCache&lt;Did,_&gt;</code> read-through (<code>:80–113</code>) — a per-lookup cache, not a start-up rebuild</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (re-key the cache in N2-A, #59)</td>
+</tr>
+<tr>
+<td>28</td>
+<td>icn-federation</td>
+<td><code>agreement/store.rs:86 party_index_key</code></td>
+<td><code>Store</code></td>
+<td>agreements by party</td>
+<td><code>pfx ‖ did.as_str() ‖ &#39;/&#39; ‖ agreement</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>29</td>
+<td>icn-rpc</td>
+<td><code>auth.rs:508 make_challenge_key</code></td>
+<td><code>Store</code></td>
+<td>auth challenge per DID</td>
+<td><code>&quot;auth:challenge:&quot; ‖ to_string()</code></td>
+<td>D/E</td>
+<td>wire <code>from_str</code></td>
+<td><code>auth.rs:433 load_challenges</code> → <code>:378 challenges: HashMap&lt;Did, Challenge&gt;</code> (prod <code>init_rpc.rs:148</code>) — overwrite; TTL 5 min, fail-closed</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (low — TTL-bounded, fail-closed)</td>
+</tr>
+<tr>
+<td>30</td>
+<td>icn-trust</td>
+<td><code>lib.rs:569 edge_key</code></td>
+<td><code>Store</code></td>
+<td>trust edge (source→target)</td>
+<td><code>pfx ‖ &quot;/edges/&quot; ‖ src ‖ &#39;:&#39; ‖ tgt</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td><code>lib.rs:869 get_all_known_dids → HashSet&lt;Did&gt;</code> (and <code>multi_graph.rs:280</code>), then per-survivor spelling-prefix <code>get_outgoing_edges</code> (<code>apps/trust-app/src/service_tokio.rs:193, 757</code>) — the dropped spellings&#39; edges vanish from enumeration/provenance input</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>31</td>
+<td>icn-identity</td>
+<td><code>personhood_store.rs:160 did_index_key</code></td>
+<td><code>Store</code></td>
+<td>personhood anchor by DID</td>
+<td><code>pfx ‖ did.as_str()</code></td>
+<td>D</td>
+<td>written under the locally generated <code>anchor.to_did()</code> (canonical spelling); <code>link_did</code> has only a <code>#[cfg(test)]</code> caller</td>
+<td>none — point lookup <code>get_by_did :273</code></td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (first pass said NM — no <code>Did</code> re-key; the exposure here is the anchor-DID read defect §10.1, not I7)</td>
+</tr>
+<tr>
+<td>32</td>
+<td>icn-identity</td>
+<td><code>commons_store.rs:73 did_index_key</code></td>
+<td><code>Store</code></td>
+<td>commons holder by DID</td>
+<td><code>pfx ‖ did.as_str()</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>33</td>
+<td>icn-entity</td>
+<td><code>sled_registry.rs:120 entity_key</code></td>
+<td>sled</td>
+<td>entity record</td>
+<td><code>&quot;entity:&quot; ‖ EntityId(String)</code> — <code>EntityId::from_did</code> splices the spelling into <code>entity:icn:individual:&lt;spelling&gt;</code></td>
+<td>D</td>
+<td><code>EntityId::from_did</code></td>
+<td>none (<code>EntityId</code> is <code>String</code>-equal)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — <strong>not moved by I7</strong>; §10.6 namespace decision (first pass said NM, which cannot differ from #34/#35)</td>
+</tr>
+<tr>
+<td>34</td>
+<td>icn-entity</td>
+<td><code>sled_registry.rs:124 membership_key</code></td>
+<td>sled</td>
+<td>(parent, member) membership</td>
+<td><code>&quot;membership:&quot; ‖ parent ‖ &#39;:&#39; ‖ member</code></td>
+<td>D</td>
+<td><code>EntityId::from_did</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — not moved by I7 (§10.6)</td>
+</tr>
+<tr>
+<td>35</td>
+<td>icn-entity</td>
+<td><code>sled_registry.rs:128 type_index_key</code></td>
+<td>sled</td>
+<td>entities by type</td>
+<td><code>&quot;type:&quot; ‖ type ‖ &#39;:&#39; ‖ EntityId</code></td>
+<td>D</td>
+<td><code>EntityId::from_did</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — not moved by I7 (§10.6)</td>
+</tr>
+<tr>
+<td>36</td>
+<td>icn-coop</td>
+<td><code>store.rs:59</code> member key</td>
+<td>sled</td>
+<td>(coop, member)</td>
+<td><code>&quot;member:&quot; ‖ coop_id ‖ &#39;:&#39; ‖ did</code></td>
+<td>D</td>
+<td><code>from_str</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+</tbody></table>
+<h3 id="51-durable-keyspaces-the-first-pass-missed-found-by-s11s14">5.1 Durable keyspaces the first pass missed (found by S11–S14)</h3>
+<p>Numbering continues after §6/§7 so earlier references stay stable. Most are point-lookup splits
+(<code>SILENT-MERGE RISK</code>); #65, #68 and #69 are <code>NEEDS MIGRATION</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Crate</th>
+<th>Source + symbol</th>
+<th>Storage</th>
+<th>Logical key</th>
+<th>Physical key encoding</th>
+<th>Class</th>
+<th>DID enters via</th>
+<th><code>Did</code>-re-keying consumer (§3.1)</th>
+<th>Live?</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>62</td>
+<td>icn-entity</td>
+<td><code>sled_registry.rs:132 member_of_index_key</code> (written <code>:400</code>, <code>:651</code>)</td>
+<td>sled</td>
+<td>(member, parent) reverse index</td>
+<td><code>&quot;member_of:&quot; ‖ member EntityId ‖ &#39;:&#39; ‖ parent EntityId</code></td>
+<td>D</td>
+<td><code>EntityId::from_did</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — not moved by I7 (§10.6; sibling of #33–#35)</td>
+</tr>
+<tr>
+<td>63</td>
+<td>icn-commons</td>
+<td><code>store.rs:827</code> steward primary key (<code>StewardRecord::new</code>, <code>steward.id().to_hex()</code>)</td>
+<td><code>Store</code> (sled; live via <code>CommonsHandle::with_sled_path</code>, <code>icn-core lifecycle.rs:120</code>)</td>
+<td>steward record</td>
+<td><code>&quot;commons/stewards/&quot; ‖ hex(StewardId)</code> where <code>StewardId::from_did = SHA-256(&quot;steward:&quot; ‖ did.as_str())</code> (<code>icn-governance/src/steward.rs:29–38</code>)</td>
+<td>D</td>
+<td>API <code>from_str</code></td>
+<td>none — <code>[u8;32]</code> id, <code>String</code> cache</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — <strong>not moved by I7</strong> (hash over the spelling); two spellings ⇒ two steward records permanently (§10.6)</td>
+</tr>
+<tr>
+<td>64</td>
+<td>icn-commons</td>
+<td><code>store.rs:43–44 STEWARD_BY_DID_PREFIX</code> (written <code>:828/:836</code>)</td>
+<td><code>Store</code></td>
+<td>steward by holder DID</td>
+<td><code>&quot;commons/stewards/by_did/&quot; ‖ holder_did.to_string()</code></td>
+<td>D</td>
+<td>API <code>from_str</code></td>
+<td>none (<code>get_steward_by_did</code>, <code>api/steward/mod.rs:161</code>; <code>LruCache&lt;String,_&gt;</code>)</td>
+<td>live — the live twin of dormant #21/#22</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>65</td>
+<td>icn-commons</td>
+<td><code>inner.rs:346–362 update_display_name</code></td>
+<td><code>Store</code></td>
+<td>weak-holder record (minted on first display-name update)</td>
+<td><code>&quot;commons/holders/&quot; ‖ hex(SHA-256(did.to_string()))</code> + a by_did row</td>
+<td>D</td>
+<td>path <code>{did}</code> (<code>api/members.rs:141</code>) gated by <code>caller_did != did</code> and <code>coop.members.iter().any(|m| m.did == did)</code> — <strong><code>Did</code> equality</strong></td>
+<td>the gate itself: after I7 the <code>Did</code>-equality gate passes for an aliased spelling while the spelling-hashed store misses ⇒ a <strong>second</strong> <code>CommonsHolderRecord</code> is minted for one key</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (§3.1 clause (d) — I7 makes the authorization equality and the storage key disagree)</td>
+</tr>
+<tr>
+<td>66</td>
+<td>icn-commons</td>
+<td><code>store.rs:37 ANCHOR_BY_DID_PREFIX</code> (<code>:480, :530, :557</code>)</td>
+<td><code>Store</code></td>
+<td>anchor id by DID</td>
+<td><code>&quot;commons/anchors/by_did/&quot; ‖ anchor.to_did().to_string()</code></td>
+<td>D</td>
+<td>written from <code>Anchor::to_did()</code> (canonical spelling, ~50% unreadable §10.1); read with a wire-parsed <code>Did</code> (<code>commons_mgr.rs:113</code>, <code>api/commons/mod.rs:131</code>)</td>
+<td>none (<code>LruCache&lt;String,_&gt;</code> keyed by hex id)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>67</td>
+<td>icn-commons</td>
+<td><code>store.rs:39 HOLDER_BY_DID_PREFIX</code> (<code>:608, :662, :691</code>)</td>
+<td><code>Store</code></td>
+<td>holder id by DID</td>
+<td><code>&quot;commons/holders/by_did/&quot; ‖ holder_did.to_string()</code></td>
+<td>D</td>
+<td>wire <code>from_str</code> (<code>inner.rs:301 create_holder_from_anchor</code>)</td>
+<td>none — but it is an <strong>authorization gate</strong>: <code>icn-gateway authority.rs:44, 89 require_office_in_jurisdiction</code>, <code>api/membership/mod.rs:152, 195, 719</code>, <code>api/steward/mod.rs:517</code> do <code>get_holder_by_did(caller_did)</code> → not-found ⇒ <code>AuthorizationFailed</code></td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (fail-closed split)</td>
+</tr>
+<tr>
+<td>68</td>
+<td>icn-ledger</td>
+<td><code>freeze.rs:44 FREEZE_PREFIX</code> (<code>persist_frozen :397</code>, <code>remove_frozen :404</code>)</td>
+<td><code>Store</code> (<code>ledger.rs:373 FreezeManager::with_store</code>)</td>
+<td>frozen member</td>
+<td><code>&quot;ledger:frozen:&quot; ‖ Display</code></td>
+<td>D</td>
+<td><code>freeze(did)</code> from governance/gateway</td>
+<td>#42 — <code>load_from_store :378–384</code> → <code>frozen.insert(record.did)</code>; enforcement <code>ledger.rs:2907, 2915 is_frozen</code>; post-I7 <code>unfreeze(alias)</code> removes the merged entry but deletes only that spelling&#39;s row ⇒ the freeze <strong>resurrects on restart</strong></td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (the durable side of #42, absent from the first pass&#39;s §5)</td>
+</tr>
+<tr>
+<td>69</td>
+<td>icn-ledger</td>
+<td><code>ledger.rs:239 CLEARED_VOLUME_PREFIX</code>; <code>ledger_impl/balances.rs:248–292</code></td>
+<td><code>Store</code></td>
+<td>cleared volume per (account, currency)</td>
+<td><code>&quot;ledger:cleared_volume:&quot; ‖ Display ‖ &#39;:&#39; ‖ currency</code></td>
+<td>D</td>
+<td>journal <code>delta.account_id</code></td>
+<td><code>load_cleared_volume_index :248</code> → <code>Did::from_str</code> → <code>cleared_volume_index: HashMap&lt;(Did,String),i64&gt;</code> (<code>ledger.rs:291</code>, loaded <code>:414</code>, saved <code>:1721</code> — write-back orphans the losers; tuple key, invisible to S1)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong></td>
+</tr>
+<tr>
+<td>70</td>
+<td>icn-ledger</td>
+<td><code>treasury/audit.rs:289, 317</code></td>
+<td><code>Store</code></td>
+<td>treasury audit trail</td>
+<td><code>&quot;ledger:treasury:audit:&quot; ‖ Display ‖ &#39;:&#39; ‖ ts ‖ &#39;:&#39; ‖ id</code> (read by <code>scan_reverse_paginated</code> on the <code>Display</code> prefix)</td>
+<td>D</td>
+<td><code>record.treasury_did: Did</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (audit history split across spellings)</td>
+</tr>
+<tr>
+<td>71</td>
+<td>apps/trust-app</td>
+<td><code>sequence.rs:72, 94, 136</code> (<code>:54</code> issuer side)</td>
+<td><code>Store</code> (<code>service_tokio.rs:58</code>)</td>
+<td>receiver replay floor per attestation issuer</td>
+<td><code>&quot;trust/sequences/receiver/&quot; ‖ Display</code></td>
+<td>D</td>
+<td><code>attestation.issuer: Did</code> from gossip (<code>service_tokio.rs:425, 497</code>) — any spelling</td>
+<td>none (read/write by key only)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — a <strong>fourth instance of the §10.2 replay-window class</strong> (the first pass listed only icn-net #1–#4)</td>
+</tr>
+<tr>
+<td>72</td>
+<td>icn-community</td>
+<td><code>types.rs:68 Community.members: HashMap&lt;MemberId = String, Member&gt;</code>, persisted wholesale <code>store.rs:24 COMMUNITY_PREFIX ‖ id</code> → <code>serde_json(Community)</code></td>
+<td><code>Store</code> (live: <code>bins/icnd community_wiring.rs</code>, gateway <code>community_mgr.rs</code>)</td>
+<td>members per community</td>
+<td><code>String</code>-keyed map inside the record (&quot;Can be DID or CooperativeId&quot;)</td>
+<td>C (String)</td>
+<td><code>req.member_id: String</code> (<code>api/communities.rs:216–241</code>), gated by <code>claims.sub != req.member_id</code> (string)</td>
+<td>none (all operations by <code>String</code> key)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — not moved by I7; diverges from any <code>Did</code>-typed membership view (§10.6)</td>
+</tr>
+<tr>
+<td>73</td>
+<td>icn-store</td>
+<td><code>lib.rs:72–99 ReplicaMetadata</code> (<code>put_replica_metadata :911</code>, keyed by content hash)</td>
+<td><code>Store</code></td>
+<td>replica accounting per content hash</td>
+<td>value: <code>replicas: Vec&lt;ReplicaInfo { peer_did: String }&gt;</code> de-duped by string <code>==</code> (<code>:186–189</code>); <code>last_challenged/last_verified: HashMap&lt;String,u64&gt;</code></td>
+<td>C (String)</td>
+<td>gossip <code>offering_peer.to_string()</code> (<code>icn-gossip handlers/replica.rs:57, 106, 169</code>)</td>
+<td>none by <code>Did</code> — <code>icn-core replication/manager.rs:201 replicas.len()</code>, <code>:382 HashSet&lt;String&gt;</code></td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> — not moved by I7; a peer announcing under N spellings counts as N replicas today</td>
+</tr>
+<tr>
+<td>74</td>
+<td>icn-gateway</td>
+<td><code>identity_mgr.rs:15 DID_DOCUMENT_PREFIX</code> (<code>:75, :112, :130</code>)</td>
+<td><code>Store</code> (<code>server.rs:1573 new_with_storage</code>) + <code>LruCache&lt;String,_&gt;</code></td>
+<td>DID document (multi-device verification methods)</td>
+<td><code>&quot;did_doc:&quot; ‖ did.as_str()</code></td>
+<td>D</td>
+<td>path <code>{did}</code> parsed <code>from_str</code> after a <code>claims.sub != did_str</code> <strong>string</strong> gate (<code>api/devices.rs:85–106</code>)</td>
+<td>none (lookups by <code>as_str</code>)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (fail-closed split: a device registered under spelling A is not a valid signer for requests presenting spelling B)</td>
+</tr>
+<tr>
+<td>75</td>
+<td>icn-gateway</td>
+<td><code>notification_store.rs:95, 116</code> (<code>register_device</code> / <code>get_device_tokens</code>)</td>
+<td>sled (<code>NotificationStore.db</code>)</td>
+<td>device tokens by owner</td>
+<td><code>&quot;idx_device_owner:&quot; ‖ did.to_string() ‖ &#39;:&#39; ‖ token</code></td>
+<td>D</td>
+<td>JWT <code>web::ReqData&lt;Did&gt;</code> → <code>to_string()</code> (<code>api/notifications.rs:37–46</code>)</td>
+<td>none (prefix scan by the current spelling; <code>notification_processor.rs:293</code> re-<code>to_string()</code>s the recipient)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (split: devices registered under one spelling invisible to another)</td>
+</tr>
+<tr>
+<td>76</td>
+<td>icn-gateway</td>
+<td><code>notification_store.rs:141, 159, 191, 236</code> (<code>store_notification</code>, <code>get_notifications</code>, <code>get_unread_count</code>, <code>mark_all_read</code>)</td>
+<td>sled</td>
+<td>in-app notifications by recipient</td>
+<td><code>&quot;idx_notif_recipient:&quot; ‖ recipient String ‖ &#39;:&#39; ‖ created_at ‖ &#39;:&#39; ‖ id</code></td>
+<td>D/E</td>
+<td><code>InAppNotification.recipient: String</code> from event payloads (<code>notification_processor.rs:604</code>); read side <code>did.to_string()</code> of the JWT principal</td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>77</td>
+<td>apps/ledger-app</td>
+<td><code>recurring.rs:182, 188</code> (+ <code>list_by_owner :141–151</code>)</td>
+<td>sled (<code>Db</code> from gateway/icnd)</td>
+<td>recurring settlements by owner</td>
+<td><code>&quot;idx_owner:&quot; ‖ owner String ‖ &#39;:&#39; ‖ id</code></td>
+<td>D/E</td>
+<td><code>RecurringPayment.owner: String</code> = gateway <code>claims.sub</code> (<code>api/recurring_settlements.rs:104</code>) — the JWT <code>sub</code> is minted as <code>did.to_string()</code> (<code>auth.rs:405</code>), so the wire spelling propagates</td>
+<td>none (ownership checks are string compares <code>:154, 184, 233</code>)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>78</td>
+<td>apps/ledger-app</td>
+<td><code>escrow.rs:187, 191, 198, 201</code> (+ <code>list_by_user :145–170</code>)</td>
+<td>sled</td>
+<td>escrows by creator / beneficiary</td>
+<td><code>&quot;idx_escrow_creator:&quot; ‖ creator ‖ &#39;:&#39; ‖ id</code>, <code>&quot;idx_escrow_beneficiary:&quot; ‖ to_account ‖ &#39;:&#39; ‖ id</code></td>
+<td>D/E</td>
+<td>request body + <code>claims.sub</code> (<code>api/escrow.rs:96, 137, 286</code>)</td>
+<td>none (<code>escrow.creator != user_did</code> string compare <code>:146, 295</code>)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>79</td>
+<td>apps/ledger-app</td>
+<td><code>budgets.rs:193, 199</code> (+ <code>list_by_owner :171–180</code>)</td>
+<td>sled</td>
+<td>budgets by owner</td>
+<td><code>&quot;idx_budget_owner:&quot; ‖ owner ‖ &#39;:&#39; ‖ id</code></td>
+<td>D/E</td>
+<td><code>Budget.owner: String</code> = <code>claims.sub</code> (<code>api/budgets.rs:101</code>)</td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong></td>
+</tr>
+<tr>
+<td>80</td>
+<td>apps/ledger (<code>icn-ledger-actor</code>, ← <code>icn-core lifecycle.rs:979</code>)</td>
+<td><code>resource_access.rs:24, 35, 58, 75</code> (<code>SledResourceAccessStore::key</code>, tree <code>exec:resource</code>)</td>
+<td>sled (<code>&lt;store_path&gt;/resource_access/</code>, <code>init.rs:45–48</code>)</td>
+<td>resource access grants by grantee</td>
+<td><code>&quot;access:&quot; ‖ resource_type ‖ &#39;:&#39; ‖ grantee_did String</code></td>
+<td>E</td>
+<td><code>ResourceEffect::GrantAccess { grantee_did: String }</code> (kernel-api <code>effects.rs:448</code>) via <code>governance_executor.rs:760–815</code> — a free-form wire string <strong>never parsed as <code>Did</code></strong></td>
+<td>none (get/revoke by raw string)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (class E: the string is never validated as a DID at all)</td>
+</tr>
+<tr>
+<td>81</td>
+<td>apps/governance</td>
+<td><code>manager.rs:310–325 assignee_idx_key</code>, reader <code>:443 list_by_assignee</code></td>
+<td>sled</td>
+<td>action items by assignee</td>
+<td><code>&quot;action_item_by_assignee:&quot; ‖ did.as_str() ‖ &#39;:&#39; ‖ domain ‖ &#39;:&#39; ‖ item</code></td>
+<td>D</td>
+<td><code>ActionItem.assignee: Option&lt;Did&gt;</code> (<code>icn-governance action_item.rs:107</code>) from HTTP/governance wire <code>from_str</code></td>
+<td>none (<code>digest_overdue_items :5441</code>, <code>list_work_for_person :5557</code> prefix-scan by <code>as_str</code>)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (the person digest / &quot;my work&quot; views miss items assigned under another spelling)</td>
+</tr>
+<tr>
+<td>82</td>
+<td>apps/governance</td>
+<td><code>manager.rs:582–587, 872–877, 1062–1071</code></td>
+<td>sled</td>
+<td>structures / activities / programs by parent entity</td>
+<td><code>&quot;structure_by_entity:&quot; ‖ parent_entity_id ‖ &#39;:&#39; ‖ id</code> (and <code>activity_by_entity:</code>, <code>program_by_entity:</code>)</td>
+<td>E</td>
+<td><code>parent_entity_id: String</code> verbatim from HTTP (<code>http/handlers.rs:5037</code>), never validated as <code>EntityId</code> or <code>Did</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (low — only if an individual <code>entity:icn:individual:&lt;did&gt;</code> is ever a parent; parents are institutions in practice)</td>
+</tr>
+<tr>
+<td>83</td>
+<td>icn-gateway (+ apps/governance writer)</td>
+<td><code>receipt_store.rs:2291–2296</code> (write), <code>:2317–2335</code> (read); v2 <code>receipt_backend.rs:926–940 put_meeting_attendance_v2</code> → <code>opaque_by_key_key :1680</code></td>
+<td>sled (gateway receipt store)</td>
+<td>meeting attendance by (meeting, attendee)</td>
+<td><code>MEETING_ATTENDANCE_BY_PAIR ‖ len‖meeting_id ‖ len‖attendee_did ‖ …</code>; opaque <code>(class, meeting_id, attendee_did)</code></td>
+<td>E</td>
+<td><code>MeetingAttendanceReceipt.attendee_did: String</code> set from HTTP <code>req.did</code> (<code>http/handlers.rs:4807</code> → <code>manager.rs:5878</code>), matched to <code>meeting.attendees[].did</code> by string <code>==</code></td>
+<td>none</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (low; a receipt index, matched by string throughout)</td>
+</tr>
+<tr>
+<td>84</td>
+<td>(dead write paths)</td>
+<td><code>icn-ledger use_access.rs:1020–1048</code> second <code>SledResourceAccessStore</code> (only <code>tests/use_access_integration.rs</code>); <code>icn-ledger dynamic_limits.rs:215</code> (<code>set_dynamic_limit_manager</code> test-only); <code>icn-ledger progressive_limits.rs:241</code> (<code>set_progressive_limit_manager</code> has no caller); <code>icn-ledger treasury/budgets.rs:405 persist_budget_index</code> (<code>TREASURY_IDX_BUDGETS_PREFIX</code>: one <code>put</code>, zero scans — write-only); <code>icn-store peer_cache.rs:257 make_key</code> (<code>PeerCache</code>/<code>CachedPeer</code> have no users outside <code>icn-store</code>); <code>icn-gateway commons_store.rs:37, 39, 44</code> (<code>SledCommonsStore</code> twin of #64/#66/#67 — re-exported, never constructed); <code>icn-entity sled_registry.rs:828–877 rel:from/rel:to</code> (<code>store_relationship</code> has zero production callers); <code>icn-entity coop_entity_map.rs:85 entity_coop:</code> (institution ids by construction); <code>apps/membership</code> (<code>icn-membership-app</code>) duplicates of #33–#36 and #62 — the crate has <strong>no dependents</strong></td>
+<td>sled / <code>Store</code></td>
+<td>—</td>
+<td>DID-spelling-keyed</td>
+<td>D</td>
+<td>various</td>
+<td>none reachable</td>
+<td><strong>dead / unwired</strong></td>
+<td><strong>SAFE</strong> (dead — flag for deletion, not migration; an N2-A scan that finds rows here is finding test residue)</td>
+</tr>
+</tbody></table>
+<h2 id="6-inventory--reconstructed-indexes-and-serialized-maps-class-bc">6. Inventory — reconstructed indexes and serialized maps (class B/C)</h2>
+<p>These are where I7 actually collapses rows, because durable rows are re-keyed by <code>Did</code> on load or
+on decode. A consumer row and its keyspace row are <strong>one</strong> entry in the migration list (§12).</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Crate</th>
+<th>Source + symbol</th>
+<th>Class</th>
+<th>Rebuilt from / serialized how</th>
+<th>Collapse behaviour under I7</th>
+<th>Live?</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>37</td>
+<td>icn-net</td>
+<td><code>replay_guard.rs:525 sequences: HashMap&lt;Did, SequenceWindow&gt;</code></td>
+<td>B</td>
+<td>rows #1–#3 via <code>parse_*_key</code></td>
+<td>N windows → 1; survivor = last key in <code>sled</code> lexicographic order — the <code>Base256Emoji</code> (<code>🚀…</code>) spelling sorts after even the canonical <code>z…</code>, so the survivor is <strong>attacker-selectable</strong>; a <strong>lower</strong> floor can win</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (consumer of #1–#3; one keyspace)</td>
+</tr>
+<tr>
+<td>38</td>
+<td>icn-security</td>
+<td><code>misbehavior.rs:415–430</code> four <code>HashMap&lt;Did,_&gt;</code>, <code>load_from_store :988</code></td>
+<td>B</td>
+<td>rows #5–#8 via <code>did_str.parse::&lt;Did&gt;()</code></td>
+<td>N penalty rows → 1 (overwrite; a whole violation <code>Vec</code> replaced); <code>save_to_store</code> then orphans the losers on disk</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (consumer of #5–#8)</td>
+</tr>
+<tr>
+<td>39</td>
+<td>icn-ledger</td>
+<td><code>ledger.rs:287 cached_balances</code>, <code>balances.rs:209 load_cached_balances</code></td>
+<td>B</td>
+<td>row #9</td>
+<td>N balance rows → 1; <code>save_cached_balances</code> writes back only the survivor, <strong>orphaning</strong> the others; <code>verify_integrity</code> then spuriously mismatches</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (consumer of #9)</td>
+</tr>
+<tr>
+<td>40</td>
+<td>icn-ledger</td>
+<td><code>balance.rs:11 compute_all_balances</code></td>
+<td>B</td>
+<td>journal entries (durable)</td>
+<td>two aliasing <code>account_id</code>s <strong>sum</strong> into one account</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (with #9)</td>
+</tr>
+<tr>
+<td>41</td>
+<td>icn-ledger</td>
+<td><code>treasury.rs:215–254</code> five <code>HashMap&lt;Did,_&gt;</code></td>
+<td>B</td>
+<td>rows #10 + budgets/rules/shares (<code>:1021 insert</code> on load)</td>
+<td>N treasuries → 1 — but no wire spelling reaches #10&#39;s writer today</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (consumer of #10; see its flag)</td>
+</tr>
+<tr>
+<td>42</td>
+<td>icn-ledger</td>
+<td><code>freeze.rs:141 frozen: HashMap&lt;Did, FrozenMember&gt;</code></td>
+<td>B (+ D: its durable rows are #68)</td>
+<td>#68 via <code>load_from_store :378</code></td>
+<td>overwrite on load; <code>unfreeze(alias)</code> deletes one spelling&#39;s row only → freeze resurrects on restart</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (first pass said SMR; its durable side was missing)</td>
+</tr>
+<tr>
+<td>43</td>
+<td>icn-governance</td>
+<td><code>delegation.rs:339/342 delegations_from/to</code></td>
+<td><strong>A</strong> (not B)</td>
+<td>— (no <code>Serialize</code>, no store, no load path; &quot;rebuilt from #19–#20&quot; was unsupported)</td>
+<td>in-memory merge only — I7&#39;s intended effect</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said SMR)</td>
+</tr>
+<tr>
+<td>44</td>
+<td>icn-governance</td>
+<td><code>tally.rs:108/111 vote_map</code>, <code>counted</code></td>
+<td>B</td>
+<td>row #17 (dormant)</td>
+<td><code>vote_map</code> keeps the last vote; pass 1 counts <strong>both</strong> regardless (§10.3)</td>
+<td><strong>dormant</strong> — only <code>#[cfg(test)]</code> callers</td>
+<td><strong>SILENT-MERGE RISK</strong> (dormant; NM-shaped with #17)</td>
+</tr>
+<tr>
+<td>45</td>
+<td>icn-gossip</td>
+<td><code>vector_clock.rs:56 SerializedClock { clock: HashMap&lt;Did,u64&gt; }</code></td>
+<td>C</td>
+<td>wire (<code>GossipMessage</code>) <strong>and</strong> durable (<code>GossipEntry.clock</code>)</td>
+<td>custom <code>Deserialize :280–292</code>: serde map decode keeps the <strong>last</strong> duplicate silently — causality under-counted, <strong>no error</strong></td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (§3.1 clause (b))</td>
+</tr>
+<tr>
+<td>46</td>
+<td>icn-gossip</td>
+<td><code>scalability.rs:106 CompressedVectorClock { deltas: HashMap&lt;Did,i64&gt; }</code></td>
+<td>C</td>
+<td>— (zero users outside <code>scalability.rs</code>; <code>lib.rs:75 pub use</code> only)</td>
+<td>same collapse, structurally</td>
+<td><strong>dormant</strong></td>
+<td><strong>NEEDS MIGRATION</strong> (clause (b), dormant — fix the shape, no data step)</td>
+</tr>
+<tr>
+<td>47</td>
+<td>icn-gossip</td>
+<td><code>quotas.rs:105 quotas: HashMap&lt;Did, StorageQuota&gt;</code></td>
+<td><strong>A</strong></td>
+<td>— (<code>StorageQuotaManager</code> has no <code>Serialize</code>, no store/scan/load; &quot;quota records&quot; do not exist)</td>
+<td>in-memory</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said SMR)</td>
+</tr>
+<tr>
+<td>48</td>
+<td>icn-gossip</td>
+<td><code>handlers/blob_nonce_guard.rs:83 peers</code></td>
+<td><strong>A</strong></td>
+<td>— (no <code>Serialize</code>, no store)</td>
+<td>in-memory</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said SMR)</td>
+</tr>
+<tr>
+<td>49</td>
+<td>icn-identity</td>
+<td><code>sync.rs:69 DidDocumentCache { HashMap&lt;Did, CachedDidDocument&gt; }</code></td>
+<td><strong>A</strong></td>
+<td>— (<code>#[derive(Debug, Clone)]</code>, no persistence)</td>
+<td>in-memory</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said SMR)</td>
+</tr>
+<tr>
+<td>50</td>
+<td>icn-steward</td>
+<td><code>recovery.rs:162 revoked_dids: HashMap&lt;Did, RevocationRecord&gt;</code></td>
+<td><strong>A</strong></td>
+<td>— (<code>RecoveryService</code> has no <code>Serialize</code>, no store, no load path)</td>
+<td>in-memory; the collapse is I7&#39;s intended effect</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said NM — a false positive)</td>
+</tr>
+<tr>
+<td>51</td>
+<td>icn-snapshot</td>
+<td><code>protocol.rs:141/143 channel_states</code>, <code>participant_hashes</code>; <code>coordinator.rs:47 participant_states</code></td>
+<td><strong>A</strong> (not C)</td>
+<td>— (these structs are <code>#[derive(Debug, Clone)]</code> only; the serde types in the module are <code>SnapshotId</code>/<code>SnapshotMessage</code>)</td>
+<td>in-memory</td>
+<td>live</td>
+<td><strong>SAFE</strong> (first pass said class C / SMR)</td>
+</tr>
+<tr>
+<td>52</td>
+<td>icn-net</td>
+<td><code>topology.rs:42–55 PeerId(pub Did)</code> in 4 <code>BTreeSet</code> + 1 <code>HashMap</code></td>
+<td>A (partner)</td>
+<td>—</td>
+<td>derived <code>Eq</code>/<code>Hash</code> move to bytes, hand-written <code>Ord</code> over <code>to_string()</code> stays ⇒ <strong><code>Ord</code>/<code>Eq</code> contract violation</strong> (§10.5)</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (not durable; N2-A must fix it in the same change)</td>
+</tr>
+<tr>
+<td>53</td>
+<td>icn-kernel-api</td>
+<td><code>proofs.rs:490 BTreeMap&lt;Did,u64&gt;</code> (<code>RawVectorClockProjection</code>) — <strong><code>Did</code> here is <code>crate::types::Did = String</code></strong> (<code>types.rs:9</code>); <code>icn-kernel-api</code> does not depend on <code>icn-identity</code>, and <code>icn_identity::Did</code> has no <code>Ord</code> so this could not compile otherwise</td>
+<td>— (String)</td>
+<td>wire</td>
+<td><strong>not moved by I7</strong> (String keys; <code>from_entries</code> keeps the max per key)</td>
+<td>live</td>
+<td><strong>SAFE</strong> / not moved (first pass said class E SMR — wrong type; I12/N2-H family, §10.6)</td>
+</tr>
+<tr>
+<td>54</td>
+<td>icn-snapshot → icn-gossip</td>
+<td><code>lib.rs:174 GossipState.vector_clock: HashMap&lt;String,u64&gt;</code> (snapshot file, <code>save_snapshot :470</code>, written at shutdown <code>icn-core shutdown.rs:109</code>)</td>
+<td>C (String on disk, <code>Did</code>-keyed on restore)</td>
+<td>export = <code>to_string()</code> projection of the <code>Did</code>-keyed clock (<code>gossip.rs:1298–1301</code>); restore <code>gossip.rs:1369–1382 restore_state</code>: <code>Did::from_str(&amp;did_str)</code> → <code>self.clock.insert(did, count)</code> (prod <code>icn-core supervisor/init_gossip.rs:383</code>)</td>
+<td>N clock entries → 1 on restore (overwrite; <code>HashMap</code>-iteration survivor, so a <strong>lower</strong> count can win); and one unparseable DID aborts the whole restore (<code>.context(..)?</code>)</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (§3.1 clause (c)) — <strong>RESOLVED</strong> (first pass: UNRESOLVED)</td>
+</tr>
+</tbody></table>
+<h3 id="61-structures-the-first-pass-missed-found-by-s11s14">6.1 Structures the first pass missed (found by S11–S14)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Crate</th>
+<th>Source + symbol</th>
+<th>Class</th>
+<th>Rebuilt from / serialized how</th>
+<th>Collapse behaviour under I7</th>
+<th>Live?</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>56</td>
+<td>icn-governance / apps/governance</td>
+<td><code>membership.rs:32–34 MembershipSource::StaticList(Vec&lt;Did&gt;)</code> (serde-derived), persisted wholesale inside the domain record (<code>icn-governance store.rs:405 domain_key</code> — dormant; <strong>live:</strong> <code>apps/governance state_store.rs:192 &quot;gov:domain:&quot;</code>)</td>
+<td>C (<code>Vec</code>, not a map)</td>
+<td>API add-member (<code>manager.rs:3345–3358</code>: <code>contains</code> guard then <code>push</code>)</td>
+<td>a <code>Vec</code> decode is <strong>not</strong> lossy — N aliasing entries survive. Post-I7: <code>contains</code> (<code>manager.rs:4730</code>, <code>resolver.rs:113/143</code>, <code>handlers.rs:130/1207/1310</code>, <code>rehearsal.rs:755</code>) becomes alias-tolerant; <code>position(..)+remove</code> (<code>:3355–3356</code>) removes the <em>first</em> equal entry; <code>eligible_count = len()</code> (<code>actor.rs:2247–2248</code>, the quorum denominator) still counts N — a pre-existing over-count I7 does not change; <code>eligible_voters: HashSet&lt;Did&gt;</code> (<code>handlers.rs:1326</code>) collapses</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (membership storage — <strong>§7.5 gate</strong>; N2-A needs a de-dupe pass for denominators)</td>
+</tr>
+<tr>
+<td>57</td>
+<td>icn-snapshot → icn-net</td>
+<td><code>lib.rs:243 NetworkState.peer_connections: HashMap&lt;String, PeerConnectionInfo&gt;</code> and legacy <code>:249 peer_x25519_keys: HashMap&lt;String,[u8;32]&gt;</code> (snapshot file) → <code>actor/mod.rs:827 restore_state</code> (prod <code>icn-core supervisor/lifecycle.rs:645</code>)</td>
+<td>C (String on disk, <code>Did</code>-keyed on restore)</td>
+<td><code>Did::from_str :834</code> → <code>connections_write.insert(did, info) :848</code> into <code>:1098 peer_connections: HashMap&lt;Did, PeerConnectionInfo&gt;</code>; legacy arm <code>:854–860 entry(did).or_insert_with</code></td>
+<td>N peer records → 1 (overwrite; legacy arm first-wins); the x25519 / ML-KEM material of the dropped spelling is lost; <code>peer_addresses</code> (<code>:254</code>) is exported empty and never restored</td>
+<td>live</td>
+<td><strong>NEEDS MIGRATION</strong> (clause (c)) — the first pass listed <code>actor/mod.rs:1098</code> as SAFE (&quot;no load-from-durable rebuild&quot;), which is false</td>
+</tr>
+<tr>
+<td>58</td>
+<td>icn-snapshot → icn-gossip</td>
+<td><code>lib.rs:182 GossipState.subscriptions: HashMap&lt;String, Vec&lt;String&gt;&gt;</code> → <code>gossip.rs:1469–1489 restore_state</code> (<code>Did::from_str :1481</code>; <code>if !sub_list.contains(&amp;did) { push }</code> <code>:1487–1488</code>) into <code>gossip.rs:108 subscriptions: HashMap&lt;String, Vec&lt;Did&gt;&gt;</code></td>
+<td>C (String on disk)</td>
+<td>snapshot of wire-learned subscribers</td>
+<td><code>Vec&lt;Did&gt;::contains</code> de-dupe: N subscriber spellings → 1 (first wins). Identity-only — no per-subscriber state is lost and routing is <code>Did</code>-keyed, so the collapse is benign</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (identity-only de-dupe; no data step)</td>
+</tr>
+<tr>
+<td>59</td>
+<td>icn-federation</td>
+<td><code>attestation_store.rs:22 cache: RwLock&lt;LruCache&lt;Did, Vec&lt;FederatedTrustAttestation&gt;&gt;&gt;</code> read-through over rows #27 (<code>:80–113</code>)</td>
+<td>B (lazy cache, not a start-up rebuild)</td>
+<td>rows #27 by spelling-prefix scan on miss</td>
+<td>first-loader-wins staleness: post-I7 a lookup under spelling B hits the slot filled by spelling A&#39;s prefix scan, so B&#39;s own durable rows are invisible until eviction / <code>:60</code> invalidation; no durable row is lost or orphaned</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (no data step; N2-A must key the cache by decoded bytes or bypass it)</td>
+</tr>
+<tr>
+<td>60</td>
+<td>icn-net</td>
+<td><code>session.rs:58 SessionManager.connections: HashMap&lt;String, quinn::Connection&gt;</code> (keyed by <code>from.to_string()</code>, <code>:906–912</code>) <strong>vs</strong> <code>actor/mod.rs:1098 peer_connections: HashMap&lt;Did,_&gt;</code> — both filled from the same Hello <code>from: Did</code> (<code>handlers/hello.rs:234–273</code>), joined in <code>actor/messages.rs:474–491 send_message_to_peer</code> (<code>Did</code>-keyed <code>get</code>, then <code>connections().find(|(peer_did,_)| peer_did == did.as_str())</code>); also <code>actor/mod.rs:1352</code>, <code>handlers/onion.rs:61</code>, <code>handlers/peer_exchange.rs:132</code></td>
+<td>A (partner pair)</td>
+<td>—</td>
+<td>I7 moves the <code>Did</code> map (alias-tolerant <code>get</code>) but not the <code>String</code> map (<code>== as_str()</code> misses) ⇒ post-I7 &quot;connection info found, QUIC connection not found&quot; for an alias spelling — the same shape as #52</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (partner-invariant desync; fix alongside #52 in N2-A, §12.1 item 6)</td>
+</tr>
+<tr>
+<td>61</td>
+<td>icn-ccl</td>
+<td><code>types.rs:110–131 enum Value</code> derives <code>PartialEq, Eq</code> (<code>Value::Did(Did)</code> moves) but hand-implements <code>Hash</code> (<code>:200–220</code>) and hashes <code>Value::Did</code> as <code>format!(&quot;{did:?}&quot;)</code> — a string, which does not move; <code>Value::Set(HashSet&lt;Value&gt;)</code> (<code>:128</code>) is used for <code>participants</code> and <code>in</code> checks (<code>interpreter.rs:403–410, 484–485</code>)</td>
+<td>A (partner)</td>
+<td>contract state is in-memory only (<code>runtime.rs:25</code>); <code>Value::Set</code> is persisted inside <code>Contract.state_vars[].initial_value</code> via <code>icn_encoding</code> (<code>ast.rs:69</code>); <code>ContractRegistry</code> persists <code>participants: Vec&lt;Did&gt;</code> value-position and <code>owner: String</code></td>
+<td>post-I7 <code>HashSet&lt;Value&gt;</code> violates the <code>Hash</code>/<code>Eq</code> contract for <code>Value::Did</code>: <code>List.contains</code> (Eq, moves) and <code>Set.contains</code> (Hash, does not) disagree</td>
+<td>live</td>
+<td><strong>SILENT-MERGE RISK</strong> (partner invariant; fix in N2-A) — closes §11 item 4: <code>icn-ccl</code> persists no <code>Did</code>-keyed map, but its value type is a partner type</td>
+</tr>
+</tbody></table>
+<h2 id="7-inventory--assessed-and-found-safe-class-a">7. Inventory — assessed and found safe (class A)</h2>
+<p>Purely ephemeral, not reconstructed from durable state, and not serialized. I7 changes their
+contents only for the lifetime of a process, which is the intended effect of I7 rather than a
+hazard.</p>
+<p><strong>The count is derived, not curated.</strong> Search class S1 returns <strong>108</strong> <code>Did</code>-keyed collection
+lines (none under a <code>tests/</code> directory). Attribute each line, not each file:</p>
+<table>
+<thead>
+<tr>
+<th>S1 lines</th>
+<th>Where they go</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>icn-kernel-api/src/proofs.rs:490</code> — the kernel <code>type Did = String</code> alias (#53); not <code>icn_identity::Did</code></td>
+</tr>
+<tr>
+<td>39</td>
+<td>consumers of <code>NEEDS MIGRATION</code> / <code>SILENT-MERGE RISK</code> rows in §5/§6: <code>replay_guard.rs:26, 525</code> (#37) · <code>misbehavior.rs:415–430</code> (#38) · <code>ledger.rs:287, 2374</code>, <code>ledger_impl/balances.rs:67</code> (#39) · <code>balance.rs:11, 12, 74</code> (#40) · <code>treasury.rs:215–254</code> (#41) · <code>freeze.rs:141</code> (#42) · <code>tally.rs:108, 111, 165, 166</code> (#44) · <code>vector_clock.rs:50, 56, 272, 500</code> (#45) · <code>scalability.rs:106</code> (#46) · <code>apps/governance/src/actor.rs:3862, 3864</code> (#23) · <code>icn-rpc/src/auth.rs:378</code> (#29) · <code>icn-trust/src/lib.rs:872</code>, <code>multi_graph.rs:280</code> (#30) · the <code>peer_connections</code> <code>Arc</code> in <code>actor/mod.rs:178, 1098</code>, <code>handlers/mod.rs:37, 171</code>, <code>actor/connection.rs:213, 402</code> (#57) · <code>attestation_store.rs:22</code> (#59)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>rows the review found <code>SAFE</code> but which are listed in §6 so the correction is visible: <code>delegation.rs:339, 342</code> (#43) · <code>quotas.rs:105</code> (#47) · <code>blob_nonce_guard.rs:83</code> (#48) · <code>sync.rs:69</code> (#49) · <code>recovery.rs:162</code> (#50) · <code>snapshot protocol.rs:125, 141, 143</code>, <code>coordinator.rs:47</code> (#51)</td>
+</tr>
+<tr>
+<td><strong>58</strong></td>
+<td><strong>the <code>SAFE</code> set below</strong></td>
+</tr>
+</tbody></table>
+<p>Re-derive with S1 and subtract the lines above — the arithmetic is the audit, so nothing is
+excluded by assertion. (The first pass reported &quot;105 → 39 → 66&quot;: it attributed by <em>file</em>, dropped
+the three <code>LruCache&lt;Did, _&gt;</code> lines, and counted <code>actor/mod.rs:1098</code>, <code>icn-rpc auth.rs:378</code> and
+<code>icn-trust lib.rs:872</code> as safe — each of which is in fact the consumer that makes its keyspace
+<code>NEEDS MIGRATION</code>.) By crate:</p>
+<table>
+<thead>
+<tr>
+<th>Crate</th>
+<th>SAFE sites</th>
+<th>Crate</th>
+<th>SAFE sites</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>icn-trust</td>
+<td>16</td>
+<td>icn-governance</td>
+<td>5</td>
+</tr>
+<tr>
+<td>apps/governance</td>
+<td>14</td>
+<td>icn-gossip</td>
+<td>5</td>
+</tr>
+<tr>
+<td>icn-core</td>
+<td>7</td>
+<td>icn-privacy</td>
+<td>2</td>
+</tr>
+<tr>
+<td>icn-net</td>
+<td>6</td>
+<td>icn-ledger</td>
+<td>2</td>
+</tr>
+<tr>
+<td>icn-gateway</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Representative fields, so the shape of the set is legible:</p>
+<p><code>icn-net</code>: <code>rate_limit.rs:1026 buckets</code> + <code>:1187</code>, <code>blob_registry.rs:137 per_peer_size</code> + <code>:355 peer_counts</code>,
+<code>actor/mod.rs:1106 relay_proxies</code>, <code>candidate_cache.rs:24 candidates</code> · <code>icn-gossip</code>: <code>sync.rs:223 states</code>,
+<code>partition.rs:39 last_seen</code> + <code>:356 healing_in_progress</code>,
+<code>handlers/blob_transfer_state.rs:170 per_peer_counts</code>, <code>handlers/provider_registry.rs:156 exclude</code> ·
+<code>icn-core</code>: <code>init_notifications.rs:26 ProfileCache</code>, <code>version_tracker.rs:21 peer_versions</code>,
+<code>upgrade.rs:29</code> + <code>upgrade_actor.rs:117/118</code>, <code>trust_propagation.rs:93/95</code> ·
+<code>icn-trust</code>: <code>anomaly.rs</code> traversal sets (<code>:160/161/320/601/602/638/673/715/723/798–801</code>),
+<code>pathfinder.rs:144 visited</code>, <code>trust_cache.rs:39</code> and <code>precompute.rs:34</code> (<code>LruCache</code>s — ephemeral,
+though post-I7 <code>TrustCache</code> serves a score computed over spelling-A edges to a spelling-B lookup) ·
+<code>icn-governance</code>: <code>handle.rs:140/171/172</code>, <code>discussion.rs:376 participants</code>,
+<code>delegation.rs:856 visited</code> · <code>apps/governance</code>: <code>actor.rs</code> and <code>manager.rs</code> / <code>http/handlers.rs</code>
+eligible-voter / excluded-delegator sets · <code>icn-privacy</code>: <code>onion_routing.rs:101 peer_public_keys</code>,
+<code>:365 trust_scores</code> · <code>icn-gateway</code>: <code>auth.rs:160</code> in-memory <code>challenges</code> (the <code>icn-rpc</code> twin is
+store-backed and is #29) · <code>icn-ledger</code>: <code>ledger_impl/witness_ops.rs:82, 163 transaction_parties</code>.</p>
+<p><strong>Count: 58 sites</strong>, verdict <code>SAFE</code>. Every one is process-local: no <code>Serialize</code> derive, no
+<code>Store</code>/sled write path, and no load-from-durable rebuild. Several (<code>eligible_voters</code>,
+<code>excluded_delegators</code>, <code>visited</code>, <code>exclude</code>) are function parameters or traversal scratch rather
+than stores at all; they are counted because S1 returns them and silently dropping grep hits is how
+a coverage claim becomes unfalsifiable.</p>
+<p>One further genuine <code>SAFE</code>, and the reason it is safe is the useful part:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Crate</th>
+<th>Symbol</th>
+<th>Why safe</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>55</td>
+<td>icn-identity</td>
+<td><code>authority_log::PrincipalKey</code> (<code>body.rs:125–150</code>)</td>
+<td><strong>Already key equality.</strong> <code>PrincipalKey(VerifyingKey)</code> is built by <code>try_from_bytes</code>, which applies canonical-encoding and weak-point checks, and its doc states N1 &quot;does not inherit the legacy <code>Did</code> parser&#39;s more permissive ZIP-215 acceptance rules&quot;. N1 independently reached the same conclusion this inventory reaches, and rejects hash-derived DIDs explicitly. <strong>This is the precedent N2-A should follow.</strong></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="8-legacy-and-compatibility-paths-examined">8. Legacy and compatibility paths examined</h2>
+<p>The inventory must cover data current code can <em>load</em>, not only data it creates.</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Examined</th>
+<th>Finding</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>#2517</code> replay-state legacy regime (<code>replay_guard.rs:468</code>, <code>:624 MigratingFromLegacy</code>)</td>
+<td>yes</td>
+<td>Legacy entries are recognised by the <em>absence</em> of <code>semantic_version</code>. The migration re-reads legacy rows and re-keys nothing — the DID spelling in the key is carried through verbatim. Legacy rows therefore inherit rows #1–#3&#39;s exposure.</td>
+</tr>
+<tr>
+<td><code>legacy_proposal_index_key</code> backfill (<code>receipt_store.rs:3869–4017</code>)</td>
+<td>yes</td>
+<td>A real legacy→current index rewrite exists and is exercised. It rewrites <em>index shape</em>, not key identity, so a re-keying migration has a working precedent to copy but no DID normalization to inherit.</td>
+</tr>
+<tr>
+<td><code>dispatch_evidence_backfill.rs</code> (icn-gateway)</td>
+<td>yes</td>
+<td>Backfills by hash, not by DID. No exposure.</td>
+</tr>
+<tr>
+<td><code>Anchor::to_did</code> / <code>from_anchor_id</code> historical rows</td>
+<td>yes</td>
+<td>§2.3 — about half are unreadable on deserialization today (49.2% for cooperative treasury DIDs as produced). Any historical anchor-derived DID in a durable store is already at risk, before I7; <code>treasury.rs:980</code> skips them silently (#2628).</td>
+</tr>
+<tr>
+<td><code>AccountId</code> untagged deserialization (<code>entity.rs:917</code>)</td>
+<td>yes</td>
+<td><code>#[serde(untagged)]</code> tries <code>Did</code> first, then <code>EntityId(String)</code>, which accepts <strong>any</strong> string. An invalid DID silently becomes an <code>AccountId::Entity</code> rather than erroring. Recorded as a contract observation; the account domain is N2-C′&#39;s and is <strong>not</strong> resolved here.</td>
+</tr>
+<tr>
+<td>Non-Rust clients (<code>sdk/</code>, <code>web/</code>, <code>website/</code>)</td>
+<td>yes</td>
+<td>No DID-keyed durable client store found (S9). Clients hold DIDs but do not key persistent structures by them.</td>
+</tr>
+<tr>
+<td>Second durable engine</td>
+<td>yes</td>
+<td>None among databases. <code>sled</code> only (S2) — but <strong>the <code>icn-snapshot</code> file is a second durable DID-keyed medium</strong> (S13): <code>save_snapshot</code>/<code>load_snapshot</code> (<code>icn-snapshot/src/lib.rs:470–497</code>), written at shutdown (<code>icn-core supervisor/shutdown.rs:109</code>), restored at <code>init_gossip.rs:383</code> / <code>lifecycle.rs:645</code>. Its <code>GossipState.vector_clock</code> (#54) and <code>NetworkState.peer_connections</code> / legacy <code>peer_x25519_keys</code> (#57) are <code>String</code>-keyed on disk and re-keyed by <code>Did</code> on restore (<code>NEEDS MIGRATION</code>); <code>subscriptions</code> (#58) is an identity-only de-dupe; <code>topics[].access_control</code> (<code>Participants:[did,…]</code>) is a value-position <code>Vec&lt;Did&gt;</code>; <code>peer_addresses</code> is exported empty and never restored.</td>
+</tr>
+<tr>
+<td>Other file-backed state (S13)</td>
+<td>yes</td>
+<td><code>icn-identity</code> keystore (<code>keypair.age</code>) is one keypair; <code>icn-core config/genesis.rs</code> <code>initial_dids</code> / <code>founding_members</code> and <code>bins/icnctl</code> JSON exports (<code>governance_setup.json</code>, charter, DID-doc, appliance manifest) are value lists with no Rust reader that keys by them; <code>icn-core config/ledger.rs:212 quorum_witnesses</code> (TOML) → <code>WitnessPolicy::Quorum { witnesses: Vec&lt;Did&gt; }</code> is a value set (operator-authored; two spellings of one witness would inflate <code>M</code> — config hygiene, not a store); <code>icn-store</code> blob store and <code>icn-gossip</code> chunk files are keyed by hash.</td>
+</tr>
+<tr>
+<td>Canonical re-encoding on any write path (S11)</td>
+<td>yes</td>
+<td><strong>None.</strong> 42 non-test <code>Did::from_public_key</code> sites, every one fed by a keypair/<code>VerifyingKey</code>; zero re-derive a <code>Did</code> from a parsed <code>Did</code>; the gateway JWT <code>sub</code> is minted as <code>did.to_string()</code> (<code>auth.rs:405</code>), so a wire spelling propagates into every <code>claims.sub</code>-keyed row (#77–#79).</td>
+</tr>
+<tr>
+<td>Crates with no production dependents</td>
+<td>yes</td>
+<td><code>apps/membership</code> (<code>icn-membership-app</code>) duplicates #33–#36 and #62 but nothing depends on it — excluded as dead (#84). <code>icn-ledger-actor</code> ← <code>icn-core</code>; <code>icn-ledger-app</code> ← <code>icnd</code>, <code>icn-gateway</code>; <code>icn-governance-actor</code> ← gateway, <code>icnd</code>, <code>icnctl</code>, <code>icn-core</code>; <code>icn-trust-app</code> ← <code>icnd</code>, <code>icn-core</code>; <code>icn-community</code> ← <code>icnd</code>.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="9-identifier-domain-classification-descriptive-only">9. Identifier-domain classification (descriptive only)</h2>
+<p>Per #2623 §5 and IDENTITY_SEMANTICS §3. <strong>This retypes nothing and does not answer N2-C′.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Domain (§3)</th>
+<th>Stores in this inventory</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cryptographic principal</td>
+<td>#1–#4, #21, #25, #29, #30, #37, #48, #52, #55, #57, #59, #60, #71, #74</td>
+</tr>
+<tr>
+<td>Context subject (human)</td>
+<td>#17, #18, #23, #31, #34, #36, #44, #56, #62, #65, #66, #67, #75, #76, #81, #83</td>
+</tr>
+<tr>
+<td>Governed entity (institution)</td>
+<td>#27, #28, #33, #35, #63, #64, #72, #82</td>
+</tr>
+<tr>
+<td>Infrastructure / node</td>
+<td>#45, #46, #47, #51, #53, #54, #58, #73</td>
+</tr>
+<tr>
+<td>Account / resource</td>
+<td>#9, #10, #11, #12, #13, #14, #15, #16, #39, #40, #41, #42, #68, #69, #70, #77, #78, #79, #80</td>
+</tr>
+<tr>
+<td>Unknown / legacy-mixed</td>
+<td>#5–#8, #19, #20, #22, #26, #32, #38, #43, #49, #50, #61, #84</td>
+</tr>
+</tbody></table>
+<p><strong>Observations, recorded and not acted on.</strong> The <em>node</em> domain has no durable type (§3 says so
+explicitly), so #45/#54 key node identity by <code>Did</code>/<code>String</code> with nothing distinguishing it from a
+person. <code>icn-security</code>&#39;s four keyspaces sit squarely in <em>unknown/legacy-mixed</em>: a reputation row
+may describe a node, a device or a person and nothing in the key says which — which is why their
+merge consequence cannot be reasoned about per-domain and they are classified by exposure instead.</p>
+<hr>
+<h2 id="10-findings-that-exist-independently-of-i7">10. Findings that exist independently of I7</h2>
+<p>Per #2623&#39;s scope rule, these are <strong>documented, not fixed</strong>; none is in N2-A0&#39;s or N2-A&#39;s scope.
+The review&#39;s disposition of each is recorded at the end of its entry (owner issue, or why no issue).</p>
+<h3 id="101-anchor-derived-dids-are-unreadable-about-half-the-time">10.1 Anchor-derived DIDs are unreadable about half the time</h3>
+<p><code>from_anchor_id</code> writes via <code>new_unchecked</code> (no validation); <code>Deserialize</code> reads via <code>from_str</code>
+(Ed25519 validation). Measured ≈ 50% failure (§2.3: 110/200, 9,949/20,000, 989/2,000 via
+<code>Anchor::from_vui</code>, and <strong>2,459/5,000 for cooperative treasury DIDs exactly as <code>icn-coop</code>
+constructs them</strong>). Any durable store holding an anchor-derived DID in a serde-decoded field can
+fail to load; <code>icn-ledger/src/treasury.rs:980 load_from_store</code> skips such rows <strong>silently</strong>, so
+about half of cooperative treasuries would drop out of the treasury manager&#39;s maps on reload;
+<code>icn-gossip/src/gossip.rs:1380 restore_state</code> is the opposite failure mode — one unparseable DID
+aborts the whole gossip restore. This is a <em>live read-path</em> defect, not constructor hygiene.
+<strong>Disposition:</strong> owned by I8 / N2-B (#2628, &quot;compatibility-only reads come first … closes the
+deserialization-path defect&quot;); the measurements above are recorded <strong>on #2628</strong> (comment of
+2026-08-19) rather than in a duplicate issue, with the note that the compat-read half may deserve
+to be pulled ahead of N2-A.</p>
+<h3 id="102-any-party-can-re-spell-a-captured-envelope-and-replay-it">10.2 Any party can re-spell a captured envelope and replay it</h3>
+<p>§2.2 proves both envelopes verify <em>and</em> that the signature does not cover <code>from</code>, so a third party
+with no key material can rewrite <code>from</code> to an alternate spelling and the <code>ReplayGuard</code> opens a fresh
+window for it. Rows #1–#4 and map #37 are keyed by the wire spelling, so one principal&#39;s traffic has
+up to 23 independent replay floors, and <code>apps/trust-app/src/sequence.rs</code> (#71) is a fourth instance
+of the same class for attestation issuers. Replay protection at the envelope-sequence layer is
+bypassable <strong>today</strong>. This is the highest-severity finding in this document and it is <strong>not</strong>
+caused by I7 — equality-over-bytes would <em>reduce</em> it (one in-memory window per key) but not close
+it (the durable rows #1–#3 are spelling-keyed and <code>from</code> stays unsigned); pin-at-parse or signing
+<code>from</code> closes it. <strong>Disposition:</strong> no existing issue owned it (#2480 observed &quot;<code>from</code> is not in the
+signed bytes&quot; and concluded it did not matter; it did not consider spellings). <strong>Filed by this
+review as #2640</strong> (<code>epic:trust-hardening</code>, <code>security-review</code>).</p>
+<h3 id="103-vote-double-counting-and-a-re-cast-guard-that-cannot-fire">10.3 Vote double-counting, and a re-cast guard that cannot fire</h3>
+<p><code>GovernanceError::AlreadyVoted</code> (<code>icn-governance/src/error.rs:33</code>) has <strong>zero constructors anywhere
+in the workspace</strong> — confirmed live, matching IDENTITY_SEMANTICS §7.5&#39;s &quot;declared but never
+constructed&quot;. The production tally paths count every stored row: <code>GovernanceStore::compute_tally</code>
+(<code>store.rs:298</code>, <code>:650</code>) is <code>list_votes</code> → <code>VoteTally::from(votes)</code>, and
+<code>compute_tally_with_delegations</code> (<code>tally.rs:114–118</code>, no non-test caller today) calls
+<code>tally.add_vote(vote)</code> unconditionally in pass 1 with <code>counted</code> gating only <em>delegation</em>
+resolution. Two votes from one person under two spellings are <strong>both counted</strong>; row #18&#39;s
+de-duplication is over <code>Vec&lt;String&gt;</code>, so it does not catch it; and <code>apps/governance</code>&#39;s own guard
+(<code>manager.rs:~4771</code>, <code>v.voter == voter</code>) is <code>Did</code> string equality, so the live store (#23) takes the
+second row too. Because <code>icn-governance</code>&#39;s sled store is dormant (§3.1), the <em>live</em> double-count is
+#23. §7.5 anticipated this for a <em>re-key</em>; it is reachable now without one, and I7 alone does not
+fix it (the rows are <code>Display</code>-keyed). <strong>Disposition:</strong> no issue owned it (§7.5 is stated as a gate,
+not materialised; #2623/#2626/#2627 disclaim governance storage). <strong>Filed by this review as
+#2641.</strong></p>
+<h3 id="104-grantee_canonical_bytes-canonicalizes-the-layout-not-the-spelling">10.4 <code>grantee_canonical_bytes</code> canonicalizes the <em>layout</em>, not the spelling</h3>
+<p><code>receipt_store.rs:1071</code> is named <code>*_canonical_bytes</code> and emits a tag byte followed by
+<code>did.as_str()</code> — the raw spelling. A lookup with a differently-spelled DID misses the grant (fails
+closed), while two grants for one principal can coexist. On re-reading, its doc comment defines
+&quot;canonical&quot; precisely: the ADR-0014 tag-byte + length-prefix <em>layout</em> that keeps <code>Person</code> and
+<code>Entity</code> in separate keyspaces and prevents prefix aliasing (PR #1576) — it does not claim DID
+spelling canonicalization. The first pass&#39;s &quot;the name asserts a property the function does not
+have&quot; is therefore withdrawn. <strong>Disposition:</strong> not an independent defect — it is row #25&#39;s ordinary
+spelling-keyed index, in the same class as every other <code>SILENT-MERGE RISK</code> row; handled by N2-A&#39;s
+scan, no issue.</p>
+<h3 id="105-partner-invariants-that-i7-would-introduce-n2-a-must-fix-atomically">10.5 Partner invariants that I7 would <em>introduce</em> (N2-A must fix atomically)</h3>
+<p>Not current defects — today every one of these is string-consistent. I7 moves one half and not the
+other. <strong>Disposition:</strong> no &quot;current defect&quot; issue; tracked as N2-A constraints (§12.1 item 6) and
+recorded on #2627 (comment of 2026-08-19).</p>
+<ul>
+<li><code>PeerId(pub Did)</code> (<code>icn-net/src/topology.rs:42–55</code>) derives <code>PartialEq</code>/<code>Eq</code>/<code>Hash</code> — which
+delegate to <code>Did</code> and so move under I7 — while hand-implementing <code>Ord</code> over
+<code>self.0.to_string()</code>, which does not move (<code>Did</code> itself has no <code>Ord</code>). After I7, two aliasing
+<code>PeerId</code>s satisfy <code>a == b</code> while <code>a.cmp(&amp;b) != Equal</code>, violating the standard library&#39;s
+<code>Ord</code>/<code>Eq</code> consistency requirement. <code>PeerId</code> is used in four <code>BTreeSet</code>s and one <code>HashMap</code>
+(<code>topology.rs:23–35</code>), where an inconsistent <code>Ord</code> yields unspecified lookup and insertion
+behaviour. (Row #52.)</li>
+<li><code>icn-ccl</code> <code>Value</code> (<code>icn-ccl/src/types.rs:110–131</code>) derives <code>PartialEq</code>/<code>Eq</code> — <code>Value::Did</code>
+moves — but hand-implements <code>Hash</code> (<code>:200–220</code>) and hashes <code>Value::Did</code> as
+<code>format!(&quot;{did:?}&quot;)</code>, a string, which does not move. <code>HashSet&lt;Value&gt;</code> (<code>Value::Set</code>, used for
+<code>participants</code> and <code>in</code> checks in <code>interpreter.rs:403–410, 484–485</code>) then violates the
+<code>Hash</code>/<code>Eq</code> contract: <code>List.contains</code> (Eq, moves) and <code>Set.contains</code> (Hash, does not) disagree.
+(Row #61.) Contract <em>state</em> is in-memory only, but <code>Value::Set</code> is persisted inside
+<code>Contract.state_vars[].initial_value</code> via <code>icn_encoding</code> (<code>ast.rs:69</code>).</li>
+<li>The <code>icn-net</code> connection-map pair: <code>SessionManager.connections: HashMap&lt;String, quinn::Connection&gt;</code>
+keyed by <code>from.to_string()</code> (<code>session.rs:58</code>, <code>:906–912</code>) and <code>NetworkActor.peer_connections: HashMap&lt;Did, PeerConnectionInfo&gt;</code> (<code>actor/mod.rs:1098</code>), both filled from the same Hello <code>from</code>
+and joined in <code>actor/messages.rs:474–491 send_message_to_peer</code> (<code>Did</code>-keyed lookup, then
+<code>connections().find(|(peer_did, _)| peer_did == did.as_str())</code>). Post-I7 the <code>Did</code> map finds an
+alias, the <code>String</code> map does not. (Row #60.)</li>
+<li>Every production <code>did.as_str() == string</code> / <code>did.to_string() != string</code> comparison standing in
+for <code>Did</code> equality stays spelling-sensitive post-I7: <code>icn-gateway</code> <code>api/commons/mod.rs:242, 278, 358</code> (<code>claims.sub != did.to_string()</code>), <code>websocket.rs:220</code>, <code>api/sdis/simple_enrollment.rs:1096, 1127</code>, <code>listings_mgr.rs:929</code>, <code>trust_mgr.rs:1159</code>; <code>icn-core storage_challenge.rs:526</code>,
+<code>supervisor/init_network.rs:315, 370</code>; <code>icn-gossip handlers/storage_challenge.rs:58</code>; <code>icn-store pos.rs:251, 490, 596</code>; <code>icn-trust lib.rs:1180</code> (<code>Did</code> vs <code>Did</code> via <code>as_str</code>); <code>bins/icnctl main.rs:6242</code>. Not defects today; N2-A must decide per site whether string comparison is the
+intended semantics.</li>
+</ul>
+<h3 id="106-namespaces-that-i7-does-not-reach-and-therefore-desynchronises">10.6 Namespaces that I7 does not reach, and therefore desynchronises</h3>
+<p>Three constructs embed or duplicate a DID but keep string equality, so I7 moves <code>Did</code> out from
+under them:</p>
+<ul>
+<li><strong><code>EntityId(String)</code></strong> — <code>EntityId::from_did</code> (<code>entity.rs:51</code>) splices the multibase spelling
+verbatim into <code>entity:icn:individual:&lt;spelling&gt;</code>. Rows #33–#35 are durable membership keys.
+After I7, <code>a == b</code> as <code>Did</code> while <code>EntityId::from_did(a) != EntityId::from_did(b)</code> — two member
+rows for one principal, permanently, and I7 alone will not fix it.</li>
+<li><strong><code>icn-kernel-api::Did = String</code></strong> (<code>types.rs:9</code>) — the alias family I12/N2-H owns. Unaffected by
+I7 by construction.</li>
+<li><strong><code>StewardId::from_did</code></strong> (<code>icn-governance/src/steward.rs:29–38</code>) = SHA-256 of
+<code>&quot;steward:&quot; ‖ did.as_str()</code> — a primary key hashed over the <em>spelling</em>, used by the live
+<code>icn-commons</code> steward store (<code>commons/stewards/&lt;hex&gt;</code>, #63). Two spellings → two steward records,
+and I7 does not move a <code>[u8; 32]</code>.</li>
+<li><strong><code>icn-commons</code> weak-holder id</strong> (<code>icn-commons/src/inner.rs:346–362 update_display_name</code>) =
+SHA-256 of <code>did.to_string()</code>, minted behind a <code>Did</code>-equality authorization gate (#65) — the one
+namespace construct where I7 <em>creates</em> a durable split (§3.1 clause (d)).</li>
+<li><strong><code>icn-snapshot::vector_clock: HashMap&lt;String,u64&gt;</code></strong> (#54) and
+<strong><code>NetworkState.peer_connections: HashMap&lt;String,_&gt;</code></strong> (#57) — <code>String</code>-keyed on disk, but
+both are parsed back into <code>Did</code>-keyed maps on restore, so they <em>are</em> moved (lossily) by I7 at
+the restore boundary. #54 is therefore resolved <code>NEEDS MIGRATION</code>, not <code>UNRESOLVED</code> (§11).</li>
+<li><strong><code>icn-community</code> <code>Community.members: HashMap&lt;String, Member&gt;</code></strong> (#72) — <code>String</code>-keyed
+(&quot;Can be DID or CooperativeId&quot;), never parsed to <code>Did</code>; diverges from any <code>Did</code>-typed
+membership view.</li>
+</ul>
+<p><strong>N2-A must state explicitly which of these it is and is not fixing</strong> (§12.1 item 4(iv)).</p>
+<hr>
+<h2 id="11-coverage-limits--what-this-inventory-does-not-establish">11. Coverage limits — what this inventory does not establish</h2>
+<p>Stated plainly, per #2623&#39;s sixth acceptance criterion.</p>
+<ol>
+<li><strong>No live data was examined.</strong> Every verdict is derived from source and from probes against the
+real types. Whether any deployed store <em>currently contains</em> two aliasing spellings is unknown and
+unknowable from the repository. The inventory therefore bounds the <strong>reachable</strong> hazard, not the
+<strong>realised</strong> one. A pre-migration scan of live keyspaces remains necessary and is N2-A&#39;s to run
+(§12.1 item 3).</li>
+<li><strong>Row #54 is resolved</strong> (<code>NEEDS MIGRATION</code>, §3.1 clause (c)): the snapshot vector clock is
+parsed back into the <code>Did</code>-keyed gossip clock on restore (<code>gossip.rs:1369–1382</code>). No row is
+<code>UNRESOLVED</code> after this review. The two <code>String</code>-keyed structures that are <em>not</em> re-keyed (#72
+<code>Community.members</code>, #73 <code>ReplicaMetadata</code>) are classified, not left open: not moved by I7,
+flagged for N2-A&#39;s namespace decision (§10.6).</li>
+<li><strong>Value-position DIDs were not exhaustively enumerated.</strong> S8 found 155 struct-field rows (147
+distinct structs) with a <code>Did</code> field. Those used as <em>keys</em> are covered; those appearing only in
+<em>values</em> are not individually listed, on the ground that I7 does not change value semantics. If
+N2-A adds normalization at the parse boundary rather than at <code>Eq</code>/<code>Hash</code>, that assumption breaks
+and all 147 need re-review.</li>
+<li><strong><code>icn-ccl</code> is now traced</strong> (first pass: untraced). Contract <em>state</em> is in-memory only
+(<code>runtime.rs:25</code>); <code>ContractRegistry</code> persists <code>participants: Vec&lt;Did&gt;</code> value-position and
+<code>owner: String</code> (its doc header claims an <code>index:owner:&lt;did&gt;</code> keyspace that is <strong>not written</strong> —
+comment drift, noted); <code>Value::Set</code> is persisted only inside <code>Contract.state_vars[].initial_value</code>.
+No <code>Did</code>-keyed map is persisted, but the <code>Value</code> type is a partner type (#61, §10.5).</li>
+<li><strong>Test-only stores were excluded by construction</strong> (<code>/tests/</code>, <code>#[cfg(test)]</code>). A durable store
+reachable only from test harnesses would be missed; the S5 root scan found no such case, but this
+is an exclusion, not a proof. Conversely, S14 found <em>library</em> stores that no binary constructs
+(dormant #17–#22, #44, #46) and write paths no binary reaches (dead, #84).</li>
+<li><strong>The 23-spelling figure is a floor, not a ceiling.</strong> It is what multibase v0.9.2 (24 declared
+bases: 23 unconditional + <code>Identity</code>) accepts through <code>Did::from_str</code>. A dependency bump that
+adds a base widens the aliasing surface with no code change in this repo; a key whose raw bytes
+are valid UTF-8 (~1 in 10⁸ random keys, grindable) has a 24th.</li>
+<li><strong>Probe sources are recorded but not committed</strong> — this tranche adds no code, so the
+integration-test probes live in §13.4 and §13.5 rather than in <code>tests/</code>. Re-add them as temporary
+integration tests to reproduce §2; delete them afterwards and <strong>before</strong> re-taking any S1/S7 count.</li>
+<li><strong><code>sled</code> iteration order is lexicographic by key bytes</strong> (resolved; first pass: &quot;treated as
+unspecified&quot;). <code>SledStore::scan</code> (<code>icn-store/src/lib.rs:811</code>) iterates <code>db.scan_prefix(prefix)</code>,
+which yields keys in byte order, so every &quot;last-writer-wins&quot; rebuild in §6 has a
+<strong>deterministic, attacker-selectable</strong> survivor: the multibase code character decides — in ASCII
+<code>&#39;B&#39; &lt; &#39;C&#39; &lt; … &lt; &#39;Z&#39; &lt; &#39;b&#39; &lt; &#39;c&#39; &lt; &#39;f&#39; &lt; &#39;h&#39; &lt; &#39;k&#39; &lt; &#39;m&#39; &lt; &#39;t&#39; &lt; &#39;u&#39; &lt; &#39;v&#39; &lt; &#39;z&#39;</code>, and the
+<code>Base256Emoji</code> prefix <code>🚀</code> (<code>F0 9F 9A 80</code>) sorts after all of them, so an attacker who wants
+their row to survive spells it in <code>Base256Emoji</code>; the canonical <code>z…</code> spelling beats every other
+ASCII alternate. This does not change any verdict under §3.1 (the class is decided by whether a
+<code>Did</code>-re-keying consumer exists, not by who wins) but it changes the severity wording: &quot;arbitrary
+survivor&quot; in #37, #38, #39 is &quot;chosen survivor&quot;. <code>HashMap</code>-sourced restores (#54, #57) have a
+nondeterministic survivor instead.</li>
+<li><strong>Line numbers are as of <code>798c8d54</code>.</strong> Symbols, not line numbers, are the citation; the review
+re-found every cited symbol at or near its line.</li>
+</ol>
+<hr>
+<h2 id="12-result">12. Result</h2>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SAFE</code></td>
+<td><strong>67</strong> — 58 ephemeral S1 sites not belonging to any row (§7) + <code>PrincipalKey</code> (#55) + 8 rows the review reclassified as safe or dead (#43, #47, #48, #49, #50, #51, #53, #84)</td>
+</tr>
+<tr>
+<td><code>SILENT-MERGE RISK</code></td>
+<td><strong>51</strong> — 24 in §5, 19 in §5.1, 3 in §6, 5 in §6.1</td>
+</tr>
+<tr>
+<td><code>NEEDS MIGRATION</code></td>
+<td><strong>24</strong> rows — 12 in §5, 3 in §5.1, 8 in §6, 1 in §6.1</td>
+</tr>
+<tr>
+<td><code>UNRESOLVED</code></td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td><strong>Total candidate stores inspected</strong></td>
+<td><strong>142</strong> — 36 durable keyspaces (§5) + 23 added (§5.1) + 18 reconstructed/serialized (§6) + 6 added (§6.1) + 58 safe sites (§7) + #55</td>
+</tr>
+</tbody></table>
+<p>(First pass: 121 candidates — 67 / 31 / 22 / 1. The review added 29 rows, reclassified 18, and
+resolved the open one. Counts are produced by the generator that renders the tables, and
+re-verified by counting the rendered verdict cells — see the closing comment on #2623.)</p>
+<p><strong>Concrete list N2-A inherits — the <code>NEEDS MIGRATION</code> rows</strong>, 24 in all: #1, #2, #3, #4, #5, #6,
+#7, #8, #9, #23, #29, #30, #37, #38, #39, #40, #42, #45, #46, #54, #57, #65, #68, #69.
+Folding each consumer row into its keyspace, that is <strong>13 live keyspaces / structures plus one
+dormant shape</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Keyspace / structure</th>
+<th>Consumer that makes it lossy</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>icn-net replay state #1–#3</td>
+<td>#37 <code>load_persisted_state</code></td>
+<td>overwrite, chosen survivor; lower floor can win</td>
+</tr>
+<tr>
+<td>2</td>
+<td>icn-net sequence tracker #4</td>
+<td>own <code>:98 cache</code></td>
+<td>overwrite; lower outgoing seq ⇒ nonce regression</td>
+</tr>
+<tr>
+<td>3</td>
+<td>icn-security misbehavior #5–#8</td>
+<td>#38 <code>load_from_store</code></td>
+<td>overwrite + orphan on save</td>
+</tr>
+<tr>
+<td>4</td>
+<td>icn-ledger balances #9 (+ journal)</td>
+<td>#39 <code>load_cached_balances</code>, #40 <code>compute_all_balances</code></td>
+<td>overwrite + orphan; sum</td>
+</tr>
+<tr>
+<td>5</td>
+<td>icn-ledger cleared volume #69</td>
+<td>own <code>load_cleared_volume_index</code></td>
+<td>overwrite + orphan (tuple key)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>icn-ledger freeze #68</td>
+<td>#42 <code>load_from_store</code></td>
+<td>overwrite; unfreeze deletes one spelling only</td>
+</tr>
+<tr>
+<td>7</td>
+<td>apps/governance votes #23 (<strong>§7.5 gate</strong>)</td>
+<td><code>actor.rs:3862–3864</code></td>
+<td>last-writer; direct double-count</td>
+</tr>
+<tr>
+<td>8</td>
+<td>icn-rpc auth challenges #29 (low)</td>
+<td><code>load_challenges</code></td>
+<td>overwrite; TTL-bounded</td>
+</tr>
+<tr>
+<td>9</td>
+<td>icn-trust edges #30</td>
+<td><code>get_all_known_dids</code> → spelling scans</td>
+<td>dropped spellings&#39; edges vanish</td>
+</tr>
+<tr>
+<td>10</td>
+<td>icn-commons weak-holder id #65</td>
+<td>the <code>Did</code>-equality gate</td>
+<td>second record minted post-I7 (clause (d))</td>
+</tr>
+<tr>
+<td>11</td>
+<td>class C: <code>VectorClock</code> #45</td>
+<td>serde map decode</td>
+<td>last duplicate kept silently</td>
+</tr>
+<tr>
+<td>12</td>
+<td>class C: snapshot <code>vector_clock</code> #54</td>
+<td><code>gossip.rs restore_state</code></td>
+<td>overwrite on restore</td>
+</tr>
+<tr>
+<td>13</td>
+<td>class C: snapshot <code>peer_connections</code> #57</td>
+<td><code>actor/mod.rs restore_state</code></td>
+<td>overwrite / first-wins on restore</td>
+</tr>
+<tr>
+<td>—</td>
+<td>class C: <code>CompressedVectorClock</code> #46 (<strong>dormant</strong>)</td>
+<td>none today</td>
+<td>fix the derive shape; no data step</td>
+</tr>
+</tbody></table>
+<p>Dropped from the first pass&#39;s list, with the reason in each row: #17/#18 (dormant store — the live
+vote keyspace is #23), #24 (raw-byte-keyed state, no <code>Did</code> re-key), #31 (local canonical write
+path, point lookup only), #33/#34 (<code>EntityId</code> is not moved by I7 — a §10.6 namespace decision, and
+cannot differ from #35), #50 (ephemeral). Added: #29, #30, #42/#68, #46, #54, #57, #65, #69.</p>
+<p><strong>What the evidence says about the mechanism choice.</strong> IDENTITY_SEMANTICS §11 (I7) permits either
+equality over decoded bytes or encoding pinned at parse. This inventory does not choose — that is
+N2-A&#39;s decision and its rationale is N2-A&#39;s to state — but it records three constraints the choice
+must satisfy:</p>
+<ol>
+<li>Pinning at parse changes what <code>Did::from_str</code> <em>accepts</em>, which is a wire-compatibility change
+affecting all 168 class-E parse sites (§4 S7), and would make currently-loadable persisted rows
+unloadable. Equality over decoded bytes changes no acceptance and no durable byte — but it is
+the only one of the two that leaves the third-party re-spelling replay (§2.2) open, because
+<code>from</code> is unsigned and the durable replay rows stay spelling-keyed.</li>
+<li>Neither mechanism fixes §10.6 — <code>EntityId</code>, <code>StewardId</code>, the <code>icn-commons</code> holder id, the
+kernel <code>String</code> alias, <code>Community.members</code> and <code>ReplicaMetadata</code> keep string equality either way.</li>
+<li>Neither mechanism repairs a durable keyspace by itself. Every §5 row is built by <code>Display</code>, which
+I7 does not touch, so the physical rows survive I7 unchanged and a <strong>separate re-keying step</strong> is
+required for the list above. <code>PrincipalKey</code> (#55) is the in-repo precedent for the decoded-byte
+form, <code>VectorClockProjection::from_entries</code> (max-per-key) for a decode merge rule, and
+<code>legacy_proposal_index_key</code> (§8) for the rewrite mechanics.</li>
+</ol>
+<p><strong>§7.5 remains a separate hard gate.</strong> Rows #23 (live), #17/#18 (dormant), #56 (<code>StaticList</code>
+membership) and finding §10.3 are membership and vote storage. §7.5 requires migration ordering,
+alias/transition recognition, duplicate-act prevention and final cutover to be designed before any
+live re-key. Nothing here discharges that gate, and N2-A must not treat these rows as ordinary
+migrations.</p>
+<h3 id="121-what-n2-a-must-design-against--the-surface-not-the-design">12.1 What N2-A must design against — the surface, not the design</h3>
+<p>This inventory does not design the migration. It hands N2-A the surface the migration must be
+designed against, as a checklist it can be reviewed against:</p>
+<ol>
+<li><strong>Persisted-keyspace list</strong> — §5 (rows #1–#36 plus the review additions). Every durable
+keyspace whose key embeds a DID spelling, with its write path (locally-generated canonical vs
+wire/API spelling) and whether it is live, dormant or dead.</li>
+<li><strong>Migration-required list</strong> — §12 <em>Concrete list</em>, with the mechanism per row in §5/§6. A
+keyspace appears once; its re-keying consumer is the evidence.</li>
+<li><strong>Pre-migration collision scan</strong> — mandatory, because no live data was examined (§11 item 1).
+For every keyspace in §5, group rows by decoded key bytes (not by spelling) and report groups
+of size &gt; 1. <code>Base256Emoji</code> (<code>🚀…</code>) spellings sort after every ASCII spelling under <code>sled</code>&#39;s
+lexicographic order, so report the <em>order</em> of rows in each group too — it decides the
+survivor in every last-writer rebuild (§11 item 8).</li>
+<li><strong>Ordering constraints</strong> —
+(i) for <code>NEEDS MIGRATION</code> keyspaces with a <code>Did</code>-keyed rebuild (#1–#3/#37, #4, #5–#8/#38,
+#9/#39/#40, #23, #29, #30, #42/#68, #54, #57, #69), de-dupe the durable rows <strong>before</strong> the first start of a
+binary with key-equality <code>Did</code>, because that first start performs the lossy rebuild and the
+write-back (<code>save_to_store</code>, <code>save_cached_balances</code>) then orphans the losers;
+(ii) for class-C structures (#45, #46) the merge rule for aliasing keys (max / sum / reject)
+must be chosen before decode collapses them — <code>VectorClockProjection::from_entries</code> already
+picks <em>max</em>, which is a precedent;
+(iii) membership and vote keyspaces (#17/#18 dormant, #23 live, <code>StaticList</code> row) are behind
+the <strong>§7.5 hard gate</strong> — migration ordering, alias/transition recognition, duplicate-act
+prevention and final cutover — and are not ordinary migrations;
+(iv) the namespaces I7 does not move (<code>EntityId::from_did</code>, <code>StewardId::from_did</code>,
+<code>icn-commons</code> weak-holder id = SHA-256 of the spelling, the kernel <code>Did = String</code> alias,
+<code>String</code>-keyed snapshot maps) need an explicit decision — follow <code>Did</code> (canonicalise at
+construction + de-dupe rows) or stay spelling-keyed — stated in N2-A, per namespace.</li>
+<li><strong>Compatibility and rollback</strong> — equality-over-bytes changes no durable byte and no
+acceptance, so a binary rolled back to string equality reads the migrated (de-duplicated)
+rows unchanged; pin-at-parse changes acceptance and makes every alternate-spelled row
+unloadable (§12 constraint 1), so it needs a compatibility-read window first — and it is the
+only mechanism that closes the third-party re-spelling replay (§2.2, #2640) without a wire change.</li>
+<li><strong>Partner-type invariants that move out of step</strong> (all must be fixed in the same change):
+<code>PeerId</code> <code>Ord</code> over <code>to_string()</code> (#52, §10.5); <code>icn-ccl</code> <code>Value</code> derives <code>PartialEq</code>/<code>Eq</code>
+but hand-hashes <code>Value::Did</code> via <code>format!(&quot;{did:?}&quot;)</code> — <code>HashSet&lt;Value&gt;</code> (<code>Value::Set</code>,
+<code>participants</code>, <code>in</code> checks) breaks the <code>Hash</code>/<code>Eq</code> contract post-I7; the <code>String</code>/<code>Did</code>
+peer-map pair in <code>icn-net</code> (<code>SessionManager.connections: HashMap&lt;String,_&gt;</code> keyed by
+<code>from.to_string()</code> vs <code>peer_connections: HashMap&lt;Did,_&gt;</code>, joined in
+<code>actor/messages.rs send_message_to_peer</code>) which disagree post-I7; every production
+<code>did.as_str() == some_string</code> comparison standing in for <code>Did</code> equality (icn-gateway commons
+<code>claims.sub != did.to_string()</code>, websocket, sdis enrollment, listings, trust_mgr; icn-core
+storage_challenge, init_network; icn-store pos; icnctl) stays spelling-sensitive.</li>
+<li><strong>Unresolved-data policy</strong> — none of the inventory&#39;s rows is <code>UNRESOLVED</code> after review. If
+the pre-migration scan finds an aliasing group whose store has no stated merge rule, the
+policy is <strong>fail closed</strong>: refuse to start the key-equality binary on that store until the
+rule is chosen, rather than let the rebuild pick a survivor.</li>
+</ol>
+<hr>
+<h2 id="13-appendix--the-search-and-probe-sources">13. Appendix — the search and probe sources</h2>
+<p>Recorded verbatim so §4&#39;s methodology and §2&#39;s measurements are re-runnable rather than merely
+described. None of this is committed as code; all of it is reproducible from a clean checkout at
+<code>798c8d54</code> (and at <code>bca3dd0e</code> — the Rust tree is identical). The three scanners run from the
+repository root and are read-only; they are a <em>read list</em> for the human pass, not results — the
+load-bearing results are the S1–S14 commands in §4 and the two probes below. Every expected count
+in this appendix was re-run by the review and reproduced exactly, with no probe files present.</p>
+<h3 id="131-s5--rank-durable-roots-by-identity-term-density">13.1 S5 — rank durable roots by identity-term density</h3>
+<pre><code class="language-python">import re, os
+ROOT = &quot;.&quot;
+files = []
+for dp, dn, fn in os.walk(ROOT):
+    if &#39;/.git&#39; in dp or &#39;/target&#39; in dp or &#39;/node_modules&#39; in dp:
+        continue
+    files += [os.path.join(dp, f) for f in fn if f.endswith(&#39;.rs&#39;)]
+durable = [f for f in files
+           if re.search(r&#39;sled::(Db|Tree|open|Config)&#39;,
+                        open(f, encoding=&#39;utf8&#39;, errors=&#39;replace&#39;).read())]
+IDENT = re.compile(
+    r&#39;\b(did|dids|_did|did_|member_id|member_did|owner|owner_did|actor|actor_did|&#39;
+    r&#39;peer_id|peer_did|subject|subject_id|principal|voter|issuer|holder|signer|&#39;
+    r&#39;operator_did|node_did|org_did|treasury_did|coop_id|entity_id|account)\b&#39;, re.I)
+rows = sorted(((len(IDENT.findall(open(f, encoding=&#39;utf8&#39;, errors=&#39;replace&#39;).read())),
+                os.path.relpath(f, ROOT)) for f in durable), reverse=True)
+print(&quot;rust files:&quot;, len(files), &quot;| touching sled:&quot;, len(durable))
+for n, p in rows:
+    print(f&quot;{n:5d}  {p}&quot;)
+</code></pre>
+<p>Expected at <code>bca3dd0e</code>: <strong>1033</strong> Rust files, <strong>69</strong> touching <code>sled</code>.</p>
+<h3 id="132-s6--did-keyed-collections-inside-serde-derived-structs-class-c">13.2 S6 — <code>Did</code>-keyed collections inside serde-derived structs (class C)</h3>
+<pre><code class="language-python">import re, os
+COLL = re.compile(r&#39;(HashMap|BTreeMap|DashMap|HashSet|BTreeSet)&lt;\s*&amp;?\s*Did\b&#39;)
+DERIVE = re.compile(r&#39;#\[derive\(([^)]*)\)\]&#39;)
+for dp, dn, fn in os.walk(&quot;.&quot;):
+    if &#39;/.git&#39; in dp or &#39;/target&#39; in dp or &#39;/node_modules&#39; in dp:
+        continue
+    for f in fn:
+        if not f.endswith(&#39;.rs&#39;):
+            continue
+        p = os.path.join(dp, f)
+        if &#39;/tests/&#39; in p:
+            continue
+        lines = open(p, encoding=&#39;utf8&#39;, errors=&#39;replace&#39;).read().split(&#39;\n&#39;)
+        for i, l in enumerate(lines):
+            if not COLL.search(l):
+                continue
+            for j in range(i, max(-1, i - 60), -1):          # nearest enclosing item
+                if re.match(r&#39;\s*(pub )?(struct|enum) &#39;, lines[j]):
+                    for k in range(j - 1, max(-1, j - 8), -1):
+                        m = DERIVE.search(lines[k])
+                        if m and (&#39;Serialize&#39; in m.group(1) or &#39;Deserialize&#39; in m.group(1)):
+                            print(f&quot;{p}:{i+1}  {lines[j].strip()[:70]}  [{m.group(1)[:40]}]&quot;)
+                        if m:
+                            break
+                    break
+</code></pre>
+<p><strong>Known limitations, stated because they changed verdicts:</strong> (i) the backward walk stops at the
+nearest enclosing <code>struct</code>/<code>enum</code>, so a <code>let</code> binding inside an <code>impl</code> block is attributed to that
+block&#39;s type — two of the five raw hits (<code>icn-trust/src/anomaly.rs:601–602</code>) are such false
+positives; (ii) the scanner cannot tell <code>icn_identity::Did</code> from the kernel <code>type Did = String</code>
+alias — a third hit, <code>icn-kernel-api/src/proofs.rs:490</code>, is the alias (#53); (iii) it matches only
+map/set types, so a serialized <code>Vec&lt;Did&gt;</code> with set semantics (#56) is invisible to it. The two real
+class-C members are #45 and #46. Treat the output as a <em>read list</em>, never as a result.</p>
+<h3 id="133-s8--wrapper-types-that-hide-a-did-the-second-pass">13.3 S8 — wrapper types that hide a <code>Did</code> (the second pass)</h3>
+<pre><code class="language-python">import re, os
+for dp, dn, fn in os.walk(&quot;.&quot;):
+    if &#39;/.git&#39; in dp or &#39;/target&#39; in dp or &#39;/node_modules&#39; in dp:
+        continue
+    for f in fn:
+        if not f.endswith(&#39;.rs&#39;):
+            continue
+        p = os.path.join(dp, f)
+        if &#39;/tests/&#39; in p:
+            continue
+        src = open(p, encoding=&#39;utf8&#39;, errors=&#39;replace&#39;).read()
+        for m in re.finditer(r&#39;pub struct (\w+)\s*\(\s*(?:pub\s+)?Did\s*\)&#39;, src):
+            print(&quot;newtype-struct        &quot;, m.group(1), p)
+        for m in re.finditer(r&#39;(\w+)\s*\(\s*Did\s*\)\s*,&#39;, src):
+            print(&quot;enum-variant          &quot;, m.group(1), p)
+        for m in re.finditer(r&#39;pub struct (\w+)\s*\{[^}]{0,400}?\bpub \w+: Did\b&#39;, src, re.S):
+            print(&quot;struct-with-did-field &quot;, m.group(1), p)
+</code></pre>
+<p>Expected at <code>bca3dd0e</code>: <strong>155</strong> <code>struct-with-did-field</code> rows (<strong>147</strong> distinct struct names — the
+script prints every occurrence, not distinct names) and <strong>8</strong> newtype/enum-variant rows resolving to
+<strong>5</strong> distinct wrappers: <code>PeerId</code>, and the <code>Did</code> / <code>Person</code> / <code>Query</code> / <code>Remote</code> variants. Of those,
+<code>PeerId(pub Did)</code> produced finding #52, <code>AccountId::Did(Did)</code> produced #9 and §10.6, and
+<code>Grantee::Person(Did)</code> produced #25. <strong>This class is invisible to S1</strong> — it is the reason §9 exists
+as a separate pass.</p>
+<h3 id="134-probe-a--encoding-aliasing-and-anchor-round-trip-21-23">13.4 Probe A — encoding aliasing and anchor round-trip (§2.1, §2.3)</h3>
+<p>Add as <code>icn/crates/icn-identity/tests/n2a0_probe.rs</code>, run
+<code>cargo test -p icn-identity --test n2a0_probe -- --nocapture</code>, then <strong>delete it</strong>. The first test
+tries every base <code>multibase</code> v0.9.2 declares (the <code>Identity</code> base is built by hand because
+<code>multibase::encode(Identity, …)</code> panics on non-UTF-8 bytes); the second proves the <code>Identity</code>
+parser path with a constructed ASCII-valued point.</p>
+<pre><code class="language-rust">use icn_identity::anchor::{Anchor, EnrollmentPathway};
+use icn_identity::Did;
+use std::collections::HashMap;
+
+#[test]
+fn probe() {
+    let kp = icn_identity::KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let (_b, bytes) = multibase::decode(&amp;canonical.as_str()[8..]).unwrap();
+
+    use multibase::Base::*;
+    // Every base multibase 0.9.2 declares (the first pass&#39;s probe tried 22 of them).
+    let all = [Identity, Base2, Base8, Base10, Base16Lower, Base16Upper, Base32Lower, Base32Upper,
+               Base32PadLower, Base32PadUpper, Base32HexLower, Base32HexUpper,
+               Base32HexPadLower, Base32HexPadUpper, Base32Z, Base36Lower, Base36Upper,
+               Base58Flickr, Base58Btc, Base64, Base64Pad, Base64Url, Base64UrlPad, Base256Emoji];
+    let mut distinct: std::collections::HashSet&lt;String&gt; = Default::default();
+    let mut rejected = vec![];
+    for b in all {
+        let enc = if b == Identity {
+            match std::str::from_utf8(&amp;bytes) { Ok(s) =&gt; format!(&quot;\u{0}{s}&quot;), Err(_) =&gt; { rejected.push(&quot;Identity: key bytes not valid UTF-8 (encode would panic)&quot;.into()); continue; } }
+        } else { multibase::encode(b, &amp;bytes) };
+        let alt = format!(&quot;did:icn:{enc}&quot;);
+        match Did::from_str(&amp;alt) {
+            Ok(d) =&gt; {
+                // key bytes identical?
+                assert_eq!(d.to_verifying_key().unwrap().as_bytes(), &amp;bytes[..], &quot;{b:?}&quot;);
+                // serde round trip preserves spelling?
+                let j = serde_json::to_string(&amp;d).unwrap();
+                let back: Did = serde_json::from_str(&amp;j).unwrap();
+                assert_eq!(back.as_str(), alt, &quot;serde must preserve spelling for {b:?}&quot;);
+                // Display preserves spelling
+                assert_eq!(d.to_string(), alt);
+                distinct.insert(alt);
+            }
+            Err(e) =&gt; rejected.push(format!(&quot;{b:?}: {e}&quot;)),
+        }
+    }
+    println!(&quot;TRIED={} ACCEPTED={} REJECTED={:?}&quot;, all.len(), distinct.len(), rejected);
+
+    let mut m: HashMap&lt;Did, u32&gt; = HashMap::new();
+    for (i, d) in distinct.iter().enumerate() { m.insert(Did::from_str(d).unwrap(), i as u32); }
+    println!(&quot;HASHMAP_LEN={}&quot;, m.len());
+    let j = serde_json::to_string(&amp;m).unwrap();
+    let back: Result&lt;HashMap&lt;Did, u32&gt;, _&gt; = serde_json::from_str(&amp;j);
+    println!(&quot;MAP_ROUNDTRIP_LEN={:?}&quot;, back.map(|b| b.len()));
+
+    // Identity base over many keys: how often is the raw 32-byte key valid UTF-8?
+    let mut id_ok = 0u32;
+    for _ in 0..2000 {
+        let k = icn_identity::KeyPair::generate().unwrap();
+        let (_b, kb) = multibase::decode(&amp;k.did().as_str()[8..]).unwrap();
+        if let Ok(s) = std::str::from_utf8(&amp;kb) {
+            let alt = format!(&quot;did:icn:\u{0}{s}&quot;);
+            if Did::from_str(&amp;alt).is_ok() { id_ok += 1; }
+        }
+    }
+    println!(&quot;IDENTITY_BASE_ACCEPTED_OF_2000_KEYS={id_ok}&quot;);
+
+    // Anchor round-trip — artifact construction (sha256 of counter), 200 then 20000
+    for n in [200u32, 20000u32] {
+        let (mut ok, mut fail) = (0u32, 0u32);
+        for i in 0..n {
+            let mut id = [0u8; 32];
+            id.copy_from_slice(&amp;&lt;sha2::Sha256 as sha2::Digest&gt;::digest(i.to_le_bytes()));
+            let d = Did::from_anchor_id(&amp;id);
+            let j = serde_json::to_string(&amp;d).unwrap();
+            if serde_json::from_str::&lt;Did&gt;(&amp;j).is_ok() { ok += 1 } else { fail += 1 }
+        }
+        println!(&quot;ANCHOR_ROUNDTRIP_SHA_CTR n={n} OK={ok} FAIL={fail}&quot;);
+    }
+    // Real Anchor::from_vui(...).to_did() path
+    let (mut ok, mut fail) = (0u32, 0u32);
+    for i in 0u32..2000 {
+        let mut vui = [0u8; 32]; vui[..4].copy_from_slice(&amp;i.to_le_bytes());
+        let genesis = [7u8; 32];
+        let a = Anchor::from_vui(&amp;vui, EnrollmentPathway::Genesis { reason: &quot;probe&quot;.into() }, &amp;genesis);
+        let d = a.to_did();
+        let j = serde_json::to_string(&amp;d).unwrap();
+        if serde_json::from_str::&lt;Did&gt;(&amp;j).is_ok() { ok += 1 } else { fail += 1 }
+    }
+    println!(&quot;ANCHOR_ROUNDTRIP_FROM_VUI n=2000 OK={ok} FAIL={fail}&quot;);
+}
+
+#[test]
+fn identity_base_parser_path() {
+    // Find a 32-byte ASCII string that is a valid Ed25519 compressed point (~1/2 of strings are),
+    // to prove the parser accepts the multibase Identity (&#39;\0&#39;) form when bytes are valid UTF-8.
+    for i in 0u32..10000 {
+        let s: String = (0..32).map(|j| (b&#39;A&#39; + ((i.wrapping_mul(31).wrapping_add(j*7)) % 26) as u8) as char).collect();
+        let alt = format!(&quot;did:icn:\u{0}{s}&quot;);
+        if let Ok(d) = Did::from_str(&amp;alt) {
+            let (base, bytes) = multibase::decode(&amp;alt[8..]).unwrap();
+            println!(&quot;IDENTITY_ACCEPTED base={base:?} len={} key_ok={}&quot;, bytes.len(), d.to_verifying_key().is_ok());
+            let canon = Did::from_public_key(&amp;d.to_verifying_key().unwrap());
+            println!(&quot;IDENTITY_CANONICAL_NE={}&quot;, canon != d);
+            let j = serde_json::to_string(&amp;d).unwrap();
+            println!(&quot;IDENTITY_SERDE_RT_OK={}&quot;, serde_json::from_str::&lt;Did&gt;(&amp;j).map(|x| x == d).unwrap_or(false));
+            return;
+        }
+    }
+    panic!(&quot;no ascii point found&quot;);
+}
+</code></pre>
+<p>Observed at <code>798c8d54</code> (identical at <code>bca3dd0e</code>):
+<code>TRIED=24 ACCEPTED=23 REJECTED=[&quot;Identity: key bytes not valid UTF-8 (encode would panic)&quot;]</code>,
+<code>HASHMAP_LEN=23</code>, <code>MAP_ROUNDTRIP_LEN=Ok(23)</code>, <code>IDENTITY_BASE_ACCEPTED_OF_2000_KEYS=0</code>,
+<code>ANCHOR_ROUNDTRIP_SHA_CTR n=200 OK=90 FAIL=110</code>, <code>ANCHOR_ROUNDTRIP_SHA_CTR n=20000 OK=10051 FAIL=9949</code>,
+<code>ANCHOR_ROUNDTRIP_FROM_VUI n=2000 OK=1011 FAIL=989</code>;
+<code>IDENTITY_ACCEPTED base=Identity len=32 key_ok=true</code>, <code>IDENTITY_CANONICAL_NE=true</code>,
+<code>IDENTITY_SERDE_RT_OK=true</code>.</p>
+<p>The treasury-DID variant (§2.3, §10.1) goes in <code>icn/crates/icn-coop/tests/n2a0_treasury_probe.rs</code>
+(<code>cargo test -p icn-coop --test n2a0_treasury_probe -- --nocapture</code>, then delete):</p>
+<pre><code class="language-rust">use icn_identity::Did;
+#[test]
+fn coop_treasury_did_roundtrip_rate() {
+    let (mut ok, mut fail) = (0u32, 0u32);
+    for i in 0..5000u32 {
+        let anchor = icn_coop::lifecycle::derive_treasury_anchor(&amp;format!(&quot;coop-{i}&quot;));
+        let mut anchor_32 = [0u8; 32];
+        anchor_32[..16].copy_from_slice(&amp;anchor);
+        let d = Did::from_anchor_id(&amp;anchor_32);
+        let j = serde_json::to_string(&amp;d).unwrap();
+        if serde_json::from_str::&lt;Did&gt;(&amp;j).is_ok() { ok += 1 } else { fail += 1 }
+    }
+    println!(&quot;COOP_TREASURY_DID_ROUNDTRIP n=5000 OK={ok} FAIL={fail}&quot;);
+}
+</code></pre>
+<p>Observed: <code>COOP_TREASURY_DID_ROUNDTRIP n=5000 OK=2541 FAIL=2459</code>.</p>
+<h3 id="135-probe-b--envelope-verification-and-replay-windows-under-an-aliased-sender-22">13.5 Probe B — envelope verification and replay windows under an aliased sender (§2.2)</h3>
+<p>Add as <code>icn/crates/icn-net/tests/n2a0_replay.rs</code>, run
+<code>cargo test -p icn-net --test n2a0_replay -- --nocapture --test-threads=1</code>, then <strong>delete it</strong>.
+<code>icn-net</code> does not depend on <code>multibase</code>, so the base16 form is built by hand — the leading <code>f</code> is
+the multibase code for base16-lower.</p>
+<pre><code class="language-rust">use icn_identity::{Did, KeyPair};
+use icn_net::envelope::{PayloadType, SignedEnvelope};
+use icn_net::replay_guard::{ObservedSenderRegime, ReplayGuard};
+use std::sync::Arc;
+
+fn alias_of(canonical: &amp;Did) -&gt; Did {
+    let key_bytes = canonical.to_verifying_key().unwrap().as_bytes().to_vec();
+    let hex: String = key_bytes.iter().map(|x| format!(&quot;{x:02x}&quot;)).collect();
+    Did::from_str(&amp;format!(&quot;did:icn:f{hex}&quot;)).expect(&quot;alias parses today&quot;)
+}
+
+#[test]
+fn probe_signature() {
+    let kp = KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let alias = alias_of(&amp;canonical);
+    let key_bytes = canonical.to_verifying_key().unwrap().as_bytes().to_vec();
+    println!(&quot;CONTROL_ALIAS_NE_CANONICAL={}&quot;, alias != canonical);
+    println!(&quot;ALIAS_KEY_SAME={}&quot;, alias.to_verifying_key().unwrap().as_bytes() == &amp;key_bytes[..]);
+    let e1 = SignedEnvelope::new(&amp;canonical, &amp;kp, 1, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    let e2 = SignedEnvelope::new(&amp;alias, &amp;kp, 1, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    println!(&quot;CANONICAL_VERIFIES={}&quot;, e1.verify(3600).is_ok());
+    println!(&quot;ALIAS_VERIFIES={}&quot;, e2.verify(3600).is_ok());
+    println!(&quot;FROM_FIELDS_DIFFER={}&quot;, e1.from != e2.from);
+    // Cross-check: alias envelope signed by a DIFFERENT key must NOT verify (signature really binds the key)
+    let other = KeyPair::generate().unwrap();
+    let e3 = SignedEnvelope::new(&amp;alias, &amp;other, 1, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    println!(&quot;ALIAS_WRONG_KEY_VERIFIES={}&quot;, e3.verify(3600).is_ok());
+}
+
+#[test]
+fn probe_replay_guard_in_memory() {
+    let kp = KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let alias = alias_of(&amp;canonical);
+    let mut guard = ReplayGuard::new(300, 3600);
+    let e1 = SignedEnvelope::new(&amp;canonical, &amp;kp, 5, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    let e1b = SignedEnvelope::new(&amp;canonical, &amp;kp, 5, PayloadType::Gossip, b&quot;m2&quot;.to_vec()).unwrap();
+    let e2 = SignedEnvelope::new(&amp;alias, &amp;kp, 5, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    let r1 = guard.check(&amp;e1, ObservedSenderRegime::LegacyOrUnproven);
+    let r1b = guard.check(&amp;e1b, ObservedSenderRegime::LegacyOrUnproven); // CONTROL: same spelling, same seq
+    let r2 = guard.check(&amp;e2, ObservedSenderRegime::LegacyOrUnproven);  // alias spelling, same seq
+    println!(&quot;MEM_CANONICAL_SEQ5_ACCEPTED={}&quot;, r1.is_ok());
+    println!(&quot;MEM_CONTROL_SAME_SPELLING_SEQ5_REPLAY_REJECTED={} ({:?})&quot;, r1b.is_err(), r1b.as_ref().err().map(|e| e.to_string()));
+    println!(&quot;MEM_ALIAS_SEQ5_ACCEPTED={}&quot;, r2.is_ok());
+    println!(&quot;MEM_PEER_COUNT={}&quot;, guard.peer_count());
+    println!(&quot;MEM_MAX_SEQ canonical={:?} alias={:?}&quot;, guard.get_max_seq(&amp;canonical), guard.get_max_seq(&amp;alias));
+}
+
+#[test]
+fn probe_replay_guard_persistent() {
+    let kp = KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let alias = alias_of(&amp;canonical);
+    let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+    let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+    let e1 = SignedEnvelope::new(&amp;canonical, &amp;kp, 5, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    let e2 = SignedEnvelope::new(&amp;alias, &amp;kp, 5, PayloadType::Gossip, b&quot;m&quot;.to_vec()).unwrap();
+    let r1 = guard.check(&amp;e1, ObservedSenderRegime::LegacyOrUnproven);
+    let r2 = guard.check(&amp;e2, ObservedSenderRegime::LegacyOrUnproven);
+    println!(&quot;PERSIST_CANONICAL_SEQ5={:?}&quot;, r1.as_ref().map(|_| ()).map_err(|e| e.to_string()));
+    println!(&quot;PERSIST_ALIAS_SEQ5={:?}&quot;, r2.as_ref().map(|_| ()).map_err(|e| e.to_string()));
+    let _ = guard.finalize(&amp;canonical, 5);
+    let _ = guard.finalize(&amp;alias, 5);
+    use icn_store::Store;
+    let rows = store.scan(b&quot;&quot;).unwrap();
+    let mut keys: Vec&lt;String&gt; = rows.iter().map(|(k, _)| String::from_utf8_lossy(k).to_string()).collect();
+    keys.sort();
+    println!(&quot;PERSIST_ROW_COUNT={}&quot;, keys.len());
+    for k in &amp;keys { println!(&quot;PERSIST_ROW {}&quot;, k.chars().take(60).collect::&lt;String&gt;()); }
+    // Reload into a fresh guard: how many distinct windows come back?
+    let mut guard2 = ReplayGuard::new_persistent(300, 3600, store.clone());
+    let n = guard2.load_persisted_state().unwrap();
+    println!(&quot;PERSIST_RELOADED_WINDOWS={n} peer_count={}&quot;, guard2.peer_count());
+}
+
+#[test]
+fn probe_third_party_respell_replay() {
+    // Attacker has NO key material: captures a validly-signed envelope and only rewrites `from`.
+    let kp = KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let alias = alias_of(&amp;canonical);
+    let captured = SignedEnvelope::new(&amp;canonical, &amp;kp, 9, PayloadType::Gossip, b&quot;real-payload&quot;.to_vec()).unwrap();
+    let mut forged = captured.clone();
+    forged.from = alias.clone();              // only change: spelling of the sender
+    println!(&quot;TP_SIGNATURE_BYTES_UNCHANGED={}&quot;, forged.signature == captured.signature);
+    println!(&quot;TP_FORGED_VERIFIES={}&quot;, forged.verify(3600).is_ok());
+    let mut guard = ReplayGuard::new(300, 3600);
+    let a = guard.check(&amp;captured, ObservedSenderRegime::LegacyOrUnproven);
+    let b = guard.check(&amp;captured, ObservedSenderRegime::LegacyOrUnproven); // control: true replay rejected
+    let c = guard.check(&amp;forged, ObservedSenderRegime::LegacyOrUnproven);   // re-spelled replay
+    println!(&quot;TP_ORIGINAL_ACCEPTED={} TP_CONTROL_REPLAY_REJECTED={} TP_RESPELLED_REPLAY_ACCEPTED={}&quot;, a.is_ok(), b.is_err(), c.is_ok());
+    // And a from-rewrite to a DIFFERENT key&#39;s DID must fail (signature binds the key bytes, not the spelling)
+    let other = KeyPair::generate().unwrap();
+    let mut forged2 = captured.clone();
+    forged2.from = other.did().clone();
+    println!(&quot;TP_OTHER_KEY_FROM_VERIFIES={}&quot;, forged2.verify(3600).is_ok());
+}
+</code></pre>
+<p>Observed at <code>798c8d54</code> (identical at <code>bca3dd0e</code>):</p>
+<pre><code class="language-text">CONTROL_ALIAS_NE_CANONICAL=true   ALIAS_KEY_SAME=true
+CANONICAL_VERIFIES=true   ALIAS_VERIFIES=true   FROM_FIELDS_DIFFER=true   ALIAS_WRONG_KEY_VERIFIES=false
+MEM_CANONICAL_SEQ5_ACCEPTED=true
+MEM_CONTROL_SAME_SPELLING_SEQ5_REPLAY_REJECTED=true (Some(&quot;Replay detected from did:icn:z…: sequence 5 already seen (max: 5)&quot;))
+MEM_ALIAS_SEQ5_ACCEPTED=true   MEM_PEER_COUNT=2   MEM_MAX_SEQ canonical=Some(5) alias=Some(5)
+PERSIST_CANONICAL_SEQ5=Ok(())   PERSIST_ALIAS_SEQ5=Ok(())   PERSIST_ROW_COUNT=4
+PERSIST_ROW replay_finalized:did:icn:f…   PERSIST_ROW replay_finalized:did:icn:z…
+PERSIST_ROW replay_max_seq:did:icn:f…     PERSIST_ROW replay_max_seq:did:icn:z…
+PERSIST_RELOADED_WINDOWS=2 peer_count=2
+TP_SIGNATURE_BYTES_UNCHANGED=true   TP_FORGED_VERIFIES=true
+TP_ORIGINAL_ACCEPTED=true   TP_CONTROL_REPLAY_REJECTED=true   TP_RESPELLED_REPLAY_ACCEPTED=true
+TP_OTHER_KEY_FROM_VERIFIES=false
+</code></pre>
+<p><strong>The controls matter.</strong> <code>CONTROL_ALIAS_NE_CANONICAL</code> must print <code>true</code> <em>before</em> I7 — it proves
+the two spellings really are distinct <code>Did</code>s today, so <code>ALIAS_VERIFIES=true</code> demonstrates the
+bypass rather than passing vacuously on two values that were equal all along.
+<code>MEM_CONTROL_SAME_SPELLING_SEQ5_REPLAY_REJECTED</code> and <code>TP_CONTROL_REPLAY_REJECTED</code> prove the guard
+does reject a genuine same-spelling replay, so <code>…ALIAS…ACCEPTED</code> is a bypass and not a guard that
+accepts everything. <code>ALIAS_WRONG_KEY_VERIFIES=false</code> and <code>TP_OTHER_KEY_FROM_VERIFIES=false</code> prove
+the signature still binds the <em>key</em> — only the <em>spelling</em> is free. After I7 the first control
+inverts, and the probe must be re-read accordingly rather than re-run unchanged. (When run under the
+<code>DurableV1</code> regime instead of <code>LegacyOrUnproven</code>, the persistent guard answers both envelopes with
+the #2517 &quot;holding sequence … for 600s&quot; transition error — the namespace hold, orthogonal to this
+finding — while still writing one <code>replay_sender_regime:</code> row per spelling.)</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/n2-a0-stored-key-inventory.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
