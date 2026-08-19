@@ -5,7 +5,7 @@
 //! The trait is defined here so B0 can write tests with mock sources.
 
 use crate::model::edge::{CapabilityEdge, CapabilityGraph};
-use crate::model::ids::SubjectId;
+use crate::model::ids::CapabilitySubjectId;
 
 // ---------------------------------------------------------------------------
 // CapabilitySource trait
@@ -17,7 +17,7 @@ use crate::model::ids::SubjectId;
 /// The trait is defined here so B0 can write tests with mock sources.
 pub trait CapabilitySource: Send + Sync {
     /// Return all capability edges this source knows about for the given subject.
-    fn edges_for_subject(&self, subject: &SubjectId) -> Vec<CapabilityEdge>;
+    fn edges_for_subject(&self, subject: &CapabilitySubjectId) -> Vec<CapabilityEdge>;
 
     /// Return all capability edges this source can produce.
     fn all_edges(&self) -> Vec<CapabilityEdge>;
@@ -60,7 +60,7 @@ impl GraphBuilder {
     /// Poll all sources for edges matching `subject` and build a canonical graph.
     ///
     /// The resulting [`CapabilityGraph`] is sorted and deduplicated.
-    pub fn build_for_subject(&self, subject: &SubjectId) -> CapabilityGraph {
+    pub fn build_for_subject(&self, subject: &CapabilitySubjectId) -> CapabilityGraph {
         let edges: Vec<CapabilityEdge> = self
             .sources
             .iter()
@@ -93,7 +93,7 @@ mod tests {
     }
 
     impl CapabilitySource for MockSource {
-        fn edges_for_subject(&self, subject: &SubjectId) -> Vec<CapabilityEdge> {
+        fn edges_for_subject(&self, subject: &CapabilitySubjectId) -> Vec<CapabilityEdge> {
             self.edges
                 .iter()
                 .filter(|e| e.subject == *subject)
@@ -108,12 +108,12 @@ mod tests {
 
     // -- Test helpers -------------------------------------------------------
 
-    fn alice() -> SubjectId {
-        SubjectId::new("did:icn:alice").unwrap()
+    fn alice() -> CapabilitySubjectId {
+        CapabilitySubjectId::new("did:icn:alice").unwrap()
     }
 
-    fn bob() -> SubjectId {
-        SubjectId::new("did:icn:bob").unwrap()
+    fn bob() -> CapabilitySubjectId {
+        CapabilitySubjectId::new("did:icn:bob").unwrap()
     }
 
     fn propose() -> Action {
@@ -124,7 +124,7 @@ mod tests {
         ResourceId::new(ResourceKind::Entity, "coop-1")
     }
 
-    fn make_edge(subject: SubjectId, action: Action) -> CapabilityEdge {
+    fn make_edge(subject: CapabilitySubjectId, action: Action) -> CapabilityEdge {
         CapabilityEdge::new(
             subject,
             action,
