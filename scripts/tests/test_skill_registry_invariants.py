@@ -250,6 +250,30 @@ def cargo_command_with_workspace_root(root: Path) -> None:
     save_registry(root, reg)
 
 
+def cargo_command_with_unrelated_subshell_cd(root: Path) -> None:
+    r"""A cargo block whose only `cd` is a subshell into an unrelated directory — must FAIL.
+
+    Controls the guard against anchoring on `cd` *syntax* instead of the `cd` *destination*.
+    An earlier form of the check carried a bare `|\(cd\s` alternation, so this exact shape
+    — `(cd docs && ls)` next to a bare `cargo test` — passed while still being broken.
+    """
+    d = root / ".agents" / "skills" / "cargo-decoy-cd-demo"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(
+        "---\nname: cargo-decoy-cd-demo\ntruth_contract:\n  canonical_sources: []\n---\n\n"
+        "## Steps\n\n```bash\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n"
+        "(cd docs && ls)\ncargo test --workspace\n```\n"
+    )
+    reg = load_registry(root)
+    reg["skills"]["icn_level"].append({
+        "name": "cargo-decoy-cd-demo",
+        "canonical_path": ".agents/skills/cargo-decoy-cd-demo/SKILL.md",
+        "provider_mirrors": [],
+        "mirror_policy": "none",
+    })
+    save_registry(root, reg)
+
+
 def strip_truth_contract(root: Path) -> None:
     p = root / ".agents" / "skills" / "bench" / "SKILL.md"
     p.write_text(p.read_text().replace("truth_contract:", "informal_notes:", 1))
@@ -304,6 +328,8 @@ def main() -> int:
                 cargo_command_without_workspace_root, "without resolving the Cargo workspace root")
     expect_clean("cargo invocation that resolves the workspace root in its own block passes",
                  cargo_command_with_workspace_root)
+    expect_fail("cargo block whose only cd is a subshell elsewhere is rejected",
+                cargo_command_with_unrelated_subshell_cd, "without resolving the Cargo workspace root")
 
     failed = [r for r in results if not r[0]]
     print(f"\n{len(results) - len(failed)}/{len(results)} cases passed")

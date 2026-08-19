@@ -320,11 +320,15 @@ class Checker:
             return
 
         cargo_line = re.compile(r"^\s*cargo\s")
+        # Both alternations anchor on the destination, never on the syntax of the `cd`.
+        # An earlier form carried a bare `|\(cd\s` alternation to catch the inline
+        # `(cd ... && cargo ...)` subshell, but that accepted a subshell cd to *anywhere*
+        # — `(cd docs && ls)` beside a bare `cargo test` passed. The subdir-anchored
+        # alternation already covers the subshell form, so the bare one was pure
+        # accept-set widening: a guard that fails open on the very class it screens for.
         establishes_root = re.compile(
             r'cd\s+"?\$\{?CARGO_ROOT\}?"?'
-            r'|cd\s+"?\$\([^)]*\)/' + re.escape(subdir) + r'"?'
-            r'|cd\s+"?\$\{?REPO_ROOT\}?/' + re.escape(subdir) + r'"?'
-            r'|\(cd\s'
+            r'|cd\s+[^\n&|;]*/' + re.escape(subdir) + r'\b'
         )
 
         for tree in trees:
