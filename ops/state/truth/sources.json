@@ -10,9 +10,9 @@
     },
     "repo_topology": {
       "owner": "ops/state/config/repo-map.json",
-      "sections": ["repos", "org_repos", "worktrees", "relationships", "infrastructure"],
+      "sections": ["repos", "org_repos", "worktrees", "relationships"],
       "stability": "slow-changing",
-      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster ROLES (concrete addresses are private — network-ops). org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), and worktree root. The .infrastructure section is owned by cluster_topology, not here. org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
     },
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
@@ -23,6 +23,31 @@
       "owner": "ops/state/truth/policy.json",
       "stability": "slow-changing",
       "description": "Required CI checks, merge strategy, readiness definition, admin bypass rules"
+    },
+    "agent_operating_contract": {
+      "owner": "AGENTS.md",
+      "sections": [
+        "1. Start from the question, then resolve its owner",
+        "2. Bootstrap before non-trivial work",
+        "4. Scope and mutation discipline",
+        "5. Verification is path- and claim-specific",
+        "6. Memory is not authority",
+        "7. Generated artifacts are projections",
+        "8. Specialist agents and provider adapters are thin overlays",
+        "9. Completion report"
+      ],
+      "stability": "constant",
+      "description": "Provider-neutral agent bootstrap, scope/mutation discipline, verification posture, memory-not-authority rule, generated-projection rule, specialist/provider boundaries, and completion reporting. Protocol invariants are registered separately under invariants."
+    },
+    "agent_reasoning_constitution": {
+      "owner": "docs/ai/ICN_CONSTITUTIONAL_CORE.md",
+      "stability": "constant",
+      "description": "Stable agent reasoning principles: mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, and durable-memory rule. Contains no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence."
+    },
+    "agent_workflow": {
+      "owner": "docs/ai/WORKFLOW_ARCHITECTURE.md",
+      "stability": "slow-changing",
+      "description": "Agent context architecture: question-specific truth resolution, domain-owner loading, implementation/live evidence, generated navigation, memory semantics, bootstrap order, specialist/provider adapter contract, durable promotion lifecycle, and conflict protocol."
     },
     "agent_registry": {
       "owner": "ops/state/truth/agents.json",
@@ -50,6 +75,17 @@
       "stability": "slow-changing",
       "description": "Architecture Decision Records. Canonical under docs/adr/. Naming: ADR-NNNN-kebab-case-title.md. Never delete; use status: superseded."
     },
+    "documentation_classification": {
+      "owner": "docs/registry.toml",
+      "stability": "slow-changing",
+      "description": "Per-document category, status, truth_class, owner, audience, and last_updated for docs/**. Enforced by docs/scripts/doc_control_check.py. Classification only: it records what kind of document a file is and who owns it, and never establishes the domain facts inside that document — those belong to the domain owners registered here. When a document's front matter and this registry disagree, reconcile them; do not treat either as the domain's semantic owner."
+    },
+    "deployment_runtime_state": {
+      "owner": "private-network-ops",
+      "query": "resolve host/service values from the private network-ops repo when authorized, then observe the live cluster/service directly",
+      "stability": "volatile",
+      "description": "What is actually deployed and running in a named environment. NO PUBLIC OWNER EXISTS IN THIS REPO BY DESIGN: repo-map.json#infrastructure carries roles only, and code, docs, manifests, status.toml, and generated projections are all evidence of intent, never of liveness. Never infer deployment or runtime liveness from this repository; report the access boundary instead of guessing."
+    },
     "cluster_topology": {
       "owner": "ops/state/config/repo-map.json#infrastructure",
       "stability": "slow-changing",
@@ -57,9 +93,9 @@
     },
     "invariants": {
       "owner": "AGENTS.md",
-      "sections": ["ICN Invariants"],
+      "sections": ["3. ICN invariants"],
       "stability": "constant",
-      "description": "The 5 non-negotiable protocol invariants. Never override."
+      "description": "The five non-negotiable agent/protocol invariants: adversarial-by-default, determinism, canonical encodings, no panics in protocol paths, and Meaning Firewall/kernel-app boundary. Never override."
     },
     "identity_semantics": {
       "owner": "docs/architecture/IDENTITY_SEMANTICS.md",
@@ -94,6 +130,8 @@
     "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
     "Do NOT hardcode PR numbers or branch lists — query via gh",
     "Do NOT hardcode cluster IPs — repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
+    "Do NOT treat a handoff, chat summary, model memory, or generated overlay as current project authority — reverify volatile claims and load registered owners",
+    "Do NOT duplicate registered domain semantics inside specialist/provider prompts — load the owner at runtime",
     "Do NOT use icn-ops/state paths — canonical is ops/state/ (inside monorepo)",
     "Do NOT use icn-website/ paths — canonical is website/ (inside monorepo)",
     "Do NOT reference sync-from-icn.sh — the website reads docs directly"

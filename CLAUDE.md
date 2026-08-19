@@ -1,856 +1,100 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Claude Code adapter for the ICN repository.
 
-## Non-Negotiables
+**Read [`AGENTS.md`](AGENTS.md) first.** It is the provider-neutral operating contract and owns the five repository agent invariants. This file adds Claude-specific mechanics only. It is deliberately not a second architecture handbook or project-state document.
 
-1. **Concise.** No long narratives. No excessive status updates. No unrequested infrastructure.
-2. **Merge = merge.** No polling loops. Use `gh --json` not tabular parsing. Prefer `--auto`, use `--admin` when told.
-3. **Toolchain pinned.** Do not upgrade `rust-toolchain.toml`. `cargo clean` for SIGSEGV. No unrelated clippy fixes.
-4. **Port 8080.** Gateway binds 8080 (see `icn-core/src/config/gateway.rs`). Never assume 8000.
-5. **Preflight first.** Run `/icn-preflight` at session start. Check stale state before rewriting code.
-6. **Scope is law.** The user's request defines scope. Do not expand. Note adjacent concerns but do not act on them.
-7. **Hook pattern.** New hooks read tool input from stdin (`INPUT=$(cat)` + `jq`). Never use bare `TOOL_INPUT_*` env vars — see `.claude/hooks/HOOKS.md`.
+## Session start
 
-## Project Overview
+For non-trivial work:
 
-> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+1. Run `/icn-preflight` when the skill is available.
+2. Otherwise follow the bootstrap sequence in `AGENTS.md` manually.
+3. Resolve fact ownership from `ops/state/truth/sources.json` before loading broad documentation.
+4. Query branch/PR/review/CI state live when it matters.
+5. Use the Agent Context Spine path brief to narrow the files and checks relevant to the task.
 
-ICN (Intercooperative Network) is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer for cooperatives, communities, and federations to coordinate without central servers.
+Do not begin from the latest handoff unless the user explicitly asks to resume prior work or the task itself identifies that handoff. Handoffs are memory, not current state.
 
-ICN implements a **constraint enforcement architecture** where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This ensures the kernel remains predictable while cooperative governance adapts policies.
+## Claude tooling model
 
-### Core Subsystems
+### Skills
 
-- **Identity**: Decentralized identifiers (DIDs) with Ed25519 cryptography
-- **Trust Graph**: Web-of-participation trust computation → **Policy Oracle**
-- **Networking**: QUIC/TLS secure sessions with mDNS discovery → **Kernel**
-- **Ledger**: Mutual credit with double-entry accounting → **Policy Oracle**
-- **Contracts**: CCL (Cooperative Contract Language) execution → **Policy Oracle**
-- **Gossip**: Topic-based replication with causal ordering → **Kernel**
-- **Governance**: Democratic proposals and voting → **Policy Oracle**
-- **Compute**: Trust-gated distributed task execution → **Policy Oracle**
+Canonical skill ownership is declared in `ops/state/truth/skills.json`.
 
-## Deployment
+Do not infer that `.claude/skills/` is canonical merely because Claude can load it. ICN-level skills are owned where the registry says they are owned; Claude-facing copies are compatibility surfaces and should not become independent sources of truth.
 
-ICN has K3s/devnet-oriented deployment manifests and smoke paths (`deploy/k8s`, `deploy/devnet`). **Current live runtime status is an ops claim, not source-verifiable** — `docs/status.toml` flags the K3s deployment `NEEDS OPS RE-CONFIRMATION`. Do not repeat "running in production / running for N months / live federation" publicly without current ops evidence. See **[docs/operations/deployment/HOMELAB_DEPLOYMENT.md](docs/operations/deployment/HOMELAB_DEPLOYMENT.md)** for:
-- Deployment design, cluster/node topology, and quick access commands
-- CI/CD pipeline and monitoring
-- Pilot testing posture (Phase 2, partner-bound — see `docs/PHASE_PROGRESS.md`)
+Before editing a skill, resolve its canonical path from the registry.
 
-**Quick Commands**:
-```bash
-cd deploy/k8s && make full-deploy-dev  # Deploy new version
-make status                              # Check pod status
-make logs                                # View logs
-```
+### Specialist agents
 
-## Workspace Structure
+Agent routing is owned by `ops/state/truth/agents.json`.
 
-The Cargo workspace is located in the `icn/` subdirectory. All build/test commands must be run from the `icn/` directory within the repository root.
+Specialists are scoped reasoning overlays. They must load domain truth from `ops/state/truth/sources.json` rather than relying on hardcoded architectural summaries in their prompt files. If a specialist prompt conflicts with a registered domain owner, the domain owner wins and the prompt is stale.
 
-### Repo Topology (Two Roots)
+### Hooks
 
-This monorepo has **two important roots** — mixing them up causes subtle failures:
+Hooks are enforcement/tooling surfaces, not project truth. Follow `.claude/hooks/HOOKS.md` when editing them.
 
-| Root | Path | Contains |
-|------|------|----------|
-| **Monorepo root** | the checkout you are in — discover with `git rev-parse --show-toplevel` (on the dev VM: `~/icn-dev/worktrees/icn/<worktree>`) | `sdk/`, `docs/`, `web/`, `deploy/`, `scripts/`, `CLAUDE.md` |
-| **Rust workspace** | `$(git rev-parse --show-toplevel)/icn` | `Cargo.toml`, `crates/`, `bins/`, `Cargo.lock` |
+New hooks consume tool input from stdin and parse it explicitly. Do not resurrect deprecated implicit `TOOL_INPUT_*` environment-variable assumptions.
 
-**Rule**: Rust commands (`cargo *`) run from the `icn/` subdirectory of the monorepo root. SDK/OpenAPI commands run from the monorepo root's subdirectories (`sdk/typescript/`, `docs/api/`).
+## Repository/root resolution
+
+Never rely on a memorized machine path.
 
 ```bash
-# Quick "where am I?" check
-git rev-parse --show-toplevel
-test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+RUST_ROOT="${REPO_ROOT}/icn"
 ```
 
-**Legacy checkouts are not truth.** The standalone clone `~/projects/icn` and the repo-adjacent
-`../icn-wt/` worktree layout are retired (legacy); never treat them as current state — they can sit
-weeks behind `origin/main`. On the dev VM, work happens only in `~/icn-dev/worktrees/icn/<worktree>`
-(bare stores in `~/icn-dev/repos/*.git`). The worktree root of record is
-`ops/state/config/repo-map.json#worktrees.root`; the MCP server resolves it via `ICN_WT_ROOT` →
-repo-map → legacy fallback (`ops/mcp/src/paths.ts`).
+Repository/worktree topology is owned by `ops/state/config/repo-map.json`. A local path mentioned in an old handoff, prompt, or shell history is not evidence that the checkout is current.
 
-**Preflight path (one documented path — run from the monorepo root at session start):**
+Run Cargo from `${RUST_ROOT}`. Run monorepo scripts, docs tooling, SDK tooling, and `just` recipes from the root or the subdirectory their command declares.
 
-```bash
-bash scripts/icn-preflight.sh               # repo/branch, gh auth, ports, toolchain, cargo check
-bash scripts/check-preflight-consistency.sh # root-guidance drift, stale legacy checkout, MCP-root mismatch
-```
+## Claude command discipline
 
-**Crates** (38 directories in `icn/crates/`; 37 are declared in `[workspace].members`, with `icn-baseline-lock-guest` present on disk but excluded; principal crates listed below):
-- `icn-core` - Tokio runtime, supervisor, actor lifecycle management
-- `icn-identity` - DID generation, Ed25519 keypairs, Age-encrypted keystore
-- `icn-trust` - Trust graph storage & transitive trust computation
-- `icn-net` - QUIC/TLS sessions, mDNS discovery, NetworkActor
-- `icn-gossip` - Topic-based gossip with vector clocks & Bloom filters
-- `icn-ledger` - Double-entry mutual credit / state change journal (Merkle-DAG)
-- `icn-ccl` - Contract language AST, interpreter, fuel metering
-- `icn-store` - Persistent KV storage (Sled)
-- `icn-rpc` - JSON-RPC API server
-- `icn-obs` - Prometheus metrics, tracing, logging
-- `icn-gateway` - REST + WebSocket API for cooperative applications
-- `icn-governance` - Governance primitives for community decision-making
-- `icn-compute` - Distributed compute layer with trust-gated task execution
-- `icn-federation` - Inter-cooperative coordination and federation protocol
-- `icn-privacy` - Privacy primitives and metadata protection
-- `icn-security` - Byzantine fault detection and reputation
-- `icn-time` - Clock synchronization (Rough Time Protocol)
-- `icn-snapshot` - State snapshots for graceful restarts
-- `icn-crypto-pq` - Post-quantum hybrid cryptography
-- `icn-steward` - SDIS steward network & VUI computation
-- `icn-zkp` - Zero-knowledge proofs for SDIS
-- `icn-coop` - Cooperative management & lifecycle
-- `icn-community` - Community structures & civic engine
-- `icn-entity` - Unified entity model (individuals/coops/federations)
-- `icn-api` - Shared service layer for RPC and Gateway (unified validation, error handling)
-- `icn-encoding` - Serialization utilities
-- `icn-testkit` - Test utilities for multi-node scenarios
-- `icn-protocol` - Unified protocol layer (facade re-exporting icn-gossip + icn-net)
-- `icn-services` - Unified service layer (facade re-exporting icn-api + icn-rpc + icn-gateway)
-- `icn-crypto` - Unified crypto layer (facade re-exporting icn-crypto-pq)
-- `icn-authz` - Authorization primitives and capability tokens
-- `icn-http-kit` - HTTP utilities shared across gateway and API layers
-- `icn-kernel-api` - Kernel API surface (enforces kernel/app boundary)
-- `icn-naming` - Cooperative naming service and DID resolution
+- Prefer structured `gh --json` output over parsing human tables.
+- Do not create polling loops when a single live query answers the question.
+- Do not use a red CI check as permission to change unrelated code.
+- Inspect the exact failing job/log before fixing CI.
+- When a task is review-only, do not mutate the tree.
+- When the maintainer authorizes a merge, use the merge policy in `ops/state/truth/policy.json` and live branch protection. Do not hardcode a required-check list here.
+- Do not upgrade `icn/rust-toolchain.toml` unless explicitly requested.
+- If a local incremental Rust cache is demonstrably corrupted, `cargo clean` may be appropriate; do not make it a reflexive first response to ordinary build failures.
 
-**Apps** (4 in `icn/apps/`):
-- `governance` - Governance app (PolicyOracle wiring)
-- `ledger` - Ledger/journal app (PatronageTracker, settlement engine)
-- `membership` - Membership management app
-- `charter` - Charter and org lifecycle app
+## Scope overlays
 
-**Binaries** (in `icn/bins/`):
-- `icnd` - The ICN daemon
-- `icnctl` - CLI management tool (`audit verify`, node mgmt)
-- `icn-console` - Interactive TUI for cooperative management
+When a task touches an area with scoped instructions, load the narrowest relevant overlay after `AGENTS.md` and the truth owner. Examples include `.claude/rules/`, path-level `AGENTS.md`/`CLAUDE.md`, and specialist agent definitions.
 
-## Documentation Structure
+Scoped instructions may add verification or review concerns. They may not redefine canonical project semantics or live state.
 
-**IMPORTANT: Never save documentation files to the project root.** All documentation must go in the appropriate `docs/` subdirectory.
+## Writing and documentation
 
-**Project root** (only these files):
-- `README.md` - Project overview and quick start
-- `CHANGELOG.md` - User-facing changelog
-- `CLAUDE.md` - This file (Claude Code guidance)
-- `CODE_OF_CONDUCT.md` - Community guidelines
-- `CONTRIBUTING.md` - Contribution guidelines
-- `AGENTS.md` - Agent coding instructions
+Documentation belongs under `docs/` unless the file is an established root control file such as `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, or this adapter.
 
-**Documentation directory (`docs/`):**
+Before changing documentation truth:
 
-Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
+1. identify the fact domain;
+2. resolve its owner in `ops/state/truth/sources.json` and, where applicable, `docs/registry.toml`;
+3. edit the owner rather than a downstream projection;
+4. regenerate derived artifacts;
+5. distinguish synchronization from a genuine semantic/governance change.
 
-**Core Documents:**
-- `ARCHITECTURE.md` - Comprehensive system architecture (160KB+)
-- `GETTING_STARTED.md` - Quick start guide
-- `PHASE_HISTORY.md` - Completed development phases
-- `STATE.md` - Current project state
-- `TODO.md` - Active work items
-- `glossary.md` - Terminology definitions
+Do not update a broad "state" document simply because a session ended. Update the owner of the fact that actually changed.
 
-**Current Planning & Strategy (read these for project direction):**
-- `planning/` - Forward plan, crate reference, ecosystem map, vertical slice assessment
-- `strategy/` - Gap analysis, active sprint, roadmaps, whitepaper, pitch docs (March 2026)
-- `mobile/icn-mobile-ux-spec-v1.md` - Mobile member UX spec (build-facing, anchored to gateway API)
-- `status/icn-status-march-2026.md` - Current status report
-- `GOLDEN_PROMPT.md` - **Archived redirect stub.** Current agent reasoning foundation is `docs/ai/ICN_CONSTITUTIONAL_CORE.md`; current project state is `docs/STATE.md` + `docs/PHASE_PROGRESS.md`.
+## Identity warning
 
-**Main Categories:**
-- `architecture/` - Architecture documentation, design decisions, audits
-- `design/` - Feature designs, proposals, evolution plans
-  - `design/economics/` - Economic system design
-  - `design/governance/` - Governance system design
-  - `design/sdis/` - SDIS design documentation
-- `spec/` - Formal protocol and contract specifications
-- `reference/` - Technical references
-  - `reference/api/` - REST API, WebSocket, SDK documentation
-  - `reference/config/` - Configuration files and settings
-- `guides/` - User and developer guides
-  - `guides/developer/` - Development guides
-  - `guides/operations/` - Deployment and operations
-  - `guides/user/` - End-user documentation
-- `planning/` - Project planning docs (crate reference, ecosystem map, demo docs)
-- `strategy/` - Strategic direction (gap analysis, sprint plans, roadmaps)
-- `mobile/` - Mobile UX spec (v1 supersedes Dec 2024 docs in archive/)
-- `development/` - Development resources (sprints, testing)
-- `security/` - Security documentation and threat models
-- `sdis/` - SDIS implementation documentation
-- `internal/` - Internal planning and pilot programs
-- `status/` - Current status reports
-- `archive/` - Historical documentation (organized by year)
+Do not use this file for identity semantics. The identity model has changed materially over the life of the repository. Resolve the current identity semantics through `ops/state/truth/sources.json` and the owner it names before reasoning about `Did`, human subjects, institutions, nodes, device principals, continuity, or migration.
 
-**See `docs/DOCUMENTATION_MAINTENANCE.md` for where to put new documentation.**
+A legacy statement such as "a DID is a person" or "human identity is a public key" is not safe to carry forward from old prompts.
 
-**Doc-control commands (exact forms — run from the monorepo root):**
+## Provider boundary
 
-```bash
-python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
-python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
-python3 .github/scripts/compliance_linter.py --repo-root .
-python3 .github/scripts/readiness_overclaim_linter.py --repo-root .
-```
+If this file, a Claude skill, a hook, a specialist prompt, a handoff, or model memory disagrees with:
 
-**Generated orientation artifacts are navigation aids, not truth roots.** `docs/INDEX.generated.md`,
-`docs/DOCUMENT_REGISTRY.md`, `docs/reference/project-index/generated/*` (agent context spine),
-`docs/reference/project-index/full-repo-record.md`, and live-state overlays are generated to help you
-find things. Canonical ownership lives in `ops/state/truth/sources.json`; when a generated artifact
-disagrees with a canonical owner, the owner wins.
+1. `AGENTS.md` on agent operating invariants;
+2. a domain owner named by `ops/state/truth/sources.json` on that domain;
+3. current code/tests on what the checkout actually implements; or
+4. live Git/GitHub on current execution state;
 
-## Build & Test Commands
-
-All commands run from `icn/` directory:
-
-```bash
-cargo check                              # Fast type-check (use before full build)
-cargo build                              # Build everything
-cargo build --release                    # Build release binaries
-cargo test                               # Run all tests
-cargo test -p icn-gossip                 # Test specific package
-cargo test test_two_node_convergence     # Test by name
-cargo build && ./target/debug/icnd       # Run daemon
-cargo build && ./target/debug/icnctl status
-```
-
-### Rust Build Notes
-- This is a large multi-crate workspace. For a current line count run `tokei`/`cloc` rather than trusting a hard-coded figure. Use `cargo check` before `cargo build` for faster feedback.
-- Toolchain is pinned in `icn/rust-toolchain.toml` — do NOT upgrade unless explicitly asked.
-- If builds SIGSEGV or fail mysteriously, run `cargo clean` first — incremental compilation cache corruption is a known issue on this machine.
-- Do not fix pre-existing clippy lints unrelated to the current task.
-
-## Architecture: Actor-Based Runtime
-
-ICNd uses Tokio with an actor pattern. The supervisor (`icn-core/src/supervisor.rs`) spawns and manages actors:
-
-1. **Runtime** (`icn-core/src/runtime.rs`): Entry point, shutdown signal, config loading
-2. **Supervisor** (`icn-core/src/supervisor.rs`): Spawns actors, initializes metrics, bridges gossip/network
-3. **GossipActor** (`icn-gossip/src/gossip.rs`): Topic subscriptions, vector clocks, anti-entropy
-4. **NetworkActor** (`icn-net/src/actor.rs`): QUIC sessions, mDNS discovery, message routing
-5. **Ledger** (`icn-ledger/src/ledger.rs`): Double-entry accounting, gossip sync
-
-**Actor Communication**:
-```rust
-// Network → Gossip: Incoming message handler
-let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
-    if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
-        gossip_handle.blocking_write().handle_message(gossip_msg)?;
-    }
-});
-
-// Gossip → Network: Send callback
-let send_callback: SendMessageCallback = Arc::new(move |recipient, gossip_msg| {
-    network_handle.send_message(recipient, net_msg).await?;
-});
-```
-
-## Key Protocols
-
-**Gossip Protocol** (`icn-gossip`):
-- Push announcements, pull requests, anti-entropy
-- Vector clocks for causal ordering
-- Subscription notifications via callbacks
-
-**Network Protocol** (`icn-net/src/protocol.rs`):
-- `NetworkMessage` envelope with `from_did`, `to_did`, `payload`
-- Payload types: `Gossip`, `Rpc`, `Subscribe`, `Hello`, `Signed`
-- Length-prefixed framing over QUIC streams
-
-**Signed Messages** (`icn-net/src/envelope.rs`):
-- `SignedEnvelope` with Ed25519 signatures
-- `ReplayGuard` with sequence tracking
-- Automatic verification in NetworkActor
-
-## Cooperative Contract Language (CCL)
-
-CCL (`icn-ccl`) is a domain-specific language for expressing agreements:
-
-- AST-based: `Contract`, `Rule`, `Stmt`, `Expr`, `Value`
-- Capability system: `ReadLedger`, `WriteLedger`, `ReadTrust`
-- Fuel metering, not Turing-complete, deterministic
-
-## Testing Patterns
-
-**Integration Tests**: Located in `icn/crates/icn-core/tests/` and `icn/crates/icn-ledger/tests/`
-- Use `TestNode` helper pattern
-- Each node gets unique port and keypair
-- Verify convergence with retries
-
-## Identity & Keystore
-
-- DIDs: `did:icn:<base58-pubkey>` (Ed25519)
-- Keystore: Age-encrypted at `~/.icn/keystore.age`
-- Auto-migration chain: v1 → v2 → v2.1 → v3 → v4 (v2.1 adds TLS binding + X25519 keys; current chain per `icn-identity/src/keystore.rs`)
-
-**icnctl commands**: `id init`, `id show`, `id rotate`, `id export/import`
-
-## Roadmap & Phase Tracking
-
-**Standard**: All development is tracked as sequential phases. No parallel tracks, no letter suffixes. The active sequence is the Phase 0/1/2 model (begun 2026-03-18); the earlier Phase 1–18 numbering (and its planned 19–35 continuation) is retired — history in [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md).
-
-### Phase Format
-
-Each phase in documentation must follow this format:
-
-```
-### Phase N: <Name>
-**Status**: ✅ Complete | 🚧 In Progress | ⏳ Planned
-**Completed**: YYYY-MM-DD (if done)
-
-<One paragraph description of what this phase accomplishes>
-
-**Deliverables**:
-- Bullet list of concrete outputs
-```
-
-### Status Indicators
-
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | Complete - merged to main, tested, deployed |
-| 🚧 | In Progress - active development |
-| ⏳ | Planned - scoped but not started |
-
-### Source of Truth
-
-- **Completed phases**: current model (Phases 0–1) in [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md); pre-reset history (old numbering) in [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)
-- **Current & planned phases**: [docs/STATE.md](docs/STATE.md) and [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) (truth-synced, canonical); long-arc planning: [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md)
-- **This file**: Quick reference only, not authoritative
-
-### Current Status
-
-Quick reference as of 2026-05-22 — [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) is the live, canonical version.
-
-**Current Phase**: Phase 2 — Pilot Launch (in progress, partner-bound). NYCN is the intended first cooperative partner — an active partnership track, not yet a formally committed pilot. Next gate: organizer presentation -> pilot formalization -> first operator rehearsal (per the NYCN rehearsal gate in the partner repo).
-
-**Completed**: Phase 0 — Close the Demo (2026-03-18); Phase 1 — The Charter Engine (2026-03-18).
-
-See [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) and [docs/STATE.md](docs/STATE.md) for current state and issue mapping, and [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md) for the long-arc roadmap.
-
-### Rules for Agents
-
-1. **Never invent new tracking systems** - use phases with sequential numbers
-2. **Never use "Track A/B/C"** - everything is sequential
-3. **Record phase completion in docs/PHASE_PROGRESS.md and docs/STATE.md** (status flip + truth-sync edit) — docs/PHASE_HISTORY.md is pre-reset history only; do not add current-model phases to it
-4. **Update docs/STATE.md and docs/PHASE_PROGRESS.md** when phase state changes (they are canonical); update docs/strategy/ICN-Roadmap-Live.md when long-arc planning changes — never the strategy doc alone while canonical phase tracking goes stale
-5. **Keep this section as quick reference only** - detail goes in the dedicated docs
-
-## Common Development Workflows
-
-**Adding a new actor**:
-1. Create actor struct with state
-2. Implement message enum
-3. Create handle struct with `mpsc::Sender<Msg>`
-4. Implement `spawn()` method
-5. Register with supervisor
-6. Wire up callbacks/channels
-
-**Adding a new gossip topic**:
-1. Define topic string (`namespace:purpose`)
-2. Configure `AccessControl` enum
-3. Subscribe in relevant actor
-4. Set up notification callback
-5. Handle incoming messages
-
-**Adding metrics**:
-1. Define in `icn-obs/src/metrics/{module}.rs`
-2. Register in `init_metrics()`
-3. Follow naming: `{actor}_{metric}_{unit}`
-
-**Adding a new crate** (template from `icn-authz`):
-1. Create `crates/<name>/Cargo.toml` — workspace-inherited version/edition/license/repository, `[lints] workspace = true`
-2. Create `src/lib.rs` with module declarations + public re-exports
-3. Create `src/error.rs` with crate-specific error enum (derives `thiserror::Error`)
-4. Organize by concern: `model/`, `graph/`, `adapters/` (or domain-appropriate dirs)
-5. Add to workspace `members` in `icn/Cargo.toml` (alphabetical within group)
-6. Add to workspace `[dependencies]` with `path = "crates/<name>"`
-7. Integration tests in `tests/` directory
-8. Verify: `cargo check -p <name> && cargo test -p <name>`
-9. If kernel-level: no persistence, no domain imports, no side effects
-
-## Git Workflow
-
-**Goal**: `main` is always releasable. Work happens on short-lived branches, merged via PR.
-
-### Branch Policy
-
-**Protected Branch: `main`**
-- **No direct commits to `main`** - all changes land via Pull Request
-- Only merge when CI passes (or local checks pass)
-
-**Branch Naming**:
-- `feat/<short-slug>` - new capability
-- `fix/<short-slug>` - bug fix
-- `refactor/<short-slug>` - structure change, behavior preserved
-- `docs/<short-slug>` - documentation only
-- `chore/<short-slug>` - build tooling, formatting, deps
-
-Examples: `feat/gossip-compression`, `fix/trust-rate-limit-overflow`, `refactor/actor-message-routing`
-
-### Multi-Agent Parallel Work
-
-For running multiple agents simultaneously, use Git worktrees. Each agent gets an isolated working directory and branch. See `docs/dev/WORKTREES.md` for full documentation and `scripts/worktrees.sh` for the helper script.
-
-### Daily Flow
-
-```bash
-# 1) Start from updated main
-git checkout main
-git pull origin main
-
-# 2) Create a branch
-git checkout -b feat/<slug>
-
-# 3) Work in small commits
-git add -A
-git commit -m "feat(gossip): add message compression header"
-
-# 4) Keep branch synced (if main moved)
-git fetch origin
-git rebase origin/main
-git push --force-with-lease   # Only on YOUR branch
-
-# 5) Push and open PR
-git push -u origin feat/<slug>
-```
-
-### Commit Message Convention
-
-Format: `<type>(<scope>): <summary>`
-
-**Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
-
-**Scopes**: `gossip`, `net`, `identity`, `trust`, `ledger`, `ccl`, `gateway`, `cli`, `runtime`, `sdk`, `governance`, `compute`
-
-Examples:
-- `feat(ledger): add demurrage scheduler`
-- `fix(trust): prevent negative reputation underflow`
-- `refactor(runtime): isolate actor mailbox logic`
-
-### PR Requirements
-
-**Size**: One coherent change, reviewable in <20 minutes. Split large changes.
-
-**Description must include**:
-- **What**: Summary of changes
-- **Why**: Motivation / issue link
-- **How**: Implementation notes
-- **Risk**: What could break
-- **Test plan**: How you verified
-
-### Required Checks (before merge)
-
-```bash
-# Rust
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features
-
-# TypeScript SDK (if changed)
-cd sdk/typescript && npm test && npm run build
-```
-
-### CI Failure Index
-
-Common CI failures and their minimal fixes:
-
-| CI Check | Usual Cause | Fix |
-|----------|------------|-----|
-| **Check API Types Drift** | TS types out of date after API change | `cd sdk/typescript && npm ci && npm run generate-types` — commit only `src/generated/api-types.ts` |
-| **non-exhaustive patterns** | Enum variant added in shared crate | Add match arm in consumer crate, map to closest existing semantics |
-| **Clippy** | Lint regression in changed code | Fix the warning — never suppress with `#[allow]` unless pre-existing |
-| **Compare Against Base** | Benchmark compare flaky | If not required: ignore. If required: `gh run rerun <run-id> --failed` once before touching code |
-| **claude-review** | Advisory review using Claude **subscription** OAuth via the `CLAUDE_CODE_OAUTH_TOKEN` Actions secret (not direct API billing). Step-level `continue-on-error` keeps the check green on SDK errors, and oversized diffs (>500 files or >20k LOC) skip cleanly. A red `claude-review` now means workflow/config breakage worth investigating — see the run's job summary. If the failure is "organization has disabled Claude subscription access," regenerate the token with `claude setup-token` from the intended Claude subscription account and update the GitHub secret `CLAUDE_CODE_OAUTH_TOKEN`; if org-managed, confirm Claude Code subscription access is enabled for that workspace. Never blocks merge regardless. |
-
-**Full drift chain**: shared crate change → gateway/API match updates → OpenAPI regen → TS type regen → CI passes. Don't skip the second half.
-
-**Drift fix recipe** (TypeScript API Types):
-```bash
-cd sdk/typescript && npm ci && npm run generate-types
-git diff --stat  # must show ONLY sdk/typescript/src/generated/* paths
-git add sdk/typescript/src/generated/api-types.ts
-git commit -m "chore(sdk): regenerate TypeScript API types"
-```
-
-**Generated-commit gate**: A regen commit must touch only `sdk/typescript/src/generated/*`. No lockfile changes unless `npm ci` actually updated deps (rare). No mixed "refactor + regen" commits.
-
-### Agent Behavior
-
-The Claude Code agent **must**:
-- Never push directly to `main`
-- Always work on feature branches and open PRs
-- Run required checks before requesting review
-- Explain any skipped checks in the PR description
-- **When working on an existing PR**: Always check for new/updated comments and CI status before making changes
-  ```bash
-  gh pr view <PR_NUMBER> --comments  # Check for review comments
-  gh pr checks <PR_NUMBER>           # Check CI status
-  gh pr diff <PR_NUMBER>             # Review current changes
-  ```
-- **When CI fails**: Fetch and review the CI logs to understand the failure
-  ```bash
-  gh run view <RUN_ID> --log-failed  # Get failed job logs
-  ```
-
-## Issue Management
-
-See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issue taxonomy.
-
-### Label System (19 labels)
-
-**Every issue MUST have**:
-- Exactly one `epic:*` label (`epic:kernel-separation`, `epic:arch-invariants`, `epic:trust-hardening`, `epic:service-discovery`, `epic:commons-compute`, `epic:kernel-perf`)
-- Exactly one `type:*` label (`type:spec`, `type:impl`, `type:refactor`, `type:test`, `type:doc`)
-- If `epic:trust-hardening`: exactly one `tier:*` (`tier:1-correctness`, `tier:2-observability`, `tier:3-perf`)
-
-**Dependencies** go in the issue body as checklists, not labels.
-
-**Issue Title Format**: `<type>(<domain>): <action>`
-- Examples: `feat(ledger): Add demurrage scheduler`, `fix(gossip): Remove blocking operations`
-
-**Before Creating Issues**:
-1. Search for existing duplicates
-2. If duplicate exists, comment + link instead of creating new
-3. No new labels without explicit human approval
-
-## Security & Production Hardening
-
-**Three-Layer Security**:
-1. Transport: QUIC/TLS with DID-TLS binding
-2. Message: SignedEnvelope with Ed25519 + replay protection
-3. Application: EncryptedEnvelope with E2E encryption
-
-**Trust-gated rate limiting** (per trust class):
-- Isolated (< 0.1): 10 msg/sec
-- Known (0.1-0.4): 20 msg/sec
-- Partner (0.4-0.7): 100 msg/sec
-- Federated (0.7+): 200 msg/sec
-
-See [docs/security/production-hardening.md](docs/security/production-hardening.md) for complete details.
-
-### Auth / dev-gate doctrine (#2075)
-- A capability token is not a mandate: DID ownership alone must never authorize a cooperative. Self-asserted `coop_id` issuance at `/auth/verify` is **fail-closed** — see RFC-0018, issue #2075, and [docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md](docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md).
-- Any dev/self-serve auth bypass must require BOTH an explicit opt-in (`ICN_DEV_MODE`) AND a loopback bind, and must NOT be settable from a config file (`#[serde(skip)]`, not `serde(default)`). Prefer a safe-by-construction gate over per-launcher patching.
-- Never enable a dev posture on a non-loopback (`0.0.0.0` / routable) bind — that exposes the bypass to the network. Production binds coop authority through trusted issuance paths (invites/sessions/enrollment).
-
-## Notes
-
-- Daemon requires unlocked keystore (passphrase on startup)
-- Actor handles use `Arc<RwLock<T>>` or message passing
-- Shutdown via `tokio::sync::broadcast`
-- Integration tests need unique ports per node
-- Vector clocks prevent duplicate gossip processing
-
-### Canonical Type Ownership
-
-| Type | Canonical Home | Notes |
-|------|---------------|-------|
-| `Did` | `icn-identity` | Newtype `Did(String)` — `.as_str()` for &str, `.to_string()` for String |
-| `BlockHeight` | `icn-kernel-api::invariants` | `pub type BlockHeight = u64` (alias, not newtype) |
-| `ErrCode` | `icn-kernel-api::error` | 10 codes, lowercase snake_case wire format |
-| `ArtifactReceipt` | `icn-kernel-api::proofs` | Phase A addition |
-| `GovernanceProof` | `icn-governance::proof` | Phase A addition |
-
-If a type can't be imported yet (unmerged PR), use a local alias with a migration comment citing the PR number.
-
-### Lockfile Policy
-
-- Rust `Cargo.lock` changes belong in Rust commits only
-- Node `package-lock.json` changes belong in SDK commits only
-- If a lockfile changed unintentionally (branch switching churn), revert it before committing
-
-## Kernel/App Separation Architecture
-
-> **Detailed Documentation**: See [docs/architecture/KERNEL_APP_SEPARATION.md](docs/architecture/KERNEL_APP_SEPARATION.md) for comprehensive documentation including migration guides, implementation patterns, and request flow diagrams.
-
-### The Meaning Firewall
-
-The kernel enforces constraints WITHOUT understanding their semantic origin. This is the core architectural principle.
-
-**Rule**: Domain semantics (trust scores, governance rules, membership criteria) stay in apps. Kernel only sees:
-- `ConstraintSet` (rate limits, credit multipliers, voting weights)
-- `PolicyDecision` (Allow/Deny)
-- Capabilities (bearer tokens)
-
-**Violation Detection**:
-```rust
-// VIOLATION - kernel code importing domain types
-use icn_trust::{TrustGraph, TrustClass};  // ❌ NEVER in kernel crates
-
-// CORRECT - kernel code using generic types
-use icn_kernel_api::{PolicyOracle, ConstraintSet};  // ✅
-```
-
-### PolicyOracle Pattern
-
-Apps implement `PolicyOracle` to provide domain-specific authorization:
-
-```rust
-impl PolicyOracle for TrustPolicyOracle {
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        // 1. Compute domain-specific value (trust score)
-        let score = self.graph.compute_trust_score(&actor);
-
-        // 2. Convert to generic constraints (MEANING FIREWALL BOUNDARY)
-        let constraints = ConstraintSet::new()
-            .with_rate_limit(score_to_rate_limit(score))
-            .with_credit_multiplier(score);
-
-        // 3. Return decision kernel can enforce blindly
-        PolicyDecision::Allow { constraints }
-    }
-}
-```
-
-### TrustPolicyOracle Flow
-
-The following diagram shows the complete request flow through the TrustPolicyOracle:
-
-```mermaid
-sequenceDiagram
-    participant API as API Request
-    participant Oracle as TrustPolicyOracle
-    participant Check as Domain Check
-    participant Compute as Trust Computation
-    participant Firewall as Meaning Firewall
-    participant Kernel as Kernel
-
-    API->>Oracle: evaluate(PolicyRequest)
-    
-    Oracle->>Check: Check domain == "trust"
-    alt domain != "trust"
-        Check-->>Oracle: Abstain (Allow with empty constraints)
-        Oracle-->>API: PolicyDecision::Allow
-    else domain == "trust"
-        Check-->>Oracle: Continue
-    end
-    
-    Oracle->>Compute: Parse actor DID
-    alt Invalid DID format
-        Compute-->>Oracle: Return minimal trust (0.0)
-    else Valid DID
-        Compute->>Compute: graph.compute_trust_score(actor)
-        Note over Compute: Try try_read() first
-        alt Lock available
-            Compute-->>Oracle: trust_score (f64)
-        else Lock contention
-            Compute->>Compute: block_in_place()
-            Note over Compute: Increment counter metric
-            Compute-->>Oracle: trust_score (f64)
-        end
-    end
-    
-    Oracle->>Firewall: score_to_constraints(score)
-    Note over Firewall: ═══ MEANING FIREWALL ═══
-    Note over Firewall: Trust semantics END here
-    Firewall-->>Oracle: ConstraintSet
-    Note over Oracle: rate_limit, credit_multiplier,<br/>max_topics, trust_score custom field
-    
-    Oracle-->>API: PolicyDecision::Allow { constraints }
-    API->>Kernel: Enforce constraints blindly
-    Note over Kernel: Kernel never sees "trust score"<br/>or "trust class" - only limits
-```
-
-**Key Points**:
-- The **Meaning Firewall** boundary is where trust semantics (scores, classes) are converted to generic constraints
-- The kernel enforces rate limits without knowing they came from trust scores
-- Lock contention is tracked via `trust_oracle_block_in_place_total` metric
-
-
-### App Lifecycle
-
-```
-[Prepare] → [Install] → [Start] → [Stop] → [Uninstall]
-     ↓           ↓          ↓         ↓
-  Validate   Create     Spawn    Signal    Remove
-  manifest   state      task     shutdown  from
-             handles              +timeout  registry
-```
-
-### CCL (Cooperative Contract Language)
-
-CCL is the constitutional layer for governed entities:
-- **Entities**: Community, Cooperative, Federation, Individual
-- **Governance**: Bodies, decisions, delegation, thresholds
-- **Economics**: Capital, surplus allocation, credit policy
-- **Agreements**: Federation treaties, boundary protocols
-
-CCL documents are stored as state, interpreted by apps, and converted to `ConstraintSet` for kernel enforcement.
-
-### Bootstrap Phases
-
-1. **Genesis**: AllowAllOracle active, genesis capabilities can be issued
-2. **CoreApps**: First-party apps loading, trust oracle registering
-3. **Running**: Deny-by-default for unknown domains, full enforcement
-
-### Crate Organization
-
-**Kernel crates** (domain-agnostic):
-- `icn-kernel-api`: Primitive traits (PolicyOracle, State, Compute, Comms)
-- `icn-core`: Runtime, supervisor, dispatcher
-- `icn-net`, `icn-gateway`, `icn-gossip`: Network primitives
-
-**App crates** (domain-specific):
-- `apps/trust`: Trust graph → PolicyOracle
-- `apps/governance`: CCL governance → PolicyOracle (future)
-- `apps/membership`: Entity management (future)
-
-**Never import domain crates into kernel crates.**
-
-## Claude Execution Contract
-
-### Default Mode
-You are operating as an execution engine. Be concise. Do not narrate routine steps.
-- Do not over-verify or provide excessive status updates.
-- Do not build elaborate infrastructure (justfiles, bootstrap scripts, custom actions) beyond what is explicitly requested.
-- When merging PRs, use `gh pr merge --admin` if CI is queue-stalled — do not write polling loops to wait for CI.
-
-### Scope is Law
-- The user's request defines the complete scope.
-- Do not expand scope.
-- If something adjacent is important, add a short NOTE section at the end, but do not act on it.
-
-### Branch/Target Hygiene (mandatory)
-Before making ANY code change:
-1. Print current branch
-2. Identify PR number (if any) and its base branch
-3. Confirm correct repo + correct directory (`git rev-parse --show-toplevel` — must be the intended
-   worktree, never a legacy checkout)
-4. **Read before edit**: read the file in this session, from this checkout, before modifying it.
-   Never edit from memory of another checkout's copy — stale-checkout edits are how wrong-root
-   regressions ship.
-
-If any of these are ambiguous, STOP and ask.
-
-**Cross-PR rule**: One phase = one branch = one PR. Never commit Phase B work onto a Phase A branch (or vice versa). If scope bleed happens, fix immediately via `git reset --hard HEAD~N` + `git cherry-pick` onto the correct branch.
-
-**Stashes are debt**: Before switching branches, `git status --short` must be clean — commit or stash intentionally. After switching, `git stash list` should be empty. Drop unneeded stashes immediately; don't leave them for archaeology.
-
-### PR Workflow Gates (for Rust workspace)
-When applying review feedback or fixing CI:
-- After changes and before pushing:
-  - `cargo fmt --check`
-  - `cargo clippy --all-targets -- -D warnings`
-  - `cargo test` (or `cargo test --workspace` if appropriate)
-- Do not push broken formatting/lints/tests.
-- **Never run `git push` directly. Always use `/push`.** This is the only sanctioned push path.
-
-### PR Readiness Definition
-A PR is ready to merge when:
-- All review feedback, comments, and review threads addressed (`gh pr view <id> --json reviews,reviewRequests,comments`)
-- Required CI checks green (flaky non-required checks don't block)
-- No scope-bleed commits (every commit belongs to this phase)
-- Diff size matches phase expectations (no surprise 2000-line PRs)
-- Generated commits labeled as such (`chore(sdk): …`) and contain only generated files
-
-**Do not merge until PR Readiness Definition is satisfied.**
-
-```bash
-# Merge preflight
-gh pr view <id> --json state,mergeable,reviews,reviewRequests,comments,statusCheckRollup
-gh pr checks <id>
-git status --short
-```
-
-### CI Owns the Truth
-- **Local green does not override CI red.** Fix exactly what CI says, nothing more.
-- Don't pre-fix unrelated suspected issues before CI runs.
-- Rerun flaky checks once before touching code (see CI Failure Index for classification).
-
-### Do Not "Fix the World"
-- Do NOT upgrade toolchains, refactor unrelated code, or address pre-existing lints unless explicitly asked.
-- If you encounter unrelated failures, report them, but do not start a toolchain/infra project.
-- Toolchain is pinned in `icn/rust-toolchain.toml` — do NOT change it without explicit approval.
-- SIGSEGV or sccache corruption? Run `cargo clean` first before theorizing further.
-
-### Infrastructure Tasks = No ICN Code Changes
-If the task is homelab/infra/proxmox/networking:
-- Do not modify ICN repo code unless explicitly instructed.
-- Document findings in the infra/homelab notes repo (or a designated doc), not in ICN code.
-
-### Debugging Protocol (stop wrong-path spirals)
-Before pursuing any hypothesis:
-1. List top 3 hypotheses ranked by likelihood
-2. For each: evidence FOR, evidence AGAINST, cheapest test
-3. Start with the cheapest test
-
-Do not jump to hardware/compiler blame without strong evidence.
-
-### Sequential by Default
-- Do not make parallel changes without explicit instruction.
-- Do one change-set, verify it works, then proceed to the next.
-- "Implement everything in parallel" requires the user to say "in parallel."
-
-### Long-Running Shell Commands
-- `nohup ... &` is unreliable in the Claude Code bash environment.
-- For polling loops or long waits, use the Bash tool's `run_in_background: true` parameter instead.
-
-### Prose Mode (when requested)
-- Keep the user's voice: sharp, direct, not formalized, not melodramatic.
-- "Sharper/edgier" means more authentic and raw, NOT more structured or sitcom cadence.
-- If corrected on tone, internalize within the session.
-
-## CRLF / Line Ending Gotchas
-- Some branches predating `.gitattributes` line-ending normalization may show large phantom diffs on checkout.
-- If you see hundreds of CRLF-only changes:
-  - Prefer `git checkout -f main` to force-reset the worktree state.
-  - Avoid rebasing noisy branches without normalizing; consider a one-time "line ending normalization" commit, then rebase.
-- Recommended local config in all worktrees:
-  - `git config core.autocrlf false`
-  - `git config core.eol lf`
-
-## Test Filtering Notes
-- `cargo test <filter>` matches **test function names**, not file names.
-- To run an integration test file:
-  - `cargo test -p <crate> --test <filename>` (omit `.rs`)
-- Example:
-  - `cargo test -p icn-core --test backup_restore_integration`
-
-## Specialist Agents
-
-Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invoke via the `Task` tool with `subagent_type` matching the agent name.
-
-| Agent | Use when... |
-|-------|------------|
-| `icn-architect` | Crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, threat modeling. NOT economics (use `icn-economist`), NOT ops (use `icn-ops`). |
-| `icn-code-reviewer` | Reviewing PRs, diffs, or staged changes with ICN invariants lens. High signal-to-noise — surfaces bugs, security issues, invariant violations. |
-| `icn-economics-advisor` | `icn-ledger`, `apps/ledger`, commons credit accounting, `JournalEntry` construction, settlement flows, `EarningTracker`, fork detection, credit policy. |
-| `icn-economist` | Ledger logic, CCL contracts, mutual credit invariants, treasury, mana/resource allocation, regulatory terminology compliance, Phase 1 payment→settlement renaming. |
-| `icn-gossip-net` | `icn-gossip`, `icn-net`, `icn-protocol`, message formats, topic subscriptions, anti-entropy, QUIC/TLS sessions, mDNS discovery, `SignedEnvelope` handling. |
-| `icn-governance-advisor` | `icn-governance`, `icn-ccl`, `icn-community`, `icn-coop`, `icn-entity`, `apps/governance`, proposals, voting, CCL semantics, threshold mechanics, civic engine rules. |
-| `icn-identity-iam-advisor` | `icn-identity`, `icn-naming`, `icn-entity`, DID lifecycle, keystore, key rotation, capability tokens, DID-TLS binding, bearer tokens, membership-gated access. |
-| `icn-invariants-guardian` | Reviewing proposed changes against the 5 ICN invariants and cross-doc consistency. Blocks changes that violate safety properties. Use before merging significant changes. |
-| `icn-design-advisor` | `docs/design/`, `docs/design-language/`, `website/` styles or components, accessibility audits, UI copy review, action card / receipt UI doctrine, Claude Design briefing prep. NOT mobile-specific (use `icn-mobile-advisor`). |
-| `icn-mobile-advisor` | `sdk/react-native/`, mobile UX, CoopWallet app screens, mobile gateway API, offline-first patterns, mobile identity/signing, five-tab navigation. |
-| `icn-ops` | K3s cluster state, demo flow validation, CI/CD health, pod diagnostics, release readiness, pre-deployment checks. NOT protocol design (use `icn-architect`). |
-| `icn-planner` | Strategic planning with task breakdown, dependency analysis, risk assessment, merge ordering. Does NOT implement — plans only. |
-| `icn-rust-core` | Crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure implementation. |
-| `icn-security-reviewer` | Security-sensitive changes: cryptography, authentication, key handling, replay attacks, JWT, signed envelopes, rate limiting. |
-| `icn-test-generator` | Writing integration tests with `icn-testkit`, multi-node convergence scenarios, property-based tests, unit test scaffolding, `TestNode` helper pattern. |
-| `icn-trust-federation-advisor` | `icn-trust`, `icn-federation`, `TrustPolicyOracle`, trust score computation, trust-gated rate limiting, federated task placement, cross-coop coordination. |
-
-## Multi-Agent Worktree Pattern
-- Give each agent an isolated worktree and branch.
-- Keep territory constraints strict: each agent only touches its assigned crate/app.
-- Merge order:
-  - smallest / most independent first
-  - largest / most dependent last
-- Crash recovery: worktrees survive VM crashes; rebase/stash workflow can salvage state.
-
-## PR Merge Edge Cases
-- Draft PRs must be marked ready before merge:
-  - `gh pr ready <pr>`
-- `--delete-branch` will fail if the branch is checked out in a worktree.
-  - Remove the worktree first, then delete the branch.
-- Use `--admin` sparingly (prefer fixing flake sources rather than normalizing bypass).
-- `gh pr checks` exits code 8 on mixed results — always capture with `|| true`.
-- `gh pr checks` output is tab-separated; multi-word check names (e.g. "Test Coverage") need `awk -F'\t' '{print $2}'`, not `awk '{print $2}'`.
-- `claude-review` is advisory and never blocks merge. The workflow authenticates via Claude **subscription** OAuth using the `CLAUDE_CODE_OAUTH_TOKEN` Actions secret (not direct Anthropic API billing). Step-level `continue-on-error` keeps the check green on SDK errors; oversized diffs are skipped cleanly with a job summary. A red check now means workflow/config breakage — most commonly a stale/wrong-account `CLAUDE_CODE_OAUTH_TOKEN` (regenerate with `claude setup-token` from the correct subscription account and update the secret) or an org-managed subscription that has disabled Claude Code access for the workspace. Flipping to `ANTHROPIC_API_KEY` is an alternate path only if we intentionally choose direct API billing — not a default fix.
-- "Test Coverage" at `pending / 0s` = queue-stalled, not running. Safe to `--admin` merge when all other required gates are green.
-- When merging multiple PRs in dependency order, expect compilation errors from struct field changes across crates — fix forward, don't over-investigate.
-- Prefer merge strategy over rebase for subtree commits (subtree squash commits do not rebase cleanly).
-- **Stacked PRs**: Before merging a PR that is the base branch of another open PR, retarget the stacked PR first:
-  `gh pr edit <stacked-pr-number> --base main`
-  If you forget, GitHub leaves the stacked PR open but its base is gone — it shows as open with a stale diff. Verify with `gh pr view <pr> --json baseRefName`.
-- **Branch cleanup**: `delete_branch_on_merge` is enabled — remote branches are auto-deleted when a PR merges. No manual remote cleanup needed. Local refs still go stale, so run `git fetch --prune` periodically and delete local branches with `git branch -d <name>` after pulling the squash commit into `main`.
+then the Claude-facing surface is the stale layer. Report the conflict and fix the adapter rather than teaching the repository the adapter's old assumption.

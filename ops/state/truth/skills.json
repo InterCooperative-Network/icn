@@ -6,7 +6,7 @@
     "icn_level": ".agents/skills/",
     "project_level": "../../../.claude/skills/"
   },
-  "note_on_duplication": "ops/automation/skills/ is the canonical source for shared operational skills. The project-level .claude/skills/ for {status, sync-and-build, worktree} MUST be symlinks to ops/automation/skills/. Run ops/scripts/setup-skill-symlinks.sh to create/verify.",
+  "note_on_duplication": "ops/automation/skills/ is the canonical source for shared operational skills. ICN-level skills are canonical under .agents/skills/. Provider-facing .claude/skills copies are compatibility mirrors/adapters, not independent owners. Project-level .claude/skills for {status, sync-and-build, worktree} MUST be symlinks to ops/automation/skills/. Run ops/scripts/setup-skill-symlinks.sh to create/verify project-level symlinks.",
   "skills": {
     "ops_automation_canonical": [
       {
@@ -41,9 +41,9 @@
       "resume-session", "rust-verify", "update-session-state"
     ],
     "overlapping_ownership_notes": {
-      "fix-ci": "Both icn-level and project-level have this. .agents/skills/fix-ci is authoritative for ICN-specific CI work.",
-      "icn-preflight": "Both levels have this. .agents/skills/icn-preflight is authoritative — it uses the ICN-specific change routing matrix.",
-      "merge-prs": "Both levels have this. .agents/skills/merge-prs is authoritative for ICN — has the correct squash policy and 10 required checks."
+      "fix-ci": "Both ICN- and project-level surfaces may expose this workflow. .agents/skills/fix-ci is authoritative for ICN-specific CI work; live failure logs and policy.json supply current facts.",
+      "icn-preflight": "Both ICN- and provider/project-level surfaces may expose preflight. .agents/skills/icn-preflight is authoritative; provider copies must preserve its owner-driven bootstrap semantics.",
+      "merge-prs": "Both ICN- and project-level surfaces may expose merging. .agents/skills/merge-prs is authoritative for ICN and MUST load required checks/strategy dynamically from ops/state/truth/policy.json and live branch protection rather than hardcoding a check count."
     }
   }
 }

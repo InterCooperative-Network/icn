@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# check-preflight-consistency.sh — guard against root/path guidance drift (Refs #2140).
+# check-preflight-consistency.sh — guard against agent-foundation/root guidance drift.
 #
-# Companion to scripts/icn-preflight.sh (the documented preflight path is: run both).
-# CI-safe: repo-content checks always run; environment checks (stale legacy checkout,
-# MCP-root mismatch) run only where the relevant paths/vars exist and never FAIL.
+# Companion to scripts/icn-preflight.sh. CI-safe: repo-content checks always run;
+# environment checks run only where the relevant paths/vars exist and never FAIL.
 #
 # Exit 1 on FAIL (live guidance regressed), exit 0 otherwise (warnings allowed).
 set -euo pipefail
@@ -55,7 +54,12 @@ else
   pass "ops/mcp/src: no legacy worktree-root hardcoding outside paths.ts"
 fi
 
-# ── 3. Doc-control command forms: scripts exist, exact forms documented ────────
+# ── 3. Doc-control command forms have ONE provider-neutral owner ──────────────
+#
+# AGENTS.md is the provider-neutral operating contract. Provider adapters such as
+# CLAUDE.md must point to it instead of duplicating the command doctrine. This is
+# deliberately stronger than the old check, which required the same four strings in
+# both root files and therefore made drift inevitable.
 DOC_SCRIPTS=(
   "docs/scripts/doc_control_check.py"
   "docs/scripts/freshness-check.py"
@@ -72,37 +76,68 @@ DOC_COMMANDS=(
   'python3 .github/scripts/compliance_linter.py --repo-root .'
   'python3 .github/scripts/readiness_overclaim_linter.py --repo-root .'
 )
-for doc in CLAUDE.md AGENTS.md; do
-  missing=0
-  for c in "${DOC_COMMANDS[@]}"; do
-    grep -qF "$c" "$doc" || { missing=1; fail "$doc lost the documented command form: $c"; }
-  done
-  [ "$missing" -eq 0 ] && pass "$doc documents all four doc-control command forms"
-done
 
-# ── 4. Registries must point at files that exist (agents.json / skills.json) ───
+missing=0
+for c in "${DOC_COMMANDS[@]}"; do
+  grep -qF "$c" AGENTS.md || { missing=1; fail "AGENTS.md lost the canonical doc-control command form: $c"; }
+done
+[ "$missing" -eq 0 ] && pass "AGENTS.md owns all four universal doc-control command forms"
+
+if ! grep -q 'AGENTS.md' CLAUDE.md; then
+  fail "CLAUDE.md must route provider-neutral operating guidance to AGENTS.md"
+else
+  pass "CLAUDE.md routes provider-neutral operating guidance to AGENTS.md"
+fi
+
+claude_dupes=0
+for c in "${DOC_COMMANDS[@]}"; do
+  if grep -qF "$c" CLAUDE.md; then
+    claude_dupes=1
+    fail "CLAUDE.md duplicates provider-neutral doc-control command owned by AGENTS.md: $c"
+  fi
+done
+[ "$claude_dupes" -eq 0 ] && pass "CLAUDE.md does not duplicate AGENTS.md doc-control command doctrine"
+
+# ── 4. Registries must point at files that exist and foundation owners must bind ─
 python3 - <<'PYEOF' || FAILS=$((FAILS + 1))
 import json, os, sys
 bad = []
+
 agents = json.load(open("ops/state/truth/agents.json"))
 for a in agents["agents"]:
     if not os.path.exists(a["path"]):
         bad.append(f'agents.json: {a["name"]} -> {a["path"]} (missing)')
+
 skills = json.load(open("ops/state/truth/skills.json"))
 for e in skills["skills"]["ops_automation_canonical"]:
     if not os.path.exists(e["canonical_path"]):
         bad.append(f'skills.json: {e["name"]} -> {e["canonical_path"]} (missing)')
+
+sources = json.load(open("ops/state/truth/sources.json"))
+expected = {
+    "agent_operating_contract": "AGENTS.md",
+    "agent_reasoning_constitution": "docs/ai/ICN_CONSTITUTIONAL_CORE.md",
+    "agent_workflow": "docs/ai/WORKFLOW_ARCHITECTURE.md",
+    "invariants": "AGENTS.md",
+}
+for domain, owner in expected.items():
+    actual = sources.get("domains", {}).get(domain, {}).get("owner")
+    if actual != owner:
+        bad.append(f'sources.json: {domain} owner={actual!r}, expected {owner!r}')
+    elif not os.path.exists(owner.split("#", 1)[0]):
+        bad.append(f'sources.json: {domain} -> {owner} (missing)')
+
 if bad:
-    print("  FAIL  registry entries point at missing files:")
+    print("  FAIL  agent registry/truth-owner consistency:")
     for b in bad:
         print(f"        {b}")
     sys.exit(1)
-print("  ok  agents.json and skills.json registry paths all exist on disk")
+print("  ok  agent/skill registry paths exist and foundation truth owners are registered")
 PYEOF
 
-# ── 5. Preflight skill twins: warn when .agents/ and .claude/ copies diverge ───
-# skills.json declares the .agents/skills/ copy authoritative for icn-level skills.
-for skill in preflight icn-preflight; do
+# ── 5. Provider skill mirrors: warn when canonical .agents/ copy diverges ─────
+# skills.json declares .agents/skills/ authoritative for ICN-level skills.
+for skill in preflight icn-preflight handoff; do
   a=".agents/skills/${skill}/SKILL.md"
   c=".claude/skills/${skill}/SKILL.md"
   if [ -f "$a" ] && [ -f "$c" ]; then
@@ -139,7 +174,7 @@ elif [ -z "${ICN_ROOT:-}" ] && [ -d "${HOME}/icn-dev/worktrees/icn/mcp-host" ] &
   fi
 fi
 
-# ── result ──────────────────────────────────────────────────────────────────────
+# ── result ────────────────────────────────────────────────────────────────────
 if [ "$FAILS" -gt 0 ]; then
   echo -e "${RED}check-preflight-consistency: ${FAILS} failure(s)${NC}"
   exit 1
