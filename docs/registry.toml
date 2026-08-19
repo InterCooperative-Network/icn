@@ -645,6 +645,54 @@ domain_tags = ["navigation", "index", "ecosystem"]
 recommended_action = "keep"
 last_reviewed = "2026-08-19"
 
+[docs."docs/ai/ICN_CONSTITUTIONAL_CORE.md"]
+category = "guide"
+status = "canonical"
+title = "ICN Constitutional Core"
+description = "CANONICAL FOR THE agent_reasoning_constitution DOMAIN ONLY (see ops/state/truth/sources.json): stable agent reasoning principles — mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, authority/role boundary, and the durable-memory rule. Deliberately carries no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence; those have their own registered owners."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents", "developers"]
+truth_class = "normative"
+role = "internal"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+
+[docs."docs/ai/WORKFLOW_ARCHITECTURE.md"]
+category = "guide"
+status = "canonical"
+title = "ICN Agent Workflow Architecture"
+description = "CANONICAL FOR THE agent_workflow DOMAIN ONLY (see ops/state/truth/sources.json): how an agent resolves a question to its truth owner, loads context in layers, treats implementation and live execution evidence, uses generated projections, bounds memory, bootstraps a session, and promotes durable discoveries. Owns no protocol semantics, project status, merge policy, agent routing, or repository topology."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents", "developers"]
+truth_class = "normative"
+role = "internal"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+
+[docs."docs/ai/CODEX_WORKFLOW.md"]
+category = "guide"
+status = "living"
+title = "Codex Workflow for ICN"
+description = "Codex provider adapter for the provider-neutral agent workflow. Normative for Codex-specific tool usage only; explicitly NOT canonical for project truth, which stays with AGENTS.md and the owners registered in ops/state/truth/sources.json."
+last_updated = "2026-08-19"
+owner = "matt"
+audiences = ["agents"]
+truth_class = "normative"
+role = "internal"
+canonical = "no"
+freshness = "current"
+domain_tags = ["ai", "agents"]
+recommended_action = "keep"
+last_reviewed = "2026-08-19"
+
 [docs."docs/DESIGN_PRINCIPLES.md"]
 category = "architecture"
 status = "canonical"
