@@ -15,7 +15,7 @@ use icn_authz::*;
 struct FixedSource(Vec<CapabilityEdge>);
 
 impl CapabilitySource for FixedSource {
-    fn edges_for_subject(&self, subject: &SubjectId) -> Vec<CapabilityEdge> {
+    fn edges_for_subject(&self, subject: &CapabilitySubjectId) -> Vec<CapabilityEdge> {
         self.0
             .iter()
             .filter(|e| e.subject == *subject)
@@ -32,14 +32,14 @@ impl CapabilitySource for FixedSource {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn alice() -> SubjectId {
-    SubjectId::new("did:icn:alice").unwrap()
+fn alice() -> CapabilitySubjectId {
+    CapabilitySubjectId::new("did:icn:alice").unwrap()
 }
-fn bob() -> SubjectId {
-    SubjectId::new("did:icn:bob").unwrap()
+fn bob() -> CapabilitySubjectId {
+    CapabilitySubjectId::new("did:icn:bob").unwrap()
 }
-fn carol() -> SubjectId {
-    SubjectId::new("did:icn:carol").unwrap()
+fn carol() -> CapabilitySubjectId {
+    CapabilitySubjectId::new("did:icn:carol").unwrap()
 }
 fn propose() -> Action {
     Action::new("governance:propose").unwrap()
@@ -55,7 +55,7 @@ fn coop() -> ResourceId {
 }
 
 fn make_edge(
-    subject: SubjectId,
+    subject: CapabilitySubjectId,
     action: Action,
     resource: ResourceId,
     source: EdgeSource,
