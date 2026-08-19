@@ -17,7 +17,10 @@ cat <<'EOF'
   route-impact     - downstream impact of a route/API change
   navigator        - repo knowledge graph / source-to-claim / impact maps
 
-Current truth lives in docs/STATE.md + docs/PHASE_PROGRESS.md (canonical).
+Truth is claim-specific: read AGENTS.md, then resolve the fact domain in
+ops/state/truth/sources.json and load only that owner. Branch/PR/CI/issue state
+is queried live from git/gh, never recalled. Handoffs and session memory are
+historical evidence, never current authority.
 Liveness/production claims are ops claims — verify, don't assume.
 This plugin complements the project-local .claude/ config; it does not replace it.
 EOF
