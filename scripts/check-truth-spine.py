@@ -62,6 +62,7 @@ TERMINAL_STATES = {
     "complete", "completed", "cancelled", "canceled",
 }
 DORMANT_VALUES = {"dormant", "inactive", "none", "paused"}
+ACTIVE_VALUES = {"active", "running"}
 DORMANCY_KEYS = ("cadence", "lifecycle")
 
 
@@ -70,8 +71,15 @@ def declares_dormancy(data: dict) -> bool:
     right now'. Requires a positive declaration — a missing key is not dormancy,
     or every malformed owner would pass by omission."""
     for key in DORMANCY_KEYS:
-        if str(data.get(key, "")).strip().lower() in DORMANT_VALUES:
+        raw = str(data.get(key, "")).strip().lower()
+        if raw in DORMANT_VALUES:
             return True
+        if raw in ACTIVE_VALUES:
+            # An explicit ACTIVE cadence contradicts the `active_*: null`
+            # spelling below. A self-contradictory owner has not declared
+            # dormancy — accepting it would let a terminal record pass by
+            # accident, which is the failure this invariant exists to catch.
+            return False
     # `active_<thing>: null` is the other accepted spelling, but the key must be
     # PRESENT: `.get()` returning None for an absent key would fail open.
     return any(k.startswith("active_") and data[k] is None for k in data)
