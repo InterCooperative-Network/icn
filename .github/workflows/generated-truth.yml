@@ -1,18 +1,12 @@
 name: Generated-truth drift
 
-# Observational drift guard for the repo's generated orientation/truth artifacts
-# and the agent/plugin validation tooling (#2128 spine, #2130 file-record, #2127
-# Claude agent pack, #2131 live-state overlay) PLUS a canonical-state-lag check
-# (docs/STATE.md vs git merge history). These generated artifacts are
-# "Canonical: no" — orientation/reference layers, NOT truth roots (canonical
-# state is docs/STATE.md + docs/PHASE_PROGRESS.md). Drift here is therefore a
-# WARNING, not a merge blocker, mirroring the route-inventory guard in
-# docs-freshness.yml. The job only FAILS if a checker itself errors (not on
-# drift). Promote individual checks to blocking only after a clean CI baseline
-# is proven and they are added to branch protection.
-#
-# See docs/ci/GENERATED_TRUTH_DRIFT.md for what is gated, what is advisory, and
-# the regenerate commands.
+# Observational drift guard for generated orientation/reference artifacts and the
+# agent/plugin validation tooling. These artifacts are Canonical: no: they route
+# toward registered owners/current evidence and never become a universal project
+# state root. The narrow STATE.md check below is retained only to keep that legacy
+# narrative from contradicting merge history; it does not restore STATE/PHASE as
+# agent authority. Staleness is a warning. The job fails only when a checker itself
+# errors. See docs/ci/GENERATED_TRUTH_DRIFT.md.
 
 on:
   pull_request:
@@ -57,10 +51,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # Full history: check-state-lag.py's commit-lag advisory counts commits
-          # since docs/STATE.md was last edited; on the default shallow (depth-1)
-          # checkout that count is wrong (the graft boundary masquerades as the
-          # last edit), and the script skips itself on shallow clones (#2384).
+          # Full history: check-state-lag.py's historical-narrative advisory
+          # counts commits since docs/STATE.md was last edited. On a shallow
+          # checkout that count is wrong, so the script skips the advisory.
           fetch-depth: 0
 
       - name: Set up Python
@@ -68,9 +61,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Spine: structural validation + freshness vs a fresh generation
-      # (check-agent-context-spine.py runs generate-agent-context-spine.py --check).
-      # Currently green on main; observational here. exit 0 = current.
+      # Generated navigation: source files/registries remain authoritative.
       - name: Agent context spine — valid + fresh
         run: |
           python3 scripts/check-agent-context-spine.py && rc=0 || rc=$?
@@ -80,8 +71,6 @@ jobs:
             echo "::warning::agent-context-spine drift/validation issue (exit $rc). Regenerate: python3 scripts/generate-agent-context-spine.py --write"
           fi
 
-      # Claude agent pack: portable skeleton + repo-root resolution. Currently
-      # green on main; observational here.
       - name: Claude plugin skeleton portability
         run: |
           python3 scripts/check-claude-plugin.py && rc=0 || rc=$?
@@ -100,9 +89,9 @@ jobs:
             echo "::warning::check-claude-plugin-root-resolution.py reported an issue (exit $rc)."
           fi
 
-      # Live-state overlay generator is on-demand with NO committed snapshot, so
-      # there is nothing to drift-check; this is a runnable-smoke (--check
-      # self-validates the 13 sections). --no-gh keeps it offline/deterministic.
+      # Live-state overlay is on-demand with NO committed snapshot. --check
+      # validates the owner-derived structure, memory-only handoff label, JSON
+      # round-trip, and that --no-gh mode invents no GitHub state.
       - name: Live-state overlay generator smoke (--check, offline)
         run: |
           python3 scripts/generate-live-state-overlay.py --check --no-gh && rc=0 || rc=$?
@@ -112,12 +101,8 @@ jobs:
             echo "::warning::generate-live-state-overlay.py --check failed (exit $rc) — generator regression."
           fi
 
-      # Repo file-record is a periodic snapshot (Canonical: no). It legitimately
-      # lags main between refreshes, so drift is a WARNING (refresh is a separate
-      # generated-only commit). Mirrors the route-inventory guard:
-      #   exit 0 = current  -> pass
-      #   exit 1 = stale     -> ::warning:: (regenerate); job still succeeds
-      #   exit >=2 = checker errored -> fail (real breakage, not staleness)
+      # Periodic file-record projection. It legitimately lags between refreshes.
+      # exit 0=current, 1=stale warning, >=2=checker failure.
       - name: Repo file-record snapshot drift (warn on stale)
         run: |
           python3 scripts/generate_repo_record.py --repo icn=. --check && rc=0 || rc=$?
@@ -130,20 +115,17 @@ jobs:
             exit "$rc"
           fi
 
-      # Canonical-state lag: the NEWEST docs/STATE.md sync block must not assert a
-      # PR/issue is unmerged / not-on-main when git history shows it merged (the
-      # #2128 recurrence). STATE.md is append-only, so only the current view is
-      # checked. Same exit convention as the file-record check:
-      #   exit 0 = no lag  -> pass
-      #   exit 1 = lag      -> ::warning:: (refresh the sync block); job succeeds
-      #   exit >=2 = checker errored -> fail
-      - name: Canonical-state lag (STATE.md vs merge history)
+      # Legacy STATE narrative consistency only. This detects one narrow class of
+      # misleading historical/current prose: a newest sync block saying work is
+      # unmerged/not-on-main when git proves it merged. It does NOT make STATE.md
+      # the owner of current project truth.
+      - name: Legacy STATE narrative lag (STATE.md vs merge history)
         run: |
           python3 scripts/check-state-lag.py && rc=0 || rc=$?
           if [ "${rc:-0}" = "0" ]; then
-            echo "docs/STATE.md newest sync block is consistent with merge history."
+            echo "docs/STATE.md newest sync block does not contradict merge history in the checked form."
           elif [ "${rc:-0}" = "1" ]; then
-            echo "::warning::docs/STATE.md's newest sync block asserts a PR/issue is unmerged/not-on-main that git shows merged. Refresh the sync block. Audit all blocks: python3 scripts/check-state-lag.py --all"
+            echo "::warning::docs/STATE.md's newest sync block asserts a PR/issue is unmerged/not-on-main that git shows merged. Refresh that narrative block. Audit all blocks: python3 scripts/check-state-lag.py --all"
           else
             echo "::error::check-state-lag.py errored (exit $rc) — checker error, not a lag signal."
             exit "$rc"
