@@ -23,15 +23,16 @@
 //!
 //! ```text
 //! ReplayGuard (Persistent)
-//!   ├── In-memory cache (HashMap<Did, SequenceWindow>)
+//!   ├── In-memory cache (HashMap<SenderPrincipal, SequenceWindow>)
 //!   ├── Persistent store (Sled via icn-store)
-//!   │   ├── replay_max_seq:<did> → max sequence number
-//!   │   └── replay_finalized:<did>:<seq> → finalization timestamp
+//!   │   ├── replay_max_seq:<canonical did> → max sequence number
+//!   │   └── replay_finalized:<canonical did>:<seq> → finalization timestamp
 //!   └── Durable high-water as the restart floor (no sequence gap)
 //! ```
 
 use crate::envelope::SignedEnvelope;
 use anyhow::{bail, Context, Result};
+use ed25519_dalek::VerifyingKey;
 use icn_gossip::BloomFilter;
 use icn_identity::Did;
 use icn_store::Store;
@@ -41,6 +42,136 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+/// The identity a replay window belongs to: the sender's Ed25519 key, never the text
+/// that key was spelled with (#2640).
+///
+/// # Why the wire `Did` cannot be this identity
+///
+/// [`SignedEnvelope::canonical_encoding`] covers `sequence ‖ timestamp ‖ payload_type ‖
+/// payload` and **not** `from`, while `Did::from_str` accepts any multibase base and stores
+/// the string exactly as spelled. One Ed25519 key therefore has many unconditionally accepted
+/// textual `did:icn:` names, all unequal under `Did`'s string `Eq`/`Hash`. A party holding
+/// **no key material** can take a captured envelope, rewrite only the spelling of `from`,
+/// leave the signature bytes untouched, and have it verify — so keying replay state by the
+/// wire `Did` issues that party a fresh replay window for every spelling it invents.
+///
+/// # Why the decoded key is exactly the right equivalence class
+///
+/// Ed25519 hashes the *encoded* public key into its challenge (`h = H(R ‖ A ‖ M)`). A `from`
+/// rewrite that changes the decoded 32 bytes therefore cannot verify, and one that leaves
+/// them unchanged has changed nothing a replay guard should be able to see. Two DIDs map to
+/// one `SenderPrincipal` **iff** a signature valid under one is valid under the other: the
+/// class is neither wider than the attack nor narrower than it. That equality is also
+/// precisely the one `verify_classical` already uses, since it derives the verifying key with
+/// the same `Did::to_verifying_key` call — the guard and the signature check now agree on who
+/// the sender is, which is the property that was missing.
+///
+/// # Scope — this is not I7
+///
+/// Deliberately **local to replay protection**. `Did` equality and hashing stay string
+/// equality; making them key equality is I7 / N2-A (#2627), which is gated on the N2-A0
+/// inventory (#2623) and owns the other keyspaces that inventory lists. Nothing here changes
+/// the `Did` parser's acceptance policy, the unvalidated constructors (N2-B), or any
+/// account/resource identifier semantics (N2-C′).
+#[derive(Clone, Copy)]
+pub struct SenderPrincipal(VerifyingKey);
+
+impl SenderPrincipal {
+    /// Derive the replay identity from a DID as spelled on the wire.
+    ///
+    /// Fails for any DID that does not decode to an Ed25519 public key — an anchor-derived
+    /// DID, for instance, since `Did::from_anchor_id` bypasses validation and roughly half of
+    /// those do not decode (`docs/architecture/n2-a0-stored-key-inventory.md` §10.1).
+    ///
+    /// Every caller **must** fail closed on the error. There is deliberately no textual
+    /// fallback: falling back to the spelling is the defect this type exists to remove.
+    pub fn from_did(did: &Did) -> Result<Self> {
+        let key = did.to_verifying_key().context(
+            "sender DID does not decode to an Ed25519 public key, so it names no replay identity",
+        )?;
+        Ok(SenderPrincipal(key))
+    }
+
+    /// The single spelling this principal is *written* as in durable state.
+    ///
+    /// `Did::from_public_key` is base58btc, which is also what every production sender emits
+    /// (`KeyPair::did()` is derived the same way), so canonical-write is a no-op for honest
+    /// state and a merge only for rows an alias put there.
+    pub fn canonical_did(&self) -> Did {
+        Did::from_public_key(&self.0)
+    }
+
+    /// The 32 key bytes the Ed25519 signature was checked against.
+    pub fn as_bytes(&self) -> [u8; 32] {
+        self.0.to_bytes()
+    }
+}
+
+// Written out rather than derived, because the derive would silently inherit whatever
+// `VerifyingKey` decides equality means. The equivalence class is the security property here,
+// so it is spelled where a reviewer can see it: two principals are equal exactly when their
+// canonical 32-byte key encodings are equal, and the `Hash` impl agrees with it by
+// construction because it hashes the same bytes.
+impl PartialEq for SenderPrincipal {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for SenderPrincipal {}
+
+impl std::hash::Hash for SenderPrincipal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state);
+    }
+}
+
+impl std::fmt::Display for SenderPrincipal {
+    /// Renders the canonical spelling, never the one the wire happened to use — a log line
+    /// that echoed the attacker's spelling would make one sender look like many.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.canonical_did())
+    }
+}
+
+impl std::fmt::Debug for SenderPrincipal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SenderPrincipal({})", self.canonical_did())
+    }
+}
+
+/// The sender's replay identity could not be derived, so nothing was accepted.
+///
+/// Fail-closed by construction, and distinct from a replay detection so callers do not score
+/// it as one. There is no fallback to the textual spelling because that fallback *is* the
+/// #2640 defect.
+///
+/// Structurally unreachable from the network path: `Did`'s `Deserialize` runs `Did::from_str`,
+/// which requires the payload to be a valid Ed25519 public key, and `handle_signed` verifies
+/// the signature — which derives the very same key — before the guard is consulted. It exists
+/// for the crate-public API surface and for locally minted DIDs that bypass validation.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "replay identity could not be derived from sender {peer}; rejecting sequence {sequence} \
+     rather than keying replay state by the DID's textual spelling"
+)]
+pub struct ReplayIdentityUndecodable {
+    /// The DID exactly as it was spelled by whoever sent it.
+    pub peer: String,
+    /// The sequence number that was refused.
+    pub sequence: u64,
+}
+
+/// Shorthand for the replay identity of a DID in tests.
+///
+/// Test-only. Production code derives this on the accept path and fails closed on the error;
+/// every DID here is `KeyPair`-derived, so a failure to decode is a broken test rather than a
+/// case to handle.
+#[cfg(test)]
+fn pk(did: &Did) -> SenderPrincipal {
+    SenderPrincipal::from_did(did).expect("test DIDs are key-derived and must decode")
+}
 
 /// Hash a sequence number to a 32-byte hash for Bloom filter
 fn hash_sequence(sequence: u64) -> [u8; 32] {
@@ -521,8 +652,9 @@ struct FinalizedEntry {
 /// - `max_seq` per peer (prevents replays after restart)
 /// - `finalized` sequences (prevents replay of processed transactions)
 pub struct ReplayGuard {
-    /// Last seen sequence per peer (in-memory cache)
-    sequences: HashMap<Did, SequenceWindow>,
+    /// Last seen sequence per sender, keyed by the sender's **key**, not by the spelling of
+    /// `from` on the envelope that reached us (#2640). See [`SenderPrincipal`].
+    sequences: HashMap<SenderPrincipal, SequenceWindow>,
 
     /// Maximum allowed clock skew (seconds)
     max_clock_skew: u64,
@@ -720,9 +852,51 @@ impl ReplayGuard {
             return Ok(0);
         }
 
+        match self.load_persisted_state_inner() {
+            Ok(loaded) => Ok(loaded),
+            Err(e) => {
+                // Nothing was loaded, so every in-memory window is absent and every floor is
+                // 0. Leaving `initialized` set would make the *next* call skip the load
+                // entirely and run against that empty state — which accepts every replay the
+                // store was holding evidence of. Clearing it makes a load failure stay a
+                // failure until it is fixed, instead of resolving itself into a fail-open on
+                // the second message.
+                //
+                // Load-outcome hardening, not the #2640 canonicalization itself: this file
+                // now performs durable writes during the load, so the failure path had to
+                // stop being one that silently disarms the guard before the canonicalization
+                // could be relied on. Failing to read replay state must never be cheaper for
+                // an attacker than replaying against it.
+                self.initialized.store(false, Ordering::SeqCst);
+                tracing::error!(
+                    error = %e,
+                    "Replay state could not be loaded; the guard stays uninitialized and will \
+                     retry rather than run against empty state"
+                );
+                Err(e)
+            }
+        }
+    }
+
+    /// The body of [`Self::load_persisted_state`], minus the once-only latch.
+    ///
+    /// Split out so every early return in here is covered by the latch reset above.
+    fn load_persisted_state_inner(&mut self) -> Result<usize> {
+        if self.store.is_none() {
+            return Ok(0); // In-memory mode, nothing to load
+        }
+
+        // #2640 — collapse spelling-distinct rows onto one canonical key *before* anything
+        // below interprets them, so the #2514 / #2517 state machine keeps seeing at most one
+        // readable row per sender and is not modified by this fix at all.
+        //
+        // Taken before `store` is bound because it needs `&self` for the clock-independent
+        // helpers and writes through the store itself.
+        self.canonicalize_durable_identities()?;
+
         let store = match &self.store {
             Some(s) => s,
-            None => return Ok(0), // In-memory mode, nothing to load
+            None => return Ok(0),
         };
 
         let mut count = 0;
@@ -740,6 +914,10 @@ impl ReplayGuard {
 
         for (key, value) in entries {
             if let Some(did) = Self::parse_max_seq_key(&key) {
+                // Rows are keyed by the sender's key, never by its spelling (#2640).
+                let Ok(principal) = Self::window_key(&did, "replay max_seq") else {
+                    continue;
+                };
                 let parsed = serde_json::from_slice::<MaxSeqEntry>(&value);
                 if let Err(ref e) = parsed {
                     // The key's existence proves we had state for this peer, but
@@ -749,13 +927,13 @@ impl ReplayGuard {
                     // captured before the restart is too old to be replayed.
                     let window = self
                         .sequences
-                        .entry(did.clone())
+                        .entry(principal)
                         .or_insert_with(SequenceWindow::new);
                     window.hold = Some(PeerHold::Unreadable {
                         until: quarantine_until,
                     });
                     tracing::error!(
-                        peer = %did,
+                        peer = %principal,
                         error = %e,
                         quarantine_secs = self.envelope_validity_horizon().as_secs(),
                         "Corrupt replay state entry; quarantining this peer until captured \
@@ -765,7 +943,7 @@ impl ReplayGuard {
                 if let Ok(entry) = parsed {
                     let window = self
                         .sequences
-                        .entry(did.clone())
+                        .entry(principal)
                         .or_insert_with(SequenceWindow::new);
 
                     // The entry parsed, but parsing is a statement about schema and
@@ -799,7 +977,7 @@ impl ReplayGuard {
                                     window.sender_regime = SenderRegimeState::DurableV1;
 
                                     tracing::debug!(
-                                        peer = %did,
+                                        peer = %principal,
                                         max_seq = entry.max_seq,
                                         floor_seq = entry.max_seq,
                                         "Loaded replay guard state"
@@ -819,7 +997,7 @@ impl ReplayGuard {
                                     window.sender_regime = SenderRegimeState::LegacyOrUnproven;
 
                                     tracing::debug!(
-                                        peer = %did,
+                                        peer = %principal,
                                         max_seq = entry.max_seq,
                                         "Loaded replay state from an unproven sender regime"
                                     );
@@ -842,7 +1020,7 @@ impl ReplayGuard {
                                     });
 
                                     tracing::warn!(
-                                        peer = %did,
+                                        peer = %principal,
                                         legacy_max_seq = entry.max_seq,
                                         hold_secs = self.envelope_validity_horizon().as_secs(),
                                         "Resuming an incomplete sender sequence-regime migration; \
@@ -861,7 +1039,7 @@ impl ReplayGuard {
                                         Some(PeerHold::UnsupportedSenderRegime { found_regime });
 
                                     tracing::error!(
-                                        peer = %did,
+                                        peer = %principal,
                                         found_regime,
                                         "Replay state is tagged with a sender sequence regime this \
                                          binary has no migration for; refusing this peer \
@@ -887,7 +1065,7 @@ impl ReplayGuard {
                             // defaults of 0. Freshness, not the floor, carries replay
                             // rejection for the duration of the hold.
                             tracing::warn!(
-                                peer = %did,
+                                peer = %principal,
                                 found_version = entry.semantic_version,
                                 current_version = REPLAY_STATE_SEMANTIC_VERSION,
                                 discarded_max_seq = entry.max_seq,
@@ -909,7 +1087,7 @@ impl ReplayGuard {
                             window.hold = Some(PeerHold::UnsupportedVersion { found_version });
 
                             tracing::error!(
-                                peer = %did,
+                                peer = %principal,
                                 found_version,
                                 current_version = REPLAY_STATE_SEMANTIC_VERSION,
                                 "Replay state was written under a semantic regime this binary \
@@ -941,6 +1119,9 @@ impl ReplayGuard {
             let Some(did) = Self::parse_sender_regime_key(&key) else {
                 continue;
             };
+            let Ok(principal) = Self::window_key(&did, "replay sender regime") else {
+                continue;
+            };
             let Ok(raw) = <[u8; 4]>::try_from(value.as_slice()) else {
                 // Unreadable provenance is not "no provenance": it is a record whose
                 // meaning we cannot establish, and reading it as absent would silently
@@ -948,18 +1129,18 @@ impl ReplayGuard {
                 // durable namespace after a hold, on evidence we cannot actually read.
                 let window = self
                     .sequences
-                    .entry(did.clone())
+                    .entry(principal)
                     .or_insert_with(SequenceWindow::new);
                 window.hold = Some(PeerHold::Unreadable {
                     until: quarantine_until,
                 });
-                tracing::error!(peer = %did, "Corrupt sender regime provenance; quarantining");
+                tracing::error!(peer = %principal, "Corrupt sender regime provenance; quarantining");
                 continue;
             };
             let found = u32::from_be_bytes(raw);
             let window = self
                 .sequences
-                .entry(did.clone())
+                .entry(principal)
                 .or_insert_with(SequenceWindow::new);
 
             match found {
@@ -975,7 +1156,7 @@ impl ReplayGuard {
                         until: quarantine_until,
                     });
                     tracing::warn!(
-                        peer = %did,
+                        peer = %principal,
                         hold_secs = self.envelope_validity_horizon().as_secs(),
                         "Resuming an incomplete sender sequence-regime migration; restarting \
                          the full safety hold rather than trusting a remembered deadline"
@@ -986,7 +1167,7 @@ impl ReplayGuard {
                         found_regime: other,
                     });
                     tracing::error!(
-                        peer = %did,
+                        peer = %principal,
                         found_regime = other,
                         "Sender regime provenance written by a binary this one has no \
                          migration for; refusing this peer indefinitely"
@@ -1005,6 +1186,9 @@ impl ReplayGuard {
 
         for (key, value) in finalized_entries {
             if let Some((did, seq)) = Self::parse_finalized_key(&key) {
+                let Ok(principal) = Self::window_key(&did, "replay finalized") else {
+                    continue;
+                };
                 if let Ok(entry) = serde_json::from_slice::<FinalizedEntry>(&value) {
                     // Only load finalized sequences less than 24h old
                     if entry.finalized_at_ms >= cutoff_ms {
@@ -1012,7 +1196,7 @@ impl ReplayGuard {
                         // initialized from max_seq (with safety gap and floor applied).
                         // This avoids creating new windows with floor_seq=0 based solely
                         // on finalized state, which could allow replay of older sequences.
-                        if let Some(window) = self.sequences.get_mut(&did) {
+                        if let Some(window) = self.sequences.get_mut(&principal) {
                             window.finalized.insert(seq, now);
                         }
                     }
@@ -1080,17 +1264,18 @@ impl ReplayGuard {
     /// paper over a hold that a migration test is asserting.
     #[cfg(test)]
     fn pre_establish_durable(&mut self, did: &Did) {
+        let principal = SenderPrincipal::from_did(did).expect("test DID must decode to a key");
         let already_known = self
             .sequences
-            .get(did)
+            .get(&principal)
             .map(|w| w.sender_regime != SenderRegimeState::LegacyOrUnproven || w.hold.is_some())
             .unwrap_or(false);
         if already_known {
             return;
         }
-        let _ = self.persist_sender_regime(did, SENDER_REGIME_DURABLE_V1);
+        let _ = self.persist_sender_regime(&principal, SENDER_REGIME_DURABLE_V1);
         self.sequences
-            .entry(did.clone())
+            .entry(principal)
             .or_insert_with(SequenceWindow::new)
             .sender_regime = SenderRegimeState::DurableV1;
     }
@@ -1134,6 +1319,20 @@ impl ReplayGuard {
         envelope: &SignedEnvelope,
         observed_regime: ObservedSenderRegime,
     ) -> Result<()> {
+        // The replay window belongs to the sender's *key*, not to the spelling of `from` on
+        // this envelope (#2640). Derived once, before any state is read or written, and
+        // failing closed: there is deliberately no fallback to the textual spelling, because
+        // that fallback is the defect. Costs honest traffic nothing — a wire `from` always
+        // decodes (`Did::deserialize` validates it) and the caller has already verified a
+        // signature against this very key.
+        let principal = SenderPrincipal::from_did(&envelope.from).map_err(|e| {
+            anyhow::Error::new(ReplayIdentityUndecodable {
+                peer: envelope.from.as_str().to_string(),
+                sequence: envelope.sequence,
+            })
+            .context(e)
+        })?;
+
         // Ensure initialized for persistent mode
         if !self.initialized.load(Ordering::Acquire) {
             self.load_persisted_state()?;
@@ -1144,7 +1343,7 @@ impl ReplayGuard {
         // Get or create sequence window for this sender
         let window = self
             .sequences
-            .entry(envelope.from.clone())
+            .entry(principal)
             .or_insert_with(SequenceWindow::new);
 
         // Holds on our own state (CRITICAL: no sequence can be proven new). All are
@@ -1281,10 +1480,8 @@ impl ReplayGuard {
                 // re-runs the hold rather than accepting under a namespace it never
                 // finished proving. The safe direction to be interrupted in is the one
                 // that repeats work.
-                self.persist_max_seq_durable(&envelope.from, 0, SENDER_REGIME_DURABLE_V1)
-                    .and_then(|()| {
-                        self.persist_sender_regime(&envelope.from, SENDER_REGIME_DURABLE_V1)
-                    })
+                self.persist_max_seq_durable(&principal, 0, SENDER_REGIME_DURABLE_V1)
+                    .and_then(|()| self.persist_sender_regime(&principal, SENDER_REGIME_DURABLE_V1))
                     .map_err(|e| {
                         anyhow::Error::new(ReplayStateNotDurable {
                             peer: envelope.from.as_str().to_string(),
@@ -1295,7 +1492,7 @@ impl ReplayGuard {
 
                 let window = self
                     .sequences
-                    .entry(envelope.from.clone())
+                    .entry(principal)
                     .or_insert_with(SequenceWindow::new);
                 window.hold = None;
                 window.sender_regime = SenderRegimeState::DurableV1;
@@ -1324,7 +1521,7 @@ impl ReplayGuard {
         // high-water is valid only within the sender regime that produced it".
         let window = self
             .sequences
-            .entry(envelope.from.clone())
+            .entry(principal)
             .or_insert_with(SequenceWindow::new);
 
         match (window.sender_regime, observed_regime) {
@@ -1350,15 +1547,12 @@ impl ReplayGuard {
                 // state. The legacy high-water is retained in the same write, so it
                 // keeps rejecting captured old-namespace traffic throughout.
                 self.persist_max_seq_durable(
-                    &envelope.from,
+                    &principal,
                     legacy_max_seq,
                     SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
                 )
                 .and_then(|()| {
-                    self.persist_sender_regime(
-                        &envelope.from,
-                        SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
-                    )
+                    self.persist_sender_regime(&principal, SENDER_REGIME_TRANSITION_TO_DURABLE_V1)
                 })
                 .map_err(|e| {
                     anyhow::Error::new(ReplayStateNotDurable {
@@ -1371,7 +1565,7 @@ impl ReplayGuard {
                 let horizon = self.envelope_validity_horizon();
                 let window = self
                     .sequences
-                    .entry(envelope.from.clone())
+                    .entry(principal)
                     .or_insert_with(SequenceWindow::new);
                 window.sender_regime = SenderRegimeState::TransitionToDurableV1;
                 window.hold = Some(PeerHold::MigratingSenderRegime {
@@ -1419,7 +1613,7 @@ impl ReplayGuard {
 
         let window = self
             .sequences
-            .entry(envelope.from.clone())
+            .entry(principal)
             .or_insert_with(SequenceWindow::new);
 
         // Captured now, while the window is borrowed, because the persist below
@@ -1490,8 +1684,7 @@ impl ReplayGuard {
                 // by being added to the enum.
                 _ => SENDER_REGIME_LEGACY_OR_UNPROVEN,
             };
-            if let Err(e) =
-                self.persist_max_seq_durable(&envelope.from, envelope.sequence, regime_tag)
+            if let Err(e) = self.persist_max_seq_durable(&principal, envelope.sequence, regime_tag)
             {
                 return Err(anyhow::Error::new(ReplayStateNotDurable {
                     peer: envelope.from.as_str().to_string(),
@@ -1504,7 +1697,7 @@ impl ReplayGuard {
         // Durable (or unchanged) — now record acceptance in memory.
         let window = self
             .sequences
-            .entry(envelope.from.clone())
+            .entry(principal)
             .or_insert_with(SequenceWindow::new);
         if max_seq_changed {
             window.max_seq = envelope.sequence;
@@ -1532,15 +1725,25 @@ impl ReplayGuard {
     /// replay_guard.finalize(&envelope.from, envelope.sequence)?;
     /// ```
     pub fn finalize(&mut self, sender: &Did, sequence: u64) -> Result<()> {
+        // Fail closed, exactly as on the accept path: a DID that names no key names no replay
+        // state, and finalizing under its spelling would create a row nothing can ever match.
+        let principal = SenderPrincipal::from_did(sender).map_err(|e| {
+            anyhow::Error::new(ReplayIdentityUndecodable {
+                peer: sender.as_str().to_string(),
+                sequence,
+            })
+            .context(e)
+        })?;
+
         let window = self
             .sequences
-            .get_mut(sender)
+            .get_mut(&principal)
             .context("Cannot finalize sequence for unknown sender")?;
 
         window.finalized.insert(sequence, Instant::now());
 
         // Persist finalized sequence
-        if let Err(e) = self.persist_finalized(sender, sequence) {
+        if let Err(e) = self.persist_finalized(&principal, sequence) {
             tracing::warn!(
                 peer = %sender,
                 seq = sequence,
@@ -1553,9 +1756,22 @@ impl ReplayGuard {
     }
 
     /// Check if a sequence is finalized
+    ///
+    /// **Fails closed.** `true` is the blocking answer, so a DID whose replay identity cannot
+    /// be derived reports `true` rather than reporting "not finalized" for a sender this node
+    /// cannot even name (#2640). Returning `false` there would be a permissive fallback in a
+    /// predicate whose whole job is to refuse.
     pub fn is_finalized(&self, sender: &Did, sequence: u64) -> bool {
+        let Ok(principal) = SenderPrincipal::from_did(sender) else {
+            tracing::error!(
+                peer = %sender,
+                sequence,
+                "Replay identity could not be derived; reporting the sequence as finalized                  rather than answering for a sender that cannot be identified"
+            );
+            return true;
+        };
         self.sequences
-            .get(sender)
+            .get(&principal)
             .map(|w| w.finalized.contains_key(&sequence))
             .unwrap_or(false)
     }
@@ -1573,14 +1789,14 @@ impl ReplayGuard {
         let finalized_max_age = Duration::from_secs(24 * 60 * 60); // 24 hours
         let now = Instant::now();
 
-        // Collect DIDs to remove from storage
-        let mut dids_to_remove: Vec<Did> = Vec::new();
+        // Collect senders to remove from storage
+        let mut principals_to_remove: Vec<SenderPrincipal> = Vec::new();
 
         // Remove inactive peer windows
-        self.sequences.retain(|did, window| {
+        self.sequences.retain(|principal, window| {
             let keep = now.duration_since(window.last_update) < max_age;
             if !keep {
-                dids_to_remove.push(did.clone());
+                principals_to_remove.push(*principal);
             }
             keep
         });
@@ -1599,10 +1815,10 @@ impl ReplayGuard {
         // permission — accept a captured legacy sequence as a durable-v1 high-water.
         // Provenance is a few bytes per DID ever seen, bounded by federation size.
         if let Some(ref store) = self.store {
-            for did in &dids_to_remove {
-                let key = Self::make_max_seq_key(did);
+            for principal in &principals_to_remove {
+                let key = Self::make_max_seq_key(principal);
                 if let Err(e) = store.delete(&key) {
-                    tracing::warn!(peer = %did, error = %e, "Failed to delete max_seq from storage");
+                    tracing::warn!(peer = %principal, error = %e, "Failed to delete max_seq from storage");
                 }
             }
         }
@@ -1610,7 +1826,7 @@ impl ReplayGuard {
         // Prune old finalized sequences from remaining windows
         let cutoff_ms = Self::current_time_ms().saturating_sub(24 * 60 * 60 * 1000);
 
-        for (did, window) in self.sequences.iter_mut() {
+        for (principal, window) in self.sequences.iter_mut() {
             let old_finalized: Vec<u64> = window
                 .finalized
                 .iter()
@@ -1623,10 +1839,10 @@ impl ReplayGuard {
 
                 // Delete from storage
                 if let Some(ref store) = self.store {
-                    let key = Self::make_finalized_key(did, *seq);
+                    let key = Self::make_finalized_key(principal, *seq);
                     if let Err(e) = store.delete(&key) {
                         tracing::warn!(
-                            peer = %did,
+                            peer = %principal,
                             seq = seq,
                             error = %e,
                             "Failed to delete finalized sequence from storage"
@@ -1658,8 +1874,13 @@ impl ReplayGuard {
     }
 
     /// Get the max sequence seen for a specific peer
+    ///
+    /// Keyed by the sender's key, so every spelling of one sender reports the one high-water
+    /// (#2640). `None` for a DID that names no key, which is the same "no such sender" answer
+    /// it already gives for a sender never seen.
     pub fn get_max_seq(&self, did: &Did) -> Option<u64> {
-        self.sequences.get(did).map(|w| w.max_seq)
+        let principal = SenderPrincipal::from_did(did).ok()?;
+        self.sequences.get(&principal).map(|w| w.max_seq)
     }
 
     /// Check if the guard is using persistent storage
@@ -1713,26 +1934,36 @@ impl ReplayGuard {
     /// This mirrors what the outbound side already does for its reservation
     /// watermark in `signing_sequence.rs`; the receiving side was the half that
     /// never got it.
-    fn persist_max_seq_durable(&self, did: &Did, max_seq: u64, sender_regime: u32) -> Result<()> {
+    fn persist_max_seq_durable(
+        &self,
+        principal: &SenderPrincipal,
+        max_seq: u64,
+        sender_regime: u32,
+    ) -> Result<()> {
         let store = match &self.store {
             Some(s) => s,
             None => return Ok(()), // In-memory mode: no durability to promise
         };
 
-        self.persist_max_seq_inner(did, max_seq, sender_regime)?;
+        self.persist_max_seq_inner(principal, max_seq, sender_regime)?;
         store
             .flush()
             .context("Failed to flush replay high-water to durable storage")?;
         Ok(())
     }
 
-    fn persist_max_seq_inner(&self, did: &Did, max_seq: u64, sender_regime: u32) -> Result<()> {
+    fn persist_max_seq_inner(
+        &self,
+        principal: &SenderPrincipal,
+        max_seq: u64,
+        sender_regime: u32,
+    ) -> Result<()> {
         let store = match &self.store {
             Some(s) => s,
             None => return Ok(()), // In-memory mode
         };
 
-        let key = Self::make_max_seq_key(did);
+        let key = Self::make_max_seq_key(principal);
         let entry = MaxSeqEntry {
             max_seq,
             updated_at_ms: Self::current_time_ms(),
@@ -1754,13 +1985,13 @@ impl ReplayGuard {
         Ok(())
     }
 
-    fn persist_finalized(&self, did: &Did, sequence: u64) -> Result<()> {
+    fn persist_finalized(&self, principal: &SenderPrincipal, sequence: u64) -> Result<()> {
         let store = match &self.store {
             Some(s) => s,
             None => return Ok(()), // In-memory mode
         };
 
-        let key = Self::make_finalized_key(did, sequence);
+        let key = Self::make_finalized_key(principal, sequence);
         let entry = FinalizedEntry {
             finalized_at_ms: Self::current_time_ms(),
         };
@@ -1783,13 +2014,16 @@ impl ReplayGuard {
     /// [`SENDER_REGIME_DURABLE_V1`] are ever written. An absent record means
     /// "unproven", which is both the safe default and the common case, so the
     /// overwhelming majority of peers cost no provenance write at all.
-    fn persist_sender_regime(&self, did: &Did, regime: u32) -> Result<()> {
+    fn persist_sender_regime(&self, principal: &SenderPrincipal, regime: u32) -> Result<()> {
         let store = match &self.store {
             Some(s) => s,
             None => return Ok(()),
         };
         store
-            .put(&Self::make_sender_regime_key(did), &regime.to_be_bytes())
+            .put(
+                &Self::make_sender_regime_key(principal),
+                &regime.to_be_bytes(),
+            )
             .context("Failed to persist sender regime provenance")?;
         store
             .flush()
@@ -1797,9 +2031,380 @@ impl ReplayGuard {
         Ok(())
     }
 
-    fn make_sender_regime_key(did: &Did) -> Vec<u8> {
+    /// Durable keys are built from the principal's **canonical** spelling (#2640).
+    ///
+    /// Reading stays textual and greppable, which is what the operator tooling and the tests
+    /// below expect, but the text is now derived from the key rather than copied off the wire,
+    /// so no spelling an attacker invents can open a second row.
+    /// Which in-memory window a durable row belongs to (#2640).
+    ///
+    /// `Err(())` means the row's DID names no Ed25519 key, so it is the state of no sender
+    /// whose envelopes this node could ever verify: `Did::deserialize` refuses such a DID on
+    /// the wire, and `verify_classical` derives the very same key before the guard is
+    /// consulted. Such a row therefore bounds nothing, and inventing a principal for it would
+    /// be the guess this fix exists to remove. It is logged, skipped, and — importantly —
+    /// left in the store rather than deleted, so an operator can still see it.
+    fn window_key(did: &Did, keyspace: &str) -> std::result::Result<SenderPrincipal, ()> {
+        SenderPrincipal::from_did(did).map_err(|e| {
+            tracing::error!(
+                keyspace,
+                stored_did = %did,
+                error = %e,
+                "Durable replay row is stored under a DID that decodes to no Ed25519 key; \
+                 skipping it. No verifiable sender can be identified by it, so it bounds \
+                 nothing — but it is left in the store rather than deleted"
+            );
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // #2640 — durable identity canonicalization
+    // -------------------------------------------------------------------------
+
+    /// Collapse spelling-distinct durable rows for one sender onto one canonical key.
+    ///
+    /// Runs *before* the ordinary load, so everything downstream sees at most one readable
+    /// row per sender (and per `(sender, sequence)` for finalized rows) and the #2514 / #2517
+    /// state machine is left exactly as it was.
+    ///
+    /// # The merge rule, axis by axis, and why each is the conservative direction
+    ///
+    /// **`max_seq` — maximum.** The floor rejects `sequence <= floor`, so a larger floor
+    /// rejects a superset; it is the only direction that cannot admit a replay. An alias
+    /// number may belong to a namespace the canonical number does not, which makes the
+    /// maximum potentially *over*-restrictive — that is the accepted cost. What happened
+    /// before is the opposite: two rows landed in one window by last-`sled`-key-wins, so a
+    /// **lower** floor could win (N2-A0 inventory, row #2).
+    ///
+    /// **`sender_regime` — `DurableV1` > `TransitionToDurableV1` > `LegacyOrUnproven`.** A
+    /// safety ordering, not a recency one. Both lower states reach a promotion that resets
+    /// `max_seq` and `floor_seq` to 0; `DurableV1` never does. Choosing the strongest is the
+    /// only choice that cannot destroy the merged floor. An unrecognised tag is preserved
+    /// as-is and the existing unsupported-regime hold refuses the sender with no deadline.
+    ///
+    /// **`semantic_version` — the most restrictive.** Any unrecognised version wins (a
+    /// no-deadline hold), else the legacy version wins (a bounded hold that discards the
+    /// number), else the current one. Discarding a good number under a legacy hold is safe
+    /// for the reason that path already gives: the hold outlasts the freshness of anything
+    /// written under that regime, so the floor is not what is rejecting replays during it.
+    ///
+    /// **`finalized` — set union**, keeping the later `finalized_at_ms` on collision so the
+    /// entry survives the 24h prune at least as long. A union can only block more sequences.
+    ///
+    /// # What is refused rather than merged
+    ///
+    /// A row whose value does not deserialize is **not** merged and **not** deleted. The load
+    /// pass turns exactly that row into a quarantine hold on the merged sender, which is the
+    /// fail-closed answer to "we had state here and cannot read it". Silently dropping it
+    /// would be the one merge outcome that loses a bound.
+    ///
+    /// # Ordering and crash safety
+    ///
+    /// The canonical row is written **and flushed** before any alias row is deleted, so no
+    /// interruption can leave a sender holding less state than it started with. Every axis of
+    /// the merge is idempotent and order-independent (maximum, strongest, union), so a crash
+    /// between the write and the deletes re-merges to the identical value on the next start.
+    ///
+    /// A sender whose only row is already the canonical one costs **zero writes**. That is
+    /// every honest peer: production signs only with `keypair.did()`, which is
+    /// `Did::from_public_key`, which is the canonical base58btc spelling — so this pass is a
+    /// no-op except where an alias actually put a row.
+    fn canonicalize_durable_identities(&self) -> Result<()> {
+        let store = match &self.store {
+            Some(s) => s.clone(),
+            None => return Ok(()),
+        };
+        Self::canonicalize_max_seq_rows(store.as_ref())?;
+        Self::canonicalize_sender_regime_rows(store.as_ref())?;
+        Self::canonicalize_finalized_rows(store.as_ref())?;
+        Ok(())
+    }
+
+    /// The merge itself, for one `replay_max_seq` row against another.
+    fn merge_max_seq(a: &MaxSeqEntry, b: &MaxSeqEntry) -> MaxSeqEntry {
+        MaxSeqEntry {
+            max_seq: a.max_seq.max(b.max_seq),
+            updated_at_ms: a.updated_at_ms.max(b.updated_at_ms),
+            semantic_version: Self::most_restrictive_semantic_version(
+                a.semantic_version,
+                b.semantic_version,
+            ),
+            sender_regime: Self::strongest_sender_regime(a.sender_regime, b.sender_regime),
+        }
+    }
+
+    /// Ranked by how much the load pass will refuse, not by how new the version is.
+    ///
+    /// An unrecognised version produces a hold with no deadline, the legacy version produces
+    /// a bounded hold that discards the number, and the current version produces a usable
+    /// floor — so "most restrictive" is exactly that order. Two different unrecognised
+    /// versions resolve to the larger purely so the result is deterministic; both refuse the
+    /// sender indefinitely either way.
+    fn most_restrictive_semantic_version(a: u32, b: u32) -> u32 {
+        let rank = |v: u32| match v {
+            REPLAY_STATE_SEMANTIC_VERSION => 0u8,
+            LEGACY_REPLAY_STATE_SEMANTIC_VERSION => 1,
+            _ => 2,
+        };
+        match rank(a).cmp(&rank(b)) {
+            std::cmp::Ordering::Less => b,
+            std::cmp::Ordering::Greater => a,
+            std::cmp::Ordering::Equal => a.max(b),
+        }
+    }
+
+    /// `DurableV1` > `TransitionToDurableV1` > `LegacyOrUnproven`, and an unrecognised tag
+    /// above all three.
+    ///
+    /// This is a safety ordering, not a lifecycle one. The two lower states each reach a
+    /// promotion that resets `max_seq` and `floor_seq` to 0, so adopting either would let the
+    /// merged floor be destroyed later; `DurableV1` has no such path. An unrecognised tag
+    /// ranks highest because the load pass refuses it with no deadline.
+    fn strongest_sender_regime(a: u32, b: u32) -> u32 {
+        let rank = |v: u32| match v {
+            SENDER_REGIME_LEGACY_OR_UNPROVEN => 0u8,
+            SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => 1,
+            SENDER_REGIME_DURABLE_V1 => 2,
+            _ => 3,
+        };
+        match rank(a).cmp(&rank(b)) {
+            std::cmp::Ordering::Less => b,
+            std::cmp::Ordering::Greater => a,
+            std::cmp::Ordering::Equal => a.max(b),
+        }
+    }
+
+    /// Write the merged row, flush it, and only then retire the spellings it absorbed.
+    ///
+    /// Returns without writing anything when the sender's only row is already the canonical
+    /// one, which is every honest peer on every start.
+    fn install_canonical_row(
+        store: &dyn Store,
+        canonical_key: &[u8],
+        value: &[u8],
+        source_keys: &[Vec<u8>],
+        unreadable: &std::collections::HashSet<Vec<u8>>,
+        keyspace: &str,
+    ) -> Result<()> {
+        if source_keys.len() == 1 && source_keys[0] == canonical_key {
+            return Ok(());
+        }
+
+        // The canonical key is exactly where an unreadable row must be left alone. Writing the
+        // merge over it would erase the one fact the load pass turns into a quarantine — "state
+        // existed here and we cannot read it" — and replace it with a floor derived only from
+        // the spellings we *could* read, which may be lower. The whole group is therefore left
+        // as it is: nothing is written and nothing is retired, and the load pass holds the
+        // sender exactly as it would have before this migration existed. That hold is bounded
+        // by the envelope validity horizon, after which no pre-restart capture can pass
+        // freshness anyway, so leaving the readable floors unmerged costs nothing.
+        if unreadable.contains(canonical_key) {
+            tracing::error!(
+                keyspace,
+                "The canonical replay row for a sender is unreadable; leaving its alias rows \
+                 in place rather than overwriting the evidence that quarantines it (#2640)"
+            );
+            return Ok(());
+        }
+
+        store
+            .put(canonical_key, value)
+            .with_context(|| format!("Failed to write the merged {keyspace} row"))?;
+        // Durable *before* any alias is retired. An interruption here may leave duplicate
+        // rows, which re-merge to the identical value on the next start; the order that must
+        // never happen is the one where a sender ends up with less state than it had.
+        store.flush().with_context(|| {
+            format!("Failed to flush the merged {keyspace} row before retiring alias rows")
+        })?;
+
+        for stale in source_keys.iter().filter(|k| k.as_slice() != canonical_key) {
+            store
+                .delete(stale)
+                .with_context(|| format!("Failed to retire an alias {keyspace} row"))?;
+        }
+        Ok(())
+    }
+
+    fn canonicalize_max_seq_rows(store: &dyn Store) -> Result<()> {
+        use std::collections::hash_map::Entry;
+
+        let rows = store
+            .scan(MAX_SEQ_PREFIX)
+            .context("Failed to scan replay max_seq entries for canonicalization")?;
+
+        let mut grouped: HashMap<SenderPrincipal, (MaxSeqEntry, Vec<Vec<u8>>)> = HashMap::new();
+        let mut unreadable: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+        for (key, raw) in rows {
+            let Some(did) = Self::parse_max_seq_key(&key) else {
+                continue;
+            };
+            let Ok(principal) = Self::window_key(&did, "replay max_seq") else {
+                continue;
+            };
+            let Ok(entry) = serde_json::from_slice::<MaxSeqEntry>(&raw) else {
+                // Unreadable. Neither merged nor deleted — the load pass turns exactly this
+                // row into a quarantine hold on the merged sender.
+                unreadable.insert(key);
+                continue;
+            };
+            match grouped.entry(principal) {
+                Entry::Occupied(mut occupied) => {
+                    let (acc, keys) = occupied.get_mut();
+                    *acc = Self::merge_max_seq(acc, &entry);
+                    keys.push(key);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert((entry, vec![key]));
+                }
+            }
+        }
+
+        for (principal, (entry, source_keys)) in grouped {
+            let canonical_key = Self::make_max_seq_key(&principal);
+            let aliases = source_keys
+                .iter()
+                .filter(|k| k.as_slice() != canonical_key.as_slice())
+                .count();
+            if aliases > 0 {
+                tracing::warn!(
+                    peer = %principal,
+                    alias_rows = aliases,
+                    merged_max_seq = entry.max_seq,
+                    merged_sender_regime = entry.sender_regime,
+                    merged_semantic_version = entry.semantic_version,
+                    "Collapsing spelling-distinct replay high-water rows onto one sender \
+                     (#2640). The merged floor is the maximum across them, so it can only \
+                     reject more than any of them did"
+                );
+            }
+            let value =
+                serde_json::to_vec(&entry).context("Failed to serialize merged max_seq entry")?;
+            Self::install_canonical_row(
+                store,
+                &canonical_key,
+                &value,
+                &source_keys,
+                &unreadable,
+                "replay max_seq",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn canonicalize_sender_regime_rows(store: &dyn Store) -> Result<()> {
+        use std::collections::hash_map::Entry;
+
+        let rows = store
+            .scan(SENDER_REGIME_PREFIX)
+            .context("Failed to scan sender regime provenance for canonicalization")?;
+
+        let mut grouped: HashMap<SenderPrincipal, (u32, Vec<Vec<u8>>)> = HashMap::new();
+        let mut unreadable: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+        for (key, raw) in rows {
+            let Some(did) = Self::parse_sender_regime_key(&key) else {
+                continue;
+            };
+            let Ok(principal) = Self::window_key(&did, "replay sender regime") else {
+                continue;
+            };
+            let Ok(bytes) = <[u8; 4]>::try_from(raw.as_slice()) else {
+                unreadable.insert(key); // left for the load pass to quarantine on
+                continue;
+            };
+            let regime = u32::from_be_bytes(bytes);
+            match grouped.entry(principal) {
+                Entry::Occupied(mut occupied) => {
+                    let (acc, keys) = occupied.get_mut();
+                    *acc = Self::strongest_sender_regime(*acc, regime);
+                    keys.push(key);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert((regime, vec![key]));
+                }
+            }
+        }
+
+        for (principal, (regime, source_keys)) in grouped {
+            let canonical_key = Self::make_sender_regime_key(&principal);
+            if source_keys
+                .iter()
+                .any(|k| k.as_slice() != canonical_key.as_slice())
+            {
+                tracing::warn!(
+                    peer = %principal,
+                    merged_regime = regime,
+                    "Collapsing spelling-distinct sender regime provenance onto one sender \
+                     (#2640); the strongest established regime wins, because the weaker ones \
+                     each reach a promotion that would reset the replay floor"
+                );
+            }
+            Self::install_canonical_row(
+                store,
+                &canonical_key,
+                &regime.to_be_bytes(),
+                &source_keys,
+                &unreadable,
+                "replay sender regime",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn canonicalize_finalized_rows(store: &dyn Store) -> Result<()> {
+        use std::collections::hash_map::Entry;
+
+        let rows = store
+            .scan(FINALIZED_PREFIX)
+            .context("Failed to scan finalized entries for canonicalization")?;
+
+        /// One finalized sequence for one sender, with every stored key that supplied it.
+        type FinalizedGroups = HashMap<(SenderPrincipal, u64), (FinalizedEntry, Vec<Vec<u8>>)>;
+        let mut grouped: FinalizedGroups = HashMap::new();
+        let mut unreadable: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
+        for (key, raw) in rows {
+            let Some((did, sequence)) = Self::parse_finalized_key(&key) else {
+                continue;
+            };
+            let Ok(principal) = Self::window_key(&did, "replay finalized") else {
+                continue;
+            };
+            let Ok(entry) = serde_json::from_slice::<FinalizedEntry>(&raw) else {
+                unreadable.insert(key);
+                continue;
+            };
+            match grouped.entry((principal, sequence)) {
+                Entry::Occupied(mut occupied) => {
+                    let (acc, keys) = occupied.get_mut();
+                    // The later stamp, so the entry outlives the 24h prune at least as long
+                    // as the longest-lived spelling did. A finalized set only ever blocks.
+                    acc.finalized_at_ms = acc.finalized_at_ms.max(entry.finalized_at_ms);
+                    keys.push(key);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert((entry, vec![key]));
+                }
+            }
+        }
+
+        for ((principal, sequence), (entry, source_keys)) in grouped {
+            let canonical_key = Self::make_finalized_key(&principal, sequence);
+            let value =
+                serde_json::to_vec(&entry).context("Failed to serialize merged finalized entry")?;
+            Self::install_canonical_row(
+                store,
+                &canonical_key,
+                &value,
+                &source_keys,
+                &unreadable,
+                "replay finalized",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn make_sender_regime_key(principal: &SenderPrincipal) -> Vec<u8> {
         let mut key = SENDER_REGIME_PREFIX.to_vec();
-        key.extend_from_slice(did.as_str().as_bytes());
+        key.extend_from_slice(principal.canonical_did().as_str().as_bytes());
         key
     }
 
@@ -1809,10 +2414,10 @@ impl ReplayGuard {
         Did::from_str(did_str).ok()
     }
 
-    fn make_max_seq_key(did: &Did) -> Vec<u8> {
+    fn make_max_seq_key(principal: &SenderPrincipal) -> Vec<u8> {
         let mut key = Vec::with_capacity(MAX_SEQ_PREFIX.len() + 100);
         key.extend_from_slice(MAX_SEQ_PREFIX);
-        key.extend_from_slice(did.as_str().as_bytes());
+        key.extend_from_slice(principal.canonical_did().as_str().as_bytes());
         key
     }
 
@@ -1825,10 +2430,10 @@ impl ReplayGuard {
         Did::from_str(did_str).ok()
     }
 
-    fn make_finalized_key(did: &Did, sequence: u64) -> Vec<u8> {
+    fn make_finalized_key(principal: &SenderPrincipal, sequence: u64) -> Vec<u8> {
         let mut key = Vec::with_capacity(FINALIZED_PREFIX.len() + 120);
         key.extend_from_slice(FINALIZED_PREFIX);
-        key.extend_from_slice(did.as_str().as_bytes());
+        key.extend_from_slice(principal.canonical_did().as_str().as_bytes());
         key.push(b':');
         key.extend_from_slice(sequence.to_string().as_bytes());
         key
@@ -2435,13 +3040,13 @@ mod tests {
         let did = KeyPair::generate().unwrap().did().clone();
 
         // Max seq key
-        let key = ReplayGuard::make_max_seq_key(&did);
+        let key = ReplayGuard::make_max_seq_key(&pk(&did));
         let parsed = ReplayGuard::parse_max_seq_key(&key).unwrap();
         assert_eq!(parsed.as_str(), did.as_str());
 
         // Finalized key
         let seq = 12345u64;
-        let fkey = ReplayGuard::make_finalized_key(&did, seq);
+        let fkey = ReplayGuard::make_finalized_key(&pk(&did), seq);
         let (parsed_did, parsed_seq) = ReplayGuard::parse_finalized_key(&fkey).unwrap();
         assert_eq!(parsed_did.as_str(), did.as_str());
         assert_eq!(parsed_seq, seq);
@@ -2697,7 +3302,7 @@ mod tests {
     /// unflushed writes: the receiver accepted up to `accepted`, but only
     /// `durable` reached disk.
     fn force_durable_max_seq(store: &Arc<icn_store::SledStore>, did: &Did, durable: u64) {
-        let key = ReplayGuard::make_max_seq_key(did);
+        let key = ReplayGuard::make_max_seq_key(&pk(did));
         let entry = MaxSeqEntry {
             max_seq: durable,
             updated_at_ms: ReplayGuard::current_time_ms(),
@@ -2712,7 +3317,7 @@ mod tests {
         // A real promotion writes both, so a test fixture standing in for one must too.
         store
             .put(
-                &ReplayGuard::make_sender_regime_key(did),
+                &ReplayGuard::make_sender_regime_key(&pk(did)),
                 &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
             )
             .unwrap();
@@ -2795,7 +3400,7 @@ mod tests {
             "restart must not advance max_seq past what was accepted"
         );
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             42,
             "floor must equal the durable high-water, with no invented gap"
         );
@@ -3192,7 +3797,7 @@ mod tests {
         }
 
         // Corrupt the persisted entry.
-        let key = ReplayGuard::make_max_seq_key(sender.did());
+        let key = ReplayGuard::make_max_seq_key(&pk(sender.did()));
         store.put(&key, b"{not valid json").unwrap();
         std::thread::sleep(std::time::Duration::from_millis(5));
 
@@ -3339,7 +3944,10 @@ mod tests {
 
         // Durable state is unreadable, so there is no floor to fall back on.
         store
-            .put(&ReplayGuard::make_max_seq_key(sender.did()), b"{corrupt")
+            .put(
+                &ReplayGuard::make_max_seq_key(&pk(sender.did())),
+                b"{corrupt",
+            )
             .unwrap();
 
         let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
@@ -3387,7 +3995,10 @@ mod tests {
             assert!(guard.check_replay_only_durable(&env).is_ok());
         }
         store
-            .put(&ReplayGuard::make_max_seq_key(sender.did()), b"{corrupt")
+            .put(
+                &ReplayGuard::make_max_seq_key(&pk(sender.did())),
+                b"{corrupt",
+            )
             .unwrap();
 
         let mut guard = ReplayGuard::new_persistent(max_age, 3600, store.clone());
@@ -3572,7 +4183,7 @@ mod migration_tests {
         });
         store
             .put(
-                &ReplayGuard::make_max_seq_key(did),
+                &ReplayGuard::make_max_seq_key(&pk(did)),
                 &serde_json::to_vec(&legacy).unwrap(),
             )
             .unwrap();
@@ -3636,7 +4247,7 @@ mod migration_tests {
         );
 
         // The legacy number must never have become the floor.
-        let window = guard.sequences.get(sender.did()).unwrap();
+        let window = guard.sequences.get(&pk(sender.did())).unwrap();
         assert_eq!(
             window.floor_seq, 0,
             "a legacy high-water was installed as a current-semantic floor"
@@ -3735,7 +4346,7 @@ mod migration_tests {
             "a migrated peer re-entered migration on restart; migration must be one-way"
         );
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             12_902,
             "post-migration restart must restore the exact #2514 floor"
         );
@@ -3767,7 +4378,7 @@ mod migration_tests {
             "must re-enter migration, not fall through to the legacy floor. got: {err}"
         );
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             0,
             "legacy high-water leaked into the floor on the second boot"
         );
@@ -3782,7 +4393,7 @@ mod migration_tests {
         });
         store
             .put(
-                &ReplayGuard::make_max_seq_key(did),
+                &ReplayGuard::make_max_seq_key(&pk(did)),
                 &serde_json::to_vec(&future).unwrap(),
             )
             .unwrap();
@@ -3823,8 +4434,8 @@ mod migration_tests {
         );
 
         // (6) the future max_seq never became a current-semantic floor.
-        assert_eq!(guard.sequences.get(sender.did()).unwrap().floor_seq, 0);
-        assert_eq!(guard.sequences.get(sender.did()).unwrap().max_seq, 0);
+        assert_eq!(guard.sequences.get(&pk(sender.did())).unwrap().floor_seq, 0);
+        assert_eq!(guard.sequences.get(&pk(sender.did())).unwrap().max_seq, 0);
 
         // (4) outlive the complete legacy migration horizon, several times over.
         std::thread::sleep(Duration::from_millis(2_100));
@@ -3847,7 +4458,7 @@ mod migration_tests {
         // (7) ordinary traffic must not have stamped it as current — that would be a
         // silent downgrade of state a newer binary owns.
         let raw = store
-            .get(&ReplayGuard::make_max_seq_key(sender.did()))
+            .get(&ReplayGuard::make_max_seq_key(&pk(sender.did())))
             .unwrap()
             .expect("the entry must still exist");
         let on_disk: serde_json::Value = serde_json::from_slice(&raw).unwrap();
@@ -3874,7 +4485,7 @@ mod migration_tests {
                 .is_some(),
             "must remain unsupported across restart. got: {err}"
         );
-        assert_eq!(guard.sequences.get(sender.did()).unwrap().floor_seq, 0);
+        assert_eq!(guard.sequences.get(&pk(sender.did())).unwrap().floor_seq, 0);
     }
 
     /// A version *below* current that this binary has no explicit migration for must
@@ -3925,7 +4536,7 @@ mod migration_tests {
         guard.load_persisted_state().unwrap();
 
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             0,
             "the inflated legacy floor was carried forward"
         );
@@ -3969,7 +4580,7 @@ mod migration_tests {
             "an entry rewritten without a version must re-enter migration. got: {err}"
         );
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             0,
             "the downgraded value became a floor"
         );
@@ -3992,7 +4603,7 @@ mod migration_tests {
         guard.load_persisted_state().unwrap();
 
         assert_eq!(
-            guard.sequences.get(sender.did()).unwrap().floor_seq,
+            guard.sequences.get(&pk(sender.did())).unwrap().floor_seq,
             42,
             "#2514: the floor must equal the durable high-water exactly"
         );
@@ -4117,7 +4728,7 @@ mod sender_regime_tests {
         });
         store
             .put(
-                &ReplayGuard::make_max_seq_key(did),
+                &ReplayGuard::make_max_seq_key(&pk(did)),
                 &serde_json::to_vec(&legacy).unwrap(),
             )
             .unwrap();
@@ -4125,7 +4736,7 @@ mod sender_regime_tests {
 
     fn on_disk(store: &Arc<icn_store::SledStore>, did: &Did) -> serde_json::Value {
         let raw = store
-            .get(&ReplayGuard::make_max_seq_key(did))
+            .get(&ReplayGuard::make_max_seq_key(&pk(did)))
             .unwrap()
             .expect("a persisted replay entry must exist");
         serde_json::from_slice(&raw).unwrap()
@@ -4487,19 +5098,19 @@ mod sender_regime_tests {
         establish_durable(&mut guard, &clock, &sender, 1);
 
         // The peer goes quiet past the inactivity horizon; routine cleanup evicts it.
-        guard.sequences.get_mut(did).unwrap().last_update =
+        guard.sequences.get_mut(&pk(did)).unwrap().last_update =
             Instant::now() - Duration::from_secs(7_200);
         guard.cleanup();
         assert!(
             store
-                .get(&ReplayGuard::make_max_seq_key(did))
+                .get(&ReplayGuard::make_max_seq_key(&pk(did)))
                 .unwrap()
                 .is_none(),
             "cleanup must still remove the numeric high-water"
         );
         assert!(
             store
-                .get(&ReplayGuard::make_sender_regime_key(did))
+                .get(&ReplayGuard::make_sender_regime_key(&pk(did)))
                 .unwrap()
                 .is_some(),
             "but it must NOT remove the proof that this peer's legacy namespace was \
@@ -4552,7 +5163,7 @@ mod sender_regime_tests {
         // And it survives a restart as legacy, not as durable-v1.
         let restarted = boot(&store, TestClock::new());
         assert_eq!(
-            restarted.sequences[sender.did()].sender_regime,
+            restarted.sequences[&pk(sender.did())].sender_regime,
             SenderRegimeState::LegacyOrUnproven
         );
     }
@@ -4578,7 +5189,7 @@ mod sender_regime_tests {
         });
         store
             .put(
-                &ReplayGuard::make_max_seq_key(did),
+                &ReplayGuard::make_max_seq_key(&pk(did)),
                 &serde_json::to_vec(&future).unwrap(),
             )
             .unwrap();
@@ -4841,7 +5452,7 @@ mod sender_regime_tests {
 
         let mut restarted = boot(&store, TestClock::new());
         assert_eq!(
-            restarted.sequences[did].sender_regime,
+            restarted.sequences[&pk(did)].sender_regime,
             SenderRegimeState::LegacyOrUnproven,
             "the restart must resume as legacy, and the legacy bound must still apply"
         );
@@ -4921,20 +5532,21 @@ mod sender_regime_tests {
         });
         store
             .put(
-                &ReplayGuard::make_max_seq_key(did),
+                &ReplayGuard::make_max_seq_key(&pk(did)),
                 &serde_json::to_vec(&intermediate).unwrap(),
             )
             .unwrap();
 
         let guard = boot(&store, TestClock::new());
         assert_eq!(
-            guard.sequences[did].sender_regime,
+            guard.sequences[&pk(did)].sender_regime,
             SenderRegimeState::LegacyOrUnproven,
             "absence of the sender axis must mean unproven, never durable-v1; a default \
              of durable-v1 would launder every entry the intermediate build wrote"
         );
         assert_eq!(
-            guard.sequences[did].floor_seq, 510,
+            guard.sequences[&pk(did)].floor_seq,
+            510,
             "the number is still a valid bound inside its own namespace"
         );
     }
@@ -4972,7 +5584,7 @@ mod sender_regime_tests {
         let clock = TestClock::new();
         let mut guard = boot(&store, clock.clone());
         assert!(
-            !guard.sequences.contains_key(did),
+            !guard.sequences.contains_key(&pk(did)),
             "precondition: A has no history for B"
         );
 
@@ -5037,11 +5649,11 @@ mod sender_regime_tests {
         );
 
         // B goes quiet past the inactivity horizon and normal cleanup removes it.
-        guard.sequences.get_mut(did).unwrap().last_update =
+        guard.sequences.get_mut(&pk(did)).unwrap().last_update =
             Instant::now() - Duration::from_secs(7_200);
         guard.cleanup();
         assert!(
-            !guard.sequences.contains_key(did),
+            !guard.sequences.contains_key(&pk(did)),
             "precondition: cleanup evicted B"
         );
 
@@ -5096,7 +5708,7 @@ mod sender_regime_tests {
             .unwrap();
         assert!(
             store
-                .get(&ReplayGuard::make_sender_regime_key(did))
+                .get(&ReplayGuard::make_sender_regime_key(&pk(did)))
                 .unwrap()
                 .is_none(),
             "control: no provenance is written for an ordinary unproven peer, so the \
@@ -5108,7 +5720,7 @@ mod sender_regime_tests {
             .expect_err("transition begins");
 
         let raw = store
-            .get(&ReplayGuard::make_sender_regime_key(did))
+            .get(&ReplayGuard::make_sender_regime_key(&pk(did)))
             .unwrap()
             .expect(
                 "the transition must be written to the durable provenance record before \
@@ -5144,7 +5756,7 @@ mod sender_regime_tests {
         // Written by a binary that knows a regime this one does not.
         store
             .put(
-                &ReplayGuard::make_sender_regime_key(sender.did()),
+                &ReplayGuard::make_sender_regime_key(&pk(sender.did())),
                 &99u32.to_be_bytes(),
             )
             .unwrap();
@@ -5176,7 +5788,7 @@ mod sender_regime_tests {
 
         store
             .put(
-                &ReplayGuard::make_sender_regime_key(sender.did()),
+                &ReplayGuard::make_sender_regime_key(&pk(sender.did())),
                 b"not-four-bytes-at-all",
             )
             .unwrap();
@@ -5193,6 +5805,675 @@ mod sender_regime_tests {
         assert!(
             clock.elapsed() < HORIZON,
             "control: the quarantine is being asserted before it could have expired"
+        );
+    }
+}
+
+/// #2640 — durable replay state is keyed by the sender's key, not by its spelling.
+///
+/// These sit beside the state machine they protect because they seed and read the durable
+/// keyspaces directly, which is the only way to prove a *merge* happened rather than a
+/// coincidence. The third-party attack itself is exercised through the public API in
+/// `tests/respelled_envelope_replay.rs`.
+#[cfg(test)]
+mod respelled_identity_tests {
+    use super::*;
+    use crate::envelope::PayloadType;
+    use icn_identity::KeyPair;
+
+    /// The base16-lower spelling of the same key. `f` is multibase's base16-lower code.
+    fn alias_of(canonical: &Did) -> Did {
+        let hex: String = canonical
+            .to_verifying_key()
+            .unwrap()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let alias = Did::from_str(&format!("did:icn:f{hex}")).expect("base16 spelling parses");
+        assert_ne!(
+            alias.as_str(),
+            canonical.as_str(),
+            "CONTROL: the alias must be a different string"
+        );
+        assert_eq!(
+            alias.to_verifying_key().unwrap().as_bytes(),
+            canonical.to_verifying_key().unwrap().as_bytes(),
+            "CONTROL: the alias must decode to the same key"
+        );
+        alias
+    }
+
+    /// A durable key built from a DID **as spelled** — i.e. what `main` wrote, and what an
+    /// alias row looks like in a store today. Deliberately not `make_max_seq_key`, which now
+    /// canonicalizes and so could not seed the pre-fix shape at all.
+    fn spelled_key(prefix: &[u8], did: &Did) -> Vec<u8> {
+        let mut key = prefix.to_vec();
+        key.extend_from_slice(did.as_str().as_bytes());
+        key
+    }
+
+    fn spelled_finalized_key(did: &Did, sequence: u64) -> Vec<u8> {
+        let mut key = spelled_key(FINALIZED_PREFIX, did);
+        key.push(b':');
+        key.extend_from_slice(sequence.to_string().as_bytes());
+        key
+    }
+
+    fn seed_max_seq(
+        store: &dyn Store,
+        did: &Did,
+        max_seq: u64,
+        semantic_version: u32,
+        sender_regime: u32,
+    ) {
+        let entry = MaxSeqEntry {
+            max_seq,
+            updated_at_ms: ReplayGuard::current_time_ms(),
+            semantic_version,
+            sender_regime,
+        };
+        store
+            .put(
+                &spelled_key(MAX_SEQ_PREFIX, did),
+                &serde_json::to_vec(&entry).unwrap(),
+            )
+            .unwrap();
+    }
+
+    fn stored_max_seq(store: &dyn Store, did: &Did) -> Option<MaxSeqEntry> {
+        store
+            .get(&spelled_key(MAX_SEQ_PREFIX, did))
+            .unwrap()
+            .map(|raw| serde_json::from_slice(&raw).unwrap())
+    }
+
+    fn envelope(sender: &KeyPair, from: &Did, sequence: u64) -> SignedEnvelope {
+        SignedEnvelope::new(from, sender, sequence, PayloadType::Gossip, b"m".to_vec()).unwrap()
+    }
+
+    /// Two spellings of one sender must reconstruct ONE window, with the **maximum** floor.
+    ///
+    /// Both directions are seeded on purpose. `sled` scans lexicographically and the base16
+    /// alias (`…:f…`) sorts before the base58btc canonical (`…:z…`), so "keep the first row"
+    /// and "keep the last row" each happen to produce the right answer for one of the two
+    /// senders and the wrong one for the other. Only "keep the maximum" satisfies both.
+    #[test]
+    fn alias_rows_merge_to_the_maximum_floor_in_both_directions() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+
+        // Sender A: the alias row holds the higher number.
+        let a = KeyPair::generate().unwrap();
+        let a_canonical = a.did().clone();
+        let a_alias = alias_of(&a_canonical);
+        seed_max_seq(
+            store.as_ref(),
+            &a_canonical,
+            5,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &a_alias,
+            42,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        // Sender B: the canonical row holds the higher number.
+        let b = KeyPair::generate().unwrap();
+        let b_canonical = b.did().clone();
+        let b_alias = alias_of(&b_canonical);
+        seed_max_seq(
+            store.as_ref(),
+            &b_canonical,
+            42,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &b_alias,
+            5,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            guard.peer_count(),
+            2,
+            "two keys and four spellings must reconstruct exactly two windows"
+        );
+
+        for (label, canonical, alias) in [
+            ("alias-higher", &a_canonical, &a_alias),
+            ("canonical-higher", &b_canonical, &b_alias),
+        ] {
+            assert_eq!(
+                guard.get_max_seq(canonical),
+                Some(42),
+                "{label}: the merged high-water must be the maximum across spellings"
+            );
+            assert_eq!(
+                guard.get_max_seq(alias),
+                Some(42),
+                "{label}: the alias spelling must read the same one window"
+            );
+            assert_eq!(
+                stored_max_seq(store.as_ref(), canonical).map(|e| e.max_seq),
+                Some(42),
+                "{label}: the canonical durable row must hold the merged value"
+            );
+            assert!(
+                stored_max_seq(store.as_ref(), alias).is_none(),
+                "{label}: the alias row must be retired once the canonical row is durable"
+            );
+        }
+
+        // And the merged floor is live: 42 is refused, 43 is the sender's next legitimate
+        // sequence and is accepted.
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&a, &a_canonical, 42),
+                    ObservedSenderRegime::LegacyOrUnproven
+                )
+                .is_err(),
+            "the merged floor must reject a sequence at the maximum"
+        );
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&a, &a_canonical, 43),
+                    ObservedSenderRegime::LegacyOrUnproven
+                )
+                .is_ok(),
+            "the merged floor must not reject the sender's next legitimate sequence"
+        );
+    }
+
+    /// A sender whose *only* durable row is a non-canonical spelling is re-keyed, not dropped.
+    ///
+    /// The single-row case is separate from the merge case and is reachable on its own: a node
+    /// whose own configured DID was spelled non-canonically writes exactly this shape, and so
+    /// does a store in which every canonical row has already aged out of `cleanup()` while an
+    /// alias row survived.
+    #[test]
+    fn a_lone_alias_row_is_re_keyed_onto_the_canonical_spelling() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            11,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            stored_max_seq(store.as_ref(), &canonical).map(|e| e.max_seq),
+            Some(11),
+            "the lone alias row must be re-keyed onto the canonical spelling, not ignored"
+        );
+        assert!(
+            stored_max_seq(store.as_ref(), &alias).is_none(),
+            "and retired, so the durable keyspace stops being spelling-distinct"
+        );
+        assert_eq!(
+            guard.get_max_seq(&canonical),
+            Some(11),
+            "and its floor must be carried into the window, not lost"
+        );
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven
+                )
+                .is_err(),
+            "the carried floor must still reject the sequence it recorded"
+        );
+    }
+
+    /// The strongest established sender regime wins the merge, because the weaker ones each
+    /// reach a promotion that would reset the merged floor to zero.
+    #[test]
+    fn alias_merge_keeps_the_strongest_sender_regime() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // The higher number is tagged unproven; the lower one is tagged durable. A merge that
+        // took the regime from whichever row supplied the number would end up unproven.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            3,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            guard.get_max_seq(&canonical),
+            Some(10),
+            "the floor is still the maximum across spellings"
+        );
+
+        // Observable consequence: an established DurableV1 sender presenting as unproven is a
+        // downgrade and is refused. Had the merge kept `LegacyOrUnproven`, this would be the
+        // ordinary steady state and sequence 11 would be accepted.
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("a durable-established sender must not be accepted as unproven");
+        assert!(
+            err.downcast_ref::<SenderRegimeDowngrade>().is_some(),
+            "expected the merged regime to be DurableV1; got: {err}"
+        );
+    }
+
+    /// An unreadable alias row is neither merged nor deleted, and quarantines the merged
+    /// sender — the fail-closed reading of "state existed here and we cannot read it".
+    #[test]
+    fn an_unreadable_alias_row_quarantines_the_merged_sender() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        store
+            .put(&spelled_key(MAX_SEQ_PREFIX, &alias), b"{not json")
+            .unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert!(
+            store
+                .get(&spelled_key(MAX_SEQ_PREFIX, &alias))
+                .unwrap()
+                .is_some(),
+            "an unreadable row must survive the merge so an operator can still see it"
+        );
+
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 99),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("a sender with unreadable state must be held, not admitted");
+        assert!(
+            err.downcast_ref::<ReplayStateUnreadable>().is_some(),
+            "expected a quarantine on the merged sender; got: {err}"
+        );
+    }
+
+    /// The canonical row is exactly where an unreadable row must be left alone.
+    ///
+    /// Merging over it would replace "state existed here and we cannot read it" — the fact the
+    /// load pass turns into a quarantine — with a floor derived only from the spellings that
+    /// happened to be readable, which may be lower. The whole group is left untouched instead.
+    #[test]
+    fn an_unreadable_canonical_row_is_never_overwritten_by_a_merge() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // The corrupt row is the canonical one; the readable row is the alias.
+        store
+            .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+            .unwrap();
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            3,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            store
+                .get(&spelled_key(MAX_SEQ_PREFIX, &canonical))
+                .unwrap()
+                .as_deref(),
+            Some(&b"{not json"[..]),
+            "the unreadable canonical row must survive the merge byte for byte"
+        );
+        assert!(
+            store
+                .get(&spelled_key(MAX_SEQ_PREFIX, &alias))
+                .unwrap()
+                .is_some(),
+            "and its alias must not be retired against a merge that was never installed"
+        );
+
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 99),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("the sender must still be quarantined on its unreadable state");
+        assert!(
+            err.downcast_ref::<ReplayStateUnreadable>().is_some(),
+            "expected the quarantine the corrupt canonical row licenses; got: {err}"
+        );
+    }
+
+    /// Finalized rows are a set, and the merge is their union — under either spelling.
+    ///
+    /// Both halves are asserted, because they are carried by different code. The *behaviour*
+    /// (either spelling reads one finalized set) follows from the in-memory keying alone: the
+    /// load pass maps each stored key's DID to its principal. What the store-level merge adds
+    /// is that the alias row stops existing on disk, which is the half the issue's acceptance
+    /// criterion asks for and the half `cleanup()` needs in order to be able to delete it.
+    #[test]
+    fn finalized_alias_rows_merge_onto_one_sender() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // A low floor, so the finalized set — not the floor — is what rejects 7 and 8.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            1,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        let entry = serde_json::to_vec(&FinalizedEntry {
+            finalized_at_ms: ReplayGuard::current_time_ms(),
+        })
+        .unwrap();
+        store
+            .put(&spelled_finalized_key(&canonical, 7), &entry)
+            .unwrap();
+        store
+            .put(&spelled_finalized_key(&alias, 8), &entry)
+            .unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        // The physical half: one row per (sender, sequence), under the canonical spelling.
+        assert!(
+            store
+                .get(&spelled_finalized_key(&canonical, 8))
+                .unwrap()
+                .is_some(),
+            "the alias's finalized row must be re-keyed onto the canonical spelling"
+        );
+        assert!(
+            store
+                .get(&spelled_finalized_key(&alias, 8))
+                .unwrap()
+                .is_none(),
+            "and the alias row itself must be retired — otherwise the durable keyspace is \
+             still spelling-distinct and cleanup() cannot reach it"
+        );
+
+        // The behavioural half.
+        for sequence in [7u64, 8] {
+            assert!(
+                guard.is_finalized(&canonical, sequence),
+                "sequence {sequence} must be finalized for the merged sender"
+            );
+            assert!(
+                guard.is_finalized(&alias, sequence),
+                "sequence {sequence} must read the same finalized set under any spelling"
+            );
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, sequence),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .expect_err("a finalized sequence must never be accepted again");
+            assert!(
+                err.to_string().contains("finalized"),
+                "expected a finalization rejection for {sequence}; got: {err}"
+            );
+        }
+    }
+
+    /// A store that counts writes, so "this costs honest peers nothing" can be asserted
+    /// rather than asserted-about.
+    #[derive(Default)]
+    struct CountingStore {
+        data: std::sync::Mutex<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
+        puts: std::sync::atomic::AtomicUsize,
+        deletes: std::sync::atomic::AtomicUsize,
+        fail_scan: bool,
+    }
+
+    impl CountingStore {
+        fn reset_counters(&self) {
+            self.puts.store(0, Ordering::SeqCst);
+            self.deletes.store(0, Ordering::SeqCst);
+        }
+        fn counts(&self) -> (usize, usize) {
+            (
+                self.puts.load(Ordering::SeqCst),
+                self.deletes.load(Ordering::SeqCst),
+            )
+        }
+    }
+
+    impl Store for CountingStore {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            Ok(self.data.lock().unwrap().get(key).cloned())
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.puts.fetch_add(1, Ordering::SeqCst);
+            self.data
+                .lock()
+                .unwrap()
+                .insert(key.to_vec(), value.to_vec());
+            Ok(())
+        }
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.deletes.fetch_add(1, Ordering::SeqCst);
+            self.data.lock().unwrap().remove(key);
+            Ok(())
+        }
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            if self.fail_scan {
+                anyhow::bail!("simulated unreadable replay keyspace");
+            }
+            Ok(self
+                .data
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+        fn flush(&self) -> Result<()> {
+            Ok(())
+        }
+        fn get_replica_metadata(
+            &self,
+            _h: &icn_store::ContentHash,
+        ) -> Result<Option<icn_store::ReplicaMetadata>> {
+            Ok(None)
+        }
+        fn put_replica_metadata(&self, _m: &icn_store::ReplicaMetadata) -> Result<()> {
+            Ok(())
+        }
+        fn list_replica_hashes(&self) -> Result<Vec<icn_store::ContentHash>> {
+            Ok(vec![])
+        }
+    }
+
+    /// Canonicalization is idempotent, and free for a store that is already canonical.
+    ///
+    /// The zero-write case is not a micro-optimisation: every honest peer is in it on every
+    /// start, because production only ever signs with `keypair.did()`, which is the canonical
+    /// base58btc spelling. A pass that rewrote every row on every boot would make a security
+    /// fix look like a storage regression.
+    #[test]
+    fn canonicalization_is_idempotent_and_free_when_no_alias_exists() {
+        let store = Arc::new(CountingStore::default());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // Already canonical: nothing to merge, nothing to write.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            7,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        store.reset_counters();
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+        assert_eq!(
+            store.counts(),
+            (0, 0),
+            "a store with no alias rows must not be rewritten on load"
+        );
+
+        // Introduce an alias row: one merge, one retirement.
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            9,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        store.reset_counters();
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+        let (puts, deletes) = store.counts();
+        assert_eq!(puts, 1, "the merged row is written exactly once");
+        assert_eq!(deletes, 1, "the alias row is retired exactly once");
+        assert_eq!(guard.get_max_seq(&canonical), Some(9));
+
+        // Re-running finds a canonical store again and does nothing: idempotent.
+        store.reset_counters();
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+        assert_eq!(
+            store.counts(),
+            (0, 0),
+            "re-running the merge on an already-merged store must be a no-op"
+        );
+        assert_eq!(guard.get_max_seq(&canonical), Some(9));
+    }
+
+    /// A load that fails must not disarm the guard.
+    ///
+    /// Load-outcome hardening that this fix depends on: canonicalization performs durable
+    /// writes *during* the load, so the load's failure path had to stop being one that
+    /// latches "initialized" and then runs the next message against an empty window map —
+    /// which would accept every replay the store was holding evidence of.
+    #[test]
+    fn a_failed_load_leaves_the_guard_disarmed_for_nobody() {
+        let store = Arc::new(CountingStore {
+            fail_scan: true,
+            ..Default::default()
+        });
+        let sender = KeyPair::generate().unwrap();
+        let env = envelope(&sender, sender.did(), 1);
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+
+        assert!(
+            guard
+                .check_replay_only(&env, ObservedSenderRegime::LegacyOrUnproven)
+                .is_err(),
+            "a message must not be accepted while replay state cannot be read"
+        );
+        assert!(
+            !guard.is_initialized(),
+            "a failed load must not latch; otherwise the next call skips it entirely"
+        );
+        assert!(
+            guard
+                .check_replay_only(&env, ObservedSenderRegime::LegacyOrUnproven)
+                .is_err(),
+            "the second message must be refused too — the failure must not resolve itself \
+             into an empty-state acceptance"
+        );
+        assert!(!guard.is_initialized());
+    }
+
+    /// The replay identity fails closed. There is no fallback to the DID's spelling.
+    #[test]
+    fn an_undecodable_sender_did_fails_closed() {
+        // `Did::from_anchor_id` bypasses validation, and this anchor id is not a curve point.
+        let undecodable = Did::from_anchor_id(&[2u8; 32]);
+        assert!(
+            undecodable.to_verifying_key().is_err(),
+            "CONTROL: this DID must genuinely name no Ed25519 key"
+        );
+
+        let sender = KeyPair::generate().unwrap();
+        let mut forged = envelope(&sender, sender.did(), 1);
+        forged.from = undecodable.clone();
+
+        let mut guard = ReplayGuard::new(300, 3600);
+        let err = guard
+            .check_replay_only(&forged, ObservedSenderRegime::LegacyOrUnproven)
+            .expect_err("a sender with no derivable key must be refused, not keyed by its text");
+        assert!(
+            err.downcast_ref::<ReplayIdentityUndecodable>().is_some(),
+            "the refusal must be typed as an identity failure, not a replay; got: {err}"
+        );
+        assert_eq!(
+            guard.peer_count(),
+            0,
+            "a refused sender must not have created a window keyed by its spelling"
+        );
+
+        assert!(
+            guard.finalize(&undecodable, 1).is_err(),
+            "finalize must refuse a DID that names no replay identity"
+        );
+        assert!(
+            guard.is_finalized(&undecodable, 1),
+            "is_finalized must answer with the blocking value when it cannot identify the sender"
+        );
+        assert_eq!(
+            guard.get_max_seq(&undecodable),
+            None,
+            "no high-water can be reported for a sender that cannot be identified"
         );
     }
 }

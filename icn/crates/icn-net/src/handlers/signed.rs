@@ -32,7 +32,35 @@ impl ConnectionContext {
         // message rather than trusting it, and it is scoped to the network receive path, where a
         // self-sourced envelope can only be a self-connection. The connection layer refuses to
         // register the local DID as a peer, so reaching here means an earlier guard was bypassed.
-        if envelope.from == self.own_did {
+        //
+        // Compared by *key*, not by spelling (#2640). `Did` equality is string equality and
+        // `Did::from_str` accepts any multibase base, so a re-spelled copy of our own DID
+        // walked straight past a `==` here — the same primitive that gave a re-spelled
+        // captured envelope its own replay window. The comparison now asks the question the
+        // guard beneath it asks: is this the same signing key?
+        //
+        // Both sides are derivable by construction — `own_did` is `keypair.did()`, and a wire
+        // `from` has already been through `Did::deserialize`, which requires a valid Ed25519
+        // public key — so the error arm is unreachable from the network. It is written as
+        // "drop" rather than "admit" anyway, because the cost of a wrong drop is one message
+        // and the cost of a wrong admit is our own DID inside remote-peer replay and
+        // misbehaviour state (#2506), which is self-defeating after a restart.
+        let is_self = match (
+            crate::replay_guard::SenderPrincipal::from_did(&envelope.from),
+            crate::replay_guard::SenderPrincipal::from_did(&self.own_did),
+        ) {
+            (Ok(sender), Ok(own)) => sender == own,
+            _ => {
+                error!(
+                    from = %envelope.from,
+                    "Could not derive a signing key for the sender or for our own DID; \
+                     dropping rather than risking self-sourced traffic entering remote-peer \
+                     state (#2506/#2640)"
+                );
+                true
+            }
+        };
+        if is_self {
             warn!(
                 sequence = envelope.sequence,
                 "Dropping network message from our own DID without recording remote-peer state; \
@@ -574,6 +602,70 @@ mod tests {
         assert!(
             detector.read().await.get_violations(&own_did).is_empty(),
             "#2506: the local DID must never accrue misbehaviour violations from a self-loop"
+        );
+    }
+
+    /// Regression test for #2640's self-DID sub-instance.
+    ///
+    /// The #2506 drop above was `envelope.from == self.own_did`, and `Did` equality is string
+    /// equality, so a re-spelled copy of our own DID walked straight past it — the same
+    /// unsigned, un-canonicalized `from` field that gave a captured envelope a second replay
+    /// window. Nothing but a key comparison closes it: the alias is a different string that
+    /// verifies under the same key.
+    #[tokio::test]
+    async fn test_respelled_own_did_envelope_is_still_dropped() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, own_keypair, forward_count) =
+            create_test_context_with_own_keypair(Some(detector.clone()));
+        let own_did = own_keypair.did().clone();
+
+        // The base16-lower spelling of our own key. `f` is multibase's base16-lower code.
+        let hex: String = own_did
+            .to_verifying_key()
+            .unwrap()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let alias = icn_identity::Did::from_str(&format!("did:icn:f{hex}")).unwrap();
+        assert_ne!(
+            alias.as_str(),
+            own_did.as_str(),
+            "CONTROL: the alias must be a different string, or the string comparison would \
+             already have caught it and this test would prove nothing"
+        );
+
+        let mut envelope = create_signed_envelope(&own_keypair, 1);
+        envelope.from = alias.clone();
+        assert!(
+            envelope.verify(3600).is_ok(),
+            "CONTROL: the re-spelled envelope must still verify, or it would be rejected by \
+             the signature check rather than by the self-DID drop"
+        );
+
+        let message = create_network_message(&envelope);
+        ctx.handle_signed(message.clone(), &envelope).await;
+        ctx.handle_signed(message, &envelope).await;
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "#2640: a re-spelled own DID is still our own DID and must not be forwarded"
+        );
+        assert_eq!(
+            ctx.replay_guard.read().await.peer_count(),
+            0,
+            "#2640: a re-spelled own DID must not open a remote-peer replay window"
+        );
+        assert!(
+            detector.read().await.get_violations(&alias).is_empty(),
+            "#2640: no misbehaviour may be recorded against a spelling of our own DID"
+        );
+        assert!(
+            detector.read().await.get_violations(&own_did).is_empty(),
+            "#2506: nor against its canonical spelling"
         );
     }
 

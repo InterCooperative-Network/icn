@@ -298,6 +298,10 @@ takes a keypair or `VerifyingKey` directly; zero re-derive from a parsed `Did`; 
 `canonical()`/`normalize()` helper exists), so the old *Normalization* column was "none" for
 every row and is replaced by the consumer column.
 
+**Rows #1–#3 have since been discharged** for the `ReplayGuard` — see the §10.2 status note.
+They are left as measured here, because this table is the record of what was true at the basis
+commit and the fix is a later event.
+
 | # | Crate | Source + symbol | Storage | Logical key | Physical key encoding | Class | DID enters via | `Did`-re-keying consumer (§3.1) | Live? | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | icn-net | `replay_guard.rs:1800 make_sender_regime_key` | sled via `Store` | sender regime | `b"…" ‖ did.as_str()` | D | wire `from_str` | #37 — `load_persisted_state :713` → `parse_sender_regime_key :1806` → `sequences.entry(did)` | live | **NEEDS MIGRATION** |
@@ -537,6 +541,35 @@ it (the durable rows #1–#3 are spelling-keyed and `from` stays unsigned); pin-
 `from` closes it. **Disposition:** no existing issue owned it (#2480 observed "`from` is not in the
 signed bytes" and concluded it did not matter; it did not consider spellings). **Filed by this
 review as #2640** (`epic:trust-hardening`, `security-review`).
+
+#### 10.2 status — closed at the replay-protection boundary (2026-08-19, #2640)
+
+The measurements above stand as taken; this records what changed underneath them.
+
+**Fixed, in `icn-net` only.** The `ReplayGuard`'s identity is now the sender's decoded Ed25519
+key (`SenderPrincipal`), not the wire spelling. In memory, map #37 is keyed by it. Durably, rows
+**#1 (`make_sender_regime_key`)**, **#2 (`make_max_seq_key`)** and **#3 (`make_finalized_key`)**
+are written under the principal's canonical base58btc spelling, and a migration pass at
+`load_persisted_state` merges pre-existing spelling-distinct rows onto that one key —
+**maximum** high-water, **strongest** sender regime, most restrictive semantic version, **union**
+of finalized sequences; the canonical row is flushed before any alias row is retired, and an
+unreadable alias row is neither merged nor deleted but quarantines the merged sender. A
+re-spelled captured envelope is therefore rejected by the replay guard, and the self-DID drop in
+`handlers/signed.rs` (§10.2's "related sub-instance") now compares keys rather than strings.
+
+**Not fixed, and unchanged by it.** `SignedEnvelope::canonical_encoding` still does not cover
+`from`, so the field is still unauthenticated and a re-spelled envelope still *verifies*; only
+its second acceptance is refused. `Did::from_str` still accepts all 23 spellings and `Did`
+equality is still string equality — I7 / N2-A (#2627) still owns both, and this fix deliberately
+did not begin it. Every other row in §5–§7 is untouched, including `apps/trust-app/src/sequence.rs`
+(#71), the fourth instance of this class named in §10.2 above.
+
+**What N2-A must preserve.** When I7 lands, `Did` equality becomes key equality and the in-memory
+window map would collapse spellings anyway — but the durable rows would not, so the canonical
+*write* here must stay. N2-A must either keep `SenderPrincipal` as the guard's key or, if it
+replaces it with a canonical `Did`, keep writing rows #1–#3 under a key-derived spelling and keep
+the merge pass until no store can contain a legacy alias row. Dropping the migration would
+silently restore the durable half of this defect.
 
 ### 10.3 Vote double-counting, and a re-cast guard that cannot fire
 `GovernanceError::AlreadyVoted` (`icn-governance/src/error.rs:33`) has **zero constructors anywhere

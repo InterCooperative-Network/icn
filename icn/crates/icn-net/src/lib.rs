@@ -63,7 +63,7 @@ pub use rate_limit::{
     PREAUTH_SOURCE_BURST, PREAUTH_SOURCE_RENEWAL_WINDOW,
 };
 pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
-pub use replay_guard::ReplayGuard;
+pub use replay_guard::{ReplayGuard, ReplayIdentityUndecodable, SenderPrincipal};
 pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::{DialOutcome, SessionManager};
 pub use signing_sequence::SigningSequenceCounter;
