@@ -89,7 +89,7 @@ This is a live defect independent of I7 (§10.1).
 ### 2.4 Reproducing these measurements
 
 The probes are not committed (this tranche adds no code). To reproduce, add a temporary integration
-test to `icn-identity` and `icn-net` respectively; the exact sources used are recorded in §11.
+test to `icn-identity` and `icn-net` respectively; the exact sources used are recorded verbatim in **§13**.
 
 ---
 
@@ -131,7 +131,7 @@ load-bearing.
 
 **S1 — structural, type-driven.** Collection types parameterized by `Did`:
 `rg -g '*.rs' 'HashMap<\s*(&\s*)?Did\b|BTreeMap<…|DashMap<…|HashSet<…|BTreeSet<…|IndexMap<…|LruCache<…'`
-→ 109 sites, 105 outside `tests/`.
+→ **108** sites, **105** outside `tests/`.
 
 **S2 — durable engines.** `rg -l -g '*.rs' '\bsled\b'` → 174 files across 17 crates;
 `rg -g '*.rs' -g '*.toml' 'rusqlite|sqlx|rocksdb|redb|heed|lmdb|sqlite'` → no second durable
@@ -148,18 +148,19 @@ Plus the raw idiom `rg -g '*.rs' 'extend_from_slice\([a-z_]*did[a-z_]*\.as_str\(
 → 23 sites.
 
 **S5 — durable roots.** `rg -l -g '*.rs' 'sled::Db|sled::Tree|sled::open|sled::Config'` → 69 files;
-ranked by identity-term density with `scan1.py` (§11) to order the read.
+ranked by identity-term density (**§13.1**) to order the read.
 
-**S6 — serialized maps.** An AST-approximating pass (`serde_maps.py`, §11) matching `Did`-keyed
+**S6 — serialized maps.** An AST-approximating pass (**§13.2**) matching `Did`-keyed
 collections inside `#[derive(…Serialize/Deserialize…)]` structs → class **C** members.
 
 **S7 — free-form DID parsing (class E).** `rg -g '*.rs' 'Did::from_str\(|\.parse::<Did>\(\)'`
-→ **176 production sites across 20 crates** (47 in `icn-gateway` alone). Every one accepts all 22
-spellings.
+→ **176 production sites across 20 workspace members** (16 crates, 3 apps, 1 binary; **47** in
+`icn-gateway` alone). Every one accepts all 22 spellings.
 
-**S8 — wrapper types (second pass, §9).** `wrappers.py` (§11) matching newtype structs over `Did`,
-enum variants holding a `Did`, and structs with a `Did` field → **152 structs**, 5 newtype/variant
-wrappers. This class is invisible to S1 and produced findings #10, #26 and #52.
+**S8 — wrapper types (second pass, §9).** **§13.3** matching newtype structs over `Did`,
+enum variants holding a `Did`, and structs with a `Did` field → **147 distinct structs** carrying a
+`Did` field and **5** distinct newtype/enum-variant wrappers. This class is invisible to S1 and
+produced findings #9, #25 and #52.
 
 **S9 — non-Rust persistence.** `rg -g '*.ts' -g '*.tsx' -g '*.js' 'localStorage|IndexedDB|AsyncStorage|SecureStore|\.setItem\('`
 over `sdk/ web/ website/ apps/` → no DID-keyed durable store; see §9 coverage limits.
@@ -408,9 +409,9 @@ Stated plainly, per #2623's sixth acceptance criterion.
    is an exclusion, not a proof.
 6. **The 22-encoding figure is a floor, not a ceiling.** It counts what `multibase-0.9.2` supports.
    A dependency bump that adds a base widens the aliasing surface with no code change in this repo.
-7. **Probe sources are not committed** — this tranche adds no code. They are retained in the session
-   scratchpad and are ~40 lines each; the measurements in §2 are reproducible by re-adding them as
-   temporary integration tests to `icn-identity` and `icn-net`.
+7. **Probe sources are recorded but not committed** — this tranche adds no code, so the two
+   integration-test probes live in §13.4 and §13.5 rather than in `tests/`. Re-add them as temporary
+   integration tests to reproduce §2; delete them afterwards.
 8. **`sled` iteration order is treated as unspecified.** Every "last-writer-wins" verdict assumes an
    attacker cannot choose the winner. If scan order is in fact lexicographic and stable, some merges
    become *deterministically* attacker-selectable, which would raise several `SILENT-MERGE RISK`
@@ -431,12 +432,12 @@ Stated plainly, per #2623's sixth acceptance criterion.
 **Concrete list N2-A inherits** — the 22 `NEEDS MIGRATION` rows: #1, #2, #3, #4, #5, #6, #7, #8,
 #9, #17, #18, #23, #24, #31, #33, #34, #37, #38, #39, #40, #45, #50.
 
-**What the evidence says about the mechanism choice.** §11 permits either equality over decoded
+**What the evidence says about the mechanism choice.** IDENTITY_SEMANTICS §11 (I7) permits either equality over decoded
 bytes or encoding pinned at parse. This inventory does not choose — that is N2-A's decision and its
 rationale is N2-A's to state — but it records three constraints the choice must satisfy:
 
 1. Pinning at parse changes what `Did::from_str` *accepts*, which is a wire-compatibility change
-   affecting all 176 class-E parse sites, and would make currently-loadable persisted rows
+   affecting all 176 class-E parse sites (§4 S7), and would make currently-loadable persisted rows
    unloadable. Equality over decoded bytes changes no acceptance and no durable byte.
 2. Neither mechanism fixes §10.6 — `EntityId`, the kernel `String` alias, and #54 keep string
    equality either way.
@@ -449,3 +450,189 @@ rationale is N2-A's to state — but it records three constraints the choice mus
 storage. §7.5 requires migration ordering, alias/transition recognition, duplicate-act prevention and
 final cutover to be designed before any live re-key. Nothing here discharges that gate, and N2-A
 must not treat these rows as ordinary migrations.
+
+---
+
+## 13. Appendix — the search and probe sources
+
+Recorded verbatim so §4's methodology and §2's measurements are re-runnable rather than merely
+described. None of this is committed as code; all of it is reproducible from a clean checkout at
+`bca3dd0e`. The three scanners run from the repository root and are read-only.
+
+### 13.1 S5 — rank durable roots by identity-term density
+
+```python
+import re, os
+ROOT = "."
+files = []
+for dp, dn, fn in os.walk(ROOT):
+    if '/.git' in dp or '/target' in dp or '/node_modules' in dp:
+        continue
+    files += [os.path.join(dp, f) for f in fn if f.endswith('.rs')]
+durable = [f for f in files
+           if re.search(r'sled::(Db|Tree|open|Config)',
+                        open(f, encoding='utf8', errors='replace').read())]
+IDENT = re.compile(
+    r'\b(did|dids|_did|did_|member_id|member_did|owner|owner_did|actor|actor_did|'
+    r'peer_id|peer_did|subject|subject_id|principal|voter|issuer|holder|signer|'
+    r'operator_did|node_did|org_did|treasury_did|coop_id|entity_id|account)\b', re.I)
+rows = sorted(((len(IDENT.findall(open(f, encoding='utf8', errors='replace').read())),
+                os.path.relpath(f, ROOT)) for f in durable), reverse=True)
+print("rust files:", len(files), "| touching sled:", len(durable))
+for n, p in rows:
+    print(f"{n:5d}  {p}")
+```
+
+Expected at `bca3dd0e`: **1033** Rust files, **69** touching `sled`.
+
+### 13.2 S6 — `Did`-keyed collections inside serde-derived structs (class C)
+
+```python
+import re, os
+COLL = re.compile(r'(HashMap|BTreeMap|DashMap|HashSet|BTreeSet)<\s*&?\s*Did\b')
+DERIVE = re.compile(r'#\[derive\(([^)]*)\)\]')
+for dp, dn, fn in os.walk("."):
+    if '/.git' in dp or '/target' in dp or '/node_modules' in dp:
+        continue
+    for f in fn:
+        if not f.endswith('.rs'):
+            continue
+        p = os.path.join(dp, f)
+        if '/tests/' in p:
+            continue
+        lines = open(p, encoding='utf8', errors='replace').read().split('\n')
+        for i, l in enumerate(lines):
+            if not COLL.search(l):
+                continue
+            for j in range(i, max(-1, i - 60), -1):          # nearest enclosing item
+                if re.match(r'\s*(pub )?(struct|enum) ', lines[j]):
+                    for k in range(j - 1, max(-1, j - 8), -1):
+                        m = DERIVE.search(lines[k])
+                        if m and ('Serialize' in m.group(1) or 'Deserialize' in m.group(1)):
+                            print(f"{p}:{i+1}  {lines[j].strip()[:70]}  [{m.group(1)[:40]}]")
+                        if m:
+                            break
+                    break
+```
+
+**Known limitation, stated because it changed a verdict:** the backward walk stops at the nearest
+enclosing `struct`/`enum`, so a `let` binding inside an `impl` block is attributed to that block's
+type. Two of the five raw hits were such false positives and were discarded on reading. Treat the
+output as a *read list*, never as a result.
+
+### 13.3 S8 — wrapper types that hide a `Did` (the second pass)
+
+```python
+import re, os
+for dp, dn, fn in os.walk("."):
+    if '/.git' in dp or '/target' in dp or '/node_modules' in dp:
+        continue
+    for f in fn:
+        if not f.endswith('.rs'):
+            continue
+        p = os.path.join(dp, f)
+        if '/tests/' in p:
+            continue
+        src = open(p, encoding='utf8', errors='replace').read()
+        for m in re.finditer(r'pub struct (\w+)\s*\(\s*(?:pub\s+)?Did\s*\)', src):
+            print("newtype-struct        ", m.group(1), p)
+        for m in re.finditer(r'(\w+)\s*\(\s*Did\s*\)\s*,', src):
+            print("enum-variant          ", m.group(1), p)
+        for m in re.finditer(r'pub struct (\w+)\s*\{[^}]{0,400}?\bpub \w+: Did\b', src, re.S):
+            print("struct-with-did-field ", m.group(1), p)
+```
+
+Expected at `bca3dd0e`: **155** `struct-with-did-field` rows (**147** distinct struct names — the
+script prints every occurrence, not distinct names) and **8** newtype/enum-variant rows resolving to
+**5** distinct wrappers: `PeerId`, and the `Did` / `Person` / `Query` / `Remote` variants. Of those,
+`PeerId(pub Did)` produced finding #52, `AccountId::Did(Did)` produced #9 and §10.6, and
+`Grantee::Person(Did)` produced #25. **This class is invisible to S1** — it is the reason §9 exists
+as a separate pass.
+
+### 13.4 Probe A — encoding aliasing and anchor round-trip (§2.1, §2.3)
+
+Add as `icn/crates/icn-identity/tests/n2a0_probe.rs`, run
+`cargo test -p icn-identity --test n2a0_probe -- --nocapture`, then **delete it**.
+
+```rust
+use icn_identity::Did;
+use std::collections::HashMap;
+
+#[test]
+fn probe() {
+    let kp = icn_identity::KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let (_b, bytes) = multibase::decode(&canonical.as_str()[8..]).unwrap();
+
+    use multibase::Base::*;
+    let all = [Base2, Base8, Base10, Base16Lower, Base16Upper, Base32Lower, Base32Upper,
+               Base32PadLower, Base32PadUpper, Base32HexLower, Base32HexUpper,
+               Base32HexPadLower, Base32HexPadUpper, Base32Z, Base36Lower, Base36Upper,
+               Base58Flickr, Base58Btc, Base64, Base64Pad, Base64Url, Base64UrlPad];
+    let mut distinct: std::collections::HashSet<String> = Default::default();
+    for b in all {
+        let alt = format!("did:icn:{}", multibase::encode(b, &bytes));
+        if Did::from_str(&alt).is_ok() { distinct.insert(alt); }
+    }
+    println!("TRIED={} ACCEPTED={}", all.len(), distinct.len());
+
+    let mut m: HashMap<Did, u32> = HashMap::new();
+    for (i, d) in distinct.iter().enumerate() { m.insert(Did::from_str(d).unwrap(), i as u32); }
+    println!("HASHMAP_LEN={}", m.len());
+    let j = serde_json::to_string(&m).unwrap();
+    let back: Result<HashMap<Did, u32>, _> = serde_json::from_str(&j);
+    println!("MAP_ROUNDTRIP_LEN={:?}", back.map(|b| b.len()));
+
+    let (mut ok, mut fail) = (0u32, 0u32);
+    for i in 0u32..200 {
+        let mut id = [0u8; 32];
+        id.copy_from_slice(&<sha2::Sha256 as sha2::Digest>::digest(i.to_le_bytes()));
+        let d = Did::from_anchor_id(&id);
+        let j = serde_json::to_string(&d).unwrap();
+        if serde_json::from_str::<Did>(&j).is_ok() { ok += 1 } else { fail += 1 }
+    }
+    println!("ANCHOR_ROUNDTRIP_OK={} FAIL={} (of 200)", ok, fail);
+}
+```
+
+Observed at `bca3dd0e`: `TRIED=22 ACCEPTED=22`, `HASHMAP_LEN=22`, `MAP_ROUNDTRIP_LEN=Ok(22)`,
+`ANCHOR_ROUNDTRIP_OK=90 FAIL=110`.
+
+### 13.5 Probe B — envelope verification under an aliased sender (§2.2)
+
+Add as `icn/crates/icn-net/tests/n2a0_replay.rs`, run
+`cargo test -p icn-net --test n2a0_replay -- --nocapture`, then **delete it**.
+`icn-net` does not depend on `multibase`, so the base16 form is built by hand — the leading `f` is
+the multibase code for base16-lower.
+
+```rust
+use icn_identity::{Did, KeyPair};
+use icn_net::envelope::{PayloadType, SignedEnvelope};
+
+#[test]
+fn probe() {
+    let kp = KeyPair::generate().unwrap();
+    let canonical = kp.did().clone();
+    let key_bytes = canonical.to_verifying_key().unwrap().as_bytes().to_vec();
+    let hex: String = key_bytes.iter().map(|x| format!("{x:02x}")).collect();
+    let alias = Did::from_str(&format!("did:icn:f{hex}")).expect("alias parses today");
+
+    println!("CONTROL_ALIAS_NE_CANONICAL={}", alias != canonical);   // control: must be true
+    println!("ALIAS_KEY_SAME={}",
+             alias.to_verifying_key().unwrap().as_bytes() == &key_bytes[..]);
+
+    // The same sequence number, signed twice under two spellings of one key.
+    let e1 = SignedEnvelope::new(&canonical, &kp, 1, PayloadType::Gossip, b"m".to_vec()).unwrap();
+    let e2 = SignedEnvelope::new(&alias, &kp, 1, PayloadType::Gossip, b"m".to_vec()).unwrap();
+    println!("CANONICAL_VERIFIES={}", e1.verify(3600).is_ok());
+    println!("ALIAS_VERIFIES={}", e2.verify(3600).is_ok());
+    println!("FROM_FIELDS_DIFFER={}", e1.from != e2.from);
+}
+```
+
+Observed at `bca3dd0e`: all five lines `true`.
+
+**The control line matters.** `CONTROL_ALIAS_NE_CANONICAL` must print `true` *before* I7 —
+it proves the two spellings really are distinct `Did`s today, so `ALIAS_VERIFIES=true` demonstrates
+the bypass rather than passing vacuously on two values that were equal all along. After I7 that
+control inverts, and the probe must be re-read accordingly rather than re-run unchanged.
