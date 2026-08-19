@@ -69,10 +69,9 @@ Keep the claim level explicit. Useful classifications include:
 - implemented library/type/test primitive;
 - integrated into a runtime path;
 - exercised in a bounded demo/rehearsal;
-- deployed in a named environment with current evidence;
-- production-ready/adopted only with evidence specific to that stronger claim.
+- deployed in a named environment with current evidence.
 
-Do not let one level silently imply the next.
+Do not let one level silently imply the next, and do not use `production-ready` or `adopted` without evidence specific to that stronger claim.
 
 ## Agent start
 
