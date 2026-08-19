@@ -521,8 +521,9 @@ about half of cooperative treasuries would drop out of the treasury manager's ma
 `icn-gossip/src/gossip.rs:1380 restore_state` is the opposite failure mode — one unparseable DID
 aborts the whole gossip restore. This is a *live read-path* defect, not constructor hygiene.
 **Disposition:** owned by I8 / N2-B (#2628, "compatibility-only reads come first … closes the
-deserialization-path defect"); the measurements above are recorded on #2628 rather than in a
-duplicate issue, with the note that the compat-read half may deserve to be pulled ahead of N2-A.
+deserialization-path defect"); the measurements above are recorded **on #2628** (comment of
+2026-08-19) rather than in a duplicate issue, with the note that the compat-read half may deserve
+to be pulled ahead of N2-A.
 
 ### 10.2 Any party can re-spell a captured envelope and replay it
 §2.2 proves both envelopes verify *and* that the signature does not cover `from`, so a third party
@@ -534,8 +535,8 @@ bypassable **today**. This is the highest-severity finding in this document and 
 caused by I7 — equality-over-bytes would *reduce* it (one in-memory window per key) but not close
 it (the durable rows #1–#3 are spelling-keyed and `from` stays unsigned); pin-at-parse or signing
 `from` closes it. **Disposition:** no existing issue owned it (#2480 observed "`from` is not in the
-signed bytes" and concluded it did not matter; it did not consider spellings). **Filed as a
-security issue by this review** — see #2623's closing comment for the number.
+signed bytes" and concluded it did not matter; it did not consider spellings). **Filed by this
+review as #2640** (`epic:trust-hardening`, `security-review`).
 
 ### 10.3 Vote double-counting, and a re-cast guard that cannot fire
 `GovernanceError::AlreadyVoted` (`icn-governance/src/error.rs:33`) has **zero constructors anywhere
@@ -550,8 +551,8 @@ de-duplication is over `Vec<String>`, so it does not catch it; and `apps/governa
 second row too. Because `icn-governance`'s sled store is dormant (§3.1), the *live* double-count is
 #23. §7.5 anticipated this for a *re-key*; it is reachable now without one, and I7 alone does not
 fix it (the rows are `Display`-keyed). **Disposition:** no issue owned it (§7.5 is stated as a gate,
-not materialised; #2623/#2626/#2627 disclaim governance storage). **Filed by this review** — see
-#2623's closing comment.
+not materialised; #2623/#2626/#2627 disclaim governance storage). **Filed by this review as
+#2641.**
 
 ### 10.4 `grantee_canonical_bytes` canonicalizes the *layout*, not the spelling
 `receipt_store.rs:1071` is named `*_canonical_bytes` and emits a tag byte followed by
@@ -567,7 +568,7 @@ scan, no issue.
 ### 10.5 Partner invariants that I7 would *introduce* (N2-A must fix atomically)
 Not current defects — today every one of these is string-consistent. I7 moves one half and not the
 other. **Disposition:** no "current defect" issue; tracked as N2-A constraints (§12.1 item 6) and
-noted on #2627.
+recorded on #2627 (comment of 2026-08-19).
 
 - `PeerId(pub Did)` (`icn-net/src/topology.rs:42–55`) derives `PartialEq`/`Eq`/`Hash` — which
   delegate to `Did` and so move under I7 — while hand-implementing `Ord` over
@@ -777,7 +778,7 @@ designed against, as a checklist it can be reviewed against:
    acceptance, so a binary rolled back to string equality reads the migrated (de-duplicated)
    rows unchanged; pin-at-parse changes acceptance and makes every alternate-spelled row
    unloadable (§12 constraint 1), so it needs a compatibility-read window first — and it is the
-   only mechanism that closes the third-party re-spelling replay (§2.2) without a wire change.
+   only mechanism that closes the third-party re-spelling replay (§2.2, #2640) without a wire change.
 6. **Partner-type invariants that move out of step** (all must be fixed in the same change):
    `PeerId` `Ord` over `to_string()` (#52, §10.5); `icn-ccl` `Value` derives `PartialEq`/`Eq`
    but hand-hashes `Value::Did` via `format!("{did:?}")` — `HashSet<Value>` (`Value::Set`,
