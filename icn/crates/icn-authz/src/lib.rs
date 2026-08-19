@@ -21,6 +21,6 @@ pub mod model;
 pub use error::AuthzError;
 pub use graph::{CapabilitySource, GraphBuilder};
 pub use model::{
-    Action, CapabilityEdge, CapabilityGraph, Constraint, Decision, EdgeSource, ResourceId,
-    ResourceKind, SubjectId,
+    Action, CapabilityEdge, CapabilityGraph, CapabilitySubjectId, Constraint, Decision, EdgeSource,
+    ResourceId, ResourceKind,
 };

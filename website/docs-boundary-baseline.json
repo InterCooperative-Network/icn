@@ -1,0 +1,16 @@
+{
+  "schema": "icn-public-docs-baseline/v1",
+  "note": "Expected shape of the public documentation surface. Drift is reported, not enforced — refresh deliberately when documentation is added or reclassified.",
+  "recordedAt": "2026-08-19",
+  "counts": {
+    "total": 968,
+    "published": 682,
+    "withheld": 286,
+    "byLayer": {
+      "decisions": 47,
+      "reference": 433,
+      "archive": 90,
+      "learn": 112
+    }
+  }
+}

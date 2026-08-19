@@ -1,240 +1,135 @@
 ---
-// src/pages/docs/index.astro — Documentation index page
+// src/pages/docs/index.astro — documentation landing page.
+//
+// PRIMARY JOB: get a reader to current reference material, and make the
+// existence and status of everything else legible.
+//
+// ─── What changed for #2609 ──────────────────────────────────────────────────
+//
+// The index used to list one section per top-level directory of docs/, with
+// archive material in a section called "Archive" that looked exactly like
+// every other section, and a search index that ranked a 2025 sprint report
+// alongside the current architecture document.
+//
+// The page now has four explicit layers — Learn, Current reference, Decisions,
+// Archive — derived from docs/registry.toml rather than from directory names.
+// Archive lives on its own page and is excluded from the default search index;
+// the reader is told it exists and how to search it, which is the difference
+// between hiding history and organising it.
+
 import Layout from '../../layouts/Layout.astro';
 import Search from '../../components/Search.astro';
-import fs from 'node:fs';
-import path from 'node:path';
-import { resolveRepoDocsRoot } from '../../lib/paths';
+import { sectionsForLayer, entriesForLayers } from '../../lib/docsTree';
+import { DOCS_COUNTS, LAYER_META } from '../../lib/docsClassification';
 
-const docsRoot = resolveRepoDocsRoot();
+const learnSections = sectionsForLayer('learn', 'Start here');
+const referenceSections = sectionsForLayer('reference', 'Core');
+const decisionSections = sectionsForLayer('decisions', 'Decisions');
 
-interface DocFile {
-  slug: string;
-  title: string;
-  path: string;
-}
+// Default search covers Learn + Current reference + Decisions. Archive is
+// deliberately absent — #2609 asks for archive to be "excluded from default
+// docs search but remain intentionally searchable", and /docs/archive carries
+// its own search over exactly that set.
+const searchable = entriesForLayers(['learn', 'reference', 'decisions']);
 
-interface DocSection {
-  name: string;
-  docs: DocFile[];
-}
-
-function titleFromFilename(filename: string): string {
-  return filename
-    .replace(/\.md$/, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-    .replace(/\bApi\b/g, 'API')
-    .replace(/\bCcl\b/g, 'CCL')
-    .replace(/\bIcn\b/g, 'ICN')
-    .replace(/\bDid\b/g, 'DID')
-    .replace(/\bAdr\b/g, 'ADR')
-    .replace(/\bSdis\b/g, 'SDIS');
-}
-
-/**
- * Extract a display title for a doc using the fallback chain:
- *   1. YAML frontmatter `title:` field
- *   2. First Markdown `# H1` heading
- *   3. titleFromFilename(filename)
- *
- * Fails safely — any parse error falls through to the filename transform.
- */
-function titleForDoc(filePath: string, filename: string): string {
-  try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-
-    // (1) YAML frontmatter title
-    if (content.startsWith('---')) {
-      const end = content.indexOf('\n---', 3);
-      if (end > 0) {
-        const frontmatter = content.slice(3, end);
-        const match = frontmatter.match(/^\s*title\s*:\s*(.+?)\s*$/m);
-        if (match) {
-          const raw = match[1].trim();
-          // Strip surrounding quotes if present
-          const unquoted = raw.replace(/^["']([\s\S]*)["']$/, '$1').trim();
-          if (unquoted.length > 0) return unquoted;
-        }
-      }
-    }
-
-    // (2) First Markdown H1
-    // Skip frontmatter block if present, then look for first `# Heading` line.
-    let body = content;
-    if (content.startsWith('---')) {
-      const end = content.indexOf('\n---', 3);
-      if (end > 0) body = content.slice(end + 4);
-    }
-    const h1Match = body.match(/^#\s+(.+?)\s*$/m);
-    if (h1Match) {
-      return h1Match[1].trim();
-    }
-  } catch {
-    // fall through
-  }
-
-  // (3) Filename fallback
-  return titleFromFilename(filename);
-}
-
-function scanDocs(): DocSection[] {
-  const sections: DocSection[] = [];
-
-  // Core docs (top-level .md files)
-  const topLevelFiles = fs.readdirSync(docsRoot)
-    .filter(f => f.endsWith('.md') && !fs.statSync(path.join(docsRoot, f)).isDirectory())
-    .sort();
-
-  if (topLevelFiles.length > 0) {
-    sections.push({
-      name: 'Core',
-      docs: topLevelFiles.map(f => ({
-        slug: f.replace('.md', ''),
-        title: titleForDoc(path.join(docsRoot, f), f),
-        path: `/docs/${f.replace('.md', '')}`
-      }))
-    });
-  }
-
-  // Subdirectories
-  const dirs = fs.readdirSync(docsRoot)
-    .filter(f => fs.statSync(path.join(docsRoot, f)).isDirectory())
-    .sort();
-
-  for (const dir of dirs) {
-    const dirPath = path.join(docsRoot, dir);
-    const scanDir = (basePath: string, prefix: string): DocFile[] => {
-      const files: DocFile[] = [];
-      const entries = fs.readdirSync(basePath).sort();
-      for (const entry of entries) {
-        const entryPath = path.join(basePath, entry);
-        if (fs.statSync(entryPath).isDirectory()) {
-          files.push(...scanDir(entryPath, `${prefix}/${entry}`));
-        } else if (entry.endsWith('.md')) {
-          files.push({
-            slug: `${prefix}/${entry.replace('.md', '')}`,
-            title: titleForDoc(entryPath, entry),
-            path: `/docs${prefix}/${entry.replace('.md', '')}`
-          });
-        }
-      }
-      return files;
-    };
-
-    const docs = scanDir(dirPath, `/${dir}`);
-    if (docs.length > 0) {
-      sections.push({
-        name: titleFromFilename(dir),
-        docs
-      });
-    }
-  }
-
-  return sections;
-}
-
-const sections = scanDocs();
-const totalDocs = sections.reduce((sum, s) => sum + s.docs.length, 0);
-const allDocs = sections.flatMap(s => s.docs);
+const LAYER_NAV = [
+  { id: 'learn', ...LAYER_META.learn, count: DOCS_COUNTS.learn },
+  { id: 'reference', ...LAYER_META.reference, count: DOCS_COUNTS.reference },
+  { id: 'decisions', ...LAYER_META.decisions, count: DOCS_COUNTS.decisions },
+  { id: 'archive', ...LAYER_META.archive, count: DOCS_COUNTS.archive },
+];
 ---
 
-<Layout title="Documentation" activeNav="docs">
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+<Layout
+  title="Documentation"
+  description="ICN's public documentation, separated into what to learn first, current reference material, the decision record, and a clearly-marked historical archive."
+  activeNav="docs"
+>
+  <section class="section docs-landing">
     <div class="container">
-      <div class="section-header" style="text-align: left; max-width: none;">
-        <span class="badge badge-teal">{totalDocs} Documents Synced</span>
-        <h1>Documentation</h1>
-        <p>Everything you need to understand, deploy, and contribute to the InterCooperative Network. These docs are synced directly from the main repository.</p>
-      </div>
+      <header class="docs-head">
+        <span class="eyebrow">Documentation</span>
+        <h1>Read the system, and know what you are reading.</h1>
+        <p class="lede">
+          ICN's documentation is written in the open and kept in the repository.
+          That includes material which is no longer true — old plans, completed
+          phases, superseded decisions. Rather than delete it, we sort it, so a
+          page can never quietly present itself as current when it is not.
+        </p>
+      </header>
 
-      <div class="docs-quickstart">
-        <a href="/docs/GETTING_STARTED" class="docs-quickstart-card">
-          <span class="docs-quickstart-label">Developers</span>
-          <h2>Start with Getting Started</h2>
-          <p>Build the workspace, orient in the repo, and find the right contributor path without getting lost.</p>
-        </a>
-        <a href="/get-involved" class="docs-quickstart-card">
-          <span class="docs-quickstart-label">Contributors</span>
-          <h2>Use the engagement map</h2>
-          <p>Route yourself into docs, design, testing, research, institutional collaboration, or ecosystem work.</p>
-        </a>
-        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="docs-quickstart-card">
-          <span class="docs-quickstart-label">Supporters</span>
-          <h2>Support the work</h2>
-          <p>GitHub Sponsors is the live public support rail today for sustaining the project’s engineering work.</p>
-        </a>
-      </div>
+      <!-- ═══ THE FOUR LAYERS ═══════════════════════════════════════════════ -->
+      <nav class="docs-layers" aria-label="Documentation sections">
+        {LAYER_NAV.map((layer) => (
+          <a href={layer.href} class:list={['docs-layer', `docs-layer-${layer.id}`]}>
+            <span class="docs-layer-count">{layer.count} documents</span>
+            <h2>{layer.title}</h2>
+            <p>{layer.blurb}</p>
+          </a>
+        ))}
+      </nav>
 
-      <!-- Curated reading pathways -->
+      <!-- ═══ CURATED PATHS ═════════════════════════════════════════════════ -->
       <section class="docs-pathways" aria-labelledby="docs-pathways-heading">
         <header class="docs-pathways-header">
-          <h2 id="docs-pathways-heading">Choose a docs path</h2>
-          <p>If you do not yet know what to search for, start here. Each path is a short reading sequence built from existing pages and docs.</p>
+          <h2 id="docs-pathways-heading">If you don't know what to search for</h2>
+          <p class="measure">
+            Each path is a short reading sequence assembled from existing pages.
+            They are the fastest way into a corpus this size.
+          </p>
         </header>
 
         <ol class="docs-pathways-grid">
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">01</span>
             <h3>Understand the project</h3>
-            <p>What ICN is, what problem it addresses, and how the closure loop holds the institution together.</p>
+            <p>What ICN is, what problem it addresses, and how one decision travels through the system.</p>
             <ul>
               <li><a href="/what-is-icn">What is ICN</a></li>
               <li><a href="/why-icn">Why ICN</a></li>
-              <li><a href="/cooperative-economy">The cooperative economy needs its own machinery</a></li>
-              <li><a href="/how-it-works">How It Works</a></li>
+              <li><a href="/how-it-works">How it works</a></li>
+              <li><a href="/see-it-work">See it work — a worked example</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">02</span>
             <h3>Build or contribute</h3>
-            <p>Get the workspace running and find a contribution path that matches the repo as it actually exists.</p>
+            <p>Get the workspace running and find a contribution path that matches the repository as it exists.</p>
             <ul>
-              <li><a href="/for-developers">For Developers</a></li>
-              <li><a href="/get-involved">Get Involved</a></li>
-              <li><a href="/docs/GETTING_STARTED">Getting Started</a></li>
+              <li><a href="/for-developers">For developers</a></li>
+              <li><a href="/docs/GETTING_STARTED">Getting started</a></li>
               <li><a href="/docs/ARCHITECTURE">Architecture overview</a></li>
+              <li><a href="/get-involved">Get involved</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">03</span>
-            <h3>Run infrastructure</h3>
-            <p>Deployment routing, K3s, and the public domain map for nodes, gateways, and short links.</p>
+            <h3>Understand governance</h3>
+            <p>How proposals, decisions, mandates, and the kernel/app boundary actually work.</p>
             <ul>
-              <li><a href="/docs/deployment/ICN_ZONE_ROUTING">icn.zone routing plan</a></li>
-              <li><a href="/docs/deployment/DEPLOYMENT_GUIDE">Deployment guide</a></li>
-              <li><a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">Homelab deployment</a></li>
+              <li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">Governance state machine</a></li>
+              <li><a href="/docs/architecture/KERNEL_APP_SEPARATION">Kernel / app separation</a></li>
+              <li><a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index">ADR-0018 — ADR lifecycle</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">04</span>
-            <h3>Understand governance</h3>
-            <p>How proposals, decisions, mandates, and the kernel-app boundary actually work in ICN.</p>
+            <h3>Understand economics and resource governance</h3>
+            <p>The vocabulary discipline — obligation, allocation, settlement — and how external bridges are framed.</p>
             <ul>
-              <li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">Governance state machine</a></li>
-              <li><a href="/docs/architecture/KERNEL_APP_SEPARATION">Kernel / app separation</a></li>
-              <li><a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index">ADR-0018 — ADR lifecycle and canonical decision index</a></li>
+              <li><a href="/cooperative-economy">The cooperative economy needs its own machinery</a></li>
+              <li><a href="/docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives">RFC-0001 — Obligation / allocation / settlement</a></li>
+              <li><a href="/docs/design/CONTENT_STYLE_GUIDE">Content style guide</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">05</span>
-            <h3>Understand economics and resource governance</h3>
-            <p>The vocabulary discipline (obligation / allocation / settlement) and the draft RFC that frames external bridge institutions.</p>
-            <ul>
-              <li><a href="/cooperative-economy">The cooperative economy needs its own machinery</a></li>
-              <li><a href="/docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives">RFC-0001 — Obligation / Allocation / Settlement Primitives</a></li>
-              <li><a href="/docs/design/CONTENT_STYLE_GUIDE">Content Style Guide (vocabulary)</a></li>
-            </ul>
-          </li>
-
-          <li class="docs-pathway">
-            <span class="docs-pathway-num" aria-hidden="true">06</span>
             <h3>Understand federation</h3>
-            <p>How distinct cooperatives coordinate without merger — treaties, attestations, and cross-institutional clearing.</p>
+            <p>How distinct cooperatives coordinate without merger — treaties, attestations, cross-institution clearing.</p>
             <ul>
               <li><a href="/docs/architecture/FEDERATION_ACTIONS">Federation actions</a></li>
               <li><a href="/docs/architecture/FEDERATION_INTEROP_CONTRACT">Federation interop contract</a></li>
@@ -243,264 +138,323 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num" aria-hidden="true">07</span>
+            <span class="docs-pathway-num" aria-hidden="true">06</span>
             <h3>Understand design and accessibility</h3>
-            <p>The cross-surface design system, content style discipline, and accessibility floor for member-facing surfaces.</p>
+            <p>The cross-surface design system, content discipline, and the accessibility floor for member-facing surfaces.</p>
             <ul>
-              <li><a href="/docs/design/ICN_DESIGN_SYSTEM">ICN Design System</a></li>
-              <li><a href="/docs/design/ACCESSIBILITY_BASELINE">Accessibility Baseline</a></li>
-              <li><a href="/docs/design/CONTENT_STYLE_GUIDE">Content Style Guide</a></li>
-              <li><a href="/docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture">RFC-0015 — Public surface architecture</a></li>
+              <li><a href="/docs/design/ICN_DESIGN_SYSTEM">ICN design system</a></li>
+              <li><a href="/docs/design/ACCESSIBILITY_BASELINE">Accessibility baseline</a></li>
+              <li><a href="/docs/design-language/concept-map">Concept map — plain-language vocabulary</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num" aria-hidden="true">07</span>
+            <h3>Check current project state</h3>
+            <p>Dated, per-subsystem maturity with the evidence behind each claim. Read this before assuming any subsystem is more finished than it is.</p>
+            <ul>
+              <li><a href="/whats-real-now">What's real now</a></li>
+              <li><a href="/docs/STATE">State — project status</a></li>
+              <li><a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032 — public claim discipline</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
             <span class="docs-pathway-num" aria-hidden="true">08</span>
-            <h3>Check current project state</h3>
-            <p>Honest, dated maturity. Read this before treating any subsystem as production-ready.</p>
+            <h3>Run infrastructure</h3>
+            <p>Deployment routing and cluster topology for anyone standing a node up themselves.</p>
             <ul>
-              <li><a href="/whats-real-now">What's Real Now</a></li>
-              <li><a href="/docs/STATE">State (project status)</a></li>
-              <li><a href="/docs/INDEX">Documentation index</a></li>
+              <li><a href="/docs/deployment/DEPLOYMENT_GUIDE">Deployment guide</a></li>
+              <li><a href="/docs/deployment/ICN_ZONE_ROUTING">Zone routing plan</a></li>
+              <li><a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">Homelab deployment</a></li>
             </ul>
           </li>
         </ol>
       </section>
 
-      <!-- Search -->
-      <Search searchList={allDocs} />
+      <!-- ═══ SEARCH + INDEX ════════════════════════════════════════════════ -->
+      <section class="docs-browse" aria-labelledby="docs-browse-heading">
+        <h2 id="docs-browse-heading">Browse everything current</h2>
+        <p class="measure docs-browse-note">
+          Search covers the {searchable.length} current documents below — Learn,
+          Current reference, and Decisions. Historical material is
+          <a href="/docs/archive">searchable separately</a> so it cannot be
+          mistaken for current guidance.
+        </p>
 
-      <div class="docs-index-grid" id="docs-grid">
-        {sections.map(section => (
-          <div class="docs-section-card" data-section>
-            <h3>{section.name}</h3>
-            <ul>
-              {section.docs.map(doc => (
-                <li data-slug={doc.slug}><a href={doc.path}>{doc.title}</a></li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+        <Search searchList={searchable} />
+
+        <div class="docs-index-grid" id="docs-grid">
+          {[
+            { label: 'Learn', id: 'learn', sections: learnSections },
+            { label: 'Current reference', id: 'reference', sections: referenceSections },
+            { label: 'Decisions — ADRs and RFCs', id: 'decisions', sections: decisionSections },
+          ].map((layer) => (
+            <div class="docs-layer-block" id={layer.id}>
+              <h3 class="docs-layer-block-title">{layer.label}</h3>
+              <div class="docs-index-cards">
+                {layer.sections.map((section) => (
+                  <div class="docs-section-card" data-section>
+                    <h4>{section.name}</h4>
+                    <ul>
+                      {section.docs.map((doc) => (
+                        <li data-slug={doc.slug}><a href={doc.path}>{doc.title}</a></li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   </section>
 
-  <script is:inline>
-    const sections = document.querySelectorAll('[data-section]');
+  <script>
+    // Search filtering. Sections and whole layer blocks hide when they have no
+    // matches, so a filtered view never leaves an empty heading behind.
+    const sections = document.querySelectorAll<HTMLElement>('[data-section]');
+    const layerBlocks = document.querySelectorAll<HTMLElement>('.docs-layer-block');
 
-    document.addEventListener('search-filter', (e) => {
-      const matches = new Set(e.detail.matches); // slugs
-
-      sections.forEach(section => {
-        const items = section.querySelectorAll('li[data-slug]');
-        let sectionVisible = 0;
-
-        items.forEach(item => {
-          const slug = item.getAttribute('data-slug');
-          if (matches.has(slug)) {
-            item.style.display = '';
-            sectionVisible++;
-          } else {
-            item.style.display = 'none';
-          }
-        });
-
-        section.style.display = sectionVisible === 0 ? 'none' : '';
+    function syncLayerVisibility(): void {
+      layerBlocks.forEach((block) => {
+        const visible = block.querySelectorAll<HTMLElement>(
+          '[data-section]:not([hidden])',
+        ).length;
+        block.hidden = visible === 0;
       });
+    }
+
+    document.addEventListener('search-filter', (event) => {
+      const detail = (event as CustomEvent<{ matches: string[] }>).detail;
+      const matches = new Set(detail.matches);
+
+      sections.forEach((section) => {
+        const items = section.querySelectorAll<HTMLElement>('li[data-slug]');
+        let visible = 0;
+        items.forEach((item) => {
+          const slug = item.getAttribute('data-slug');
+          const isMatch = slug !== null && matches.has(slug);
+          item.hidden = !isMatch;
+          if (isMatch) visible += 1;
+        });
+        section.hidden = visible === 0;
+      });
+
+      syncLayerVisibility();
     });
 
     document.addEventListener('search-clear', () => {
-      sections.forEach(section => {
-        section.style.display = '';
-        section.querySelectorAll('li').forEach(item => item.style.display = '');
+      sections.forEach((section) => {
+        section.hidden = false;
+        section
+          .querySelectorAll<HTMLElement>('li[data-slug]')
+          .forEach((item) => {
+            item.hidden = false;
+          });
       });
+      syncLayerVisibility();
     });
   </script>
 </Layout>
 
 <style>
-  .docs-quickstart {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-md);
-    margin: 0 0 var(--space-xl);
+  .docs-landing {
+    padding-top: calc(64px + var(--space-3xl));
   }
 
-  .docs-quickstart-card {
+  .docs-head {
+    max-width: var(--measure-wide);
+    margin-bottom: var(--space-3xl);
+  }
+
+  .docs-head h1 {
+    margin: var(--space-md) 0 var(--space-lg);
+  }
+
+  /* ─── Layer cards ──────────────────────────────────────────────────────── */
+
+  .docs-layers {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    margin-bottom: var(--space-4xl);
+  }
+
+  .docs-layer {
     display: block;
     padding: var(--space-lg);
     background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-    text-decoration: none;
-    transition: all var(--duration-normal) var(--ease-out);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--accent-teal);
+    border-radius: var(--radius-lg);
+    color: inherit;
+    transition: border-color var(--duration-normal) var(--ease-out);
   }
 
-  .docs-quickstart-card:hover {
+  .docs-layer:hover {
+    border-color: var(--border-teal);
+    border-left-color: var(--accent-teal);
+  }
+
+  /* Archive is visually distinct from the three current layers — a different
+     accent and a dashed left edge, so it reads as a different kind of thing
+     even before the label is read. The label still carries the meaning. */
+  .docs-layer-archive {
+    border-left-style: dashed;
+    border-left-color: var(--accent-amber);
+    background: var(--bg-surface);
+  }
+
+  .docs-layer-archive:hover {
+    border-left-color: var(--accent-amber);
     border-color: var(--border-accent);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-glow-teal);
   }
 
-  .docs-quickstart-label {
-    display: inline-block;
-    margin-bottom: var(--space-sm);
+  .docs-layer-count {
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
+    font-size: var(--text-xs);
     text-transform: uppercase;
-    color: var(--accent-teal);
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
   }
 
-  .docs-quickstart-card h2 {
-    font-size: 1.125rem;
-    margin: 0 0 var(--space-sm);
+  .docs-layer h2 {
+    font-size: var(--text-xl);
+    margin: var(--space-xs) 0 var(--space-sm);
   }
 
-  .docs-quickstart-card p {
+  .docs-layer p {
+    font-size: var(--text-sm);
     margin: 0;
-    font-size: 0.9375rem;
-    color: var(--text-secondary);
-    max-width: none;
   }
 
-  .docs-index-grid {
+  /* ─── Browse ───────────────────────────────────────────────────────────── */
+
+  .docs-browse {
+    margin-top: var(--space-4xl);
+  }
+
+  .docs-browse-note {
+    margin: var(--space-md) 0 var(--space-xl);
+    font-size: var(--text-sm);
+  }
+
+  .docs-layer-block {
+    margin-top: var(--space-3xl);
+  }
+
+  .docs-layer-block-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-lg);
+  }
+
+  .docs-index-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: 1fr;
     gap: var(--space-lg);
-    margin-top: var(--space-xl);
   }
 
-  .docs-section-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-    padding: var(--space-xl);
-    transition: all var(--duration-normal) var(--ease-out);
-  }
-
-  .docs-section-card:hover {
-    border-color: var(--border-accent);
-    box-shadow: var(--shadow-glow-teal);
-  }
-
-  .docs-section-card h3 {
-    font-size: 1.125rem;
-    margin-bottom: var(--space-md);
-    color: var(--accent-teal);
+  .docs-section-card h4 {
+    font-size: var(--text-md);
+    margin-bottom: var(--space-sm);
   }
 
   .docs-section-card ul {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
   }
 
   .docs-section-card li a {
     display: block;
-    padding: 0.35rem var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
+    padding: 0.35rem 0;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
-    transition: all var(--duration-fast);
+    line-height: 1.5;
   }
 
-  .docs-section-card li a:hover {
-    background: var(--accent-teal-glow);
+  .docs-section-card li a:hover,
+  .docs-section-card li a:focus-visible {
     color: var(--accent-teal);
   }
 
-  @media (max-width: 900px) {
-    .docs-quickstart {
-      grid-template-columns: 1fr;
-    }
+  /* ─── Pathways ─────────────────────────────────────────────────────────── */
+
+  .docs-pathways-header h2 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-sm);
   }
 
-  /* Curated reading pathways — sit above the search/index */
-  .docs-pathways {
-    margin: var(--space-xl) 0;
-    padding: var(--space-xl);
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-  }
-  .docs-pathways-header {
-    margin-bottom: var(--space-lg);
-  }
-  .docs-pathways-header h2 {
-    font-size: 1.25rem;
-    margin: 0 0 var(--space-xs);
-  }
-  .docs-pathways-header p {
-    margin: 0;
-    font-size: 0.9375rem;
-    color: var(--text-secondary);
-    max-width: 48rem;
-  }
   .docs-pathways-grid {
     list-style: none;
-    margin: 0;
-    padding: 0;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-md);
-  }
-  .docs-pathway {
-    padding: var(--space-md) var(--space-lg);
-    background: var(--bg-base, transparent);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-  .docs-pathway-num {
-    display: inline-block;
-    margin-bottom: var(--space-xs);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--accent-teal);
-  }
-  .docs-pathway h3 {
-    font-size: 1rem;
-    margin: 0 0 var(--space-xs);
-    line-height: 1.3;
-  }
-  .docs-pathway > p {
-    margin: 0 0 var(--space-sm);
-    font-size: 0.875rem;
-    line-height: 1.55;
-    color: var(--text-secondary);
-  }
-  .docs-pathway ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-  .docs-pathway li a {
-    display: block;
-    padding: 0.25rem 0;
-    font-size: 0.875rem;
-    color: var(--accent-teal);
-    border-bottom: 1px solid var(--border-subtle);
-    transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
-  }
-  .docs-pathway li a:hover,
-  .docs-pathway li a:focus-visible {
-    color: var(--accent-teal);
-    border-bottom-color: var(--accent-teal);
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    margin-top: var(--space-xl);
   }
 
-  @media (max-width: 900px) {
+  .docs-pathway {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+  }
+
+  .docs-pathway-num {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-teal);
+  }
+
+  .docs-pathway h3 {
+    font-size: var(--text-md);
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .docs-pathway > p {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .docs-pathway ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .docs-pathway li a {
+    display: block;
+    padding: 0.3rem 0;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  /* ─── Wider viewports ──────────────────────────────────────────────────── */
+
+  @media (min-width: 640px) {
+    .docs-layers,
+    .docs-index-cards,
     .docs-pathways-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .docs-pathways {
-      padding: var(--space-lg);
+  }
+
+  @media (min-width: 1000px) {
+    .docs-layers {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .docs-index-cards,
+    .docs-pathways-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 </style>

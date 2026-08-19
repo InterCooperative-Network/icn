@@ -6,10 +6,54 @@ export interface Props {
   title: string;
   description?: string;
   activeNav?: string;
+  /**
+   * Value for <meta name="robots">. Set to "noindex, follow" on archived
+   * documentation so historical pages stop competing with current ones in
+   * search results while remaining reachable by direct link (#2609).
+   * Omit on ordinary pages — the absence of the tag is the default-index
+   * behaviour we want everywhere else.
+   */
+  robots?: string;
 }
 
-const { title, description = 'Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.', activeNav = '' } = Astro.props;
+const { title, description = 'Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.', activeNav = '', robots } = Astro.props;
 const currentPath = Astro.url.pathname;
+
+/**
+ * Top-level navigation.
+ *
+ * #2608 asked for a reduced top-level nav, and for role routing to sit below
+ * the core explanation rather than in the primary chrome. This went from eight
+ * items to five plus Docs:
+ *
+ *   dropped from top level   where it lives now
+ *   ──────────────────────   ─────────────────────────────────────────────────
+ *   Why ICN                  step 02 of the reading ladder; linked from the
+ *                            homepage problem section and from What is ICN
+ *   For Cooperatives         an audience route on Get Involved, and the
+ *                            destination of the homepage participation band
+ *   For Developers           likewise
+ *
+ * All three pages still exist and still carry their own job — they are simply
+ * not asking a first-time visitor to choose between them before the project
+ * has explained itself.
+ *
+ * `match` lists path prefixes that should light this item up, so a reader deep
+ * in a sub-page still sees where they are.
+ */
+const NAV_ITEMS: Array<{ slug: string; href: string; label: string; match: string[] }> = [
+  { slug: 'what-is-icn', href: '/what-is-icn', label: 'What is ICN', match: ['/what-is-icn', '/why-icn'] },
+  { slug: 'how-it-works', href: '/how-it-works', label: 'How it works', match: ['/how-it-works', '/architecture'] },
+  { slug: 'see-it-work', href: '/see-it-work', label: 'See it work', match: ['/see-it-work'] },
+  { slug: 'whats-real-now', href: '/whats-real-now', label: "What's real now", match: ['/whats-real-now', '/roadmap'] },
+  { slug: 'get-involved', href: '/get-involved', label: 'Get involved', match: ['/get-involved', '/for-cooperatives', '/for-developers', '/community'] },
+  { slug: 'docs', href: '/docs', label: 'Docs', match: ['/docs'] },
+];
+
+function isActive(item: (typeof NAV_ITEMS)[number]): boolean {
+  if (activeNav === item.slug) return true;
+  return item.match.some((prefix) => currentPath.startsWith(prefix));
+}
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -40,6 +84,7 @@ const jsonLd = {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content={description} />
+  {robots && <meta name="robots" content={robots} />}
   <meta name="theme-color" content="#06090f" />
   <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -65,14 +110,15 @@ const jsonLd = {
       </a>
 
       <ul class="nav-links" id="nav-links">
-        <li><a href="/what-is-icn" class:list={[{ active: activeNav === 'what-is-icn' || currentPath.startsWith('/what-is-icn') }]} aria-current={activeNav === 'what-is-icn' || currentPath.startsWith('/what-is-icn') ? 'page' : undefined}>What is ICN</a></li>
-        <li><a href="/why-icn" class:list={[{ active: activeNav === 'why-icn' || currentPath.startsWith('/why-icn') }]} aria-current={activeNav === 'why-icn' || currentPath.startsWith('/why-icn') ? 'page' : undefined}>Why ICN</a></li>
-        <li><a href="/how-it-works" class:list={[{ active: activeNav === 'how-it-works' || currentPath.startsWith('/how-it-works') }]} aria-current={activeNav === 'how-it-works' || currentPath.startsWith('/how-it-works') ? 'page' : undefined}>How It Works</a></li>
-        <li><a href="/whats-real-now" class:list={[{ active: activeNav === 'whats-real-now' || currentPath.startsWith('/whats-real-now') }]} aria-current={activeNav === 'whats-real-now' || currentPath.startsWith('/whats-real-now') ? 'page' : undefined}>What's Real Now</a></li>
-        <li><a href="/for-cooperatives" class:list={[{ active: activeNav === 'for-cooperatives' || currentPath.startsWith('/for-cooperatives') }]} aria-current={activeNav === 'for-cooperatives' || currentPath.startsWith('/for-cooperatives') ? 'page' : undefined}>For Cooperatives</a></li>
-        <li><a href="/for-developers" class:list={[{ active: activeNav === 'for-developers' || currentPath.startsWith('/for-developers') }]} aria-current={activeNav === 'for-developers' || currentPath.startsWith('/for-developers') ? 'page' : undefined}>For Developers</a></li>
-        <li><a href="/get-involved" class:list={[{ active: activeNav === 'get-involved' || currentPath.startsWith('/get-involved') }]} aria-current={activeNav === 'get-involved' || currentPath.startsWith('/get-involved') ? 'page' : undefined}>Get Involved</a></li>
-        <li><a href="/docs" class:list={[{ active: activeNav === 'docs' || currentPath.startsWith('/docs') || currentPath.startsWith('/architecture') }]} aria-current={activeNav === 'docs' || currentPath.startsWith('/docs') || currentPath.startsWith('/architecture') ? 'page' : undefined}>Explore</a></li>
+        {NAV_ITEMS.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class:list={[{ active: isActive(item) }]}
+              aria-current={isActive(item) ? 'page' : undefined}
+            >{item.label}</a>
+          </li>
+        ))}
         <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li>
       </ul>
 
@@ -105,43 +151,41 @@ const jsonLd = {
           <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p>
         </div>
 
-        <div class="footer-col">
-          <h4>Public</h4>
+        <nav class="footer-col" aria-labelledby="footer-understand">
+          <h2 id="footer-understand">Understand ICN</h2>
           <ul>
             <li><a href="/what-is-icn">What is ICN</a></li>
             <li><a href="/why-icn">Why ICN</a></li>
-            <li><a href="/how-it-works">How It Works</a></li>
-            <li><a href="/whats-real-now">What's Real Now</a></li>
-            <li><a href="/for-cooperatives">For Cooperatives</a></li>
-            <li><a href="/for-developers">For Developers</a></li>
-            <li><a href="/get-involved">Get Involved</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h4>Technical</h4>
-          <ul>
-            <li><a href="/docs">Documentation</a></li>
-            <li><a href="/architecture">Architecture</a></li>
-            <li><a href="/roadmap">Roadmap</a></li>
-            <li><a href="/about">About the Project</a></li>
+            <li><a href="/how-it-works">How it works</a></li>
+            <li><a href="/see-it-work">See it work</a></li>
+            <li><a href="/cooperative-economy">The cooperative economy</a></li>
             <li><a href="/docs/glossary">Glossary</a></li>
-            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li>
           </ul>
-        </div>
+        </nav>
 
-        <div class="footer-col">
-          <h4>Community</h4>
+        <nav class="footer-col" aria-labelledby="footer-state">
+          <h2 id="footer-state">Project state</h2>
           <ul>
-            <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li>
-            <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li>
-            <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li>
-            <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li>
-            <li><a href="/community">Community</a></li>
-            <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li>
+            <li><a href="/whats-real-now">What's real now</a></li>
+            <li><a href="/docs">Documentation</a></li>
+            <li><a href="/docs/archive">Documentation archive</a></li>
+            <li><a href="/architecture">Architecture</a></li>
+            <li><a href="/about">About the project</a></li>
             <li><a href="/blog">Blog</a></li>
           </ul>
-        </div>
+        </nav>
+
+        <nav class="footer-col" aria-labelledby="footer-take-part">
+          <h2 id="footer-take-part">Take part</h2>
+          <ul>
+            <li><a href="/get-involved">Get involved</a></li>
+            <li><a href="/for-cooperatives">For cooperatives and institutions</a></li>
+            <li><a href="/for-developers">For developers</a></li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li>
+            <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li>
+            <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </nav>
       </div>
 
       <div class="footer-bottom">

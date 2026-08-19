@@ -28,3 +28,17 @@ src/content/docs/
 
 # generated at build time by scripts/gen-stats.mjs
 src/data/stats.json
+
+# projections of canonical repo state, regenerated on every build by
+# `npm run generate`. Never edit or commit these — edit the source they are
+# derived from (named in each file's `source` field) and rebuild.
+src/data/*.generated.json
+
+# Reviewable output of scripts/check-docs-boundary.mjs. Regenerated on every
+# run; the committed docs-boundary-baseline.json is the tracked expectation.
+public-docs-manifest.json
+
+# Generated reports (scripts/audit-layout.mjs --json,
+# scripts/check-links.mjs --report-json)
+layout-audit*.json
+link-report.json

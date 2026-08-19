@@ -1,0 +1,152 @@
+---
+// Term.astro — render an ICN concept plain-language first, ICN term second.
+//
+// This is the component form of the progressive-disclosure convention #1740
+// asks for:
+//
+//   plain-language concept first → ICN term second → deeper detail on demand
+//
+// So `<Term id="standing" />` renders
+//
+//   your recognized status (standing)
+//
+// and not "standing", which means nothing to a first-time reader, and not
+// "your recognized status" alone, which would leave the reader unable to
+// connect the page to the rest of the project's vocabulary.
+//
+// Both halves come from docs/design-language/concept-map.md. Pages do not
+// write either one by hand.
+//
+// ─── Why not a tooltip ───────────────────────────────────────────────────────
+//
+// The obvious implementation is a `title` attribute or a hover card. Both fail
+// the accessibility floor: `title` is not reachable by keyboard, is not
+// announced reliably by screen readers, and never appears on touch devices —
+// which is most public-site traffic. So the gloss is either inline (`variant`
+// = "defined") or it is a link to the glossary, never a hover-only affordance.
+//
+// ─── Variants ────────────────────────────────────────────────────────────────
+//
+//   inline   (default) plain label + ICN term, ICN term links to the glossary.
+//            For running prose.
+//   defined  plain label + ICN term + the one-line gloss, as a block. Use on
+//            the first, defining appearance of a concept on a page.
+//   plain    plain label only, no ICN term. For the most introductory copy,
+//            where naming the ICN term would be premature.
+//
+// `capitalize` uppercases the first letter, for sentence-initial use.
+
+import { concept } from "../lib/concepts";
+
+export interface Props {
+  /** Canonical concept id, e.g. "standing". Must exist in the concept map. */
+  id: string;
+  variant?: "inline" | "defined" | "plain";
+  /** Uppercase the first letter of the plain label. */
+  capitalize?: boolean;
+}
+
+const { id, variant = "inline", capitalize = false } = Astro.props;
+
+const c = concept(id);
+
+const publicLabel = capitalize
+  ? c.public.charAt(0).toUpperCase() + c.public.slice(1)
+  : c.public.charAt(0).toLowerCase() + c.public.slice(1);
+
+// /glossary is generated from the same concept map as these labels, and its
+// entry anchors are the canonical concept ids — so a Term link survives a
+// rewording of the public label. (docs/glossary is the technical glossary and
+// has no anchor for most of these concepts; linking there produced dead
+// fragments, which scripts/check-links.mjs caught.)
+const glossaryHref = `/glossary#${c.canonical}`;
+---
+
+{
+  variant === "plain" && <span class="term term-plain">{publicLabel}</span>
+}
+
+{
+  variant === "inline" && (
+    <span class="term">
+      {publicLabel}{" "}
+      <span class="term-icn">
+        (<a href={glossaryHref}>{c.canonical.replace(/_/g, " ")}</a>)
+      </span>
+    </span>
+  )
+}
+
+{
+  variant === "defined" && (
+    <span class="term-defined">
+      <dfn class="term-defined-label">
+        {publicLabel}
+        <span class="term-icn">
+          {" "}
+          — ICN calls this <b>{c.canonical.replace(/_/g, " ")}</b>
+        </span>
+      </dfn>
+      <span class="term-defined-gloss">{c.short}</span>
+    </span>
+  )
+}
+
+<style>
+  /* The plain-language half is the primary reading path, so it inherits the
+     surrounding text colour and weight. The ICN term is deliberately quieter:
+     #2612 asks that "secondary technical terminology should not compete with
+     the primary explanation". */
+  .term-icn {
+    color: var(--text-muted);
+    font-size: 0.925em;
+    white-space: nowrap;
+  }
+
+  .term-icn a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 0.2em;
+  }
+
+  .term-icn a:hover,
+  .term-icn a:focus-visible {
+    color: var(--accent-teal);
+    text-decoration-style: solid;
+  }
+
+  .term-defined {
+    display: block;
+    border-left: 3px solid var(--border-teal);
+    padding-left: var(--space-md);
+    margin: var(--space-md) 0;
+  }
+
+  .term-defined-label {
+    display: block;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  /* `b` inside the label is the ICN term. Bold, because it is a term of art
+     being introduced — not because it outranks the plain label. */
+  .term-defined-label b {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .term-defined-label .term-icn {
+    font-weight: 400;
+    white-space: normal;
+  }
+
+  .term-defined-gloss {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    margin-top: 0.15em;
+  }
+</style>

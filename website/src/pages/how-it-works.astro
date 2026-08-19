@@ -25,7 +25,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <div class="truth-grid truth-grid-2">
         <div class="truth-note truth-note-teal">
           <span class="truth-note-label">What it is trying to hold together</span>
-          <h3>Decision, action, and proof in one place</h3>
+          <h2 class="intro-card-title">Decision, action, and proof in one place</h2>
           <p>
             ICN is meant to keep membership, governance, economic life, execution, and institutional memory
             from fragmenting across separate tools and separate authorities.
@@ -33,7 +33,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         </div>
         <div class="truth-note truth-note-amber">
           <span class="truth-note-label">What success would feel like</span>
-          <h3>Your institution becomes legible to itself</h3>
+          <h2 class="intro-card-title">Your institution becomes legible to itself</h2>
           <p>
             A member should be able to see what was decided, why it was legitimate, what happened next,
             and how that connects to the wider network their institution belongs to.
@@ -277,6 +277,13 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 </Layout>
 
 <style>
+  /* Promoted from h3 to h2 so the outline does not skip a level after the
+     page h1. Visual weight is unchanged — level and appearance are separate
+     concerns, and the outline is the one screen readers navigate by. */
+  .intro-card-title {
+    font-size: var(--text-xl);
+  }
+
 .narrow { max-width: 780px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }

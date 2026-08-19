@@ -1,16 +1,66 @@
-﻿#!/usr/bin/env node
-// Generate src/data/stats.json at build time from the monorepo.
-// Runs as a prebuild step — keeps stats.json gitignored.
+#!/usr/bin/env node
+// gen-stats.mjs — the small set of repository numbers the public site is
+// willing to stand behind.
+//
+// OUTPUT: website/src/data/stats.json (gitignored; also refreshed by the
+//         sync-stats.yml cron).
+//
+// ─── What was removed, and why (#1368) ───────────────────────────────────────
+//
+// This script used to emit six numbers. Four were removed because their source
+// or freshness could not be trusted, and #1368 is explicit: "Do not publish
+// repository statistics unless their source and freshness are trustworthy."
+//
+//   rustLinesOfCode — the old implementation ran `find | xargs wc -l`, which
+//                     counts blank and comment lines, contradicting its own
+//                     comment. It also disagreed with both docs/status.toml
+//                     (~414K) and docs/PHASE_PROGRESS.md (~458,000). Three
+//                     numbers, no arbiter. LoC is not a public claim anyway.
+//
+//   testCount       — counted `#[test]` occurrences by grep, which misses
+//                     table-driven cases and double-counts macros.
+//                     docs/status.toml marks its own test count "stale" and
+//                     docs/PHASE_PROGRESS.md carries an incompatible baseline.
+//
+//   mergedPRs       — mechanically obtainable, but a merged-PR count is a
+//                     vanity metric. #1368 rules those out, and a high count
+//                     invites exactly the "activity means readiness" inference
+//                     the project is trying not to make.
+//
+//   activeBranches  — actively misleading. It counted every remote ref,
+//                     including long-dead ones, and presented the total as a
+//                     sign of life.
+//
+//   docFiles        — replaced by gen-docs-classification.mjs, which reports
+//                     how many documents the site actually *publishes* rather
+//                     than how many .md files exist on disk.
+//
+// What is left is mechanical, single-sourced, and checkable by a reader in
+// one command, which is the only bar a public number needs to clear.
 
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const cwd = process.cwd();
-const repoRoot = fs.existsSync(path.resolve(cwd, "icn", "crates"))
-  ? cwd
-  : path.resolve(cwd, "..");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const websiteRoot = path.resolve(here, "..");
+const repoRoot = path.resolve(websiteRoot, "..");
 
+function run(args, opts = {}) {
+  try {
+    return execFileSync(args[0], args.slice(1), {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      ...opts,
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
+// Crate count: a directory count under icn/crates. Verifiable with
+// `ls icn/crates | wc -l`. No interpretation, no aggregation.
 const cratesDir = path.join(repoRoot, "icn", "crates");
 const crates = fs.existsSync(cratesDir)
   ? fs
@@ -18,111 +68,28 @@ const crates = fs.existsSync(cratesDir)
       .filter((d) => fs.statSync(path.join(cratesDir, d)).isDirectory()).length
   : 0;
 
-function run(cmd, opts = {}) {
-  try {
-    return execSync(cmd, { encoding: "utf-8", ...opts }).trim();
-  } catch {
-    return "";
-  }
-}
-
-// Count Rust lines of code (non-blank, non-comment lines in .rs files)
-function countRustLoc() {
-  try {
-    const out = run(
-      `find "${path.join(repoRoot, "icn", "crates")}" -name "*.rs" | xargs wc -l 2>/dev/null | tail -1`,
-    );
-    const match = out.match(/(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
-  } catch {
-    return 0;
-  }
-}
-
-// Count #[test] functions as a proxy for test count
-function countTests() {
-  try {
-    const out = run(
-      `grep -r "#\\[test\\]" "${path.join(repoRoot, "icn", "crates")}" --include="*.rs" | wc -l`,
-    );
-    return parseInt(out.trim(), 10) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-// Count merged PRs: gh API (accurate), fallback to git merge commits
-function countMergedPRs() {
-  const ghOut = run(
-    `gh pr list --state merged --limit 1000 --json number --jq 'length' -R InterCooperative-Network/icn 2>/dev/null`,
-    { cwd: repoRoot },
-  );
-  if (ghOut && /^\d+$/.test(ghOut)) return parseInt(ghOut, 10);
-  try {
-    const out = run(
-      `git log --oneline --merges --format="%h" 2>/dev/null | wc -l`,
-      { cwd: repoRoot },
-    );
-    return parseInt(out.trim(), 10) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-// Active branches: gh API first, fallback to git branch -r
-function countActiveBranches() {
-  const ghOut = run(
-    `gh api "repos/InterCooperative-Network/icn/branches?per_page=100" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END{print s}'`,
-    { cwd: repoRoot },
-  );
-  if (ghOut && /^\d+$/.test(ghOut)) return parseInt(ghOut, 10);
-  const gitOut = run(`git branch -r 2>/dev/null | grep -v HEAD | wc -l`, {
-    cwd: repoRoot,
-  });
-  return parseInt(gitOut.trim(), 10) || 0;
-}
-
-// Doc files: count all .md files under docs/ at repo root
-function countDocFiles() {
-  const docsDir = path.join(repoRoot, "docs");
-  if (!fs.existsSync(docsDir)) return 0;
-  const out = run(`find "${docsDir}" -name "*.md" | wc -l`);
-  return parseInt(out.trim(), 10) || 0;
-}
-
-const latestCommit =
-  run("git rev-parse --short HEAD", { cwd: repoRoot }) || "unknown";
-const latestCommitFull = run("git rev-parse HEAD", { cwd: repoRoot }) || "";
-
-const rustLinesOfCode = countRustLoc();
-const testCount = countTests();
-const mergedPRs = countMergedPRs();
-const activeBranches = countActiveBranches();
-const docFiles = countDocFiles();
+const latestCommit = run(["git", "rev-parse", "--short", "HEAD"]) || "unknown";
+const latestCommitFull = run(["git", "rev-parse", "HEAD"]) || "";
+// Commit date, not build date: rebuilding does not make the repository newer.
+const latestCommitDate = run(["git", "log", "-1", "--format=%cs"]) || "";
 
 const stats = {
   crates,
-  rustLinesOfCode,
-  testCount,
-  mergedPRs,
-  activeBranches,
-  docFiles,
   latestCommit,
   latestCommitFull,
+  latestCommitDate,
   syncedAt: new Date().toISOString(),
+  // Carried so a consumer can tell at a glance which fields are safe to show.
+  trust: {
+    crates: "mechanical: directory count under icn/crates",
+    latestCommit: "mechanical: git rev-parse HEAD",
+    latestCommitDate: "mechanical: committer date of HEAD",
+  },
 };
 
-const outPath = path.join(
-  fs.existsSync(path.resolve(cwd, "src"))
-    ? cwd
-    : path.join(repoRoot, "website"),
-  "src",
-  "data",
-  "stats.json",
-);
-
+const outPath = path.join(websiteRoot, "src", "data", "stats.json");
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(stats, null, 2) + "\n");
 console.log(
-  `[gen-stats] ${crates} crates · ${rustLinesOfCode.toLocaleString()} LoC · ${testCount} tests · ${mergedPRs} PRs · ${activeBranches} branches · ${docFiles} docs → ${outPath}`,
+  `[gen-stats] ${crates} crates · HEAD ${latestCommit} (${latestCommitDate}) → src/data/stats.json`,
 );

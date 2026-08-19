@@ -1,0 +1,228 @@
+---
+// SubsystemTable.astro — the generated per-subsystem state view (#1369).
+//
+// Everything rendered here comes from src/data/project-state.generated.json,
+// which scripts/gen-project-state.mjs projects from docs/status.toml. There is
+// no hand-maintained copy of these claims on the website, which is the point:
+// the previous website-owned roadmap.json had drifted a month behind the
+// canonical file with nothing to detect it.
+//
+// ─── Reading the two columns ─────────────────────────────────────────────────
+//
+// Maturity and evidence are separate columns because they are separate
+// questions, and collapsing them is how "we merged the code" turns into "it is
+// ready". A subsystem can be `strong` and `fixture-backed` at the same time —
+// well-built, and demonstrated only against prepared data. Both columns are
+// always shown; neither is ever inferred from the other.
+//
+// ─── Layout ──────────────────────────────────────────────────────────────────
+//
+// A real <table> at wide widths, because this is tabular data and a screen
+// reader user benefits from row/column semantics. Below 900px each row becomes
+// a stacked block via CSS only — the markup stays a table, so the semantics
+// survive the reflow and nothing needs a second DOM.
+
+import MaturityBadge from "./MaturityBadge.astro";
+import EvidenceBadge from "./EvidenceBadge.astro";
+// The row shape is defined once, in the typed accessor for the generated
+// projection. Re-declaring it here let the two drift: when `evidenceNotes` was
+// dropped from the projection (it was leaking a deployment-liveness claim),
+// this file still declared it and the build failed with a mismatch nobody
+// could act on. One definition, imported.
+import type { Subsystem } from "../lib/projectState";
+
+export interface Props {
+  subsystems: Subsystem[];
+  /** Show the per-subsystem gap list. Long, so it is opt-in. */
+  showGaps?: boolean;
+}
+
+const { subsystems, showGaps = true } = Astro.props;
+---
+
+<div class="scroll-x subsystem-scroll" tabindex="0" role="region" aria-label="Subsystem maturity table">
+  <table class="data-table subsystem-table">
+    <caption class="sr-only">
+      Per-subsystem maturity and evidence, generated from docs/status.toml.
+      Each row lists the subsystem, its maturity band, what kind of evidence
+      backs the claim, the date it was last verified, and the gaps the project
+      records against it.
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Subsystem</th>
+        <th scope="col">Maturity</th>
+        <th scope="col">Evidence</th>
+        <th scope="col">Verified</th>
+        {showGaps && <th scope="col">Recorded gaps</th>}
+      </tr>
+    </thead>
+    <tbody>
+      {subsystems.map((s) => (
+        <tr>
+          <th scope="row" class="subsystem-name">
+            <span class="subsystem-name-label">{s.name}</span>
+            {s.crates.length > 0 && (
+              <span class="subsystem-crates">{s.crates.join(", ")}</span>
+            )}
+          </th>
+          <td data-label="Maturity">
+            <MaturityBadge band={s.band} />
+          </td>
+          <td data-label="Evidence">
+            <EvidenceBadge
+              evidence={s.evidence.id}
+              label={s.evidence.label}
+              detail={s.evidence.detail}
+            />
+          </td>
+          <td data-label="Verified">
+            <time datetime={s.lastVerified} class="subsystem-date">{s.lastVerified}</time>
+          </td>
+          {showGaps && (
+            <td data-label="Recorded gaps">
+              {s.gaps.length === 0 ? (
+                <span class="subsystem-nogaps">None recorded</span>
+              ) : (
+                <ul class="subsystem-gaps">
+                  {s.gaps.map((gap) => <li>{gap}</li>)}
+                </ul>
+              )}
+            </td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .subsystem-scroll {
+    margin: var(--space-xl) 0;
+  }
+
+  .subsystem-table {
+    min-width: 100%;
+  }
+
+  .subsystem-name {
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: normal;
+    min-width: 12ch;
+  }
+
+  .subsystem-name-label {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-heading);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .subsystem-crates {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 0.15em;
+    overflow-wrap: anywhere;
+  }
+
+  .subsystem-date {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .subsystem-gaps {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    max-width: 46ch;
+  }
+
+  .subsystem-gaps li {
+    font-size: var(--text-xs);
+    line-height: 1.6;
+    color: var(--text-muted);
+    padding-left: var(--space-md);
+    position: relative;
+  }
+
+  .subsystem-gaps li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+  }
+
+  .subsystem-nogaps {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* Stacked layout below 900px. The table element is kept — only its display
+     changes — so row and header association survives for assistive tech even
+     though the visual grid is gone. Each cell grows a label from its
+     data-label attribute so the column meaning is not lost with the header. */
+  @media (max-width: 899px) {
+    .subsystem-table thead {
+      /* Visually hidden, not display:none — the header cells still exist for
+         the accessibility tree. */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+
+    .subsystem-table,
+    .subsystem-table tbody,
+    .subsystem-table tr,
+    .subsystem-table th,
+    .subsystem-table td {
+      display: block;
+      width: auto;
+    }
+
+    .subsystem-table tr {
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      background: var(--bg-card);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+    }
+
+    .subsystem-table th,
+    .subsystem-table td {
+      border-bottom: none;
+      padding: var(--space-xs) 0;
+    }
+
+    .subsystem-table td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.25em;
+    }
+
+    .subsystem-name {
+      padding-bottom: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+  }
+</style>

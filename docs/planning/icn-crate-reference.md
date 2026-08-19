@@ -243,7 +243,7 @@ Week 5-6 (planned): Traffic obfuscation (random delays, size padding, cover traf
 ### `icn-authz`
 **Role:** Capability graph model (app-layer — interprets domain semantics)
 
-Types: `SubjectId`, `Action`, `ResourceId/Kind`, `Constraint`, `CapabilityEdge`, `CapabilityGraph`, `Decision`
+Types: `CapabilitySubjectId`, `Action`, `ResourceId/Kind`, `Constraint`, `CapabilityEdge`, `CapabilityGraph`, `Decision`
 
 The kernel sees only hashes from this crate, never the capability model itself (Meaning Firewall compliant)
 

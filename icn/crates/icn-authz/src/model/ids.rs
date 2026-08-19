@@ -8,22 +8,28 @@ use serde::{Deserialize, Serialize};
 use crate::AuthzError;
 
 // ---------------------------------------------------------------------------
-// SubjectId
+// CapabilitySubjectId
 // ---------------------------------------------------------------------------
 
 /// A validated DID identifying a capability subject.
 ///
 /// Must start with `"did:"`. Empty strings are rejected.
+///
+/// **Not** `icn_identity::authority_log::SubjectId`, which is a 32-byte
+/// `event_id(inception body)` naming a context-scoped human subject. This type names whatever
+/// principal a capability edge is written about, and carries no personhood meaning. Exactly one
+/// type in the workspace may hold the bare `SubjectId` name, and it is that one --- see
+/// `docs/architecture/IDENTITY_SEMANTICS.md`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct SubjectId(String);
+pub struct CapabilitySubjectId(String);
 
-impl SubjectId {
-    /// Create a new `SubjectId`, rejecting values that do not start with `"did:"`.
+impl CapabilitySubjectId {
+    /// Create a new `CapabilitySubjectId`, rejecting values that do not start with `"did:"`.
     pub fn new(did: impl Into<String>) -> Result<Self, AuthzError> {
         let s = did.into();
         if !s.starts_with("did:") {
-            return Err(AuthzError::InvalidSubjectId(s));
+            return Err(AuthzError::InvalidCapabilitySubjectId(s));
         }
         Ok(Self(s))
     }
@@ -205,22 +211,22 @@ pub type BlockHeight = u64;
 mod tests {
     use super::*;
 
-    // -- SubjectId ----------------------------------------------------------
+    // -- CapabilitySubjectId ----------------------------------------------------------
 
     #[test]
-    fn subject_id_valid_did() {
-        let sid = SubjectId::new("did:icn:abc123").unwrap();
+    fn capability_subject_id_valid_did() {
+        let sid = CapabilitySubjectId::new("did:icn:abc123").unwrap();
         assert_eq!(sid.as_str(), "did:icn:abc123");
     }
 
     #[test]
-    fn subject_id_rejects_non_did() {
-        assert!(SubjectId::new("not-a-did").is_err());
+    fn capability_subject_id_rejects_non_did() {
+        assert!(CapabilitySubjectId::new("not-a-did").is_err());
     }
 
     #[test]
-    fn subject_id_rejects_empty() {
-        assert!(SubjectId::new("").is_err());
+    fn capability_subject_id_rejects_empty() {
+        assert!(CapabilitySubjectId::new("").is_err());
     }
 
     // -- Action -------------------------------------------------------------
@@ -314,10 +320,10 @@ mod tests {
     // -- Serde roundtrips ---------------------------------------------------
 
     #[test]
-    fn subject_id_serde_roundtrip() {
-        let sid = SubjectId::new("did:icn:abc").unwrap();
+    fn capability_subject_id_serde_roundtrip() {
+        let sid = CapabilitySubjectId::new("did:icn:abc").unwrap();
         let json = serde_json::to_string(&sid).unwrap();
-        let back: SubjectId = serde_json::from_str(&json).unwrap();
+        let back: CapabilitySubjectId = serde_json::from_str(&json).unwrap();
         assert_eq!(sid, back);
     }
 

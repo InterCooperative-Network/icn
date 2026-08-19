@@ -1,693 +1,778 @@
 ---
+// index.astro — the homepage.
+//
+// PRIMARY JOB: a visitor who has never heard of ICN should understand what it
+// is and why it exists before they are asked to do anything.
+//
+// ─── The reordering (#2608) ──────────────────────────────────────────────────
+//
+// The previous homepage opened with a hero, then immediately presented a
+// "Start Here — choose the right first page" panel and a four-card "Four
+// concrete ways to engage" grid. A first-time visitor was asked to classify
+// themselves as developer / non-technical contributor / institution / funder
+// in the first screen and a half — before anything had explained what the
+// project was. #2608 and #1368 both name this directly: explain first, route
+// second.
+//
+// The order below is the one #2608 specifies:
+//
+//   1  hero                 one claim, one explanation, two ways forward
+//   2  the problem          fragmentation, shown rather than asserted
+//   3  a concrete story     one cooperative, one decision, in human terms
+//   4  what ICN changes     the shift, stated plainly
+//   5  the simple model     six stages that map onto the real architecture
+//   6  see it work          the walkthrough — the strongest single link here
+//   7  what's real now      evidence, positioned as a trust mechanism
+//   8  deeper architecture  for readers who want to descend
+//   9  participation        role routing, now that the reader can choose
+//
+// ─── Visual rhythm (#2612) ───────────────────────────────────────────────────
+//
+// Sections deliberately alternate weight: hero → wide figure → narrow reading
+// column → figure → wide band → narrow column → grid. The failure mode this
+// avoids is a page made entirely of equally-weighted card grids, where nothing
+// leads and the eye has no path through.
+
 import Layout from '../layouts/Layout.astro';
-import ClosureLoop from '../components/ClosureLoop.astro';
+import FragmentationFigure from '../components/FragmentationFigure.astro';
+import PublicLoop from '../components/PublicLoop.astro';
+import MaturityBadge from '../components/MaturityBadge.astro';
+import EvidenceBadge from '../components/EvidenceBadge.astro';
 import Icon from '../components/Icon.astro';
-import MaturityGrid from '../components/MaturityGrid.astro';
-import MaturityCard from '../components/MaturityCard.astro';
+import { PROJECT_STATE as projectState, subsystemsInBand } from '../lib/projectState';
+
+// The homepage states the shape of the maturity picture, never a per-subsystem
+// claim — those belong on /whats-real-now, where each one carries its evidence
+// class and its recorded gaps. Deriving even this summary from the generated
+// data means the homepage cannot drift into a rosier account than the
+// maturity page gives.
+const strongest = subsystemsInBand('strong');
+const weakest = subsystemsInBand('notyet');
+
+const PARTICIPATION = [
+  {
+    icon: 'execution' as const,
+    title: 'You write software',
+    body: 'Build the workspace, read the architectural guardrails, and pick a scoped first issue. The repository is large and the contribution surface is real.',
+    href: '/for-developers',
+    cta: 'For developers',
+  },
+  {
+    icon: 'governance' as const,
+    title: 'You organize, write, research, or design',
+    body: 'Documentation, plain-language review, governance thinking, accessibility testing, translation. None of this requires writing Rust, and the project is short on all of it.',
+    href: '/get-involved#organizers',
+    cta: 'Non-technical contribution',
+  },
+  {
+    icon: 'federation' as const,
+    title: 'You are part of a cooperative or institution',
+    body: 'Understand what would actually be involved in evaluating ICN, what it can carry today, and what it plainly cannot. Honest answers before any commitment.',
+    href: '/for-cooperatives',
+    cta: 'For cooperatives and institutions',
+  },
+  {
+    icon: 'commons' as const,
+    title: 'You want to follow or support the work',
+    body: 'Watch the repository for project updates, or sustain the engineering directly. No mailing list you would have to trust us to actually send.',
+    href: '/get-involved#follow',
+    cta: 'Follow or support',
+  },
+];
 ---
 
-<Layout title="Institutional infrastructure for cooperatives, communities, and federations" activeNav="home">
+<Layout
+  title="Institutional infrastructure for cooperatives, communities, and federations"
+  description="ICN is shared digital infrastructure for democratic institutions. It connects the rules a cooperative sets, the decisions it makes, the actions it takes, and the durable proof of why — on infrastructure its members govern."
+  activeNav="home"
+>
+  <!-- ═══ 1 · HERO ══════════════════════════════════════════════════════════ -->
+  <section class="hero-home">
+    <div class="container">
+      <div class="hero-home-inner">
+        <span class="badge badge-teal hero-badge">
+          <span class="badge-dot" aria-hidden="true"></span>
+          Open infrastructure, built in public
+        </span>
 
-  <!-- ═══ HERO ═══════════════════════════════════════════════════ -->
-  <section class="hero hero-home">
-    <div class="container hero-container">
-      <div class="hero-shell">
-        <div class="hero-content animate-in">
-          <div class="badge badge-teal mb-lg">
-            <span class="badge-dot"></span>
-            Open infrastructure effort
-          </div>
+        <h1>
+          Your cooperative owns its work.<br />
+          <span class="hero-accent">It should own its institutional memory too.</span>
+        </h1>
 
-          <h1>
-            <span>Infrastructure for</span>
-            <span class="hero-accent">democratic institutions.</span>
-          </h1>
+        <p class="lede hero-lede">
+          The InterCooperative Network is shared digital infrastructure for
+          cooperatives, communities, and federations. It connects the rules an
+          institution sets, the decisions it makes under them, the actions that
+          follow, and the durable proof of why — instead of scattering those
+          across six products owned by somebody else.
+        </p>
 
-          <p>
-            The InterCooperative Network is shared digital infrastructure for cooperatives, communities, and federations.
-            It helps institutions keep decisions, records, obligations, and coordination on infrastructure they can govern.
-          </p>
-
-          <div class="hero-actions">
-            <a href="/what-is-icn" class="btn btn-primary">
-              What is ICN
-              <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </a>
-            <a href="/get-involved" class="btn btn-secondary">Get Involved</a>
-            <a href="/whats-real-now" class="btn btn-ghost">What's Real Now</a>
-          </div>
-          <p class="hero-qualifier">For institutions that need durable capacity, not another disconnected software stack.</p>
-          <aside class="hero-panel animate-in animate-delay-2" aria-label="Start here">
-            <div class="hero-panel-head">
-              <span class="eyebrow">Start Here</span>
-              <h2>Choose the right first page.</h2>
-              <p>
-                If you are evaluating the InterCooperative Network, start with the public framing. If you are trying to contribute,
-                partner, or support the work, use the engagement paths directly.
-              </p>
-            </div>
-
-            <div class="hero-panel-list">
-              <article class="hero-panel-item">
-                <span class="hero-panel-kicker">Understand the project</span>
-                <p>Read <a href="/what-is-icn">What is ICN</a> and <a href="/whats-real-now">What's Real Now</a> for the public framing and current maturity.</p>
-              </article>
-              <article class="hero-panel-item">
-                <span class="hero-panel-kicker">Build or contribute</span>
-                <p>Use <a href="/for-developers">For Developers</a> and <a href="/get-involved">Get Involved</a> to find the actual contribution paths.</p>
-              </article>
-              <article class="hero-panel-item">
-                <span class="hero-panel-kicker">Partner or support</span>
-                <p>Use <a href="/for-cooperatives">For Cooperatives</a> for institutional engagement and <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a> for financial support.</p>
-              </article>
-            </div>
-
-            <div class="hero-panel-links">
-              <a href="/what-is-icn">What is ICN</a>
-              <a href="/whats-real-now">What's Real Now</a>
-              <a href="/for-developers">For Developers</a>
-              <a href="/for-cooperatives">For Cooperatives</a>
-              <a href="/get-involved">Get Involved</a>
-              <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a>
-            </div>
-          </aside>
+        <div class="hero-actions">
+          <a href="/see-it-work" class="btn btn-primary">
+            See ICN work
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+          </a>
+          <a href="/what-is-icn" class="btn btn-secondary">Start reading</a>
         </div>
+
+        <p class="hero-qualifier">
+          Under active construction, and honest about it —
+          <a href="/whats-real-now">what's real now</a> states what each part of
+          the system can and cannot do today.
+        </p>
       </div>
     </div>
-    <div class="hero-bg-grid" aria-hidden="true"></div>
   </section>
 
-  <section class="section section-tight homepage-paths">
+  <!-- ═══ 2 · THE PROBLEM ═══════════════════════════════════════════════════ -->
+  <section class="section section-alt">
     <div class="container">
-      <div class="section-header">
-        <span class="badge badge-amber">Engagement Paths</span>
-        <h2>Four concrete ways to engage.</h2>
-        <p>
-          The project has different entry points for technical contributors, non-code collaborators,
-          institutions, and financial supporters. Start with the path that matches what you are actually here to do.
+      <header class="sec-head">
+        <span class="eyebrow">The problem</span>
+        <h2>An institution's memory is scattered across tools that don't know about each other.</h2>
+        <p class="sublede">
+          Every cooperative already has governance, rules, membership, money,
+          and work. What it usually doesn't have is any system that holds those
+          together — so the connections live in people's heads, and leave when
+          they do.
         </p>
-      </div>
+      </header>
 
-      <div class="grid grid-2 homepage-path-grid">
-        <article class="card card-accent-teal homepage-path-card">
-          <span class="homepage-path-num">01</span>
-          <h3>Developers and engineers</h3>
-          <p>Build the workspace, read the architectural guardrails, and pick a first contribution path that matches the repo as it actually exists.</p>
-          <a href="/for-developers" class="link-arrow">For Developers →</a>
-        </article>
-        <article class="card card-accent-amber homepage-path-card">
-          <span class="homepage-path-num">02</span>
-          <h3>Writers, designers, researchers, organizers</h3>
-          <p>Contribute documentation, design, policy thinking, testing, and ecosystem work without pretending the project is code-only.</p>
-          <a href="/get-involved#contribute" class="link-arrow">Non-technical contribution →</a>
-        </article>
-        <article class="card card-accent-purple homepage-path-card">
-          <span class="homepage-path-num">03</span>
-          <h3>Cooperatives and institutions</h3>
-          <p>Read the institutional framing first, then use the current discussion-led engagement path if your organization has a real use case and real capacity.</p>
-          <a href="/for-cooperatives" class="link-arrow">For Cooperatives →</a>
-        </article>
-        <article class="card card-accent-green homepage-path-card">
-          <span class="homepage-path-num">04</span>
-          <h3>Financial supporters</h3>
-          <p>GitHub Sponsors is the live support rail today. Use it if you want to sustain the work without inventing a funding structure that does not exist.</p>
-          <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="link-arrow">Support on GitHub ↗</a>
-        </article>
-      </div>
-    </div>
-  </section>
+      <FragmentationFigure />
 
-  <!-- ═══ PROBLEM ═══════════════════════════════════════════════ -->
-  <section class="section section-tight section-problem">
-    <div class="container narrow">
-      <div class="section-header section-header-left">
-        <span class="badge badge-amber">The Problem</span>
-        <h2>Most democratic institutions still operate across software that does not model the institution itself.</h2>
-      </div>
-      <div class="prose-block">
+      <div class="callout callout-note prob-callout">
+        <span class="callout-label">The deeper version of the problem</span>
         <p>
-          Governance happens in meetings and minutes. Policy lives in documents that are read inconsistently.
-          Membership sits in a CRM built for a sales team. Accounting lives in a system that has no idea
-          what was decided. Execution depends on whoever remembered what they were supposed to do.
+          Underneath the operational friction is a dependency problem.
+          Democratic institutions are expected to run their internal life on
+          systems controlled by outside owners, with outside incentives and
+          outside priorities. A cooperative can own its workplace outright and
+          still rent its nervous system.
         </p>
         <p>
-          In practice, that often means Google Workspace or Microsoft 365 for documents and email,
-          Loomio for voting, QuickBooks for accounting, Slack or Teams for coordination,
-          and a CRM or spreadsheet standing in for membership and standing.
-        </p>
-        <p>
-          Each tool is fine in isolation. Together, they produce drift.
-          Decisions do not reliably become action. Rules do not reliably bind practice.
-          Accountability decays into trust in individual people instead of trust in the institution.
-        </p>
-        <p>
-          Beneath the operational friction is a deeper dependency problem: democratic institutions are still
-          expected to rely on digital systems controlled by outside owners, outside incentives, and outside priorities.
-        </p>
-      </div>
-
-      <div class="bridge-block">
-        <p class="bridge-lede">
-          Credit unions, fiscal sponsors, and community development financial institutions (CDFIs)
-          help cooperatives interface with the existing economy. ICN is the machinery a cooperative
-          economy needs on its own side of the bridge.
-        </p>
-        <p class="bridge-link-row">
-          <a href="/cooperative-economy" class="link-arrow">The cooperative economy needs its own machinery →</a>
+          <a href="/why-icn" class="link-arrow">Why this is structural, not just inconvenient</a>
         </p>
       </div>
     </div>
   </section>
 
-  <!-- ═══ WHAT ICN DOES — INSTITUTIONAL PRIMITIVES ═════════════ -->
-  <section class="section-alt">
+  <!-- ═══ 3 · A CONCRETE STORY ══════════════════════════════════════════════ -->
+  <section class="section">
     <div class="container">
-      <div class="section-header">
-        <span class="badge badge-teal">Core Capabilities</span>
-        <h2>An infrastructure layer for governance, records, and coordination.</h2>
-        <p>
-          ICN provides the layer where membership, governance, economic coordination,
-          execution, and institutional memory remain connected instead of being split across unrelated systems.
-        </p>
-      </div>
+      <div class="story">
+        <header class="sec-head story-head">
+          <span class="eyebrow">What this looks like in practice</span>
+          <h2>A forty-person cooperative needs to replace a fan.</h2>
+        </header>
 
-      <div class="grid grid-3 inst-grid">
-        <article class="inst-card acc-teal">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="identity" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Identity · Standing · Authority</span>
-            </div>
+        <div class="story-cols">
+          <div class="story-col">
+            <h3 class="story-col-title">
+              <span class="story-col-kicker">How it usually goes</span>
+            </h3>
+            <ol class="story-steps story-steps-today">
+              <li>Someone raises it in the shop channel. It scrolls away.</li>
+              <li>It comes back at a meeting. The minutes land in a shared drive.</li>
+              <li>A vote happens in a separate tool. The result is pasted back into chat.</li>
+              <li>Someone orders the fan. The invoice goes to the bookkeeper.</li>
+              <li>Eighteen months later, an auditor asks who authorized it.</li>
+              <li>Three people spend an afternoon reconstructing the answer.</li>
+            </ol>
           </div>
-          <h3>Scopes as first-class institutions</h3>
-          <p>A member, a cooperative, a community, a federation, and a commons are each a scope the system knows about directly — with their own rules, members, and history. Not user groups layered on a platform.</p>
-        </article>
-        <article class="inst-card acc-amber">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="governance" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Governance · Policy · Execution</span>
-            </div>
+
+          <div class="story-col">
+            <h3 class="story-col-title">
+              <span class="story-col-kicker">With ICN</span>
+            </h3>
+            <ol class="story-steps story-steps-icn">
+              <li>The cooperative already has a rule about who decides safety spending.</li>
+              <li>The item appears as work needing a decision, with a deadline.</li>
+              <li>The person acting can see exactly what authorizes them to act.</li>
+              <li>Before confirming, they see what record it will create, and whether it can be undone.</li>
+              <li>Completing it produces a receipt that points back at the decision.</li>
+              <li>Eighteen months later, the answer is one link, not an afternoon.</li>
+            </ol>
           </div>
-          <h3>Governance that carries into action</h3>
-          <p>Proposals, deliberation, and accepted decisions produce durable records and carry into real operational effect — where the system's execution coverage reaches.</p>
-        </article>
-        <article class="inst-card acc-green">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="provenance" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Receipts · Provenance</span>
-            </div>
-          </div>
-          <h3>Provenance as institutional memory</h3>
-          <p>Every outcome traces back through the rule that shaped it, the decision that authorized it, and the members who held standing. The chain is the record the institution runs on — not an audit log bolted on after.</p>
-        </article>
-        <article class="inst-card acc-blue">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="accounting" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Accounting</span>
-            </div>
-          </div>
-          <h3>Economics as governed social accounting</h3>
-          <p>Obligations, treasury with budgets and approvals, patronage settlement, mutual-credit positions, and usage-rights accounting. Relational, denominated in obligations between real parties — not a payment rail.</p>
-        </article>
-        <article class="inst-card acc-purple">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="federation" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Federation</span>
-            </div>
-          </div>
-          <h3>Federation as treaty, not merger</h3>
-          <p>Cooperatives enter formal agreements, exchange attestations, and settle obligations across their boundaries through cross-institutional clearing — without being dissolved into a single organization.</p>
-        </article>
-        <article class="inst-card acc-rose">
-          <div class="inst-card-eyebrow">
-            <span class="inst-card-icon" aria-hidden="true"><Icon name="commons" size={18} /></span>
-            <div class="inst-card-eyebrow-labels">
-              <span>Commons · Compute</span>
-            </div>
-          </div>
-          <h3>Commons and compute as shared infrastructure</h3>
-          <p>Shared resources and coordinated work across the network — with clearing, trust-aware placement, and dispute resolution for compute results — participate in the same loop as governance and accounting, not a separate system. Compute carries out what authority asked; it does not decide institutional outcomes.</p>
-        </article>
+        </div>
+
+        <p class="story-note">
+          Nothing above removes the meeting, the argument, or the judgement.
+          The people still decide. What changes is that the decision stops
+          evaporating the moment it's made.
+        </p>
       </div>
     </div>
   </section>
 
-  <!-- ═══ THE CLOSURE LOOP ═════════════════════════════════════ -->
-  <section class="section section-closure">
-    <div class="container narrow">
-      <div class="section-header section-header-left">
-        <span class="badge badge-teal">The Closure Loop</span>
-        <h2>Nine stations, one institution.</h2>
+  <!-- ═══ 4 · WHAT ICN CHANGES ══════════════════════════════════════════════ -->
+  <section class="section band-feature">
+    <div class="container">
+      <div class="container-reading">
+        <span class="eyebrow">What changes</span>
+        <p class="pull">
+          Rules stop being documents people are expected to remember, and start
+          being the thing that determines what can happen next.
+        </p>
         <p>
-          ICN carries the full institutional chain — standing, authority, decisions, action,
-          and the record of what happened — as one substrate, station by station.
+          That is the whole shift, and it is narrower than "ICN fixes democratic
+          institutions." Deliberation, politics, judgement, and responsibility
+          stay with people. What the infrastructure contributes is memory,
+          continuity, and the ability for an institution to be legible to
+          itself — so that running a cooperative rests on something more durable
+          than whoever is currently holding the pieces together.
+        </p>
+        <p>
+          It also means an institution can answer questions about its own past
+          without depending on a vendor to still exist, still export, and still
+          be telling the truth.
         </p>
       </div>
+    </div>
+  </section>
 
-      <ClosureLoop variant="compact" title="The institutional closure" showTruthLabelChip />
+  <!-- ═══ 5 · THE SIMPLE MODEL ══════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <header class="sec-head">
+        <span class="eyebrow">The model</span>
+        <h2>Six stages, and the last one feeds the first.</h2>
+        <p class="sublede">
+          This is the introductory view. Underneath it, ICN models nine
+          stations with more precision — the mapping is shown on each stage so
+          the simple version is a view of the real thing, not a separate story
+          told to newcomers.
+        </p>
+      </header>
 
-      <p class="closure-footnote">
-        <a href="/what-is-icn">What is ICN</a> walks through each station in plain language.
-        <a href="/how-it-works">How It Works</a> goes deeper into each subsystem.
+      <PublicLoop />
+
+      <p class="figure-note">
+        <a href="/how-it-works" class="link-arrow">See the full nine-station architecture</a>
       </p>
     </div>
   </section>
 
-  <!-- ═══ WHAT'S REAL NOW ═══════════════════════════════════════ -->
-  <section class="section">
-    <div class="container narrow">
-      <div class="section-header section-header-left">
-        <span class="badge badge-green">What's Real Now</span>
-        <h2>Current maturity.</h2>
-        <p>
-          Different parts of ICN are at different levels of maturity. This section states those differences plainly.
-        </p>
-      </div>
-
-      <MaturityGrid>
-        <MaturityCard band="strong">
-          <p>Provenance and auditable coordination — receipts, decision-to-outcome chains, and the institutional memory the rest of the system depends on. Cryptographic identity and membership primitives are in place.</p>
-        </MaturityCard>
-        <MaturityCard band="advancing">
-          <p>Execution coverage — the breadth of decisions that translate into real operational effect — is where active work is concentrated. The mechanism exists; the range of decisions it handles is expanding.</p>
-        </MaturityCard>
-        <MaturityCard band="maturing">
-          <p>Federation and commons/compute have serious implementation behind them — treaties, attestations, cross-institutional clearing, shared resource governance. These subsystems are real and advancing.</p>
-        </MaturityCard>
-        <MaturityCard band="behind">
-          <p>The member-facing experience — where identity, standing, governance, accounting, and receipts converge into something a person can actually see and use — is the part most visibly trailing the capabilities underneath.</p>
-        </MaturityCard>
-      </MaturityGrid>
-
-      <div class="text-center mt-xl">
-        <a href="/whats-real-now" class="btn btn-secondary">Read the full account →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ WHO IT'S FOR ══════════════════════════════════════════ -->
-  <section class="section-alt">
+  <!-- ═══ 6 · SEE IT WORK ═══════════════════════════════════════════════════ -->
+  <section class="section see-band">
     <div class="container">
-      <div class="section-header">
-        <span class="badge badge-purple">Who It's For</span>
-        <h2>Institutions, not user groups.</h2>
-      </div>
+      <div class="see-inner">
+        <div class="see-copy">
+          <span class="eyebrow">The worked example</span>
+          <h2>Watch one decision travel the whole loop.</h2>
+          <p class="lede">
+            A short guided walkthrough of a fictional cooperative: who counts as
+            a member, what needed deciding, which rule permitted it, what would
+            happen before anything happened, and the record that can still
+            explain it a year later.
+          </p>
+          <p class="see-meta">
+            No account, no download, no command line. Around four minutes.
+            Every value in it is invented, and the page says so at every step.
+          </p>
+          <a href="/see-it-work" class="btn btn-primary">
+            Open the walkthrough
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+          </a>
+        </div>
 
-      <div class="grid grid-2">
-        <div class="card card-accent-teal">
-          <h3>Cooperatives, communities, and federations</h3>
-          <p>
-            Organizations that already know how hard running a real institution is,
-            and are tired of doing it through software that was never designed for the job.
-            ICN is being built for you — and we try to be honest about what is usable today
-            versus what is still being built.
-          </p>
-          <a href="/for-cooperatives" class="link-arrow">For Cooperatives →</a>
-        </div>
-        <div class="card card-accent-amber">
-          <h3>Developers, architects, and researchers</h3>
-          <p>
-            Technical readers evaluating ICN as a system. Kernel/app separation with a strict meaning firewall,
-            trust-native architecture, mutual-credit accounting, and an honest account of current implementation state.
-          </p>
-          <a href="/for-developers" class="link-arrow">For Developers →</a>
-        </div>
+        <ol class="see-preview" aria-label="The six steps of the walkthrough">
+          <li><span class="see-preview-n">01</span> Someone is recognized by their cooperative</li>
+          <li><span class="see-preview-n">02</span> Something comes up that needs a decision</li>
+          <li><span class="see-preview-n">03</span> The rules say who may decide it, and why</li>
+          <li><span class="see-preview-n">04</span> Before anything happens, you can see what would happen</li>
+          <li><span class="see-preview-n">05</span> What happened leaves a record that can be checked</li>
+          <li><span class="see-preview-n">06</span> The record joins the institution's memory</li>
+        </ol>
       </div>
     </div>
   </section>
 
-  <!-- ═══ WHY IT MATTERS ════════════════════════════════════════ -->
+  <!-- ═══ 7 · WHAT'S REAL NOW ═══════════════════════════════════════════════ -->
+  <section class="section section-alt">
+    <div class="container">
+      <header class="sec-head">
+        <span class="eyebrow">Current state</span>
+        <h2>What is actually built, and how we know.</h2>
+        <p class="sublede">
+          ICN's subsystems are at very different stages, and the project
+          publishes that unevenness rather than averaging it into a
+          reassuring summary. Two labels travel with every claim: how far along
+          it is, and what kind of evidence sits behind it.
+        </p>
+      </header>
+
+      <div class="state-summary">
+        <div class="state-figure">
+          <span class="state-figure-value">{strongest.length} of {projectState.subsystems.length}</span>
+          <span class="state-figure-label">
+            subsystems in the <MaturityBadge band="strong" /> band
+          </span>
+          <p>
+            {strongest.map((s) => s.name).join(', ')}.
+          </p>
+        </div>
+
+        <div class="state-figure">
+          <span class="state-figure-value">{weakest.length}</span>
+          <span class="state-figure-label">
+            still <MaturityBadge band="notyet" />
+          </span>
+          <p>
+            {weakest.length > 0
+              ? `${weakest.map((s) => s.name).join(', ')} — scaffolding exists, the capability does not.`
+              : 'No subsystem is currently in this band.'}
+          </p>
+        </div>
+
+        <div class="state-figure">
+          <span class="state-figure-value state-figure-date">{projectState.newestVerified}</span>
+          <span class="state-figure-label">last verified against source</span>
+          <p>
+            Generated from the repository's own state file on every build, so
+            this page cannot quietly fall behind the code.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout callout-caution state-callout">
+        <span class="callout-label">What none of this means</span>
+        <p>
+          ICN has no production deployment claim and no live federation. A
+          subsystem can be well-built and still only ever have been exercised
+          against prepared data — several are. Evidence labels like
+          <EvidenceBadge evidence="fixture-backed" label="Fixture-backed" /> exist
+          precisely so that distinction survives contact with a homepage.
+        </p>
+        <p>
+          <a href="/whats-real-now" class="link-arrow">The full per-subsystem account, with recorded gaps</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · DEEPER ════════════════════════════════════════════════════════ -->
   <section class="section">
-    <div class="container narrow">
-      <div class="section-header section-header-left">
-        <span class="badge badge-amber">Why It Matters</span>
-        <h2>Advanced technology, primitive institutional forms.</h2>
-      </div>
-      <div class="prose-block">
-        <p>
-          We have built extraordinary software over the last forty years and used almost none of it
-          to make our institutions more legible, more accountable, or more co-authored by the people inside them.
-          Most of our collective life still runs on tools built for firms, platforms, and administrative convenience.
-        </p>
-        <p>
-          ICN is one attempt to close that gap. Not by replacing deliberation, judgment, politics,
-          or human responsibility — those stay with people — but by giving institutions better memory,
-          better continuity, better accountability, better legibility, and better collective capacity.
-          So that the work of running a cooperative, a community, or a federation rests on something
-          more durable than whoever happens to be holding the pieces together today.
-        </p>
-        <p>
-          That is a narrower claim than "ICN fixes democratic institutions," and a more honest one.
-        </p>
+    <div class="container">
+      <header class="sec-head">
+        <span class="eyebrow">Going deeper</span>
+        <h2>If you want the actual system.</h2>
+      </header>
+
+      <div class="deeper-grid">
+        <a href="/how-it-works" class="deeper-card">
+          <h3>How it works</h3>
+          <p>The nine stations in full, each with its own maturity band — identity through to the member-facing surface.</p>
+        </a>
+        <a href="/architecture" class="deeper-card">
+          <h3>Architecture</h3>
+          <p>The constraint engine, the kernel/app boundary, and why the kernel is deliberately kept ignorant of institutional meaning.</p>
+        </a>
+        <a href="/cooperative-economy" class="deeper-card">
+          <h3>The cooperative economy</h3>
+          <p>Why credit unions and CDFIs are bridges to the existing economy, and what machinery the other side of that bridge still lacks.</p>
+        </a>
+        <a href="/docs" class="deeper-card">
+          <h3>Documentation</h3>
+          <p>Current reference, the decision record, and a clearly-marked archive of everything that used to be true.</p>
+        </a>
       </div>
     </div>
   </section>
 
-  <!-- ═══ WHERE TO GO NEXT ══════════════════════════════════════ -->
-  <section class="section-alt">
-    <div class="container narrow text-center">
-      <h2>Where to go next</h2>
-      <p class="section-lede">If you are here to understand the project, start reading. If you are here to help shape it, use the engagement paths directly.</p>
-      <div class="hero-actions" style="justify-content: center;">
-        <a href="/what-is-icn" class="btn btn-primary btn-lg">Start reading: What is ICN →</a>
-        <a href="/get-involved" class="btn btn-secondary btn-lg">Choose a path: Get Involved</a>
-        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">Support the work ↗</a>
+  <!-- ═══ 9 · PARTICIPATION ═════════════════════════════════════════════════ -->
+  <section class="section band-feature">
+    <div class="container">
+      <header class="sec-head">
+        <span class="eyebrow">Taking part</span>
+        <h2>Now that you know what this is.</h2>
+        <p class="sublede">
+          Four routes, each leading somewhere that is actually maintained. If a
+          path below turns out to be a dead end, that is a bug and we would like
+          to hear about it.
+        </p>
+      </header>
+
+      <div class="part-grid">
+        {PARTICIPATION.map((route) => (
+          <article class="part-card">
+            <span class="part-icon" aria-hidden="true">
+              <Icon name={route.icon} size={22} />
+            </span>
+            <h3>{route.title}</h3>
+            <p>{route.body}</p>
+            <a href={route.href} class="link-arrow">{route.cta}</a>
+          </article>
+        ))}
       </div>
     </div>
   </section>
-
 </Layout>
 
 <style>
-/* Homepage hero — override the global .hero to a more reasonable shape */
-.hero-home {
-  position: relative;
-  overflow: hidden;
-  min-height: 0;
-  height: auto;
-  display: block;
-  padding-top: calc(64px + var(--space-xl));
-  padding-bottom: var(--space-lg);
-}
-.hero-container {
-  position: relative;
-  z-index: 2;
-}
-.hero-shell {
-  display: block;
-}
-.hero-home .hero-content {
-  max-width: 900px;
-  margin: 0 auto;
-  text-align: center;
-}
-.hero-home .hero-content h1 {
-  font-size: clamp(2.35rem, 4.7vw, 4.1rem);
-  line-height: 1.04;
-  max-width: 11.5ch;
-  margin-bottom: var(--space-sm);
-  margin-left: auto;
-  margin-right: auto;
-}
-.hero-home .hero-content h1 span {
-  display: block;
-}
-.hero-accent {
-  color: var(--text-heading);
-}
-.hero-home .hero-content > p {
-  max-width: 38rem;
-  font-size: 1rem;
-  line-height: 1.65;
-  margin-left: auto;
-  margin-right: auto;
-}
+  /* ─── 1 · Hero ─────────────────────────────────────────────────────────── */
 
-
-.hero-qualifier {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  margin: 0.9rem auto 0;
-  letter-spacing: 0;
-  line-height: 1.55;
-  max-width: 52rem;
-}
-.hero-home .hero-actions {
-  justify-content: center;
-}
-.hero-panel {
-  position: relative;
-  margin-top: var(--space-xl);
-  max-width: 1040px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 1.25rem 1.25rem 1.2rem;
-  background:
-    linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 27, 0.96));
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-}
-.hero-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    var(--accent-teal) 0%,
-    var(--accent-amber) 55%,
-    var(--accent-blue) 100%
-  );
-}
-.hero-panel-head h2 {
-  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
-  margin: 0.45rem 0 0.6rem;
-}
-.hero-panel-head p {
-  margin: 0 auto;
-  max-width: 46rem;
-  font-size: 0.98rem;
-  line-height: 1.65;
-  color: var(--text-secondary);
-}
-.hero-panel-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 0.9rem;
-}
-.hero-panel-item {
-  padding: 0.82rem 0.9rem 0.88rem;
-  background: rgba(12, 17, 24, 0.78);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  text-align: left;
-}
-.hero-panel-kicker {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.69rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent-teal);
-  margin-bottom: 0.35rem;
-}
-.hero-panel-item p {
-  margin: 0;
-  font-size: 0.91rem;
-  line-height: 1.48;
-  color: var(--text-secondary);
-}
-.hero-panel-item a {
-  color: var(--text-heading);
-}
-.hero-panel-links {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.42rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-subtle);
-}
-.hero-panel-links a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.5rem;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: rgba(12, 17, 24, 0.56);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  line-height: 1.1;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-.hero-panel-links a:hover {
-  border-color: var(--border-default);
-  background: rgba(17, 24, 39, 0.9);
-}
-.badge-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent-teal); display: inline-block;
-  animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
-
-.hero-bg-grid {
-  --grid-line: var(--accent-teal-glow);
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
-  opacity: 0.2;
-  pointer-events: none;
-}
-
-/* Tighten the section right after the hero so the fold is not empty */
-.hero-home + .section-tight {
-  padding-top: var(--space-md);
-}
-.homepage-paths {
-  padding-bottom: var(--space-2xl);
-}
-.homepage-path-grid {
-  gap: var(--space-md);
-}
-.homepage-path-card {
-  position: relative;
-  padding: 1.5rem 1.35rem;
-}
-.homepage-path-card h3 {
-  margin-bottom: 0.65rem;
-  font-size: clamp(1.15rem, 1.6vw, 1.5rem);
-  line-height: 1.18;
-}
-.homepage-path-card p {
-  font-size: 0.9rem;
-  line-height: 1.55;
-  max-width: 32rem;
-}
-.homepage-path-num {
-  display: inline-block;
-  margin-bottom: 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--accent-teal);
-}
-
-/* Left-aligned section headers inside narrow containers */
-.section-header-left {
-  text-align: left !important;
-  max-width: none !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  align-items: flex-start;
-}
-.section-header-left h2,
-.section-header-left p {
-  text-align: left;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-/* Narrow container for prose sections */
-.narrow { max-width: 760px; margin-left: auto; margin-right: auto; }
-.prose-block p {
-  margin: 0 0 var(--space-md); line-height: 1.7;
-  font-size: 1.0625rem; color: var(--text-body);
-}
-.prose-block p:last-child { margin-bottom: 0; }
-.section-problem .section-header h2 {
-  font-size: clamp(2.2rem, 4.3vw, 3.4rem);
-  line-height: 1.14;
-  max-width: 15ch;
-}
-.section-problem .prose-block p {
-  font-size: 1rem;
-  line-height: 1.65;
-}
-
-/* Institutional card grid — paired with .inst-card class in global.css.
-   Adds a tighter gap than the default .grid gap for a denser system feel. */
-.inst-grid { gap: var(--space-md); }
-
-/* Closure loop section — slightly tighter padding than default, with
-   a quieter footnote link row. */
-.section-closure { padding-top: var(--space-3xl); padding-bottom: var(--space-3xl); }
-.closure-footnote {
-  margin-top: var(--space-xl);
-  font-size: 0.9375rem;
-  color: var(--text-muted);
-  line-height: 1.6;
-}
-.closure-footnote a { color: var(--accent-teal); border-bottom: 1px solid transparent; }
-.closure-footnote a:hover { border-bottom-color: var(--accent-teal); }
-
-/* Status grid styles moved to MaturityGrid/MaturityCard components. */
-
-/* Bridge / machinery framing block under "The Problem" */
-.bridge-block {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--border-subtle);
-}
-.bridge-lede {
-  font-size: 1.0625rem;
-  line-height: 1.6;
-  color: var(--text-body);
-  margin: 0 0 var(--space-sm);
-  max-width: 42rem;
-}
-.bridge-link-row {
-  margin: 0;
-}
-
-/* Link-arrow style for card CTAs */
-.link-arrow {
-  display: inline-block; margin-top: var(--space-md);
-  font-weight: 600; color: var(--accent-teal);
-  text-decoration: none;
-}
-.link-arrow:hover { text-decoration: underline; }
-
-.btn-lg { font-size: 1rem; padding: 0.75rem 1.5rem; }
-.section-lede {
-  font-size: 1.0625rem;
-  color: var(--text-muted);
-  margin: 0 auto var(--space-xl);
-  max-width: 36em;
-}
-
-@media (max-width: 768px) {
   .hero-home {
-    padding-top: calc(64px + var(--space-xl));
-    padding-bottom: var(--space-xl);
+    padding: calc(64px + var(--space-4xl)) 0 var(--space-4xl);
+    border-bottom: 1px solid var(--border-subtle);
   }
-  .hero-home .hero-content h1 {
-    font-size: clamp(1.75rem, 7vw, 2.5rem);
+
+  .hero-home-inner {
+    max-width: 62ch;
+  }
+
+  .hero-badge {
+    margin-bottom: var(--space-lg);
+  }
+
+  .hero-home h1 {
+    font-size: var(--text-display);
+    line-height: 1.08;
+    margin-bottom: var(--space-lg);
+  }
+
+  /* At 62ch a 56px display face broke the headline into four short lines with
+     half the viewport empty beside it. A wider measure for the headline only —
+     the body copy underneath stays at a readable width — lets it set as the
+     two lines the markup's line break assumes. */
+  @media (min-width: 900px) {
+    .hero-home-inner {
+      max-width: 74ch;
+    }
+    .hero-home .hero-lede {
+      max-width: 58ch;
+    }
+    .hero-home .hero-qualifier {
+      max-width: 58ch;
+    }
+  }
+
+  /* The second line of the headline is the claim that does the work, so it
+     carries the accent. A single accent colour on one clause — not gradient
+     text, which MUST_NOT_SHIP item 8 rejects on anything but the brand name. */
+  .hero-accent {
+    color: var(--accent-teal);
+  }
+
+  .hero-lede {
+    font-size: var(--text-xl);
+    line-height: 1.55;
+    margin-bottom: var(--space-xl);
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+
+  .hero-qualifier {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  /* ─── Shared section heads ─────────────────────────────────────────────── */
+
+  .sec-head {
+    max-width: var(--measure-wide);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .sec-head h2 {
+    font-size: var(--text-3xl);
     line-height: 1.15;
-    max-width: 10.5ch;
+    margin: var(--space-sm) 0 var(--space-lg);
+    max-width: 24ch;
   }
-  .hero-home .hero-content > p {
-    font-size: 0.9375rem;
+
+  .prob-callout {
+    margin-top: var(--space-2xl);
   }
-  .hero-panel {
-    padding: var(--space-lg);
-    border-radius: var(--radius-xl);
-  }
-  .hero-panel-list {
+
+  /* ─── 3 · Story ────────────────────────────────────────────────────────── */
+
+  .story-cols {
+    display: grid;
     grid-template-columns: 1fr;
+    gap: var(--space-2xl);
   }
-  .hero-panel-links {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  .story-col {
+    min-width: 0;
   }
-  .hero-actions .btn {
-    flex: 1 1 auto;
-    min-width: 140px;
+
+  .story-col-kicker {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
   }
-}
-@media (max-width: 480px) {
-  .hero-home {
-    padding-top: calc(56px + var(--space-lg));
+
+  .story-col-title {
+    font-size: var(--text-md);
+    margin-bottom: var(--space-lg);
   }
-  .badge { font-size: .625rem; padding: .2rem .5rem; }
-  .hero-actions .btn { width: 100%; min-width: 0; }
-}
+
+  .story-steps {
+    list-style: none;
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .story-steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.25rem;
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--text-secondary);
+    min-width: 0;
+  }
+
+  .story-steps li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 0.1em;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  /* The ICN column's numbers are accented and its steps are connected by a
+     rule; today's column is not. The distinction is carried by the connector's
+     presence or absence, which survives grayscale. */
+  .story-steps-icn li::before {
+    color: var(--accent-teal);
+  }
+
+  .story-steps-icn li:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 0.55rem;
+    top: 1.6em;
+    bottom: -0.85rem;
+    width: 1px;
+    background: var(--border-teal);
+  }
+
+  .story-note {
+    margin-top: var(--space-2xl);
+    font-size: var(--text-md);
+    color: var(--text-primary);
+    max-width: var(--measure-prose);
+    border-left: 3px solid var(--border-default);
+    padding-left: var(--space-lg);
+  }
+
+  /* ─── 6 · See it work ──────────────────────────────────────────────────── */
+
+  .see-band {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-teal);
+    border-bottom: 1px solid var(--border-teal);
+  }
+
+  .see-inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-2xl);
+    align-items: center;
+  }
+
+  .see-copy h2 {
+    font-size: var(--text-3xl);
+    line-height: 1.15;
+    margin: var(--space-sm) 0 var(--space-lg);
+    max-width: 20ch;
+  }
+
+  .see-meta {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin: var(--space-lg) 0 var(--space-xl);
+  }
+
+  .see-preview {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .see-preview li {
+    display: flex;
+    gap: var(--space-md);
+    align-items: baseline;
+    padding: var(--space-md) var(--space-lg);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
+    min-width: 0;
+  }
+
+  .see-preview li + li {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .see-preview-n {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-teal);
+    flex: none;
+  }
+
+  /* ─── 7 · State ────────────────────────────────────────────────────────── */
+
+  .state-summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-xl);
+  }
+
+  .state-figure {
+    min-width: 0;
+    padding-top: var(--space-lg);
+    border-top: 2px solid var(--border-default);
+  }
+
+  .state-figure-value {
+    display: block;
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--text-heading);
+    line-height: 1.1;
+  }
+
+  .state-figure-date {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xl);
+  }
+
+  .state-figure-label {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    align-items: baseline;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .state-figure p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+
+  .state-callout {
+    margin-top: var(--space-2xl);
+  }
+
+  /* ─── 8 · Deeper ───────────────────────────────────────────────────────── */
+
+  .deeper-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .deeper-card {
+    display: block;
+    padding: var(--space-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    color: inherit;
+    transition: border-color var(--duration-normal) var(--ease-out);
+  }
+
+  .deeper-card:hover,
+  .deeper-card:focus-visible {
+    border-color: var(--border-teal);
+  }
+
+  .deeper-card h3 {
+    font-size: var(--text-md);
+    margin-bottom: var(--space-sm);
+  }
+
+  .deeper-card p {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* ─── 9 · Participation ────────────────────────────────────────────────── */
+
+  .part-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+  }
+
+  .part-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+  }
+
+  .part-icon {
+    color: var(--accent-teal);
+    line-height: 1;
+  }
+
+  .part-card h3 {
+    font-size: var(--text-md);
+  }
+
+  .part-card p {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    flex: 1;
+  }
+
+  /* ─── Wider viewports ──────────────────────────────────────────────────── */
+
+  @media (min-width: 700px) {
+    .story-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-4xl);
+    }
+    .state-summary {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-2xl);
+    }
+    .deeper-grid,
+    .part-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .see-inner {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: var(--space-4xl);
+    }
+    .deeper-grid,
+    .part-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 </style>

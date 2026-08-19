@@ -1,47 +1,139 @@
 ---
+// get-involved.astro — the single participation surface (#1368).
+//
+// PRIMARY JOB: route someone who already understands the project to a next
+// step that actually exists and is actually maintained.
+//
+// ─── What changed for #1368 ──────────────────────────────────────────────────
+//
+// Two things.
+//
+// First, the routes are now driven by src/data/participation.ts, where every
+// route has to declare `maintainedBy` and `ifUnavailable` alongside its link.
+// The rule that data file encodes: if you cannot honestly fill those in, the
+// route does not ship. That is what went wrong with the March 2026 version of
+// this page, which routed people at a chat room and a mailing list nobody had
+// agreed to keep alive.
+//
+// Second, /community was folded into this page. It listed overlapping routes
+// and published repository counts — branch totals, merged-PR totals — whose
+// meaning could not be defended. A branch count is not a sign of life, and
+// #1368 rules out metrics we cannot stand behind. The genuinely useful part of
+// that page, "where the work is visible", is kept below.
+
 import Layout from '../layouts/Layout.astro';
+import { PARTICIPATION_ROUTES, WORKING_SURFACES } from '../data/participation';
 ---
 
 <Layout
-  title="Get Involved"
+  title="Get involved"
   activeNav="get-involved"
-  description="Concrete paths to engage with ICN: build the codebase, contribute non-technically, bring an institutional use case, or support the project financially."
+  description="Concrete, maintained ways to take part in ICN — as a developer, as an organizer or writer, as an institution evaluating it, as someone following the work, or as a supporter."
 >
-
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
-    <div class="container narrow">
-      <div class="page-hero">
-        <span class="badge badge-teal">Get Involved</span>
-        <h1>How to engage with ICN.</h1>
-        <p class="lead">
-          ICN is open infrastructure. There are four concrete ways to engage — building the codebase,
-          contributing non-technically, bringing an institutional use case, or supporting the work financially.
-          Each path below tells you what the first step is, not where to start guessing.
+  <section class="section gi-hero">
+    <div class="container">
+      <div class="gi-hero-inner">
+        <span class="eyebrow">Taking part</span>
+        <h1>Every route here leads somewhere real.</h1>
+        <p class="lede">
+          Each path below states who it is for, what the next action actually is,
+          and — because this is where participation pages usually rot — what
+          keeps the destination alive and what to do if it stops working.
+        </p>
+        <p class="sublede">
+          If a route turns out to be a dead end, that is a bug in this page.
+          Please say so.
         </p>
       </div>
+    </div>
+  </section>
 
-      <nav class="path-nav" aria-label="Jump to a path">
-        <a href="#build" class="path-nav-item">
-          <span class="path-nav-num">01</span>
-          <span class="path-nav-label">Build</span>
-          <span class="path-nav-hint">Developers and engineers</span>
-        </a>
-        <a href="#contribute" class="path-nav-item">
-          <span class="path-nav-num">02</span>
-          <span class="path-nav-label">Contribute</span>
-          <span class="path-nav-hint">Writers, designers, researchers, organizers</span>
-        </a>
-        <a href="#partner" class="path-nav-item">
-          <span class="path-nav-num">03</span>
-          <span class="path-nav-label">Partner</span>
-          <span class="path-nav-hint">Cooperatives, federations, aligned institutions</span>
-        </a>
-        <a href="#support" class="path-nav-item">
-          <span class="path-nav-num">04</span>
-          <span class="path-nav-label">Support</span>
-          <span class="path-nav-hint">Sponsor the work financially</span>
-        </a>
-      </nav>
+  <!-- ═══ ROUTES ════════════════════════════════════════════════════════════ -->
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="gi-h2">Choose a route</h2>
+
+      <div class="gi-routes">
+        {PARTICIPATION_ROUTES.map((route) => (
+          <article class="gi-route" id={route.id}>
+            <span class="gi-route-audience">{route.audience}</span>
+            <h3>{route.title}</h3>
+            <p class="gi-route-body">{route.body}</p>
+
+            <a
+              class="link-arrow gi-route-cta"
+              href={route.href}
+              target={route.external ? '_blank' : undefined}
+              rel={route.external ? 'noopener' : undefined}
+            >
+              {route.nextAction}{route.external ? ' \u2197' : ''}
+            </a>
+
+            <details class="disclosure gi-route-detail">
+              <summary>Who keeps this working?</summary>
+              <div class="disclosure-body">
+                <dl class="gi-route-meta">
+                  <dt>Maintained by</dt>
+                  <dd>{route.maintainedBy}</dd>
+                  <dt>If it stops working</dt>
+                  <dd>{route.ifUnavailable}</dd>
+                </dl>
+              </div>
+            </details>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ WHERE THE WORK IS VISIBLE ═════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <h2 class="gi-h2">Where the work is visible</h2>
+      <p class="sublede">
+        Everything the project does happens in the open, including the parts
+        that are unfinished. These are the surfaces to read if you would rather
+        look than ask.
+      </p>
+
+      <ul class="gi-surfaces">
+        {WORKING_SURFACES.map((surface) => (
+          <li>
+            <a
+              href={surface.href}
+              target={surface.href.startsWith('http') ? '_blank' : undefined}
+              rel={surface.href.startsWith('http') ? 'noopener' : undefined}
+            >{surface.label}</a>
+            <span>{surface.blurb}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div class="callout callout-note">
+        <span class="callout-label">On repository statistics</span>
+        <p>
+          This page used to publish counts of branches, merged pull requests,
+          and documentation files. Those are gone. A branch total counts dead
+          branches, a merged-PR total measures nothing a reader cares about,
+          and neither had a freshness guarantee. The
+          <a href="/whats-real-now">project state page</a> reports the things
+          that are worth reporting, with the date each was verified.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ IN DEPTH ══════════════════════════════════════════════════════════ -->
+  <section class="section band-feature">
+    <div class="container">
+      <div class="container-reading">
+        <h2 class="gi-h2">In depth</h2>
+        <p>
+          The sections below go step by step through each path — the actual
+          build commands, the checks to run before pushing, what an institution
+          would need to bring, and what the project is honest about not having.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -112,7 +204,7 @@ cargo test --workspace --lib</code></pre>
             </li>
             <li>
               If you want to read the code first rather than an issue first,
-              <a href="/for-developers#how-to-explore-the-codebase-and-docs">the reading order on For Developers</a>
+              <a href="/for-developers">the reading order on For Developers</a>
               tells you where to start.
             </li>
             <li>
@@ -431,6 +523,141 @@ cargo test --workspace --lib</code></pre>
 </Layout>
 
 <style>
+  /* ─── #1368 participation routes ───────────────────────────────────────── */
+
+  .gi-hero {
+    padding-top: calc(64px + var(--space-3xl));
+  }
+
+  .gi-hero-inner {
+    max-width: var(--measure-wide);
+  }
+
+  .gi-hero h1 {
+    margin: var(--space-md) 0 var(--space-lg);
+  }
+
+  .gi-hero .sublede {
+    margin-top: var(--space-md);
+  }
+
+  .gi-h2 {
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-md);
+  }
+
+  .gi-routes {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    margin-top: var(--space-xl);
+  }
+
+  .gi-route {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-top: 3px solid var(--accent-teal);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* Anchor links from the homepage land clear of the fixed nav. */
+    scroll-margin-top: 88px;
+  }
+
+  .gi-route-audience {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .gi-route h3 {
+    font-size: var(--text-lg);
+    margin: var(--space-xs) 0 var(--space-sm);
+  }
+
+  .gi-route-body {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.7;
+    flex: 1;
+    margin-bottom: var(--space-md);
+  }
+
+  .gi-route-cta {
+    font-weight: 600;
+  }
+
+  .gi-route-detail {
+    margin: var(--space-md) 0 0;
+  }
+
+  .gi-route-meta dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-top: var(--space-md);
+  }
+
+  .gi-route-meta dt:first-child {
+    margin-top: 0;
+  }
+
+  .gi-route-meta dd {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  .gi-surfaces {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    margin: var(--space-xl) 0;
+  }
+
+  .gi-surfaces li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .gi-surfaces li a {
+    font-weight: 500;
+  }
+
+  .gi-surfaces li span {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  @media (min-width: 700px) {
+    .gi-routes {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .gi-surfaces {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .gi-routes {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .gi-surfaces {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+
 .narrow { max-width: 820px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }
@@ -465,7 +692,7 @@ cargo test --workspace --lib</code></pre>
 }
 .path-nav-num {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--accent-teal);
@@ -559,9 +786,19 @@ cargo test --workspace --lib</code></pre>
   overflow-x: auto;
   font-size: 0.875rem;
   margin: var(--space-sm) 0;
+  /* A clone URL in here was setting the list item's min-content width and
+     pushing the whole page to 595px at a 320px viewport. `overflow-x: auto`
+     alone does not prevent that inside a flex or grid item — the width cap
+     and min-width:0 are what make the block scroll itself instead. */
+  max-width: 100%;
+  min-width: 0;
+}
+.path-steps li {
+  min-width: 0;
 }
 .path-steps code {
-  font-size: 0.85em;
+  /* 0.85em of the surrounding 14px is 11.9px — under the 12px floor. */
+  font-size: max(0.85em, var(--text-xs));
   font-family: var(--font-mono);
 }
 .path-steps pre code {
@@ -612,7 +849,7 @@ cargo test --workspace --lib</code></pre>
 }
 .contribution-next strong { color: var(--text-body); }
 .contribution-card code {
-  font-size: 0.85em;
+  font-size: max(0.85em, var(--text-xs));
   background: var(--bg-surface);
   padding: 0.1em 0.4em;
   border-radius: 4px;
@@ -634,7 +871,7 @@ cargo test --workspace --lib</code></pre>
 .partner-stage-label {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;

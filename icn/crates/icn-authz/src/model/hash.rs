@@ -6,7 +6,7 @@
 
 use super::edge::CapabilityEdge;
 use super::ids::{
-    Action, BlockHeight, Constraint, EdgeSource, ResourceId, ResourceKind, SubjectId,
+    Action, BlockHeight, CapabilitySubjectId, Constraint, EdgeSource, ResourceId, ResourceKind,
 };
 
 // ---------------------------------------------------------------------------
@@ -121,8 +121,8 @@ fn edge_source_inner(es: &EdgeSource) -> &str {
 // Per-type hash functions
 // ---------------------------------------------------------------------------
 
-/// Deterministic BLAKE3 hash of a [`SubjectId`].
-pub fn hash_subject(s: &SubjectId) -> [u8; 32] {
+/// Deterministic BLAKE3 hash of a [`CapabilitySubjectId`].
+pub fn hash_subject(s: &CapabilitySubjectId) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&[TAG_SUBJECT]);
     hash_bytes(&mut hasher, s.as_str().as_bytes());
@@ -210,12 +210,12 @@ pub fn hash_edge_set(edges: &[CapabilityEdge]) -> [u8; 32] {
 mod tests {
     use super::*;
 
-    fn alice() -> SubjectId {
-        SubjectId::new("did:icn:alice").unwrap()
+    fn alice() -> CapabilitySubjectId {
+        CapabilitySubjectId::new("did:icn:alice").unwrap()
     }
 
-    fn bob() -> SubjectId {
-        SubjectId::new("did:icn:bob").unwrap()
+    fn bob() -> CapabilitySubjectId {
+        CapabilitySubjectId::new("did:icn:bob").unwrap()
     }
 
     fn transfer() -> Action {
@@ -243,7 +243,7 @@ mod tests {
     }
 
     fn make_edge(
-        subject: SubjectId,
+        subject: CapabilitySubjectId,
         action: Action,
         valid_at: Option<BlockHeight>,
     ) -> CapabilityEdge {
@@ -257,7 +257,7 @@ mod tests {
         )
     }
 
-    // -- SubjectId hashing --------------------------------------------------
+    // -- CapabilitySubjectId hashing --------------------------------------------------
 
     #[test]
     fn hash_subject_deterministic() {

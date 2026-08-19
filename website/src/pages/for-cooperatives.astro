@@ -21,7 +21,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <div class="truth-grid truth-grid-2">
         <div class="truth-note truth-note-teal">
           <span class="truth-note-label">Partner value</span>
-          <h3>Continuity, accountability, and interoperability</h3>
+          <h2 class="intro-card-title">Continuity, accountability, and interoperability</h2>
           <p>
             The value is not only better tooling. It is stronger institutional memory,
             more credible governance records, and better coordination across cooperative relationships.
@@ -29,7 +29,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         </div>
         <div class="truth-note truth-note-amber">
           <span class="truth-note-label">Strategic direction</span>
-          <h3>Cooperative infrastructure, co-operated and collectively held</h3>
+          <h2 class="intro-card-title">Cooperative infrastructure, co-operated and collectively held</h2>
           <p>
             The larger goal is infrastructure that the movement uses, governs, and improves together —
             owned by the institutions that depend on it.
@@ -229,6 +229,13 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 </Layout>
 
 <style>
+  /* Promoted from h3 to h2 so the outline does not skip a level after the
+     page h1. Visual weight is unchanged — level and appearance are separate
+     concerns, and the outline is the one screen readers navigate by. */
+  .intro-card-title {
+    font-size: var(--text-xl);
+  }
+
 .narrow { max-width: 760px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }

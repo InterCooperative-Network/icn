@@ -21,7 +21,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <div class="truth-grid truth-grid-2">
         <div class="truth-note truth-note-teal">
           <span class="truth-note-label">Why build here</span>
-          <h3>Infrastructure for democratic institutions, not another SaaS</h3>
+          <h2 class="intro-card-title">Infrastructure for democratic institutions, not another SaaS</h2>
           <p>
             ICN is trying to become the substrate democratic organizations can rely on the way firms rely on ERP systems,
             cloud platforms, and payment rails today, except without surrendering ownership or governance.
@@ -29,7 +29,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         </div>
         <div class="truth-note truth-note-amber">
           <span class="truth-note-label">What kind of system this wants to be</span>
-          <h3>A shared public utility for institutional coordination</h3>
+          <h2 class="intro-card-title">A shared public utility for institutional coordination</h2>
           <p>
             The long game is not a winner-take-all platform. It is shared digital infrastructure
             that many organizations can run, extend, and govern without being captured by a landlord.
@@ -215,6 +215,13 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 </Layout>
 
 <style>
+  /* Promoted from h3 to h2 so the outline does not skip a level after the
+     page h1. Visual weight is unchanged — level and appearance are separate
+     concerns, and the outline is the one screen readers navigate by. */
+  .intro-card-title {
+    font-size: var(--text-xl);
+  }
+
 .narrow { max-width: 780px; }
 .page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
 .page-hero .badge { align-self: flex-start; }
