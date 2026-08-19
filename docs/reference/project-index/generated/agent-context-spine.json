@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-08-18T23:44:04+00:00",
-  "source_commit": "3c09e22b48523482e13c0ffcb5052cea7ea61dbc",
+  "generated": "2026-08-19T16:13:33+00:00",
+  "source_commit": "0a15f3c2f7465351878da24d4f5c0ffd505af045",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,7 +35,7 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 135,
+    "nodes": 140,
     "edges": 92
   },
   "nodes": [
@@ -2291,7 +2291,7 @@
       "type": "skill",
       "name": "preflight",
       "path": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
-      "description": "ICN session preflight. This skill should be used when the user explicitly invokes \"/icn-agent-pack:preflight\", or asks to \"run preflight\", \"orient me on ICN\", or \"check the ICN session environment\". Loads canonical docs and the latest handoff, then verifies branch, gh auth, ports, toolchain, and a light cargo check. Read-only; reports, never fixes.",
+      "description": "Portable ICN session grounding. Verifies checkout, loads the truth-owner map, optionally queries live GitHub state, and points to task-specific context without treating handoffs as authority.",
       "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
       "status": "present",
       "evidence": [
@@ -2472,6 +2472,46 @@
       ]
     },
     {
+      "id": "truth_source:agent_operating_contract",
+      "type": "truth_source",
+      "name": "agent_operating_contract",
+      "owner": "AGENTS.md",
+      "description": "Provider-neutral agent bootstrap, scope/mutation discipline, verification posture, memory-not-authority rule, generated-projection rule, specialist/provider boundaries, and completion reporting. Protocol invariants are registered separately under invariants.",
+      "stability": "constant",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:agent_reasoning_constitution",
+      "type": "truth_source",
+      "name": "agent_reasoning_constitution",
+      "owner": "docs/ai/ICN_CONSTITUTIONAL_CORE.md",
+      "description": "Stable agent reasoning principles: mission, Meaning Firewall, sovereignty/no-hidden-authority posture, adversarial honesty, determinism/inspectability, truth discipline, bounded change, and durable-memory rule. Contains no current phase, subsystem maturity, deployment state, identity taxonomy, or active work sequence.",
+      "stability": "constant",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "docs/ai/ICN_CONSTITUTIONAL_CORE.md",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
       "id": "truth_source:agent_registry",
       "type": "truth_source",
       "name": "agent_registry",
@@ -2487,6 +2527,26 @@
         },
         {
           "source": "ops/state/truth/agents.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:agent_workflow",
+      "type": "truth_source",
+      "name": "agent_workflow",
+      "owner": "docs/ai/WORKFLOW_ARCHITECTURE.md",
+      "description": "Agent context architecture: question-specific truth resolution, domain-owner loading, implementation/live evidence, generated navigation, memory semantics, bootstrap order, specialist/provider adapter contract, durable promotion lifecycle, and conflict protocol.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "docs/ai/WORKFLOW_ARCHITECTURE.md",
           "kind": "truth-owner"
         }
       ]
@@ -2552,6 +2612,42 @@
       ]
     },
     {
+      "id": "truth_source:deployment_runtime_state",
+      "type": "truth_source",
+      "name": "deployment_runtime_state",
+      "owner": "private-network-ops",
+      "description": "What is actually deployed and running in a named environment. NO PUBLIC OWNER EXISTS IN THIS REPO BY DESIGN: repo-map.json#infrastructure carries roles only, and code, docs, manifests, status.toml, and generated projections are all evidence of intent, never of liveness. Never infer deployment or runtime liveness from this repository; report the access boundary instead of guessing.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:documentation_classification",
+      "type": "truth_source",
+      "name": "documentation_classification",
+      "owner": "docs/registry.toml",
+      "description": "Per-document category, status, truth_class, owner, audience, and last_updated for docs/**. Enforced by docs/scripts/doc_control_check.py. Classification only: it records what kind of document a file is and who owns it, and never establishes the domain facts inside that document — those belong to the domain owners registered here. When a document's front matter and this registry disagree, reconcile them; do not treat either as the domain's semantic owner.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "docs/registry.toml",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
       "id": "truth_source:downstream_dependency_locks",
       "type": "truth_source",
       "name": "downstream_dependency_locks",
@@ -2612,7 +2708,7 @@
       "type": "truth_source",
       "name": "invariants",
       "owner": "AGENTS.md",
-      "description": "The 5 non-negotiable protocol invariants. Never override.",
+      "description": "The five non-negotiable agent/protocol invariants: adversarial-by-default, determinism, canonical encodings, no panics in protocol paths, and Meaning Firewall/kernel-app boundary. Never override.",
       "stability": "constant",
       "source_of_truth": "ops/state/truth/sources.json",
       "status": "present",
