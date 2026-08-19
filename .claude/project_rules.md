@@ -1,33 +1,21 @@
-# ICN Project Rules (supplements CLAUDE.md)
+# ICN Claude Project Rules
 
-## Reasoning Foundation
+Compatibility layer for Claude Code.
 
-Agent reasoning derives from `docs/ai/ICN_CONSTITUTIONAL_CORE.md`.
-Session grounding follows `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md`.
-See `docs/ai/WORKFLOW_ARCHITECTURE.md` for the full four-doc architecture.
+The provider-neutral operating contract is `AGENTS.md`. The agent workflow architecture is `docs/ai/WORKFLOW_ARCHITECTURE.md`. Canonical fact ownership is registered in `ops/state/truth/sources.json`.
 
-> Meaning firewall, kernel boundary, error handling, PR conventions, and testing patterns
-> are covered in CLAUDE.md and `.claude/rules/{kernel-boundary,rust-core,gateway,deploy}.md`.
-> This file contains ONLY rules not covered elsewhere.
+This file intentionally owns **no protocol semantics, current project state, merge policy, deployment facts, identity model, or subsystem-specific invariants**.
 
-## Reducer Purity
+## Claude-specific rules
 
-- Reducers receive immutable `StateSnapshot`
-- Reducers return state delta, not mutated state
-- Reducers have NO access to async runtime, network, or time
+- Run `/icn-preflight` for non-trivial work when available.
+- Resolve specialist routing from `ops/state/truth/agents.json` rather than a duplicated agent list.
+- Resolve canonical skill paths from `ops/state/truth/skills.json` before editing a skill.
+- Load scoped `.claude/rules/*.md` only when their path/domain is relevant.
+- Hooks are implementation enforcement. Follow `.claude/hooks/HOOKS.md` when modifying them.
+- Prefer structured `gh --json` queries for live GitHub state.
+- Treat handoffs and model memory as historical context, never current authority.
 
-## Bootstrap Security
+## Conflict rule
 
-- Genesis capabilities expire after 60 seconds
-- Running phase denies requests for unregistered domains
-- Never allow permanent backdoors
-- `AllowAllOracle` active only during genesis bootstrap
-
-## Code Review Quick Checklist
-
-- [ ] No domain imports in kernel crates (enforced by firewall-guard hook)
-- [ ] No `unwrap()`/`expect()` in non-test code (enforced by panic-guard hook)
-- [ ] Error paths use `ErrCode`, not ad-hoc strings
-- [ ] Tests cover error paths, not just happy path
-- [ ] TTL/cache values have documented security trade-offs
-- [ ] Canon edits labeled: `[sync edit]` vs `[governance edit proposal]`
+If this file or another Claude-facing prompt conflicts with `AGENTS.md`, a registered domain owner, current implementation evidence, or live Git/GitHub state, the Claude-facing prompt is stale. Report and repair the adapter instead of propagating the old assumption.
