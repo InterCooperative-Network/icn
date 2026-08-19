@@ -1,63 +1,74 @@
 ---
 Status: template
-Authority: process
+Authority: agent process
 Canonical: no
-Last verified: 2026-04-15
+Last verified: 2026-08-19
 ---
 
 # ICN Session Frame Template
 
-Fill this frame before beginning non-trivial work. Do not code until it is complete.
+A short grounding record for non-trivial work. It should take minutes, not become a planning artifact of its own.
 
-Trivial work (single-file typo, one-line fix) may skip the frame. Everything else gets one.
-
----
+The frame records **what was checked before mutation**. It is not a truth source and is not carried forward as current state.
 
 ```markdown
 ## Session Frame
 
-**Task:**
-<one-sentence statement of the actual task>
+**Task**
+<one sentence>
 
-**Truth layers loaded:**
-- Declared project truth: <docs/STATE.md, docs/PHASE_PROGRESS.md — loaded? current?>
-- Implementation truth: <relevant code inspected? what was verified?>
-- Execution truth: <latest handoff loaded? branch state checked?>
-- Narrative truth: <strategy docs consulted if relevant?>
+**Scope boundary**
+- In scope: <paths/behavior/outcome>
+- Out of scope: <adjacent work intentionally excluded>
 
-**Branch:** <current branch>
+**Checkout**
+- repo root: <git rev-parse --show-toplevel>
+- branch: <git branch --show-current>
+- HEAD: <git rev-parse HEAD>
+- working tree: <clean / concise dirty-state note>
+- origin/main observed: <sha, if freshness matters>
 
-**Working tree:** <clean/dirty + notable uncommitted files>
+**Truth domains resolved**
+| Claim/domain needed | Owner consulted | Freshness/evidence |
+|---|---|---|
+| <e.g. identity semantics> | <resolved from ops/state/truth/sources.json> | <what was read/verified> |
 
-**Current canonical phase:** <from docs/STATE.md and docs/PHASE_PROGRESS.md>
+**Live execution state checked**
+- issue/control surface: <live query or not applicable>
+- PR/reviews/checks: <live query or not applicable>
 
-**Current execution target:** <what this branch/session is actually trying to land>
+**Implementation evidence checked**
+- <smallest code/test/schema evidence proving the current gap>
 
-**Touched subsystem(s):** <governance / ledger / federation / compute / member surface / workflow / docs / etc.>
+**Path context**
+- Agent Context Spine brief: <paths or not needed>
+- scoped instructions loaded: <paths>
 
-**Main risk:** <the most likely drift, architectural violation, or truth-plane mismatch>
+**Invariant / compatibility risk**
+- <which AGENTS.md invariant or compatibility surface could be affected>
 
-**Smallest high-leverage next move:** <the move that improves closure without expanding scope>
+**Main uncertainty**
+- <the most important thing not yet proven>
 
-**Verification commands:**
-<exact commands to run before claiming success>
+**Bounded plan**
+1. <smallest mutation>
+2. <verification>
+3. <stop boundary>
 
-**Canonical-doc impact:**
-- [ ] None
-- [ ] Synchronization edit likely (aligning canon to verified reality)
-- [ ] Governance edit proposal likely (changing project truth classification)
+**Verification**
+- <commands/evidence appropriate to the touched surface>
 
-**Public-claim impact:**
-- [ ] None
-- [ ] Internal narrative only
-- [ ] Public narrative must be updated
+**Authorization boundary**
+- [ ] analysis/review only
+- [ ] code/docs mutation authorized
+- [ ] merge authorized separately
+- [ ] deploy/release/migration authorized separately
 ```
 
----
+## Rules
 
-## Usage Notes
-
-- The frame is for grounding, not ceremony. Keep it short.
-- If truth layers conflict, name the conflict in the frame before proceeding.
-- If the session discovers that the frame was wrong, update it — don't pretend it was right.
-- The frame becomes part of the handoff record at session end.
+- Do not fill a "current canonical phase" field unless the task actually depends on a domain that owns such a concept.
+- Do not load `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, or the latest handoff by default. Load them only when they are relevant evidence for the question being asked.
+- Resolve current PR/CI/issue state live.
+- If implementation evidence and a registered semantic owner conflict, write the conflict into the frame before editing.
+- Update the frame if the premise changes materially during the session. Do not preserve a disproven starting assumption for appearances.
