@@ -143,6 +143,13 @@
 //! remains one [`PrincipalKey`]. Validity spans are position-denominated and never wall-clock
 //! (O-N1 stays inside the pure model).
 //!
+//! **Legacy-bridge prohibitions (N2-E1).** The reverse direction — a legacy `did:icn:<key>`
+//! becoming a subject — is forbidden by `docs/architecture/IDENTITY_SEMANTICS.md` §7.2 and is held
+//! by regression tests in `tests/authority_log_bridge_prohibitions.rs`: a legacy key enters only
+//! as a [`PrincipalKey`], signing bridge evidence is **not** enrollment, and no principal-keyed
+//! reverse lookup from a key to the subjects it seeded exists. Those tests add no bridge
+//! machinery; the bridge-evidence object itself is N2-E2 and is not specified.
+//!
 //! # 4. The replicated state model (§9.2.1, inherited — not redesigned)
 //!
 //! ```text
