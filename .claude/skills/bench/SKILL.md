@@ -34,16 +34,21 @@ All commands run from the Rust workspace root (`icn/` within the monorepo).
 
 ## Steps
 
-1. Confirm working directory: `cd "$CLAUDE_PROJECT_DIR/icn"`
+1. Resolve the Cargo workspace root — never the monorepo root, it has no `Cargo.toml`:
+   ```bash
+   CARGO_ROOT="$(git rev-parse --show-toplevel)/icn"
+   ```
 
 2. If `$ARGUMENTS` is a short crate name (e.g. `gossip`), look up its bench file above and run:
    ```bash
+   cd "${CARGO_ROOT}"
    cargo bench -p icn-<short-name> --bench <bench_file>
    ```
    Example: `cargo bench -p icn-gossip --bench gossip_bench`
 
 3. If `$ARGUMENTS` is `all` or empty, run all six:
    ```bash
+   cd "${CARGO_ROOT}"
    cargo bench --bench compute_bench --bench commons_bench --bench gossip_bench \
      --bench ledger_bench --bench net_bench --bench trust_bench
    ```

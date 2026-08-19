@@ -102,6 +102,7 @@ class Checker:
         self.check_population(entries, skills, canonical_trees, provider_trees)
         self.check_relationships(entries, reg)
         self.check_content(reg, canonical_trees + provider_trees)
+        self.check_cargo_workspace_root(canonical_trees + provider_trees)
         return self.report()
 
     def collect_entries(self, skills: dict) -> list[dict]:
@@ -282,6 +283,74 @@ class Checker:
                           f"add them to adapter_fields or re-sync them from canonical.")
         if not undeclared and (not body_must_match or c_body == m_body):
             self.ok(f"{name}: adapter differs only in declared fields {sorted(declared)}")
+
+    # -- cargo workspace root ---------------------------------------------------
+
+    def cargo_workspace_subdir(self) -> str | None:
+        """The Cargo workspace subdirectory, from repo-map.json — never hardcoded here.
+
+        icn#2642: three skills invoked `cargo` after resolving REPO_ROOT to the monorepo
+        root, which has no Cargo.toml. The fix pattern recurs, so it is now a structural
+        check instead of three one-off fixes: this repository's workspace subdir name is a
+        fact repo-map.json already owns (repos.icn.cargo_workspace), so the checker reads it
+        rather than assuming "icn" — a repo-map change updates the check automatically.
+        """
+        p = self.root / "ops" / "state" / "config" / "repo-map.json"
+        if not p.is_file():
+            return None
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+            return d.get("repos", {}).get("icn", {}).get("cargo_workspace")
+        except (json.JSONDecodeError, AttributeError):
+            return None
+
+    def check_cargo_workspace_root(self, trees: list[str]) -> None:
+        """Every fenced bash block invoking `cargo` must resolve the workspace root itself.
+
+        A block is self-contained evidence, not the surrounding prose: an agent (or a human)
+        may copy a single fenced block in isolation, so a `cd` stated only in a preceding
+        paragraph does not protect the command inside the block. This is deliberately
+        block-scoped, not file-scoped or line-numbered, so it holds for any future skill
+        without editing this checker.
+        """
+        subdir = self.cargo_workspace_subdir()
+        if not subdir:
+            self.fail("could not resolve repos.icn.cargo_workspace from repo-map.json — "
+                      "cargo-workspace-root check cannot run")
+            return
+
+        cargo_line = re.compile(r"^\s*cargo\s")
+        establishes_root = re.compile(
+            r'cd\s+"?\$\{?CARGO_ROOT\}?"?'
+            r'|cd\s+"?\$\([^)]*\)/' + re.escape(subdir) + r'"?'
+            r'|cd\s+"?\$\{?REPO_ROOT\}?/' + re.escape(subdir) + r'"?'
+            r'|\(cd\s'
+        )
+
+        for tree in trees:
+            d = self.root / tree
+            if not d.is_dir():
+                continue
+            for f in sorted(d.glob("*/SKILL.md")):
+                rel = f.relative_to(self.root)
+                text = f.read_text(encoding="utf-8")
+                blocks = re.findall(r"```bash\n(.*?)```", text, re.S)
+                for i, block in enumerate(blocks):
+                    lines = block.splitlines()
+                    has_cargo = any(cargo_line.match(ln) for ln in lines)
+                    if not has_cargo:
+                        continue
+                    if establishes_root.search(block):
+                        self.ok(f"{rel} block {i}: cargo invocation resolves workspace root")
+                    else:
+                        self.fail(
+                            f"{rel}: a fenced bash block invokes `cargo` without resolving the "
+                            f"Cargo workspace root ({subdir}/) within that same block — the "
+                            f"monorepo root has no Cargo.toml, so this fails if copied verbatim. "
+                            f"Add `cd \"${{CARGO_ROOT}}\"` (or an inline `(cd ... && cargo ...)`) "
+                            f"inside the block itself:\n            " +
+                            "\n            ".join(ln for ln in lines if cargo_line.match(ln))[:300]
+                        )
 
     # -- content ---------------------------------------------------------------
 

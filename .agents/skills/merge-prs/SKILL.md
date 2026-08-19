@@ -89,8 +89,8 @@ the tooling you're running may itself be unreliable.
    ```bash
    gh pr view <remaining-N> --json headRefName --jq '.headRefName'   # resolve branch
    git checkout <branch> && git rebase origin/main
-   # Run scoped clippy before force-pushing
-   cargo clippy -p <affected-packages> --all-targets -- -D warnings
+   # Run scoped clippy before force-pushing — from the Cargo workspace root, never the monorepo root
+   (cd "$(git rev-parse --show-toplevel)/icn" && cargo clippy -p <affected-packages> --all-targets -- -D warnings)
    git push --force-with-lease
    ```
 

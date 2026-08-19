@@ -23,6 +23,7 @@ Fix CI failures for the current branch. Scope-locked. Output: cause, fix, proof.
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+CARGO_ROOT="${REPO_ROOT}/icn"                  # Cargo workspace root: all cargo commands run here
 bash "${REPO_ROOT}/ops/scripts/drift-check.sh" 2>/dev/null | tail -3 || true
 ```
 
@@ -53,10 +54,13 @@ If drift-check reports FAIL → note it. Agent tooling drift may itself be causi
 
 3. **Fix**: Apply minimal fix. Stay in scope.
 
-4. **Prove**: Run the gate that failed:
-   - `cargo fmt --check`
-   - `cargo clippy --workspace --all-targets -- -D warnings`
-   - `cargo test` (or the specific failing test)
+4. **Prove**: Run the gate that failed, from `${CARGO_ROOT}` (never the monorepo root — it has no `Cargo.toml`):
+   ```bash
+   cd "${CARGO_ROOT}"
+   cargo fmt --check
+   cargo clippy --workspace --all-targets -- -D warnings
+   cargo test   # or the specific failing test
+   ```
 
 ## Output
 

@@ -116,8 +116,8 @@ git checkout <branch> && git rebase origin/main
 
 After rebase, run scoped local verification before force-pushing:
 ```bash
-# Use resolve-rust-targets to find the right scope
-cargo clippy -p <affected-packages> --all-targets -- -D warnings
+# Use resolve-rust-targets to find the right scope — from the Cargo workspace root, never the monorepo root
+(cd "$(git rev-parse --show-toplevel)/icn" && cargo clippy -p <affected-packages> --all-targets -- -D warnings)
 ```
 
 Only force-push if verification passes:

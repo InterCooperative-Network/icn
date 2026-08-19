@@ -17,7 +17,7 @@ The older repo-adjacent `../icn-wt` layout is retired — do not assume it.
 **Always resolve the root dynamically — never assume a fixed layout or an absolute path:**
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE_ROOT="$(python3 -c "import json,os,sys; r=json.load(open(sys.argv[1]))['worktrees']['root']; print(os.path.normpath(os.path.join(sys.argv[2], r)))" "${REPO_ROOT}/ops/state/config/repo-map.json" "${REPO_ROOT}")"
+WORKTREE_ROOT="$(python3 -c 'import json,os,sys; r=json.load(open(sys.argv[1]))["worktrees"]["root"]; print(os.path.normpath(os.path.join(sys.argv[2], r)))' "${REPO_ROOT}/ops/state/config/repo-map.json" "${REPO_ROOT}")"
 ```
 
 Parse the argument to determine the subcommand. If no argument or unrecognized, default to `status`.

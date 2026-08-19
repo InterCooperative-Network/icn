@@ -23,6 +23,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 CHECKER = REPO / "scripts" / "check-skill-registry.py"
 REGISTRY = "ops/state/truth/skills.json"
+REPO_MAP = "ops/state/config/repo-map.json"
 TREES = ["ops/automation/skills", ".agents/skills", ".claude/skills"]
 
 VERBOSE = False
@@ -33,7 +34,9 @@ def make_fixture(tmp: Path) -> Path:
     """A minimal repo root: the registry plus the three skill trees, symlinks preserved."""
     root = tmp / "repo"
     (root / "ops" / "state" / "truth").mkdir(parents=True)
+    (root / "ops" / "state" / "config").mkdir(parents=True)
     shutil.copy2(REPO / REGISTRY, root / REGISTRY)
+    shutil.copy2(REPO / REPO_MAP, root / REPO_MAP)
     for tree in TREES:
         shutil.copytree(REPO / tree, root / tree, symlinks=True)
     return root
@@ -209,6 +212,44 @@ def registered_skill_missing_from_disk(root: Path) -> None:
     shutil.rmtree(root / ".claude" / "skills" / "bench")
 
 
+def cargo_command_without_workspace_root(root: Path) -> None:
+    """New skill: valid front matter, but a bash block invokes cargo with no cd to the workspace."""
+    d = root / ".agents" / "skills" / "cargo-no-root-demo"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(
+        "---\nname: cargo-no-root-demo\ntruth_contract:\n  canonical_sources: []\n---\n\n"
+        "## Steps\n\n```bash\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n"
+        "cargo test --workspace\n```\n"
+    )
+    reg = load_registry(root)
+    reg["skills"]["icn_level"].append({
+        "name": "cargo-no-root-demo",
+        "canonical_path": ".agents/skills/cargo-no-root-demo/SKILL.md",
+        "provider_mirrors": [],
+        "mirror_policy": "none",
+    })
+    save_registry(root, reg)
+
+
+def cargo_command_with_workspace_root(root: Path) -> None:
+    """The same shape, but the block resolves CARGO_ROOT and cds into it first — must PASS."""
+    d = root / ".agents" / "skills" / "cargo-with-root-demo"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(
+        "---\nname: cargo-with-root-demo\ntruth_contract:\n  canonical_sources: []\n---\n\n"
+        "## Steps\n\n```bash\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n"
+        "CARGO_ROOT=\"${REPO_ROOT}/icn\"\ncd \"${CARGO_ROOT}\"\ncargo test --workspace\n```\n"
+    )
+    reg = load_registry(root)
+    reg["skills"]["icn_level"].append({
+        "name": "cargo-with-root-demo",
+        "canonical_path": ".agents/skills/cargo-with-root-demo/SKILL.md",
+        "provider_mirrors": [],
+        "mirror_policy": "none",
+    })
+    save_registry(root, reg)
+
+
 def strip_truth_contract(root: Path) -> None:
     p = root / ".agents" / "skills" / "bench" / "SKILL.md"
     p.write_text(p.read_text().replace("truth_contract:", "informal_notes:", 1))
@@ -259,6 +300,10 @@ def main() -> int:
                 registered_skill_missing_from_disk, "no directory on disk")
     expect_fail("skill without truth_contract is rejected",
                 strip_truth_contract, "missing truth_contract")
+    expect_fail("cargo invocation with no workspace-root cd in its own block is rejected",
+                cargo_command_without_workspace_root, "without resolving the Cargo workspace root")
+    expect_clean("cargo invocation that resolves the workspace root in its own block passes",
+                 cargo_command_with_workspace_root)
 
     failed = [r for r in results if not r[0]]
     print(f"\n{len(results) - len(failed)}/{len(results)} cases passed")

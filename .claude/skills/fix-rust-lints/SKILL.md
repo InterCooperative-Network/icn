@@ -26,22 +26,27 @@ stops relearning under pressure.
 
 ## Steps
 
+0. **Resolve the Cargo workspace root** (never the monorepo root — it has no `Cargo.toml`):
+   ```bash
+   CARGO_ROOT="$(git rev-parse --show-toplevel)/icn"
+   ```
+
 1. **Collect failures**: If `$ARGUMENTS` is empty, run:
    ```bash
-   cargo clippy --workspace --all-targets -- -D warnings 2>&1 | grep "^error"
+   (cd "${CARGO_ROOT}" && cargo clippy --workspace --all-targets -- -D warnings 2>&1) | grep "^error"
    ```
    Or read from provided output.
 
 2. **Classify each error** by lint name (appears in brackets after `error:`):
    ```bash
-   cargo clippy ... 2>&1 | grep -E "^error\[|^\s+-->"
+   (cd "${CARGO_ROOT}" && cargo clippy --workspace --all-targets -- -D warnings 2>&1) | grep -E "^error\[|^\s+-->"
    ```
 
 3. **Apply canonical fix** from the playbook below.
 
 4. **Scan for recurrences** of the same anti-pattern in nearby code:
    ```bash
-   grep -rn "<pattern>" crates/ apps/ bins/
+   grep -rn "<pattern>" "${CARGO_ROOT}/crates/" "${CARGO_ROOT}/apps/" "${CARGO_ROOT}/bins/"
    ```
 
 5. **Verify**: Re-run the scoped clippy command to confirm the fix.
@@ -69,9 +74,9 @@ let cfg = FooConfig {
 
 **Why**: Removes the `mut` binding, signals intent at construction, eliminates post-init mutation.
 
-**Scan for recurrences**:
+**Scan for recurrences** (from `${CARGO_ROOT}`, resolved in Step 0):
 ```bash
-grep -rn "let mut .* = .*::default();" crates/ apps/ bins/ --include="*.rs"
+grep -rn "let mut .* = .*::default();" "${CARGO_ROOT}"/{crates,apps,bins}/ --include="*.rs"
 ```
 
 ---
@@ -95,11 +100,11 @@ membership_age_secs: MIN_MEMBERSHIP_AGE_SECS + 1,
 membership_age_secs: AttestationThresholds::default().min_membership_age_secs + 1,
 ```
 
-**Scan for recurrences**:
+**Scan for recurrences** (from `${CARGO_ROOT}`, resolved in Step 0):
 ```bash
 # Find uses of deprecated constants in test modules
 grep -rn "MIN_MEMBERSHIP_AGE_SECS\|MAX_ATTESTATIONS_PER_PERIOD\|MIN_TRUST_TO_ATTEST" \
-  crates/ apps/ --include="*.rs" | grep -v "pub const\|#\[deprecated"
+  "${CARGO_ROOT}"/{crates,apps}/ --include="*.rs" | grep -v "pub const\|#\[deprecated"
 ```
 
 **Re-export workaround**: When a module re-exports deprecated items for backward compat,
