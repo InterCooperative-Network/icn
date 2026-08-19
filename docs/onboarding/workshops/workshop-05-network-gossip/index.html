@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 5: Network and Gossip Deep Dive | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Workshop on network and gossip systems"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Workshop 5: Network and Gossip Deep Dive | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,12 +35,8 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 05 network gossip</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-05-network-gossip.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop 5: Network and Gossip Deep Dive</h1>
-<h2>Learning Objectives</h2>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>workshops</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>workshop 05 network gossip</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Learn</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="workshop-5-network-and-gossip-deep-dive">Workshop 5: Network and Gossip Deep Dive</h1>
+<h2 id="learning-objectives">Learning Objectives</h2>
 <p>By the end of this workshop, you will be able to:</p>
 <ol>
 <li><strong>Trace message flow</strong> - Follow a message from QUIC transport to gossip handler</li>
@@ -49,56 +45,56 @@ View source on GitHub →
 <li><strong>Debug sync issues</strong> - Use anti-entropy to diagnose and repair partition gaps</li>
 <li><strong>Write gossip tests</strong> - Create multi-node integration tests using TestNode</li>
 </ol>
-<h2>Goal</h2>
+<h2 id="goal">Goal</h2>
 <p>Understand how messages flow from the transport layer through the gossip protocol,
 including topic subscriptions, vector clocks, and anti-entropy synchronization.</p>
-<h2>Prerequisites</h2>
+<h2 id="prerequisites">Prerequisites</h2>
 <ul>
 <li>Completed <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-05-network-gossip">Module 5: Networking</a></li>
 <li>ICN binaries built (<code>cargo build</code>)</li>
 <li>Two terminal windows available</li>
 </ul>
-<h2>Estimated time</h2>
+<h2 id="estimated-time">Estimated time</h2>
 <p>2-3 hours</p>
-<h2>Related Materials</h2>
+<h2 id="related-materials">Related Materials</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/module-05-network-gossip">Module 5: Networking</a> - Background reading</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/workshop-06-ledger-contracts">Workshop 6: Ledger and Contracts</a> - Uses gossip for ledger sync</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">CLAUDE.md Gossip Protocol</a> - Protocol reference</li>
 </ul>
-<h2>Part 1: Network Actor Structure</h2>
-<h3>Steps</h3>
+<h2 id="part-1-network-actor-structure">Part 1: Network Actor Structure</h2>
+<h3 id="steps">Steps</h3>
 <ol>
 <li>Open <code>icn/crates/icn-net/src/actor/mod.rs</code></li>
 <li>Find the <code>NetworkActor</code> struct definition</li>
 <li>Identify the key components: endpoint, sessions, router</li>
 </ol>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer">Questions to answer</h3>
 <ol>
 <li>What QUIC library is used for transport?</li>
 <li>How are active peer sessions tracked?</li>
 <li>What happens when a new connection arrives?</li>
 </ol>
-<h3>Code to find</h3>
+<h3 id="code-to-find">Code to find</h3>
 <pre><code class="language-rust">pub struct NetworkActor {
     endpoint: quinn::Endpoint,
     sessions: HashMap&lt;Did, PeerSession&gt;,
     // ...
 }
 </code></pre>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You can identify the QUIC endpoint</li>
 <li><input disabled="" type="checkbox"> You understand how sessions are managed</li>
 </ul>
-<h2>Part 2: Message Protocol</h2>
-<h3>Steps</h3>
+<h2 id="part-2-message-protocol">Part 2: Message Protocol</h2>
+<h3 id="steps-1">Steps</h3>
 <ol>
 <li>Open <code>icn/crates/icn-net/src/protocol.rs</code></li>
 <li>Find the <code>NetworkMessage</code> struct</li>
 <li>List all <code>MessagePayload</code> variants</li>
 </ol>
-<h3>Expected variants</h3>
+<h3 id="expected-variants">Expected variants</h3>
 <ul>
 <li><code>Gossip</code> - Gossip protocol messages</li>
 <li><code>Rpc</code> - RPC request/response</li>
@@ -106,13 +102,13 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.<
 <li><code>Hello</code> - Initial handshake</li>
 <li><code>Signed</code> - Signed envelope wrapper</li>
 </ul>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-1">Questions to answer</h3>
 <ol>
 <li>How is the sender&#39;s DID included in messages?</li>
 <li>What serialization format is used?</li>
 <li>How are messages framed on the wire?</li>
 </ol>
-<h3>Code to examine</h3>
+<h3 id="code-to-examine">Code to examine</h3>
 <pre><code class="language-rust">pub struct NetworkMessage {
     pub from_did: Did,
     pub to_did: Option&lt;Did&gt;,
@@ -120,19 +116,19 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.<
     pub timestamp: u64,
 }
 </code></pre>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-1">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You can list all message payload types</li>
 <li><input disabled="" type="checkbox"> You understand the message envelope structure</li>
 </ul>
-<h2>Part 3: Network-to-Gossip Bridge</h2>
-<h3>Steps</h3>
+<h2 id="part-3-network-to-gossip-bridge">Part 3: Network-to-Gossip Bridge</h2>
+<h3 id="steps-2">Steps</h3>
 <ol>
 <li>Open <code>icn/crates/icn-core/src/supervisor/mod.rs</code></li>
 <li>Find where the incoming handler is wired</li>
 <li>Trace how gossip messages are delivered</li>
 </ol>
-<h3>Diagram: Message Flow</h3>
+<h3 id="diagram-message-flow">Diagram: Message Flow</h3>
 <pre><code>┌─────────────┐     QUIC      ┌─────────────┐
 │  Remote Peer│──────────────►│ NetworkActor│
 └─────────────┘               └──────┬──────┘
@@ -153,25 +149,25 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.<
                           │   handle_message()  │
                           └─────────────────────┘
 </code></pre>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-2">Questions to answer</h3>
 <ol>
 <li>What type is <code>IncomingMessageHandler</code>?</li>
 <li>How does error handling work in the callback?</li>
 <li>Can the callback block the network actor?</li>
 </ol>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-2">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You can explain the bridge between network and gossip</li>
 <li><input disabled="" type="checkbox"> You understand callback-based decoupling</li>
 </ul>
-<h2>Part 4: Gossip Topics and Subscriptions</h2>
-<h3>Steps</h3>
+<h2 id="part-4-gossip-topics-and-subscriptions">Part 4: Gossip Topics and Subscriptions</h2>
+<h3 id="steps-3">Steps</h3>
 <ol>
 <li>Open <code>icn/crates/icn-gossip/src/gossip.rs</code></li>
 <li>Find the subscription management code</li>
 <li>Identify how topics are organized</li>
 </ol>
-<h3>Topic naming convention</h3>
+<h3 id="topic-naming-convention">Topic naming convention</h3>
 <pre><code>namespace:purpose
 </code></pre>
 <p>Examples:</p>
@@ -181,41 +177,41 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.<
 <li><code>governance:votes</code> - Voting events</li>
 <li><code>coop:&lt;id&gt;:announcements</code> - Cooperative-specific messages</li>
 </ul>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-3">Questions to answer</h3>
 <ol>
 <li>How are subscriptions stored?</li>
 <li>What is <code>AccessControl</code> and how does it work?</li>
 <li>How are subscription notifications delivered?</li>
 </ol>
-<h3>Exercise</h3>
+<h3 id="exercise">Exercise</h3>
 <p>Search for topic definitions:</p>
 <pre><code class="language-bash">grep -r &quot;topic\|Topic&quot; icn/crates/icn-gossip/src/ --include=&quot;*.rs&quot; | grep -v &quot;^Binary&quot; | head -20
 </code></pre>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-3">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You understand topic naming conventions</li>
 <li><input disabled="" type="checkbox"> You can explain subscription management</li>
 </ul>
-<h2>Part 5: Vector Clocks</h2>
-<h3>Steps</h3>
+<h2 id="part-5-vector-clocks">Part 5: Vector Clocks</h2>
+<h3 id="steps-4">Steps</h3>
 <ol>
 <li>Open <code>icn/crates/icn-gossip/src/sync/</code> (or search for VectorClock)</li>
 <li>Find the <code>VectorClock</code> implementation</li>
 <li>Understand how causality is tracked</li>
 </ol>
-<h3>How vector clocks work</h3>
+<h3 id="how-vector-clocks-work">How vector clocks work</h3>
 <pre><code>Node A: {A: 1, B: 0}  sends message
 Node B: {A: 0, B: 1}  receives, merges to {A: 1, B: 1}
 Node A: {A: 2, B: 0}  sends another
 Node B: {A: 2, B: 1}  merges, knows it missed one
 </code></pre>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-4">Questions to answer</h3>
 <ol>
 <li>How does <code>happened_before()</code> comparison work?</li>
 <li>What happens when clocks are concurrent (neither before the other)?</li>
 <li>How do vector clocks prevent processing duplicates?</li>
 </ol>
-<h3>Code to find</h3>
+<h3 id="code-to-find-1">Code to find</h3>
 <pre><code class="language-rust">impl VectorClock {
     pub fn merge(&amp;mut self, other: &amp;VectorClock) {
         for (did, &amp;time) in &amp;other.clock {
@@ -225,13 +221,13 @@ Node B: {A: 2, B: 1}  merges, knows it missed one
     }
 }
 </code></pre>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-4">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You can explain vector clock merge semantics</li>
 <li><input disabled="" type="checkbox"> You understand how causality is tracked</li>
 </ul>
-<h2>Part 6: Anti-Entropy Protocol</h2>
-<h3>Steps</h3>
+<h2 id="part-6-anti-entropy-protocol">Part 6: Anti-Entropy Protocol</h2>
+<h3 id="steps-5">Steps</h3>
 <ol>
 <li>Search for anti-entropy code:<pre><code class="language-bash">grep -r &quot;anti.entropy\|AntiEntropy&quot; icn/crates/icn-gossip/ --include=&quot;*.rs&quot;
 </code></pre>
@@ -239,26 +235,26 @@ Node B: {A: 2, B: 1}  merges, knows it missed one
 <li>Find the periodic sync mechanism</li>
 <li>Understand how gaps are detected and filled</li>
 </ol>
-<h3>Anti-entropy phases</h3>
+<h3 id="anti-entropy-phases">Anti-entropy phases</h3>
 <ol>
 <li><strong>Digest Exchange</strong>: Nodes share Bloom filter of known entries</li>
 <li><strong>Gap Detection</strong>: Compare digests to find missing entries</li>
 <li><strong>Pull Request</strong>: Request specific missing entries</li>
 <li><strong>Data Transfer</strong>: Send requested entries</li>
 </ol>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-5">Questions to answer</h3>
 <ol>
 <li>How often does anti-entropy run?</li>
 <li>What information is in a sync digest?</li>
 <li>How are Bloom filters used to minimize bandwidth?</li>
 </ol>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-5">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You understand the anti-entropy protocol</li>
 <li><input disabled="" type="checkbox"> You can explain how partitions are healed</li>
 </ul>
-<h2>Part 7: Two-Node Gossip Test</h2>
-<h3>Steps</h3>
+<h2 id="part-7-two-node-gossip-test">Part 7: Two-Node Gossip Test</h2>
+<h3 id="steps-6">Steps</h3>
 <ol>
 <li><p>Find the gossip integration tests:</p>
 <pre><code class="language-bash">ls icn/crates/icn-gossip/tests/ 2&gt;/dev/null || ls icn/crates/icn-core/tests/
@@ -269,7 +265,7 @@ Node B: {A: 2, B: 1}  merges, knows it missed one
 <li><p>Understand how test nodes are set up</p>
 </li>
 </ol>
-<h3>Test pattern</h3>
+<h3 id="test-pattern">Test pattern</h3>
 <p>From <code>icn/crates/icn-testkit/src/node.rs</code> - the actual TestNode API:</p>
 <pre><code class="language-rust">#[tokio::test]
 async fn test_two_node_gossip() -&gt; anyhow::Result&lt;()&gt; {
@@ -308,25 +304,25 @@ async fn test_two_node_gossip() -&gt; anyhow::Result&lt;()&gt; {
 <li><code>publish()</code> returns a hash, not the message</li>
 <li>Use <code>has_entry()</code> to verify propagation</li>
 </ul>
-<h3>Questions to answer</h3>
+<h3 id="questions-to-answer-6">Questions to answer</h3>
 <ol>
 <li>How are unique ports assigned to test nodes?</li>
 <li>How does the test wait for gossip propagation?</li>
 <li>What cleanup happens after the test?</li>
 </ol>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-6">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You can read and understand gossip tests</li>
 <li><input disabled="" type="checkbox"> You know how to set up multi-node test scenarios</li>
 </ul>
-<h2>Part 8: Observing Gossip (Optional)</h2>
+<h2 id="part-8-observing-gossip-optional">Part 8: Observing Gossip (Optional)</h2>
 <p>If you have two terminals and want to see gossip in action:</p>
-<h3>Prerequisites</h3>
+<h3 id="prerequisites-1">Prerequisites</h3>
 <p>First, verify the ports are available:</p>
 <pre><code class="language-bash"># Check if ports 4001 and 4002 are free
 lsof -i :4001 -i :4002 2&gt;/dev/null || echo &quot;Ports available&quot;
 </code></pre>
-<h3>Steps</h3>
+<h3 id="steps-7">Steps</h3>
 <ol>
 <li><p>Terminal 1 - Start first node:</p>
 <pre><code class="language-bash">export ICN_DATA=$(mktemp -d)
@@ -345,18 +341,18 @@ RUST_LOG=icn_gossip=debug ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot; -
 <li><p>Watch for gossip log messages when nodes discover each other via mDNS</p>
 </li>
 </ol>
-<h3>Expected observations</h3>
+<h3 id="expected-observations">Expected observations</h3>
 <ul>
 <li>&quot;New peer discovered&quot; messages</li>
 <li>&quot;Subscribing to topic&quot; messages</li>
 <li>Anti-entropy sync events</li>
 </ul>
-<h3>Checkpoint</h3>
+<h3 id="checkpoint-7">Checkpoint</h3>
 <ul>
 <li><input disabled="" type="checkbox"> You observed gossip messages in logs</li>
 <li><input disabled="" type="checkbox"> You understand what each log message means</li>
 </ul>
-<h2>Summary</h2>
+<h2 id="summary">Summary</h2>
 <p>After completing this workshop you should be able to:</p>
 <ul>
 <li>Trace message flow from network to gossip layer</li>
@@ -365,7 +361,7 @@ RUST_LOG=icn_gossip=debug ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot; -
 <li>Describe the anti-entropy protocol</li>
 <li>Read and write gossip integration tests</li>
 </ul>
-<h2>Key Takeaways</h2>
+<h2 id="key-takeaways">Key Takeaways</h2>
 <table>
 <thead>
 <tr>
@@ -394,7 +390,7 @@ RUST_LOG=icn_gossip=debug ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot; -
 <td>Network → IncomingHandler callback → GossipActor</td>
 </tr>
 </tbody></table>
-<h2>Try It Yourself</h2>
+<h2 id="try-it-yourself">Try It Yourself</h2>
 <p><strong>Challenge 1</strong>: Simulate a network partition</p>
 <ol>
 <li>Start three nodes (ports 4001, 4002, 4003)</li>
@@ -416,16 +412,19 @@ Add logging to trace vector clock evolution:</p>
 <pre><code class="language-bash">RUST_LOG=icn_gossip::sync=trace ./target/debug/icnd --data-dir &quot;$ICN_DATA&quot;
 </code></pre>
 <p>Observe how clocks merge when messages are received.</p>
-<h2>Troubleshooting</h2>
-<h3>Nodes don&#39;t discover each other</h3>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="nodes-dont-discover-each-other">Nodes don&#39;t discover each other</h3>
 <p>mDNS may be blocked. Try explicit peer connection or check firewall settings.</p>
-<h3>Messages not propagating</h3>
+<h3 id="messages-not-propagating">Messages not propagating</h3>
 <p>Check that both nodes are subscribed to the same topic with matching access control.</p>
-<h3>Vector clock inconsistencies</h3>
+<h3 id="vector-clock-inconsistencies">Vector clock inconsistencies</h3>
 <p>Verify that node identities (DIDs) are unique across all nodes.</p>
-<h2>Next steps</h2>
+<h2 id="next-steps">Next steps</h2>
 <p>Proceed to Workshop 6: Ledger and Contract Flow</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/workshops/workshop-05-network-gossip.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

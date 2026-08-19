@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Q4 decision document unblocking DecisionRecordedReceipt implementation (#1748/#2141, merged contract #2280): decides all four Q4 branches — (A) v1 stays an opaque body_hash-only recorded-decision fact (no typed DecisionRecord/HumanDecisionSet payload; the brief positions HumanDecisionSet as a read-model); (B) parallel with explicit non-convergence to the load-bearing proposal/vote GovernanceDecisionReceipt lineage icn:gov:decision:v1/v2/v3 (effect dispatch, mandate/authority-grant indexes, action cards) — the spine names but does not absorb it; any future reference is v2-or-later after its own ADR; (C) no deciding-body handle in v1, recorded_by stays recorder-not-decider; (D) resolution stays deferred out of DeliberationEntryKind v1 with discriminant 10 reserved. Hash-layout consequence: none — the merged #2280 contract is implementation-ready as written. Design decision only — no runtime change (Refs #1748, #2141; no closure claims)"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>decision recorded q4 decision</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/decision-recorded-q4-decision.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>decision recorded q4 decision</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-07-02</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="decisionrecordedreceipt-q4-decision--recorded-fact-vs-proposalvote-lineage">DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage</h1>
 <p><strong>Status</strong>: draft — design / audit decision (not runtime implementation)
 <strong>Truth class</strong>: descriptive
 <strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
@@ -56,7 +53,7 @@ document decides all four. It decides nothing else: no runtime change, no
 new receipt fields, no proposal/vote migration. Receipts record
 institutional facts. They grant zero authority.</p>
 </blockquote>
-<h2>1. Problem</h2>
+<h2 id="1-problem">1. Problem</h2>
 <p>PR #2280 defined the fourth <code>ProcessTransitionReceipt</code> class,
 <code>DecisionRecordedReceipt</code> (proposed tag <code>icn:gov:decision_recorded:v1</code>),
 and deliberately refused to pin its runtime <code>:v1</code> layout until Q4 is
@@ -77,7 +74,7 @@ before implementation: every unresolved branch changes the <code>:v1</code> cano
 hash layout or the class&#39;s lineage relationships, and the landed rule (from
 the #2278 review cycle) is that hash-participating structure is decided in
 writing before a tag is pinned, never silently in an implementation PR.</p>
-<h2>2. Prior-art audit (verified at <code>2b2622ca</code>)</h2>
+<h2 id="2-prior-art-audit-verified-at-2b2622ca">2. Prior-art audit (verified at <code>2b2622ca</code>)</h2>
 <p><strong>The proposal/vote decision lineage — outcome machinery, load-bearing.</strong>
 <code>icn/crates/icn-governance/src/proof.rs</code>: <code>GovernanceDecisionReceipt</code>
 (~L226, tag <code>icn:gov:decision:v1</code> ~L251) carries <code>proposal_id</code>,
@@ -133,8 +130,8 @@ boundary crossing.</p>
 <code>DecisionRecordedReceipt</code> and <code>decision_recorded</code> appear nowhere under
 <code>icn/</code> at <code>2b2622ca</code>. The only definitions are the merged #2280 contract
 and status/backlog references.</p>
-<h2>3. The four Q4 axes — options and decision</h2>
-<h3>Axis A — representation of the recorded decision in <code>:v1</code></h3>
+<h2 id="3-the-four-q4-axes--options-and-decision">3. The four Q4 axes — options and decision</h2>
+<h3 id="axis-a--representation-of-the-recorded-decision-in-v1">Axis A — representation of the recorded decision in <code>:v1</code></h3>
 <p>Options considered:</p>
 <ol>
 <li><strong>Opaque recorded-decision fact</strong> — <code>body_hash</code> fingerprint only, no
@@ -163,7 +160,7 @@ receipt witnesses that a decision artifact was recorded — attributed
 outcome-naming content lives in the (never-stored, fingerprinted) decision
 body; structured who/rule/tally legibility arrives later as a read-model
 or a future tag version, not in this hash layout.</p>
-<h3>Axis B — relationship to <code>GovernanceDecisionReceipt</code></h3>
+<h3 id="axis-b--relationship-to-governancedecisionreceipt">Axis B — relationship to <code>GovernanceDecisionReceipt</code></h3>
 <p>Options considered:</p>
 <ol>
 <li>Absorb — make the proposal/vote lineage a specialization of the
@@ -194,7 +191,7 @@ whatever rule produced it. The two lineages never converge tags, never
 share fields, never share stores. Any future formal reference or adapter
 between them is a <code>:v2</code>-or-later change (or a separate adapter class)
 requiring its own explicit ADR — never a silent addition to <code>:v1</code>.</p>
-<h3>Axis C — deciding-body handle in <code>:v1</code></h3>
+<h3 id="axis-c--deciding-body-handle-in-v1">Axis C — deciding-body handle in <code>:v1</code></h3>
 <p>Options considered:</p>
 <ol>
 <li><strong>No deciding-body field in v1. CHOSEN.</strong></li>
@@ -214,7 +211,7 @@ remains recorder evidence — not <code>decider</code>, not <code>author</code>,
 Who decided, in what role, by what rule is deferred to the
 <code>HumanDecisionSet</code> read-model / idea-0020 lane, exactly where the framing
 brief puts it.</p>
-<h3>Axis D — fate of the deferred <code>resolution</code> deliberation kind</h3>
+<h3 id="axis-d--fate-of-the-deferred-resolution-deliberation-kind">Axis D — fate of the deferred <code>resolution</code> deliberation kind</h3>
 <p>Options considered:</p>
 <ol>
 <li><strong>Keep deferred (discriminant <code>10</code> stays reserved). CHOSEN.</strong></li>
@@ -241,7 +238,7 @@ a home (the recorded decision&#39;s fingerprinted body); the input reading
 input-only <code>resolution</code> kind may still be appended later via the #2278
 evolution rule if a real consumer demonstrates the need — this document
 neither performs nor forecloses that append.</p>
-<h2>4. Decision summary</h2>
+<h2 id="4-decision-summary">4. Decision summary</h2>
 <p><strong>Option A — <code>DecisionRecordedReceipt</code> <code>:v1</code> is a generic recorded-decision
 fact, parallel to and explicitly non-convergent with
 <code>GovernanceDecisionReceipt</code>.</strong></p>
@@ -275,7 +272,7 @@ idempotent return).</li>
 <li><code>resolution</code> remains deferred out of <code>DeliberationEntryKind</code> v1;
 discriminant <code>10</code> stays reserved.</li>
 </ul>
-<h2>5. Hash-layout consequence</h2>
+<h2 id="5-hash-layout-consequence">5. Hash-layout consequence</h2>
 <p><strong>No change to #2280. The merged contract is implementation-ready as
 written.</strong> This decision adds zero fields, removes zero fields, and
 changes zero encodings: the <code>:v1</code> canonical layout is exactly #2280 §4
@@ -288,7 +285,7 @@ join duplicate identity) now applies to any <strong>future</strong> tag version 
 than to <code>:v1</code>. There are no silent layout changes available to the
 implementation PR: it implements #2280 §4–§8 byte-for-byte or it stops and
 comes back to design.</p>
-<h2>6. Boundaries (what this receipt is and is not)</h2>
+<h2 id="6-boundaries-what-this-receipt-is-and-is-not">6. Boundaries (what this receipt is and is not)</h2>
 <ul>
 <li><code>DecisionRecordedReceipt</code> records that a decision fact was recorded
 against an opened process session. That is all.</li>
@@ -303,7 +300,7 @@ attestations, effect dispatch, mandate/authority-grant indexes, action
 cards — remains intact, separate, and untouched.</li>
 <li>Receipts record institutional facts. They grant zero authority.</li>
 </ul>
-<h2>7. Implementation instruction</h2>
+<h2 id="7-implementation-instruction">7. Implementation instruction</h2>
 <p>With Q4 decided as above, the implementation blocker recorded in #2280
 §10/§11 is cleared. The next PR in this lane may implement
 <code>DecisionRecordedReceipt</code> <strong>exactly</strong> from the merged #2280 contract
@@ -333,7 +330,7 @@ green).</li>
 <li>Existing process receipts unchanged (session-open, gate-result,
 deliberation-entry suites green, byte-identical semantics).</li>
 </ol>
-<h2>8. Explicit non-goals</h2>
+<h2 id="8-explicit-non-goals">8. Explicit non-goals</h2>
 <p>No runtime implementation in this PR. No <code>DecisionRecordedReceipt</code> code,
 route, proof type, backend method, manager method, or generated-inventory
 change. No <code>HumanDecisionSet</code> runtime or read-model implementation. No
@@ -344,7 +341,7 @@ publication. No privacy/redaction evidence export; no accessibility-gate
 run. No #1748 closure; no #2141 closure; no #2081/#2080/#2274 work. No
 process-runtime, Phase-2, production, pilot, member/organizer-readiness,
 live-federation, or service-hosting claims.</p>
-<h2>9. Validation (this document&#39;s PR)</h2>
+<h2 id="9-validation-this-documents-pr">9. Validation (this document&#39;s PR)</h2>
 <p>Docs-only change set: this file, a <code>docs/registry.toml</code> row, a
 <code>docs/INDEX.md</code> link, and the regenerated <code>docs/DOCUMENT_REGISTRY.md</code>
 (regeneration after registry row additions is required by that file&#39;s
@@ -352,7 +349,10 @@ header). Validation: <code>git diff --check</code>, <code>python3 docs/scripts/d
 (no new warnings), <code>python3 scripts/check-state-lag.py</code>. No route,
 OpenAPI, or generated-inventory files are touched, so none are
 regenerated.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/decision-recorded-q4-decision.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>04: Actors and Concurrency | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Learning module on ICN's actor model and concurrent execution"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>04: Actors and Concurrency | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,21 +35,16 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 2 architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>04 actors and concurrency</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-2-architecture/04-actors-and-concurrency.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>04: Actors and Concurrency</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>path</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>phase 2 architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>04 actors and concurrency</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Learn</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="04-actors-and-concurrency">04: Actors and Concurrency</h1>
 <blockquote>
 <p><strong>Phase</strong>: 2 | <strong>Tier</strong>: Fixer<br><strong>Patterns introduced</strong>: <a href="#actor-pattern">Actor</a>, <a href="#async-callbacks">Async Callbacks</a>, <a href="#shutdown-coordination">Shutdown Coordination</a>, <a href="#handle-holder">Handle Holder</a><br><strong>Prerequisite</strong>: Phase 1 complete (Reader tier)</p>
 </blockquote>
-<h2>Why This Matters</h2>
+<h2 id="why-this-matters">Why This Matters</h2>
 <p>ICN&#39;s central concurrency model is the <strong>actor pattern</strong> — each subsystem (Network, Gossip, Ledger, Governance, Compute) runs independently, processing messages sequentially from a bounded mailbox. This eliminates data races, simplifies reasoning, and enables graceful shutdown.</p>
 <p>Understanding actors is prerequisite to understanding the Meaning Firewall (Layer 05) — the boundary between kernel and apps is enforced through actor communication, not direct function calls.</p>
 <p>→ See <code>manual.md</code> § &quot;Concurrency via Actors&quot; for the design rationale.</p>
-<h2>What You&#39;ll Read</h2>
-<h3>1. The Actor Template</h3>
+<h2 id="what-youll-read">What You&#39;ll Read</h2>
+<h3 id="1-the-actor-template">1. The Actor Template</h3>
 <p><strong>File</strong>: <code>docs/architecture/ARCHITECTURE_MAP.md</code> (search for &quot;Actor Pattern&quot;)</p>
 <p>Every ICN actor follows this template:</p>
 <pre><code class="language-rust">// 1. Message enum
@@ -94,37 +89,37 @@ pub fn spawn_actor() -&gt; ActorHandle {
 <li><strong>Bounded mailbox</strong>: Backpressure via <code>mpsc::channel(N)</code> prevents unbounded memory growth</li>
 <li><strong>Async API</strong>: Handle provides <code>async fn</code> methods that send messages and await replies</li>
 </ul>
-<h3>2. Real Actors: Simplest to Most Complex</h3>
+<h3 id="2-real-actors-simplest-to-most-complex">2. Real Actors: Simplest to Most Complex</h3>
 <p>Trace these actors in order of complexity:</p>
-<h4><strong>Level 1: CoopActor</strong> (<code>icn-coop/src/actor.rs</code>)</h4>
+<h4 id="level-1-coopactor-icn-coopsrcactorrs"><strong>Level 1: CoopActor</strong> (<code>icn-coop/src/actor.rs</code>)</h4>
 <ul>
 <li>Manages cooperative membership and lifecycle</li>
 <li>State: <code>HashMap&lt;CoopId, Coop&gt;</code></li>
 <li>Messages: <code>CreateCoop</code>, <code>AddMember</code>, <code>UpdateStatus</code></li>
 <li>No external callbacks, pure state management</li>
 </ul>
-<h4><strong>Level 2: ContractRegistryActor</strong> (<code>icn/crates/icn-ccl/src/registry.rs</code>)</h4>
+<h4 id="level-2-contractregistryactor-icncratesicn-cclsrcregistryrs"><strong>Level 2: ContractRegistryActor</strong> (<code>icn/crates/icn-ccl/src/registry.rs</code>)</h4>
 <ul>
 <li>Stores and retrieves CCL contracts</li>
 <li>State: <code>HashMap&lt;ContractId, Contract&gt;</code></li>
 <li>Messages: <code>Register</code>, <code>Get</code>, <code>List</code></li>
 <li>Simple pattern: request/response with no side effects</li>
 </ul>
-<h4><strong>Level 3: CommunityActor</strong> (<code>icn-community/src/actor.rs</code>)</h4>
+<h4 id="level-3-communityactor-icn-communitysrcactorrs"><strong>Level 3: CommunityActor</strong> (<code>icn-community/src/actor.rs</code>)</h4>
 <ul>
 <li>Manages communities (groupings of coops/individuals)</li>
 <li>State: <code>HashMap&lt;CommunityId, Community&gt;</code></li>
 <li>Messages: <code>Create</code>, <code>AddMember</code>, <code>ListMembers</code></li>
 <li>Callback: Gossip send for replication</li>
 </ul>
-<h4><strong>Level 4: StewardActor</strong> (<code>icn-steward/src/actor.rs</code>)</h4>
+<h4 id="level-4-stewardactor-icn-stewardsrcactorrs"><strong>Level 4: StewardActor</strong> (<code>icn-steward/src/actor.rs</code>)</h4>
 <ul>
 <li>SDIS steward network for VUI computation</li>
 <li>State: <code>HashMap&lt;Did, StewardInfo&gt;</code>, threshold crypto state</li>
 <li>Messages: <code>EnrollMember</code>, <code>ComputeVui</code>, <code>IssueToken</code></li>
 <li>Complex: cryptographic operations, multi-party coordination</li>
 </ul>
-<h4><strong>Level 5: ComputeActor</strong> (<code>icn-compute/src/actor.rs</code>)</h4>
+<h4 id="level-5-computeactor-icn-computesrcactorrs"><strong>Level 5: ComputeActor</strong> (<code>icn-compute/src/actor.rs</code>)</h4>
 <ul>
 <li>Distributed task execution with trust gating</li>
 <li>State: <code>HashMap&lt;TaskId, Task&gt;</code>, execution queue</li>
@@ -132,7 +127,7 @@ pub fn spawn_actor() -&gt; ActorHandle {
 <li>Callbacks: PolicyOracle for trust checks, Network for distribution</li>
 <li><strong>Most complex</strong>: scheduling, resource management, result aggregation</li>
 </ul>
-<h4><strong>Level 6: NetworkActor</strong> (<code>icn/crates/icn-net/src/actor/mod.rs</code>)</h4>
+<h4 id="level-6-networkactor-icncratesicn-netsrcactormodrs"><strong>Level 6: NetworkActor</strong> (<code>icn/crates/icn-net/src/actor/mod.rs</code>)</h4>
 <ul>
 <li>QUIC transport, mDNS discovery, session management</li>
 <li>State: <code>HashMap&lt;Did, Connection&gt;</code>, peer discovery cache</li>
@@ -140,14 +135,14 @@ pub fn spawn_actor() -&gt; ActorHandle {
 <li>Callbacks: Incoming message handlers (routes to Gossip/RPC)</li>
 <li><strong>Deepest</strong>: handles raw network I/O, certificate validation, retry logic</li>
 </ul>
-<h3>3. Four Communication Patterns</h3>
-<h4><strong>Pattern A: Channel-Based (mpsc::Sender<Msg>)</strong></h4>
+<h3 id="3-four-communication-patterns">3. Four Communication Patterns</h3>
+<h4 id="pattern-a-channel-based-mpscsender"><strong>Pattern A: Channel-Based (mpsc::Sender<Msg>)</strong></h4>
 <p>Used for: Actor-to-actor messaging within the same process.</p>
 <pre><code class="language-rust">let (tx, rx) = mpsc::channel(32);
 // Send a message
 tx.send(Msg::DoSomething { arg }).await?;
 </code></pre>
-<h4><strong>Pattern B: Shared State (Arc&lt;RwLock<T>&gt;)</strong></h4>
+<h4 id="pattern-b-shared-state-arcrwlock"><strong>Pattern B: Shared State (Arc&lt;RwLock<T>&gt;)</strong></h4>
 <p>Used for: Read-heavy state shared across actors.</p>
 <pre><code class="language-rust">let state = Arc::new(RwLock::new(SharedState::new()));
 // Read
@@ -156,7 +151,7 @@ let data = state.read().await;
 let mut data = state.write().await;
 </code></pre>
 <p><strong>Warning</strong>: Don&#39;t hold locks across <code>.await</code> points — causes deadlocks.</p>
-<h4><strong>Pattern C: Callbacks</strong></h4>
+<h4 id="pattern-c-callbacks"><strong>Pattern C: Callbacks</strong></h4>
 <p>Used for: Decoupling actors (e.g., Gossip → Network).</p>
 <pre><code class="language-rust">pub type SendCallback = Arc&lt;dyn Fn(Did, Vec&lt;u8&gt;) -&gt; Result&lt;()&gt; + Send + Sync&gt;;
 
@@ -168,7 +163,7 @@ if let Some(ref cb) = self.send_callback {
     cb(recipient, data)?;
 }
 </code></pre>
-<h4><strong>Pattern D: Broadcast (Shutdown)</strong></h4>
+<h4 id="pattern-d-broadcast-shutdown"><strong>Pattern D: Broadcast (Shutdown)</strong></h4>
 <p>Used for: Shutdown signal propagation.</p>
 <pre><code class="language-rust">let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
 
@@ -181,7 +176,7 @@ tokio::select! {
     _ = shutdown_rx.recv() =&gt; { break; }
 }
 </code></pre>
-<h3>4. Shutdown Coordination</h3>
+<h3 id="4-shutdown-coordination">4. Shutdown Coordination</h3>
 <p><strong>File</strong>: <code>icn/crates/icn-core/src/runtime.rs</code></p>
 <p>The runtime waits for shutdown signal or error:</p>
 <pre><code class="language-rust">tokio::select! {
@@ -213,7 +208,7 @@ tokio::time::sleep(Duration::from_secs(2)).await;
 }
 // Cleanup: flush buffers, close connections, etc.
 </code></pre>
-<h3>5. The <code>parking_lot::RwLock</code> vs <code>tokio::sync::RwLock</code> Distinction</h3>
+<h3 id="5-the-parking_lotrwlock-vs-tokiosyncrwlock-distinction">5. The <code>parking_lot::RwLock</code> vs <code>tokio::sync::RwLock</code> Distinction</h3>
 <p>ICN has <strong>two</strong> <code>TrustPolicyOracle</code> implementations:</p>
 <p><strong><code>apps/trust/src/oracle.rs</code></strong> (uses <code>parking_lot::RwLock</code>):</p>
 <pre><code class="language-rust">pub struct TrustPolicyOracle {
@@ -247,14 +242,14 @@ tokio::time::sleep(Duration::from_secs(2)).await;
 </tbody></table>
 <p><strong>ICN&#39;s choice</strong>: The trust oracle does <strong>fast in-memory graph queries</strong> (no I/O), so <code>parking_lot::RwLock</code> is appropriate. If the oracle needed to call async functions inside the lock, <code>tokio::sync::RwLock</code> would be required.</p>
 <p><strong>Rule of thumb</strong>: Use <code>parking_lot</code> for pure CPU-bound operations, <code>tokio::sync</code> if you need <code>.await</code> inside the lock.</p>
-<h2>Patterns Introduced</h2>
-<h3>Actor Pattern</h3>
+<h2 id="patterns-introduced">Patterns Introduced</h2>
+<h3 id="actor-pattern">Actor Pattern</h3>
 <p>→ See <code>patterns.md</code> #1 for full template.</p>
-<h3>Async Callbacks</h3>
+<h3 id="async-callbacks">Async Callbacks</h3>
 <p>→ See <code>patterns.md</code> #3 for full template.</p>
-<h3>Shutdown Coordination</h3>
+<h3 id="shutdown-coordination">Shutdown Coordination</h3>
 <p>→ See <code>patterns.md</code> #9 for full template.</p>
-<h3>Handle Holder</h3>
+<h3 id="handle-holder">Handle Holder</h3>
 <p><strong>Pattern</strong>: <code>Arc&lt;RwLock&lt;Option&lt;Handle&gt;&gt;&gt;</code> for late-bound actors.</p>
 <p><strong>Why</strong>: During supervisor initialization, some actors depend on handles from others. Use <code>Option&lt;Handle&gt;</code> to allow phased initialization.</p>
 <pre><code class="language-rust">let gossip_handle_holder = Arc::new(RwLock::new(None));
@@ -269,7 +264,7 @@ if let Some(ref handle) = *gossip_handle_holder.read().await {
 }
 </code></pre>
 <p>→ See <code>patterns.md</code> #15 for full template.</p>
-<h2>What You&#39;ll Build</h2>
+<h2 id="what-youll-build">What You&#39;ll Build</h2>
 <p>→ <strong>Lab</strong>: <code>labs/lab-03-mini-actor/</code></p>
 <p>Build a mini actor runtime:</p>
 <ul>
@@ -279,7 +274,7 @@ if let Some(ref handle) = *gossip_handle_holder.read().await {
 <li>Timeouts + retries to simulate network behavior</li>
 </ul>
 <p><strong>Done when</strong>: Actor processes messages, shuts down gracefully on signal, tests prove ordering.</p>
-<h2>Checkpoint</h2>
+<h2 id="checkpoint">Checkpoint</h2>
 <p>You&#39;ve completed this layer when you can:</p>
 <ol>
 <li><strong>Identify actor boundaries</strong>: Given ICN code, identify which subsystems are actors and which are pure functions</li>
@@ -288,9 +283,12 @@ if let Some(ref handle) = *gossip_handle_holder.read().await {
 <li><strong>Implement shutdown</strong>: Add graceful shutdown to your lab actor</li>
 </ol>
 <p><strong>Artifact</strong>: Diagram showing message flow for a gossip announcement (Gateway → Gossip → Network → Peer).</p>
-<h2>Deep Reference</h2>
+<h2 id="deep-reference">Deep Reference</h2>
 <p>→ <code>reference/module-03-runtime-actors.md</code> — Full actor lifecycle, supervisor details<br>→ <a href="https://tokio.rs/tokio/tutorial" target="_blank" rel="noopener">Tokio tutorial</a> — Async Rust fundamentals<br>→ <a href="https://www.brianstorti.com/the-actor-model/" target="_blank" rel="noopener">The Actor Model</a> — Conceptual overview</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/path/phase-2-architecture/04-actors-and-concurrency.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Made-Available, Federation Sync, Access, and Repair Boundary Map | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design/control map (#2336) for the boundary after the landed EvidencePacketMadeAvailableReceipt (#2333/#2335). Distinguishes sender/custodian availability from federation digest propagation, routing proof, peer observation, recipient access, delivery, receipt, acceptance, audit, certification, and legal sufficiency. Maps the design-level ArtifactRegistry, ScopedVault, PrivateObjectRef, DisclosurePolicy, future AccessReceipt, and the wire-stable anti-entropy proof artifacts without claiming live emission or enforcement. Decides that AccessReceipt is design-ready only and runtime-blocked by authority-basis, entity-aware authorization, trusted issuance, and vault-enforcement gaps. Recommends #1868/#2061 authority work as the next lane. No runtime, receipt class, route, UI, fixture, vault, encryption, federation rollout, or readiness change."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Made-Available, Federation Sync, Access, and Repair Boundary Map | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>made available federation access boundary map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/made-available-federation-access-boundary-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Made-Available, Federation Sync, Access, and Repair Boundary Map</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>made available federation access boundary map</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-07-05</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="made-available-federation-sync-access-and-repair-boundary-map">Made-Available, Federation Sync, Access, and Repair Boundary Map</h1>
 <p><strong>Status:</strong> draft - design/control map
 <strong>Truth class:</strong> descriptive
 <strong>Canonical:</strong> no - implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
@@ -48,7 +45,7 @@ View source on GitHub →
 <blockquote>
 <p>This document maps the control boundaries after <code>EvidencePacketMadeAvailableReceipt</code>. It is a design map for ICN as Digital Public Infrastructure, a Coordination OS, and democratic institutional infrastructure. It adds no runtime behavior, receipt class, route, authorization rule, vault, federation path, user interface, or fixture. It does not claim that a packet was accessed, delivered, received, accepted, audited, certified, or legally sufficient. Receipts record bounded institutional facts. Receipts grant zero authority.</p>
 </blockquote>
-<h2>1. Why this map exists</h2>
+<h2 id="1-why-this-map-exists">1. Why this map exists</h2>
 <!-- truth: descriptive -->
 
 <p><code>EvidencePacketMadeAvailableReceipt</code> is now a landed runtime class and has a fixture-only member-shell render. That closes one narrow sender/custodian-side evidence boundary. It does not establish the mechanisms that come after availability.</p>
@@ -62,7 +59,7 @@ View source on GitHub →
 <li>treating trust evidence as an authority grant.</li>
 </ul>
 <p>This map prevents those substitutions. It connects the landed receipt to the existing federation proof-loop and storage designs, identifies what remains design-only, and names the authority work that must precede private-access runtime.</p>
-<h2>2. Current landed facts</h2>
+<h2 id="2-current-landed-facts">2. Current landed facts</h2>
 <!-- truth: descriptive -->
 
 <p>The landed process/evidence sequence is:</p>
@@ -94,7 +91,7 @@ EvidencePacketMadeAvailableReceipt
 <li>no authority decision that follows from any receipt.</li>
 </ul>
 <p>The anti-entropy identifiers named in <a href="/docs/spec/network-anti-entropy-proof-loops">`network-anti-entropy-proof-loops.md`</a> are wire-stable, but the spec explicitly says that live construction, gossip, classification, and repair are not wired end to end. The artifact registry and scoped vault in <a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a> remain design-level objects.</p>
-<h2>3. Boundary vocabulary</h2>
+<h2 id="3-boundary-vocabulary">3. Boundary vocabulary</h2>
 <!-- truth: descriptive -->
 
 <p>These terms are related but not interchangeable.</p>
@@ -178,7 +175,7 @@ EvidencePacketMadeAvailableReceipt
 </tr>
 </tbody></table>
 <p>Trust can inform a policy oracle. It does not grant authority. The Meaning Firewall requires apps to translate semantic trust and governance decisions into bounded constraints while the kernel enforces those constraints without interpreting their institutional meaning.</p>
-<h2>4. The boundary chain</h2>
+<h2 id="4-the-boundary-chain">4. The boundary chain</h2>
 <!-- truth: descriptive -->
 
 <p>The control chain is:</p>
@@ -210,7 +207,7 @@ federation observation != recipient acceptance
 trust != authority
 </code></pre>
 <p>An implementation must not collapse two rows because the same network exchange, actor, or stored fingerprint happens to participate in both.</p>
-<h2>5. Made-available vs federation sync</h2>
+<h2 id="5-made-available-vs-federation-sync">5. Made-available vs federation sync</h2>
 <!-- truth: descriptive -->
 
 <p><code>EvidencePacketMadeAvailableReceipt</code> is a sender/custodian availability fact. It records an opaque recipient scope plus disclosure-policy and availability-method fingerprints. It does not say that any federation peer observed the receipt.</p>
@@ -225,7 +222,7 @@ trust != authority
 <p><code>QuorumSyncCheck</code> can prove that named federation peers exchanged matching digests for a state class within a <code>FederationSyncWindow</code>. It cannot prove that those peers agree with the institutional act, that a recipient accepted it, or that a private artifact was disclosed.</p>
 <p><code>RoutingProof</code> proves bounded network acknowledgement for a message or receipt. It is not an application-level delivery receipt. A future delivery contract would need to identify what was delivered, by which transport, to what recipient-side authority, and what acknowledgement counts. Until that contract exists, routing proof must be rendered as routing evidence only.</p>
 <p>Peer observation is evidence, not assent. Federation coordination occurs by agreement among domains; gossip cannot create that agreement.</p>
-<h2>6. Made-available vs artifact registry and scoped vault</h2>
+<h2 id="6-made-available-vs-artifact-registry-and-scoped-vault">6. Made-available vs artifact registry and scoped vault</h2>
 <!-- truth: descriptive -->
 
 <p>The landed made-available receipt carries fingerprints only:</p>
@@ -255,7 +252,7 @@ ScopedVault
 </code></pre>
 <p>The registry records what exists and what governs it. The vault enforces privacy. The receipt store records actions on both. These responsibilities stay separate.</p>
 <p><code>PrivateObjectRef</code> is the bridge, not the body. A reference may be digestible and synchronized without synchronizing the private contents. Anti-entropy repair must preserve that separation and must never widen privacy class, data locality, recipient scope, or custody.</p>
-<h2>7. Made-available vs AccessReceipt</h2>
+<h2 id="7-made-available-vs-accessreceipt">7. Made-available vs AccessReceipt</h2>
 <!-- truth: descriptive -->
 
 <p>Made available means that a prepared export was placed under a disclosure policy for a named recipient scope. The policy may describe which recipient scope can retrieve it, but the receipt does not adjudicate whether a particular actor currently holds valid authority.</p>
@@ -273,7 +270,7 @@ ScopedVault
 <li>append-only evidence for successful and refused attempts where safe.</li>
 </ul>
 <p><code>not_found_or_not_visible</code> is mandatory to avoid turning the access path or receipt into an existence oracle. A caller must not be able to distinguish a missing hidden object from an object they are not allowed to know exists.</p>
-<h3>Runtime readiness decision</h3>
+<h3 id="runtime-readiness-decision">Runtime readiness decision</h3>
 <p><strong><code>AccessReceipt</code> is design-ready only. Its runtime is blocked.</strong></p>
 <p>The following are partially unblocked at the design level:</p>
 <ul>
@@ -293,7 +290,7 @@ ScopedVault
 <li>there is no approved contract for visibility and retention of denied access evidence.</li>
 </ul>
 <p>An <code>AccessReceipt</code> implementation before those seams are clear could faithfully record an access attempt while still relying on the wrong authority gate. That would create strong-looking evidence around weak authority. The receipt must follow the authority decision, not substitute for it.</p>
-<h2>8. Federation proof-loop relationship</h2>
+<h2 id="8-federation-proof-loop-relationship">8. Federation proof-loop relationship</h2>
 <!-- truth: descriptive -->
 
 <p>The anti-entropy proof rail includes:</p>
@@ -352,7 +349,7 @@ ScopedVault
 <p>These are proof/evidence artifacts or envelopes where the current spec says so. They are not new process/evidence receipt classes. <code>RepairReceipt</code>, despite its name, travels inside an existing evidence envelope and does not extend the ten-class process ladder.</p>
 <p>Anti-entropy can prove that a made-available receipt or safe artifact reference is missing, stale, or divergent at a peer. It can plan and record a bounded repair. It cannot authorize access to the private object. A repair executor may copy only material that the plan, authority basis, privacy class, locality, and disclosure policy permit. If the body is out of scope, the correct repair may synchronize only the digest/reference, quarantine state, or escalate for governance review.</p>
 <p>Repair outcome is not convergence forever. A later probe must verify the after-state within a fresh window. Matching state is not agreement with the underlying institutional act.</p>
-<h2>9. Authority blockers and why they matter</h2>
+<h2 id="9-authority-blockers-and-why-they-matter">9. Authority blockers and why they matter</h2>
 <!-- truth: descriptive -->
 
 <table>
@@ -401,7 +398,7 @@ ScopedVault
 </tbody></table>
 <p><code>#1907</code> remains a protected review/control item unrelated to this implementation sequence. This map does not change or close it.</p>
 <p>Trust remains an input to policy, not an authority source. The kernel can enforce a typed constraint or capability blindly. It must not derive authority by interpreting a trust score, federation relationship, sync result, or receipt.</p>
-<h2>10. Cross-repo implications</h2>
+<h2 id="10-cross-repo-implications">10. Cross-repo implications</h2>
 <!-- truth: descriptive -->
 
 <p>The repository order remains part of the control boundary:</p>
@@ -415,7 +412,7 @@ ScopedVault
 <li><strong>demo-repository</strong> has no assigned role in this lane.</li>
 </ul>
 <p>No downstream repository changes are part of this map. Cross-repo work follows the order <code>icn</code> first, private consumers second, teaching third, and public mirror last.</p>
-<h2>11. Recommended next sequence</h2>
+<h2 id="11-recommended-next-sequence">11. Recommended next sequence</h2>
 <!-- truth: descriptive -->
 
 <ol>
@@ -429,7 +426,7 @@ ScopedVault
 <li>Revisit <code>AccessReceipt</code> runtime last, with authority, object reference, policy enforcement, and evidence visibility all testable together.</li>
 </ol>
 <p><strong>Recommended first next lane:</strong> the #1868/#2061 authority-basis control and hardening work. A docs-only <code>AccessReceipt</code> rung can follow immediately after that representation is explicit. Do not start <code>AccessReceipt</code> runtime from this map.</p>
-<h2>12. Non-goals</h2>
+<h2 id="12-non-goals">12. Non-goals</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -453,7 +450,7 @@ ScopedVault
 <li>No #2041 completion claim.</li>
 <li>No closure of #1748, #2141, #2041, #1868, #2061, #2080, #2081, or #1907.</li>
 </ul>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/access-made-available-disclosure-receipt-decision-rung">`access-made-available-disclosure-receipt-decision-rung.md`</a></li>
 <li><a href="/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY">`PRIVATE_DATA_DISCLOSURE_BOUNDARY.md`</a></li>
@@ -480,7 +477,10 @@ Refs #1868.
 Refs #2061.
 Refs #2080.
 Refs #2081.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/made-available-federation-access-boundary-map.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

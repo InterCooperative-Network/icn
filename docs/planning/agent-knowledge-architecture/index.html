@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Agent Knowledge Architecture Spec | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design for AI agent knowledge bases and context management"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Agent Knowledge Architecture Spec | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,18 +35,15 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>planning</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>agent knowledge architecture</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/planning/agent-knowledge-architecture.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Agent Knowledge Architecture Spec</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>planning</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>agent knowledge architecture</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="agent-knowledge-architecture-spec">Agent Knowledge Architecture Spec</h1>
 <p><strong>Status:</strong> Draft
 <strong>Date:</strong> 2026-03-18
 <strong>Author:</strong> Matt Faherty
 <strong>Purpose:</strong> Design the retrieval and indexing architecture that lets any agent — Claude Code on icn-dev, Cowork on Zentith, or future surfaces — find and use the right knowledge on demand.</p>
 <hr>
-<h2>1. Problem Statement</h2>
+<h2 id="1-problem-statement">1. Problem Statement</h2>
 <p>Two knowledge systems exist. Neither knows about the other. Both depend on agents reading the right files in the right order. There is no search, no structured lookup, and no cross-system bridging. The result: agents working in one system are blind to knowledge in the other, and even within a single system, relevant docs are only found if the agent happens to browse the right directory.</p>
-<h3>Current Systems</h3>
+<h3 id="current-systems">Current Systems</h3>
 <p><strong>System A: ICN Repo</strong> (<code>~/projects/icn</code>)</p>
 <ul>
 <li>Agent: Claude Code on icn-dev (or any Claude Code session)</li>
@@ -63,7 +60,7 @@ View source on GitHub →
 <li>Strength: Rich personal context, cross-project state, identity, relationships</li>
 <li>Weakness: No path to ICN codebase context, specialized agents, or repo-level docs</li>
 </ul>
-<h3>Failure Modes</h3>
+<h3 id="failure-modes">Failure Modes</h3>
 <ol>
 <li><p><strong>Blind spots:</strong> Cowork session designing ICN mobile UX cannot access the 11 specialized ICN agents, the GOLDEN_PROMPT, or the repo&#39;s 200+ docs. Claude Code session on icn-dev cannot access funding strategy, cooperative contacts, or personal health/disability context that affects scheduling.</p>
 </li>
@@ -77,7 +74,7 @@ View source on GitHub →
 </li>
 </ol>
 <hr>
-<h2>2. Design Principles</h2>
+<h2 id="2-design-principles">2. Design Principles</h2>
 <ol>
 <li><p><strong>Repo is always the baseline for code-adjacent knowledge.</strong> The ICN repo&#39;s docs/ directory is the source of truth for anything about ICN&#39;s architecture, codebase, APIs, deployment, and development process. Launchpad can reference it but should not duplicate it.</p>
 </li>
@@ -93,8 +90,8 @@ View source on GitHub →
 </li>
 </ol>
 <hr>
-<h2>3. Architecture</h2>
-<h3>3.1 Three-Layer Model</h3>
+<h2 id="3-architecture">3. Architecture</h2>
+<h3 id="31-three-layer-model">3.1 Three-Layer Model</h3>
 <pre><code>Layer 1: Entry Points (auto-loaded, minimal)
   ├── ICN CLAUDE.md (repo) — Claude Code sessions
   ├── Launchpad CLAUDE.md — Cowork sessions
@@ -111,9 +108,9 @@ Layer 3: Knowledge (the actual docs)
   ├── Launchpad operations/ + fabric/
   └── Projects (ICN, summit, homelab, etc.)
 </code></pre>
-<h3>3.2 Layer 1: Entry Points (redesigned)</h3>
+<h3 id="32-layer-1-entry-points-redesigned">3.2 Layer 1: Entry Points (redesigned)</h3>
 <p><strong>Goal:</strong> Minimal context that orients the agent and teaches it how to retrieve more.</p>
-<h4>ICN Repo CLAUDE.md (for Claude Code)</h4>
+<h4 id="icn-repo-claudemd-for-claude-code">ICN Repo CLAUDE.md (for Claude Code)</h4>
 <p>Keep the current operational content (build commands, architecture, git workflow, agent rules). These are needed every session.</p>
 <p><strong>Add:</strong> A &quot;Knowledge Retrieval&quot; section that teaches the agent how to find deeper context:</p>
 <pre><code class="language-markdown">## Knowledge Retrieval
@@ -130,7 +127,7 @@ When you need context beyond this file:
 7. **Structured lookup:** See `docs/KNOWLEDGE_INDEX.yaml` for metadata-tagged doc catalog
 </code></pre>
 <p><strong>Remove from CLAUDE.md:</strong> Nothing. It&#39;s already well-scoped for its purpose.</p>
-<h4>Launchpad CLAUDE.md (for Cowork)</h4>
+<h4 id="launchpad-claudemd-for-cowork">Launchpad CLAUDE.md (for Cowork)</h4>
 <p><strong>Problem:</strong> Currently 19KB, loaded on every session. Most of it is reference material (education history, career arc, psychological profile, infrastructure details) that&#39;s rarely needed in full.</p>
 <p><strong>Proposed change:</strong> Split into:</p>
 <ul>
@@ -155,7 +152,7 @@ When you need context beyond this file:
 9. **Structured lookup:** `KNOWLEDGE_INDEX.yaml` for metadata-tagged catalog
 10. **Task state:** `TASKS.md` (current), `ACTIVITY_LOG.md` (history)
 </code></pre>
-<h3>3.3 Layer 2: Unified Knowledge Index</h3>
+<h3 id="33-layer-2-unified-knowledge-index">3.3 Layer 2: Unified Knowledge Index</h3>
 <p><strong>This is the core new artifact.</strong></p>
 <p>A single structured index file (<code>KNOWLEDGE_INDEX.yaml</code>) that catalogs every significant document across both systems with consistent metadata. This enables:</p>
 <ul>
@@ -164,7 +161,7 @@ When you need context beyond this file:
 <li>&quot;What system is this in?&quot; → check <code>system</code> field</li>
 <li>&quot;What should I read for task Y?&quot; → filter by <code>domain</code> + <code>type</code></li>
 </ul>
-<h4>Schema</h4>
+<h4 id="schema">Schema</h4>
 <pre><code class="language-yaml"># KNOWLEDGE_INDEX.yaml
 version: 1
 last_updated: &quot;2026-03-18&quot;
@@ -227,7 +224,7 @@ documents:
     summary: &quot;October 2026 summit. Budget $24K. Location TBD Albany/Schenectady. Matt = core organizer.&quot;
     tags: [summit, cooperative, event, icn-demo]
 </code></pre>
-<h4>Fields</h4>
+<h4 id="fields">Fields</h4>
 <table>
 <thead>
 <tr>
@@ -292,22 +289,22 @@ documents:
 <td>Freeform tags for search/filter</td>
 </tr>
 </tbody></table>
-<h4>Location</h4>
+<h4 id="location">Location</h4>
 <p>The index lives in <strong>both</strong> systems:</p>
 <ul>
 <li><code>~/projects/icn/docs/KNOWLEDGE_INDEX.yaml</code> (repo copy)</li>
 <li><code>.claude_launchpad/KNOWLEDGE_INDEX.yaml</code> (launchpad copy)</li>
 </ul>
 <p>One is the source of truth (Launchpad, since it spans both systems). The repo copy is synced manually or by a future automation.</p>
-<h3>3.4 Layer 3: Knowledge Organization (minimal changes)</h3>
+<h3 id="34-layer-3-knowledge-organization-minimal-changes">3.4 Layer 3: Knowledge Organization (minimal changes)</h3>
 <p>The actual doc trees stay where they are. The index makes them findable. Only two structural changes needed:</p>
 <ol>
 <li><strong>Launchpad CLAUDE.md slimming</strong> — move reference-heavy sections to dedicated files in <code>memory/context/</code></li>
 <li><strong>Cross-system pointers</strong> — each system&#39;s entry point includes a &quot;how to access the other system&quot; section</li>
 </ol>
 <hr>
-<h2>4. Cross-System Bridging</h2>
-<h3>4.1 ICN Repo → Launchpad</h3>
+<h2 id="4-cross-system-bridging">4. Cross-System Bridging</h2>
+<h3 id="41-icn-repo--launchpad">4.1 ICN Repo → Launchpad</h3>
 <p>An agent on icn-dev needs Launchpad context when:</p>
 <ul>
 <li>Scheduling work (health/disability constraints)</li>
@@ -316,7 +313,7 @@ documents:
 <li>Summit planning (people, budget, timeline)</li>
 </ul>
 <p><strong>Bridge mechanism:</strong> The repo&#39;s CLAUDE.md tells agents that personal/cross-project context lives in Launchpad. If the agent is on icn-dev (WSL2 or SSH), Launchpad is accessible at <code>/mnt/c/Users/mattf/.claude_launchpad/</code> or via OneDrive sync. If not accessible, the agent asks the user.</p>
-<h3>4.2 Launchpad → ICN Repo</h3>
+<h3 id="42-launchpad--icn-repo">4.2 Launchpad → ICN Repo</h3>
 <p>A Cowork session needs repo context when:</p>
 <ul>
 <li>Designing ICN features (crate reference, gateway API, architecture)</li>
@@ -324,7 +321,7 @@ documents:
 <li>Writing about ICN (whitepaper, pitch, scenarios)</li>
 </ul>
 <p><strong>Bridge mechanism:</strong> Launchpad&#39;s CLAUDE.md tells agents that ICN codebase context lives in the repo. From Cowork, the repo is accessible via WSL2 (<code>wsl.exe</code> method documented in CLAUDE.md). The <code>projects/icn/</code> directory in Launchpad holds planning docs that have been migrated to the repo — these are convenience copies, the repo is authoritative.</p>
-<h3>4.3 Specialized Agents (future)</h3>
+<h3 id="43-specialized-agents-future">4.3 Specialized Agents (future)</h3>
 <p>The 11 ICN agents in <code>.claude/agents/</code> are currently only available to Claude Code sessions on the repo. Cowork sessions can&#39;t invoke them. A future enhancement would be:</p>
 <ul>
 <li>An MCP tool that proxies queries to the repo&#39;s specialized agents</li>
@@ -332,17 +329,17 @@ documents:
 </ul>
 <p>This is not needed now but should be designed for.</p>
 <hr>
-<h2>5. Freshness Protocol</h2>
-<h3>Problem</h3>
+<h2 id="5-freshness-protocol">5. Freshness Protocol</h2>
+<h3 id="problem">Problem</h3>
 <p>Static docs go stale. An agent reading <code>memory/projects/icn.md</code> doesn&#39;t know if it reflects yesterday&#39;s state or last month&#39;s.</p>
-<h3>Solution</h3>
+<h3 id="solution">Solution</h3>
 <p>Every entry in KNOWLEDGE_INDEX.yaml has a <code>last_verified</code> date. The protocol:</p>
 <ol>
 <li><strong>On document update:</strong> Author updates <code>last_verified</code> in the index entry</li>
 <li><strong>On session start:</strong> Agent can scan the index for stale entries (&gt;30 days unverified)</li>
 <li><strong>On use:</strong> If an agent reads a doc and finds it&#39;s stale, it updates the <code>last_verified</code> date after confirming accuracy — or flags it as needing review</li>
 </ol>
-<h3>Staleness Tiers</h3>
+<h3 id="staleness-tiers">Staleness Tiers</h3>
 <table>
 <thead>
 <tr>
@@ -373,8 +370,8 @@ documents:
 </tr>
 </tbody></table>
 <hr>
-<h2>6. Retrieval Patterns</h2>
-<h3>Pattern 1: &quot;What do I know about X?&quot;</h3>
+<h2 id="6-retrieval-patterns">6. Retrieval Patterns</h2>
+<h3 id="pattern-1-what-do-i-know-about-x">Pattern 1: &quot;What do I know about X?&quot;</h3>
 <pre><code>Agent receives task mentioning &quot;federation settlement&quot;
   → Scans KNOWLEDGE_INDEX.yaml for tags containing &quot;federation&quot; or &quot;settlement&quot;
   → Finds: icn-gap-analysis (tags: [gap-analysis, reality-check])
@@ -383,7 +380,7 @@ documents:
   → Reads the most relevant (gap analysis, since it&#39;s tagged as reality-check)
   → Now has grounded context for the task
 </code></pre>
-<h3>Pattern 2: &quot;Who should I contact about X?&quot;</h3>
+<h3 id="pattern-2-who-should-i-contact-about-x">Pattern 2: &quot;Who should I contact about X?&quot;</h3>
 <pre><code>Agent needs to discuss summit logistics
   → Scans KNOWLEDGE_INDEX.yaml for domain: cooperative, type: project
   → Finds: lp-ny-coop-summit
@@ -391,13 +388,13 @@ documents:
   → Scans memory/people/ for joe-marraffino.md
   → Has full contact context
 </code></pre>
-<h3>Pattern 3: &quot;Is this doc still accurate?&quot;</h3>
+<h3 id="pattern-3-is-this-doc-still-accurate">Pattern 3: &quot;Is this doc still accurate?&quot;</h3>
 <pre><code>Agent reads memory/projects/icn.md for ICN status
   → Checks KNOWLEDGE_INDEX.yaml entry: last_verified: 2026-03-12
   → 6 days old → Fresh tier → trusts it
   → If &gt;30 days: would verify against live repo state before acting on claims
 </code></pre>
-<h3>Pattern 4: &quot;What should I read for this task?&quot;</h3>
+<h3 id="pattern-4-what-should-i-read-for-this-task">Pattern 4: &quot;What should I read for this task?&quot;</h3>
 <pre><code>Agent starting a mobile UX implementation session
   → Scans KNOWLEDGE_INDEX.yaml for tags containing &quot;mobile&quot; + domain: icn
   → Finds: icn-mobile-ux-spec (spec, 36KB)
@@ -406,8 +403,8 @@ documents:
   → Reads in priority order: spec first, then crate reference for implementation details
 </code></pre>
 <hr>
-<h2>7. Implementation Phases</h2>
-<h3>Phase 1: Index Creation (1-2 sessions)</h3>
+<h2 id="7-implementation-phases">7. Implementation Phases</h2>
+<h3 id="phase-1-index-creation-1-2-sessions">Phase 1: Index Creation (1-2 sessions)</h3>
 <p>Build KNOWLEDGE_INDEX.yaml from scratch by auditing both systems:</p>
 <ul>
 <li>Catalog every significant doc in Launchpad memory/ and projects/</li>
@@ -415,28 +412,28 @@ documents:
 <li>Assign IDs, domains, types, tags, freshness dates</li>
 <li>Place copies in both systems</li>
 </ul>
-<h3>Phase 2: Entry Point Optimization (1 session)</h3>
+<h3 id="phase-2-entry-point-optimization-1-session">Phase 2: Entry Point Optimization (1 session)</h3>
 <ul>
 <li>Slim Launchpad CLAUDE.md (move reference sections → memory/context/)</li>
 <li>Add &quot;Knowledge Retrieval&quot; sections to both CLAUDE.md files</li>
 <li>Add cross-system bridge instructions</li>
 <li>Update BOOT.md to reference the index</li>
 </ul>
-<h3>Phase 3: Freshness Audit (1 session)</h3>
+<h3 id="phase-3-freshness-audit-1-session">Phase 3: Freshness Audit (1 session)</h3>
 <ul>
 <li>Walk through every indexed doc</li>
 <li>Mark last_verified dates</li>
 <li>Identify and archive docs that are &gt;90 days stale</li>
 <li>Flag docs that need updating</li>
 </ul>
-<h3>Phase 4: Agent Integration (future)</h3>
+<h3 id="phase-4-agent-integration-future">Phase 4: Agent Integration (future)</h3>
 <ul>
 <li>Build a Claude Code skill (<code>/knowledge-lookup</code>) that queries the index</li>
 <li>Build a Cowork skill that can read ICN repo docs via WSL2</li>
 <li>Consider: MCP tool that serves the index as structured data</li>
 </ul>
 <hr>
-<h2>8. What This Does NOT Include</h2>
+<h2 id="8-what-this-does-not-include">8. What This Does NOT Include</h2>
 <ul>
 <li><strong>No database.</strong> The index is a YAML file, not a SQLite DB or vector store. Agents can grep it.</li>
 <li><strong>No auto-sync.</strong> The index is manually maintained. Automation is Phase 4+.</li>
@@ -445,7 +442,7 @@ documents:
 <li><strong>No merging of the two systems.</strong> Launchpad and ICN repo serve different purposes. They should stay separate but connected.</li>
 </ul>
 <hr>
-<h2>9. Success Criteria</h2>
+<h2 id="9-success-criteria">9. Success Criteria</h2>
 <ol>
 <li>A new agent session (Claude Code or Cowork) can find any significant document within 2 hops from its entry point</li>
 <li>An agent can answer &quot;what do I know about X?&quot; by scanning the index, without browsing directories</li>
@@ -456,7 +453,10 @@ documents:
 </ol>
 <hr>
 <p><em>Spec generated 2026-03-18. Implement in order: Phase 1 (index) → Phase 2 (entry points) → Phase 3 (freshness) → Phase 4 (tooling).</em></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/planning/agent-knowledge-architecture.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

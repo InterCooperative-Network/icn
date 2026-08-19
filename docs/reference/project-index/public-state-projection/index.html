@@ -1,0 +1,325 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="How canonical repository state is projected onto the public website, including the status.toml to ADR-0032 maturity band mapping and the evidence-class mapping"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Public state projection | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>public state projection</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Canonical</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-17</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="public-state-projection">Public state projection</h1>
+<blockquote>
+<p><strong>One sentence.</strong> The public website renders a <em>projection</em> of canonical
+repository state, never a second copy of it, and this document defines every
+place the internal vocabulary meets the public one.</p>
+</blockquote>
+<p>Implements the durable requirement of
+<a href="https://github.com/InterCooperative-Network/icn/issues/1369" target="_blank" rel="noopener">#1369</a>. Read
+alongside <a href="https://github.com/InterCooperative-Network/icn/blob/main/claim-boundaries">claim-boundaries.md</a> (the two-axis rule) and
+<a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a> (the public band
+vocabulary and the seven claim rules).</p>
+<hr>
+<h2 id="1--why-a-projection-rather-than-a-website-tracker">1 · Why a projection rather than a website tracker</h2>
+<p>Before this, <code>website/src/data/roadmap.json</code> held a hand-written account of
+project state. It was a second project tracker, and it did what second trackers
+do: at the time it was removed it was roughly a month behind <code>docs/status.toml</code>,
+the file it was supposed to reflect, and nothing in CI or in review would have
+caught that.</p>
+<p>The rule now is one-directional:</p>
+<pre><code>docs/status.toml  →  website/scripts/gen-project-state.mjs  →  the page
+</code></pre>
+<p>Nobody edits the public claim. They edit <code>docs/status.toml</code>, which is where the
+claim was supposed to live all along, and the website follows on the next build.</p>
+<hr>
+<h2 id="2--what-is-projected">2 · What is projected</h2>
+<table>
+<thead>
+<tr>
+<th>Source field</th>
+<th>Projected as</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>subsystems.&lt;id&gt;.name</code></td>
+<td>Subsystem name</td>
+<td>verbatim</td>
+</tr>
+<tr>
+<td><code>subsystems.&lt;id&gt;.status</code></td>
+<td>Public maturity band</td>
+<td>mapped — see §3</td>
+</tr>
+<tr>
+<td><code>subsystems.&lt;id&gt;.evidence_type</code></td>
+<td>Public evidence class</td>
+<td>mapped — see §4</td>
+</tr>
+<tr>
+<td><code>subsystems.&lt;id&gt;.last_verified</code></td>
+<td>&quot;Verified&quot; date</td>
+<td>verbatim</td>
+</tr>
+<tr>
+<td><code>subsystems.&lt;id&gt;.gaps[]</code></td>
+<td>&quot;Recorded gaps&quot; column</td>
+<td>verbatim, unabridged</td>
+</tr>
+<tr>
+<td><code>subsystems.&lt;id&gt;.crates[]</code></td>
+<td>Crate list under the name</td>
+<td>verbatim</td>
+</tr>
+</tbody></table>
+<h3 id="what-is-deliberately-not-projected">What is deliberately not projected</h3>
+<p>The <code>[summary]</code> table is <strong>not</strong> projected at all. Three of its fields are
+unpublishable and the table has no schema guaranteeing a fourth will not be
+added:</p>
+<ul>
+<li><code>total_tests_note</code> — <code>status.toml</code> marks its own test count stale, and
+<code>docs/PHASE_PROGRESS.md</code> carries an incompatible baseline for the same date.</li>
+<li><code>loc_approx</code> — contradicted by <code>PHASE_PROGRESS.md</code>; a third number was
+previously computed at build time by the website itself.</li>
+<li><code>deployment</code> — contains a <code>running since &lt;date&gt;</code> phrase, which
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">show-readiness-map.md</a> § red lines forbids on a public
+surface.</li>
+</ul>
+<p>Excluding the whole table is a deliberate fail-safe choice over maintaining a
+per-field denylist that a new field could quietly outflank.</p>
+<hr>
+<h2 id="3--status--maturity-band">3 · Status → maturity band</h2>
+<p><code>docs/status.toml</code> declares a closed <code>status</code> vocabulary; ADR-0032 declares a
+closed public band vocabulary. No mapping between them existed anywhere in the
+repository before this document. This is it.</p>
+<table>
+<thead>
+<tr>
+<th><code>status.toml</code> value</th>
+<th>Public band</th>
+<th>Reasoning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>exceeds-spec</code></td>
+<td><code>strong</code></td>
+<td>Verified working beyond the specified behaviour.</td>
+</tr>
+<tr>
+<td><code>confirmed</code></td>
+<td><code>strong</code></td>
+<td>Verified working. The band the project defends in public.</td>
+</tr>
+<tr>
+<td><code>partially-confirmed</code></td>
+<td><code>maturing</code></td>
+<td>Real implementation; verification incomplete. Not <code>advancing</code>, because the limit is what has been <em>checked</em>, not what has been <em>built</em>.</td>
+</tr>
+<tr>
+<td><code>simplified</code></td>
+<td><code>maturing</code></td>
+<td>A deliberately reduced implementation. Real, but not the full concept — which is precisely what &quot;real but maturing&quot; says.</td>
+</tr>
+<tr>
+<td><code>working-immature</code></td>
+<td><code>advancing</code></td>
+<td>Works; not yet reliable enough to lean on. The active frontier.</td>
+</tr>
+<tr>
+<td><code>foundation-only</code></td>
+<td><code>notyet</code></td>
+<td>Scaffolding exists, the capability does not.</td>
+</tr>
+</tbody></table>
+<p><strong>Unmapped values fail the build.</strong> <code>gen-project-state.mjs</code> exits non-zero on
+any <code>status</code> it does not recognise rather than defaulting to a band. A new
+status value is a decision about a public claim, and it should be made here,
+deliberately, not absorbed silently by a fallback.</p>
+<blockquote>
+<p><strong>Vocabulary defect, recorded here so it is not rediscovered:</strong> ADR-0032
+writes the fifth band as <code>not-yet</code>, while <code>MaturityBadge.astro</code> declares it
+<code>notyet</code>. The code spelling is what the site uses. Reconciling the two is a
+separate, narrow change to ADR-0032 and the component together.</p>
+</blockquote>
+<hr>
+<h2 id="4--evidence-type--evidence-class">4 · Evidence type → evidence class</h2>
+<p>The second axis. <a href="https://github.com/InterCooperative-Network/icn/blob/main/claim-boundaries">claim-boundaries.md</a> requires
+implementation maturity and evidence strength to be carried together and never
+collapsed; this is the public rendering of the second one.</p>
+<table>
+<thead>
+<tr>
+<th><code>status.toml</code> <code>evidence_type</code></th>
+<th>Public class</th>
+<th>Public wording</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>test</code></td>
+<td><code>test-backed</code></td>
+<td>Exercised by the automated test suite in this repository.</td>
+</tr>
+<tr>
+<td><code>ci</code></td>
+<td><code>ci-backed</code></td>
+<td>Enforced by a check that runs on every change.</td>
+</tr>
+<tr>
+<td><code>demo</code></td>
+<td><code>fixture-backed</code></td>
+<td>Demonstrated against deterministic fixture data, not live institutional use.</td>
+</tr>
+<tr>
+<td><code>code-review</code></td>
+<td><code>reviewed</code></td>
+<td>Established by reading the implementation, not by an automated check.</td>
+</tr>
+<tr>
+<td><code>human-asserted</code></td>
+<td><code>asserted</code></td>
+<td>Stated by a maintainer. No automated check currently proves this one.</td>
+</tr>
+</tbody></table>
+<p>The wording matters more than the label. &quot;Test-backed&quot; must not be readable as
+&quot;has been run by an institution&quot;, so the sentence says what the evidence
+actually covers.</p>
+<p><strong>Why this axis exists at all:</strong> without it, a subsystem marked <code>strong</code> reads
+as finished. With it, <code>Governance — strong — fixture-backed</code> says the true and
+more useful thing: well-built, and demonstrated only against prepared data.</p>
+<hr>
+<h2 id="5--freshness">5 · Freshness</h2>
+<p>The page shows two dates and they are not interchangeable:</p>
+<ul>
+<li><strong>Subsystem data verified</strong> — the newest <code>last_verified</code> across subsystems, from
+<code>status.toml</code>. Generated. It moves only when someone re-verifies a subsystem
+against source.</li>
+<li><strong>Narrative last reviewed</strong> — a constant in <code>whats-real-now.astro</code>, covering the
+hand-written prose. It moves only when someone re-reads that prose against the
+generated table.</li>
+</ul>
+<p>Neither is the build timestamp, deliberately. A rebuild must never look like a
+re-verification — that is the exact failure mode that makes a &quot;last updated&quot;
+stamp worthless.</p>
+<hr>
+<h2 id="6--fail-closed-behaviour">6 · Fail-closed behaviour</h2>
+<p><code>gen-project-state.mjs</code> exits non-zero, taking the build with it, when:</p>
+<ul>
+<li><code>docs/status.toml</code> is missing or unparseable;</li>
+<li>any <code>status</code> or <code>evidence_type</code> value is unmapped;</li>
+<li>any subsystem lacks <code>last_verified</code>;</li>
+<li>fewer than 8 subsystems parse.</li>
+</ul>
+<p>A public page whose entire purpose is trustworthiness is worse than useless
+when it silently renders partial data. A red build is the cheap failure.</p>
+<p>The same discipline applies to the sibling generators:
+<code>gen-docs-classification.mjs</code> refuses to publish an unfiltered or near-empty
+docs surface, and <code>gen-concepts.mjs</code> refuses to emit a glossary missing any of
+the nine closure-loop concepts.</p>
+<hr>
+<h2 id="7--subsystems-with-no-row">7 · Subsystems with no row</h2>
+<p><code>status.toml</code> has no row for membership, receipts/provenance, the member-facing
+shell, or the rehearsal appliance. The website does not invent one. Those are
+covered in the hand-written narrative on <code>/whats-real-now</code>, and the page states
+plainly that they are absent from the generated table.</p>
+<p>That absence is itself worth publishing: the machine-readable record does not
+yet cover everything the project talks about, and hiding that would be its own
+small dishonesty.</p>
+<hr>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/claim-boundaries">claim-boundaries.md</a> — the orthogonal-axes rule</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">show-readiness-map.md</a> — red lines for public claims</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">proof-level-taxonomy-capability-matrix.md</a> — the L0–L8 evidence ladder</li>
+<li><a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a> — public band vocabulary and claim rules</li>
+<li><a href="/docs/design/PUBLIC_SITE_IA">../../design/PUBLIC_SITE_IA.md</a> — page responsibilities and plain-language conventions</li>
+</ul>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/public-state-projection.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

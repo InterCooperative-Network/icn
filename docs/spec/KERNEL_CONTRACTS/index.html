@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel Contracts Specification | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Specification of kernel contract primitives"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel Contracts Specification | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,16 +35,13 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KERNEL CONTRACTS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/KERNEL_CONTRACTS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Kernel Contracts Specification</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KERNEL CONTRACTS</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-kernel-contracts-specification">ICN Kernel Contracts Specification</h1>
 <p><strong>Version</strong>: 0.1.0
 <strong>Status</strong>: Draft
 <strong>Last Updated</strong>: 2025-01-25</p>
 <p>This document defines the contracts for ICN kernel primitives. It is the constitutional document for the kernel architecture - all kernel code must conform to these contracts.</p>
 <hr>
-<h2>Table of Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#0-contract-rules">Contract Rules</a></li>
 <li><a href="#1-common-types">Common Types</a></li>
@@ -59,8 +56,8 @@ View source on GitHub →
 <li><a href="#10-app-runtime-contract">App Runtime Contract</a></li>
 </ol>
 <hr>
-<h2>0. Contract Rules</h2>
-<h3>0.1 Stability Policy</h3>
+<h2 id="0-contract-rules">0. Contract Rules</h2>
+<h3 id="01-stability-policy">0.1 Stability Policy</h3>
 <p>The kernel follows semantic versioning for API stability:</p>
 <table>
 <thead>
@@ -83,7 +80,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Wire format stability</strong>: All serialized formats (events, capabilities, messages) MUST be versioned and support at least N-2 versions for reading.</p>
-<h3>0.2 The Meaning Firewall</h3>
+<h3 id="02-the-meaning-firewall">0.2 The Meaning Firewall</h3>
 <p>The kernel provides <strong>mechanisms</strong>, not <strong>semantics</strong>.</p>
 <p><strong>The kernel MUST NOT:</strong></p>
 <ul>
@@ -101,14 +98,14 @@ View source on GitHub →
 <li>Accept arbitrary bytes/schemas without interpretation</li>
 </ul>
 <p><strong>Litmus test</strong>: &quot;Could a developer build a DIFFERENT economic model / governance system / trust algorithm using these primitives?&quot; If no, the primitives are too specific.</p>
-<h3>0.3 Extension Points</h3>
+<h3 id="03-extension-points">0.3 Extension Points</h3>
 <p>Each primitive MUST define:</p>
 <ol>
 <li><strong>Adapter interfaces</strong>: Pluggable implementations (e.g., different storage backends, different DID methods)</li>
 <li><strong>Policy oracle hooks</strong>: Points where apps can inject authorization decisions</li>
 <li><strong>Resource accounting hooks</strong>: Metering points for quotas and limits</li>
 </ol>
-<h3>0.4 PR Checklist</h3>
+<h3 id="04-pr-checklist">0.4 PR Checklist</h3>
 <p>Every PR touching kernel code MUST answer:</p>
 <ul>
 <li><input disabled="" type="checkbox"> Does this add a new kernel operation? → Update <code>kernel_surface.toml</code></li>
@@ -119,7 +116,7 @@ View source on GitHub →
 <li><input disabled="" type="checkbox"> Does this break wire format compatibility? → Requires major version bump</li>
 </ul>
 <hr>
-<h2>1. Common Types</h2>
+<h2 id="1-common-types">1. Common Types</h2>
 <p>All primitives share these foundational types:</p>
 <pre><code class="language-rust">// === Identifiers ===
 
@@ -252,9 +249,9 @@ pub enum Blame {
 }
 </code></pre>
 <hr>
-<h2>2. Identity Primitive</h2>
+<h2 id="2-identity-primitive">2. Identity Primitive</h2>
 <p>The Identity primitive provides decentralized identity management without credential semantics.</p>
-<h3>2.1 Contract</h3>
+<h3 id="21-contract">2.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>DID creation, rotation, and deactivation</li>
@@ -269,7 +266,7 @@ pub enum Blame {
 <li>Trust/reputation scores</li>
 <li>Steward ceremonies or verification rituals</li>
 </ul>
-<h3>2.2 Trait Definitions</h3>
+<h3 id="22-trait-definitions">2.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Core identity operations
 pub trait IdentityService: Send + Sync {
     /// Create a new DID with the specified method
@@ -355,7 +352,7 @@ pub enum SignatureAlgorithm {
     // Future: post-quantum algorithms
 }
 </code></pre>
-<h3>2.3 Design Notes</h3>
+<h3 id="23-design-notes">2.3 Design Notes</h3>
 <ul>
 <li><strong>DID resolution for networked methods</strong> (did:web) runs as an adapter/service with egress capability</li>
 <li><strong>Pure methods</strong> (did:key, did:icn) can resolve in deterministic compute</li>
@@ -363,9 +360,9 @@ pub enum SignatureAlgorithm {
 <li><strong>Steward ceremonies</strong> and identity verification are apps built on top, not kernel features</li>
 </ul>
 <hr>
-<h2>3. Authorization Primitive</h2>
+<h2 id="3-authorization-primitive">3. Authorization Primitive</h2>
 <p>The Authorization primitive provides object-capability tokens and policy oracle integration.</p>
-<h3>3.1 Contract</h3>
+<h3 id="31-contract">3.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Object-capability tokens (NOT RBAC)</li>
@@ -380,7 +377,7 @@ pub enum SignatureAlgorithm {
 <li>Predefined capability taxonomies</li>
 <li>Any policy logic (just enforcement)</li>
 </ul>
-<h3>3.2 Trait Definitions</h3>
+<h3 id="32-trait-definitions">3.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Capability token granting specific access
 #[derive(Clone, Debug)]
 pub struct Capability {
@@ -536,7 +533,7 @@ pub enum CapabilityError {
     Internal(String),
 }
 </code></pre>
-<h3>3.3 Bootstrap Sequence</h3>
+<h3 id="33-bootstrap-sequence">3.3 Bootstrap Sequence</h3>
 <p>The capability bootstrapping paradox (trust is an app, but apps need capabilities) is solved via genesis bootstrap:</p>
 <pre><code class="language-rust">/// Bootstrap phases for node startup
 pub enum BootstrapPhase {
@@ -570,7 +567,7 @@ pub struct GenesisCapabilities {
     pub node_admin: Capability,
 }
 </code></pre>
-<h3>3.4 Design Notes</h3>
+<h3 id="34-design-notes">3.4 Design Notes</h3>
 <ul>
 <li><strong>Bearer tokens</strong> for automation; <strong>holder-bound tokens</strong> for humans (require co-signature)</li>
 <li><strong>Short expirations + refresh model</strong> because revocation lists don&#39;t scale globally</li>
@@ -578,9 +575,9 @@ pub struct GenesisCapabilities {
 <li><strong>Default oracle = AllowAllOracle</strong> for simple single-coop deployments</li>
 </ul>
 <hr>
-<h2>4. State Primitive</h2>
+<h2 id="4-state-primitive">4. State Primitive</h2>
 <p>The State primitive provides namespaced, typed storage without domain semantics.</p>
-<h3>4.1 Contract</h3>
+<h3 id="41-contract">4.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Namespaced storage: <code>/&lt;org&gt;/&lt;app&gt;/&lt;sub&gt;/</code></li>
@@ -595,7 +592,7 @@ pub struct GenesisCapabilities {
 <li>Domain-specific schemas</li>
 <li>&quot;Ledger&quot; or &quot;governance&quot; data types</li>
 </ul>
-<h3>4.2 Trait Definitions</h3>
+<h3 id="42-trait-definitions">4.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Append-only, ordered event streams
 pub trait LogService: Send + Sync {
     /// Create a new log in a namespace
@@ -721,16 +718,16 @@ pub enum StateError {
     Internal(String),
 }
 </code></pre>
-<h3>4.3 Ordering Guarantees</h3>
+<h3 id="43-ordering-guarantees">4.3 Ordering Guarantees</h3>
 <ul>
 <li><strong>Logs</strong> are ordered per-writer by default (cheap, scalable)</li>
 <li><strong>Total ordering</strong> requires consensus group (<code>ClusterStrong</code>) - opt-in, expensive</li>
 <li><strong>Apps that need global order</strong> must explicitly request <code>ClusterStrong</code> replication</li>
 </ul>
 <hr>
-<h2>5. Compute Primitive</h2>
+<h2 id="5-compute-primitive">5. Compute Primitive</h2>
 <p>The Compute primitive provides WASM execution with metering and scheduling.</p>
-<h3>5.1 Contract</h3>
+<h3 id="51-contract">5.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>WASM execution with resource metering</li>
@@ -744,7 +741,7 @@ pub enum StateError {
 <li>Privileged execution for &quot;official&quot; apps</li>
 <li>Any interpretation of what code does</li>
 </ul>
-<h3>5.2 Trait Definitions</h3>
+<h3 id="52-trait-definitions">5.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Compute execution engine
 pub trait ComputeEngine: Send + Sync {
     /// Execute deterministic computation (no I/O, reproducible)
@@ -868,16 +865,16 @@ pub enum ComputeError {
     Internal(String),
 }
 </code></pre>
-<h3>5.3 Design Notes</h3>
+<h3 id="53-design-notes">5.3 Design Notes</h3>
 <ul>
 <li><strong>ABIs are versioned and stable</strong> (like syscalls) - never break without major version</li>
 <li><strong>Scheduling is at-least-once</strong> - exactly-once requires coordination pattern at app layer</li>
 <li><strong>All apps use the same compute APIs</strong> - no privileged syscalls for &quot;core&quot; functionality</li>
 </ul>
 <hr>
-<h2>6. Communication Primitive</h2>
+<h2 id="6-communication-primitive">6. Communication Primitive</h2>
 <p>The Communication primitive provides messaging without message semantics.</p>
-<h3>6.1 Contract</h3>
+<h3 id="61-contract">6.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Pub/sub with at-least-once delivery</li>
@@ -891,7 +888,7 @@ pub enum ComputeError {
 <li>Moderation/filtering logic (apps via oracles)</li>
 <li>Exactly-once delivery (apps build this if needed)</li>
 </ul>
-<h3>6.2 Trait Definitions</h3>
+<h3 id="62-trait-definitions">6.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Publish-subscribe messaging
 pub trait PubSub: Send + Sync {
     /// Publish a message to a topic
@@ -1003,7 +1000,7 @@ pub enum CommsError {
     Internal(String),
 }
 </code></pre>
-<h3>6.3 Ordering Guarantees</h3>
+<h3 id="63-ordering-guarantees">6.3 Ordering Guarantees</h3>
 <ul>
 <li><strong>Per-topic partition ordering</strong> (not global)</li>
 <li><strong>Message IDs are stable and signed</strong> (can verify authenticity)</li>
@@ -1011,9 +1008,9 @@ pub enum CommsError {
 <li><strong>Replay is first-class</strong> (projections can rebuild from any offset)</li>
 </ul>
 <hr>
-<h2>7. Time Primitive</h2>
+<h2 id="7-time-primitive">7. Time Primitive</h2>
 <p>The Time primitive provides logical clocks and scheduling.</p>
-<h3>7.1 Contract</h3>
+<h3 id="71-contract">7.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Logical clocks for causal ordering</li>
@@ -1026,7 +1023,7 @@ pub enum CommsError {
 <li>Calendar/timezone concepts</li>
 <li>&quot;Vote ends at 5pm&quot; semantics (app layer)</li>
 </ul>
-<h3>7.2 Trait Definitions</h3>
+<h3 id="72-trait-definitions">7.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Time services
 pub trait TimeService: Send + Sync {
     /// Get current logical timestamp
@@ -1093,9 +1090,9 @@ pub enum TimeError {
 }
 </code></pre>
 <hr>
-<h2>8. Coordination Primitive</h2>
+<h2 id="8-coordination-primitive">8. Coordination Primitive</h2>
 <p>The Coordination primitive provides consensus and CRDTs.</p>
-<h3>8.1 Contract</h3>
+<h3 id="81-contract">8.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Scoped consensus groups (Raft-like)</li>
@@ -1109,7 +1106,7 @@ pub enum TimeError {
 <li>Cross-scope transactions (app layer via sagas)</li>
 <li>Arbitrary merge functions (security risk)</li>
 </ul>
-<h3>8.2 Trait Definitions</h3>
+<h3 id="82-trait-definitions">8.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Coordination services
 pub trait Coordination: Send + Sync {
     // === Consensus Groups ===
@@ -1220,7 +1217,7 @@ pub enum CoordError {
     Internal(String),
 }
 </code></pre>
-<h3>8.3 Critical Design Rule</h3>
+<h3 id="83-critical-design-rule">8.3 Critical Design Rule</h3>
 <p><strong>Consensus is always scoped</strong> (per namespace, per dataset). No global chain. This prevents:</p>
 <ul>
 <li>Imperial scaling (one chain to rule them all)</li>
@@ -1228,9 +1225,9 @@ pub enum CoordError {
 <li>Unbounded coordination costs</li>
 </ul>
 <hr>
-<h2>9. Naming Primitive</h2>
+<h2 id="9-naming-primitive">9. Naming Primitive</h2>
 <p>The Naming primitive provides name resolution and service discovery.</p>
-<h3>9.1 Contract</h3>
+<h3 id="91-contract">9.1 Contract</h3>
 <p><strong>Provides:</strong></p>
 <ul>
 <li>Name records (name → target, signed by authority)</li>
@@ -1244,7 +1241,7 @@ pub enum CoordError {
 <li>Dispute resolution (just enforces signatures)</li>
 <li>Global namespace (scoped by design)</li>
 </ul>
-<h3>9.2 Trait Definitions</h3>
+<h3 id="92-trait-definitions">9.2 Trait Definitions</h3>
 <pre><code class="language-rust">/// Name resolution service
 pub trait NamingService: Send + Sync {
     /// Register a name record
@@ -1386,7 +1383,7 @@ pub enum NamingError {
     Internal(String),
 }
 </code></pre>
-<h3>9.3 Why Naming Matters</h3>
+<h3 id="93-why-naming-matters">9.3 Why Naming Matters</h3>
 <p>Without naming, apps hardcode addresses. With naming:</p>
 <ul>
 <li>Apps compose via stable names that survive scaling, failover, and federation</li>
@@ -1394,9 +1391,9 @@ pub enum NamingError {
 <li>Aliases enable gradual migrations</li>
 </ul>
 <hr>
-<h2>10. App Runtime Contract</h2>
+<h2 id="10-app-runtime-contract">10. App Runtime Contract</h2>
 <p>This section defines how applications interact with kernel primitives.</p>
-<h3>10.1 App Manifest Schema (v0)</h3>
+<h3 id="101-app-manifest-schema-v0">10.1 App Manifest Schema (v0)</h3>
 <pre><code class="language-yaml"># Every app—official or third-party—uses this format
 name: my-app
 version: 1.0.0
@@ -1478,7 +1475,7 @@ placement:
   replicas: 3
   locality: org_scope
 </code></pre>
-<h3>10.2 App Lifecycle</h3>
+<h3 id="102-app-lifecycle">10.2 App Lifecycle</h3>
 <pre><code class="language-rust">pub enum AppState {
     /// Manifest loaded, not yet configured
     Installed,
@@ -1517,7 +1514,7 @@ pub trait AppRuntime: Send + Sync {
     fn state(&amp;self, app: &amp;AppId) -&gt; Result&lt;AppState, RuntimeError&gt;;
 }
 </code></pre>
-<h3>10.3 Isolation Guarantees</h3>
+<h3 id="103-isolation-guarantees">10.3 Isolation Guarantees</h3>
 <ol>
 <li><strong>Namespace isolation</strong>: Each app gets <code>/&lt;org&gt;/&lt;app&gt;/</code></li>
 <li><strong>Cross-namespace access</strong>: Requires explicit capability</li>
@@ -1525,7 +1522,7 @@ pub trait AppRuntime: Send + Sync {
 <li><strong>Private state</strong>: Apps cannot access other apps&#39; private state</li>
 <li><strong>Public streams</strong>: Apps CAN read other apps&#39; public event streams (with capability)</li>
 </ol>
-<h3>10.4 Handler Contracts</h3>
+<h3 id="104-handler-contracts">10.4 Handler Contracts</h3>
 <pre><code class="language-rust">/// Reducer (deterministic) handler contract
 /// Called for each event on subscribed logs
 pub trait Reducer {
@@ -1551,7 +1548,7 @@ pub trait Service {
 }
 </code></pre>
 <hr>
-<h2>Appendix A: Capability Naming Convention</h2>
+<h2 id="appendix-a-capability-naming-convention">Appendix A: Capability Naming Convention</h2>
 <p>Standard capability format: <code>&lt;domain&gt;:&lt;resource&gt;:&lt;action&gt;</code></p>
 <p><strong>Examples:</strong></p>
 <ul>
@@ -1569,7 +1566,7 @@ pub trait Service {
 <li><code>:&lt;path&gt;</code> - Specific resource path</li>
 </ul>
 <hr>
-<h2>Appendix B: Wire Format Versioning</h2>
+<h2 id="appendix-b-wire-format-versioning">Appendix B: Wire Format Versioning</h2>
 <p>All serialized formats include version information:</p>
 <pre><code class="language-rust">/// Envelope for all wire messages
 pub struct WireEnvelope {
@@ -1590,7 +1587,7 @@ pub struct WireEnvelope {
 <li>Unknown versions MUST be rejected with clear error</li>
 </ul>
 <hr>
-<h2>Appendix C: Error Handling Guidelines</h2>
+<h2 id="appendix-c-error-handling-guidelines">Appendix C: Error Handling Guidelines</h2>
 <ol>
 <li><strong>Errors include blame</strong>: Caller, Kernel, or Adapter</li>
 <li><strong>Errors indicate retryability</strong>: Can this be retried?</li>
@@ -1612,7 +1609,7 @@ match result {
 }
 </code></pre>
 <hr>
-<h2>Document History</h2>
+<h2 id="document-history">Document History</h2>
 <table>
 <thead>
 <tr>
@@ -1629,7 +1626,10 @@ match result {
 </tbody></table>
 <hr>
 <p><em>This document is the constitutional foundation for ICN kernel development. All kernel code must conform to these contracts.</em></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/KERNEL_CONTRACTS.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>The Principal Model | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Who ICN can honestly say did something. Establishes the Person != Device != Node != Institution invariant, records the verified current state at 74c832f1 (TWO semantically different Person-identity constructions — key-derived Dids, and SDIS anchor-derived Dids built from H(VUI || genesis_random) via new_unchecked that embed no controllable key and are indistinguishable by format, recorded as open decision O18; a device roster whose Capability::Sign is never checked in production; an AddDevice signer able to grant capabilities it does not itself hold; SignedGovernanceOp accepting only the author's root key; the node DID standing in as proposal author in actor-backed mode), and proposes a four-class principal taxonomy in which an institution deliberately holds no signing key. Specifies member-origin signing via a carried, self-contained device authorization, and derives implementation slices and their exact dependency on #2469 slices 4-7. Records ten open decisions (O3, O8-O18), the load-bearing one being O9: ICN has no convergent cross-node device-revocation model, and all three candidate shapes are refuted against current semantics. Design only: no implementation, no change to SignedGovernanceOp, no lifting of #2470 containment."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>The Principal Model | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PRINCIPAL MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/PRINCIPAL_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>The Principal Model</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PRINCIPAL MODEL</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-14</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="the-principal-model">The Principal Model</h1>
 <p>Who ICN can honestly say did something: which actors are independently
 identifiable, what each may sign for, and why an identity must never silently
 become another identity merely because it runs on, controls, hosts, or belongs
@@ -86,7 +83,7 @@ principal proves today) ·
 <a href="/docs/design/authenticated-governance-replication">authenticated-governance-replication</a>
 (#2469) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION</a> (Meaning Firewall)</p>
 <hr>
-<h2>1. The invariant</h2>
+<h2 id="1-the-invariant">1. The invariant</h2>
 <pre><code>Person != Device != Node != Institution
 </code></pre>
 <p>Each is independently identifiable. Relationships between them are explicit,
@@ -101,7 +98,7 @@ scoped, and revocable — never implicit inheritance.</p>
 </ol>
 <p>This document exists because <strong>ICN currently fails test 1 and test 2 in
 shipping code</strong>, and cannot express tests 3–5 at all. §2 shows where.</p>
-<h3>1.1 Principles</h3>
+<h3 id="11-principles">1.1 Principles</h3>
 <ul>
 <li><strong>The DID is the anchor; institutions are changing contexts.</strong> Cooperatives,
 communities and federations are co-equal — never a ladder. (Already binding
@@ -126,9 +123,9 @@ the documentation says.</li>
 above the Meaning Firewall.</li>
 </ul>
 <hr>
-<h2>2. What ICN implements today</h2>
+<h2 id="2-what-icn-implements-today">2. What ICN implements today</h2>
 <p>Verified at <code>74c832f1</code>. This section is descriptive.</p>
-<h3>2.1 One opaque, key-derived identifier for everything</h3>
+<h3 id="21-one-opaque-key-derived-identifier-for-everything">2.1 One opaque, key-derived identifier for everything</h3>
 <p><code>pub struct Did(String)</code> (<code>icn/crates/icn-identity/src/lib.rs:177</code>).
 <code>Did::from_str</code> (<code>:209-244</code>) requires the <code>did:icn:</code> prefix, a decodable
 <strong>multibase</strong> payload of exactly 32 bytes, and a valid Ed25519 public key.</p>
@@ -172,7 +169,7 @@ trustee (<code>icn-identity/src/multi_device.rs:108</code>), and a ledger author
 <p>Genesis is already self-sovereign and offline: <code>KeyPair::generate()</code> (<code>:341</code>) →
 <code>Did::from_public_key</code> (<code>:191</code>). No registry, no network call. <strong>This part of
 the goal is already met.</strong></p>
-<h3>2.2 A device roster, not a device authority model</h3>
+<h3 id="22-a-device-roster-not-a-device-authority-model">2.2 A device roster, not a device authority model</h3>
 <p><code>icn/crates/icn-identity/src/multi_device.rs</code> (772 lines) implements
 <code>DidDocument</code>(:19), <code>VerificationMethod</code>(:43), <code>Capability</code>(:78),
 <code>RecoveryConfig</code>(:100), <code>RotationEvent</code>(:135), <code>RecoveryProof</code>(:237),
@@ -224,7 +221,7 @@ the network verifies.</strong> The capability model governs roster mutation only
 <p>One thing already works in our favour: the <code>Did</code> is derived from the <em>original</em>
 key and is <strong>stable across rotation</strong> (<code>multi_device.rs:21-22</code>). Identity
 continuity is designed in.</p>
-<h3>2.3 Two contradictory definitions of &quot;who may sign as DID X&quot;</h3>
+<h3 id="23-two-contradictory-definitions-of-who-may-sign-as-did-x">2.3 Two contradictory definitions of &quot;who may sign as DID X&quot;</h3>
 <table>
 <thead>
 <tr>
@@ -251,7 +248,7 @@ continuity is designed in.</p>
 unless <code>Did::from_public_key(signing_key) == author</code>.</p>
 <p><strong>Therefore a device key can never produce a valid <code>SignedGovernanceOp</code> for its
 person.</strong> This is the precise mechanism behind #2469 §7.0.2&#39;s custody boundary.</p>
-<h3>2.4 Authorship is assumed, not proven</h3>
+<h3 id="24-authorship-is-assumed-not-proven">2.4 Authorship is assumed, not proven</h3>
 <ul>
 <li><p><code>CastVote { voter: Did, .. }</code> (<code>apps/governance/src/actor.rs:171-180</code>) carries
 a doc-comment reading &quot;DID of the voter (authenticated caller)&quot;. The handler
@@ -297,7 +294,7 @@ reachable under a DID the requester cannot sign for.</p>
 scope.</p>
 </li>
 </ul>
-<h3>2.4a Token issuance taxonomy — what a bearer token actually evidences</h3>
+<h3 id="24a-token-issuance-taxonomy--what-a-bearer-token-actually-evidences">2.4a Token issuance taxonomy — what a bearer token actually evidences</h3>
 <p>All gateway and RPC tokens are <strong>HMAC HS256 over a shared secret</strong>
 (<code>auth.rs:415-419</code>, <code>:190-192</code>) — there is no asymmetric issuer key, so a token
 proves only that <em>something holding the gateway secret</em> emitted these claims.
@@ -370,7 +367,7 @@ and that path&#39;s <code>sub</code> is cryptographically proven regardless.</p>
 that consumes <code>claims.sub</code> as authorship must name which modes it trusts; §6
 exists precisely so that governance authorship stops depending on this table at
 all.</p>
-<h3>2.5 The node already stands in for the person — in production</h3>
+<h3 id="25-the-node-already-stands-in-for-the-person--in-production">2.5 The node already stands in for the person — in production</h3>
 <p><code>manager.rs:3480</code> accepts <code>proposer: Did</code>. In the actor-backed branch
 (<code>:3486-3497</code>) it calls <code>create_proposal_with_actions(..)</code> and <strong>never passes
 it</strong> — the argument is silently dropped. Downstream, <code>actor.rs:1925-1927</code> does
@@ -379,7 +376,7 @@ the proposal author</strong>. The non-actor fallback (<code>manager.rs:3512</cod
 caller.</p>
 <p><strong>The same endpoint attributes authorship differently by deployment mode.</strong> This
 is invariant test 2 failing today, not hypothetically.</p>
-<h3>2.6 An institution is a slug, and never signs</h3>
+<h3 id="26-an-institution-is-a-slug-and-never-signs">2.6 An institution is a slug, and never signs</h3>
 <p><code>EntityId(String)</code> = <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code> (<code>icn-entity/src/entity.rs:43,61</code>).
 <code>to_did()</code> returns <code>Some</code> <strong>only for individuals</strong> (<code>:159</code>). Organization slugs
 are human-chosen and unbound to any key.</p>
@@ -406,7 +403,7 @@ appear only as resources (<code>ids.rs:110</code>).</p>
 delegated authority scopes but do NOT grant sovereignty.&quot;</p>
 <p>There is <strong>no verifiable-credential layer</strong> anywhere in the entity or governance
 crates.</p>
-<h3>2.7 Nodes are self-issued; no claiming exists</h3>
+<h3 id="27-nodes-are-self-issued-no-claiming-exists">2.7 Nodes are self-issued; no claiming exists</h3>
 <p><code>icnd --init</code> generates a keypair locally and refuses only if a keystore already
 exists (<code>icn/bins/icnd/src/main.rs:398-419</code>). <strong>Nothing authorizes a node into
 existence</strong>; the network treats self-issued DIDs as cheap by design
@@ -425,7 +422,7 @@ DID: <code>create_node_profile(did.clone(), did.clone(), // For now, operator is
 by the node&#39;s own gateway (<code>middleware.rs:84-95</code>).</p>
 <p><code>SignedEnvelope</code> authenticates the <strong>hop, not the author</strong> — stated verbatim at
 <code>icn-governance/src/replication.rs:16-18</code>.</p>
-<h3>2.8 Hosting: the data model allows it, the identity model forbids it</h3>
+<h3 id="28-hosting-the-data-model-allows-it-the-identity-model-forbids-it">2.8 Hosting: the data model allows it, the identity model forbids it</h3>
 <p>Node config carries exactly one <code>[federation].coop_id: String</code>
 (<code>icn-core/src/config/federation.rs:18</code>); <code>init_federation.rs:71-85</code> builds one
 <code>own_coop_info</code> bound to the node DID. But the entity store is multi-entity
@@ -455,7 +452,7 @@ may complete a challenge to obtain a token, but no key signs the genesis payload
 <strong>The consequence is stronger, not weaker: institutional genesis carries no
 authorship binding whatsoever</strong>, so the §7.3 remedy — genesis signed by the
 founding Persons — is closing a hole that is currently fully open.</p>
-<h3>2.9 Clients</h3>
+<h3 id="29-clients">2.9 Clients</h3>
 <table>
 <thead>
 <tr>
@@ -497,7 +494,7 @@ unbootstrappable from client code</strong>.</p>
 <p>The RN surface already names itself correctly: &quot;Device Keyring implementation
 (legacy-named &#39;wallet&#39;)&quot; (<code>wallet.ts:55</code>).</p>
 <hr>
-<h2>3. Historical design intent, classified</h2>
+<h2 id="3-historical-design-intent-classified">3. Historical design intent, classified</h2>
 <table>
 <thead>
 <tr>
@@ -572,7 +569,7 @@ personal/household cells; QR-based <em>device enrollment</em> (only QR proof
 <em>presentation</em> exists); org-owned vs member-contributed infrastructure as a
 designed distinction; offline signing (referenced as a property, no design doc).</p>
 <hr>
-<h2>4. The principal taxonomy (proposed)</h2>
+<h2 id="4-the-principal-taxonomy-proposed">4. The principal taxonomy (proposed)</h2>
 <p>Four principal classes. A fifth is deliberately <strong>not</strong> created.</p>
 <table>
 <thead>
@@ -634,7 +631,7 @@ designed distinction; offline signing (referenced as a property, no design doc).
 <td>any Person</td>
 </tr>
 </tbody></table>
-<h3>4.1 Why an Institution gets no DID and no key</h3>
+<h3 id="41-why-an-institution-gets-no-did-and-no-key">4.1 Why an Institution gets no DID and no key</h3>
 <p>This is the load-bearing asymmetry, and it is not aesthetic.</p>
 <p><code>Did</code> is structurally an Ed25519 public key (§2.1). Giving an institution a DID
 therefore means giving it a <strong>keypair</strong>, which means someone holds that keypair.
@@ -655,7 +652,7 @@ so. §11.3 records what this costs.</p>
 <p>What an institution <em>does</em> need is a <strong>non-squattable, stable identifier</strong>.
 Today&#39;s human-chosen slug (§2.6) is neither. §7.1 proposes binding it to its
 genesis decision.</p>
-<h4>4.1.1 The options, tested against the invariants</h4>
+<h4 id="411-the-options-tested-against-the-invariants">4.1.1 The options, tested against the invariants</h4>
 <p><em>Re-evaluated in review round 8, deliberately not for symmetry with Person/Device/Node.</em></p>
 <table>
 <thead>
@@ -753,7 +750,7 @@ cost, resting on the ESTABLISHED source facts that no institution signs in produ
 (§2.6) and that <code>Did</code> is structurally a public key (§2.1). Reopening it is legitimate
 if institutions turn out to need self-authenticating statements — that is the decisive
 test, and it is recorded as <strong>O12</strong>.</p>
-<h3>4.2 Why Device gets a DID</h3>
+<h3 id="42-why-device-gets-a-did">4.2 Why Device gets a DID</h3>
 <p>A device already holds an Ed25519 keypair (§2.2, <code>wallet.ts:93</code>), and a
 <code>did:icn:</code> <em>is</em> a base58 Ed25519 public key — so a device DID costs nothing new
 cryptographically. It buys three things a string id cannot:</p>
@@ -764,14 +761,14 @@ cryptographically. It buys three things a string id cannot:</p>
 </ol>
 <p>The device DID <strong>never appears as a governance author.</strong> It appears as the
 <em>acting</em> principal alongside the authoring Person.</p>
-<h3>4.3 Why there is no separate Service/Agent principal</h3>
+<h3 id="43-why-there-is-no-separate-serviceagent-principal">4.3 Why there is no separate Service/Agent principal</h3>
 <p>A background service, scheduler, or automation runs on a Node and acts under a
 scoped <code>AuthorityGrant</code>. It needs no new identity class: the Node DID names <em>who
 is running</em>, and the grant names <em>what it may do</em>. Creating a fifth class would
 add a key custody problem without adding an authority distinction.</p>
 <hr>
-<h2>5. Lifecycles</h2>
-<h3>5.1 Person</h3>
+<h2 id="5-lifecycles">5. Lifecycles</h2>
+<h3 id="51-person">5.1 Person</h3>
 <pre><code>generate root keypair locally  ──►  Person DID exists
         (offline, no network)          (self-certifying)
                                             │
@@ -794,7 +791,7 @@ be backed up (recovery phrase) and otherwise kept out of the hot path. The
 device key does the routine work.</p>
 <p><em>Open:</em> whether the root key may live on the first phone at all, or must be
 generated to backup material from the outset. See §13.</p>
-<h3>5.2 Device</h3>
+<h3 id="52-device">5.2 Device</h3>
 <pre><code>device generates its own keypair  ──►  Device DID
               │
               ▼
@@ -823,7 +820,7 @@ ignores it, and §6.4 forbids receivers from enforcing it.</li>
 <li>Hardware backing (Secure Enclave / Android Keystore / passkey) is a property of
 the device key, not a new principal class. Absent in Rust today (§2.1).</li>
 </ul>
-<h3>5.3 Node</h3>
+<h3 id="53-node">5.3 Node</h3>
 <pre><code>first boot ──► node generates its own keypair ──► Node DID (per instance)
                                                         │
                                                         ▼
@@ -895,7 +892,7 @@ ceremony exists to prevent.</p>
 is a genuine open question (§13) with a real security cost either way: keeping it
 makes backup-restore-twice indistinguishable from a clone; rotating it breaks
 every peer expectation and hosting assignment.</p>
-<h3>5.4 Institution</h3>
+<h3 id="54-institution">5.4 Institution</h3>
 <pre><code>people agree  ──►  genesis decision (signed by founding Persons)
                               │
                               ▼
@@ -913,10 +910,10 @@ the institution&#39;s sovereign. Today, entity genesis requires only the JWT sco
 (<code>icn-gateway/src/api/entity.rs:296,404-408</code>) — with no mandate, charter, or
 governed decision. That is the gap.</p>
 <hr>
-<h2>6. Member-origin signing</h2>
+<h2 id="6-member-origin-signing">6. Member-origin signing</h2>
 <p>This is the load-bearing mechanism, and it is what unblocks the honest version of
 #2469 slice 7.</p>
-<h3>6.1 The shape</h3>
+<h3 id="61-the-shape">6.1 The shape</h3>
 <pre><code>Person P                                (root key — offline / backup)
    │ signs once
    ▼
@@ -949,7 +946,7 @@ and is removed — §6.4 explains why a receiver must not evaluate it.</p>
 <p><strong>Author remains the Person DID.</strong> The device is the <em>acting</em> principal, carried
 alongside. A gateway can relay this without ever holding P&#39;s key — which is
 exactly what §7.0.2 of #2469 says is impossible today.</p>
-<h3>6.2 Why carried, not resolved</h3>
+<h3 id="62-why-carried-not-resolved">6.2 Why carried, not resolved</h3>
 <p>The alternative — having the receiver resolve P&#39;s DID document and call
 <code>can_sign</code> — recreates precisely the flaw #2469 §14.1 rejected when it declined to
 add a <code>standing_hash</code>: the receiver would compare against distributed state whose
@@ -959,7 +956,7 @@ because it would look like the hole was closed.&quot;</em></p>
 <p>A carried proof is self-certifying. Both signatures verify against keys recovered
 from the DIDs in the envelope itself. No resolution, no external state, no
 ingress-path dependency.</p>
-<h3>6.3 The rotation problem — a blocking flaw in this design</h3>
+<h3 id="63-the-rotation-problem--a-blocking-flaw-in-this-design">6.3 The rotation problem — a blocking flaw in this design</h3>
 <p><em>Raised in review on PR #2586; it is real and it is load-bearing.</em></p>
 <p>Because a DID <strong>is</strong> its genesis public key (§2.1), <code>P.to_verifying_key()</code> always
 recovers the <strong>original</strong> key, even after the Person rotates or recovers. A verifier
@@ -1048,7 +1045,7 @@ alternative must cover all four.</p>
 <p><strong>Still unresolved (O8, §13), and it blocks slice A</strong>, which must not freeze an
 authorization format that cannot express rotation. Until O8 is answered, what §5.1 and
 §7 say about identity continuity holds only for the pre-rotation case.</p>
-<h3>6.4 Expiry is not order-independent — a second constraint on slice D</h3>
+<h3 id="64-expiry-is-not-order-independent--a-second-constraint-on-slice-d">6.4 Expiry is not order-independent — a second constraint on slice D</h3>
 <p><em>Raised in review on PR #2586.</em></p>
 <p><code>not_after</code> evaluated against each receiver&#39;s local clock is <strong>not</strong> a
 convergent predicate: an operation delivered before the deadline at peer A and
@@ -1063,7 +1060,7 @@ mechanism at all</strong>. A compromised device holds the private key: it will n
 acceptable <strong>indefinitely</strong>. Expiry bounds only behaviour an attacker has no
 reason to exhibit.</p>
 <p>What would actually revoke a device is the subject of §6.5.</p>
-<h3>6.5 Device revocation — no deterministic anchor exists today</h3>
+<h3 id="65-device-revocation--no-deterministic-anchor-exists-today">6.5 Device revocation — no deterministic anchor exists today</h3>
 <p><em>Reworked in review round 8. The previous text called short expiry &quot;the primary
 control&quot;, which §6.4 had already invalidated.</em></p>
 <p>For a receiver to reject a compromised device&#39;s operation, it needs replicated,
@@ -1197,7 +1194,7 @@ answered</strong>, because every candidate implies different carried fields.</p>
 <p>Until then the honest statement is: <strong>a device authorization, once issued, is
 acceptable to every receiver for as long as the format is valid.</strong> Roster
 revocation is a local bookkeeping act with no protocol effect.</p>
-<h3>6.6 Implications for <code>SignedGovernanceOp</code> — <strong>not changed here</strong></h3>
+<h3 id="66-implications-for-signedgovernanceop--not-changed-here">6.6 Implications for <code>SignedGovernanceOp</code> — <strong>not changed here</strong></h3>
 <p>Per the session constraint, nothing in <code>SignedGovernanceOp</code> is modified. Recording
 implications only:</p>
 <ul>
@@ -1218,14 +1215,14 @@ ops&quot; is not enforceable: ingress cannot distinguish a node DID from a Perso
 (§2.1), so while v1 is accepted a compromised pre-rotation Person root bypasses
 every v2 device-authorization and revocation rule. See <strong>O13</strong>.</li>
 </ul>
-<h3>6.7 Layer boundary</h3>
+<h3 id="67-layer-boundary">6.7 Layer boundary</h3>
 <p>Device authorization is a <strong>principal-authentication</strong> primitive, not a governance
 one. It belongs in <code>icn-identity</code> (§6.7) and must be usable by any subsystem that needs
 &quot;principal A authorized principal B to act in class X&quot; — settlement, membership,
 compute. #2469 consumes it; #2469 does not own it.</p>
 <hr>
-<h2>7. Institutions, membership, and hosting</h2>
-<h3>7.1 Institution identity</h3>
+<h2 id="7-institutions-membership-and-hosting">7. Institutions, membership, and hosting</h2>
+<h3 id="71-institution-identity">7.1 Institution identity</h3>
 <p>An institution keeps <code>EntityId</code>, but the identifier must become <strong>bound rather
 than squattable</strong>. Proposed: bind the <code>EntityId</code> to the hash of its genesis
 decision, so that claiming a slug requires producing the decision that created
@@ -1239,7 +1236,7 @@ The hashed field set must also be stated, so a decision cannot be rebound to a
 different slug. The current <code>EntityId</code> is an unbound human-chosen string (§2.6),
 and <code>derive_treasury_did</code> compounds this by minting DID-shaped strings with no key
 and no <code>Did</code> validation.</p>
-<h3>7.2 Membership is a relationship, never inheritance</h3>
+<h3 id="72-membership-is-a-relationship-never-inheritance">7.2 Membership is a relationship, never inheritance</h3>
 <p>Person P being a member of Institution I grants P <em>standing within I&#39;s context</em>.
 It does not merge identities, and it does not require a separate account.</p>
 <p>ICN&#39;s existing membership record with its bidirectional index
@@ -1254,7 +1251,7 @@ with no credential form, so standing cannot be proven to a party that does not
 already hold the registry (§2.6). A membership credential — a signed, verifiable
 statement of standing — is the gap. It is <em>not</em> required for slice-7 governance,
 because membership there is evaluated against the receiver&#39;s own domain state.</p>
-<h3>7.3 Hosted and shared infrastructure</h3>
+<h3 id="73-hosted-and-shared-infrastructure">7.3 Hosted and shared infrastructure</h3>
 <p>The symmetry that makes this tractable:</p>
 <blockquote>
 <p>Person identity survives device replacement.
@@ -1307,7 +1304,7 @@ only; person + personal node; institution on a hosted node; institution on its o
 node; federation across many nodes. Moving between them is a change of <em>hosting
 assignment</em>, not of identity.</p>
 <hr>
-<h2>8. Mobile onboarding and the NYCN acceptance vertical</h2>
+<h2 id="8-mobile-onboarding-and-the-nycn-acceptance-vertical">8. Mobile onboarding and the NYCN acceptance vertical</h2>
 <p>The reference flow, and what each step needs that does not exist yet:</p>
 <table>
 <thead>
@@ -1360,7 +1357,7 @@ enter the kernel; per <code>.claude/rules/design.md</code>, NYCN vocabulary belo
 institution packages. If the generic primitives cannot express NYCN, the
 primitives are wrong — not NYCN.</p>
 <hr>
-<h2>9. Threat model</h2>
+<h2 id="9-threat-model">9. Threat model</h2>
 <table>
 <thead>
 <tr>
@@ -1457,7 +1454,7 @@ primitives are wrong — not NYCN.</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>10. Privacy and correlation</h2>
+<h2 id="10-privacy-and-correlation">10. Privacy and correlation</h2>
 <p><strong>Honest statement of the tradeoff, as the brief requires.</strong></p>
 <p>A single permanent Person DID used everywhere makes a person&#39;s entire
 institutional life trivially linkable: the same 32-byte identifier appears in
@@ -1492,7 +1489,7 @@ that the current architecture optimizes for verifiability over unlinkability, an
 that this was not an explicit decision — it is a consequence of <code>Did</code> being a raw
 public key.</p>
 <hr>
-<h2>11. Architectural conflicts discovered</h2>
+<h2 id="11-architectural-conflicts-discovered">11. Architectural conflicts discovered</h2>
 <ol>
 <li><strong>Two contradictory signing authorities</strong> (§2.3). <code>can_sign</code> (multi-key,
 document-mediated) is dead; <code>to_verifying_key()</code> (single-key, self-certifying)
@@ -1516,7 +1513,7 @@ reconciliation code.</li>
 authorization subjects — consistent with §4.1, but currently by accident.</li>
 </ol>
 <hr>
-<h2>12. Explicit non-properties</h2>
+<h2 id="12-explicit-non-properties">12. Explicit non-properties</h2>
 <p>This model does <strong>not</strong> provide, and must not be read as providing:</p>
 <ul>
 <li>anonymity or unlinkability (§10);</li>
@@ -1540,7 +1537,7 @@ while leaving a compromised original root able to authorize (§6.3);</li>
 <li>any change to #2470 containment, which remains in force.</li>
 </ul>
 <hr>
-<h2>13. Open design decisions</h2>
+<h2 id="13-open-design-decisions">13. Open design decisions</h2>
 <table>
 <thead>
 <tr>
@@ -1641,7 +1638,7 @@ while leaving a compromised original root able to authorize (§6.3);</li>
 </tr>
 </tbody></table>
 <hr>
-<h2>14. Implementation gap matrix</h2>
+<h2 id="14-implementation-gap-matrix">14. Implementation gap matrix</h2>
 <p>Legend: <strong>I</strong> implemented · <strong>P</strong> partial · <strong>M</strong> missing · <strong>C</strong> conflicting ·
 <strong>D</strong> needs design decision</p>
 <table>
@@ -1913,7 +1910,7 @@ while leaving a compromised original root able to authorize (§6.3);</li>
 </tr>
 </tbody></table>
 <hr>
-<h2>15. Proposed implementation slices</h2>
+<h2 id="15-proposed-implementation-slices">15. Proposed implementation slices</h2>
 <p>Derived from source dependencies. <strong>None are implemented in this session.</strong></p>
 <p>Ordering rationale: A is the primitive everything else consumes; B and C are
 independent of each other once A lands; D is the #2469 join point; E–G are the
@@ -1999,7 +1996,7 @@ node/institution arc, which does not block D.</p>
 <td>—</td>
 </tr>
 </tbody></table>
-<h3>15.1 Slice A is no longer the correct first slice</h3>
+<h3 id="151-slice-a-is-no-longer-the-correct-first-slice">15.1 Slice A is no longer the correct first slice</h3>
 <p><em>Conclusion of review round 8.</em> Slice A is blocked twice over — <strong>O8</strong> (rotation) and
 <strong>O9</strong> (revocation anchor) — and both change the <em>carried field set</em>, not merely the
 policy around it. Freezing a <code>DeviceAuthorization</code> encoding before either is answered
@@ -2055,7 +2052,7 @@ until O9 has an answer.</p>
 <p>A0 is proof-bearing on its own: it either converges on two nodes under a forked
 rotation event, or it does not, and that is testable without governance, without
 mobile, and without touching <code>SignedGovernanceOp</code>.</p>
-<h3>Dependency on #2469</h3>
+<h3 id="dependency-on-2469">Dependency on #2469</h3>
 <table>
 <thead>
 <tr>
@@ -2082,7 +2079,7 @@ mobile, and without touching <code>SignedGovernanceOp</code>.</p>
 </tbody></table>
 <p>Slices 4–6 are explicitly <strong>not blocked</strong> by this work.</p>
 <hr>
-<h2>16. Migration and evolution</h2>
+<h2 id="16-migration-and-evolution">16. Migration and evolution</h2>
 <ul>
 <li><strong>Additive — but V1 must be retired, not merely coexist.</strong> <em>(Raised in review
 round 9.)</em> The intent was that <code>GOV_OP_V1</code> remains valid for node-authored
@@ -2112,7 +2109,10 @@ order governance operations against revocations or roll back applied effects —
 scheduling A and D after it would freeze the authorization format and the v2
 envelope before deterministic revocation exists (§15.1).</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/PRINCIPAL_MODEL.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

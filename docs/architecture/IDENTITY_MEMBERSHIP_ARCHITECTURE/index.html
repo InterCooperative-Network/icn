@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Identity and Membership Architecture for ICN | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="HISTORICAL PREDECESSOR (2025-12-25). Retained for rationale, not as current truth. Its IDENTITY portions are superseded: it documents anchor-derived DIDs as first-class person identifiers, which HUMAN_IDENTITY_ARCHITECTURE.md dispositions for removal, and it predates the N1 authority-log primitive and the N2 semantic contract entirely. For the semantic identity classes, identifier domains, substitution rules and legacy-DID bridge invariants, docs/architecture/IDENTITY_SEMANTICS.md is canonical; for the broader identity architecture, threat model and derivation, HUMAN_IDENTITY_ARCHITECTURE.md controls. Its membership-lifecycle and federation-recognition rationale is not superseded by N2 but is not current truth either - that work is downstream (#2605 N5, blocked). Registry status corrected 2026-08-18: it was `living`, which ranked a superseded predecessor above the documents that supersede it. Retained in place rather than archived so its inbound references stay resolvable; a future move to docs/archive/ is the open follow-up."><meta name="robots" content="noindex, follow"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Identity and Membership Architecture for ICN (archived) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,15 +35,22 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IDENTITY MEMBERSHIP ARCHITECTURE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Identity and Membership Architecture for ICN</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <a href="/docs/archive" data-astro-cid-uadgga6g>Archive</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>IDENTITY MEMBERSHIP ARCHITECTURE</span> </nav>  <aside class="callout callout-archive doc-banner" aria-labelledby="doc-banner-title" data-astro-cid-w3hnbhco><span class="callout-label" id="doc-banner-title" data-astro-cid-w3hnbhco>
+Historical document — not current project state
+</span><p data-astro-cid-w3hnbhco>
+This page is kept for the record. It described the project at the time it
+        was written and has not been maintained since. Do not read it as a
+        statement about how ICN works today.
+</p><dl class="doc-banner-meta" data-astro-cid-w3hnbhco><div data-astro-cid-w3hnbhco><dt data-astro-cid-w3hnbhco>Classification</dt><dd data-astro-cid-w3hnbhco>registry status=&quot;superseded&quot;</dd></div><div data-astro-cid-w3hnbhco><dt data-astro-cid-w3hnbhco>Last reviewed</dt><dd data-astro-cid-w3hnbhco>2026-08-18</dd></div></dl><p class="doc-banner-actions" data-astro-cid-w3hnbhco>
+For current material, start at <a href="/docs" data-astro-cid-w3hnbhco>the documentation index</a>,
+        or read <a href="/whats-real-now" data-astro-cid-w3hnbhco>What's real now</a> for the maturity
+        account of each subsystem.
+</p></aside> <article class="prose" data-astro-cid-uadgga6g><h1 id="identity-and-membership-architecture-for-icn">Identity and Membership Architecture for ICN</h1>
 <p><strong>Original status</strong>: Design Document
 <strong>Date</strong>: 2025-12-25
 <strong>Author</strong>: Architecture Review</p>
 <blockquote>
-<h2>Truth status — HISTORICAL PREDECESSOR. Do not build from this document.</h2>
+<h2 id="truth-status--historical-predecessor-do-not-build-from-this-document">Truth status — HISTORICAL PREDECESSOR. Do not build from this document.</h2>
 <p>Written 2025-12-25, <strong>before</strong> the N1 authority-log primitive and before the N2
 semantic contract. It is retained for its rationale and problem framing, and
 <strong>is not current truth</strong>. Its registry status was corrected from <code>living</code> to
@@ -97,7 +104,7 @@ blocked)</strong>, and authenticated institutional standing is <strong>#2441</st
 </ul>
 <p>Retained in place rather than archived so inbound references stay resolvable.</p>
 </blockquote>
-<h2>Executive Summary</h2>
+<h2 id="executive-summary">Executive Summary</h2>
 <p>This document proposes a unified identity and membership architecture for ICN that addresses:</p>
 <ul>
 <li>Individual identity independent of infrastructure nodes</li>
@@ -108,7 +115,7 @@ blocked)</strong>, and authenticated institutional standing is <strong>#2441</st
 </ul>
 <p>The design adheres to cooperative principles of democratic control and voluntary membership while maintaining cryptographic security.</p>
 <hr>
-<h2>Table of Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#1-current-state-analysis">Current State Analysis</a></li>
 <li><a href="#2-individual-identity-model">Individual Identity Model</a></li>
@@ -120,14 +127,14 @@ blocked)</strong>, and authenticated institutional standing is <strong>#2441</st
 <li><a href="#8-migration-strategy">Migration Strategy</a></li>
 </ol>
 <hr>
-<h2>1. Current State Analysis</h2>
-<h3>1.1 Identity Layer (icn-identity)</h3>
+<h2 id="1-current-state-analysis">1. Current State Analysis</h2>
+<h3 id="11-identity-layer-icn-identity">1.1 Identity Layer (icn-identity)</h3>
 <p>The current implementation provides a robust foundation:</p>
-<h4>DID Types</h4>
+<h4 id="did-types">DID Types</h4>
 <pre><code>did:icn:&lt;base58-ed25519-pubkey&gt;     # Legacy: key-derived DID
 did:icn:&lt;base58-anchor-id&gt;          # SDIS: anchor-derived DID
 </code></pre>
-<h4>Key Components</h4>
+<h4 id="key-components">Key Components</h4>
 <table>
 <thead>
 <tr>
@@ -167,7 +174,7 @@ did:icn:&lt;base58-anchor-id&gt;          # SDIS: anchor-derived DID
 <td>M-of-N social recovery protocol</td>
 </tr>
 </tbody></table>
-<h4>Keystore Format Progression</h4>
+<h4 id="keystore-format-progression">Keystore Format Progression</h4>
 <ul>
 <li><strong>v1</strong>: Basic Ed25519 keypair</li>
 <li><strong>v2</strong>: Added TLS binding for DID-TLS security</li>
@@ -175,7 +182,7 @@ did:icn:&lt;base58-anchor-id&gt;          # SDIS: anchor-derived DID
 <li><strong>v3</strong>: Added DID Document and multi-device support</li>
 <li><strong>v4</strong>: Added SDIS Anchor and KeyBundle (hybrid PQ signatures)</li>
 </ul>
-<h3>1.2 Cooperative Membership (icn-cooperative)</h3>
+<h3 id="12-cooperative-membership-icn-cooperative">1.2 Cooperative Membership (icn-cooperative)</h3>
 <p>Current cooperative membership model:</p>
 <pre><code class="language-rust">pub struct Member {
     pub did: String,              // Member&#39;s DID
@@ -194,7 +201,7 @@ pub enum CooperativeStatus {
 }
 </code></pre>
 <p><strong>Membership Actions</strong>: Apply, Approve, Reject, Remove, ChangeTier, Suspend, Reinstate</p>
-<h3>1.3 Community Membership (icn-community)</h3>
+<h3 id="13-community-membership-icn-community">1.3 Community Membership (icn-community)</h3>
 <p>Current community membership model:</p>
 <pre><code class="language-rust">pub enum MemberType {
     Individual(String),   // DID
@@ -214,7 +221,7 @@ pub enum CommunityType {
 }
 </code></pre>
 <p>Communities support both individual and organizational members.</p>
-<h3>1.4 Federation (icn-federation)</h3>
+<h3 id="14-federation-icn-federation">1.4 Federation (icn-federation)</h3>
 <p>Federation operates at the cooperative level:</p>
 <pre><code class="language-rust">pub struct CooperativeInfo {
     pub coop_id: String,
@@ -232,7 +239,7 @@ pub enum FederationPolicy {
     Closed,
 }
 </code></pre>
-<h3>1.5 Current Gaps</h3>
+<h3 id="15-current-gaps">1.5 Current Gaps</h3>
 <ol>
 <li><strong>Identity-Node Coupling</strong>: Node identity currently equals user identity</li>
 <li><strong>No Individual-Coop Separation</strong>: An individual joining multiple coops needs multiple nodes</li>
@@ -241,8 +248,8 @@ pub enum FederationPolicy {
 <li><strong>Cross-Coop Identity</strong>: Same person in multiple coops has no identity linking</li>
 </ol>
 <hr>
-<h2>2. Individual Identity Model</h2>
-<h3>2.1 Design Principles</h3>
+<h2 id="2-individual-identity-model">2. Individual Identity Model</h2>
+<h3 id="21-design-principles">2.1 Design Principles</h3>
 <ol>
 <li><strong>Identity Independence</strong>: Individuals have DIDs independent of any node</li>
 <li><strong>Multi-Device Native</strong>: Design assumes multiple devices from the start</li>
@@ -250,7 +257,7 @@ pub enum FederationPolicy {
 <li><strong>Privacy-Preserving</strong>: No PII in DIDs or public data</li>
 <li><strong>Progressive Trust</strong>: Identity strength grows with attestations</li>
 </ol>
-<h3>2.2 Proposed Identity Architecture</h3>
+<h3 id="22-proposed-identity-architecture">2.2 Proposed Identity Architecture</h3>
 <pre><code>                        ┌──────────────────────────────────────────────────┐
                         │               PersonhoodAnchor                   │
                         │  (Permanent, survives all key rotations)         │
@@ -289,10 +296,10 @@ pub enum FederationPolicy {
                                 │  Stores local keychain   │
                                 └──────────────────────────┘
 </code></pre>
-<h3>2.3 Individuals Independent of Nodes</h3>
+<h3 id="23-individuals-independent-of-nodes">2.3 Individuals Independent of Nodes</h3>
 <p><strong>Question</strong>: Should individuals have DIDs independent of nodes?
 <strong>Answer</strong>: <strong>Yes, absolutely.</strong></p>
-<h4>Rationale</h4>
+<h4 id="rationale">Rationale</h4>
 <ol>
 <li><p><strong>Real-World Mapping</strong>: People are not machines. An individual should have a persistent identity across:</p>
 <ul>
@@ -306,7 +313,7 @@ pub enum FederationPolicy {
 <li><p><strong>Cooperative Mobility</strong>: Members may leave one coop and join another. Their identity and reputation should be portable.</p>
 </li>
 </ol>
-<h4>Implementation</h4>
+<h4 id="implementation">Implementation</h4>
 <pre><code class="language-rust">/// Individual identity structure
 pub struct IndividualIdentity {
     /// Permanent anchor (survives key rotation)
@@ -344,7 +351,7 @@ pub enum OrganizationType {
     Federation,
 }
 </code></pre>
-<h3>2.4 Multi-Device Support</h3>
+<h3 id="24-multi-device-support">2.4 Multi-Device Support</h3>
 <p>The existing <code>DidDocument</code> with <code>VerificationMethod</code> array already supports this. Enhancements:</p>
 <pre><code class="language-rust">/// Enhanced device capabilities
 pub enum Capability {
@@ -380,8 +387,8 @@ pub enum DeviceClass {
     GatewayDelegated,
 }
 </code></pre>
-<h3>2.5 Key Rotation and Recovery</h3>
-<h4>Proactive Rotation</h4>
+<h3 id="25-key-rotation-and-recovery">2.5 Key Rotation and Recovery</h3>
+<h4 id="proactive-rotation">Proactive Rotation</h4>
 <pre><code class="language-rust">pub struct RotationPolicy {
     /// Maximum key age before forced rotation
     pub max_key_age_days: u32,
@@ -391,7 +398,7 @@ pub enum DeviceClass {
     pub notify_days_before: u32,
 }
 </code></pre>
-<h4>Recovery Options</h4>
+<h4 id="recovery-options">Recovery Options</h4>
 <p>The existing <code>RecoveryConfig</code> supports M-of-N social recovery. Extensions:</p>
 <pre><code class="language-rust">pub enum RecoveryMethod {
     /// M-of-N social recovery (existing)
@@ -420,7 +427,7 @@ pub enum DeviceClass {
     None,
 }
 </code></pre>
-<h3>2.6 Identity Synchronization</h3>
+<h3 id="26-identity-synchronization">2.6 Identity Synchronization</h3>
 <p>DID Documents are synchronized via gossip (existing <code>identity:updates</code> topic):</p>
 <pre><code class="language-rust">/// Enhanced identity update for multi-org context
 pub struct IdentityUpdateMessage {
@@ -437,15 +444,15 @@ pub struct IdentityUpdateMessage {
 }
 </code></pre>
 <hr>
-<h2>3. Membership Lifecycle</h2>
-<h3>3.1 Design Principles</h3>
+<h2 id="3-membership-lifecycle">3. Membership Lifecycle</h2>
+<h3 id="31-design-principles">3.1 Design Principles</h3>
 <ol>
 <li><strong>Democratic Control</strong>: Membership decisions follow cooperative governance</li>
 <li><strong>Voluntary Membership</strong>: Easy exit without losing identity</li>
 <li><strong>Role Clarity</strong>: Clear capability mapping per membership tier</li>
 <li><strong>Auditability</strong>: All membership changes are recorded</li>
 </ol>
-<h3>3.2 Unified Membership Model</h3>
+<h3 id="32-unified-membership-model">3.2 Unified Membership Model</h3>
 <pre><code class="language-rust">/// Universal membership structure (works for Coops, Communities, Federations)
 pub struct Membership {
     /// Member&#39;s DID (individual or organization)
@@ -498,7 +505,7 @@ pub enum MembershipStatus {
     Removed { reason: String },
 }
 </code></pre>
-<h3>3.3 Joining a Cooperative</h3>
+<h3 id="33-joining-a-cooperative">3.3 Joining a Cooperative</h3>
 <pre><code>┌─────────────┐                    ┌─────────────┐                    ┌─────────────┐
 │  Applicant  │                    │ Cooperative │                    │ Governance  │
 │   (DID)     │                    │   System    │                    │   Process   │
@@ -527,7 +534,7 @@ pub enum MembershipStatus {
        │──────────────────────────────────►│                                   │
        │                                   │                                   │
 </code></pre>
-<h4>Membership Policies</h4>
+<h4 id="membership-policies">Membership Policies</h4>
 <pre><code class="language-rust">pub enum MembershipPolicy {
     /// Anyone can join
     Open,
@@ -560,7 +567,7 @@ pub enum MembershipStatus {
     Closed,
 }
 </code></pre>
-<h3>3.4 Joining a Community</h3>
+<h3 id="34-joining-a-community">3.4 Joining a Community</h3>
 <p>Communities have more flexible membership, supporting both individuals and organizations:</p>
 <pre><code class="language-rust">pub struct CommunityMembershipRequest {
     /// Applicant (individual or coop)
@@ -599,7 +606,7 @@ pub enum CommunityRole {
     Steward,
 }
 </code></pre>
-<h3>3.5 Role-Based Permissions</h3>
+<h3 id="35-role-based-permissions">3.5 Role-Based Permissions</h3>
 <pre><code class="language-rust">/// Capability matrix for membership tiers
 pub struct TierCapabilities {
     pub tier_name: String,
@@ -637,7 +644,7 @@ pub enum MembershipCapability {
     RecoveryGuardian,
 }
 </code></pre>
-<h3>3.6 Departure and Removal</h3>
+<h3 id="36-departure-and-removal">3.6 Departure and Removal</h3>
 <pre><code class="language-rust">pub enum DepartureType {
     /// Voluntary resignation
     Voluntary {
@@ -671,8 +678,8 @@ pub struct DepartureEffects {
 }
 </code></pre>
 <hr>
-<h2>4. Federation Identity</h2>
-<h3>4.1 Entity Representation in Federations</h3>
+<h2 id="4-federation-identity">4. Federation Identity</h2>
+<h3 id="41-entity-representation-in-federations">4.1 Entity Representation in Federations</h3>
 <p>Federations in ICN connect cooperatives and communities, not individuals directly.</p>
 <pre><code class="language-rust">/// Entity that can participate in federation
 pub struct FederatedEntity {
@@ -715,7 +722,7 @@ pub struct RepresentativeAuth {
     pub delegation_signature: Vec&lt;u8&gt;,
 }
 </code></pre>
-<h3>4.2 Cross-Entity Identity Recognition</h3>
+<h3 id="42-cross-entity-identity-recognition">4.2 Cross-Entity Identity Recognition</h3>
 <p>When an individual belongs to multiple entities in a federation:</p>
 <pre><code class="language-rust">/// Cross-entity identity claim
 pub struct CrossEntityClaim {
@@ -762,7 +769,7 @@ pub enum MembershipProof {
     },
 }
 </code></pre>
-<h3>4.3 Trust Propagation Through Federations</h3>
+<h3 id="43-trust-propagation-through-federations">4.3 Trust Propagation Through Federations</h3>
 <pre><code class="language-rust">/// Trust propagation rules for federation
 pub struct FederationTrustPolicy {
     /// Base trust for member entities
@@ -806,8 +813,8 @@ pub struct FederatedTrustPath {
 }
 </code></pre>
 <hr>
-<h2>5. Node Topology</h2>
-<h3>5.1 Node Types</h3>
+<h2 id="5-node-topology">5. Node Topology</h2>
+<h3 id="51-node-types">5.1 Node Types</h3>
 <pre><code>┌────────────────────────────────────────────────────────────────────────────────┐
 │                             ICN Node Topology                                    │
 ├────────────────────────────────────────────────────────────────────────────────┤
@@ -844,7 +851,7 @@ pub struct FederatedTrustPath {
 │                                                                                  │
 └────────────────────────────────────────────────────────────────────────────────┘
 </code></pre>
-<h3>5.2 Full Node (Personal)</h3>
+<h3 id="52-full-node-personal">5.2 Full Node (Personal)</h3>
 <p>Individual-owned node with complete functionality:</p>
 <pre><code class="language-rust">pub struct PersonalNode {
     /// Node&#39;s operational keypair (distinct from user DID)
@@ -880,7 +887,7 @@ pub struct NodeCapabilities {
     pub federation_relay: bool,
 }
 </code></pre>
-<h3>5.3 Shared/Hosted Nodes</h3>
+<h3 id="53-sharedhosted-nodes">5.3 Shared/Hosted Nodes</h3>
 <p>Cooperative infrastructure supporting multiple members:</p>
 <pre><code class="language-rust">pub struct SharedNode {
     /// Node&#39;s institutional identity
@@ -928,7 +935,7 @@ pub enum TenancyMode {
     VirtualMachine,
 }
 </code></pre>
-<h3>5.4 Light Clients</h3>
+<h3 id="54-light-clients">5.4 Light Clients</h3>
 <p>Mobile and web clients that don&#39;t run full nodes:</p>
 <pre><code class="language-rust">pub struct LightClient {
     /// Client identity
@@ -978,7 +985,7 @@ pub struct LightClientCache {
     pub active_proposals: Vec&lt;ProposalSummary&gt;,
 }
 </code></pre>
-<h3>5.5 Gateway Access Patterns</h3>
+<h3 id="55-gateway-access-patterns">5.5 Gateway Access Patterns</h3>
 <pre><code class="language-rust">pub struct GatewayService {
     /// Gateway identity
     pub gateway_did: Did,
@@ -1028,7 +1035,7 @@ pub struct GatewaySession {
     pub refresh_token: Option&lt;String&gt;,
 }
 </code></pre>
-<h3>5.6 Node-Identity Separation</h3>
+<h3 id="56-node-identity-separation">5.6 Node-Identity Separation</h3>
 <p><strong>Key Principle</strong>: Node identity is operational; user identity is personal.</p>
 <pre><code class="language-rust">/// Mapping between nodes and identities
 pub struct IdentityNodeMapping {
@@ -1068,8 +1075,8 @@ pub enum NodeAccessType {
 }
 </code></pre>
 <hr>
-<h2>6. Implementation Phases</h2>
-<h3>Phase 1: Identity Foundation (4 weeks)</h3>
+<h2 id="6-implementation-phases">6. Implementation Phases</h2>
+<h3 id="phase-1-identity-foundation-4-weeks">Phase 1: Identity Foundation (4 weeks)</h3>
 <p><strong>Goal</strong>: Establish individual identity independent of nodes</p>
 <ol>
 <li><p><strong>Extend DID Document</strong> (1 week)</p>
@@ -1094,7 +1101,7 @@ pub enum NodeAccessType {
 </ul>
 </li>
 </ol>
-<h3>Phase 2: Membership Lifecycle (3 weeks)</h3>
+<h3 id="phase-2-membership-lifecycle-3-weeks">Phase 2: Membership Lifecycle (3 weeks)</h3>
 <p><strong>Goal</strong>: Unified membership model across entity types</p>
 <ol>
 <li><p><strong>Unified Membership API</strong> (1 week)</p>
@@ -1116,7 +1123,7 @@ pub enum NodeAccessType {
 </ul>
 </li>
 </ol>
-<h3>Phase 3: Federation Identity (3 weeks)</h3>
+<h3 id="phase-3-federation-identity-3-weeks">Phase 3: Federation Identity (3 weeks)</h3>
 <p><strong>Goal</strong>: Cross-entity identity and trust</p>
 <ol>
 <li><p><strong>Representative Delegation</strong> (1 week)</p>
@@ -1138,7 +1145,7 @@ pub enum NodeAccessType {
 </ul>
 </li>
 </ol>
-<h3>Phase 4: Node Topology (4 weeks)</h3>
+<h3 id="phase-4-node-topology-4-weeks">Phase 4: Node Topology (4 weeks)</h3>
 <p><strong>Goal</strong>: Support for diverse deployment patterns</p>
 <ol>
 <li><p><strong>Shared Node Support</strong> (1.5 weeks)</p>
@@ -1163,8 +1170,8 @@ pub enum NodeAccessType {
 </li>
 </ol>
 <hr>
-<h2>7. Security Considerations</h2>
-<h3>7.1 Threat Model</h3>
+<h2 id="7-security-considerations">7. Security Considerations</h2>
+<h3 id="71-threat-model">7.1 Threat Model</h3>
 <table>
 <thead>
 <tr>
@@ -1197,7 +1204,7 @@ pub enum NodeAccessType {
 <td>Governance approval, sponsor accountability</td>
 </tr>
 </tbody></table>
-<h3>7.2 Cryptographic Requirements</h3>
+<h3 id="72-cryptographic-requirements">7.2 Cryptographic Requirements</h3>
 <ol>
 <li><strong>Identity Keys</strong>: Ed25519 (with ML-DSA hybrid option)</li>
 <li><strong>Encryption</strong>: X25519 for key agreement, AES-256-GCM for data</li>
@@ -1205,7 +1212,7 @@ pub enum NodeAccessType {
 <li><strong>Key Derivation</strong>: HKDF-SHA256</li>
 <li><strong>Commitments</strong>: SHA-256</li>
 </ol>
-<h3>7.3 Access Control</h3>
+<h3 id="73-access-control">7.3 Access Control</h3>
 <pre><code class="language-rust">/// Access check for any operation
 pub struct AccessCheck {
     /// Who is requesting
@@ -1229,8 +1236,8 @@ pub enum AccessDecision {
 }
 </code></pre>
 <hr>
-<h2>8. Migration Strategy</h2>
-<h3>8.1 From Node-Centric to Individual-Centric</h3>
+<h2 id="8-migration-strategy">8. Migration Strategy</h2>
+<h3 id="81-from-node-centric-to-individual-centric">8.1 From Node-Centric to Individual-Centric</h3>
 <p>Current state: Node keypair = User DID</p>
 <p>Target state: User DID independent, Node has operational keypair</p>
 <p><strong>Migration Steps</strong>:</p>
@@ -1241,7 +1248,7 @@ pub enum AccessDecision {
 <li><strong>Phase D</strong>: Deprecate node-as-identity pattern (soft deprecation)</li>
 <li><strong>Phase E</strong>: Full separation (breaking change, major version)</li>
 </ol>
-<h3>8.2 Backward Compatibility</h3>
+<h3 id="82-backward-compatibility">8.2 Backward Compatibility</h3>
 <pre><code class="language-rust">/// Legacy compatibility wrapper
 pub enum IdentityMode {
     /// New mode: individual DID separate from node
@@ -1266,7 +1273,7 @@ impl IdentityMode {
     }
 }
 </code></pre>
-<h3>8.3 Data Migration</h3>
+<h3 id="83-data-migration">8.3 Data Migration</h3>
 <ol>
 <li><strong>Membership records</strong>: Add <code>member_identity_type</code> field</li>
 <li><strong>Trust relationships</strong>: Preserve for both DID types</li>
@@ -1274,7 +1281,7 @@ impl IdentityMode {
 <li><strong>Governance votes</strong>: Include identity type in vote metadata</li>
 </ol>
 <hr>
-<h2>Appendix A: Cooperative Principles Alignment</h2>
+<h2 id="appendix-a-cooperative-principles-alignment">Appendix A: Cooperative Principles Alignment</h2>
 <table>
 <thead>
 <tr>
@@ -1312,7 +1319,7 @@ impl IdentityMode {
 </tr>
 </tbody></table>
 <hr>
-<h2>Appendix B: Related Documents</h2>
+<h2 id="appendix-b-related-documents">Appendix B: Related Documents</h2>
 <ul>
 <li><code>/home/matt/projects/icn/docs/ARCHITECTURE.md</code> - System architecture overview</li>
 <li><code>/home/matt/projects/icn/docs/trust-multi-graph-migration.md</code> - Trust system design</li>
@@ -1320,7 +1327,7 @@ impl IdentityMode {
 <li><code>/home/matt/projects/icn/CLAUDE.md</code> - Development guidelines</li>
 </ul>
 <hr>
-<h2>Appendix C: Open Questions</h2>
+<h2 id="appendix-c-open-questions">Appendix C: Open Questions</h2>
 <ol>
 <li><p><strong>Identity Portability</strong>: How to handle identity when leaving all cooperatives? Should &quot;homeless&quot; identities be allowed?</p>
 </li>
@@ -1336,7 +1343,10 @@ impl IdentityMode {
 <hr>
 <p><em>Document Version: 1.0</em>
 <em>Last Updated: 2025-12-25</em></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs/archive" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to archive </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

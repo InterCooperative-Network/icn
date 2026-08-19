@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC: ICN Commons Evolution | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design for evolving ICN commons governance and stewardship models over phases 0-3"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC: ICN Commons Evolution | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COMMONS EVOLUTION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/COMMONS_EVOLUTION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>RFC: ICN Commons Evolution</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COMMONS EVOLUTION</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-15</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="rfc-icn-commons-evolution">RFC: ICN Commons Evolution</h1>
 <p><strong>Document ID</strong>: ICN-RFC-COMMONS-01
 <strong>Status</strong>: IMPLEMENTED (v0.3.0 Foundation)
 <strong>Author</strong>: Matthew Faherty
 <strong>Created</strong>: 2025-12-14
 <strong>Updated</strong>: 2025-12-14
 <strong>Target Version</strong>: v0.3.0+</p>
-<h3>Implementation Status (2025-12-14)</h3>
+<h3 id="implementation-status-2025-12-14">Implementation Status (2025-12-14)</h3>
 <p><strong>v0.3.0 Foundation - COMPLETE</strong>:</p>
 <ul>
 <li>PersonhoodAnchor, CommonsHolderRecord, Charter structs</li>
@@ -88,7 +85,7 @@ View source on GitHub →
 <li>140 governance tests + 195 gateway tests passing</li>
 </ul>
 <hr>
-<h2>Abstract</h2>
+<h2 id="abstract">Abstract</h2>
 <p>This RFC proposes evolving ICN from a &quot;cooperative coordination tool&quot; to a &quot;global commons infrastructure.&quot; The core insight: <strong>Commons Holder is the root identity; membership is scoped capability grants under that identity.</strong></p>
 <p>This enables:</p>
 <ul>
@@ -98,8 +95,8 @@ View source on GitHub →
 <li>True &quot;global participation&quot; without centralized authority</li>
 </ul>
 <hr>
-<h2>Motivation</h2>
-<h3>Current Model (v0.2.x)</h3>
+<h2 id="motivation">Motivation</h2>
+<h3 id="current-model-v02x">Current Model (v0.2.x)</h3>
 <pre><code>Person → creates DID → joins Coop → joins Federation
          (identity)    (membership)  (inter-coop)
 </code></pre>
@@ -110,7 +107,7 @@ View source on GitHub →
 <li>No formal distinction between &quot;person&quot; and &quot;key&quot;</li>
 <li>No constitutional layer above federations</li>
 </ul>
-<h3>Proposed Model (v0.3.x+)</h3>
+<h3 id="proposed-model-v03x">Proposed Model (v0.3.x+)</h3>
 <pre><code>Person → PersonhoodAnchor → CommonsHolder → Affiliations
          (proof-of-person)   (baseline rights)  (coop/community/federation)
 </code></pre>
@@ -122,8 +119,8 @@ View source on GitHub →
 <li>Constitutional governance enables network-wide decisions</li>
 </ul>
 <hr>
-<h2>Conceptual Framework</h2>
-<h3>The Three Layers</h3>
+<h2 id="conceptual-framework">Conceptual Framework</h2>
+<h3 id="the-three-layers">The Three Layers</h3>
 <table>
 <thead>
 <tr>
@@ -152,14 +149,14 @@ View source on GitHub →
 <td>Jurisdiction governance</td>
 </tr>
 </tbody></table>
-<h3>Key Principle</h3>
+<h3 id="key-principle">Key Principle</h3>
 <blockquote>
 <p>A cooperative can revoke your membership.
 A cooperative cannot revoke your personhood.</p>
 </blockquote>
 <p>This separation protects individuals from local power abuse while preserving organizational autonomy.</p>
 <hr>
-<h2>New Domain Types</h2>
+<h2 id="new-domain-types">New Domain Types</h2>
 <p>Current ICN uses flat domain identifiers. This RFC introduces hierarchical domains:</p>
 <pre><code>network:commons          # Global commons layer
 network:governance       # Network-level constitutional governance
@@ -169,7 +166,7 @@ federation:&lt;id&gt;          # Regional/sectoral federations
 coop:&lt;id&gt;                # Economic cooperatives
 community:&lt;id&gt;           # Civic communities (mutual aid, advocacy)
 </code></pre>
-<h3>Domain Relationships</h3>
+<h3 id="domain-relationships">Domain Relationships</h3>
 <pre><code>network:commons
     ├── network:governance
     ├── network:stewards
@@ -182,8 +179,8 @@ community:&lt;id&gt;           # Civic communities (mutual aid, advocacy)
         └── community:timebank-nyc
 </code></pre>
 <hr>
-<h2>New Core Data Structures</h2>
-<h3>1. PersonhoodAnchor (Layer 0)</h3>
+<h2 id="new-core-data-structures">New Core Data Structures</h2>
+<h3 id="1-personhoodanchor-layer-0">1. PersonhoodAnchor (Layer 0)</h3>
 <p>The cryptographic root of a human&#39;s participation, independent of key rotation.</p>
 <pre><code class="language-rust">/// Proof of personhood anchor - persistent across key rotations
 pub struct PersonhoodAnchor {
@@ -256,7 +253,7 @@ pub enum POPLevel {
     Verified,
 }
 </code></pre>
-<h3>2. CommonsHolderRecord (Layer 1)</h3>
+<h3 id="2-commonsholderrecord-layer-1">2. CommonsHolderRecord (Layer 1)</h3>
 <p>A human participant&#39;s record in the global commons.</p>
 <pre><code class="language-rust">/// Record of a Commons Holder - a human participant with baseline rights
 pub struct CommonsHolderRecord {
@@ -329,7 +326,7 @@ pub struct CommonsRights {
     pub audit_access: bool,
 }
 </code></pre>
-<h3>3. Charter (Organization Genesis)</h3>
+<h3 id="3-charter-organization-genesis">3. Charter (Organization Genesis)</h3>
 <p>The founding document that creates a cooperative, community, or federation.</p>
 <pre><code class="language-rust">/// Charter - founding document for a jurisdiction
 pub struct Charter {
@@ -399,7 +396,7 @@ pub struct MembershipPolicy {
     pub training_requirements: Vec&lt;TrainingId&gt;,
 }
 </code></pre>
-<h3>4. MembershipRecord (Layer 2)</h3>
+<h3 id="4-membershiprecord-layer-2">4. MembershipRecord (Layer 2)</h3>
 <p>Jurisdiction-scoped membership with capabilities.</p>
 <pre><code class="language-rust">/// Membership record for a specific jurisdiction
 pub struct MembershipRecord {
@@ -462,7 +459,7 @@ pub struct MembershipConditions {
     pub training_requirements: Vec&lt;TrainingId&gt;,
 }
 </code></pre>
-<h3>5. StewardRecord</h3>
+<h3 id="5-stewardrecord">5. StewardRecord</h3>
 <p>Trusted operators who perform identity verification and infrastructure maintenance.</p>
 <pre><code class="language-rust">/// Record of a network steward
 pub struct StewardRecord {
@@ -507,7 +504,7 @@ pub enum StewardStatus {
     Revoked { reason: String },
 }
 </code></pre>
-<h3>6. RevocationRecord</h3>
+<h3 id="6-revocationrecord">6. RevocationRecord</h3>
 <p>Records of revoked credentials, memberships, or anchors.</p>
 <pre><code class="language-rust">/// Record of a revocation action
 pub struct RevocationRecord {
@@ -556,8 +553,8 @@ pub enum RevocationScope {
 }
 </code></pre>
 <hr>
-<h2>New CLI Commands</h2>
-<h3>Commons Enrollment</h3>
+<h2 id="new-cli-commands">New CLI Commands</h2>
+<h3 id="commons-enrollment">Commons Enrollment</h3>
 <pre><code class="language-bash"># Enroll as Commons Holder (requires steward attestation)
 icnctl commons enroll --steward did:icn:STEWARD_DID
 
@@ -570,7 +567,7 @@ icnctl commons affiliations
 # Exit the commons (voluntary, irreversible)
 icnctl commons exit --reason &quot;Moving to different network&quot;
 </code></pre>
-<h3>Charter Management</h3>
+<h3 id="charter-management">Charter Management</h3>
 <pre><code class="language-bash"># Create a new cooperative
 icnctl charter create \
   --type coop \
@@ -594,7 +591,7 @@ icnctl charter amend \
   --domain-id &quot;coop:my-food-coop&quot; \
   --amendment-file ./proposed-amendment.md
 </code></pre>
-<h3>Membership Management</h3>
+<h3 id="membership-management">Membership Management</h3>
 <pre><code class="language-bash"># Apply for membership in a jurisdiction
 icnctl membership apply --jurisdiction &quot;coop:my-food-coop&quot;
 
@@ -616,7 +613,7 @@ icnctl membership suspend \
 # Exit membership voluntarily
 icnctl membership exit --jurisdiction &quot;coop:my-food-coop&quot;
 </code></pre>
-<h3>Steward Operations</h3>
+<h3 id="steward-operations">Steward Operations</h3>
 <pre><code class="language-bash"># Issue proof-of-personhood attestation
 icnctl steward attest-pop \
   --target did:icn:NEW_HOLDER_DID \
@@ -630,8 +627,8 @@ icnctl steward stats
 icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 </code></pre>
 <hr>
-<h2>New CCL Contracts</h2>
-<h3>commons-core-v1.ccl</h3>
+<h2 id="new-ccl-contracts">New CCL Contracts</h2>
+<h3 id="commons-core-v1ccl">commons-core-v1.ccl</h3>
 <pre><code>contract CommonsCore {
     // Commons Holder lifecycle
     rule enroll_holder(anchor: AnchorId, attestations: Vec&lt;POPAttestation&gt;) {
@@ -654,7 +651,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
     }
 }
 </code></pre>
-<h3>charter-v1.ccl</h3>
+<h3 id="charter-v1ccl">charter-v1.ccl</h3>
 <pre><code>contract CharterManagement {
     rule create_charter(
         org_type: OrgType,
@@ -677,7 +674,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
     }
 }
 </code></pre>
-<h3>membership-v1.ccl</h3>
+<h3 id="membership-v1ccl">membership-v1.ccl</h3>
 <pre><code>contract Membership {
     rule apply(jurisdiction: DomainId, applicant: DID) {
         require is_commons_holder(applicant);
@@ -700,7 +697,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
     }
 }
 </code></pre>
-<h3>commons-governance-v1.ccl</h3>
+<h3 id="commons-governance-v1ccl">commons-governance-v1.ccl</h3>
 <pre><code>contract CommonsGovernance {
     // Network-level constitutional governance
 
@@ -726,8 +723,8 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 }
 </code></pre>
 <hr>
-<h2>Glossary Additions</h2>
-<h3>New Terms</h3>
+<h2 id="glossary-additions">Glossary Additions</h2>
+<h3 id="new-terms">New Terms</h3>
 <table>
 <thead>
 <tr>
@@ -772,7 +769,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <td>Verification that a Commons Holder represents a unique human, not a bot or duplicate identity</td>
 </tr>
 </tbody></table>
-<h3>Updated Terms</h3>
+<h3 id="updated-terms">Updated Terms</h3>
 <table>
 <thead>
 <tr>
@@ -793,22 +790,22 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 </tr>
 </tbody></table>
 <hr>
-<h2>Migration Path</h2>
-<h3>Phase 1: v0.2.x → v0.3.0 (Non-Breaking)</h3>
+<h2 id="migration-path">Migration Path</h2>
+<h3 id="phase-1-v02x--v030-non-breaking">Phase 1: v0.2.x → v0.3.0 (Non-Breaking)</h3>
 <ol>
 <li>Add new structs as optional/parallel to existing</li>
 <li>Existing DIDs continue to work unchanged</li>
 <li>New <code>commons enroll</code> command available but not required</li>
 <li>Charter creation optional for existing coops</li>
 </ol>
-<h3>Phase 2: v0.3.x → v0.4.0 (Soft Migration)</h3>
+<h3 id="phase-2-v03x--v040-soft-migration">Phase 2: v0.3.x → v0.4.0 (Soft Migration)</h3>
 <ol>
 <li>Steward network bootstrapped</li>
 <li>POP attestation available</li>
 <li>Existing members can opt-in to Commons Holder status</li>
 <li>New members encouraged to enroll via steward</li>
 </ol>
-<h3>Phase 3: v0.5.0+ (Full Commons)</h3>
+<h3 id="phase-3-v050-full-commons">Phase 3: v0.5.0+ (Full Commons)</h3>
 <ol>
 <li>Commons enrollment becomes standard path</li>
 <li>Baseline rights enforcement active</li>
@@ -816,7 +813,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li>Legacy DID-only mode deprecated (but still functional)</li>
 </ol>
 <hr>
-<h2>Implementation Roadmap</h2>
+<h2 id="implementation-roadmap">Implementation Roadmap</h2>
 <table>
 <thead>
 <tr>
@@ -858,8 +855,8 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 </tr>
 </tbody></table>
 <hr>
-<h2>Security Considerations</h2>
-<h3>Steward Trust Model</h3>
+<h2 id="security-considerations">Security Considerations</h2>
+<h3 id="steward-trust-model">Steward Trust Model</h3>
 <p>Stewards are trusted to verify personhood honestly. Mitigations:</p>
 <ul>
 <li><strong>Multiple attestations required</strong>: No single steward can create a Commons Holder</li>
@@ -868,7 +865,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li><strong>Reputation tracking</strong>: Historical accuracy affects future trust</li>
 <li><strong>Governance oversight</strong>: Network can remove rogue stewards</li>
 </ul>
-<h3>Sybil Resistance</h3>
+<h3 id="sybil-resistance">Sybil Resistance</h3>
 <p>The POP system must prevent one human from having multiple Commons Holder identities:</p>
 <ul>
 <li><strong>Cross-attestation requirements</strong>: Different stewards or methods</li>
@@ -876,7 +873,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li><strong>Social graph analysis</strong>: Unusual patterns flag review</li>
 <li><strong>Periodic renewal</strong>: Some verification methods expire</li>
 </ul>
-<h3>Jurisdiction Abuse</h3>
+<h3 id="jurisdiction-abuse">Jurisdiction Abuse</h3>
 <p>A jurisdiction cannot:</p>
 <ul>
 <li>Revoke baseline Commons Rights</li>
@@ -892,7 +889,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li>Establish economic policies for its scope</li>
 </ul>
 <hr>
-<h2>Open Questions</h2>
+<h2 id="open-questions">Open Questions</h2>
 <ol>
 <li><strong>POP Privacy</strong>: How do we verify personhood without creating a surveillance database?</li>
 <li><strong>Steward Bootstrap</strong>: Who are the first stewards, and how are they selected?</li>
@@ -901,7 +898,7 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li><strong>Recovery</strong>: If PersonhoodAnchor is compromised, what&#39;s the recovery path?</li>
 </ol>
 <hr>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current system architecture</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance-primitives">governance-primitives.md</a> - Existing governance layer</li>
@@ -909,11 +906,14 @@ icnctl steward list --jurisdiction &quot;federation:pacific-nw&quot;
 <li><a href="/docs/security/threat-model">threat-model.md</a> - Security considerations</li>
 </ul>
 <hr>
-<h2>Changelog</h2>
+<h2 id="changelog">Changelog</h2>
 <ul>
 <li><strong>2025-12-14</strong>: Initial RFC draft</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/COMMONS_EVOLUTION.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

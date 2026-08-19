@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Abuse-case hardening strategy | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Strategy / doctrine doc codifying ICN's institutional-failure-mode hardening layer: the substrate must not become an administrative panel with receipts. Ten one-line doctrine rules (receipts prove events not legitimacy; authority shortcuts must label themselves as shortcuts; unresolved standing is not standing in production; accepted is not applied; convenience paths must not become authority paths; bootstrap is not democracy; a capability token is not a mandate; a UI must not launder uncertainty into confidence; privacy posture is not private content; index absence is not record absence). Ten code-anchored abuse stories and matching hardening tracks: narrowing the broad governance:write scope, marking direct membership mutation and direct charter activation as bootstrap-only shortcuts with explicit administrative receipts, fail-closed resolver/checker policy in production, closed lifecycle vocabulary across API/shell/cockpit, per-effect idempotency, governance-parameter sanity bands, shell/cockpit fixture matrix, PrivateEvidence non-rendering regression, typed-receipt atomicity inventory. Strategy only — no runtime change, no new ADR, no new contract URN, no production-readiness claim. Companion to ARCHITECTURE_DUE_DILIGENCE.md and upstream of security/production-hardening.md."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Abuse-case hardening strategy | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ABUSE CASE HARDENING STRATEGY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Abuse-case hardening strategy</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ABUSE CASE HARDENING STRATEGY</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Canonical</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-06-18</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="abuse-case-hardening-strategy">Abuse-case hardening strategy</h1>
 <blockquote>
 <p><strong>Receipts prove events. They do not prove legitimacy.</strong></p>
 <p><strong>Authority shortcuts must label themselves as shortcuts.</strong></p>
@@ -48,7 +45,7 @@ View source on GitHub →
 <p>The doctrine is not a security checklist for transport encryption, key management, or replay defense. Those live in <a href="/docs/security/production-hardening">`../security/production-hardening.md`</a>. This is the upstream layer that asks whether a procedurally clean record actually corresponds to an institutionally legitimate outcome — and what the substrate must do, in code and in surfaces, so the answer cannot be &quot;no&quot; while the receipt still looks like &quot;yes.&quot;</p>
 <!-- truth: descriptive -->
 
-<h2>0. Status and non-claims</h2>
+<h2 id="0-status-and-non-claims">0. Status and non-claims</h2>
 <ul>
 <li><strong>Status</strong>: descriptive strategy. No runtime behavior is changed by this document.</li>
 <li><strong>No new ADR.</strong> The doctrine extends <code>ARCHITECTURE_DUE_DILIGENCE.md</code>; the operational decisions are deferred to follow-up PRs that may file ADRs as the design firms up.</li>
@@ -59,7 +56,7 @@ View source on GitHub →
 </ul>
 <!-- truth: descriptive -->
 
-<h2>1. Why this exists</h2>
+<h2 id="1-why-this-exists">1. Why this exists</h2>
 <p>The strongest current red-team finding against ICN is not that someone might corrupt the receipt store or forge a signature. Those failure modes are already addressed by the opaque hash-keyed receipt store, the <code>SignedEnvelope</code> replay-guard pattern, the QUIC/TLS DID-binding layer, and the regular audit verification CLI.</p>
 <p>The stronger finding is that someone can use ICN&#39;s primitives <strong>correctly</strong> — issue a capability token that has the right scope, call a route that the gateway is happy to authorize, file a proposal whose decision hash binds cleanly, watch the effect dispatch chain produce an evidence record — and end up with procedurally clean machinery that proves an institutionally illegitimate outcome.</p>
 <p>A worked example, written from code currently in <code>main</code>:</p>
@@ -71,64 +68,64 @@ View source on GitHub →
 <p>This document writes the doctrine, invariants, and follow-up tracks that prevent that sequence from ever being procedurally clean — without widening the meaning firewall, without importing domain semantics into the kernel, and without inventing a SaaS-style RBAC pyramid that ignores ICN&#39;s mandate / capability model.</p>
 <!-- truth: descriptive -->
 
-<h2>2. Core doctrine</h2>
+<h2 id="2-core-doctrine">2. Core doctrine</h2>
 <blockquote>
 <p>The danger is not only that someone might break the machinery. The danger is that someone might use the machinery correctly to prove the wrong thing.</p>
 </blockquote>
 <p>The doctrine below is the upstream version of the more specific rules in §3–§13. Each line is a sentence reviewers are expected to be able to quote at design time.</p>
-<h3>2.1 Receipts prove events, not legitimacy</h3>
+<h3 id="21-receipts-prove-events-not-legitimacy">2.1 Receipts prove events, not legitimacy</h3>
 <p>A receipt establishes that some specific event occurred under some specific authority basis. It does not, on its own, establish that the event was institutionally legitimate. A reviewer reading a receipt must always be able to recover the authority basis, the actor identity, the standing at the time, and any administrative-shortcut flag — and must be able to challenge the receipt without challenging the substrate.</p>
-<h3>2.2 Authority shortcuts must label themselves as shortcuts</h3>
+<h3 id="22-authority-shortcuts-must-label-themselves-as-shortcuts">2.2 Authority shortcuts must label themselves as shortcuts</h3>
 <p>Some paths in the substrate are intentionally not democratic: direct charter activation, direct membership mutation, bootstrap onboarding, fixture-mode seeding. These exist for legitimate reasons. They must never look like ordinary governance in any surface — not in receipts, not in member shell, not in the steward cockpit, not in API responses. The convenience of the shortcut does not buy the legitimacy of the long path.</p>
-<h3>2.3 Unresolved standing is not standing in production</h3>
+<h3 id="23-unresolved-standing-is-not-standing-in-production">2.3 Unresolved standing is not standing in production</h3>
 <p>If the substrate cannot resolve whether an actor has standing, the production answer is not &quot;yes by default.&quot; Trust-threshold membership, suspension state, steward authority, delegation eligibility — each of these has a resolver or checker today. In production, the absence of a resolver, an unreachable resolver, or a stale resolver answer must not cause the substrate to act as though standing is established.</p>
-<h3>2.4 Accepted is not applied</h3>
+<h3 id="24-accepted-is-not-applied">2.4 Accepted is not applied</h3>
 <p>A proposal can be <code>Accepted</code> and still have produced no effect. The effect dispatch chain (decision → mandate → effect plan → dispatch → application) has many ways to halt or partially complete, several of which are honestly recorded as <code>EmittedOnly</code>, <code>ExecutionEvidenced</code>, or <code>ExecutionFailed</code> in <code>icn/apps/governance/src/dispatch_evidence.rs:131–169</code>. A surface that renders <code>Accepted</code> as <code>done</code> is laundering uncertainty into confidence.</p>
-<h3>2.5 Convenience paths must not become authority paths</h3>
+<h3 id="25-convenience-paths-must-not-become-authority-paths">2.5 Convenience paths must not become authority paths</h3>
 <p>A surface introduced for convenience — a direct admin endpoint, a fixture-mode shortcut, a debug bypass — must not silently become the path institutional decisions travel through. This is the legitimacy-layer analogue of <code>ARCHITECTURE_DUE_DILIGENCE.md</code> §2.1; that doctrine names DNS and SaaS; this one names admin scopes and bootstrap flags.</p>
-<h3>2.6 Bootstrap is not democracy</h3>
+<h3 id="26-bootstrap-is-not-democracy">2.6 Bootstrap is not democracy</h3>
 <p>The substrate must be bootstrappable. The first charter, the first member set, the first steward have to come from somewhere outside the governance loop. That somewhere is administrative, by definition. Bootstrap artifacts must be visibly bootstrap artifacts, not retroactively dressed as democratic outputs.</p>
-<h3>2.7 A token is not a mandate</h3>
+<h3 id="27-a-token-is-not-a-mandate">2.7 A token is not a mandate</h3>
 <p>Capability scopes (<code>governance:write</code>, etc.) are kernel-side enforcement primitives. They are not, on their own, institutional mandates. The institution authorizes by mandate; the substrate authorizes by capability. Where the two diverge, the institution&#39;s view wins, and the surface must show the divergence.</p>
-<h3>2.8 A UI must not launder uncertainty into confidence</h3>
+<h3 id="28-a-ui-must-not-launder-uncertainty-into-confidence">2.8 A UI must not launder uncertainty into confidence</h3>
 <p>Member shell and steward cockpit are designed to render real states: degraded, partial, stale, disputed, emitted-only, challenge-window-open, awaiting-evidence, reversed. A surface that renders any of these as a clean green checkmark fails the doctrine — even if every receipt under it is real.</p>
-<h3>2.9 Privacy posture is not private content</h3>
+<h3 id="29-privacy-posture-is-not-private-content">2.9 Privacy posture is not private content</h3>
 <p><code>ScopedVault</code> and <code>PrivateEvidence</code> define what bodies a surface may read. Existence, scope, access path, authority basis, access receipts — these are renderable. Body bytes are not. Debug convenience cannot lift a body byte into a rendering layer; if it has, the surface has become a surveillance panel by accident.</p>
-<h3>2.10 Index absence is not record absence</h3>
+<h3 id="210-index-absence-is-not-record-absence">2.10 Index absence is not record absence</h3>
 <p>A receipt may exist in the primary store and be missing from a secondary index. In the opaque receipt store this is impossible by construction (atomic primary + index + bind writes). On older typed-receipt paths it is currently possible. Absence from index must never silently become absence from truth.</p>
-<h3>2.11 A global id is not a grant</h3>
+<h3 id="211-a-global-id-is-not-a-grant">2.11 A global id is not a grant</h3>
 <p>An object reachable by a globally-keyed id must still be proven to belong to the institutional context named by the request before it is returned. Knowing — or guessing — an object&#39;s id is not standing over the object. A correct check on the <em>caller&#39;s</em> context (path coop, token scope) does not bind the <em>object</em> to that context; the object carries its own context and must be matched to the request&#39;s. Where they differ, the answer is not-found, and a foreign object must be reported exactly as a missing one, so the endpoint cannot be used to enumerate or confirm objects in contexts the caller has no standing in.</p>
 <!-- truth: descriptive -->
 
-<h2>3. Abuse stories</h2>
+<h2 id="3-abuse-stories">3. Abuse stories</h2>
 <p>Each story below is short on purpose. Each maps to a hardening track in §4. Each cites at least one code anchor so a follow-up PR has somewhere to start.</p>
-<h3>3.1 The broad-scope institution factory</h3>
+<h3 id="31-the-broad-scope-institution-factory">3.1 The broad-scope institution factory</h3>
 <p>A member with <code>governance:write</code> mints a new <code>LocalDomain</code> via <code>create_domain</code> (<code>handlers.rs:386</code>), activates a permissive charter directly via <code>activate_charter</code> (<code>handlers.rs:694</code>), seeds a member list with <code>add_domain_member</code> (<code>handlers.rs:548</code>), files and closes proposals under rules they just authored, and produces a complete trail of clean receipts. Anchor: <code>icn/crates/icn-rpc/src/auth.rs:947</code> (single broad scope).</p>
-<h3>3.2 Membership coup by direct mutation</h3>
+<h3 id="32-membership-coup-by-direct-mutation">3.2 Membership coup by direct mutation</h3>
 <p>A member with <code>governance:write</code> calls <code>add_domain_member</code> to add allies and <code>remove_domain_member</code> (<code>handlers.rs:593</code>) to remove opposition, then files a decisive proposal against the altered electorate. Both endpoints fail-open on <code>TrustThreshold</code> membership domains (<code>handlers.rs:572</code> for add, <code>:617</code> for remove); the resolver, if any, is consulted only at proposal-close time (<code>:1269</code>), never at mutation time.</p>
-<h3>3.3 Resolver-outage democracy</h3>
+<h3 id="33-resolver-outage-democracy">3.3 Resolver-outage democracy</h3>
 <p>A <code>TrustThreshold</code> domain comes up with <code>MemberStandingChecker</code> (<code>configure.rs:197-201</code>), <code>SuspensionChecker</code> (<code>configure.rs:214-218</code>), or <code>MembershipResolver</code> (<code>configure.rs:264</code>) unwired, miswired, or degraded. Write paths short-circuit to <code>true</code> (<code>handlers.rs:78, 572, 617, 1111, 1203</code>). Suspended or non-eligible actors influence governance, and the evidence trail is internally consistent but institutionally wrong. The existing inline comment at <code>handlers.rs:1267–1268</code> (&quot;Fail-open on resolver errors&quot;) is a known trade-off that has not yet been re-evaluated against a production threat model.</p>
-<h3>3.4 Admin monarchy with YAML</h3>
+<h3 id="34-admin-monarchy-with-yaml">3.4 Admin monarchy with YAML</h3>
 <p>A privileged operator calls <code>POST /charters</code> → <code>activate_charter</code> (<code>handlers.rs:694–744</code>). The handler constructs a synthetic provenance string <code>direct-activation:{charter_id}</code> and proceeds without the ratified-proposal decision hash, without an <code>InstitutionalEffectRecord</code>, and without <code>EffectDispatchEvidence</code>. The charter activates; the substrate begins enforcing it; the authority basis is &quot;someone with <code>governance:write</code> did it.&quot;</p>
-<h3>3.5 The receipt halo effect</h3>
+<h3 id="35-the-receipt-halo-effect">3.5 The receipt halo effect</h3>
 <p>A member opens the member shell, sees a row labeled &quot;Accepted,&quot; and concludes the institution decided the matter. In fact the proposal may be <code>Accepted</code> and <code>EmittedOnly</code> (no evidence yet), <code>Accepted</code> and <code>ExecutionFailed</code> (anchor: <code>dispatch_evidence.rs:146</code>), <code>Accepted</code> and partial, <code>Accepted</code> and pending a challenge window, or <code>Accepted</code> and reversed. The current API surface and the rendering layers above it do not consistently expose this distinction.</p>
-<h3>3.6 Retry / restart / partial-effect ambiguity</h3>
+<h3 id="36-retry--restart--partial-effect-ambiguity">3.6 Retry / restart / partial-effect ambiguity</h3>
 <p>A high-impact effect partially applies before a restart. The substrate retries. One subsystem no-ops correctly; another mutates a second time; a third returns opaque evidence. The current idempotency key for institutional effects is at institutional-effect granularity, not per-effect granularity; the stronger <code>(decision_hash, manifest_hash, effect_index)</code> key named by <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> is future schema work and is not yet in the dispatch path.</p>
-<h3>3.7 The fake-domain factory</h3>
+<h3 id="37-the-fake-domain-factory">3.7 The fake-domain factory</h3>
 <p>A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, a one-day voting period, no challenge window, no notification requirement. The validation actually reached on the create-domain route (<code>validate_governance_params</code> in <code>icn/apps/governance/src/http/validation.rs</code>, called from <code>create_domain</code> in <code>icn/apps/governance/src/http/handlers.rs</code>) is range-only: it rejects percentages above 100, a zero voting period, and a voting period beyond one year. Quorum 1 and approval threshold 1 pass. There are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs. Two structural gaps widen the story rather than narrow it. First, <code>GovernanceParams::validate</code> (<code>icn/crates/icn-governance/src/config.rs</code>) carries stricter deliberation and execution-delay bounds but is compiled and unit-tested with no production caller. Second, the HTTP route is not the only way to create a domain: the JSON-RPC handler <code>handle_governance_domain_create</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>) builds <code>GovernanceParams</code> straight from the request and calls <code>GovernanceHandle::create_domain</code> with <strong>no parameter validation at all</strong>, bypassing the HTTP validator entirely. Neither terminus validates either — <code>GovernanceManager::create_domain</code> (<code>icn/apps/governance/src/manager.rs</code>) accepts a <code>GovernanceParams</code> value as given, and the actor&#39;s <code>GovernanceCommand::CreateDomain</code> arm (<code>icn/apps/governance/src/actor.rs</code>) builds a <code>GovernanceConfig</code> from it unchecked. Challenge window and notification requirement are not <code>GovernanceParams</code> fields at all, so no band test can currently read them.</p>
-<h3>3.8 Visual greenwashing</h3>
+<h3 id="38-visual-greenwashing">3.8 Visual greenwashing</h3>
 <p>Implementation drift between <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> and <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> lets a degraded, partial, stale, or disputed state render as a clean green checkmark in member shell while the cockpit shows red. The v0 spec already flags this as a failure-table violation; the fixture matrix that catches it before merge does not yet exist.</p>
-<h3>3.9 Surveillance by debug</h3>
+<h3 id="39-surveillance-by-debug">3.9 Surveillance by debug</h3>
 <p>A rendering layer in the cockpit, or a &quot;debug preview&quot; in the shell, dereferences a <code>PrivateEvidence</code> body when it should be displaying only existence + scope + authority basis + access receipts. The current digest-only rendering boundary in <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> (<code>ArtifactDigest::scoped_vault_reference</code>) is clean; the abuse case is the regression test that doesn&#39;t yet exist.</p>
-<h3>3.10 Index-skew invisibility</h3>
+<h3 id="310-index-skew-invisibility">3.10 Index-skew invisibility</h3>
 <p>A crash mid-write on an older typed-receipt path leaves the primary record durable but the secondary index missing. The opaque receipt store is atomic by construction; <code>icn/apps/governance/src/receipt_backend.rs:173-210</code> documents that the <strong>default</strong> <code>put_mandate_with_grants</code> is <strong>not atomic</strong> and depends on the sled-backed gateway override. Other typed write paths have not been inventoried for the same invariant.</p>
-<h3>3.11 Cross-context read by global id</h3>
+<h3 id="311-cross-context-read-by-global-id">3.11 Cross-context read by global id</h3>
 <p>A member holding a valid <code>coop-a</code> token requests <code>GET /treasury/coop-a/budgets/{id}</code> with a <code>coop-b</code> budget id they knew or guessed. The flat guard passes (token coop == path coop), the budget is fetched by its globally-keyed id, and — before #2087 — returned, leaking <code>coop-b</code>&#39;s treasury DID, purpose, and amount across the institutional boundary. The leak survived a <em>correct subject check</em> because the loaded object was never bound to the named context. Closed for this endpoint by #2087 (<code>icn/crates/icn-gateway/src/api/treasury.rs:699-702</code>, the <code>treasury_did</code> ownership match in <code>get_budget</code>; tests <code>test_get_budget_cross_coop_read_denied</code>, <code>_same_coop_read_ok</code>, <code>_path_coop_without_treasury_does_not_reveal_foreign_budget</code>). The class is older than this instance — caller-context siblings hardened in #2052 / #2056 / #2058 — and the cross-gateway generalization is still open as the enumeration-safe-404 audit <strong>#1642</strong>. Anchor: <code>icn/crates/icn-gateway/src/api/treasury.rs:647</code> (<code>get_budget</code>; generic <code>&quot;Budget not found&quot;</code> at <code>:670</code>, ownership match at <code>:699-702</code>).</p>
 <!-- truth: descriptive -->
 
-<h2>4. Hardening tracks</h2>
+<h2 id="4-hardening-tracks">4. Hardening tracks</h2>
 <p>Each subsection has the same shape: problem, hardening goal, doctrine line for future PRs to quote, draft design (explicitly marked draft), and code anchors.</p>
-<h3>4.1 Narrow production authority scopes</h3>
+<h3 id="41-narrow-production-authority-scopes">4.1 Narrow production authority scopes</h3>
 <p><strong>Problem.</strong> <code>governance:write</code> is a single broad capability across ~12 mutation endpoints; one capability token is an institution factory.</p>
 <p><strong>Hardening goal.</strong> Production write authority is decomposed so the surface that issues a capability can describe what the capability actually authorizes — at the level of an institutional act, not &quot;all of governance.&quot;</p>
 <p><strong>Doctrine.</strong> <em>A capability scope must describe an act the institution can authorize, not a directory of routes the gateway can dispatch.</em></p>
@@ -152,7 +149,7 @@ View source on GitHub →
 </ul>
 <p>The two are not in tension: the kernel-side enforcement primitive is the capability; the institutional gate that produces the capability is the mandate. The split is <strong>where the institution authorizes</strong> versus <strong>how the kernel enforces</strong>.</p>
 <p><strong>Anchors.</strong> <code>icn/crates/icn-rpc/src/auth.rs:947</code> (scope string), <code>icn/apps/governance/src/http/handlers.rs:283–2342</code> (route handlers gated by it).</p>
-<h3>4.2 Direct membership mutation as bootstrap-only</h3>
+<h3 id="42-direct-membership-mutation-as-bootstrap-only">4.2 Direct membership mutation as bootstrap-only</h3>
 <p><strong>Problem.</strong> <code>add_domain_member</code> and <code>remove_domain_member</code> mutate the electorate without proposal → decision → mandate → effect → evidence, and fail-open on <code>TrustThreshold</code> domains.</p>
 <p><strong>Hardening goal.</strong> Production membership mutation flows through the governance loop. Direct mutation, if it remains in production, is classified as a bootstrap / administrative shortcut and labels itself as one in every surface it touches.</p>
 <p><strong>Doctrine.</strong> <em>Direct membership mutation is not a normal democratic act. Authority shortcuts must label themselves as shortcuts.</em></p>
@@ -174,7 +171,7 @@ View source on GitHub →
 </ul>
 <p>Membership mutation triggered by a ratified proposal does not emit this artifact; it emits the ordinary <code>EffectDispatchEvidence</code> chain.</p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/http/handlers.rs:548-635</code> (handlers), <code>:572, :617</code> (fail-open TrustThreshold), <code>:1245-1294</code> (resolver-aware delegation exclusion that already exists at close-time, as positive precedent).</p>
-<h3>4.3 Fail-closed resolver / checker policy in production</h3>
+<h3 id="43-fail-closed-resolver--checker-policy-in-production">4.3 Fail-closed resolver / checker policy in production</h3>
 <p><strong>Problem.</strong> <code>MemberStandingChecker</code>, <code>SuspensionChecker</code>, and <code>MembershipResolver</code> are <code>Option&lt;...&gt;</code>; nothing in production startup currently asserts they are wired and healthy.</p>
 <p><strong>Hardening goal.</strong> Production runtime refuses to serve write paths whose institutional correctness depends on an unwired or unhealthy resolver. Test and fixture builds carve explicit, visibly labeled exceptions.</p>
 <p><strong>Doctrine.</strong> <em>Unresolved standing is not standing in production.</em></p>
@@ -186,7 +183,7 @@ View source on GitHub →
 </ul>
 <p>The choice per call site is design work in the follow-up PR; this strategy lists the menu and the invariants, not the per-site policy.</p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/http/configure.rs:197-264</code> (optional checker types), <code>handlers.rs:78, 572, 617, 1111, 1203</code> (fail-open sites), <code>handlers.rs:1267–1268</code> (existing inline comment acknowledging the trade-off).</p>
-<h3>4.4 Direct charter activation as bootstrap-only</h3>
+<h3 id="44-direct-charter-activation-as-bootstrap-only">4.4 Direct charter activation as bootstrap-only</h3>
 <p><strong>Problem.</strong> <code>POST /charters</code> activates a charter outside the ratified proposal path, with synthetic provenance <code>direct-activation:{charter_id}</code>, no institutional-effect record, and no dispatch evidence.</p>
 <p><strong>Hardening goal.</strong> Direct activation is classified as bootstrap-only. Where retained, it emits a clearly distinct administrative artifact and is gated by a separate, narrow scope (or, preferably, a bootstrap mandate).</p>
 <p><strong>Doctrine.</strong> <em>A charter that bypasses governance must never look like one ratified by governance.</em></p>
@@ -208,7 +205,7 @@ View source on GitHub →
 </ul>
 <p>Whether the artifact is a new receipt class or a discriminator on an existing one is an <strong>open question</strong> (§15).</p>
 <p><strong>Anchors.</strong> <code>handlers.rs:694-744</code> (handler), <code>:647, :725</code> (synthetic provenance string).</p>
-<h3>4.5 Closed lifecycle vocabulary for accepted-vs-applied</h3>
+<h3 id="45-closed-lifecycle-vocabulary-for-accepted-vs-applied">4.5 Closed lifecycle vocabulary for accepted-vs-applied</h3>
 <p><strong>Problem.</strong> The current dispatch evidence layer produces <code>EmittedOnly</code>, <code>ExecutionEvidenced</code>, and <code>ExecutionFailed</code> (<code>dispatch_evidence.rs:131-169</code>), but surfaces (member shell, cockpit, API consumers) can flatten these to &quot;Accepted&quot; and lose the distinction.</p>
 <p><strong>Hardening goal.</strong> A closed lifecycle vocabulary is defined once and adopted consistently across API, member shell, and cockpit. &quot;Accepted&quot; never carries the implicit meaning &quot;applied and reconciled.&quot;</p>
 <p><strong>Doctrine.</strong> <em>Accepted is not applied. Receipt exists is not complete.</em></p>
@@ -231,13 +228,13 @@ View source on GitHub →
 </ul>
 <p>Where this vocabulary lives — kernel-api proofs vs governance-app types — is an <strong>open question</strong> (§15).</p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/dispatch_evidence.rs:131-169</code> (existing reconciliation status).</p>
-<h3>4.6 Per-effect idempotency</h3>
+<h3 id="46-per-effect-idempotency">4.6 Per-effect idempotency</h3>
 <p><strong>Problem.</strong> Effect dispatch can partially apply, retries on restart, and currently keys idempotency at institutional-effect granularity. The stronger key <code>(decision_hash, manifest_hash, effect_index)</code> is named in the spec but not yet in code.</p>
 <p><strong>Hardening goal.</strong> Every effect carries a stable per-effect idempotency key. Subsystems contract for duplicate dispatch behavior: a duplicate dispatch returns the prior outcome, never mutates a second time, and emits a <code>Duplicate</code> evidence record rather than a fresh applied-evidence record.</p>
 <p><strong>Doctrine.</strong> <em>Retries are governance events when effects are not provably idempotent.</em></p>
 <p><strong>Draft design.</strong> Candidate key <code>decision_hash + manifest_hash + effect_index</code>. Per-subsystem contract: idempotent / read-after-write idempotent / not idempotent (requires governance decision before retry). Evidence records distinguish first application from duplicate.</p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/dispatch_evidence.rs:34-87</code> (<code>EffectDispatchEvidence</code> struct, current granularity), <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> (spec calling for the stronger key).</p>
-<h3>4.7 Governance parameter sanity bounds</h3>
+<h3 id="47-governance-parameter-sanity-bounds">4.7 Governance parameter sanity bounds</h3>
 <p><strong>Problem.</strong> Governance parameter validation on the create-domain route is range-only — percentage bounds and a non-zero, under-one-year voting period. Pilot-readiness sanity bounds do not exist, there is no explicit fixture-mode escape hatch, the stricter bounds that do exist in <code>GovernanceParams::validate</code> are not wired into any create path, and the JSON-RPC create path validates nothing at all.</p>
 <p><strong>Hardening goal.</strong> Governance configs are classified into bands: <code>technically-valid</code>, <code>fixture-valid</code>, <code>pilot-valid</code>, <code>production-valid</code>. Member-facing institutions whose configs fail the band test render as <code>Degraded/InsufficientGovernanceConfig</code> and refuse member-facing operation until corrected.</p>
 <p><strong>Doctrine.</strong> <em>A technically valid institution can still be democratically fake.</em></p>
@@ -283,7 +280,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Where the gate has to go.</strong> There is no single composition root today. In actor-backed deployments the HTTP and JSON-RPC paths converge only at the actor&#39;s <code>GovernanceCommand::CreateDomain</code> arm; in standalone mode the manager&#39;s in-memory branch is a separate terminus that the actor never sees. A band gate must therefore cover both termini, or the domain-creation entry points must first be funnelled through one.</p>
-<h3>4.8 Shell / cockpit fixture matrix (no greenwashing)</h3>
+<h3 id="48-shell--cockpit-fixture-matrix-no-greenwashing">4.8 Shell / cockpit fixture matrix (no greenwashing)</h3>
 <p><strong>Problem.</strong> Implementation drift between member shell and cockpit can let degraded / partial / stale / disputed states render as clean.</p>
 <p><strong>Hardening goal.</strong> A fixture matrix asserts member-shell rendering against cockpit rendering for every degraded state, every administrative shortcut, every pending challenge, every emitted-only effect, every stale resolver answer. If cockpit shows degraded, member shell must show degraded — in member vocabulary.</p>
 <p><strong>Doctrine.</strong> <em>The UI must not launder uncertainty into confidence.</em></p>
@@ -300,12 +297,12 @@ View source on GitHub →
 <li>signed-but-unacknowledged / shell-says-sent-not-confirmed parity.</li>
 </ul>
 <p><strong>Anchors.</strong> <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> (design principle 9 + failure-table row), <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> (cockpit-degraded → shell-degraded rule).</p>
-<h3>4.9 PrivateEvidence non-rendering regression</h3>
+<h3 id="49-privateevidence-non-rendering-regression">4.9 PrivateEvidence non-rendering regression</h3>
 <p><strong>Problem.</strong> Debug convenience can promote a <code>PrivateEvidence</code> body byte into a rendering layer.</p>
 <p><strong>Hardening goal.</strong> A regression test asserts that no rendering layer (member shell fixture, cockpit fixture) ever receives a private body. Rendering layers receive existence, scope, authority basis, access path, access-holder identity (where policy permits), access / export receipts — and nothing else.</p>
 <p><strong>Doctrine.</strong> <em>Privacy posture is not private content. Debug convenience cannot become surveillance authority.</em></p>
 <p><strong>Anchors.</strong> <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> (<code>ArtifactDigest::scoped_vault_reference</code>, current digest-only boundary).</p>
-<h3>4.10 Typed-receipt atomicity inventory</h3>
+<h3 id="410-typed-receipt-atomicity-inventory">4.10 Typed-receipt atomicity inventory</h3>
 <p><strong>Problem.</strong> Opaque receipt storage is atomic by construction; typed receipt paths are not uniformly atomic.</p>
 <p><strong>Hardening goal.</strong> Every typed receipt write path is classified and remediated. The classification matrix below is filled in by a follow-up PR; the doctrine here is that no typed write path is allowed to silently fall outside the atomicity guarantees of the opaque store without an explicit named exception.</p>
 <p><strong>Classification axes</strong> (one row per typed write entry point):</p>
@@ -320,7 +317,7 @@ View source on GitHub →
 </ul>
 <p><strong>Doctrine.</strong> <em>Index absence must not silently become record absence.</em></p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/receipt_backend.rs:42, 80, 106, 146, 178-210, 248</code> (typed write entry points; default <code>put_mandate_with_grants</code> is documented as <strong>not atomic</strong> at lines 178-190).</p>
-<h3>4.11 Object-context binding on global-id reads</h3>
+<h3 id="411-object-context-binding-on-global-id-reads">4.11 Object-context binding on global-id reads</h3>
 <p><strong>Problem.</strong> Endpoints shaped <code>/{context}/{collection}/{object_id}</code> authorize on the path / token context but fetch by a globally-keyed object id. If the loaded object&#39;s own context is not matched to the named one, a caller with standing in context A can read an object in context B by id (#2087 in treasury budgets; the class also covers ledger, compute, storage, governance records, federation provenance, and the escrow / invite / recurring objects of #2058).</p>
 <p><strong>Hardening goal.</strong> Every global-id read binds the loaded object to the institutional context named by the request before returning it, and reports a foreign object identically to a missing one (enumeration-safe, per #1642).</p>
 <p><strong>Doctrine.</strong> <em>A record reached by a globally-keyed id must be proven to belong to the institutional context named by the request before it is returned; a foreign object is reported exactly as a missing one.</em></p>
@@ -337,7 +334,7 @@ View source on GitHub →
 <p><strong>Anchors.</strong> <code>icn/crates/icn-gateway/src/api/treasury.rs:647-705</code> (<code>get_budget</code>, #2087 — the proven example); #1642 (open enumeration-safe-404 audit, the generalization); #2052 / #2056 / #2058 (caller-context siblings). Unbound families to sweep next: ledger, compute, storage, governance records, federation provenance.</p>
 <!-- truth: descriptive -->
 
-<h2>5. Production invariants</h2>
+<h2 id="5-production-invariants">5. Production invariants</h2>
 <p>The substrate refuses to serve the listed write paths unless the listed resolver / checker / config is wired and healthy. Fixture, dev, and test builds carve explicit exceptions; the exception is visibly labeled in every surface it touches.</p>
 <ul>
 <li><strong>TrustThreshold write paths require <code>MemberStandingChecker</code>.</strong> No write to a <code>TrustThreshold</code> domain proceeds unless <code>ctx.member_checker</code> is <code>Some</code> and recent. Affected sites: <code>handlers.rs:78, 572, 617, 1111, 1203</code>.</li>
@@ -351,7 +348,7 @@ View source on GitHub →
 <p>The production / fixture / dev classification is driven by an explicit deployment posture (env var, config field, or build feature) that is visible at startup. Surfaces render the posture; a &quot;production posture but fixture wiring&quot; combination is itself a degraded state.</p>
 <!-- truth: descriptive -->
 
-<h2>6. Closed lifecycle vocabulary (draft)</h2>
+<h2 id="6-closed-lifecycle-vocabulary-draft">6. Closed lifecycle vocabulary (draft)</h2>
 <p>The vocabulary is draft. The intent is one closed set adopted by the API surface, member shell, and steward cockpit so consumers do not invent their own collapses of &quot;Accepted&quot; or &quot;Applied.&quot;</p>
 <table>
 <thead>
@@ -450,8 +447,8 @@ View source on GitHub →
 <p>The hard rule remains: a receipt of any kind never means &quot;legitimate and complete&quot; by default. Receipts prove specific events under specific authority bases; the surface vocabulary states which event.</p>
 <!-- truth: descriptive -->
 
-<h2>7. Authority shortcut policy</h2>
-<h3>7.1 What is an authority shortcut</h3>
+<h2 id="7-authority-shortcut-policy">7. Authority shortcut policy</h2>
+<h3 id="71-what-is-an-authority-shortcut">7.1 What is an authority shortcut</h3>
 <p>A surface is an authority shortcut if it produces an institutional effect without traversing the proposal → decision → mandate → effect → evidence chain. Current shortcuts in the substrate:</p>
 <ul>
 <li><code>add_domain_member</code> / <code>remove_domain_member</code> (<code>handlers.rs:548-635</code>)</li>
@@ -459,13 +456,13 @@ View source on GitHub →
 <li>The single broad <code>governance:write</code> capability (<code>auth.rs:947</code>) when used to exercise any of the above</li>
 </ul>
 <p>Future shortcuts must be evaluated against this list and either added (with labeling) or rejected.</p>
-<h3>7.2 Labeling requirements</h3>
+<h3 id="72-labeling-requirements">7.2 Labeling requirements</h3>
 <p>Every shortcut emits an administrative receipt (the artifact draft in §4.2 / §4.4). The receipt is rendered as <code>Accepted/AdministrativeShortcut</code> in surfaces (§6). API consumers receive a structured discriminator, not a free-text annotation; the surface is responsible for translating the discriminator to member-readable text.</p>
-<h3>7.3 Production allow-list</h3>
+<h3 id="73-production-allow-list">7.3 Production allow-list</h3>
 <p>Each shortcut carries two flags in its administrative receipt: <code>production-allowed</code> and <code>post-pilot-allowed</code>. Deployment posture (§5) governs which flags are honored. A shortcut whose <code>production-allowed: false</code> flag is set refuses to execute in production deployments and surfaces an explicit &quot;this path is bootstrap-only&quot; error.</p>
 <!-- truth: descriptive -->
 
-<h2>8. Resolver / checker fail-closed policy</h2>
+<h2 id="8-resolver--checker-fail-closed-policy">8. Resolver / checker fail-closed policy</h2>
 <p>Production semantics, per §3.3 abuse story:</p>
 <table>
 <thead>
@@ -504,7 +501,7 @@ View source on GitHub →
 <p>The current inline &quot;fail-open on resolver errors&quot; trade-off (<code>handlers.rs:1267-1268</code>) is a known production gap. The follow-up PR that lands per-site policy resolves it explicitly.</p>
 <!-- truth: descriptive -->
 
-<h2>9. Receipt semantics policy</h2>
+<h2 id="9-receipt-semantics-policy">9. Receipt semantics policy</h2>
 <p>Per §2.1 doctrine, receipts state what they prove. Receipt rendering layers in member shell and cockpit must distinguish:</p>
 <ul>
 <li><strong>Application receipts</strong> — the effect ran and applied.</li>
@@ -520,7 +517,7 @@ View source on GitHub →
 <p>No surface flattens any of these into a single &quot;Receipt issued&quot; affirmation.</p>
 <!-- truth: descriptive -->
 
-<h2>10. Governance parameter sanity strategy</h2>
+<h2 id="10-governance-parameter-sanity-strategy">10. Governance parameter sanity strategy</h2>
 <p>Per §4.7. The follow-up PR fills in the per-band bounds; this section names the bands and the gate.</p>
 <ul>
 <li><code>fixture-valid</code> — anything that parses. Explicitly labeled in every surface.</li>
@@ -530,7 +527,7 @@ View source on GitHub →
 <p>A domain whose config is below its declared band refuses member-facing operation and renders as <code>Degraded/InsufficientGovernanceConfig</code> in both surfaces.</p>
 <!-- truth: descriptive -->
 
-<h2>11. Shell / cockpit fixture matrix</h2>
+<h2 id="11-shell--cockpit-fixture-matrix">11. Shell / cockpit fixture matrix</h2>
 <p>Per §4.8. Implementation lives in the testkit; the matrix here is the design contract.</p>
 <p>For every state listed in §6 and every shortcut listed in §7, a fixture asserts:</p>
 <ul>
@@ -543,7 +540,7 @@ View source on GitHub →
 <p>The matrix runs as part of the testkit. A v0 violation (cockpit and shell disagree) fails the build.</p>
 <!-- truth: descriptive -->
 
-<h2>12. Privacy / ScopedVault abuse prevention</h2>
+<h2 id="12-privacy--scopedvault-abuse-prevention">12. Privacy / ScopedVault abuse prevention</h2>
 <p>Per §4.9 and §2.9 doctrine. The regression test set covers:</p>
 <ul>
 <li>no <code>PrivateEvidence</code> body byte reaches any rendering layer,</li>
@@ -554,7 +551,7 @@ View source on GitHub →
 <p>The existing digest-only rendering in <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> is the positive-precedent anchor.</p>
 <!-- truth: descriptive -->
 
-<h2>13. Typed-receipt atomicity inventory</h2>
+<h2 id="13-typed-receipt-atomicity-inventory">13. Typed-receipt atomicity inventory</h2>
 <p>Per §4.10. The follow-up PR fills in the matrix; this section lists the entry points to inventory.</p>
 <p>Entry points (<code>icn/apps/governance/src/receipt_backend.rs</code>):</p>
 <ul>
@@ -568,9 +565,9 @@ View source on GitHub →
 <p>For each: classify, document the gap (or lack of gap), and either migrate to opaque-store-grade atomicity, add a repair scan, or accept and document the weaker guarantee with an explicit reason.</p>
 <!-- truth: descriptive -->
 
-<h2>14. Implementation issue roster</h2>
+<h2 id="14-implementation-issue-roster">14. Implementation issue roster</h2>
 <p>Candidate follow-up issues, grouped by priority. <strong>Names are descriptive; no issue numbers are minted by this document.</strong> Each row names the track section, a code anchor, and a candidate label set (existing labels in the repo include <code>epic:trust-hardening</code>, <code>tier:1-correctness</code>, etc., per <code>.github/ISSUE_POLICY.md</code>).</p>
-<h3>P0 — production invariants and authority shortcuts</h3>
+<h3 id="p0--production-invariants-and-authority-shortcuts">P0 — production invariants and authority shortcuts</h3>
 <table>
 <thead>
 <tr>
@@ -600,7 +597,7 @@ View source on GitHub →
 <td><code>icn/apps/governance/src/http/configure.rs:197-264</code></td>
 </tr>
 </tbody></table>
-<h3>P1 — evidence and execution correctness</h3>
+<h3 id="p1--evidence-and-execution-correctness">P1 — evidence and execution correctness</h3>
 <table>
 <thead>
 <tr>
@@ -630,7 +627,7 @@ View source on GitHub →
 <td><code>handlers.rs:1267-1268</code></td>
 </tr>
 </tbody></table>
-<h3>P2 — surface regression</h3>
+<h3 id="p2--surface-regression">P2 — surface regression</h3>
 <table>
 <thead>
 <tr>
@@ -660,7 +657,7 @@ View source on GitHub →
 <td>same</td>
 </tr>
 </tbody></table>
-<h3>P3 — governance sanity and receipt-store consistency</h3>
+<h3 id="p3--governance-sanity-and-receipt-store-consistency">P3 — governance sanity and receipt-store consistency</h3>
 <table>
 <thead>
 <tr>
@@ -692,7 +689,7 @@ View source on GitHub →
 </tbody></table>
 <!-- truth: descriptive -->
 
-<h2>15. Open questions</h2>
+<h2 id="15-open-questions">15. Open questions</h2>
 <p>The questions below are genuinely open; the strategy doc is descriptive of what production must look like, not prescriptive of how to encode the answer.</p>
 <ul>
 <li><strong>Scope decomposition vs mandate gating.</strong> Where does the line fall between kernel-side capability strings and ICN-native mandate / authority-grant gating? The doctrine in §4.1 keeps both available; the follow-up design PR picks per call site.</li>
@@ -703,9 +700,9 @@ View source on GitHub →
 </ul>
 <!-- truth: descriptive -->
 
-<h2>16. Recommended sequencing</h2>
+<h2 id="16-recommended-sequencing">16. Recommended sequencing</h2>
 <p>Implementation order, designed so the production-safety floor is in place before the surface-regression and governance-sanity layers land on top.</p>
-<h3>Stage A — documentation / control plane (this PR)</h3>
+<h3 id="stage-a--documentation--control-plane-this-pr">Stage A — documentation / control plane (this PR)</h3>
 <ol>
 <li>Strategy document (this file).</li>
 <li>Abuse-case review checklist embedded in the strategy doc (sections §3, §4).</li>
@@ -713,7 +710,7 @@ View source on GitHub →
 <li>Production invariants (§5).</li>
 <li>Authority shortcut policy (§7).</li>
 </ol>
-<h3>Stage B — safety rails</h3>
+<h3 id="stage-b--safety-rails">Stage B — safety rails</h3>
 <ol>
 <li>Production config guard for optional checker / resolver wiring (§4.3, §5).</li>
 <li>Scope split design or mandate-gating design (§4.1) — design, then PR.</li>
@@ -721,7 +718,7 @@ View source on GitHub →
 <li>Direct membership mutation marked bootstrap-only (§4.2).</li>
 <li>Fixture / dev / test exceptions made explicit and visibly labeled (§5).</li>
 </ol>
-<h3>Stage C — evidence correctness</h3>
+<h3 id="stage-c--evidence-correctness">Stage C — evidence correctness</h3>
 <ol>
 <li>Per-effect idempotency key (§4.6).</li>
 <li>Dispatch lifecycle status — closed vocabulary adoption (§4.5, §6).</li>
@@ -729,7 +726,7 @@ View source on GitHub →
 <li>Typed receipt atomicity inventory (§4.10, §13).</li>
 <li>Repair-scan strategy where needed.</li>
 </ol>
-<h3>Stage D — surface regression</h3>
+<h3 id="stage-d--surface-regression">Stage D — surface regression</h3>
 <ol>
 <li>Shell / cockpit fixture matrix (§4.8, §11).</li>
 <li>No-greenwashing degraded-state tests.</li>
@@ -737,7 +734,7 @@ View source on GitHub →
 <li>Stale / degraded / offline parity tests.</li>
 <li>Bootstrap / direct-path labeling tests (§7.2).</li>
 </ol>
-<h3>Stage E — governance sanity</h3>
+<h3 id="stage-e--governance-sanity">Stage E — governance sanity</h3>
 <ol>
 <li>Pilot / member-facing governance profile gate (§4.7, §10).</li>
 <li>Challenge / review window requirement for high-impact effects.</li>
@@ -747,7 +744,7 @@ View source on GitHub →
 </ol>
 <!-- truth: descriptive -->
 
-<h2>17. Non-claims preserved</h2>
+<h2 id="17-non-claims-preserved">17. Non-claims preserved</h2>
 <p>This document does not imply or claim:</p>
 <ul>
 <li>production deployment, Phase 2 completion, or formal pilot status for any partner,</li>
@@ -762,7 +759,7 @@ View source on GitHub →
 <p>NYCN remains the <strong>intended first cooperative partner</strong>, not a committed formal pilot.</p>
 <!-- truth: descriptive -->
 
-<h2>18. See also</h2>
+<h2 id="18-see-also">18. See also</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -776,7 +773,10 @@ View source on GitHub →
 <li><a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a> — Phase 2 status remains ⏳ and partner-bound.</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">`.github/ISSUE_POLICY.md`</a> — issue label taxonomy; the §14 roster uses these labels descriptively, not as a filing instruction.</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

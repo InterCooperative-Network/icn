@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Steward Cockpit v0 | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Defines the ICN steward cockpit as the operator-facing civic-infrastructure surface for node and domain stewards at v0 — the operator/steward complement of docs/spec/member-shell-v0.md (#1830). Consumes verbatim the 9-field cockpit surface from docs/spec/network-anti-entropy-proof-loops.md (#1829) for the Network / Federation section, the 14-field operator/steward dashboard from docs/spec/compute-placement-policy.md (#1826) for the Compute / Commons section, and the storage durability policy objects from docs/spec/storage-durability-policies.md (#1823). Names six hard boundary lines (vs member shell #1830, vs node operator civic-role surface #1613, vs public website, vs institution-package skin, vs backend/runtime, vs surveillance/admin-control panel), ten v0 design principles (stewardship-not-domination, proof-before-confidence, degraded-is-visible, privacy-posture-not-private-content, receipts-explain-state, required-actions-explicit, authority-basis-visible, scope-visible, member-impact-summary-always-present, no-financial-framing), twelve cockpit information-architecture surfaces (Overview/Required Actions, Node Status, Domain Status, Network/Federation, Receipt Store, Storage/Artifacts/ScopedVault, Governance/Process, Compute/Commons, Participation Access, Privacy Posture, Backup/Export/Recovery, Warnings/Incidents/Repair), fourteen operator action-card scenarios with source class / authority pattern / expected outcome, per-surface rendering contracts that consume merged sibling specs without redefining them, a closed v0 operator-facing status vocabulary plus a verbatim member-impact summary mapping into the merged #1829 member-shell sync vocabulary, twenty-row failure/safety table including the load-bearing 'dashboard says healthy while member shell says degraded' v0 violation, and three fixture-first dogfood slices (read-only receipt-store + anti-entropy degraded/repair fixture; storage replica / backup overdue / restore-test receipt fixture; compute placement review-required fixture). No new endpoints, no frontend technology decision, no surveillance console, no private-data preview, no production-dashboard claim. Advances #1795 — does not by itself close it. Defers the live cockpit implementation, the frontend technology decision, the per-surface implementation specs, and the cross-link audit against icn-obs metric module renaming to named follow-ups."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Steward Cockpit v0 | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,16 +35,13 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>steward cockpit v0</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/steward-cockpit-v0.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Steward Cockpit v0</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>steward cockpit v0</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-05-15</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="steward-cockpit-v0">Steward Cockpit v0</h1>
 <blockquote>
 <p><strong>Status: spec, work-in-progress.</strong> Defines the ICN steward cockpit as the operator-facing civic-infrastructure surface for node and domain stewards at v0. It is the operator/steward complement of <code>docs/spec/member-shell-v0.md</code> (merged #1830). It does <strong>not</strong> redefine any merged sibling spec, does <strong>not</strong> implement a dashboard, does <strong>not</strong> define new endpoints, and does <strong>not</strong> specify a frontend technology choice. The shell renders plain participation status; the cockpit renders technical detail. The PR introducing this doc advances <code>#1795</code> without closing it.</p>
 </blockquote>
 <!-- truth-class: normative -->
 
-<h2>Purpose</h2>
+<h2 id="purpose">Purpose</h2>
 <p>A node steward, a domain steward, and a federation steward show up to keep institutional infrastructure honest. The cockpit is what they see. It answers, in technical detail:</p>
 <ol>
 <li><strong>Is this node / domain healthy?</strong></li>
@@ -60,7 +57,7 @@ View source on GitHub →
 </ol>
 <p>The cockpit makes stewardship legible <strong>without turning stewards into rulers</strong>. It surfaces obligations, warnings, receipts, authority basis, and repair paths. Every steward action runs through the same mandate / authority / receipt envelope as every other institutional action.</p>
 <p>The cockpit is the consumer side of: the 9-field steward-cockpit surface in <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot; (merged #1829), the 14-field operator/steward dashboard in <code>docs/spec/compute-placement-policy.md</code> §&quot;Operator / steward dashboard&quot; (merged #1826), the storage durability policy objects in <code>docs/spec/storage-durability-policies.md</code> (merged #1823), the artifact registry / scoped-vault posture in <code>docs/spec/artifact-registry-and-scoped-vault.md</code> (merged #1824), the governed-service-binding lifecycle &quot;Observe&quot; state (merged #1822), the CCL policy registry adoption surface (merged #1821), the institutional-domain policy hooks (merged #1820), and the Stage 5 effect-dispatch evidence (merged #1819).</p>
-<h2>Scope and non-goals</h2>
+<h2 id="scope-and-non-goals">Scope and non-goals</h2>
 <p><strong>In scope:</strong></p>
 <ul>
 <li>Six hard boundary lines distinguishing the cockpit from neighboring surfaces.</li>
@@ -87,22 +84,22 @@ View source on GitHub →
 <li>Not a NYCN-specific or named-partner-specific framing. Institution packages localize labels; the generic cockpit stays generic.</li>
 <li>Not closure of <code>#1795</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s acceptance criteria.</li>
 </ul>
-<h2>Boundary lines</h2>
-<h3>Steward cockpit vs. member shell (<code>#1830</code>)</h3>
+<h2 id="boundary-lines">Boundary lines</h2>
+<h3 id="steward-cockpit-vs-member-shell-1830">Steward cockpit vs. member shell (<code>#1830</code>)</h3>
 <p>The member shell renders <strong>plain participation status</strong> using the closed seven-string sync vocabulary from <code>#1829</code> and the closed seven-string execution-scope vocabulary from <code>#1826</code>. The cockpit renders <strong>technical detail</strong> using the operator-facing names: <code>DivergenceEvidence</code> class names, peer DIDs, digest forms, <code>policy_version_id</code> content hashes, mandate references, replica counts, backup timestamps.</p>
 <p>The same divergence event surfaces in both, in different vocabularies. The shell <strong>must not</strong> show cockpit technical detail (per <code>docs/spec/member-shell-v0.md</code> Boundary lines). The cockpit <strong>must not</strong> collapse to the shell&#39;s plain-language summary alone — every cockpit row shows technical detail under &quot;details&quot; even when the row&#39;s headline is plain-language for quick scanning.</p>
 <p>A steward who is also a member sees both surfaces in their respective contexts. The cockpit is the steward-context view; the shell is the member-context view of the same institution.</p>
-<h3>Steward cockpit vs. node operator civic-role surface (<code>#1613</code>)</h3>
+<h3 id="steward-cockpit-vs-node-operator-civic-role-surface-1613">Steward cockpit vs. node operator civic-role surface (<code>#1613</code>)</h3>
 <p><code>#1613</code>&#39;s node operator civic-role surface in Commons Shell is a <strong>separate</strong> operator surface aimed at infrastructure operators of cooperative-operated nodes who are also performing civic roles inside the cooperative. The cockpit is the <strong>institutional</strong> stewardship surface: domain stewards, federation stewards, and any steward role a <code>DomainPolicy</code> adopts. The two surfaces may share underlying telemetry but their audience and authority context are distinct. This spec does not preempt <code>#1613</code>.</p>
-<h3>Steward cockpit vs. public website</h3>
+<h3 id="steward-cockpit-vs-public-website">Steward cockpit vs. public website</h3>
 <p>The website is the institution&#39;s outward-facing surface. The cockpit is the institution&#39;s inward-facing operator surface. The website has no operator authority; the cockpit consumes the steward&#39;s standing and mandates to render scoped actions.</p>
-<h3>Steward cockpit vs. institution-package skin</h3>
+<h3 id="steward-cockpit-vs-institution-package-skin">Steward cockpit vs. institution-package skin</h3>
 <p>Institution packages localize the cockpit with their own role labels (&quot;steward,&quot; &quot;treasurer-of-record,&quot; &quot;node-keeper,&quot; etc.), ceremony markers, and visual identity. The generic v0 spec stays generic: it names the structural concepts (<code>LocalDomain</code>, <code>DomainPolicy</code>, <code>Mandate</code>, <code>AuthorityClass</code>, <code>Standing</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>PlacementDecision</code>, <code>BackupPolicy</code>, etc.), and lets packages add local nouns under &quot;details&quot; without losing the structural concept.</p>
-<h3>Steward cockpit vs. backend / runtime</h3>
+<h3 id="steward-cockpit-vs-backend--runtime">Steward cockpit vs. backend / runtime</h3>
 <p>Per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>, the kernel never imports cockpit strings, layouts, or rendering rules. The cockpit is app-side rendering. It consumes existing surfaces (the <code>icn-obs</code> metrics modules; the governance proof / receipt surfaces; the gateway endpoints; the merged spec status vocabularies) and renders them. It does not define new wire formats, new endpoints, or new receipt classes.</p>
-<h3>Steward cockpit vs. surveillance / admin-control panel</h3>
+<h3 id="steward-cockpit-vs-surveillance--admin-control-panel">Steward cockpit vs. surveillance / admin-control panel</h3>
 <p>The cockpit is <strong>not</strong> a surveillance console. Operator actions are bounded by authority: every steward action that mutates institutional state requires a covering mandate, produces a receipt, and is challengeable per <code>DomainPolicy</code>. The cockpit does <strong>not</strong> surface private vault content. It does <strong>not</strong> offer &quot;see all member activity&quot; views. Member-impact summaries surface affected scope and counts, never identities or message bodies, unless the steward holds an explicit, receipted authority basis to see them.</p>
-<h2>Design principles</h2>
+<h2 id="design-principles">Design principles</h2>
 <p>Ten v0 principles, each load-bearing for what the cockpit is allowed to be:</p>
 <ol>
 <li><strong>Stewardship, not domination.</strong> Every cockpit action that mutates institutional state runs through the same mandate / authority / receipt envelope as every member action. The cockpit makes stewardship legible; it does not grant rulers.</li>
@@ -116,7 +113,7 @@ View source on GitHub →
 <li><strong>Member-impact summary is always present.</strong> Every cockpit row that affects member-facing surfaces carries a one-line member-impact summary using the merged member-shell vocabulary from <code>docs/spec/member-shell-v0.md</code>. A steward looking at degraded sync sees both the technical detail and the seven-string member-facing status that members are seeing in their shell. This keeps the operator honest: when the cockpit shows degraded, the shell must already be showing degraded.</li>
 <li><strong>No financial-product framing.</strong> The cockpit never uses payment, currency, balance, wallet, token, crypto, blockchain, or timebank framing for ICN-native participation. The vocabulary discipline in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full. Settlement, position, obligation, allocation, receipt, and provenance are the operator-facing terms.</li>
 </ol>
-<h2>Cockpit information architecture</h2>
+<h2 id="cockpit-information-architecture">Cockpit information architecture</h2>
 <p>The v0 cockpit offers twelve surfaces. The list is the <strong>minimum</strong>; institution-package skins may add, but a cockpit missing any of these is not v0.</p>
 <table>
 <thead>
@@ -188,7 +185,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p>The cockpit may offer more surfaces; a v0-conformant cockpit offers at least these twelve.</p>
-<h2>Required Actions / Steward Action Cards</h2>
+<h2 id="required-actions--steward-action-cards">Required Actions / Steward Action Cards</h2>
 <p><strong>Schema status (forward-direction).</strong> The member shell consumes ADR-0027&#39;s <code>ActionCard</code> schema (closed enums: <code>source_kind ∈ {proposal, meeting, action_item}</code> + two RFC-gated reserved values; <code>action_kind ∈ {vote, attend, complete}</code>). The fourteen operator scenarios named below — repair, backup, restore drill, key rotation, export review, stale peer, etc. — <strong>cannot</strong> be represented by that schema as it currently stands. ADR-0027 was not written to cover operator-required-action surfaces. This spec therefore <strong>does not</strong> claim the existing schema fits; it names the scenarios at design-level and <strong>defers the schema question</strong> to a follow-up <code>spec(contracts): define steward required-action card contract</code> that either (a) amends ADR-0027 with an operator-required-action superset, or (b) defines a separate <code>StewardRequiredActionCard</code> primitive alongside the member-facing <code>ActionCard</code>. Per this PR&#39;s non-claims, no schema, ADR, or wire format is introduced here.</p>
 <p>Per <code>#1795</code> acceptance criteria, the cockpit defines steward-side required-action scenarios for at least the following operator situations. Each scenario is named, with its source class, its authority basis pattern, and its expected <code>RepairReceipt</code> or evidence outcome. The <strong>rendering needs</strong> below are spec-level; the <strong>wire-stable record shape</strong> that carries them is forward-direction.</p>
 <table>
@@ -300,7 +297,7 @@ View source on GitHub →
 <li><strong>Member-impact summary</strong> — verbatim from the member-shell vocabulary mapping (Design principle 9).</li>
 </ul>
 <p>These are <strong>rendering analogs</strong>, not a schema definition. The cockpit renders them with operator-facing technical detail rather than member-facing plain language; the member shell does not show them at all (per §&quot;Boundary lines&quot; → &quot;Member shell vs steward cockpit&quot;). The forward-direction follow-up either amends ADR-0027 with an operator-required-action superset or defines a separate <code>StewardRequiredActionCard</code> primitive; this PR does neither.</p>
-<h2>Node Status surface</h2>
+<h2 id="node-status-surface">Node Status surface</h2>
 <p>Renders the local node&#39;s operational posture as observed via existing <code>icn-obs</code> metrics and <code>icn-core</code> supervisor state. Every field has a freshness timestamp; stale beyond a policy window renders as <code>stale</code>.</p>
 <ul>
 <li><strong>Daemon health</strong> — running / stopped / restarting / crashed; uptime; last-restart cause if not graceful.</li>
@@ -312,7 +309,7 @@ View source on GitHub →
 <li><strong>Current mode</strong> — fixture / devnet / K3s / live, labeled honestly. Fixtures and devnet runs are never rendered as live.</li>
 <li><strong>Evidence timestamp</strong> — when the cockpit last refreshed this surface.</li>
 </ul>
-<h2>Domain Status surface</h2>
+<h2 id="domain-status-surface">Domain Status surface</h2>
 <p>Renders the <code>InstitutionalDomain</code> the steward is operating against.</p>
 <ul>
 <li><strong>InstitutionalDomain id</strong> — the domain DID; the owning entity class (Cooperative / Community / Federation / Individual / other governed class, per <code>docs/spec/institutional-domain.md</code>).</li>
@@ -324,7 +321,7 @@ View source on GitHub →
 <li><strong>Action-card generation posture</strong> — <code>/me/action-cards</code> generation health; last generation timestamp; missing-source warnings (e.g., <code>signal_rule</code> / <code>obligation_lifecycle</code> source paths are inert pending <code>#1631</code> / <code>#1634</code>).</li>
 <li><strong>Member-facing readiness summary</strong> — a one-line summary of whether the domain&#39;s member-facing surfaces (per <code>docs/spec/member-shell-v0.md</code>) currently render <code>Synced</code>, <code>Sync delayed</code>, <code>Review required</code>, or <code>Sync delayed / degraded</code> to members in this domain.</li>
 </ul>
-<h2>Network / Federation surface</h2>
+<h2 id="network--federation-surface">Network / Federation surface</h2>
 <p>This surface <strong>consumes</strong> the 9-field cockpit surface from <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot; verbatim. Each open <code>DivergenceEvidence</code> (per the 18-class taxonomy) renders with:</p>
 <ol>
 <li><strong>Affected scope</strong> — <code>LocalDomain</code>, <code>Federation</code>, <code>Commons</code>, or peer-pair.</li>
@@ -339,7 +336,7 @@ View source on GitHub →
 </ol>
 <p>Each row carries the closed status terminology from <code>#1799</code> / <code>#1829</code> (direct / relayed / degraded / partitioned / stale / syncing / verified / unverified) and a member-impact summary using the merged member-shell sync vocabulary.</p>
 <p><code>QuorumSyncCheck</code> and <code>FederationSyncWindow</code> posture appear here when the domain participates in a federation: which checks are fresh, which are stale beyond the window, and which placement / settlement decisions are currently <code>RejectedByPolicy</code> for lack of fresh proof (per <code>docs/spec/compute-placement-policy.md</code> Boundary rule 6 and <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 6).</p>
-<h2>Receipt Store surface</h2>
+<h2 id="receipt-store-surface">Receipt Store surface</h2>
 <p>Renders persistent receipt posture.</p>
 <ul>
 <li><strong>Latest receipts</strong> — by ADR-0026 / ADR-0025 receipt class: <code>GovernanceDecisionReceipt</code> (Layer 1), <code>ActionItemCompletionReceipt</code>, <code>MeetingAttendanceReceipt</code>, <code>ArtifactReceipt</code> (Layer 2), <code>InstitutionalEffectRecord</code> + <code>EffectDispatchEvidence</code> (Stage 5), future <code>RatificationReceipt</code> (when ADR-0025 / <code>#1818</code> follow-ups land it as a top-level class).</li>
@@ -352,7 +349,7 @@ View source on GitHub →
 <li><strong>Evidence envelope references</strong> — links to the Stage 5 <code>EffectDispatchEvidence</code> artifacts (per <code>docs/spec/effect-dispatch-contract.md</code>) the receipts belong to.</li>
 <li><strong>Forward-direction proof / evidence artifacts (not receipt classes).</strong> Several merged sibling specs name forward-direction artifact identifiers that travel <strong>inside existing receipt envelopes</strong> (Stage 5 <code>EffectDispatchEvidence</code> or Layer 2 <code>ArtifactReceipt</code> per ADR-0026), <strong>not</strong> as new ADR-0026 receipt classes. From <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Proof artifacts (forward-direction names)&quot;: <code>RepairReceipt</code>, <code>RoutingProof</code>, <code>RedundancyProof</code> (and the broader anti-entropy proof-artifact set). From <code>docs/spec/compute-placement-policy.md</code> §&quot;Candidate outputs&quot;: <code>PlacementFallbackReceipt</code> (an attachment on its parent <code>PlacementDecision</code>, not a new top-level receipt class — see also the Compute / Commons surface below for the placement-side rendering). The cockpit surfaces these as attachments on their parent evidence record; they do <strong>not</strong> appear in the &quot;Latest receipts — by class&quot; list above.</li>
 </ul>
-<h2>Storage / Artifacts / ScopedVault surface</h2>
+<h2 id="storage--artifacts--scopedvault-surface">Storage / Artifacts / ScopedVault surface</h2>
 <p>Consumes <code>docs/spec/storage-durability-policies.md</code> and <code>docs/spec/artifact-registry-and-scoped-vault.md</code>.</p>
 <ul>
 <li><strong>Storage class / custody class</strong> — <code>Canonical</code>, <code>ServiceState</code>, <code>Blobs</code> (per <code>icn-kernel-api/src/storage.rs</code>); custody class breakdown.</li>
@@ -364,7 +361,7 @@ View source on GitHub →
 <li><strong>Private object reference health</strong> — divergence class 16 (&quot;private object reference mismatch without content disclosure&quot;) rows.</li>
 <li><strong>Redaction / evidence packet status</strong> — <code>EvidencePacket</code> and <code>PrivateEvidence</code> artifact-class counts (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code> artifact-class taxonomy); redaction posture without revealing content.</li>
 </ul>
-<h2>Governance / Process surface</h2>
+<h2 id="governance--process-surface">Governance / Process surface</h2>
 <p>Consumes <code>docs/spec/effect-dispatch-contract.md</code>, <code>docs/spec/institutional-domain.md</code>, <code>docs/spec/ccl-policy-registry.md</code>.</p>
 <ul>
 <li><strong>Proposals</strong> — open proposals scoped to the domain; deadline; current standing; vote tally if applicable.</li>
@@ -375,7 +372,7 @@ View source on GitHub →
 <li><strong>Process-transition receipt classes where present</strong> — coverage check against <code>docs/spec/effect-dispatch-contract.md</code> receipt-class summary.</li>
 <li><strong>Challenge / reversal windows</strong> — open challenge windows on receipts that support disputes; deadlines; required authority class to act.</li>
 </ul>
-<h2>Compute / Commons surface</h2>
+<h2 id="compute--commons-surface">Compute / Commons surface</h2>
 <p>This surface <strong>consumes</strong> the 14-field operator/steward dashboard from <code>docs/spec/compute-placement-policy.md</code> §&quot;Operator / steward dashboard&quot; verbatim:</p>
 <ol>
 <li><strong>Placement decision</strong> — one of the seven placement classes (<code>LocalOnly</code>, <code>DomainLocalPreferred</code>, <code>LocalDomainBound</code>, <code>FederationBound</code>, <code>CommonsEligible</code>, <code>ExternalCustodianRequired</code>, <code>RejectedByPolicy</code>).</li>
@@ -394,7 +391,7 @@ View source on GitHub →
 <li><strong>Failure / fallback reason</strong> — when the placement fell back or was <code>RejectedByPolicy</code>, the reason and authority basis.</li>
 </ol>
 <p>Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. <code>PlacementFallbackReceipt</code>s (per <code>docs/spec/compute-placement-policy.md</code> §&quot;Candidate outputs&quot;) render as evidence attachments on their parent <code>PlacementDecision</code>. The Stage 5 envelope that carries the attachment is the <code>EffectDispatchEvidence</code> from <code>docs/spec/effect-dispatch-contract.md</code>.</p>
-<h2>Participation Access surface</h2>
+<h2 id="participation-access-surface">Participation Access surface</h2>
 <p>Consumes <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> and ADR-0028.</p>
 <ul>
 <li><strong>Accessibility gate results</strong> — pass / fail per the twelve categories, per member-facing surface in this domain.</li>
@@ -405,7 +402,7 @@ View source on GitHub →
 <li><strong>Screen-reader / keyboard / color-independent readiness</strong> — per the relevant categories from ADR-0028.</li>
 </ul>
 <p>A failing accessibility gate row produces a Required Action card per the table above.</p>
-<h2>Privacy Posture surface</h2>
+<h2 id="privacy-posture-surface">Privacy Posture surface</h2>
 <p>Consumes merged <code>docs/spec/artifact-registry-and-scoped-vault.md</code> and forward-direction <code>#1792</code> / <code>#1767</code>.</p>
 <ul>
 <li><strong>Private overlay loaded / missing</strong> — per <code>#1767</code> (encrypted distributed private-overlay storage).</li>
@@ -416,7 +413,7 @@ View source on GitHub →
 <li><strong>Redaction / evidence status</strong> — <code>EvidencePacket</code> and <code>PrivateEvidence</code> posture without surfacing content.</li>
 <li><strong>Hard rule:</strong> no raw private content in cockpit. Body bytes of private artifacts never reach the rendering layer.</li>
 </ul>
-<h2>Backup / Export / Recovery surface</h2>
+<h2 id="backup--export--recovery-surface">Backup / Export / Recovery surface</h2>
 <p>Consumes <code>docs/spec/storage-durability-policies.md</code>.</p>
 <ul>
 <li><strong>Backup policy status</strong> — <code>BackupPolicy</code> cadence freshness per spec; missed backups flagged.</li>
@@ -426,7 +423,7 @@ View source on GitHub →
 <li><strong>Recovery drill cadence</strong> — when the next drill is due per <code>DomainPolicy</code>.</li>
 <li><strong>Locality / disclosure inheritance warnings</strong> — any backup, replica, archive, or export that would broaden <code>DataLocality</code> or <code>privacy_class</code> is flagged before it can run (per <code>docs/spec/storage-durability-policies.md</code> §&quot;Locality and privacy inheritance&quot; and <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 4).</li>
 </ul>
-<h2>Warnings / Incidents / Repair surface</h2>
+<h2 id="warnings--incidents--repair-surface">Warnings / Incidents / Repair surface</h2>
 <p>Aggregates open warnings, active incidents, and repair flows across all surfaces. Distinct from the Overview / Required Actions surface: that one orders by required steward action; this one orders by warning / incident severity and life-cycle, and is the place to drill into the underlying evidence chain.</p>
 <p>Each row renders:</p>
 <ul>
@@ -450,9 +447,9 @@ View source on GitHub →
 <li>Degraded state must match member-shell status. Per Design principle 9, the Member-impact summary on every row must be honest; a cockpit row that says &quot;degraded&quot; while the member shell is showing &quot;Synced&quot; is a v0 violation per the failure / safety table.</li>
 <li>Every repair action needs an authority basis and an evidence path. The row&#39;s Authority basis and Evidence / receipt refs columns are mandatory; an action lacking either is rendered as visibly blocked.</li>
 </ul>
-<h2>Status vocabulary</h2>
+<h2 id="status-vocabulary">Status vocabulary</h2>
 <p>The cockpit uses operator-facing technical terms. Each operator term carries a member-impact summary that maps to the closed seven-string member-shell sync vocabulary from <code>docs/spec/network-anti-entropy-proof-loops.md</code> and the closed seven-string member-shell execution-scope vocabulary from <code>docs/spec/compute-placement-policy.md</code>.</p>
-<h3>Operator states (closed v0 set)</h3>
+<h3 id="operator-states-closed-v0-set">Operator states (closed v0 set)</h3>
 <ul>
 <li><strong>healthy</strong> — fresh evidence; all relevant freshness windows satisfied.</li>
 <li><strong>degraded</strong> — partial evidence; some freshness windows stale or some metrics outside policy bounds.</li>
@@ -467,7 +464,7 @@ View source on GitHub →
 <li><strong>blocked by policy</strong> — action available in principle but blocked by current <code>DomainPolicy</code> (e.g., placement <code>RejectedByPolicy</code>, federation agreement absent).</li>
 <li><strong>private content restricted</strong> — surface intentionally opaque due to privacy / custody rule; existence + scope + access path are shown, body is not.</li>
 </ul>
-<h3>Member-impact summary mapping</h3>
+<h3 id="member-impact-summary-mapping">Member-impact summary mapping</h3>
 <p>Every operator-state surface row that has member impact carries a one-line member-impact line using the merged member-shell sync vocabulary:</p>
 <table>
 <thead>
@@ -518,7 +515,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p>This mapping is <strong>honest</strong>: when the cockpit shows <code>degraded</code>, the member shell must already be showing <code>Sync delayed</code>. The &quot;dashboard says healthy while member shell says degraded&quot; row in the failure / safety table below is a v0 violation.</p>
-<h2>Failure and safety table</h2>
+<h2 id="failure-and-safety-table">Failure and safety table</h2>
 <table>
 <thead>
 <tr>
@@ -628,9 +625,9 @@ View source on GitHub →
 <td>v0 violation. Replace with settlement / position / obligation / allocation / receipt / provenance. Forbidden as positive ICN-native framing in operator copy.</td>
 </tr>
 </tbody></table>
-<h2>First safe proof-loop / dogfood slice</h2>
+<h2 id="first-safe-proof-loop--dogfood-slice">First safe proof-loop / dogfood slice</h2>
 <p>Per <code>#1795</code> acceptance criteria and the session pattern from #1829 / #1830, the spec names docs- and fixture-first slices that exercise the cockpit contract without touching real operators, real partner federations, or a real backend.</p>
-<h3>Slice A (preferred): Read-only receipt-store + anti-entropy degraded / repair cockpit fixture</h3>
+<h3 id="slice-a-preferred-read-only-receipt-store--anti-entropy-degraded--repair-cockpit-fixture">Slice A (preferred): Read-only receipt-store + anti-entropy degraded / repair cockpit fixture</h3>
 <ul>
 <li><strong>Fixture peers.</strong> Three peer fixtures (DIDs assigned, signing keys local) per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Slice A.</li>
 <li><strong>Fictional institution / domain.</strong> A fixture <code>LocalDomain</code> (e.g., <code>did:icn:demo:exampledomain</code>).</li>
@@ -641,7 +638,7 @@ View source on GitHub →
 <li><strong>Accessibility checklist applied.</strong> The twelve-category gate from ADR-0028 / <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> evaluated on the fixture rendering. Operator surfaces are accessible: keyboard reachable, screen-reader navigable, color-independent status, plain technical detail without surveillance-style aggregation.</li>
 </ul>
 <p><strong>Implementation status (<code>#1840</code>).</strong> Slice A is implemented as a fixture-only Rust integration test at <code>icn/crates/icn-kernel-api/tests/steward_cockpit_divergence_render_slice_a.rs</code>. The fixture builds three in-memory peers (A/B/C), drives the proof chain landed by <code>#1843</code> / <code>#1844</code> / <code>#1845</code>, and renders open-then-resolved <code>FixtureStewardCockpitView</code> structs that carry all nine required cockpit fields plus the closed v0 operator-state label and the verbatim member-impact summary line. The twelve-category accessibility checklist (<code>FixtureAccessibilityChecklist</code>) is evaluated on each rendered view and asserted to pass. Public <code>RepairReceipt</code> remains design-level — the fixture uses a private <code>FixtureRepairOutcome</code> and documents the substitution. The fixture is a proof-of-shape (the cockpit can describe the open divergence honestly), not a proof-of-runtime: it does not implement the live cockpit, the dashboard, any UI, or any network behavior, and does not advance the production-readiness or live-federation posture of the spec. The member-shell rendering surface (<code>#1839</code>) remains separate.</p>
-<h3>Slice B: Storage replica / backup overdue / restore-test receipt fixture</h3>
+<h3 id="slice-b-storage-replica--backup-overdue--restore-test-receipt-fixture">Slice B: Storage replica / backup overdue / restore-test receipt fixture</h3>
 <ul>
 <li>Same fixture stack.</li>
 <li>Fixture artifacts with <code>ReplicationPolicy.target_replicas = 3</code> held by only two of three fixture peers.</li>
@@ -649,7 +646,7 @@ View source on GitHub →
 <li>Backup cadence intentionally set such that the most recent backup is overdue; Required Action card &quot;backup overdue&quot; surfaces.</li>
 <li>Restore-test receipt fixture: one successful, one failed; cockpit surfaces both with member-impact summaries.</li>
 </ul>
-<h3>Slice C: Compute placement review-required fixture</h3>
+<h3 id="slice-c-compute-placement-review-required-fixture">Slice C: Compute placement review-required fixture</h3>
 <ul>
 <li>Same fixture stack.</li>
 <li>Fixture <code>PlacementDecision</code> for an advisory workload that produces a <code>ReviewRequiredActionCard</code>.</li>
@@ -658,7 +655,7 @@ View source on GitHub →
 <li>Member-impact summary: <code>Members see: Review required</code>.</li>
 </ul>
 <p>All three slices are fixture-only. None implements the cockpit. None touches a real network, a real federation, real artifacts, or real members.</p>
-<h2>Relationship to sibling work</h2>
+<h2 id="relationship-to-sibling-work">Relationship to sibling work</h2>
 <table>
 <thead>
 <tr>
@@ -783,7 +780,7 @@ View source on GitHub →
 <td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
 </tr>
 </tbody></table>
-<h2>Non-claims (repeat block for grep clarity)</h2>
+<h2 id="non-claims-repeat-block-for-grep-clarity">Non-claims (repeat block for grep clarity)</h2>
 <ul>
 <li>This spec does not implement a steward cockpit. No code lands here.</li>
 <li>This spec does not specify a frontend technology, a native shell, a web framework, or any platform choice.</li>
@@ -799,7 +796,10 @@ View source on GitHub →
 <li>This spec does not authorize any change to the runtime, gateway, SDK, website, deploy scripts, K3s, DNS, Forgejo, or any deployed infrastructure.</li>
 <li>This spec does not close <code>#1795</code>. The PR uses <code>Refs: #1795</code>; closure is a user-driven decision against the issue&#39;s acceptance criteria.</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/steward-cockpit-v0.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0014: Constitutional Object Model | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Semantic freeze for the four governance constitutional types. Decision: accepted; implementation: partially landed (types + accepted-decision minting seam land at the governance app layer; kernel dispatch is not yet gated by mandates). See ADR-0019 for the minting/persistence seam decision."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0014: Constitutional Object Model | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,11 +35,8 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0014 constitutional object model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0014-constitutional-object-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR 0014: Constitutional Object Model</h1>
-<h2>Status</h2>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0014 constitutional object model</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Decision record</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-04-26</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="adr-0014-constitutional-object-model">ADR 0014: Constitutional Object Model</h1>
+<h2 id="status">Status</h2>
 <p><strong>Accepted; implementation partially landed (status updated 2026-04-26).</strong> The
 ADR was originally filed as <code>proposed</code> (docs-only semantic freeze); the
 semantic content was never revised. Code has since landed that proves the
@@ -49,7 +46,7 @@ lifecycle (<code>accepted</code>) is independent from the <code>implementation_s
 (<code>partially implemented</code>).</p>
 <p>The original Status note is preserved verbatim below as the historical
 record of what this ADR claimed at filing time.</p>
-<h3>Original status note (2026-04-19)</h3>
+<h3 id="original-status-note-2026-04-19">Original status note (2026-04-19)</h3>
 <blockquote>
 <p><strong>Proposed (docs-only semantic freeze).</strong> This ADR introduces no behavior changes, no
 new code paths, no new crate public surface. It freezes the meaning of four constitutional
@@ -58,13 +55,13 @@ implementation tranche can land them without reopening what they are.</p>
 <p>Implementation follows this ADR in a separate PR. Nothing in this ADR promotes any phase
 status or claims completion.</p>
 </blockquote>
-<h2>Implementation Update (2026-04-26)</h2>
+<h2 id="implementation-update-2026-04-26">Implementation Update (2026-04-26)</h2>
 <p>The four constitutional types frozen by this ADR are now implemented at the
 governance app layer. The accepted-decision seam mints <code>AuthorityGrant</code>s
 and persists <code>Mandate</code>s. The minting/persistence behavior is recorded
 separately as a decision in <a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">ADR-0019</a>;
 this section records what is verifiable in code as of this date.</p>
-<h3>What is implemented</h3>
+<h3 id="what-is-implemented">What is implemented</h3>
 <table>
 <thead>
 <tr>
@@ -101,21 +98,21 @@ this section records what is verifiable in code as of this date.</p>
 <td><code>icn/crates/icn-governance/src/authority.rs</code> module doc lines 1-30 explicitly states this rule</td>
 </tr>
 </tbody></table>
-<h3>What is NOT implemented</h3>
+<h3 id="what-is-not-implemented">What is NOT implemented</h3>
 <ul>
 <li><strong>Kernel dispatch is not gated by mandates or authority grants.</strong> A grep of <code>icn/crates/icn-kernel-api/</code> and <code>icn/crates/icn-core/src/dispatch*</code> for <code>Mandate</code> / <code>mandate</code> returns no matches as of 2026-04-26. Mandates exist as institutional memory; they are not yet a precondition for <code>KernelEffect</code> execution.</li>
 <li><strong>Kernel <code>Capability</code> tokens are not minted from <code>AuthorityGrant</code>s.</strong> ADR-0014 explicitly leaves this for a future implementation tranche, and that tranche has not landed.</li>
 <li><strong>Authority revocation end-to-end is partial.</strong> Revocation writes are referenced in <code>grant_minting.rs:343</code>; the full revocation lifecycle has not been verified by this update.</li>
 <li><strong>Federation-side mandate recognition is not specified or implemented.</strong> Federation peers do not yet read or honor mandates from another entity.</li>
 </ul>
-<h3>What this update does NOT change</h3>
+<h3 id="what-this-update-does-not-change">What this update does NOT change</h3>
 <ul>
 <li>The semantic content of this ADR (Context, Decision, Consequences, Alternatives) is unchanged from the original filing.</li>
 <li>The decision recorded here is the same decision; only its lifecycle marker (<code>status: accepted</code>) and <code>implementation_status</code> (<code>partially implemented</code>) are updated, per ADR-0018&#39;s rule that historical content is preserved while current status can change.</li>
 <li>This update does not authorize kernel-side enforcement. That requires a separate decision.</li>
 </ul>
 <hr>
-<h2>Context</h2>
+<h2 id="context">Context</h2>
 <p>The repository now has a working governance-to-evidence pipeline post-#1562/#1567/#1571:</p>
 <ul>
 <li>Proposals are deliberated and accepted.</li>
@@ -179,7 +176,7 @@ new consumers. The natural downstream work — narrow federation authority, exec
 gating, governance-validated attestation, member-visible &quot;what am I authorized to do&quot;,
 and proposal-to-execution closure — all depend on a frozen object model underneath.</p>
 <hr>
-<h2>Animating principles</h2>
+<h2 id="animating-principles">Animating principles</h2>
 <p>The object model below is shaped by six non-negotiable commitments. If a future
 refinement of these types violates any of them, the refinement is wrong, not the
 principle.</p>
@@ -212,11 +209,11 @@ platform-issued currency. The typed model must not smuggle a balance worldview
 into the constitutional layer.</li>
 </ol>
 <hr>
-<h2>Decision (what this ADR freezes)</h2>
+<h2 id="decision-what-this-adr-freezes">Decision (what this ADR freezes)</h2>
 <p>Introduce four constitutional objects at the <strong>governance app layer</strong>, with the meanings
 below. Exact Rust representations may refine at implementation time (field names, enum
 encoding, serialization tags). The <em>semantic categories</em> are frozen now.</p>
-<h3>1. <code>AuthorityClass</code></h3>
+<h3 id="1-authorityclass">1. <code>AuthorityClass</code></h3>
 <p>A closed, enumerated kind of authority. Three variants, and only three, at the
 constitutional level:</p>
 <table>
@@ -251,7 +248,7 @@ anti-capture failure the typed model exists to prevent.</p>
 kernel-level capability bearer semantics (those remain in <code>icn-kernel-api::authz</code>),
 trust score computations, or ordinary membership status. A member <em>being</em> a member is
 not an authority grant; a member <em>appointed to execute</em> under a bounded scope is.</p>
-<h3>2. <code>AuthorityGrant</code></h3>
+<h3 id="2-authoritygrant">2. <code>AuthorityGrant</code></h3>
 <p>A bounded, auditable grant of authority issued by a sovereign entity to a grantee,
 in one and only one <code>AuthorityClass</code>. Conceptual fields:</p>
 <ul>
@@ -289,7 +286,7 @@ Kernel-side <code>icn_kernel_api::authz::Capability</code> (bearer token with ho
 expiration/signature) remains the mechanical transport. <code>AuthorityGrant</code> is the
 institutional source the app layer can point a future enforcement path at; it is
 not imported into kernel crates.</p>
-<h3>3. <code>TypedScope</code></h3>
+<h3 id="3-typedscope">3. <code>TypedScope</code></h3>
 <p>The typed replacement path for today&#39;s <code>authority_scope: Vec&lt;String&gt;</code>. Minimal and
 tranche-sized — designed to cover what existing consumers already express, not to
 anticipate every future dimension.</p>
@@ -319,7 +316,7 @@ one populated scope category to be meaningful, &quot;unbounded on everything&quo
 expressible.</p>
 <p><code>TypedScope</code> is not a subset of <code>DelegationScope</code>, and does not supersede it.
 <code>DelegationScope</code> remains vote-delegation-specific (see §Mapping).</p>
-<h3>4. <code>Mandate</code></h3>
+<h3 id="4-mandate">4. <code>Mandate</code></h3>
 <p><code>Mandate</code> is the constitutional mediation layer between a governance decision and
 the execution of its effects. This is the object the repo is currently missing and
 the one that this ADR most carefully defines, because its absence is what keeps
@@ -389,10 +386,10 @@ discharged. Without it, authority-to-execute is implicit and managerial, and the
 evidence layer records <em>what happened</em> without being able to answer <em>who was
 authorized to do it and under which grant</em>.</p>
 <hr>
-<h2>Mapping against existing repo structures</h2>
+<h2 id="mapping-against-existing-repo-structures">Mapping against existing repo structures</h2>
 <p>This section is the authoritative &quot;what stays, what becomes adjacent, what is merely
 proto-form&quot; reference for the implementation PR.</p>
-<h3>Charter (<code>icn-governance::charter</code>, <code>apps/charter::CharterPolicyOracle</code>, <code>icn-ccl::schema::bridge</code>)</h3>
+<h3 id="charter-icn-governancecharter-appschartercharterpolicyoracle-icn-cclschemabridge">Charter (<code>icn-governance::charter</code>, <code>apps/charter::CharterPolicyOracle</code>, <code>icn-ccl::schema::bridge</code>)</h3>
 <p><strong>Stays.</strong> The charter remains the sovereign constitutional source of the entity. This
 ADR does not touch charter representation, ratification, or the <code>charter_to_constraints</code>
 bridge. <code>CharterPolicyOracle</code> continues to translate ratified charter documents into
@@ -400,7 +397,7 @@ bridge. <code>CharterPolicyOracle</code> continues to translate ratified charter
 <p>Relationship to the new objects: <code>AuthorityGrant</code>s descend from the charter&#39;s process.
 The charter defines who may issue which grants under what governance process.
 <code>Mandate</code>s are issued when decisions made under the charter direct an action.</p>
-<h3>Delegation (<code>icn-governance::delegation</code>)</h3>
+<h3 id="delegation-icn-governancedelegation">Delegation (<code>icn-governance::delegation</code>)</h3>
 <p><strong>Stays as representation-specific.</strong> <code>DelegationScope::{Blanket, Domain, Proposal}</code>
 remains the typed surface for vote delegation. A vote delegation is conceptually a
 time-bounded <code>AuthorityGrant</code> of class <code>Representation</code> with a scope matching
@@ -410,7 +407,7 @@ this tranche — doing so would be effect-family widening.</p>
 not Execution authority and must not be conflated with it. An entity that needs to
 authorize an executor does so via a <code>Mandate</code> (and its referenced <code>AuthorityGrant</code>s),
 not by delegating votes.</p>
-<h3>RoleAssignment (<code>icn-governance::structure</code>)</h3>
+<h3 id="roleassignment-icn-governancestructure">RoleAssignment (<code>icn-governance::structure</code>)</h3>
 <p><strong>Proto-authority surface.</strong> <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code> is the
 closest current analogue of <code>AuthorityGrant.scope</code> and is the primary migration target
 (see §Migration). <code>RoleAssignment.assigned_by_decision: Option&lt;ProposalId&gt;</code> is the
@@ -418,12 +415,12 @@ closest current analogue of <code>AuthorityGrant.granted_by</code>.</p>
 <p><code>RoleAssignment</code> is not deprecated by this ADR. Its role as a structural placement
 (this DID holds this role in this structure) remains. Its authority-scoping surface
 becomes a typed projection into <code>AuthorityGrant</code>.</p>
-<h3>Structure::Office (<code>icn-governance::structure</code>)</h3>
+<h3 id="structureoffice-icn-governancestructure">Structure::Office (<code>icn-governance::structure</code>)</h3>
 <p><strong>Adjacent.</strong> <code>Structure { kind: Office }</code> names an institutional seat. An office is
 not itself an <code>AuthorityGrant</code>; office-holders may be grantees of grants, and offices
 may be the addressee of mandates (as a named role rather than a DID). This ADR does
 not redefine offices.</p>
-<h3>Agreement::FederationMembership (<code>icn-federation::agreement::types</code>)</h3>
+<h3 id="agreementfederationmembership-icn-federationagreementtypes">Agreement::FederationMembership (<code>icn-federation::agreement::types</code>)</h3>
 <p><strong>Adjacent, proto-compact.</strong> <code>AgreementType::FederationMembership { terms }</code> has the
 shape of a typed inter-entity compact. It is not yet the narrow, typed, revocable
 federation authority system this ADR ultimately prepares. Federation-level
@@ -433,7 +430,7 @@ out of scope here.</p>
 <p>This ADR does not alter <code>Agreement</code> types. Later work to narrow federation authority
 will emit <code>AuthorityGrant</code>s alongside (or attached to) <code>Agreement</code>s; that narrowing
 belongs in a subsequent ADR and PR.</p>
-<h3>StewardRecord + StewardAttestation (<code>icn-governance::steward</code>)</h3>
+<h3 id="stewardrecord--stewardattestation-icn-governancesteward">StewardRecord + StewardAttestation (<code>icn-governance::steward</code>)</h3>
 <p><strong>Adjacent, proto-attestation-authority.</strong> <code>StewardRecord { governance_approval, status, term_start, term_end, attestations_issued, … }</code> already carries most of the
 shape of an <code>AuthorityGrant</code> of class <code>Attestation</code>: a grantor&#39;s decision reference,
 a bounded term, a grantee DID, and an attestation-counter surface.</p>
@@ -441,7 +438,7 @@ a bounded term, a grantee DID, and an attestation-counter surface.</p>
 gate that validates &quot;is this steward currently authorized, under a non-revoked grant,
 to issue <em>this specific class</em> of attestation?&quot; That gate is future work. The freeze
 of <code>AuthorityClass::Attestation</code> gives that future gate a concept to consult.</p>
-<h3>InstitutionalEffectRecord (<code>apps/governance::institutional_effect</code>)</h3>
+<h3 id="institutionaleffectrecord-appsgovernanceinstitutional_effect">InstitutionalEffectRecord (<code>apps/governance::institutional_effect</code>)</h3>
 <p><strong>Evidence-side only.</strong> <code>icn/apps/governance/src/institutional_effect.rs</code> (lines 1-19)
 is explicit: <code>InstitutionalEffectRecord</code> is &quot;the governance-app answer to the question
 &#39;what artifact did this decision actually create?&#39;&quot; — it is the translation evidence,
@@ -451,13 +448,13 @@ future wiring: <code>GovernanceDecisionReceipt</code> (decision happened) → <c
 to execute) → <code>InstitutionalEffectRecord</code> (translation occurred) → <code>EffectDispatchEvidence</code>
 (execution reported). This ADR does not implement that wiring; it freezes the
 meaning of the missing link.</p>
-<h3>GovernanceDecisionReceipt (<code>icn-governance::proof</code>)</h3>
+<h3 id="governancedecisionreceipt-icn-governanceproof">GovernanceDecisionReceipt (<code>icn-governance::proof</code>)</h3>
 <p><strong>Stays.</strong> The receipt is the cryptographic anchor for &quot;the decision was reached
 under canonical process.&quot; <code>Mandate.decision_receipt_id</code> and <code>Mandate.decision_hash</code>
 reference it. The receipt is not subsumed into <code>Mandate</code>; they are distinct records
 with distinct purposes (receipt = decision identity; mandate = authorization to act
 on the decision).</p>
-<h3>CCL / charter bridge (<code>icn-ccl::schema::bridge::charter_to_constraints</code>)</h3>
+<h3 id="ccl--charter-bridge-icn-cclschemabridgecharter_to_constraints">CCL / charter bridge (<code>icn-ccl::schema::bridge::charter_to_constraints</code>)</h3>
 <p><strong>Stays unchanged.</strong> The charter bridge operates at <code>PolicyOracle::evaluate()</code> time to
 translate ratified charters into <code>ConstraintSet</code>s. It is not replaced by this ADR,
 and it does not import any of the new objects.</p>
@@ -465,13 +462,13 @@ and it does not import any of the new objects.</p>
 by whatever <code>ConstraintSet</code> that charter translates to. Nothing more. The kernel still
 enforces constraints without understanding that the constraints came from a charter
 and without understanding that a mandate mediates between decision and effect.</p>
-<h3>Kernel authz (<code>icn-kernel-api::authz::Capability</code>, <code>PolicyOracle</code>, <code>ConstraintSet</code>)</h3>
+<h3 id="kernel-authz-icn-kernel-apiauthzcapability-policyoracle-constraintset">Kernel authz (<code>icn-kernel-api::authz::Capability</code>, <code>PolicyOracle</code>, <code>ConstraintSet</code>)</h3>
 <p><strong>Stays unchanged and remains unimported.</strong> The kernel capability is a mechanical
 bearer token used for transport-level authorization. <code>AuthorityGrant</code> is the
 constitutional source that a future implementation might <em>mint</em> kernel capabilities
 from — but the two remain in distinct layers and the kernel does not learn the
 meaning of <code>AuthorityClass</code>, <code>TypedScope</code>, or <code>Mandate</code>.</p>
-<h3>Shared-service entities (<code>icn-commons</code>, <code>icn-compute</code>, future shared services)</h3>
+<h3 id="shared-service-entities-icn-commons-icn-compute-future-shared-services">Shared-service entities (<code>icn-commons</code>, <code>icn-compute</code>, future shared services)</h3>
 <p><strong>Become legible institutional actors under the same grammar.</strong> Shared services
 currently function as real actors (commons identity registry, commons-pool compute)
 but are not yet modeled as grantees/grantors in a first-class way. The typed model
@@ -492,7 +489,7 @@ ADR exists to prevent.</li>
 </ul>
 <p>No shared-service refactor is part of this ADR. Their future legibility through
 this grammar is part of what the freeze prepares.</p>
-<h3>Mobile/member constitutional surface (<code>sdk/react-native</code>, <code>examples/mobile-app</code>, <code>web/pilot-ui</code>)</h3>
+<h3 id="mobilemember-constitutional-surface-sdkreact-native-examplesmobile-app-webpilot-ui">Mobile/member constitutional surface (<code>sdk/react-native</code>, <code>examples/mobile-app</code>, <code>web/pilot-ui</code>)</h3>
 <p><strong>Not implemented by this ADR; directly enabled by it.</strong> The strategic frame names
 mobile/member interaction as mission-level, and the member shell as a constitutional
 interface rather than cosmetic polish. This ADR does not add a single hook or
@@ -509,7 +506,7 @@ surface is a prerequisite for accessibility; screen readers, plain-language
 summaries, and member-facing explainers all need typed content to render
 faithfully. This ADR protects that future surface by freezing its substrate now.</p>
 <hr>
-<h2>Layer placement</h2>
+<h2 id="layer-placement">Layer placement</h2>
 <p>All four objects (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) live at
 the <strong>governance app / domain layer</strong>:</p>
 <ul>
@@ -525,11 +522,11 @@ constitutional meaning.</li>
 boundary types. Apps translate <code>Mandate</code>-authorized actions into <code>KernelEffect</code>s at
 the existing translation seam; the kernel stays generic.</p>
 <hr>
-<h2>Boundary rules between authority types</h2>
+<h2 id="boundary-rules-between-authority-types">Boundary rules between authority types</h2>
 <p>The ADR explicitly separates the three authority classes and names, for each, the
 concrete repo locations of partial current implementation and the distinct
 conflations to reject.</p>
-<h3>Representation authority</h3>
+<h3 id="representation-authority">Representation authority</h3>
 <ul>
 <li>Permits: voting in place of another; speaking/answering in place of another within
 a bounded scope; occupying a federation council seat on behalf of a coop.</li>
@@ -540,7 +537,7 @@ is not authorizing the delegate to execute mandates on their behalf.</li>
 <li>Why typed separation matters: prevents delegation-to-dictatorship — a broad vote
 delegation cannot be upgraded to administrative authority without a distinct grant.</li>
 </ul>
-<h3>Execution authority</h3>
+<h3 id="execution-authority">Execution authority</h3>
 <ul>
 <li>Permits: carrying out actions that mutate institutional state — budget spends,
 charter deployments, member freezes/unfreezes, steward appointments, clearing
@@ -555,7 +552,7 @@ issue personhood attestations.</li>
 platform capture is silent aggregation of execution authority under roles that
 were not explicitly granted it.</li>
 </ul>
-<h3>Attestation authority</h3>
+<h3 id="attestation-authority">Attestation authority</h3>
 <ul>
 <li>Permits: issuing signed statements of fact or status that downstream consumers
 rely on — steward personhood attestations, uniqueness proofs, audit sign-offs,
@@ -576,7 +573,7 @@ treat as authoritative, with no constitutional trail back to an explicit grant.<
 <code>Attestation</code> cannot authorize an execution effect. The type system expresses the
 institutional anti-capture rule.</p>
 <hr>
-<h2>Scope and non-goals</h2>
+<h2 id="scope-and-non-goals">Scope and non-goals</h2>
 <p>This ADR is a semantic freeze. It does <strong>not</strong> do, and a future implementation PR
 must not do under the banner of &quot;the ADR said so,&quot; any of the following:</p>
 <ol>
@@ -613,8 +610,8 @@ value, or platform-issued currency. The typed model does not provide a seam
 through which a balance abstraction can re-enter the constitutional layer.</li>
 </ol>
 <hr>
-<h2>Migration guidance</h2>
-<h3>From <code>authority_scope: Vec&lt;String&gt;</code> toward <code>TypedScope</code></h3>
+<h2 id="migration-guidance">Migration guidance</h2>
+<h3 id="from-authority_scope-vecstring-toward-typedscope">From <code>authority_scope: Vec&lt;String&gt;</code> toward <code>TypedScope</code></h3>
 <p>The implementation PR will add <code>TypedScope</code> as a new, typed projection without
 removing the string surface. Concretely:</p>
 <ol>
@@ -632,7 +629,7 @@ vector becomes a legacy parallel representation and eventually a derived view.</
 <li>No hard break is scheduled in this ADR. A later ADR will declare the string
 surface deprecated when the typed surface is the single source of truth.</li>
 </ol>
-<h3>Intended future chain (not yet implemented)</h3>
+<h3 id="intended-future-chain-not-yet-implemented">Intended future chain (not yet implemented)</h3>
 <pre><code>Charter (ratified, active)
     │
     │  process produces →
@@ -659,8 +656,8 @@ to-end. The missing step is <code>Mandate</code>; the other steps are live. Impl
 tranches will land the <code>Mandate</code> object and, subsequently, an execution gate that
 consults it.</p>
 <hr>
-<h2>Consequences</h2>
-<h3>What this freeze prepares (but does not itself implement)</h3>
+<h2 id="consequences">Consequences</h2>
+<h3 id="what-this-freeze-prepares-but-does-not-itself-implement">What this freeze prepares (but does not itself implement)</h3>
 <ul>
 <li><strong>Narrow federation authority.</strong> Once <code>AuthorityGrant</code> exists, federation-level
 authority (e.g. &quot;federation F may clear settlement receipts for coop C up to X
@@ -696,7 +693,7 @@ by whom, and how it was discharged.&quot;</li>
 becomes auditable end-to-end: which decision, which authorization, which execution,
 which evidence, which discharge.</li>
 </ul>
-<h3>What this freeze costs</h3>
+<h3 id="what-this-freeze-costs">What this freeze costs</h3>
 <ul>
 <li>Review attention on definitional precision. Freezing meaning before code is cheap
 <em>here</em> and expensive <em>later</em>, but the act of freezing has a cost now: it narrows
@@ -705,13 +702,13 @@ representation and execution without a typed grant).</li>
 <li>One additional small surface area in <code>icn-governance</code> when implementation lands.
 That surface is purposely minimal.</li>
 </ul>
-<h3>What this freeze explicitly does not do</h3>
+<h3 id="what-this-freeze-explicitly-does-not-do">What this freeze explicitly does not do</h3>
 <p>Already enumerated in §Scope and non-goals. Reiterated here as a consequence: no
 behavior changes land on the back of this ADR. If a PR claims to &quot;implement this ADR,&quot;
 reviewers should expect type additions, an <code>authority_scope: Vec&lt;String&gt;</code> bridge, and
 tests — not a new enforcement gate.</p>
 <hr>
-<h2>Open questions left for implementation</h2>
+<h2 id="open-questions-left-for-implementation">Open questions left for implementation</h2>
 <p>These are intentionally unresolved here; they are implementation details, not
 semantic decisions:</p>
 <ol>
@@ -729,7 +726,7 @@ events. Event sourcing is not mandated.</li>
 later one. Not required for the types to be usable internally.</li>
 </ol>
 <hr>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li><code>ADR-0010</code> — App topology and canonical app roots</li>
 <li><code>ADR-0012</code> — Federation state origin model</li>
@@ -747,7 +744,10 @@ later one. Not required for the types to be usable internally.</li>
 <li><code>icn/crates/icn-kernel-api/src/authz.rs</code> — kernel Capability / PolicyOracle</li>
 <li><code>icn/bins/icnd/src/main.rs</code> — CharterPolicyOracle wiring at startup</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0014-constitutional-object-model.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

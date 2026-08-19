@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Design Principles | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Canonical three-tier index of operational invariants, firewall contract, and frozen-core governance invariants. Pairs with the design system entry point as the kernel-side counterpart."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Design Principles | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,9 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DESIGN PRINCIPLES</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/DESIGN_PRINCIPLES.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Design Principles</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DESIGN PRINCIPLES</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Canonical</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-05-17</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-design-principles">ICN Design Principles</h1>
 <p>This is the canonical index of ICN&#39;s design principles. The principles already exist — they are
 encoded in code (<code>icn-kernel-api/src/invariants.rs</code>), enforced in CI
 (<code>.github/scripts/firewall_denylist.py</code>), surfaced at session start
@@ -50,7 +48,7 @@ kernel enforces constraints without understanding meaning. Every principle below
 protects that frame, makes it verifiable, or makes it survivable.</p>
 </blockquote>
 <hr>
-<h2>The three tiers</h2>
+<h2 id="the-three-tiers">The three tiers</h2>
 <table>
 <thead>
 <tr>
@@ -83,9 +81,9 @@ protects that frame, makes it verifiable, or makes it survivable.</p>
 governs <em>what governance and ledger apps are allowed to do to people</em>. Tier 1 violations are bugs.
 Tier 2 violations are architectural drift. Tier 3 violations are constitutional failures.</p>
 <hr>
-<h2>1. Operational invariants (tier 1)</h2>
+<h2 id="1-operational-invariants-tier-1">1. Operational invariants (tier 1)</h2>
 <p>These are the five invariants printed at every session start. They apply to all protocol-path code.</p>
-<h3>1.1 Adversarial-by-default</h3>
+<h3 id="11-adversarial-by-default">1.1 Adversarial-by-default</h3>
 <p><strong>Definition.</strong> Every peer is untrusted until trust is established through verifiable participation.
 No code path may assume good faith from a remote DID.</p>
 <p><strong>Forbids.</strong> Accepting unsigned messages on protocol paths. Skipping replay-guard checks. Granting
@@ -101,7 +99,7 @@ async fn handle(msg: NetworkMessage) {
 }
 </code></pre>
 <hr>
-<h3>1.2 Determinism</h3>
+<h3 id="12-determinism">1.2 Determinism</h3>
 <p><strong>Definition.</strong> Same inputs produce same outputs. Two nodes processing the same log arrive at the
 same state. No floating point in consensus or hash inputs. RNG is seeded. Serialization is
 canonical.</p>
@@ -117,7 +115,7 @@ let bytes = serde_json::to_vec(&amp;map)?;
 let hash = blake3::hash(&amp;bytes);          // hash depends on insertion order
 </code></pre>
 <hr>
-<h3>1.3 Canonical encodings</h3>
+<h3 id="13-canonical-encodings">1.3 Canonical encodings</h3>
 <p><strong>Definition.</strong> One valid byte representation per value. No ambiguity in wire format, proof
 format, or storage format.</p>
 <p><strong>Forbids.</strong> Indefinite-length CBOR. Unsorted map keys. Multiple equivalent integer encodings.
@@ -131,7 +129,7 @@ let h: HashMap&lt;&amp;str, i64&gt; = [(&quot;b&quot;, 1), (&quot;a&quot;, 2)].i
 serde_cbor::to_vec(&amp;h)?;                  // key order undefined → hash drifts
 </code></pre>
 <hr>
-<h3>1.4 No panics in protocol paths</h3>
+<h3 id="14-no-panics-in-protocol-paths">1.4 No panics in protocol paths</h3>
 <p><strong>Definition.</strong> The daemon does not crash on bad input. Protocol/network/actor/deserialization
 paths return <code>Result&lt;T, E&gt;</code>. Failures are handled, logged, metricized, and degraded against —
 never propagated as a panic.</p>
@@ -146,7 +144,7 @@ Clippy lints (<code>-D warnings</code> in CI).</p>
 let parsed: GossipMessage = serde_cbor::from_slice(&amp;bytes).unwrap();
 </code></pre>
 <hr>
-<h3>1.5 Kernel/app boundary is inviolable</h3>
+<h3 id="15-kernelapp-boundary-is-inviolable">1.5 Kernel/app boundary is inviolable</h3>
 <p><strong>Definition.</strong> The dependency graph enforces it. Kernel crates may not import domain crates.
 The Meaning Firewall is structural, not aspirational.</p>
 <p><strong>Forbids.</strong> Importing <code>icn-trust</code>, <code>icn-governance</code>, <code>icn-ccl</code>, <code>icn-coop</code>, <code>icn-community</code>,
@@ -159,7 +157,7 @@ waves 2–6 migration). <code>.claude/rules/kernel-boundary.md</code> (agent gua
 <p><strong>This invariant is the gateway to tier 2.</strong> Tier 2 is the same rule, decomposed into six concrete
 mechanical sub-rules a reviewer can check on a PR.</p>
 <hr>
-<h2>2. Firewall contract (tier 2)</h2>
+<h2 id="2-firewall-contract-tier-2">2. Firewall contract (tier 2)</h2>
 <p>The six invariants that operationalize 1.5. Defined and exhaustively exampled in
 <a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a>
 §Firewall Contract.</p>
@@ -206,13 +204,13 @@ mechanical sub-rules a reviewer can check on a PR.</p>
 kernel→domain dependencies. CI gate is currently <code>continue-on-error: true</code> and flips to a hard
 gate once waves complete. See KERNEL_APP_SEPARATION.md §6.0 for the wave schedule.</p>
 <hr>
-<h2>3. Frozen-core invariants (tier 3)</h2>
+<h2 id="3-frozen-core-invariants-tier-3">3. Frozen-core invariants (tier 3)</h2>
 <p>Ten invariants that protect the sovereignty of identities and the conservation of value, regardless
 of which governance app is running. They live in code as <code>InvariantId</code> in
 <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-kernel-api/src/invariants.rs">`icn/crates/icn-kernel-api/src/invariants.rs`</a> and
 are evaluated by app-layer code; the kernel verifies attestation presence + hash linkage but never
 re-evaluates the predicates (consistent with tier-2 invariant #6).</p>
-<h3>3.1 SovereigntyCore (#1–#3)</h3>
+<h3 id="31-sovereigntycore-13">3.1 SovereigntyCore (#1–#3)</h3>
 <table>
 <thead>
 <tr>
@@ -237,7 +235,7 @@ re-evaluates the predicates (consistent with tier-2 invariant #6).</p>
 <td>Adding an identity to an entity without their signature</td>
 </tr>
 </tbody></table>
-<h3>3.2 AntiCaptureCore (#4–#7)</h3>
+<h3 id="32-anticapturecore-47">3.2 AntiCaptureCore (#4–#7)</h3>
 <table>
 <thead>
 <tr>
@@ -267,7 +265,7 @@ re-evaluates the predicates (consistent with tier-2 invariant #6).</p>
 <td>Delegating capabilities you do not possess</td>
 </tr>
 </tbody></table>
-<h3>3.3 EconomicCore (#8–#10)</h3>
+<h3 id="33-economiccore-810">3.3 EconomicCore (#8–#10)</h3>
 <table>
 <thead>
 <tr>
@@ -297,7 +295,7 @@ the opaque receipt cascade described in tier-2 #6 (PRs #1755–#1759). It is cur
 governance invariant, but every successful state transition in the system already depends on it —
 see the <em>Audit findings</em> §A2 below.</p>
 <hr>
-<h2>4. The eight primitives</h2>
+<h2 id="4-the-eight-primitives">4. The eight primitives</h2>
 <p>The kernel provides exactly eight mechanical primitives. Adding a ninth requires an ADR amending
 <a href="/docs/strategy/ADR-001-What-ICN-Is">`docs/strategy/ADR-001-What-ICN-Is.md`</a>. Everything else is an
 app.</p>
@@ -353,7 +351,7 @@ app.</p>
 <p>&quot;Apps that ship with <code>icnd</code>&quot; today: governance, ledger, membership, trust, federation (see
 ADR-001 for the full descope table). Apps are not ICN — they are the first things built on it.</p>
 <hr>
-<h2>5. Meta-principles (the <em>why</em> behind the rules)</h2>
+<h2 id="5-meta-principles-the-why-behind-the-rules">5. Meta-principles (the <em>why</em> behind the rules)</h2>
 <p>These are not invariants. They are the dispositions a contributor should adopt before writing
 code that touches the kernel.</p>
 <ol>
@@ -380,7 +378,7 @@ operational form of tier-3 invariant #10.</p>
 </li>
 </ol>
 <hr>
-<h2>6. Where each principle lives in the codebase</h2>
+<h2 id="6-where-each-principle-lives-in-the-codebase">6. Where each principle lives in the codebase</h2>
 <table>
 <thead>
 <tr>
@@ -440,42 +438,42 @@ operational form of tier-3 invariant #10.</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>7. Audit findings (2026-05-17)</h2>
+<h2 id="7-audit-findings-2026-05-17">7. Audit findings (2026-05-17)</h2>
 <p>This document was produced by auditing the corpus of existing principles. The audit surfaced
 the following gaps. None of them block any current work; they are noted here so future
 contributors can address them deliberately.</p>
-<h3>A1. Quick-ref drift</h3>
+<h3 id="a1-quick-ref-drift">A1. Quick-ref drift</h3>
 <p><a href="/docs/architecture/ARCHITECTURE_QUICK_REF">`docs/architecture/ARCHITECTURE_QUICK_REF.md`</a>
 (snapshot dated December 2025) lists 25 crates. The workspace currently has 34 (per CLAUDE.md
 §Workspace Structure). It also lists trust class ranges (<code>Unknown / Known / Colleague / Close / Intimate</code>) that differ from the canonical thresholds in <code>icn-kernel-api/src/services.rs</code>
 (<code>Isolated / Known / Partner / Federated</code>). The doc is correctly marked as a historical snapshot,
 but downstream readers may quote it. <strong>Action:</strong> add a header pointing readers to this file plus
 <code>KERNEL_APP_SEPARATION.md</code> §3.2 for current trust thresholds, or regenerate the snapshot.</p>
-<h3>A2. Receipt universality is structurally a tier-1 invariant</h3>
+<h3 id="a2-receipt-universality-is-structurally-a-tier-1-invariant">A2. Receipt universality is structurally a tier-1 invariant</h3>
 <p>Tier-3 #10 (<code>UniversalReceiptGeneration</code>) is currently classified as a governance invariant,
 but every successful state transition in the system already depends on it — the entire opaque
 receipt cascade (tier-2 #6, PRs #1755–#1759) exists to make it cheap. <strong>Recommendation (not yet
 applied):</strong> promote it to a sixth tier-1 invariant (&quot;Receipts are the unit of truth&quot;) and keep
 its frozen-core slot as the governance-app-facing form. Requires consensus before edit — see
 also Meta-principle §5.5.</p>
-<h3>A3. No machine-readable principles registry</h3>
+<h3 id="a3-no-machine-readable-principles-registry">A3. No machine-readable principles registry</h3>
 <p>Principles are documented in prose. The <code>kernel_surface.toml</code> file referenced in ADR-001 is the
 closest thing to a machine-readable principles registry, but it audits crates against the
 firewall, not principles against code. <strong>Recommendation:</strong> if future enforcement wants to assert
 <em>&quot;every kernel crate has a doc-comment header citing the tier-1 invariants it depends on,&quot;</em> that
 will need a registry. Not needed yet.</p>
-<h3>A4. &quot;Adversarial-by-default&quot; lacks a single-page operational definition</h3>
+<h3 id="a4-adversarial-by-default-lacks-a-single-page-operational-definition">A4. &quot;Adversarial-by-default&quot; lacks a single-page operational definition</h3>
 <p>The principle is named everywhere but never decomposed into a checklist a reviewer could use on
 a PR. Tier-1 §1.1 above is the first such decomposition; it should be exercised on a few real PR
 reviews before being treated as load-bearing.</p>
-<h3>A5. The CCL boundary question is answered but not surfaced in tier hierarchy</h3>
+<h3 id="a5-the-ccl-boundary-question-is-answered-but-not-surfaced-in-tier-hierarchy">A5. The CCL boundary question is answered but not surfaced in tier hierarchy</h3>
 <p>ADR-001 cleanly resolves where CCL lives (interpreter = kernel via Compute primitive; contracts
 = apps). Neither tier 1 nor tier 2 has an invariant that names this boundary, so a future
 contributor adding CCL features could violate it without tripping any documented rule.
 <strong>Recommendation:</strong> add a tier-2 invariant #7, <em>&quot;CCL contracts may not be re-exported as Rust
 types from kernel crates,&quot;</em> once CCL contract authoring becomes a regular activity.</p>
 <hr>
-<h2>8. UI/UX surface counterpart</h2>
+<h2 id="8-uiux-surface-counterpart">8. UI/UX surface counterpart</h2>
 <p>The design system that renders this kernel architecture to humans lives in
 <a href="/docs/design/ICN_DESIGN_SYSTEM">`docs/design/ICN_DESIGN_SYSTEM.md`</a> (entry point) and is built from:</p>
 <ul>
@@ -491,7 +489,7 @@ types from kernel crates,&quot;</em> once CCL contract authoring becomes a regul
 <p>ICN_DESIGN_SYSTEM.md §&quot;Kernel architecture binding&quot; carries the load-bearing mapping between this
 document&#39;s invariants and that document&#39;s design principles + product surfaces. A change to the
 firewall contract or the frozen-core invariants implies a review of that section.</p>
-<h2>9. Maintenance</h2>
+<h2 id="9-maintenance">9. Maintenance</h2>
 <p>This document is normative for the meta-principles (§5) and audit findings (§7). For the actual
 invariants, the linked authoritative sources win on conflict:</p>
 <table>
@@ -525,7 +523,10 @@ invariants, the linked authoritative sources win on conflict:</p>
 </tbody></table>
 <p><strong>Last Reviewed:</strong> 2026-05-17. Re-review on any of: change to <code>invariants.rs</code>, merge of a Wave-2+
 PR, or amendment to ADR-001.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/DESIGN_PRINCIPLES.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

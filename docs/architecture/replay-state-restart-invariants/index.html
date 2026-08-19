@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Replay state and restart invariants | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Durability invariants for receiver-side replay protection across restart (#2514). Derives floor == highest-actually-accepted from the two-sided security/liveness constraint, showing why any constant sequence-space safety gap is a liveness bug; states the sender non-reuse guarantee (#2510), durability before acceptance (which removes the accepted-but-unflushed crash window entirely), why wall-clock timestamps cannot order events across machines, and the freshness horizon that makes replay-state expiry safe."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Replay state and restart invariants | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>replay state restart invariants</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/replay-state-restart-invariants.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Replay state and restart invariants</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>replay state restart invariants</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-03</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="replay-state-and-restart-invariants">Replay state and restart invariants</h1>
 <p><strong>Status:</strong> current · <strong>Scope:</strong> <code>icn-net</code> — <code>ReplayGuard</code>, <code>SignedEnvelope</code>, <code>SigningSequenceCounter</code></p>
 <p>This document states the durability invariants that make replay protection survive a restart
 without rejecting traffic a legitimate sender is actually emitting. It is the design record for
 issue #2514 and the security half of the #2504 restart/rejoin chain. The narrative forensic history
 lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/restart-rejoin-investigation-2504">restart-rejoin-investigation-2504.md</a>; this file is
 the invariant statement.</p>
-<h2>1. Two quantities, not one</h2>
+<h2 id="1-two-quantities-not-one">1. Two quantities, not one</h2>
 <p>Per peer, distinguish:</p>
 <table>
 <thead>
@@ -70,7 +67,7 @@ the invariant statement.</p>
 <p>On restart the receiver can only restore what it durably has, so <strong><code>floor = D</code></strong>. In general
 <code>D &lt;= A</code>, and the interval <code>(D, A]</code> is the set of sequences that were accepted but whose record did
 not survive.</p>
-<h2>2. The two-sided constraint</h2>
+<h2 id="2-the-two-sided-constraint">2. The two-sided constraint</h2>
 <p><strong>Security</strong> requires <code>floor &gt;= A</code>. Otherwise a captured message with sequence in <code>(floor, A]</code> is
 accepted a second time: the Bloom filter is empty after restart, so nothing else rejects it.</p>
 <p><strong>Liveness</strong> requires <code>floor &lt;= A</code>. Per the sender invariant (§3) a healthy sender&#39;s next emission
@@ -84,7 +81,7 @@ the violation of the liveness half. A constant gap cannot be &quot;tuned&quot;: 
 legitimate traffic, and <code>0</code> is correct <strong>only if <code>D == A</code></strong>.</p>
 <p>So the real design question is not &quot;how big should the gap be&quot; but <strong>&quot;how do we guarantee
 <code>D == A</code>&quot;</strong> — or, failing that, what else can cover <code>(D, A]</code>.</p>
-<h2>3. The sender invariant (#2510 / #2511)</h2>
+<h2 id="3-the-sender-invariant-2510--2511">3. The sender invariant (#2510 / #2511)</h2>
 <p><code>SigningSequenceCounter::next_sequence()</code> reserves a block of <code>RESERVATION_BLOCK = 1000</code> and
 persists <strong>and flushes</strong> the new <code>reserved_end</code> <em>before</em> issuing any sequence from that block
 (<code>signing_sequence.rs</code>). Formally: every emitted sequence <code>s</code> satisfies <code>s &lt; reserved_end</code> at
@@ -94,7 +91,7 @@ durable <code>reserved_end</code>, hence above every sequence that could have es
 </code></pre>
 <p>This is what licenses the liveness half of §2. It does <strong>not</strong> eliminate receiver persistence lag —
 these are different crash-consistency problems and must not be conflated.</p>
-<h2>4. Wall clocks cannot close <code>(D, A]</code> — an ambiguity result</h2>
+<h2 id="4-wall-clocks-cannot-close-d-a--an-ambiguity-result">4. Wall clocks cannot close <code>(D, A]</code> — an ambiguity result</h2>
 <p>A tempting cheap fix is to reject envelopes &quot;signed before the restart&quot;, using the signed timestamp.
 <strong>This does not work, and the reason is worth recording so it is not retried.</strong></p>
 <p><code>envelope.timestamp</code> comes from the <strong>sender&#39;s</strong> wall clock. Any restart instant the receiver
@@ -124,7 +121,7 @@ event&quot; is a strictly stronger question that ICN&#39;s time contract does no
 boundary that actually encodes the distinction. Envelope signatures cover
 <code>sequence || timestamp || payload_type || payload</code> — no session, epoch, or nonce — so no such
 boundary exists today without a wire-format and signature-input change.</p>
-<h2>5. Freshness: what it does and does not promise</h2>
+<h2 id="5-freshness-what-it-does-and-does-not-promise">5. Freshness: what it does and does not promise</h2>
 <p><code>SignedEnvelope::verify_age(max_age_secs)</code> enforces:</p>
 <ul>
 <li>reject if <code>now - timestamp &gt; max_age</code> (too old)</li>
@@ -164,7 +161,7 @@ consulted, so a stale envelope never reaches the replay guard.</p>
 <p>The first two coincide today but are independent literals; production calls <code>check_replay_only</code>,
 which never consults <code>max_clock_skew</code>. Do not treat one as a proxy for the other. The invariant that
 matters is stated in §7 and must be maintained deliberately if any of them changes.</p>
-<h2>6. The receiver invariant: durability before acceptance</h2>
+<h2 id="6-the-receiver-invariant-durability-before-acceptance">6. The receiver invariant: durability before acceptance</h2>
 <blockquote>
 <p><strong>Invariant.</strong> The replay high-water is made durable <strong>before</strong> an acceptance is returned to the
 caller. Therefore <code>D == A</code> at every instant, and the floor restored on restart is exactly <code>A</code>.</p>
@@ -183,7 +180,7 @@ a peer for our own disk problem is exactly the false-positive class #2514 was ab
 <li><strong>No clock comparison anywhere in restart recovery.</strong> Correctness does not depend on clock
 synchronisation between sender and receiver.</li>
 </ul>
-<h3>6.1 Measured cost</h3>
+<h3 id="61-measured-cost">6.1 Measured cost</h3>
 <p>Two very different storage profiles, and only the second is deployment evidence.</p>
 <table>
 <thead>
@@ -247,7 +244,7 @@ unrelated write load the 5 ms p50 can grow.</li>
 implemented. It remains the escape hatch if inbound rates approach the ceiling or if the storage
 class regresses, at the cost of holding delivery until the batch commits. Correctness is not
 negotiable in that trade: the invariant remains <em>durable replay fact before semantic acceptance</em>.</p>
-<h2>7. Forgetting replay state</h2>
+<h2 id="7-forgetting-replay-state">7. Forgetting replay state</h2>
 <p><code>ReplayGuard::cleanup()</code> runs periodically and, for any peer with no <strong>accepted</strong> traffic in
 <code>max_peer_age_secs</code>, removes the in-memory window <strong>and deletes the persisted
 <code>replay_max_seq:&lt;did&gt;</code> key</strong>.</p>
@@ -260,7 +257,7 @@ by a millisecond and it aged out on a fixed 3600 s timer.</li>
 <li><strong>Deleting the state is safe only because of freshness</strong> — and the margin is <em>not</em> one freshness
 interval. See the horizon derivation below.</li>
 </ol>
-<h3>7.1 The envelope validity horizon</h3>
+<h3 id="71-the-envelope-validity-horizon">7.1 The envelope validity horizon</h3>
 <p>How long can an envelope the receiver already accepted still pass <code>verify_age</code>, counting from the
 moment the receiver stops tracking it?</p>
 <p><code>verify_age</code> admits timestamp <code>T</code> while the receiver&#39;s wall clock lies in
@@ -283,7 +280,7 @@ reducing the horizon to one interval makes that test fail.</p>
 <p>Today that is <code>3600 &gt; 600</code>, a 6× margin (not the 12× a single-interval reading suggests). The three
 constants are independent literals (§5), so this relation must be maintained deliberately. It is
 asserted by <code>test_peer_age_exceeds_envelope_validity_horizon_in_production_config</code>.</p>
-<h3>7.2 Clock-security contract</h3>
+<h3 id="72-clock-security-contract">7.2 Clock-security contract</h3>
 <p>The horizon assumes the receiver&#39;s wall clock does not jump <strong>backwards</strong> after a restart. If it
 does, <code>verify_age</code> itself is compromised — an expired envelope becomes &quot;fresh&quot; again — and no
 amount of replay-state bookkeeping can repair that, because freshness is the boundary being
@@ -292,7 +289,7 @@ below <code>A</code>, so the exposure is confined to the corrupt-state case (§8
 <p>This is a property of ICN&#39;s time contract, not something <code>ReplayGuard</code> can solve. Recorded here so
 it is not mistaken for a replay-guard defect: <strong>bounded monotonic wall-clock progress on each node
 is a prerequisite for signed-envelope freshness</strong>, and therefore for replay-state expiry.</p>
-<h2>8. Storage rollback, corruption, and other degenerate states</h2>
+<h2 id="8-storage-rollback-corruption-and-other-degenerate-states">8. Storage rollback, corruption, and other degenerate states</h2>
 <ul>
 <li><strong>Corrupt / undeserialisable entry.</strong> The key&#39;s existence proves state existed, but its high-water
 is unreadable, so no sequence can be shown to be new. The peer is <strong>quarantined</strong> — all of its
@@ -311,7 +308,7 @@ become acceptable again and only envelope freshness bounds the exposure. Pinned 
 discovered.</li>
 <li><strong>Failed <code>put</code> or <code>flush</code>.</strong> Fail closed, per §6.</li>
 </ul>
-<h2>9. Migration: these invariants describe state created under the corrected protocol</h2>
+<h2 id="9-migration-these-invariants-describe-state-created-under-the-corrected-protocol">9. Migration: these invariants describe state created under the corrected protocol</h2>
 <p>Every invariant above governs replay state <strong>created by this code</strong>. None of them repair state that
 was written, or is remembered by a peer, under earlier sequence semantics. That is a separate
 invariant and it is not yet satisfied.</p>
@@ -339,11 +336,11 @@ misbehaviour and ban events on the way.</p>
 changed without its format changing — suggests versioning the records so a reader can tell
 old-regime data from new and treat old-regime entries as untrusted rather than authoritative, which
 would cover both instances with one mechanism. That is for #2517 to decide, not this document.</p>
-<h2>10. Connection lifetime vs replay lifetime</h2>
+<h2 id="10-connection-lifetime-vs-replay-lifetime">10. Connection lifetime vs replay lifetime</h2>
 <p>Replay state is keyed by peer <strong>DID</strong>, not by connection. Reconnects, stale-connection replacement
 (#2505), and transport churn do not reset it. Conversely, the local identity is never admitted as a
 remote peer (#2506 / #2513), so a node cannot create replay state for itself.</p>
-<h2>Related</h2>
+<h2 id="related">Related</h2>
 <ul>
 <li>#2504 restart/rejoin umbrella · #2505 stale connection · #2510/#2511 durable sender sequence ·
 #2506/#2513 self-peer · #2514 receiver restart floor · #2517 semantic-regime migration</li>
@@ -353,7 +350,10 @@ the current regime; that document governs the transition into it.</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/restart-rejoin-investigation-2504">restart-rejoin-investigation-2504.md</a> — forensic narrative</li>
 <li><a href="/docs/security/production-hardening">../security/production-hardening.md</a> — three-layer model</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/replay-state-restart-invariants.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

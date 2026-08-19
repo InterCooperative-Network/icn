@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN API Versioning Guide | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Versioning scheme and compatibility policy for ICN APIs"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN API Versioning Guide | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,13 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>api</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>api versioning</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/api/api-versioning.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN API Versioning Guide</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>api</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>api versioning</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-api-versioning-guide">ICN API Versioning Guide</h1>
 <p><strong>Document</strong>: ICN-DOC-VERSIONING-01
 <strong>Last Updated</strong>: 2025-12-04
 <strong>Status</strong>: Complete</p>
 <p>This guide covers versioning strategies for all ICN interfaces: the REST Gateway API, RPC protocol, and P2P network protocol.</p>
 <hr>
-<h2>Table of Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#1-overview">Overview</a></li>
 <li><a href="#2-gateway-rest-api-versioning">Gateway REST API Versioning</a></li>
@@ -57,7 +53,7 @@ View source on GitHub →
 <li><a href="#8-version-compatibility-matrix">Version Compatibility Matrix</a></li>
 </ol>
 <hr>
-<h2>1. Overview</h2>
+<h2 id="1-overview">1. Overview</h2>
 <p>ICN uses semantic versioning (SemVer) for releases and maintains three separate versioned interfaces:</p>
 <table>
 <thead>
@@ -91,8 +87,8 @@ View source on GitHub →
 <li><strong>Deprecation</strong> precedes removal by at least 2 minor versions</li>
 </ul>
 <hr>
-<h2>2. Gateway REST API Versioning</h2>
-<h3>2.1 URL Path Versioning</h3>
+<h2 id="2-gateway-rest-api-versioning">2. Gateway REST API Versioning</h2>
+<h3 id="21-url-path-versioning">2.1 URL Path Versioning</h3>
 <p>All Gateway API endpoints use URL path versioning with the <code>/v1/</code> prefix:</p>
 <pre><code>http://localhost:8080/v1/coops
 http://localhost:8080/v1/ledger/{coop_id}/balance/{did}
@@ -104,7 +100,7 @@ http://localhost:8080/v1/compute/submit
 <li>Easy to route at load balancer level</li>
 <li>Simple to test with curl/httpie</li>
 </ul>
-<h3>2.2 Version Lifecycle</h3>
+<h3 id="22-version-lifecycle">2.2 Version Lifecycle</h3>
 <table>
 <thead>
 <tr>
@@ -134,7 +130,7 @@ http://localhost:8080/v1/compute/submit
 <td>-</td>
 </tr>
 </tbody></table>
-<h3>2.3 Adding New API Version</h3>
+<h3 id="23-adding-new-api-version">2.3 Adding New API Version</h3>
 <p>When adding <code>/v2/</code> endpoints:</p>
 <ol>
 <li><p><strong>Create new API module</strong>:</p>
@@ -154,7 +150,7 @@ App::new()
 <li><p><strong>Maintain parallel implementations</strong> during transition period</p>
 </li>
 </ol>
-<h3>2.4 Response Format Changes</h3>
+<h3 id="24-response-format-changes">2.4 Response Format Changes</h3>
 <p><strong>Non-breaking additions</strong> (allowed within same version):</p>
 <ul>
 <li>New optional fields in responses</li>
@@ -182,7 +178,7 @@ App::new()
   &quot;created_at&quot;: &quot;2025-01-15T10:30:00Z&quot;  // New optional field
 }
 </code></pre>
-<h3>2.5 Request Validation</h3>
+<h3 id="25-request-validation">2.5 Request Validation</h3>
 <p>New <strong>optional</strong> request fields can be added without breaking clients:</p>
 <pre><code class="language-json">// v1 original request
 {
@@ -198,8 +194,8 @@ App::new()
 }
 </code></pre>
 <hr>
-<h2>3. RPC Protocol Versioning</h2>
-<h3>3.1 JSON-RPC Method Naming</h3>
+<h2 id="3-rpc-protocol-versioning">3. RPC Protocol Versioning</h2>
+<h3 id="31-json-rpc-method-naming">3.1 JSON-RPC Method Naming</h3>
 <p>RPC methods follow the pattern: <code>namespace.method</code>:</p>
 <pre><code class="language-json">{
   &quot;jsonrpc&quot;: &quot;2.0&quot;,
@@ -218,12 +214,12 @@ App::new()
 <li><code>governance.*</code> - Governance domains/proposals</li>
 <li><code>identity.*</code> - Identity management</li>
 </ul>
-<h3>3.2 Adding RPC Methods</h3>
+<h3 id="32-adding-rpc-methods">3.2 Adding RPC Methods</h3>
 <p>New methods can be added without breaking existing clients:</p>
 <pre><code class="language-rust">// Add new method in server.rs
 &quot;compute.cancel&quot; =&gt; self.handle_compute_cancel(params).await,
 </code></pre>
-<h3>3.3 Evolving Method Parameters</h3>
+<h3 id="33-evolving-method-parameters">3.3 Evolving Method Parameters</h3>
 <p><strong>Non-breaking</strong> (add with defaults):</p>
 <pre><code class="language-json">// Before
 {&quot;method&quot;: &quot;compute.submit&quot;, &quot;params&quot;: {&quot;code&quot;: &quot;...&quot;, &quot;fuel_limit&quot;: 1000}}
@@ -235,7 +231,7 @@ App::new()
 <pre><code class="language-json">// Don&#39;t change semantics - create new method instead
 {&quot;method&quot;: &quot;compute.submit_v2&quot;, &quot;params&quot;: {...}}
 </code></pre>
-<h3>3.4 RPC Error Codes</h3>
+<h3 id="34-rpc-error-codes">3.4 RPC Error Codes</h3>
 <p>Standard JSON-RPC error codes are used:</p>
 <table>
 <thead>
@@ -279,8 +275,8 @@ App::new()
 </tbody></table>
 <p>Custom error codes use -32100 to -32199 range.</p>
 <hr>
-<h2>4. P2P Protocol Versioning</h2>
-<h3>4.1 Protocol Version Negotiation</h3>
+<h2 id="4-p2p-protocol-versioning">4. P2P Protocol Versioning</h2>
+<h3 id="41-protocol-version-negotiation">4.1 Protocol Version Negotiation</h3>
 <p>ICN nodes negotiate protocol versions during the Hello handshake:</p>
 <pre><code class="language-rust">pub struct VersionInfo {
     /// Current protocol version this node is running
@@ -304,7 +300,7 @@ App::new()
 pub const MIN_SUPPORTED_VERSION: u32 = 1; // Minimum we accept
 pub const MAX_SUPPORTED_VERSION: u32 = 1; // Maximum we support
 </code></pre>
-<h3>4.2 Negotiation Algorithm</h3>
+<h3 id="42-negotiation-algorithm">4.2 Negotiation Algorithm</h3>
 <p>Nodes negotiate to the highest mutually supported version:</p>
 <pre><code class="language-rust">fn negotiate_version(local: &amp;VersionInfo, remote: &amp;VersionInfo) -&gt; Result&lt;u32&gt; {
     // Find the overlap between supported versions
@@ -324,7 +320,7 @@ Node B: min=1, max=1, current=1
 
 Negotiated: min(2, 1) = 1 ✓ (both support v1)
 </code></pre>
-<h3>4.3 Handshake Sequence</h3>
+<h3 id="43-handshake-sequence">4.3 Handshake Sequence</h3>
 <pre><code>Client                                Server
    |                                     |
    |---- Hello + VersionInfo -----------&gt;|
@@ -335,7 +331,7 @@ Negotiated: min(2, 1) = 1 ✓ (both support v1)
    |                                     |
    |&lt;=========== Connection OK ==========&gt;|
 </code></pre>
-<h3>4.4 Incrementing Protocol Version</h3>
+<h3 id="44-incrementing-protocol-version">4.4 Incrementing Protocol Version</h3>
 <p>When to increment the protocol version:</p>
 <table>
 <thead>
@@ -385,8 +381,8 @@ pub const MAX_SUPPORTED_VERSION: u32 = 2;
 </li>
 </ol>
 <hr>
-<h2>5. Capability-Based Features</h2>
-<h3>5.1 Capability Flags</h3>
+<h2 id="5-capability-based-features">5. Capability-Based Features</h2>
+<h3 id="51-capability-flags">5.1 Capability Flags</h3>
 <p>Beyond version numbers, ICN uses capability flags for fine-grained feature detection:</p>
 <pre><code class="language-rust">pub struct CapabilityFlags: u64 {
     const E2E_ENCRYPTION     = 0b00000001;  // Phase 10
@@ -399,7 +395,7 @@ pub const MAX_SUPPORTED_VERSION: u32 = 2;
     const ECONOMIC_SAFETY    = 0b10000000;  // Phase 12
 }
 </code></pre>
-<h3>5.2 Feature Detection Pattern</h3>
+<h3 id="52-feature-detection-pattern">5.2 Feature Detection Pattern</h3>
 <p>Check peer capabilities before using optional features:</p>
 <pre><code class="language-rust">let common = common_capabilities(&amp;local_version, &amp;peer_version);
 
@@ -411,7 +407,7 @@ if common.contains(CapabilityFlags::E2E_ENCRYPTION) {
     send_signed_message(peer, payload);
 }
 </code></pre>
-<h3>5.3 Adding New Capabilities</h3>
+<h3 id="53-adding-new-capabilities">5.3 Adding New Capabilities</h3>
 <ol>
 <li><p>Add flag constant:</p>
 <pre><code class="language-rust">const NEW_FEATURE = 0b100000000; // Next available bit
@@ -432,8 +428,8 @@ if common.contains(CapabilityFlags::E2E_ENCRYPTION) {
 </li>
 </ol>
 <hr>
-<h2>6. Migration Strategies</h2>
-<h3>6.1 Rolling Upgrades</h3>
+<h2 id="6-migration-strategies">6. Migration Strategies</h2>
+<h3 id="61-rolling-upgrades">6.1 Rolling Upgrades</h3>
 <p>For networks with mixed versions:</p>
 <ol>
 <li><strong>Upgrade executors first</strong> - They need newest features</li>
@@ -446,7 +442,7 @@ if common.contains(CapabilityFlags::E2E_ENCRYPTION) {
 <li>Monitor metrics for version distribution</li>
 <li>Set deadline for upgrade completion</li>
 </ul>
-<h3>6.2 Data Migration</h3>
+<h3 id="62-data-migration">6.2 Data Migration</h3>
 <p>When storage formats change:</p>
 <pre><code class="language-bash"># Check current version
 icnctl version --data-dir ~/.icn
@@ -463,7 +459,7 @@ icnctl verify --data-dir ~/.icn
 <li>Migrations are one-way (no downgrade path)</li>
 <li>Test migrations on copy first</li>
 </ul>
-<h3>6.3 API Migration Checklist</h3>
+<h3 id="63-api-migration-checklist">6.3 API Migration Checklist</h3>
 <p>For Gateway API version transitions:</p>
 <ul>
 <li><input disabled="" type="checkbox"> Create new version endpoints</li>
@@ -476,15 +472,15 @@ icnctl verify --data-dir ~/.icn
 <li><input disabled="" type="checkbox"> Remove old endpoints after sunset period</li>
 </ul>
 <hr>
-<h2>7. Deprecation Policy</h2>
-<h3>7.1 Deprecation Process</h3>
+<h2 id="7-deprecation-policy">7. Deprecation Policy</h2>
+<h3 id="71-deprecation-process">7.1 Deprecation Process</h3>
 <ol>
 <li><strong>Announce</strong> - Document deprecation in CHANGELOG, add header to responses</li>
 <li><strong>Warn</strong> - Log warnings when deprecated features used</li>
 <li><strong>Monitor</strong> - Track usage of deprecated features</li>
 <li><strong>Remove</strong> - After sunset period, remove feature</li>
 </ol>
-<h3>7.2 Deprecation Signals</h3>
+<h3 id="72-deprecation-signals">7.2 Deprecation Signals</h3>
 <p><strong>REST API</strong>: Add response header</p>
 <pre><code class="language-http">Deprecation: Sun, 01 Jun 2025 00:00:00 GMT
 Sunset: Sun, 01 Dec 2025 00:00:00 GMT
@@ -506,7 +502,7 @@ tracing::warn!(
     &quot;Received deprecated message type&quot;
 );
 </code></pre>
-<h3>7.3 Timeline Guidelines</h3>
+<h3 id="73-timeline-guidelines">7.3 Timeline Guidelines</h3>
 <table>
 <thead>
 <tr>
@@ -532,8 +528,8 @@ tracing::warn!(
 </tr>
 </tbody></table>
 <hr>
-<h2>8. Version Compatibility Matrix</h2>
-<h3>8.1 Current Compatibility</h3>
+<h2 id="8-version-compatibility-matrix">8. Version Compatibility Matrix</h2>
+<h3 id="81-current-compatibility">8.1 Current Compatibility</h3>
 <table>
 <thead>
 <tr>
@@ -559,7 +555,7 @@ tracing::warn!(
 <td>0.1.0</td>
 </tr>
 </tbody></table>
-<h3>8.2 Feature Availability by Version</h3>
+<h3 id="82-feature-availability-by-version">8.2 Feature Availability by Version</h3>
 <table>
 <thead>
 <tr>
@@ -618,7 +614,7 @@ tracing::warn!(
 <td>TOPOLOGY_AWARE</td>
 </tr>
 </tbody></table>
-<h3>8.3 Testing Compatibility</h3>
+<h3 id="83-testing-compatibility">8.3 Testing Compatibility</h3>
 <p>Run compatibility tests before deployment:</p>
 <pre><code class="language-bash"># Test against older version
 ./scripts/test-compatibility.sh --old-version 0.1.0 --new-version 0.2.0
@@ -630,7 +626,7 @@ cargo test -p icn-net test_negotiate
 cargo test -p icn-gateway test_v1_compat
 </code></pre>
 <hr>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
 <li><a href="/docs/design/capability-based-features">capability-based-features.md</a> - Detailed capability guide</li>
@@ -638,7 +634,7 @@ cargo test -p icn-gateway test_v1_compat
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Version history</li>
 </ul>
 <hr>
-<h2>Changelog</h2>
+<h2 id="changelog">Changelog</h2>
 <table>
 <thead>
 <tr>
@@ -651,7 +647,10 @@ cargo test -p icn-gateway test_v1_compat
 <td>Initial document creation</td>
 </tr>
 </tbody></table>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/api/api-versioning.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

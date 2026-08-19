@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Version Upgrade Guide | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Guide for upgrading between ICN versions"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Version Upgrade Guide | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,12 +35,9 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>migration guides</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>version upgrades</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/migration-guides/version-upgrades.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Version Upgrade Guide</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>migration guides</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>version upgrades</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-version-upgrade-guide">ICN Version Upgrade Guide</h1>
 <p>This guide covers upgrading ICN between major, minor, and patch versions.</p>
-<h2>Versioning Scheme</h2>
+<h2 id="versioning-scheme">Versioning Scheme</h2>
 <p>ICN follows <a href="https://semver.org/" target="_blank" rel="noopener">Semantic Versioning</a>:</p>
 <ul>
 <li><strong>MAJOR.MINOR.PATCH</strong> (e.g., 0.2.1)</li>
@@ -49,7 +46,7 @@ View source on GitHub →
 <li><strong>PATCH</strong>: Bug fixes (backward-compatible)</li>
 </ul>
 <hr>
-<h2>Pre-Upgrade Checklist</h2>
+<h2 id="pre-upgrade-checklist">Pre-Upgrade Checklist</h2>
 <p>Before upgrading <strong>any</strong> version:</p>
 <ul>
 <li><p><input disabled="" type="checkbox"> <strong>Backup your data directory</strong>:</p>
@@ -68,8 +65,8 @@ View source on GitHub →
 </li>
 </ul>
 <hr>
-<h2>Upgrade Methods</h2>
-<h3>Method 1: Package Manager (Recommended)</h3>
+<h2 id="upgrade-methods">Upgrade Methods</h2>
+<h3 id="method-1-package-manager-recommended">Method 1: Package Manager (Recommended)</h3>
 <p><strong>If you installed via the installer script:</strong></p>
 <pre><code class="language-bash"># Download and run upgrade script
 curl -fsSL https://raw.githubusercontent.com/InterCooperative-Network/icn/main/scripts/upgrade.sh | bash
@@ -82,7 +79,7 @@ curl -fsSL https://raw.githubusercontent.com/InterCooperative-Network/icn/main/s
 <li>Restart icnd</li>
 <li>Verify successful start</li>
 </ol>
-<h3>Method 2: Build from Source</h3>
+<h3 id="method-2-build-from-source">Method 2: Build from Source</h3>
 <p><strong>For development or custom builds:</strong></p>
 <pre><code class="language-bash"># 1. Backup
 icnctl backup ~/icn-backup.tar.gz.age
@@ -109,7 +106,7 @@ sudo systemctl start icnd
 icnctl --version
 icnctl status
 </code></pre>
-<h3>Method 3: Docker</h3>
+<h3 id="method-3-docker">Method 3: Docker</h3>
 <pre><code class="language-bash"># Pull latest image
 docker pull icn/icnd:latest
 
@@ -121,8 +118,8 @@ docker-compose up -d
 docker exec icn-node icnctl status
 </code></pre>
 <hr>
-<h2>Version-Specific Upgrade Notes</h2>
-<h3>v0.1.x → v0.2.x (Hypothetical)</h3>
+<h2 id="version-specific-upgrade-notes">Version-Specific Upgrade Notes</h2>
+<h3 id="v01x--v02x-hypothetical">v0.1.x → v0.2.x (Hypothetical)</h3>
 <p><strong>Breaking Changes:</strong></p>
 <ul>
 <li>Protocol version bump (requires all nodes to upgrade)</li>
@@ -150,8 +147,8 @@ If upgrade fails:</p>
 <li>Restart icnd</li>
 </ol>
 <hr>
-<h2>Upgrade Scenarios</h2>
-<h3>Patch Upgrade (e.g., 0.1.0 → 0.1.1)</h3>
+<h2 id="upgrade-scenarios">Upgrade Scenarios</h2>
+<h3 id="patch-upgrade-eg-010--011">Patch Upgrade (e.g., 0.1.0 → 0.1.1)</h3>
 <p><strong>Risk</strong>: Low
 <strong>Downtime</strong>: ~30 seconds
 <strong>Rollback</strong>: Easy</p>
@@ -172,7 +169,7 @@ journalctl -u icnd -f
 sudo cp /path/to/old/icnd /usr/local/bin/icnd
 sudo systemctl start icnd
 </code></pre>
-<h3>Minor Upgrade (e.g., 0.1.0 → 0.2.0)</h3>
+<h3 id="minor-upgrade-eg-010--020">Minor Upgrade (e.g., 0.1.0 → 0.2.0)</h3>
 <p><strong>Risk</strong>: Low-Medium
 <strong>Downtime</strong>: ~1-2 minutes
 <strong>Rollback</strong>: Moderate (may require data migration)</p>
@@ -199,7 +196,7 @@ icnctl status
 icnctl network peers  # Check peer connectivity
 icnctl ledger balance  # Check data integrity
 </code></pre>
-<h3>Major Upgrade (e.g., 0.x.x → 1.0.0)</h3>
+<h3 id="major-upgrade-eg-0xx--100">Major Upgrade (e.g., 0.x.x → 1.0.0)</h3>
 <p><strong>Risk</strong>: High
 <strong>Downtime</strong>: 5-15 minutes
 <strong>Rollback</strong>: Difficult (coordinate with network)</p>
@@ -238,33 +235,33 @@ icnctl gov domain list
 journalctl -u icnd -f
 </code></pre>
 <hr>
-<h2>Post-Upgrade Verification</h2>
+<h2 id="post-upgrade-verification">Post-Upgrade Verification</h2>
 <p>After any upgrade, verify:</p>
-<h3>1. Daemon Status</h3>
+<h3 id="1-daemon-status">1. Daemon Status</h3>
 <pre><code class="language-bash">icnctl status
 # Expected: Daemon running, no errors
 </code></pre>
-<h3>2. Network Connectivity</h3>
+<h3 id="2-network-connectivity">2. Network Connectivity</h3>
 <pre><code class="language-bash">icnctl network peers
 # Expected: Peers reconnected within 30 seconds
 </code></pre>
-<h3>3. Data Integrity</h3>
+<h3 id="3-data-integrity">3. Data Integrity</h3>
 <pre><code class="language-bash">icnctl id show           # DID unchanged
 icnctl ledger balance    # Balance correct
 icnctl trust list        # Trust relationships intact
 icnctl gov domain list   # Governance domains present
 </code></pre>
-<h3>4. Logs</h3>
+<h3 id="4-logs">4. Logs</h3>
 <pre><code class="language-bash">journalctl -u icnd -f
 # Expected: No errors, normal operation
 </code></pre>
-<h3>5. Metrics</h3>
+<h3 id="5-metrics">5. Metrics</h3>
 <pre><code class="language-bash">curl http://localhost:9100/metrics | grep icn_network_connections_active
 # Expected: &gt; 0 connections
 </code></pre>
 <hr>
-<h2>Rollback Procedures</h2>
-<h3>Simple Rollback (Patch/Minor)</h3>
+<h2 id="rollback-procedures">Rollback Procedures</h2>
+<h3 id="simple-rollback-patchminor">Simple Rollback (Patch/Minor)</h3>
 <p>If new version has issues:</p>
 <pre><code class="language-bash"># 1. Stop new version
 sudo systemctl stop icnd
@@ -281,7 +278,7 @@ sudo systemctl start icnd
 # 5. Verify
 icnctl status
 </code></pre>
-<h3>Complex Rollback (Major)</h3>
+<h3 id="complex-rollback-major">Complex Rollback (Major)</h3>
 <p><strong>Requires network coordination</strong>:</p>
 <ol>
 <li>Stop all nodes</li>
@@ -292,8 +289,8 @@ icnctl status
 </ol>
 <p><strong>Prevention</strong>: Test major upgrades on staging network first!</p>
 <hr>
-<h2>Multi-Node Cooperative Upgrades</h2>
-<h3>Strategy 1: Rolling Upgrade (Minor versions)</h3>
+<h2 id="multi-node-cooperative-upgrades">Multi-Node Cooperative Upgrades</h2>
+<h3 id="strategy-1-rolling-upgrade-minor-versions">Strategy 1: Rolling Upgrade (Minor versions)</h3>
 <p>Upgrade nodes one at a time:</p>
 <ol>
 <li><p><strong>Upgrade Node 1</strong>:</p>
@@ -314,7 +311,7 @@ icnctl status
 </ol>
 <p><strong>Benefit</strong>: Zero downtime for cooperative
 <strong>Requirement</strong>: Backward-compatible protocol</p>
-<h3>Strategy 2: Coordinated Upgrade (Major versions)</h3>
+<h3 id="strategy-2-coordinated-upgrade-major-versions">Strategy 2: Coordinated Upgrade (Major versions)</h3>
 <p>All nodes upgrade simultaneously:</p>
 <ol>
 <li><p><strong>Pre-coordination</strong>:</p>
@@ -342,7 +339,7 @@ icnctl status
 <p><strong>Benefit</strong>: Clean protocol version bump
 <strong>Downside</strong>: Requires downtime</p>
 <hr>
-<h2>Automated Upgrades</h2>
+<h2 id="automated-upgrades">Automated Upgrades</h2>
 <p><strong>NOT RECOMMENDED</strong> for production cooperatives.</p>
 <p>If you must automate:</p>
 <pre><code class="language-bash">#!/bin/bash
@@ -379,8 +376,8 @@ icnctl status || {
 </code></pre>
 <p><strong>Better</strong>: Use monitoring and alerts, upgrade manually.</p>
 <hr>
-<h2>Troubleshooting</h2>
-<h3>&quot;Version mismatch&quot; errors</h3>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="version-mismatch-errors">&quot;Version mismatch&quot; errors</h3>
 <p><strong>Symptom</strong>: Peers disconnect after upgrade</p>
 <p><strong>Cause</strong>: Incompatible protocol versions</p>
 <p><strong>Solution</strong>:</p>
@@ -389,7 +386,7 @@ icnctl status || {
 <li>Verify protocol version: <code>icnctl network status</code></li>
 <li>Coordinate upgrade if nodes out of sync</li>
 </ol>
-<h3>&quot;Migration failed&quot;</h3>
+<h3 id="migration-failed">&quot;Migration failed&quot;</h3>
 <p><strong>Symptom</strong>: Migration tool exits with error</p>
 <p><strong>Cause</strong>: Corrupted data or incompatible format</p>
 <p><strong>Solution</strong>:</p>
@@ -398,7 +395,7 @@ icnctl status || {
 <li>Review migration logs: <code>journalctl -u icnd -b</code></li>
 <li>Report bug with logs if persistent</li>
 </ol>
-<h3>&quot;Daemon won&#39;t start after upgrade&quot;</h3>
+<h3 id="daemon-wont-start-after-upgrade">&quot;Daemon won&#39;t start after upgrade&quot;</h3>
 <p><strong>Symptom</strong>: icnd crashes on startup</p>
 <p><strong>Causes</strong>:</p>
 <ul>
@@ -412,7 +409,7 @@ icnctl status || {
 <li>Try migration tool: <code>icnctl migrate v0.2</code></li>
 <li>If failing, restore backup and rollback</li>
 </ol>
-<h3>&quot;Ledger out of sync&quot;</h3>
+<h3 id="ledger-out-of-sync">&quot;Ledger out of sync&quot;</h3>
 <p><strong>Symptom</strong>: Different balance on different nodes</p>
 <p><strong>Cause</strong>: Gossip not converged yet</p>
 <p><strong>Solution</strong>:</p>
@@ -422,7 +419,7 @@ icnctl status || {
 <li>Check gossip metrics: <code>curl localhost:9100/metrics | grep gossip</code></li>
 </ol>
 <hr>
-<h2>Best Practices</h2>
+<h2 id="best-practices">Best Practices</h2>
 <ol>
 <li><strong>Always backup before upgrading</strong></li>
 <li><strong>Read CHANGELOG before major upgrades</strong></li>
@@ -434,7 +431,7 @@ icnctl status || {
 <li><strong>Document your upgrade process</strong> for your coop</li>
 </ol>
 <hr>
-<h2>Emergency Contacts</h2>
+<h2 id="emergency-contacts">Emergency Contacts</h2>
 <p>If upgrade fails and you need help:</p>
 <ol>
 <li><strong>GitHub Issues</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
@@ -442,7 +439,7 @@ icnctl status || {
 <li><strong>Community support</strong>: Check community channels</li>
 </ol>
 <hr>
-<h2>Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Version history</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/keystore-versions">Keystore Migration</a> - Identity format changes</li>
@@ -451,7 +448,10 @@ icnctl status || {
 </ul>
 <hr>
 <p><em>Last Updated: 2025-11-21</em></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/migration-guides/version-upgrades.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

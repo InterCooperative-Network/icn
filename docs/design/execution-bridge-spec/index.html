@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Execution Bridge Specification | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Authoritative design for bridging between ICN and external execution environments"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Execution Bridge Specification | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>execution bridge spec</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/execution-bridge-spec.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Execution Bridge Specification</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>execution bridge spec</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="execution-bridge-specification">Execution Bridge Specification</h1>
 <p><strong>Status</strong>: Authoritative Design Document
 <strong>Last Updated</strong>: 2026-02-17
 <strong>Purpose</strong>: Specifies how finalized governance decisions become executed economic actions.
 <strong>Audience</strong>: Implementors wiring the governance-to-economics pipeline
 <strong>Depends On</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/economics/model-validation">economics/model-validation.md</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/model-validation">governance/model-validation.md</a></p>
 <hr>
-<h2>1. Overview</h2>
+<h2 id="1-overview">1. Overview</h2>
 <p>The execution bridge converts governance decisions into economic state changes.
 The provenance chain is:</p>
 <pre><code>GovernanceDecisionReceipt          (icn-governance)
@@ -91,8 +88,8 @@ JournalEntry                       (icn-ledger/src/types.rs)
 </tr>
 </tbody></table>
 <hr>
-<h2>2. Effect Path (Governance Decisions)</h2>
-<h3>2.1 Event Source</h3>
+<h2 id="2-effect-path-governance-decisions">2. Effect Path (Governance Decisions)</h2>
+<h3 id="21-event-source">2.1 Event Source</h3>
 <p>Governance proposals that pass tally emit <code>KernelEffect</code> variants:</p>
 <pre><code>KernelEffect::Treasury(TreasuryEffect)
 KernelEffect::Protocol(ProtocolEffect)
@@ -103,7 +100,7 @@ KernelEffect::NoOp { reason }
 </code></pre>
 <p><strong>File</strong>: <code>icn-kernel-api/src/effects.rs</code>
 <strong>Executor</strong>: <code>icn-core/src/supervisor/governance_executor.rs</code></p>
-<h3>2.2 Treasury Effect Flow</h3>
+<h3 id="22-treasury-effect-flow">2.2 Treasury Effect Flow</h3>
 <pre><code>TreasuryEffect::Spend { treasury_did, recipient_did, amount, currency, memo, decision_hash }
   │
   ▼  treasury_effect_to_operation()  [governance_executor.rs:722]
@@ -119,7 +116,7 @@ TreasuryOperation { treasury_id, operation_type, amount, currency, recipient, me
   └── ELSE: placeholder success (no ledger mutation)
 </code></pre>
 <p><strong>Current state</strong>: The LedgerService path is wired. When the governance executor has a ledger service injected (production mode), treasury spend effects create real journal entries.</p>
-<h3>2.3 Supported Treasury Effects</h3>
+<h3 id="23-supported-treasury-effects">2.3 Supported Treasury Effects</h3>
 <table>
 <thead>
 <tr>
@@ -154,7 +151,7 @@ TreasuryOperation { treasury_id, operation_type, amount, currency, recipient, me
 <td>NO - returns unmapped placeholder</td>
 </tr>
 </tbody></table>
-<h3>2.4 Protocol Effect Flow</h3>
+<h3 id="24-protocol-effect-flow">2.4 Protocol Effect Flow</h3>
 <pre><code>ProtocolEffect::SetParameter { parameter_name, old_value_hash, new_value_json, effective_at }
   │
   ▼  protocol_effect_to_change()  [governance_executor.rs:804]
@@ -170,7 +167,7 @@ ProtocolChange { parameter_name, old_value, new_value, effective_at }
   └── Return state_change_hash for provenance
 </code></pre>
 <p><strong>Concurrency guard</strong>: If the parameter changed between proposal creation and tally, execution fails with &quot;has changed since proposal&quot;. This prevents stale writes.</p>
-<h3>2.5 Unsupported Effects (Pilot V1)</h3>
+<h3 id="25-unsupported-effects-pilot-v1">2.5 Unsupported Effects (Pilot V1)</h3>
 <table>
 <thead>
 <tr>
@@ -201,8 +198,8 @@ ProtocolChange { parameter_name, old_value, new_value, effective_at }
 </tr>
 </tbody></table>
 <hr>
-<h2>3. Receipt Path (Compute Settlement)</h2>
-<h3>3.1 SettlementEngine</h3>
+<h2 id="3-receipt-path-compute-settlement">3. Receipt Path (Compute Settlement)</h2>
+<h3 id="31-settlementengine">3.1 SettlementEngine</h3>
 <p><strong>File</strong>: <code>icn-ledger/src/settlement.rs</code></p>
 <p>Converts verified <code>ExecutionReceipt</code> (from compute layer) into <code>JournalEntry</code>:</p>
 <pre><code>SettlementRequest {
@@ -216,7 +213,7 @@ ProtocolChange { parameter_name, old_value, new_value, effective_at }
     executor_verified: bool,    // MUST be true
 }
 </code></pre>
-<h3>3.2 Invariants</h3>
+<h3 id="32-invariants">3.2 Invariants</h3>
 <ol>
 <li><strong>Verification required</strong>: <code>executor_verified</code> must be <code>true</code> (caller verifies signatures)</li>
 <li><strong>Scope routing</strong>: Local/Cell/Org settle directly. Federation/Commons MUST use clearing.</li>
@@ -224,12 +221,12 @@ ProtocolChange { parameter_name, old_value, new_value, effective_at }
 <li><strong>No self-dealing</strong>: <code>executor != submitter</code></li>
 <li><strong>Dedup</strong>: <code>sha256(&quot;icn-ledger:settlement:v1:&quot; || receipt_hash)</code> tracked in <code>HashSet</code></li>
 </ol>
-<h3>3.3 Current Gap</h3>
+<h3 id="33-current-gap">3.3 Current Gap</h3>
 <p>The SettlementEngine is fully tested (14 tests) but <strong>never called from the runtime</strong>.
 No code path converts an <code>ExecutionReceipt</code> into a <code>SettlementRequest</code> and invokes <code>settle_receipt()</code>.</p>
 <hr>
-<h2>4. Allocation Receipt Path (Budget Decisions)</h2>
-<h3>4.1 AllocationReceipt</h3>
+<h2 id="4-allocation-receipt-path-budget-decisions">4. Allocation Receipt Path (Budget Decisions)</h2>
+<h3 id="41-allocationreceipt">4.1 AllocationReceipt</h3>
 <p><strong>File</strong>: <code>icn-kernel-api/src/receipts.rs</code></p>
 <p>Links governance budget decisions to settlement intents:</p>
 <pre><code>AllocationReceipt {
@@ -239,7 +236,7 @@ No code path converts an <code>ExecutionReceipt</code> into a <code>SettlementRe
     provenance: ProvenanceAnchors,          // upstream hash chain
 }
 </code></pre>
-<h3>4.2 SettlementIntent</h3>
+<h3 id="42-settlementintent">4.2 SettlementIntent</h3>
 <p><strong>File</strong>: <code>icn-kernel-api/src/economics.rs</code></p>
 <pre><code>SettlementIntent {
     decision_receipt_id: String,
@@ -254,20 +251,20 @@ No code path converts an <code>ExecutionReceipt</code> into a <code>SettlementRe
     provenance: ProvenanceAnchors,
 }
 </code></pre>
-<h3>4.3 Builder</h3>
+<h3 id="43-builder">4.3 Builder</h3>
 <p><strong>File</strong>: <code>icn-ledger/src/allocations.rs</code></p>
 <pre><code class="language-rust">create_budget_allocation(
     decision_hash, proposal_id, treasury_did, recipient_did,
     amount, currency, purpose,
 ) -&gt; AllocationReceipt
 </code></pre>
-<h3>4.4 Current Gap</h3>
+<h3 id="44-current-gap">4.4 Current Gap</h3>
 <p><code>create_budget_allocation()</code> produces an <code>AllocationReceipt</code> with <code>SettlementIntent</code>,
 but nothing converts the intent&#39;s <code>(from, to, amount, unit)</code> into a <code>JournalEntry</code>
 and appends it to the ledger. The conversion function does not exist yet.</p>
 <hr>
-<h2>5. Idempotency Rules</h2>
-<h3>5.1 Effect Path</h3>
+<h2 id="5-idempotency-rules">5. Idempotency Rules</h2>
+<h3 id="51-effect-path">5.1 Effect Path</h3>
 <table>
 <thead>
 <tr>
@@ -289,7 +286,7 @@ and appends it to the ledger. The conversion function does not exist yet.</p>
 </tr>
 </tbody></table>
 <p><strong>Gap</strong>: No dedup guard on <code>TreasuryEntryRequest</code>. If the same decision is replayed (e.g., gossip redelivery), the same journal entry could be created twice.</p>
-<h3>5.2 Receipt Path</h3>
+<h3 id="52-receipt-path">5.2 Receipt Path</h3>
 <table>
 <thead>
 <tr>
@@ -303,10 +300,10 @@ and appends it to the ledger. The conversion function does not exist yet.</p>
 </tr>
 </tbody></table>
 <p><strong>Gap</strong>: Dedup set is <strong>in-memory only</strong>. Node restart loses dedup state. Must persist to sled.</p>
-<h3>5.3 Allocation Path</h3>
+<h3 id="53-allocation-path">5.3 Allocation Path</h3>
 <p>No idempotency mechanism exists. The <code>AllocationReceipt.canonical_hash()</code> could serve as a dedup key, but no code checks it.</p>
 <hr>
-<h2>6. Canonical Hash Rules</h2>
+<h2 id="6-canonical-hash-rules">6. Canonical Hash Rules</h2>
 <p>All receipts implement <code>CanonicalReceipt</code> trait:</p>
 <pre><code class="language-rust">trait CanonicalReceipt {
     fn canonical_hash(&amp;self) -&gt; Hash;       // deterministic, cross-node equal
@@ -314,13 +311,13 @@ and appends it to the ledger. The conversion function does not exist yet.</p>
     fn provenance(&amp;self) -&gt; &amp;ProvenanceAnchors;
 }
 </code></pre>
-<h3>Hash computation</h3>
+<h3 id="hash-computation">Hash computation</h3>
 <ul>
 <li>Serialization: <code>bincode::serialize()</code> (deterministic byte order)</li>
 <li>Hash function: <code>blake3::hash()</code> -&gt; <code>[u8; 32]</code></li>
 <li>Helper: <code>compute_canonical_hash&lt;T: Serialize&gt;(value: &amp;T) -&gt; Hash</code></li>
 </ul>
-<h3>Excluded from canonical hash</h3>
+<h3 id="excluded-from-canonical-hash">Excluded from canonical hash</h3>
 <table>
 <thead>
 <tr>
@@ -337,12 +334,12 @@ and appends it to the ledger. The conversion function does not exist yet.</p>
 <td><code>receipt_id</code>, <code>signature</code></td>
 </tr>
 </tbody></table>
-<h3>Order independence</h3>
+<h3 id="order-independence">Order independence</h3>
 <p><code>AllocationReceipt::canonical_hash()</code> sorts intent hashes before hashing.
 Two nodes adding the same intents in different order produce the same canonical hash.</p>
 <hr>
-<h2>7. Failure Modes and Recovery</h2>
-<h3>7.1 Effect Execution Failures</h3>
+<h2 id="7-failure-modes-and-recovery">7. Failure Modes and Recovery</h2>
+<h3 id="71-effect-execution-failures">7.1 Effect Execution Failures</h3>
 <table>
 <thead>
 <tr>
@@ -377,7 +374,7 @@ Two nodes adding the same intents in different order produce the same canonical 
 <td>Add explicit mapping</td>
 </tr>
 </tbody></table>
-<h3>7.2 Settlement Failures</h3>
+<h3 id="72-settlement-failures">7.2 Settlement Failures</h3>
 <table>
 <thead>
 <tr>
@@ -417,15 +414,15 @@ Two nodes adding the same intents in different order produce the same canonical 
 <td>Node restart</td>
 </tr>
 </tbody></table>
-<h3>7.3 Retry Policy</h3>
+<h3 id="73-retry-policy">7.3 Retry Policy</h3>
 <ul>
 <li><strong>Effect path</strong>: No automatic retry. Failed effects are recorded in governance tally results. Re-execution requires a new governance proposal.</li>
 <li><strong>Receipt path</strong>: Caller may retry after transient failures (lock contention). Dedup prevents double-settlement on retry.</li>
 <li><strong>Allocation path</strong>: Not yet implemented. Should follow receipt path pattern (dedup on canonical_hash).</li>
 </ul>
 <hr>
-<h2>8. Golden-Path Test Inventory</h2>
-<h3>8.1 Effect Path Tests</h3>
+<h2 id="8-golden-path-test-inventory">8. Golden-Path Test Inventory</h2>
+<h3 id="81-effect-path-tests">8.1 Effect Path Tests</h3>
 <table>
 <thead>
 <tr>
@@ -460,7 +457,7 @@ Two nodes adding the same intents in different order produce the same canonical 
 <td>Pilot V1 limitations documented in tests</td>
 </tr>
 </tbody></table>
-<h3>8.2 Settlement Path Tests</h3>
+<h3 id="82-settlement-path-tests">8.2 Settlement Path Tests</h3>
 <table>
 <thead>
 <tr>
@@ -495,7 +492,7 @@ Two nodes adding the same intents in different order produce the same canonical 
 <td>Dedup prefix prevents cross-feature collision</td>
 </tr>
 </tbody></table>
-<h3>8.3 Allocation Receipt Tests</h3>
+<h3 id="83-allocation-receipt-tests">8.3 Allocation Receipt Tests</h3>
 <table>
 <thead>
 <tr>
@@ -525,7 +522,7 @@ Two nodes adding the same intents in different order produce the same canonical 
 <td>Intent order does not affect hash</td>
 </tr>
 </tbody></table>
-<h3>8.4 Missing Golden-Path Tests</h3>
+<h3 id="84-missing-golden-path-tests">8.4 Missing Golden-Path Tests</h3>
 <table>
 <thead>
 <tr>
@@ -555,36 +552,36 @@ Two nodes adding the same intents in different order produce the same canonical 
 </tr>
 </tbody></table>
 <hr>
-<h2>9. Minimum Viable Fixes for Pilot</h2>
-<h3>Fix 1: Settlement dedup persistence</h3>
+<h2 id="9-minimum-viable-fixes-for-pilot">9. Minimum Viable Fixes for Pilot</h2>
+<h3 id="fix-1-settlement-dedup-persistence">Fix 1: Settlement dedup persistence</h3>
 <p><strong>Problem</strong>: <code>SettlementEngine.settled</code> is <code>RwLock&lt;HashSet&lt;[u8; 32]&gt;&gt;</code> (in-memory).
 <strong>Fix</strong>: Add sled persistence with key prefix <code>settlement:dedup:</code>.
 <strong>Effort</strong>: ~30 lines. Read settled set on startup, write on each settle.
 <strong>File</strong>: <code>icn-ledger/src/settlement.rs</code></p>
-<h3>Fix 2: AllocationReceipt -&gt; JournalEntry conversion</h3>
+<h3 id="fix-2-allocationreceipt---journalentry-conversion">Fix 2: AllocationReceipt -&gt; JournalEntry conversion</h3>
 <p><strong>Problem</strong>: No function converts <code>SettlementIntent</code> fields into <code>JournalEntryBuilder</code> calls.
 <strong>Fix</strong>: Add <code>settle_allocation(receipt: &amp;AllocationReceipt, ledger: &amp;mut Ledger)</code> that iterates intents, builds entries, and appends to ledger with dedup on <code>intent.canonical_hash()</code>.
 <strong>Effort</strong>: ~50 lines.
 <strong>File</strong>: New function in <code>icn-ledger/src/settlement.rs</code></p>
-<h3>Fix 3: Treasury effect dedup guard</h3>
+<h3 id="fix-3-treasury-effect-dedup-guard">Fix 3: Treasury effect dedup guard</h3>
 <p><strong>Problem</strong>: <code>submit_treasury_entry()</code> has no idempotency check. Replayed governance decisions could create duplicate entries.
 <strong>Fix</strong>: Track <code>decision_receipt_id</code> in a dedup set (same pattern as SettlementEngine).
 <strong>Effort</strong>: ~20 lines.
 <strong>File</strong>: <code>icn-core/src/supervisor/governance_executor.rs</code> or the LedgerService implementation</p>
-<h3>Fix 4: Wire SettlementEngine into compute receipt handler</h3>
+<h3 id="fix-4-wire-settlementengine-into-compute-receipt-handler">Fix 4: Wire SettlementEngine into compute receipt handler</h3>
 <p><strong>Problem</strong>: No runtime code converts <code>ExecutionReceipt</code> to <code>SettlementRequest</code>.
 <strong>Fix</strong>: Add handler in compute receipt processing that calls <code>settle_receipt()</code>.
 <strong>Effort</strong>: ~40 lines.
 <strong>Files</strong>: <code>icn-core/src/supervisor/</code> (new compute settlement handler)</p>
-<h3>Fix 5: End-to-end integration test</h3>
+<h3 id="fix-5-end-to-end-integration-test">Fix 5: End-to-end integration test</h3>
 <p><strong>Problem</strong>: No test proves governance decision -&gt; ledger entry across the full stack.
 <strong>Fix</strong>: Integration test using <code>TestNode</code> that creates a treasury, submits a governance proposal, tallies it, and verifies the resulting journal entry.
 <strong>Effort</strong>: ~100 lines.
 <strong>File</strong>: <code>icn-core/tests/</code> (new integration test)</p>
 <hr>
-<h2>10. Decision Executor (New Component)</h2>
+<h2 id="10-decision-executor-new-component">10. Decision Executor (New Component)</h2>
 <p>The Decision Executor is the missing layer that wraps the <code>EffectDispatcher</code> with persistent idempotency, saga state tracking, and execution receipts.</p>
-<h3>10.1 Architecture</h3>
+<h3 id="101-architecture">10.1 Architecture</h3>
 <pre><code>┌─────────────────────────────────────────────────────────────────────┐
 │  APP LAYER (icn-governance)                                         │
 │  1. ProposalState::Accepted                                         │
@@ -615,7 +612,7 @@ Two nodes adding the same intents in different order produce the same canonical 
 │  11. Return EffectResult { success, message, state_change_hash }    │
 └─────────────────────────────────────────────────────────────────────┘
 </code></pre>
-<h3>10.2 ExecutionRecord Schema</h3>
+<h3 id="102-executionrecord-schema">10.2 ExecutionRecord Schema</h3>
 <pre><code class="language-rust">pub struct ExecutionRecord {
     /// SHA-256 of (proposal_id || payload_bytes || tally_bytes).
     /// ONLY idempotency key. Survives retries, rebuilds, federation replay.
@@ -648,7 +645,7 @@ pub enum ExecutionStatus {
     PermanentlyFailed, // Max retries exceeded. Manual intervention.
 }
 </code></pre>
-<h3>10.3 Idempotency Key: decision_hash</h3>
+<h3 id="103-idempotency-key-decision_hash">10.3 Idempotency Key: decision_hash</h3>
 <p><strong>Why decision_hash, not proposal_id</strong>: Proposals can be re-submitted. Federation nodes may assign different local IDs. The decision_hash captures the exact combination of proposal + payload + vote outcome.</p>
 <p><strong>Why not timestamp</strong>: Non-deterministic. Two nodes processing the same decision must agree on the key.</p>
 <p><strong>Computation</strong>:</p>
@@ -656,7 +653,7 @@ pub enum ExecutionStatus {
     sha256(b&quot;icn:decision:v1:&quot; || proposal_id || b&quot;:&quot; || payload || b&quot;:&quot; || tally)
 }
 </code></pre>
-<h3>10.4 Retry Policy</h3>
+<h3 id="104-retry-policy">10.4 Retry Policy</h3>
 <table>
 <thead>
 <tr>
@@ -692,7 +689,7 @@ pub enum ExecutionStatus {
 </tr>
 </tbody></table>
 <p>Backoff: 1s, 2s, 4s (exponential, base 1s).</p>
-<h3>10.5 Component Placement</h3>
+<h3 id="105-component-placement">10.5 Component Placement</h3>
 <table>
 <thead>
 <tr>
@@ -722,7 +719,7 @@ pub enum ExecutionStatus {
 <td>Meaning firewall: app translates</td>
 </tr>
 </tbody></table>
-<h3>10.6 Receipt Chain</h3>
+<h3 id="106-receipt-chain">10.6 Receipt Chain</h3>
 <pre><code>GovernanceDecisionReceipt        (existing, icn-governance)
   ├── decision_hash ─────────────┐
   ├── vote_tally                 │
@@ -740,8 +737,8 @@ JournalEntry                     │ (existing, icn-ledger)
   └── decision_hash
 </code></pre>
 <hr>
-<h2>11. Implementation Sequence</h2>
-<h3>Phase 1: Skeleton (no behavior)</h3>
+<h2 id="11-implementation-sequence">11. Implementation Sequence</h2>
+<h3 id="phase-1-skeleton-no-behavior">Phase 1: Skeleton (no behavior)</h3>
 <p><strong>Branch</strong>: <code>feat/execution-bridge-skeleton</code></p>
 <ol>
 <li><code>ExecutionRecord</code> + <code>ExecutionStatus</code> types in <code>icn-kernel-api</code></li>
@@ -750,7 +747,7 @@ JournalEntry                     │ (existing, icn-ledger)
 <li>Wire into supervisor lifecycle (runs, does nothing)</li>
 <li>Unit tests for record serialization + log CRUD</li>
 </ol>
-<h3>Phase 2: Escrow Release Slice</h3>
+<h3 id="phase-2-escrow-release-slice">Phase 2: Escrow Release Slice</h3>
 <p><strong>Branch</strong>: <code>feat/executor-escrow-release</code></p>
 <ol>
 <li>Idempotency check in <code>process_decision()</code></li>
@@ -764,7 +761,7 @@ JournalEntry                     │ (existing, icn-ledger)
 </ul>
 </li>
 </ol>
-<h3>Phase 3: Budget Enforcement Slice</h3>
+<h3 id="phase-3-budget-enforcement-slice">Phase 3: Budget Enforcement Slice</h3>
 <p><strong>Branch</strong>: <code>feat/executor-budget-enforcement</code></p>
 <ol>
 <li>New <code>TreasuryEffect::CreateBudget</code> variant (or extend existing)</li>
@@ -772,14 +769,14 @@ JournalEntry                     │ (existing, icn-ledger)
 <li>Budget validation in <code>Ledger::append_entry()</code></li>
 <li>Integration test: approved budget -&gt; spending constrained</li>
 </ol>
-<h3>Phase 4: Generalize</h3>
+<h3 id="phase-4-generalize">Phase 4: Generalize</h3>
 <ol>
 <li>Effect translation for remaining <code>ProposalPayload</code> variants</li>
 <li><code>SurplusAllocation</code>, <code>ShareRedemption</code>, <code>DisputeResolution</code> effects</li>
 <li>Federation effect execution beyond logging</li>
 </ol>
 <hr>
-<h2>12. Sequence Diagram: Full Golden Path</h2>
+<h2 id="12-sequence-diagram-full-golden-path">12. Sequence Diagram: Full Golden Path</h2>
 <pre><code>Governance        Effect           Treasury        Ledger
 Tally             Executor         Executor        Service
   │                  │                │               │
@@ -803,11 +800,14 @@ Tally             Executor         Executor        Service
   │  (success=true)  │                │               │
 </code></pre>
 <hr>
-<h2>Document History</h2>
+<h2 id="document-history">Document History</h2>
 <ul>
 <li>2026-02-17: Initial creation from codebase audit and architecture analysis</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/execution-bridge-spec.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

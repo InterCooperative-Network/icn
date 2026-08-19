@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Production Hardening - Security &amp; Stability | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Hardening measures protecting against DoS, resource exhaustion, and operational failures"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Production Hardening - Security &amp; Stability | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,12 +35,9 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>production hardening</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/production-hardening.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Production Hardening - Security &amp; Stability</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>production hardening</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-15</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="production-hardening---security--stability">Production Hardening - Security &amp; Stability</h1>
 <p>This document details the production hardening measures implemented in ICN to protect against DoS attacks, resource exhaustion, and operational edge cases.</p>
-<h2>Table of Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#overview">Overview</a></li>
 <li><a href="#critical-security-fixes">Critical Security Fixes</a></li>
@@ -50,7 +47,7 @@ View source on GitHub →
 <li><a href="#remaining-work">Remaining Work</a></li>
 </ol>
 <hr>
-<h2>Overview</h2>
+<h2 id="overview">Overview</h2>
 <p>ICN&#39;s production hardening focuses on three primary threat vectors:</p>
 <ol>
 <li><strong>Network-level attacks</strong>: DoS via malicious peers exploiting QUIC/gossip protocols</li>
@@ -59,8 +56,8 @@ View source on GitHub →
 </ol>
 <p>Historical claim from the Phase 7 cycle: critical and high-priority issues in that cycle were marked resolved at the time.</p>
 <hr>
-<h2>Critical Security Fixes</h2>
-<h3>1. Unbounded Message Allocation DoS</h3>
+<h2 id="critical-security-fixes">Critical Security Fixes</h2>
+<h3 id="1-unbounded-message-allocation-dos">1. Unbounded Message Allocation DoS</h3>
 <p><strong>Severity</strong>: Critical
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/protocol.rs#L143-L167#L143-L167">`icn-net/src/protocol.rs:143-167`</a></p>
 <p><strong>Vulnerability</strong>: Malicious peer could send a network message with an extremely large length prefix, causing the victim to allocate gigabytes of memory before validating content.</p>
@@ -87,7 +84,7 @@ let mut buf = vec![0u8; len];
 <li>Maximum message size: 10MB (<code>MAX_MESSAGE_SIZE</code>)</li>
 </ul>
 <hr>
-<h3>2. Blocking Operations in Async Context</h3>
+<h3 id="2-blocking-operations-in-async-context">2. Blocking Operations in Async Context</h3>
 <p><strong>Severity</strong>: Critical
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-core/src/supervisor/mod.rs">`icn-core/src/supervisor/mod.rs`</a></p>
 <p><strong>Vulnerability</strong>: The incoming message handler used <code>blocking_write()</code> to acquire RwLock on shared state (GossipActor). Under high message load, this blocks Tokio worker threads, causing thread starvation and degraded performance across the entire runtime.</p>
@@ -111,7 +108,7 @@ tokio::spawn(async move {
 <li>Maintains async/await best practices throughout</li>
 </ul>
 <hr>
-<h3>3. TLS Certificate Verification Disabled</h3>
+<h3 id="3-tls-certificate-verification-disabled">3. TLS Certificate Verification Disabled</h3>
 <p><strong>Severity</strong>: Critical
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/tls.rs#L81-L195#L81-L195">`icn-net/src/tls.rs:81-195`</a></p>
 <p><strong>Vulnerability</strong>: Custom <code>DidCertificateVerifier</code> accepted all certificates without validation, enabling trivial MITM attacks and peer impersonation.</p>
@@ -168,7 +165,7 @@ tokio::spawn(async move {
 </ul>
 <p><strong>Dependencies added</strong>: <code>x509-parser = &quot;0.16&quot;</code></p>
 <hr>
-<h3>8. Social Recovery Ledger Transfer Bug</h3>
+<h3 id="8-social-recovery-ledger-transfer-bug">8. Social Recovery Ledger Transfer Bug</h3>
 <p><strong>Severity</strong>: Critical
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/ledger.rs#L469-L484#L469-L484">`icn-ledger/src/ledger.rs:469-484`</a>
 <strong>Status</strong>: Fixed (2025-11-17)</p>
@@ -229,8 +226,8 @@ let entry = if *balance &gt; 0 {
 <li>Related to Phase 7 ledger semantics fix (which this test initially failed against)</li>
 </ul>
 <hr>
-<h2>High Priority Fixes</h2>
-<h3>4. Integer Overflow in Timestamp Conversion</h3>
+<h2 id="high-priority-fixes">High Priority Fixes</h2>
+<h3 id="4-integer-overflow-in-timestamp-conversion">4. Integer Overflow in Timestamp Conversion</h3>
 <p><strong>Severity</strong>: High
 <strong>Files</strong>:</p>
 <ul>
@@ -253,7 +250,7 @@ let timestamp = SystemTime::now()
 </code></pre>
 <p><strong>Impact</strong>: Prevents silent data corruption in ledger entries and gossip messages.</p>
 <hr>
-<h3>5. Bloom Filter Index Out of Bounds</h3>
+<h3 id="5-bloom-filter-index-out-of-bounds">5. Bloom Filter Index Out of Bounds</h3>
 <p><strong>Severity</strong>: High
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-gossip/src/bloom.rs#L103-L149#L103-L149">`icn-gossip/src/bloom.rs:103-149`</a></p>
 <p><strong>Vulnerability</strong>: <code>BloomFilter::from_data()</code> didn&#39;t validate that claimed size matched actual data, allowing malicious peer to trigger index panic via crafted <code>BloomFilterData</code>.</p>
@@ -296,7 +293,7 @@ let timestamp = SystemTime::now()
 <li>Logging for security auditing</li>
 </ul>
 <hr>
-<h3>6. Network Message Rate Limiting</h3>
+<h3 id="6-network-message-rate-limiting">6. Network Message Rate Limiting</h3>
 <p><strong>Severity</strong>: High
 <strong>Files</strong>:</p>
 <ul>
@@ -351,7 +348,7 @@ let timestamp = SystemTime::now()
 <p><strong>Metrics</strong>: <code>icn_network_messages_rate_limited_total</code> (counter)</p>
 <p><strong>Memory management</strong>: Periodic cleanup of inactive peer buckets via <code>cleanup_old_buckets()</code>.</p>
 <hr>
-<h3>7. Bounded QUIC Stream Limits</h3>
+<h3 id="7-bounded-quic-stream-limits">7. Bounded QUIC Stream Limits</h3>
 <p><strong>Severity</strong>: High
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/session.rs#L20-L44#L20-L44">`icn-net/src/session.rs:20-44`</a></p>
 <p><strong>Vulnerability</strong>: Default QUIC configuration allowed 100+ concurrent streams per connection, enabling resource exhaustion via stream flooding.</p>
@@ -385,7 +382,7 @@ let timestamp = SystemTime::now()
 </ul>
 <p><strong>Applied to</strong>: Both server and client QUIC configurations.</p>
 <hr>
-<h3>8. Ledger Recovery Transfer Bug (BUG #30)</h3>
+<h3 id="8-ledger-recovery-transfer-bug-bug-30">8. Ledger Recovery Transfer Bug (BUG #30)</h3>
 <p><strong>Severity</strong>: Critical
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-ledger/src/ledger.rs#L469-L484#L469-L484">`icn-ledger/src/ledger.rs:469-484`</a></p>
 <p><strong>Vulnerability</strong>: The <code>transfer_balances_for_recovery()</code> function had inverted debit/credit operations, causing balance transfers during social recovery to <strong>double the old DID&#39;s balance</strong> instead of transferring it to the new DID. This would have allowed users to create unlimited credit by repeatedly initiating fake recoveries.</p>
@@ -445,8 +442,8 @@ assert_eq!(alice.ledger.read().await.balance(&amp;alice_did, &quot;hours&quot;),
 assert_eq!(alice.ledger.read().await.balance(&amp;alice2_did, &quot;hours&quot;), Some(100));   // New DID: 0 → 100
 </code></pre>
 <hr>
-<h2>Configuration</h2>
-<h3>Default Security Settings</h3>
+<h2 id="configuration">Configuration</h2>
+<h3 id="default-security-settings">Default Security Settings</h3>
 <p>All production hardening features are enabled by default with conservative limits:</p>
 <table>
 <thead>
@@ -497,7 +494,7 @@ assert_eq!(alice.ledger.read().await.balance(&amp;alice2_did, &quot;hours&quot;)
 <td>Yes (via <code>TransportConfig</code>)</td>
 </tr>
 </tbody></table>
-<h3>Customizing Rate Limits</h3>
+<h3 id="customizing-rate-limits">Customizing Rate Limits</h3>
 <p>To adjust rate limiting (e.g., for high-throughput scenarios):</p>
 <pre><code class="language-rust">use icn_net::{RateLimitConfig, RateLimiter};
 use std::time::Duration;
@@ -511,7 +508,7 @@ let config = RateLimitConfig {
 let rate_limiter = Arc::new(RateLimiter::new(config));
 </code></pre>
 <p><strong>Note</strong>: Current implementation requires modifying <code>NetworkActor::spawn()</code> to accept custom config. This is a future enhancement opportunity.</p>
-<h3>Witness Signatures for Material Transactions</h3>
+<h3 id="witness-signatures-for-material-transactions">Witness Signatures for Material Transactions</h3>
 <p>Witness signatures provide Byzantine fault tolerance by requiring multiple parties to co-sign material transactions. This prevents double-spending and provides additional security for high-value transfers.</p>
 <p><strong>Configuration</strong> (<code>[ledger.witness]</code> in TOML):</p>
 <pre><code class="language-toml">[ledger.witness]
@@ -567,8 +564,8 @@ collection_timeout_secs = 300
 <li><strong>Full consensus</strong>: Use <code>all_parties</code> for unanimous agreement requirements</li>
 </ol>
 <hr>
-<h2>Monitoring</h2>
-<h3>Security Metrics</h3>
+<h2 id="monitoring">Monitoring</h2>
+<h3 id="security-metrics">Security Metrics</h3>
 <p>The following Prometheus metrics track security-related events:</p>
 <p><strong>Rate Limiting</strong>:</p>
 <ul>
@@ -586,7 +583,7 @@ collection_timeout_secs = 300
 <li><code>icn_gossip_announces_received_total</code> (counter): Announce messages received</li>
 <li><code>icn_gossip_requests_received_total</code> (counter): Request messages received</li>
 </ul>
-<h3>Alerting Recommendations</h3>
+<h3 id="alerting-recommendations">Alerting Recommendations</h3>
 <p>Consider setting up alerts for:</p>
 <ol>
 <li><p><strong>High rate limiting</strong>: <code>rate(icn_network_messages_rate_limited_total[5m]) &gt; 10</code></p>
@@ -605,7 +602,7 @@ collection_timeout_secs = 300
 </ul>
 </li>
 </ol>
-<h3>Log Monitoring</h3>
+<h3 id="log-monitoring">Log Monitoring</h3>
 <p>Security-relevant log patterns:</p>
 <pre><code class="language-bash"># Rate limiting events
 grep &quot;Rate limited message from&quot; /var/log/icnd.log
@@ -619,7 +616,7 @@ grep &quot;BloomFilter deserialization&quot; /var/log/icnd.log
 # Message validation errors
 grep &quot;Message too large\|Invalid message&quot; /var/log/icnd.log
 </code></pre>
-<h3>Scope-Aware Capacity (Epic 2)</h3>
+<h3 id="scope-aware-capacity-epic-2">Scope-Aware Capacity (Epic 2)</h3>
 <p><strong>Metrics</strong> (added in PR #962):</p>
 <ul>
 <li><code>icn_compute_task_scope_map_size</code> (gauge): Number of active task→scope mappings. Tracks memory overhead of scope queue tracking. Alert if &gt;500 (warning) or &gt;2000 (critical, possible leak).</li>
@@ -637,10 +634,10 @@ grep &quot;Message too large\|Invalid message&quot; /var/log/icnd.log
 </li>
 </ol>
 <hr>
-<h2>Remaining Work</h2>
-<h3>High Priority (Not Yet Implemented)</h3>
+<h2 id="remaining-work">Remaining Work</h2>
+<h3 id="high-priority-not-yet-implemented">High Priority (Not Yet Implemented)</h3>
 <p>The following issues were identified but not yet addressed:</p>
-<h4>Medium Priority (5 issues):</h4>
+<h4 id="medium-priority-5-issues">Medium Priority (5 issues):</h4>
 <ol>
 <li><p><strong>No request timeouts in session management</strong></p>
 <ul>
@@ -674,7 +671,7 @@ grep &quot;Message too large\|Invalid message&quot; /var/log/icnd.log
 </ul>
 </li>
 </ol>
-<h4>Low Priority (3 issues):</h4>
+<h4 id="low-priority-3-issues">Low Priority (3 issues):</h4>
 <ol>
 <li><p><strong>Inconsistent error handling patterns</strong></p>
 <ul>
@@ -695,7 +692,7 @@ grep &quot;Message too large\|Invalid message&quot; /var/log/icnd.log
 </ul>
 </li>
 </ol>
-<h3>Trust-Gated TLS Verification (✓ Implemented - Phase 8B)</h3>
+<h3 id="trust-gated-tls-verification--implemented---phase-8b">Trust-Gated TLS Verification (✓ Implemented - Phase 8B)</h3>
 <p><strong>Status</strong>: COMPLETE (2025-01-12)
 <strong>File</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net/src/tls.rs">`icn-net/src/tls.rs`</a></p>
 <p>The TLS certificate verifier now integrates with the trust graph to enforce trust-based access control:</p>
@@ -740,7 +737,7 @@ if trust_score &lt; self.min_trust_threshold {
 <li>Trust threshold boundary conditions</li>
 </ul>
 <hr>
-<h2>Testing</h2>
+<h2 id="testing">Testing</h2>
 <p>All production hardening changes include comprehensive tests:</p>
 <ul>
 <li><strong>Rate limiter</strong>: 4 unit tests (token consumption, refills, per-peer isolation, cleanup)</li>
@@ -753,7 +750,7 @@ if trust_score &lt; self.min_trust_threshold {
 </code></pre>
 <p>Historical result (2025-11-17 snapshot): 64 tests passed (27 + 18 + 16 + 0)</p>
 <hr>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li><a href="/docs/ARCHITECTURE">Architecture Documentation</a></li>
 <li><a href="/docs/reference/api/topic-subscriptions-api">Topic Subscriptions API</a></li>
@@ -762,7 +759,7 @@ if trust_score &lt; self.min_trust_threshold {
 <li><a href="https://owasp.org/www-project-top-ten/" target="_blank" rel="noopener">OWASP Top 10</a></li>
 </ul>
 <hr>
-<h2>Changelog</h2>
+<h2 id="changelog">Changelog</h2>
 <ul>
 <li><p><strong>2025-11-17</strong>: Critical ledger recovery bug fix (BUG #30)</p>
 <ul>
@@ -781,7 +778,10 @@ if trust_score &lt; self.min_trust_threshold {
 </ul>
 </li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/production-hardening.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

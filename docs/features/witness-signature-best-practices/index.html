@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Witness Signature Best Practices | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Developer guide for witness signature implementation"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Witness Signature Best Practices | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,15 +35,12 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>features</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>witness signature best practices</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/features/witness-signature-best-practices.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Witness Signature Best Practices</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>features</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>witness signature best practices</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="witness-signature-best-practices">Witness Signature Best Practices</h1>
 <p><strong>Last Updated</strong>: 2026-01-24<br><strong>Status</strong>: Developer Guide<br><strong>Related</strong>: PR #826 (Witness Signature Support), Issue #832 (Trust-Graph Integration)</p>
 <hr>
-<h2>Overview</h2>
+<h2 id="overview">Overview</h2>
 <p>This guide provides best practices for using witness signatures in ICN&#39;s resource access system. Witness signatures enable cryptographic attestation of high-value transactions, stewardship transfers, and multi-party agreements, providing an immutable audit trail and enhanced security for critical cooperative operations.</p>
-<h3>What Are Witness Signatures?</h3>
+<h3 id="what-are-witness-signatures">What Are Witness Signatures?</h3>
 <p>Witness signatures are Ed25519 cryptographic signatures from trusted community members who attest to the validity of a ledger entry or resource transfer. Unlike the entry author (who records the transaction), witnesses provide independent verification that the transaction occurred as described.</p>
 <p><strong>Key Components:</strong></p>
 <ul>
@@ -52,7 +49,7 @@ View source on GitHub →
 <li><strong>WitnessConfig</strong>: Ledger-wide witness configuration with value thresholds and timeouts</li>
 <li><strong>UsageEvent Witnesses</strong>: Witness attestation for resource usage and handoff events</li>
 </ul>
-<h3>Two Types of Witness Signatures</h3>
+<h3 id="two-types-of-witness-signatures">Two Types of Witness Signatures</h3>
 <p>ICN provides <strong>two distinct witness systems</strong> for different use cases:</p>
 <table>
 <thead>
@@ -90,8 +87,8 @@ View source on GitHub →
 </ul>
 <p>Most examples in this guide apply to both systems, but the API differs. Sections are labeled to indicate which system they apply to.</p>
 <hr>
-<h2>When to Use Witness Signatures</h2>
-<h3>High-Value Resources</h3>
+<h2 id="when-to-use-witness-signatures">When to Use Witness Signatures</h2>
+<h3 id="high-value-resources">High-Value Resources</h3>
 <p>Use witness signatures for resources with significant economic or community value:</p>
 <p><strong>Examples:</strong></p>
 <ul>
@@ -108,7 +105,7 @@ let witness_config = WitnessConfig {
     collection_timeout_secs: 300, // 5 minutes to collect signatures
 };
 </code></pre>
-<h3>Legal and Regulatory Requirements</h3>
+<h3 id="legal-and-regulatory-requirements">Legal and Regulatory Requirements</h3>
 <p>When legal compliance or regulatory oversight is required:</p>
 <p><strong>Examples:</strong></p>
 <ul>
@@ -118,7 +115,7 @@ let witness_config = WitnessConfig {
 <li>Medical or hazardous equipment requiring attestation</li>
 </ul>
 <p><strong>Recommendation</strong>: Use <code>WitnessPolicy::Quorum</code> with designated governance roles as witnesses.</p>
-<h3>Multi-Party Stewardship Transfers</h3>
+<h3 id="multi-party-stewardship-transfers">Multi-Party Stewardship Transfers</h3>
 <p>When responsibility for a resource changes hands between stewards:</p>
 <p><strong>Examples:</strong></p>
 <ul>
@@ -154,7 +151,7 @@ if !access.validate_duty_completion(&amp;handoff_event, 2) { // Require 2 witnes
     return Err(AccessError::InsufficientWitnesses);
 }
 </code></pre>
-<h3>Trust-Critical Operations</h3>
+<h3 id="trust-critical-operations">Trust-Critical Operations</h3>
 <p>Operations where trust and transparency are paramount:</p>
 <p><strong>Examples:</strong></p>
 <ul>
@@ -165,8 +162,8 @@ if !access.validate_duty_completion(&amp;handoff_event, 2) { // Require 2 witnes
 </ul>
 <p><strong>Recommendation</strong>: Use <code>WitnessPolicy::AllParties</code> to ensure all affected parties sign off.</p>
 <hr>
-<h2>Witness Selection Guidelines</h2>
-<h3>How Many Witnesses to Require</h3>
+<h2 id="witness-selection-guidelines">Witness Selection Guidelines</h2>
+<h3 id="how-many-witnesses-to-require">How Many Witnesses to Require</h3>
 <p>The number of required witnesses should balance security with practical feasibility:</p>
 <table>
 <thead>
@@ -227,9 +224,9 @@ impl WitnessConfig {
     }
 }
 </code></pre>
-<h3>Who Makes Good Witnesses</h3>
+<h3 id="who-makes-good-witnesses">Who Makes Good Witnesses</h3>
 <p>Effective witnesses have three key qualities:</p>
-<h4>1. Trust and Reputation</h4>
+<h4 id="1-trust-and-reputation">1. Trust and Reputation</h4>
 <ul>
 <li>Established cooperative members with positive trust graph scores</li>
 <li>No conflict of interest in the transaction</li>
@@ -243,7 +240,7 @@ pub fn validate_witness_trust(ledger: &amp;Ledger, witness_did: &amp;Did) -&gt; 
     Ok(trust_score &gt;= 0.5) // Minimum trust threshold
 }
 </code></pre>
-<h4>2. Relevant Expertise or Role</h4>
+<h4 id="2-relevant-expertise-or-role">2. Relevant Expertise or Role</h4>
 <ul>
 <li>Equipment coordinators for machinery transfers</li>
 <li>Land stewards for farmland handoffs</li>
@@ -268,14 +265,14 @@ let tractor_pool = WitnessPool {
     required_count: 2,
 };
 </code></pre>
-<h4>3. Availability and Responsiveness</h4>
+<h4 id="3-availability-and-responsiveness">3. Availability and Responsiveness</h4>
 <ul>
 <li>Able to respond within the <code>collection_timeout_secs</code> window</li>
 <li>Geographically proximate for physical verification requirements</li>
 <li>Sufficient time availability for due diligence</li>
 </ul>
 <p><strong>Best Practice</strong>: Maintain backup witnesses in case primary witnesses are unavailable.</p>
-<h3>Geographic and Organizational Diversity</h3>
+<h3 id="geographic-and-organizational-diversity">Geographic and Organizational Diversity</h3>
 <p><strong>Why Diversity Matters:</strong></p>
 <ul>
 <li>Prevents collusion or coordinated fraud</li>
@@ -300,8 +297,8 @@ WitnessPolicy::Quorum {
 }
 </code></pre>
 <hr>
-<h2>Configuration Examples</h2>
-<h3>Basic Counterparty Witness</h3>
+<h2 id="configuration-examples">Configuration Examples</h2>
+<h3 id="basic-counterparty-witness">Basic Counterparty Witness</h3>
 <p>The simplest witness policy: require the other party to the transaction to sign.</p>
 <pre><code class="language-rust">use icn_ledger::types::{WitnessConfig, WitnessPolicy};
 
@@ -340,7 +337,7 @@ let witnessed = WitnessedEntry {
 
 ledger.append_witnessed_entry(witnessed).await?;
 </code></pre>
-<h3>Quorum-Based Witness Policy</h3>
+<h3 id="quorum-based-witness-policy">Quorum-Based Witness Policy</h3>
 <p>Require a specified number of signatures from a designated witness pool.</p>
 <pre><code class="language-rust">// Define witness pool for equipment transfers
 let equipment_witnesses = vec![
@@ -397,7 +394,7 @@ let witnessed = WitnessedEntry {
 
 ledger.append_witnessed_entry(witnessed).await?;
 </code></pre>
-<h3>HandoffProcedure with Witness Verification</h3>
+<h3 id="handoffprocedure-with-witness-verification">HandoffProcedure with Witness Verification</h3>
 <p>Use witness signatures to attest to completion of multi-step handoff procedures.</p>
 <pre><code class="language-rust">use icn_ledger::use_access::{
     AccessModel, StewardshipDuty, UsageEvent, ResourceAccess,
@@ -446,7 +443,7 @@ if !access.validate_duty_completion(&amp;handoff_event, 2) {
 
 access.record_usage_event(handoff_event)?;
 </code></pre>
-<h3>All-Parties Witness Policy</h3>
+<h3 id="all-parties-witness-policy">All-Parties Witness Policy</h3>
 <p>Require all non-author counterparties to sign (strictest policy).</p>
 <pre><code class="language-rust">// For critical multi-party agreements
 let config = WitnessConfig {
@@ -479,8 +476,8 @@ let witnessed = WitnessedEntry {
 };
 </code></pre>
 <hr>
-<h2>Edge Cases and Error Handling</h2>
-<h3>Empty Witness List</h3>
+<h2 id="edge-cases-and-error-handling">Edge Cases and Error Handling</h2>
+<h3 id="empty-witness-list">Empty Witness List</h3>
 <p><strong>Scenario</strong>: A <code>WitnessedEntry</code> is created with an empty <code>witness_signatures</code> vector.</p>
 <p><strong>Behavior</strong>:</p>
 <ul>
@@ -501,7 +498,7 @@ if witnessed.witness_signatures.is_empty() &amp;&amp;
 assert!(witnessed.has_sufficient_signatures());
 </code></pre>
 <p><strong>Best Practice</strong>: Always validate witness count before submission to avoid rejected entries.</p>
-<h3>Unavailable Witnesses</h3>
+<h3 id="unavailable-witnesses">Unavailable Witnesses</h3>
 <p><strong>Scenario</strong>: Required witnesses are offline, unresponsive, or have lost their keys.</p>
 <p><strong>Mitigation Strategies</strong>:</p>
 <ol>
@@ -552,7 +549,7 @@ pub fn rotate_witnesses(ledger: &amp;mut Ledger, new_witnesses: Vec&lt;Did&gt;) 
 </code></pre>
 </li>
 </ol>
-<h3>Witness Rotation During Long Handoff Processes</h3>
+<h3 id="witness-rotation-during-long-handoff-processes">Witness Rotation During Long Handoff Processes</h3>
 <p><strong>Scenario</strong>: A handoff procedure takes multiple days/weeks, and witnesses change roles during the process.</p>
 <p><strong>Challenge</strong>: </p>
 <ul>
@@ -589,7 +586,7 @@ pub fn update_handoff_witnesses(
 <li>For long-term stewardship transitions, break into discrete steps with separate witness attestations</li>
 <li>Document witness rotation policy in cooperative governance</li>
 </ul>
-<h3>Signature Timestamp Validation</h3>
+<h3 id="signature-timestamp-validation">Signature Timestamp Validation</h3>
 <p><strong>Scenario</strong>: A witness signature is timestamped in the future or is expired.</p>
 <p><strong>Behavior</strong>:</p>
 <pre><code class="language-rust">// Witness signatures are validated with strict timestamp checks
@@ -621,7 +618,7 @@ pub fn validate_witness_signatures(ledger: &amp;Ledger, witnessed: &amp;Witnesse
 <li>Collect and submit witness signatures promptly after signing</li>
 <li>Configure <code>collection_timeout_secs</code> based on realistic coordination timelines</li>
 </ul>
-<h3>Duplicate Witness Signatures</h3>
+<h3 id="duplicate-witness-signatures">Duplicate Witness Signatures</h3>
 <p><strong>Scenario</strong>: The same witness DID signs multiple times (e.g., user error, retry logic).</p>
 <p><strong>Behavior</strong>:</p>
 <pre><code class="language-rust">// Witnesses are deduplicated by DID when counting
@@ -635,7 +632,7 @@ pub fn unique_witness_count(&amp;self) -&gt; usize {
 </code></pre>
 <p><strong>Implication</strong>: Multiple signatures from the same DID count as one witness.</p>
 <p><strong>Best Practice</strong>: Client code should deduplicate before submission to reduce payload size.</p>
-<h3>Author as Witness</h3>
+<h3 id="author-as-witness">Author as Witness</h3>
 <p><strong>Scenario</strong>: The entry author also appears in the witness list.</p>
 <p><strong>Behavior</strong>:</p>
 <pre><code class="language-rust">// Author is never counted as a witness (prevented double-counting)
@@ -651,8 +648,8 @@ pub fn count_entry_signers(entry: &amp;JournalEntry, witnesses: &amp;[WitnessSig
 <p><strong>Implication</strong>: Author always counts as 1 signer, but not as a witness.</p>
 <p><strong>Best Practice</strong>: Don&#39;t include the author in the witness list (wastes space, provides no additional verification).</p>
 <hr>
-<h2>Security Considerations</h2>
-<h3>Trust Requirements for Witnesses</h3>
+<h2 id="security-considerations">Security Considerations</h2>
+<h3 id="trust-requirements-for-witnesses">Trust Requirements for Witnesses</h3>
 <p><strong>Principle</strong>: Witness signatures are only meaningful if witnesses are trustworthy.</p>
 <p><strong>Current Implementation</strong>:</p>
 <ul>
@@ -697,7 +694,7 @@ pub fn select_qualified_witnesses(
 <li>Document witness selection criteria in cooperative bylaws</li>
 <li>Implement periodic witness pool audits (quarterly recommended)</li>
 </ul>
-<h3>Avoiding Single Points of Failure</h3>
+<h3 id="avoiding-single-points-of-failure">Avoiding Single Points of Failure</h3>
 <p><strong>Risk</strong>: If all witnesses are controlled by a single party or collude, attestation is meaningless.</p>
 <p><strong>Mitigations</strong>:</p>
 <ol>
@@ -733,7 +730,7 @@ WitnessPolicy::Quorum {
 </ul>
 </li>
 </ol>
-<h3>Audit Trail and Dispute Resolution</h3>
+<h3 id="audit-trail-and-dispute-resolution">Audit Trail and Dispute Resolution</h3>
 <p><strong>Principle</strong>: Witness signatures create an immutable audit trail for dispute resolution.</p>
 <p><strong>Key Features</strong>:</p>
 <ol>
@@ -786,7 +783,7 @@ pub fn get_transaction_witnesses(
 <li>Maintain long-term archive of witness signatures (backup/restore procedures)</li>
 <li>Implement witness accountability mechanisms (reputation penalties for false attestations)</li>
 </ul>
-<h3>Witness Key Security</h3>
+<h3 id="witness-key-security">Witness Key Security</h3>
 <p><strong>Risk</strong>: Compromised witness keys could enable fraudulent attestations.</p>
 <p><strong>Mitigations</strong>:</p>
 <ol>
@@ -827,12 +824,12 @@ pub fn rotate_witness_key(old_did: &amp;Did, new_did: &amp;Did) -&gt; Result&lt;
 <li>Monitor for suspicious witness behavior (unusual signing patterns)</li>
 </ul>
 <hr>
-<h2>Integration with Trust Graph (Future)</h2>
+<h2 id="integration-with-trust-graph-future">Integration with Trust Graph (Future)</h2>
 <p><strong>Status</strong>: Planned enhancement (Issue #832)</p>
 <blockquote>
 <p><strong>⚠️ Note</strong>: All code examples in this section represent <strong>planned APIs</strong> that are <strong>not yet implemented</strong>. These examples illustrate the intended design direction for trust-graph integration. Do not attempt to use these APIs in current ICN versions.</p>
 </blockquote>
-<h3>Automatic Trust Validation</h3>
+<h3 id="automatic-trust-validation">Automatic Trust Validation</h3>
 <p>Future versions will integrate witness selection with ICN&#39;s trust graph:</p>
 <pre><code class="language-rust">// ⚠️ PLANNED API (not yet implemented) - Issue #832
 pub struct TrustWeightedWitnessPolicy {
@@ -861,7 +858,7 @@ impl TrustWeightedWitnessPolicy {
     }
 }
 </code></pre>
-<h3>Reputation-Based Witness Quality</h3>
+<h3 id="reputation-based-witness-quality">Reputation-Based Witness Quality</h3>
 <pre><code class="language-rust">// ⚠️ PLANNED API (not yet implemented) - Issue #832
 // Witness reputation tracking
 pub struct WitnessReputation {
@@ -874,7 +871,7 @@ pub struct WitnessReputation {
 // Penalize witnesses whose attestations are frequently disputed
 // Boost reputation for witnesses whose attestations stand up to scrutiny
 </code></pre>
-<h3>Dynamic Witness Pool Management</h3>
+<h3 id="dynamic-witness-pool-management">Dynamic Witness Pool Management</h3>
 <pre><code class="language-rust">// ⚠️ PLANNED API (not yet implemented) - Issue #832
 // Automatically maintain witness pools based on trust graph
 pub fn update_witness_pool_from_trust(
@@ -892,18 +889,18 @@ pub fn update_witness_pool_from_trust(
 }
 </code></pre>
 <hr>
-<h2>Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation</h2>
 <ul>
 <li><strong><a href="/docs/design/economics/ECONOMIC_ARCHITECTURE">ECONOMIC_ARCHITECTURE.md</a></strong>: Asset token witness bonding (Layer 2 economy)</li>
 <li><strong><a href="/docs/security/production-hardening">production-hardening.md</a></strong>: Witness signature timestamp validation</li>
-<li><strong><a href="/docs/development/trust-multi-graph-migration">trust-multi-graph-migration.md</a></strong>: Trust graph architecture for future witness integration</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/trust-multi-graph-migration.md">trust-multi-graph-migration.md</a></strong>: Trust graph architecture for future witness integration</li>
 <li><strong><a href="/docs/design/governance/governance-primitives">governance-primitives.md</a></strong>: Governance-based witness pool management</li>
 <li><strong>Ledger Implementation</strong>: <code>icn/crates/icn-ledger/src/ledger_impl/witness_ops.rs</code></li>
 <li><strong>Resource Access</strong>: <code>icn/crates/icn-ledger/src/use_access.rs</code></li>
 <li><strong>Integration Tests</strong>: <code>icn/crates/icn-core/tests/witness_integration.rs</code></li>
 </ul>
 <hr>
-<h2>Summary</h2>
+<h2 id="summary">Summary</h2>
 <p>Witness signatures provide cryptographic attestation for high-value transactions and resource stewardship transfers in ICN. Key takeaways:</p>
 <ol>
 <li><strong>Use witnesses for</strong>: High-value resources, legal compliance, multi-party transfers, trust-critical operations</li>
@@ -914,7 +911,7 @@ pub fn update_witness_pool_from_trust(
 </ol>
 <p>Witness signatures are a foundational security feature for cooperative resource management. As ICN matures, integration with the trust graph will enable automatic witness selection and reputation tracking, further enhancing the security and usability of this critical feature.</p>
 <hr>
-<h2>Feedback and Contributions</h2>
+<h2 id="feedback-and-contributions">Feedback and Contributions</h2>
 <p>This document is maintained by the ICN community. To suggest improvements:</p>
 <ol>
 <li>Open an issue: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
@@ -922,7 +919,10 @@ pub fn update_witness_pool_from_trust(
 <li>Discuss in the ICN community forum</li>
 </ol>
 <p><strong>Last Reviewed</strong>: 2026-01-24</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/features/witness-signature-best-practices.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

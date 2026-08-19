@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Defines six forward-direction policy objects that bind storage classes to durability commitments: StorageSpec (binding between a workload/service/domain and storage), BackupPolicy (frequency, target, integrity, retention), ReplicationPolicy (replicas, placement, anti-entropy), RecoveryPolicy (restore objective class, drill cadence, restore authority), ArchivePolicy (long-term retention, immutability, access), and IntegrityPolicy (verification cadence, repair path). Reuses existing kernel-level types (StorageClass and DataLocality from icn/crates/icn-kernel-api/src/storage.rs) verbatim and acknowledges the drift between the 3-variant kernel enum and the 7-class spine-doc custody taxonomy (canonical store / service state / artifact-blob / volume-block / scoped vault / secret-key / cache-derived) — reconciliation deferred to a named follow-up. Names restore-test receipts as their own concept; mandates that backups, replicas, archives, and exports inherit source locality and disclosure constraints and MUST NOT broaden them. Specifies authority rules tying restore of authoritative state to ADR-0014 mandates and the effect dispatch chain (Stage 5 evidence). Provides a sixteen-row failure/safety table covering missing spec, locality boundary crossing, restore without authority, cache treated as canonical, secret material in ordinary backup, archive quiet deletion, etc. Advances #1816 — does not by itself close it. Defers wire-stable schema, restore-test receipt envelope, locality/privacy inheritance checks, archive verification contract, backup-provider interface, and anti-entropy integration to named follow-ups."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,14 +35,11 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>storage durability policies</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/storage-durability-policies.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>storage durability policies</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-05-14</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="storage-durability-policies--backup-replication-recovery-archive-integrity">Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity</h1>
 <blockquote>
 <p><strong>Status: spec, work-in-progress.</strong> Defines the design-level policy objects that bind storage classes to durability, recoverability, locality, privacy, integrity, archival, and exit commitments. Names <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> as the six forward-direction objects the spine doc tracks under #1816 and the merged specs (#1819, #1820, #1821, #1822) defer to. Reuses existing kernel-level types (<code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code> from <code>icn/crates/icn-kernel-api/src/storage.rs</code>) verbatim where they apply. Clauses that depend on schema fields or kernel behavior that have not yet landed are marked as forward-direction. The PR introducing this doc advances <code>#1816</code> without closing it.</p>
 </blockquote>
-<h2>Purpose</h2>
+<h2 id="purpose">Purpose</h2>
 <p>ICN&#39;s storage layer already enforces two kernel-level constraints: <code>StorageClass</code> (Canonical / ServiceState / Blobs, per <code>icn-kernel-api/src/storage.rs:53</code>) and <code>DataLocality</code> (CellLocal / CoopReplicated / FederationMirrored / CommonsPublic, per the same file at line 155). Those constraints establish what the kernel can refuse. They do not, by themselves, establish how storage stays durable, how a backup is taken or restored, what counts as a verified replica, what an archive owes the institution years from now, or what authority a restore requires.</p>
 <p>The spine doc names six policy objects for the missing durability layer — <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> — and explicitly marks them as forward-direction tracked under #1816. The four merged sibling architecture specs each defer to this spec for the <strong>design-level policy contract</strong> for those objects:</p>
 <ul>
@@ -53,7 +50,7 @@ View source on GitHub →
 </ul>
 <p>Foundational storage canon is <strong>separate from the merged sibling specs above</strong>. <code>docs/state/storage-governance-spec.md</code> is the existing foundational doc for <code>StorageClass</code>, <code>DataLocality</code>, and storage-access enforcement vocabulary; it independently names <code>StorageSpec</code> and <code>validate_storage_access()</code> as required follow-ups. This spec gives those names design-level shape without redefining the existing kernel-level types.</p>
 <p>This spec defines those objects at <strong>object granularity</strong> — fields, lifecycle stages, authority bindings, receipt expectations, hard rules — and names the institutional rules that bind them to authority and receipts. <strong>It does not introduce schema, wire format, Rust types, or storage-backend implementation.</strong> It explicitly defers vendor choices, replication algorithms, SLA commitments, and storage-backend selection. It does not redefine <code>StorageClass</code> or <code>DataLocality</code>; both remain canonical per the kernel-level enums.</p>
-<h2>What this spec is not</h2>
+<h2 id="what-this-spec-is-not">What this spec is not</h2>
 <ul>
 <li>Not a storage backend implementation. No code lands here.</li>
 <li>Not a backup-job implementation. The spec names what a backup is in institutional terms; the schedule, the worker, the wire format are forward work.</li>
@@ -66,7 +63,7 @@ View source on GitHub →
 <li>Not a production-readiness claim. No partner federation is operating under these primitives today.</li>
 <li>Not closure of <code>#1816</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s scope.</li>
 </ul>
-<h2>Storage class model</h2>
+<h2 id="storage-class-model">Storage class model</h2>
 <p>ICN canon currently carries <strong>two related but distinct</strong> storage taxonomies. The spec uses both and names the relationship between them.</p>
 <p><strong>Kernel-level <code>StorageClass</code> (3 variants, implemented):</strong></p>
 <table>
@@ -136,7 +133,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Drift note (honest):</strong> the seven-class custody taxonomy is broader than the three-variant kernel enum. They overlap but do not align 1:1 today. Reconciliation — whether to widen the kernel enum or to keep the kernel coarse and treat the seven classes as an app-layer projection — is forward work, tracked as a follow-up in this PR&#39;s handoff. This spec uses the <strong>seven-class custody taxonomy</strong> at design level and the <strong>three-variant kernel enum</strong> at kernel-enforcement level; the difference is explicit, not hand-waved.</p>
-<h2><code>StorageSpec</code></h2>
+<h2 id="storagespec"><code>StorageSpec</code></h2>
 <p><code>StorageSpec</code> is the binding between a workload, service, or domain object and the storage it touches. Today it does not exist as a Rust type; <code>storage-governance-spec.md</code> names it as a required follow-up. This spec defines its shape at design granularity.</p>
 <p><strong>Identity and references</strong></p>
 <ul>
@@ -180,7 +177,7 @@ View source on GitHub →
 <li>A storage binding without a backup, replication, and exit policy is <strong>incomplete</strong>; the chain should refuse adoption until the gap is named (even explicitly to record that the class warrants none).</li>
 <li><code>DataLocality</code> is upper-bound, not exact. A spec at <code>CoopReplicated</code> may host data in <code>CellLocal</code>; it may not host data in <code>FederationMirrored</code>.</li>
 </ul>
-<h2><code>BackupPolicy</code></h2>
+<h2 id="backuppolicy"><code>BackupPolicy</code></h2>
 <p>A backup is an institutional record of what was true at a moment, kept for the institution to recover from loss. Today <code>BackupPolicy</code> does not exist as a type. This spec defines its design shape.</p>
 <p><strong>Frequency and schedule</strong></p>
 <ul>
@@ -228,7 +225,7 @@ View source on GitHub →
 <blockquote>
 <p>A backup inherits the source&#39;s locality and disclosure rules unless a governance decision explicitly narrows access further. It MUST NOT broaden locality or disclosure.</p>
 </blockquote>
-<h2><code>ReplicationPolicy</code></h2>
+<h2 id="replicationpolicy"><code>ReplicationPolicy</code></h2>
 <p>Replication keeps the service alive. It is <em>not</em> the same as backup; it shares only the verification surface with <code>IntegrityPolicy</code> and the anti-entropy proof loops tracked under <code>#1799</code>.</p>
 <p><strong>Replica count and placement</strong></p>
 <ul>
@@ -257,7 +254,7 @@ View source on GitHub →
 <li><strong>Replication is not backup.</strong> A replica is a current copy; a backup is a record of past state. The two share a verification surface but answer different institutional questions.</li>
 <li><strong>Cross-reference:</strong> <code>#1799</code> defines the substrate-side proof loops; this spec defines the institution-side policy that consumes them.</li>
 </ul>
-<h2><code>RecoveryPolicy</code></h2>
+<h2 id="recoverypolicy"><code>RecoveryPolicy</code></h2>
 <p>Recovery is what the institution promises to itself when something goes wrong. The policy names what restoring authoritative state means and who can do it.</p>
 <p><strong>Restore objective</strong></p>
 <ul>
@@ -301,7 +298,7 @@ View source on GitHub →
 <blockquote>
 <p>Restoring authoritative state is a governed event. It MUST produce receipts and preserve provenance.</p>
 </blockquote>
-<h2><code>ArchivePolicy</code></h2>
+<h2 id="archivepolicy"><code>ArchivePolicy</code></h2>
 <p>Archives keep the institution accountable to itself and to its partners. An archive is not a backup; a backup may eventually become an archive when retention crosses an archival horizon.</p>
 <p><strong>Retention</strong></p>
 <ul>
@@ -340,7 +337,7 @@ View source on GitHub →
 <blockquote>
 <p>Archives keep the institution accountable. <code>ArchivePolicy</code> MUST NOT become a quiet deletion policy. Expiration of archival material is a governance act with its own receipt.</p>
 </blockquote>
-<h2><code>IntegrityPolicy</code></h2>
+<h2 id="integritypolicy"><code>IntegrityPolicy</code></h2>
 <p>Integrity is the institution&#39;s assertion that storage has not silently changed. The policy names how that assertion is produced and how often.</p>
 <p><strong>Verification cadence</strong></p>
 <ul>
@@ -368,7 +365,7 @@ View source on GitHub →
 <li>Integrity-failure receipt.</li>
 <li>Integrity-repair receipt.</li>
 </ul>
-<h2>Restore-test receipts</h2>
+<h2 id="restore-test-receipts">Restore-test receipts</h2>
 <p>Restore-test receipts deserve their own section. A backup that has never been restored is hope, not durability.</p>
 <p><strong>What a restore-test is</strong></p>
 <p>A restore-test is a deliberate, scheduled or governance-triggered drill that exercises the recovery path without putting authoritative state at risk. The drill produces a receipt naming what was attempted, where it landed, who authorized it, and what was verified.</p>
@@ -400,7 +397,7 @@ View source on GitHub →
 <p>The failure produces a receipt with <code>success = false</code>. The steward cockpit (<code>#1795</code>) surfaces it. Where the failure indicates a real recoverability gap, the policy names which proposal class is required to address it.</p>
 <p><strong>Member visibility</strong></p>
 <p>For storage classes whose loss would affect members directly (canonical state, scoped vaults), the restore-test result is summarized for affected members at a member-shell-appropriate cadence (per <code>#1818</code>). The summary does not expose the underlying data; it asserts the institution&#39;s recovery posture.</p>
-<h2>Locality and privacy inheritance</h2>
+<h2 id="locality-and-privacy-inheritance">Locality and privacy inheritance</h2>
 <p>The single most load-bearing rule in this spec. Stated three ways for emphasis.</p>
 <blockquote>
 <p><strong>Note on scope vocabulary.</strong> Generic scope language in this spec uses <code>LocalDomain</code> / <code>InstitutionalDomain</code> / <code>Domain</code> (per <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a> §C3 &quot;Entity-scope vocabulary&quot;). The kernel-level <code>DataLocality::CoopReplicated</code> enum variant is preserved as the existing serialized Rust identifier; new generic scope concepts that this spec introduces use the local-domain vocabulary rather than coining new <code>Coop-</code>-prefixed names. Rename of the kernel-level variant is forward work (compatibility-aware migration; not in this spec&#39;s scope).</p>
@@ -429,7 +426,7 @@ View source on GitHub →
 <li><code>#1767</code> — encrypted private-overlay storage, including key custody for backups of vault material.</li>
 <li><code>#1792</code> — disclosure boundary and <code>AccessReceipt</code> class for backup access.</li>
 </ul>
-<h2>Backup / export / restore authority</h2>
+<h2 id="backup--export--restore-authority">Backup / export / restore authority</h2>
 <p>The authority rules tie this spec to ADR-0014 (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) and to <code>docs/spec/effect-dispatch-contract.md</code>.</p>
 <p><strong>Policy adoption and amendment</strong></p>
 <ul>
@@ -459,7 +456,7 @@ View source on GitHub →
 <ul>
 <li>Failed backup integrity, failed restore tests, divergent replicas, missing archives — all surface in the steward cockpit (<code>#1795</code>). They are first-class institutional facts, not buried operational alerts.</li>
 </ul>
-<h2>Relationship to sibling work</h2>
+<h2 id="relationship-to-sibling-work">Relationship to sibling work</h2>
 <p>Cross-link, do not duplicate.</p>
 <table>
 <thead>
@@ -533,7 +530,7 @@ View source on GitHub →
 <td>ADR-0019.</td>
 </tr>
 </tbody></table>
-<h2>Failure and safety rules</h2>
+<h2 id="failure-and-safety-rules">Failure and safety rules</h2>
 <p>Each failure mode has a deterministic response. Cross-cutting rule: <strong>fail closed, surface honestly, never silently fall back.</strong></p>
 <table>
 <thead>
@@ -607,7 +604,7 @@ View source on GitHub →
 <td>The domain MUST amend its <code>DomainPolicy</code> via a governance act before evaluation continues. References pointing at deprecated versions cause selection to fail closed (mirrors <code>ccl-policy-registry.md</code> §&quot;Failure / safety rules&quot;).</td>
 </tr>
 </tbody></table>
-<h2>Open questions and deferred decisions</h2>
+<h2 id="open-questions-and-deferred-decisions">Open questions and deferred decisions</h2>
 <p>Each is named so future readers know where this spec stops.</p>
 <table>
 <thead>
@@ -661,7 +658,7 @@ View source on GitHub →
 <td>Future ADR / extension to <code>icn-kernel-api/src/storage.rs</code>.</td>
 </tr>
 </tbody></table>
-<h2>Non-claims (repeated for clarity)</h2>
+<h2 id="non-claims-repeated-for-clarity">Non-claims (repeated for clarity)</h2>
 <ul>
 <li>This document does not introduce any of the forward-direction policy objects it names. They remain forward-direction.</li>
 <li>It does not introduce schema, wire format, or contract changes.</li>
@@ -674,7 +671,7 @@ View source on GitHub →
 <li>It does not use payment, wallet, balance, currency, or blockchain as ICN-native framing. The discipline list in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full.</li>
 <li>It does not by itself close <code>#1816</code>. The PR uses <code>Refs:</code>.</li>
 </ul>
-<h2>Related documents and issues</h2>
+<h2 id="related-documents-and-issues">Related documents and issues</h2>
 <p>Architecture and spine:</p>
 <ul>
 <li><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> — §&quot;Storage as custody&quot; and §&quot;Backup, redundancy, recovery, archive.&quot;</li>
@@ -730,7 +727,10 @@ View source on GitHub →
 <li><code>#1795</code> — steward cockpit.</li>
 <li><code>#1748</code> — institutional process substrate.</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/storage-durability-policies.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

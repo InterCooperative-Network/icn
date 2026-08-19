@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance→Ledger Integration: Bugs &amp; Issues Found | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Historical document, kept for the record. Not current ICN project state."><meta name="robots" content="noindex, follow"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance→Ledger Integration: Bugs &amp; Issues Found (archived) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,40 +35,46 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GOVERNANCE LEDGER BUGS FOUND</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/GOVERNANCE-LEDGER-BUGS-FOUND.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This document is from 2025 and has been archived.</p>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <a href="/docs/archive" data-astro-cid-uadgga6g>Archive</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>GOVERNANCE LEDGER BUGS FOUND</span> </nav>  <aside class="callout callout-archive doc-banner" aria-labelledby="doc-banner-title" data-astro-cid-w3hnbhco><span class="callout-label" id="doc-banner-title" data-astro-cid-w3hnbhco>
+Historical document — not current project state
+</span><p data-astro-cid-w3hnbhco>
+This page is kept for the record. It described the project at the time it
+        was written and has not been maintained since. Do not read it as a
+        statement about how ICN works today.
+</p><dl class="doc-banner-meta" data-astro-cid-w3hnbhco><div data-astro-cid-w3hnbhco><dt data-astro-cid-w3hnbhco>Classification</dt><dd data-astro-cid-w3hnbhco>registry role=archive</dd></div></dl><p class="doc-banner-actions" data-astro-cid-w3hnbhco>
+For current material, start at <a href="/docs" data-astro-cid-w3hnbhco>the documentation index</a>,
+        or read <a href="/whats-real-now" data-astro-cid-w3hnbhco>What's real now</a> for the maturity
+        account of each subsystem.
+</p></aside> <article class="prose" data-astro-cid-uadgga6g><p>⚠️ <strong>ARCHIVED</strong> - This document is from 2025 and has been archived.</p>
 <p>For current information, see:</p>
 <ul>
 <li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - Current architecture</li>
 <li><a href="/docs/STATE">STATE.md</a> - Current project state</li>
 </ul>
 <hr>
-<h1>Governance→Ledger Integration: Bugs &amp; Issues Found</h1>
+<h1 id="governanceledger-integration-bugs--issues-found">Governance→Ledger Integration: Bugs &amp; Issues Found</h1>
 <p><strong>Date</strong>: 2025-01-17 (Updated: 2025-11-17)
 <strong>Analysis</strong>: Code review and testing after initial implementation</p>
 <hr>
-<h2>✅ CRITICAL: Subscription Handle Immediately Dropped (FIXED)</h2>
+<h2 id="-critical-subscription-handle-immediately-dropped-fixed">✅ CRITICAL: Subscription Handle Immediately Dropped (FIXED)</h2>
 <p><strong>Severity</strong>: CRITICAL
 <strong>Impact</strong>: Complete governance→ledger integration failure in daemon
 <strong>Status</strong>: ✅ FIXED (2025-11-17)</p>
-<h3>Description</h3>
+<h3 id="description">Description</h3>
 <p>The governance event subscription handle was immediately dropped after registration, causing the SubscriptionHandle::drop() trait to execute and remove the subscription from the EventBus. This meant <strong>zero governance events were ever processed</strong> by the daemon.</p>
-<h3>Root Cause</h3>
+<h3 id="root-cause">Root Cause</h3>
 <p><strong>Incorrect pattern</strong>:</p>
 <pre><code class="language-rust">let _ = event_bus.subscribe(Arc::new(move |event| {
     // ... handler code ...
 })).await;
 </code></pre>
 <p>The <code>let _ =</code> pattern immediately drops the SubscriptionHandle, triggering its Drop implementation which removes the subscription. The subscription only exists for one line of code!</p>
-<h3>Why Tests Didn&#39;t Catch It</h3>
+<h3 id="why-tests-didnt-catch-it">Why Tests Didn&#39;t Catch It</h3>
 <p>Integration tests used the correct pattern:</p>
 <pre><code class="language-rust">let _handle = event_bus.subscribe(...).await;
 </code></pre>
 <p>The underscore prefix <code>_handle</code> keeps the handle alive for the scope lifetime while silencing &quot;unused variable&quot; warnings. This masked the bug because tests worked but the daemon didn&#39;t.</p>
-<h3>Fix Applied (2025-11-17)</h3>
+<h3 id="fix-applied-2025-11-17">Fix Applied (2025-11-17)</h3>
 <p><strong>Implementation</strong>: Store handle for daemon lifetime in <code>supervisor.rs:982,1156-1157</code></p>
 <p><strong>Correct pattern</strong>:</p>
 <pre><code class="language-rust">let _governance_event_subscription = {
@@ -85,14 +91,14 @@ View source on GitHub →
 <li>Subscription only removed during supervisor shutdown</li>
 <li>Drop triggered naturally when <code>run()</code> function exits</li>
 </ul>
-<h3>Impact</h3>
+<h3 id="impact">Impact</h3>
 <ul>
 <li><strong>Before</strong>: Governance→ledger integration completely non-functional (0% events processed)</li>
 <li><strong>After</strong>: Full functionality restored in daemon</li>
 <li><strong>Tests</strong>: Unchanged (were already correct)</li>
 <li><strong>Credit</strong>: User discovered during code review</li>
 </ul>
-<h3>Verification</h3>
+<h3 id="verification">Verification</h3>
 <p>All 3 governance-ledger tests passing:</p>
 <ul>
 <li><code>test_duplicate_proposal_event_is_idempotent</code> ✅</li>
@@ -100,13 +106,13 @@ View source on GitHub →
 <li><code>test_rejected_proposal_does_not_execute</code> ✅</li>
 </ul>
 <hr>
-<h2>✅ CRITICAL: Idempotency Bug (FIXED)</h2>
+<h2 id="-critical-idempotency-bug-fixed">✅ CRITICAL: Idempotency Bug (FIXED)</h2>
 <p><strong>Severity</strong>: CRITICAL
 <strong>Impact</strong>: Financial integrity - duplicate payments
 <strong>Status</strong>: ✅ FIXED (2025-01-17)</p>
-<h3>Description</h3>
+<h3 id="description-1">Description</h3>
 <p>If a <code>ProposalAccepted</code> event is processed multiple times (due to event replay, gossip duplicates, or system restarts), the ledger transaction is executed multiple times, resulting in <strong>double-counting of balances</strong>.</p>
-<h3>Root Cause</h3>
+<h3 id="root-cause-1">Root Cause</h3>
 <p>The event handler in <code>supervisor.rs</code> does NOT check if a proposal has already been executed before creating a ledger transaction. It unconditionally calls <code>ledger.append_entry()</code> which:</p>
 <ol>
 <li>Creates a NEW journal entry (with new timestamp → new hash)</li>
@@ -114,7 +120,7 @@ View source on GitHub →
 <li>Persists the double-counted balances</li>
 <li>Overwrites audit trail (hiding the evidence)</li>
 </ol>
-<h3>Proof</h3>
+<h3 id="proof">Proof</h3>
 <p>Test: <code>icn-core/tests/governance_ledger_idempotency.rs</code></p>
 <pre><code>After 1st emission - Sender: -5000, Recipient: +5000  ✅ CORRECT
 After 2nd emission - Sender: -10000, Recipient: +10000  ❌ BUG
@@ -124,14 +130,14 @@ After 2nd emission - Sender: -10000, Recipient: +10000  ❌ BUG
 <li><code>86a9b243...</code> (timestamp: 1763420197996)</li>
 <li><code>25a972b5...</code> (timestamp: 1763420198197)</li>
 </ul>
-<h3>Attack Scenarios</h3>
+<h3 id="attack-scenarios">Attack Scenarios</h3>
 <ol>
 <li><strong>Malicious Replay</strong>: Attacker captures <code>ProposalAccepted</code> event from gossip and replays it</li>
 <li><strong>Network Partition</strong>: Same proposal processed on both sides of partition, then merged</li>
 <li><strong>Restart During Execution</strong>: System crashes after ledger write but before event bus clears</li>
 <li><strong>Gossip Duplicates</strong>: Anti-entropy re-delivers the same governance message</li>
 </ol>
-<h3>Recommended Fix</h3>
+<h3 id="recommended-fix">Recommended Fix</h3>
 <p><strong>Option 1: Check Audit Trail Before Execution</strong> (Simplest)</p>
 <pre><code class="language-rust">// In supervisor.rs event handler:
 let audit_key = format!(&quot;gov:audit:{}&quot;, proposal_id.0);
@@ -158,7 +164,7 @@ if let Ok(Some(_)) = store.get(audit_key.as_bytes()) {
 }
 </code></pre>
 <p><strong>Recommendation</strong>: Implement BOTH for defense in depth.</p>
-<h3>✅ Fix Applied (2025-01-17)</h3>
+<h3 id="-fix-applied-2025-01-17">✅ Fix Applied (2025-01-17)</h3>
 <p><strong>Implementation</strong>: Fail-safe idempotency check with explicit error handling in <code>supervisor.rs:1010-1032</code></p>
 <pre><code class="language-rust">// IDEMPOTENCY CHECK: Skip if proposal already executed
 // CRITICAL: Fail-safe approach - refuse to execute if we can&#39;t verify
@@ -206,11 +212,11 @@ match store.get(audit_key.as_bytes()) {
 <li>Financial integrity protected even during storage failures</li>
 </ul>
 <hr>
-<h2>✅ MEDIUM: Partial Failure - Inconsistent State (FIXED)</h2>
+<h2 id="-medium-partial-failure---inconsistent-state-fixed">✅ MEDIUM: Partial Failure - Inconsistent State (FIXED)</h2>
 <p><strong>Severity</strong>: MEDIUM
 <strong>Impact</strong>: Audit trail may be missing for executed transactions
 <strong>Status</strong>: ✅ FIXED (2025-01-17)</p>
-<h3>Description</h3>
+<h3 id="description-2">Description</h3>
 <p>If the ledger transaction succeeds but the audit trail write fails (e.g., store full, permission error), the money moves but there&#39;s no governance record.</p>
 <pre><code class="language-rust">match ledger_guard.append_entry(entry) {
     Ok(entry_hash) =&gt; {
@@ -222,7 +228,7 @@ match store.get(audit_key.as_bytes()) {
     }
 }
 </code></pre>
-<h3>Recommended Fix</h3>
+<h3 id="recommended-fix-1">Recommended Fix</h3>
 <p>Wrap in a transaction or log to dead-letter queue for manual reconciliation:</p>
 <pre><code class="language-rust">match ledger_guard.append_entry(entry) {
     Ok(entry_hash) =&gt; {
@@ -235,7 +241,7 @@ match store.get(audit_key.as_bytes()) {
     }
 }
 </code></pre>
-<h3>✅ Fix Applied (2025-01-17)</h3>
+<h3 id="-fix-applied-2025-01-17-1">✅ Fix Applied (2025-01-17)</h3>
 <p><strong>Implementation</strong>: Enhanced error logging in <code>supervisor.rs:1045-1077</code></p>
 <p><strong>Changes</strong>:</p>
 <ol>
@@ -261,13 +267,13 @@ match store.get(audit_key.as_bytes()) {
    ACTION REQUIRED: Manual reconciliation needed
 </code></pre>
 <hr>
-<h2>✅ MEDIUM: Shutdown Race Condition (FIXED)</h2>
+<h2 id="-medium-shutdown-race-condition-fixed">✅ MEDIUM: Shutdown Race Condition (FIXED)</h2>
 <p><strong>Severity</strong>: MEDIUM
 <strong>Impact</strong>: In-flight transactions may be lost on shutdown
 <strong>Status</strong>: ✅ FIXED (2025-01-17)</p>
-<h3>Description</h3>
+<h3 id="description-3">Description</h3>
 <p>The event handler spawns a <code>tokio::spawn()</code> task. If the supervisor shuts down before this task completes, the ledger transaction might not be persisted (though Sled provides some guarantees).</p>
-<h3>Current Code</h3>
+<h3 id="current-code">Current Code</h3>
 <pre><code class="language-rust">event_bus.subscribe(Arc::new(move |event| {
     tokio::spawn(async move {
         // Long-running ledger + audit trail writes
@@ -275,7 +281,7 @@ match store.get(audit_key.as_bytes()) {
     });
 })).await;
 </code></pre>
-<h3>Recommended Fix</h3>
+<h3 id="recommended-fix-2">Recommended Fix</h3>
 <p>Track in-flight tasks and wait for completion on shutdown:</p>
 <pre><code class="language-rust">// In supervisor:
 let in_flight_tasks = Arc::new(Mutex::new(Vec::new()));
@@ -289,7 +295,7 @@ for task in in_flight_tasks.lock().await.drain(..) {
     let _ = task.await;
 }
 </code></pre>
-<h3>✅ Fix Applied (2025-01-17)</h3>
+<h3 id="-fix-applied-2025-01-17-2">✅ Fix Applied (2025-01-17)</h3>
 <p><strong>Implementation</strong>: Added grace period in <code>supervisor.rs:1258-1261</code></p>
 <p><strong>Changes</strong>:</p>
 <ol>
@@ -318,15 +324,15 @@ tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 <li><strong>Future</strong>: Implement proper task tracking for zero-delay guaranteed completion</li>
 </ul>
 <hr>
-<h2>✅ LOW: No Unsubscribe Mechanism (FIXED)</h2>
+<h2 id="-low-no-unsubscribe-mechanism-fixed">✅ LOW: No Unsubscribe Mechanism (FIXED)</h2>
 <p><strong>Severity</strong>: LOW
 <strong>Impact</strong>: Potential memory leak if subscribers are added dynamically
 <strong>Status</strong>: ✅ FIXED (2025-11-17)</p>
-<h3>Description</h3>
+<h3 id="description-4">Description</h3>
 <p><code>EventBus</code> allows subscribers to be added but never removed. The <code>Vec&lt;EventCallback&gt;</code> grows without bounds.</p>
-<h3>Impact Assessment</h3>
+<h3 id="impact-assessment">Impact Assessment</h3>
 <p>For the current use case (system-wide events registered once at startup), this is acceptable. However, if event subscriptions become dynamic, this becomes a leak.</p>
-<h3>✅ Fix Applied (2025-11-17)</h3>
+<h3 id="-fix-applied-2025-11-17">✅ Fix Applied (2025-11-17)</h3>
 <p><strong>Implementation</strong>: Added SubscriptionHandle with automatic cleanup in <code>events.rs:49-116</code></p>
 <p><strong>Changes</strong>:</p>
 <ol>
@@ -368,11 +374,11 @@ impl Drop for SubscriptionHandle {
 </code></pre>
 <p><strong>Impact</strong>: Prevents memory leaks if subscriptions become dynamic, safe cleanup during shutdown</p>
 <hr>
-<h2>✅ LOW: Missing Metrics (FIXED)</h2>
+<h2 id="-low-missing-metrics-fixed">✅ LOW: Missing Metrics (FIXED)</h2>
 <p><strong>Severity</strong>: LOW
 <strong>Impact</strong>: No observability for execution success/failure rates
 <strong>Status</strong>: ✅ FIXED (2025-01-17)</p>
-<h3>Description</h3>
+<h3 id="description-5">Description</h3>
 <p>There are no Prometheus metrics tracking:</p>
 <ul>
 <li>Proposals executed successfully</li>
@@ -380,7 +386,7 @@ impl Drop for SubscriptionHandle {
 <li>Execution duration</li>
 <li>Audit trail write failures</li>
 </ul>
-<h3>Recommended Fix</h3>
+<h3 id="recommended-fix-3">Recommended Fix</h3>
 <p>Add metrics in the event handler:</p>
 <pre><code class="language-rust">use icn_obs::metrics;
 
@@ -405,7 +411,7 @@ match ledger_guard.append_entry(entry) {
     }
 }
 </code></pre>
-<h3>✅ Fix Applied (2025-01-17)</h3>
+<h3 id="-fix-applied-2025-01-17-3">✅ Fix Applied (2025-01-17)</h3>
 <p><strong>Implementation</strong>: Added comprehensive Prometheus metrics in <code>icn-obs/src/metrics.rs:301-321</code> and <code>supervisor.rs:1007-1107</code></p>
 <p><strong>Metrics Added</strong>:</p>
 <ol>
@@ -457,11 +463,11 @@ match ledger_guard.append_entry(entry) {
 <li>Alerting on execution_failures_total spike</li>
 </ul>
 <hr>
-<h2>✅ LOW: Audit Trail Timestamp Inaccuracy (FIXED)</h2>
+<h2 id="-low-audit-trail-timestamp-inaccuracy-fixed">✅ LOW: Audit Trail Timestamp Inaccuracy (FIXED)</h2>
 <p><strong>Severity</strong>: LOW
 <strong>Impact</strong>: Audit timestamps don&#39;t match governance decision time
 <strong>Status</strong>: ✅ FIXED (2025-11-17)</p>
-<h3>Description</h3>
+<h3 id="description-6">Description</h3>
 <p>The audit trail captures <code>executed_at</code> timestamp AFTER the ledger write, not at the time of governance decision:</p>
 <pre><code class="language-rust">&quot;executed_at&quot;: std::time::SystemTime::now()  // After ledger write
     .duration_since(std::time::UNIX_EPOCH)
@@ -469,7 +475,7 @@ match ledger_guard.append_entry(entry) {
     .as_secs(),
 </code></pre>
 <p>Should use <code>decided_at</code> from the event instead.</p>
-<h3>✅ Fix Applied (2025-11-17)</h3>
+<h3 id="-fix-applied-2025-11-17-1">✅ Fix Applied (2025-11-17)</h3>
 <p><strong>Implementation</strong>: Added <code>decided_at</code> field to audit trail in <code>supervisor.rs:991,1002,1060</code></p>
 <p><strong>Changes</strong>:</p>
 <ol>
@@ -496,7 +502,7 @@ match ledger_guard.append_entry(entry) {
 <li>Compliance: Separate timestamps for governance vs financial events</li>
 </ul>
 <hr>
-<h2>Summary</h2>
+<h2 id="summary">Summary</h2>
 <table>
 <thead>
 <tr>
@@ -541,7 +547,7 @@ match ledger_guard.append_entry(entry) {
 <td><strong>FIXED</strong></td>
 </tr>
 </tbody></table>
-<h2>Next Steps</h2>
+<h2 id="next-steps">Next Steps</h2>
 <ol>
 <li><del><strong>Fix idempotency bug</strong></del> ✅ COMPLETE</li>
 <li><del><strong>Add comprehensive error handling for partial failures</strong></del> ✅ COMPLETE</li>
@@ -557,7 +563,10 @@ match ledger_guard.append_entry(entry) {
 <strong>Governance→Ledger Integration</strong>: Production-ready with full metrics &amp; safety
 <strong>Critical Fixes</strong>: Subscription handle lifetime (daemon broken) + Idempotency (double-counting)
 <strong>Remaining Work</strong>: Optional enhancements only (JoinSet task tracking, dead-letter queue)</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/GOVERNANCE-LEDGER-BUGS-FOUND.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs/archive" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to archive </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 4: Identity and Trust | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Reference module on identity and trust primitives"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Module 4: Identity and Trust | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,16 +35,12 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 04 identity trust</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-04-identity-trust.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Module 4: Identity and Trust</h1>
-<h2>Overview</h2>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>onboarding</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>module 04 identity trust</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Learn</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="module-4-identity-and-trust">Module 4: Identity and Trust</h1>
+<h2 id="overview">Overview</h2>
 <p>This module teaches you ICN&#39;s foundational identity and trust systems. Identity
 proves who you are; trust determines how much the system trusts you. Together,
 they enable secure, socially-aware coordination without central authorities.</p>
-<h2>Objectives</h2>
+<h2 id="objectives">Objectives</h2>
 <ul>
 <li>Understand DIDs (Decentralized Identifiers) and why ICN uses them</li>
 <li>Master the keystore lifecycle: creation, encryption, rotation</li>
@@ -52,20 +48,20 @@ they enable secure, socially-aware coordination without central authorities.</p>
 <li>Understand trust computation: direct, transitive, and multi-dimensional</li>
 <li>Know how trust influences access control and rate limiting</li>
 </ul>
-<h2>Prerequisites</h2>
+<h2 id="prerequisites">Prerequisites</h2>
 <ul>
 <li>Module 3 (Runtime &amp; Actors)</li>
 <li>Module 1 (Rust Fundamentals)</li>
 </ul>
-<h2>Key Reading</h2>
+<h2 id="key-reading">Key Reading</h2>
 <ul>
 <li><code>icn/crates/icn-identity/src/keystore.rs</code> - Key storage</li>
 <li><code>icn/crates/icn-trust/src/lib.rs</code> - Trust graph</li>
 <li><code>docs/ARCHITECTURE.md</code> - Sections 1 and 2</li>
 </ul>
 <hr>
-<h2>Core Concepts</h2>
-<h3>1. What is a DID?</h3>
+<h2 id="core-concepts">Core Concepts</h2>
+<h3 id="1-what-is-a-did">1. What is a DID?</h3>
 <p>A <strong>DID</strong> (Decentralized Identifier) is a globally unique identifier that:</p>
 <ul>
 <li>Is <strong>self-certifying</strong>: The identifier itself proves ownership</li>
@@ -86,7 +82,7 @@ they enable secure, socially-aware coordination without central authorities.</p>
 <li><strong>Portable</strong>: Works offline, no network required</li>
 <li><strong>Deterministic</strong>: Same key = same DID always</li>
 </ul>
-<h3>2. Ed25519 Cryptography</h3>
+<h3 id="2-ed25519-cryptography">2. Ed25519 Cryptography</h3>
 <p>ICN uses <strong>Ed25519</strong> for all identity operations:</p>
 <table>
 <thead>
@@ -142,8 +138,8 @@ impl Did {
 }
 </code></pre>
 <hr>
-<h2>The Keystore</h2>
-<h3>3. Keystore Architecture</h3>
+<h2 id="the-keystore">The Keystore</h2>
+<h3 id="3-keystore-architecture">3. Keystore Architecture</h3>
 <p>The <strong>keystore</strong> securely stores private keys:</p>
 <pre><code>┌─────────────────────────────────────────────────────────┐
 │                      KEYSTORE                            │
@@ -164,7 +160,7 @@ impl Did {
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 </code></pre>
-<h3>4. Keystore Lifecycle</h3>
+<h3 id="4-keystore-lifecycle">4. Keystore Lifecycle</h3>
 <pre><code class="language-rust">pub trait KeyStore: Send + Sync {
     /// Unlock the keystore with a passphrase
     fn unlock(&amp;mut self, passphrase: &amp;[u8]) -&gt; Result&lt;()&gt;;
@@ -191,7 +187,7 @@ impl Did {
 <li><strong>Lock</strong>: On shutdown or explicit lock, keys cleared from memory</li>
 <li><strong>Rotation</strong>: Create new keypair, publish rotation record</li>
 </ol>
-<h3>5. The Identity Bundle</h3>
+<h3 id="5-the-identity-bundle">5. The Identity Bundle</h3>
 <p>When the keystore is unlocked, it produces an <strong>IdentityBundle</strong>:</p>
 <pre><code class="language-rust">pub struct IdentityBundle {
     /// The DID for this identity
@@ -229,7 +225,7 @@ impl IdentityBundle {
     }
 }
 </code></pre>
-<h3>6. DID-TLS Binding</h3>
+<h3 id="6-did-tls-binding">6. DID-TLS Binding</h3>
 <p>The TLS certificate is cryptographically bound to the DID:</p>
 <pre><code>┌─────────────────────────────────────────────────────────┐
 │                    DID-TLS BINDING                       │
@@ -252,7 +248,7 @@ impl IdentityBundle {
 └─────────────────────────────────────────────────────────┘
 </code></pre>
 <p><strong>This proves:</strong> &quot;The entity with this DID controls this TLS connection.&quot;</p>
-<h3>7. Key Rotation</h3>
+<h3 id="7-key-rotation">7. Key Rotation</h3>
 <p>Keys can be rotated without losing identity (with caveats):</p>
 <pre><code class="language-rust">pub struct KeyRotation {
     /// Old DID (being rotated from)
@@ -288,7 +284,7 @@ pub enum RotationReason {
 <li>Old key enters grace period</li>
 <li>After grace period, old key is invalid</li>
 </ol>
-<h3>8. Hardware-Backed Keys (TPM/HSM)</h3>
+<h3 id="8-hardware-backed-keys-tpmhsm">8. Hardware-Backed Keys (TPM/HSM)</h3>
 <blockquote>
 <p><strong>Current Status</strong>: ⏳ Planned for Phase 22 (Security Hardening)</p>
 <p>TPM/HSM support is not yet implemented. The APIs shown below represent the
@@ -404,8 +400,8 @@ pcr_policy = [0, 7]
 <li>Remote attestation requires additional infrastructure</li>
 </ul>
 <hr>
-<h2>The Trust Graph</h2>
-<h3>8. What is Trust in ICN?</h3>
+<h2 id="the-trust-graph">The Trust Graph</h2>
+<h3 id="8-what-is-trust-in-icn">8. What is Trust in ICN?</h3>
 <p><strong>Trust</strong> models social relationships between identities:</p>
 <pre><code>       Alice ────0.8───► Bob
          │                 │
@@ -419,7 +415,7 @@ pcr_policy = [0, 7]
 <li><strong>Weights</strong> (0.0 to 1.0) represent trust level</li>
 <li><strong>Directed</strong>: Alice trusting Bob ≠ Bob trusting Alice</li>
 </ul>
-<h3>9. Trust Dimensions</h3>
+<h3 id="9-trust-dimensions">9. Trust Dimensions</h3>
 <p>ICN models trust across multiple <strong>dimensions</strong>:</p>
 <pre><code class="language-rust">pub enum TrustGraphType {
     /// Social relationships (friendship, community membership)
@@ -436,7 +432,7 @@ pcr_policy = [0, 7]
 <li>Someone can pay reliably but be new to the community</li>
 <li>Prevents gaming: can&#39;t boost economic trust through social manipulation</li>
 </ul>
-<h3>10. Trust Storage</h3>
+<h3 id="10-trust-storage">10. Trust Storage</h3>
 <pre><code class="language-rust">pub struct TrustEdge {
     /// Who is granting trust
     pub from: Did,
@@ -463,7 +459,7 @@ pub struct TrustGraph {
     store: Arc&lt;dyn Store&gt;,
 }
 </code></pre>
-<h3>11. Computing Trust Scores</h3>
+<h3 id="11-computing-trust-scores">11. Computing Trust Scores</h3>
 <p><strong>Direct trust:</strong> Explicitly stated edges</p>
 <pre><code class="language-rust">pub fn get_direct_trust(&amp;self, from: &amp;Did, to: &amp;Did, graph_type: TrustGraphType) -&gt; Option&lt;f64&gt; {
     self.edges.get(&amp;(from.clone(), to.clone(), graph_type))
@@ -506,7 +502,7 @@ Alice&#39;s transitive trust of Carol:
 = 0.8 × 0.6 × 0.5
 = 0.24
 </code></pre>
-<h3>12. Trust Classes</h3>
+<h3 id="12-trust-classes">12. Trust Classes</h3>
 <p>Trust scores map to <strong>trust classes</strong> for policy decisions:</p>
 <pre><code class="language-rust">pub enum TrustClass {
     /// Trust &lt; 0.1 - Unknown or untrusted
@@ -540,8 +536,8 @@ impl TrustClass {
 }
 </code></pre>
 <hr>
-<h2>Trust in Action</h2>
-<h3>13. Trust-Based Rate Limiting</h3>
+<h2 id="trust-in-action">Trust in Action</h2>
+<h3 id="13-trust-based-rate-limiting">13. Trust-Based Rate Limiting</h3>
 <p>Network traffic is limited based on trust:</p>
 <pre><code class="language-rust">pub struct TrustRateLimiter {
     /// Remaining tokens per peer
@@ -570,7 +566,7 @@ impl TrustRateLimiter {
     }
 }
 </code></pre>
-<h3>14. Trust-Gated Topic Access</h3>
+<h3 id="14-trust-gated-topic-access">14. Trust-Gated Topic Access</h3>
 <p>Gossip topics can require minimum trust:</p>
 <pre><code class="language-rust">pub fn check_topic_access(&amp;self, peer: &amp;Did, topic: &amp;str) -&gt; Result&lt;()&gt; {
     let policy = self.get_topic_policy(topic);
@@ -596,7 +592,7 @@ impl TrustRateLimiter {
     }
 }
 </code></pre>
-<h3>15. Trust in Ledger Operations</h3>
+<h3 id="15-trust-in-ledger-operations">15. Trust in Ledger Operations</h3>
 <p>Ledger entries can require author trust:</p>
 <pre><code class="language-rust">impl Ledger {
     fn validate_entry(&amp;self, entry: &amp;JournalEntry) -&gt; Result&lt;()&gt; {
@@ -618,8 +614,8 @@ impl TrustRateLimiter {
 }
 </code></pre>
 <hr>
-<h2>Diagrams</h2>
-<h3>Identity Flow</h3>
+<h2 id="diagrams">Diagrams</h2>
+<h3 id="identity-flow">Identity Flow</h3>
 <pre><code class="language-mermaid">flowchart TB
     subgraph Creation
         Init[icnctl id init]
@@ -646,7 +642,7 @@ impl TrustRateLimiter {
     Bundle --&gt; TLS
     Bundle --&gt; Author
 </code></pre>
-<h3>Trust Computation</h3>
+<h3 id="trust-computation">Trust Computation</h3>
 <pre><code class="language-mermaid">flowchart LR
     subgraph Input
         Edges[(Trust Edges)]
@@ -672,7 +668,7 @@ impl TrustRateLimiter {
     Score --&gt; Class
 </code></pre>
 <hr>
-<h2>Exercises</h2>
+<h2 id="exercises">Exercises</h2>
 <ol>
 <li><p><strong>DID Parsing</strong>: Write a function that extracts the public key bytes from
 a DID string <code>did:icn:5KQwrPbwdL6PhXujxW37...</code>.</p>
@@ -697,7 +693,7 @@ required in a KeyRotation record?</p>
 </li>
 </ol>
 <hr>
-<h2>Checkpoints</h2>
+<h2 id="checkpoints">Checkpoints</h2>
 <ul>
 <li><input disabled="" type="checkbox"> You can explain the DID format and why it&#39;s self-certifying</li>
 <li><input disabled="" type="checkbox"> You understand the keystore lifecycle (create, unlock, rotate)</li>
@@ -708,7 +704,7 @@ required in a KeyRotation record?</p>
 <li><input disabled="" type="checkbox"> You know how trust classes affect rate limiting</li>
 </ul>
 <hr>
-<h2>Quick Reference</h2>
+<h2 id="quick-reference">Quick Reference</h2>
 <table>
 <thead>
 <tr>
@@ -750,10 +746,13 @@ required in a KeyRotation record?</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>Next Steps</h2>
+<h2 id="next-steps">Next Steps</h2>
 <p>Proceed to <strong>Module 5: Network &amp; Gossip</strong> to understand how identities connect
 and how trust enables secure peer-to-peer communication.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/reference/module-04-identity-trust.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

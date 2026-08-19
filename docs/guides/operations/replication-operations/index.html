@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Replication Operations Guide | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Replication procedures for Phase 17 storage hardening"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Replication Operations Guide | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,18 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>replication operations</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/replication-operations.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Replication Operations Guide</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>replication operations</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Learn</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-replication-operations-guide">ICN Replication Operations Guide</h1>
 <p><strong>Phase 17: Storage Hardening &amp; Replication</strong>
 <strong>Version</strong>: 1.0
 <strong>Last Updated</strong>: 2025-11-24</p>
-<h2>Overview</h2>
+<h2 id="overview">Overview</h2>
 <p>ICN&#39;s replication system provides fault-tolerant data storage through trust-weighted peer replication. This guide covers configuration, monitoring, and troubleshooting for production deployments.</p>
-<h2>Architecture</h2>
-<h3>Components</h3>
+<h2 id="architecture">Architecture</h2>
+<h3 id="components">Components</h3>
 <ol>
 <li><p><strong>ReplicationManager Actor</strong></p>
 <ul>
@@ -71,7 +67,7 @@ View source on GitHub →
 </ul>
 </li>
 </ol>
-<h3>Data Flow</h3>
+<h3 id="data-flow">Data Flow</h3>
 <pre><code>Content Published
     ↓
 ReplicationManager detects under-replication
@@ -86,8 +82,8 @@ Metadata updated in store
     ↓
 Health monitoring continues (60s loop)
 </code></pre>
-<h2>Configuration</h2>
-<h3>Default Configuration</h3>
+<h2 id="configuration">Configuration</h2>
+<h3 id="default-configuration">Default Configuration</h3>
 <p>The ReplicationManager uses sensible defaults suitable for most deployments:</p>
 <pre><code class="language-rust">ReplicationConfig {
     target_replicas: 3,                    // Aim for 3 copies
@@ -97,9 +93,9 @@ Health monitoring continues (60s loop)
     unreachable_threshold_secs: 900,       // 15 minutes = Unreachable
 }
 </code></pre>
-<h3>Custom Configuration</h3>
+<h3 id="custom-configuration">Custom Configuration</h3>
 <p>For production environments with specific requirements, configure via environment or code:</p>
-<h4>Environment Variables</h4>
+<h4 id="environment-variables">Environment Variables</h4>
 <pre><code class="language-bash"># Increase replica target for critical data
 export ICN_REPLICATION_TARGET_REPLICAS=5
 
@@ -109,7 +105,7 @@ export ICN_REPLICATION_MIN_TRUST_CLASS=Federated
 # More frequent health checks
 export ICN_REPLICATION_HEALTH_CHECK_INTERVAL_SECS=30
 </code></pre>
-<h4>Programmatic Configuration</h4>
+<h4 id="programmatic-configuration">Programmatic Configuration</h4>
 <pre><code class="language-rust">use icn_core::ReplicationConfig;
 use icn_trust::TrustClass;
 
@@ -123,8 +119,8 @@ let config = ReplicationConfig {
 
 // ReplicationManager spawned with custom config in supervisor
 </code></pre>
-<h2>Trust Classes and Selection</h2>
-<h3>Trust Class Hierarchy</h3>
+<h2 id="trust-classes-and-selection">Trust Classes and Selection</h2>
+<h3 id="trust-class-hierarchy">Trust Class Hierarchy</h3>
 <table>
 <thead>
 <tr>
@@ -154,7 +150,7 @@ let config = ReplicationConfig {
 <td>Deep collaboration</td>
 </tr>
 </tbody></table>
-<h3>Selection Algorithm</h3>
+<h3 id="selection-algorithm">Selection Algorithm</h3>
 <p>When ReplicationManager detects under-replication:</p>
 <ol>
 <li><strong>Query gossip for known peers</strong> (subscribers + vector clock peers)</li>
@@ -172,8 +168,8 @@ let config = ReplicationConfig {
 
 Request order: Dave, Carol, Bob (up to 5 total)
 </code></pre>
-<h2>Health Monitoring</h2>
-<h3>Health States</h3>
+<h2 id="health-monitoring">Health Monitoring</h2>
+<h3 id="health-states">Health States</h3>
 <table>
 <thead>
 <tr>
@@ -198,7 +194,7 @@ Request order: Dave, Carol, Bob (up to 5 total)
 <td>Likely offline, trigger re-replication</td>
 </tr>
 </tbody></table>
-<h3>Monitoring Loop</h3>
+<h3 id="monitoring-loop">Monitoring Loop</h3>
 <p>Every 60 seconds (configurable), ReplicationManager:</p>
 <ol>
 <li>Loads all content hashes with replica metadata</li>
@@ -210,15 +206,15 @@ Request order: Dave, Carol, Bob (up to 5 total)
 </li>
 <li>Logs health check results</li>
 </ol>
-<h3>Request Rate Limiting</h3>
+<h3 id="request-rate-limiting">Request Rate Limiting</h3>
 <p>To avoid spam, ReplicationManager tracks recent requests:</p>
 <ul>
 <li><strong>Cooldown period</strong>: 5 minutes minimum between requests for same content</li>
 <li><strong>Request limit</strong>: 5 peers per health check cycle</li>
 <li><strong>Exponential backoff</strong>: If no candidates found, wait before retrying</li>
 </ul>
-<h2>Prometheus Metrics</h2>
-<h3>Current Metrics (Week 3)</h3>
+<h2 id="prometheus-metrics">Prometheus Metrics</h2>
+<h3 id="current-metrics-week-3">Current Metrics (Week 3)</h3>
 <table>
 <thead>
 <tr>
@@ -243,7 +239,7 @@ Request order: Dave, Carol, Bob (up to 5 total)
 <td>Replica requests sent</td>
 </tr>
 </tbody></table>
-<h3>Planned Metrics (Week 4)</h3>
+<h3 id="planned-metrics-week-4">Planned Metrics (Week 4)</h3>
 <table>
 <thead>
 <tr>
@@ -273,7 +269,7 @@ Request order: Dave, Carol, Bob (up to 5 total)
 <td>Failed replication attempts</td>
 </tr>
 </tbody></table>
-<h3>Monitoring Dashboard (Example)</h3>
+<h3 id="monitoring-dashboard-example">Monitoring Dashboard (Example)</h3>
 <pre><code class="language-promql"># Under-replicated content alert
 rate(icn_replication_under_replicated_total[5m]) &gt; 0
 
@@ -284,8 +280,8 @@ avg(icn_replication_replica_count)
 rate(icn_replication_offers_received_total[5m])
   / rate(icn_replication_requests_sent_total[5m])
 </code></pre>
-<h2>Operational Procedures</h2>
-<h3>Checking Replication Health</h3>
+<h2 id="operational-procedures">Operational Procedures</h2>
+<h3 id="checking-replication-health">Checking Replication Health</h3>
 <p><strong>Via Prometheus:</strong></p>
 <pre><code class="language-bash">curl http://localhost:9100/metrics | grep icn_replication
 </code></pre>
@@ -296,7 +292,7 @@ journalctl -u icnd | grep &quot;Replication health check complete&quot;
 # Example output:
 # Replication health check complete: 127 healthy, 3 under-replicated
 </code></pre>
-<h3>Increasing Replica Count</h3>
+<h3 id="increasing-replica-count">Increasing Replica Count</h3>
 <p>If data loss is a concern, increase target replicas:</p>
 <p><strong>Method 1: Environment Variable (restart required)</strong></p>
 <pre><code class="language-bash">export ICN_REPLICATION_TARGET_REPLICAS=5
@@ -306,7 +302,7 @@ systemctl restart icnd
 <pre><code class="language-bash"># Planned for Phase 18
 icnctl replication set-target 5
 </code></pre>
-<h3>Handling Under-Replication Alerts</h3>
+<h3 id="handling-under-replication-alerts">Handling Under-Replication Alerts</h3>
 <p><strong>Diagnosis:</strong></p>
 <ol>
 <li>Check peer connectivity: <code>icnctl network peers</code></li>
@@ -319,7 +315,7 @@ icnctl replication set-target 5
 <li><strong>Peers offline</strong>: Wait for peers to reconnect, or find new peers</li>
 <li><strong>Insufficient capacity</strong>: Peers may be at storage limits (Phase 18: quotas)</li>
 </ul>
-<h3>Manual Re-Replication (Emergency)</h3>
+<h3 id="manual-re-replication-emergency">Manual Re-Replication (Emergency)</h3>
 <p>If automatic re-replication fails:</p>
 <pre><code class="language-bash"># Force health check (triggers re-replication immediately)
 # Planned for Phase 17 Week 4
@@ -331,8 +327,8 @@ icnctl replication status &lt;content_hash&gt;
 # Manually request replica from specific peer
 icnctl replication request &lt;content_hash&gt; &lt;peer_did&gt;
 </code></pre>
-<h2>Troubleshooting</h2>
-<h3>Symptom: Replication requests never sent</h3>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="symptom-replication-requests-never-sent">Symptom: Replication requests never sent</h3>
 <p><strong>Possible Causes:</strong></p>
 <ul>
 <li>No trusted peers at Partner+ level</li>
@@ -355,7 +351,7 @@ journalctl -u icnd | grep &quot;ReplicaRequest&quot;
 <li>Lower min_trust_class (not recommended for production)</li>
 <li>Wait for cooldown period to expire</li>
 </ul>
-<h3>Symptom: High under-replication count</h3>
+<h3 id="symptom-high-under-replication-count">Symptom: High under-replication count</h3>
 <p><strong>Possible Causes:</strong></p>
 <ul>
 <li>Network partition (peers offline)</li>
@@ -376,7 +372,7 @@ icnctl trust compute &lt;peer_did&gt;
 <li>Add more high-trust peers to network</li>
 <li>Investigate peer storage capacity (Phase 18: quotas)</li>
 </ul>
-<h3>Symptom: Replicas marked as Stale/Unreachable</h3>
+<h3 id="symptom-replicas-marked-as-staleunreachable">Symptom: Replicas marked as Stale/Unreachable</h3>
 <p><strong>Possible Causes:</strong></p>
 <ul>
 <li>Peer temporarily offline (network issue)</li>
@@ -396,8 +392,8 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <li>If peer permanently offline, ReplicationManager will request new replicas</li>
 <li>Check system clocks (Phase 19: clock synchronization)</li>
 </ul>
-<h2>Best Practices</h2>
-<h3>Production Deployments</h3>
+<h2 id="best-practices">Best Practices</h2>
+<h3 id="production-deployments">Production Deployments</h3>
 <ol>
 <li><p><strong>Set target_replicas ≥ 3</strong></p>
 <ul>
@@ -425,7 +421,7 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 </ul>
 </li>
 </ol>
-<h3>Development/Testing</h3>
+<h3 id="developmenttesting">Development/Testing</h3>
 <ol>
 <li><p><strong>Use lower health_check_interval_secs</strong></p>
 <ul>
@@ -447,8 +443,8 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 </ul>
 </li>
 </ol>
-<h2>Performance Considerations</h2>
-<h3>Network Overhead</h3>
+<h2 id="performance-considerations">Performance Considerations</h2>
+<h3 id="network-overhead">Network Overhead</h3>
 <p>Each replica request incurs:</p>
 <ul>
 <li>1 ReplicaRequest message (~100 bytes)</li>
@@ -461,7 +457,7 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <li>600 requests × 250 bytes = 150 KB bandwidth</li>
 <li>Spread over 60 seconds = 2.5 KB/sec (negligible)</li>
 </ul>
-<h3>Storage Overhead</h3>
+<h3 id="storage-overhead">Storage Overhead</h3>
 <p>Replica metadata per content hash:</p>
 <ul>
 <li>Content hash: 32 bytes</li>
@@ -473,15 +469,15 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <li>1,000 × (32 + 80×3) = 272 KB metadata</li>
 <li>Negligible compared to actual content size</li>
 </ul>
-<h3>CPU Overhead</h3>
+<h3 id="cpu-overhead">CPU Overhead</h3>
 <p>Health check cycle (every 60 seconds):</p>
 <ul>
 <li>Load all replica metadata: ~1ms per 100 items</li>
 <li>Trust score lookups: ~10ms per 100 peers</li>
 <li>Total: ~11ms per cycle (0.018% CPU usage)</li>
 </ul>
-<h2>Security Considerations</h2>
-<h3>Trust Requirements</h3>
+<h2 id="security-considerations">Security Considerations</h2>
+<h3 id="trust-requirements">Trust Requirements</h3>
 <p><strong>Why Partner+ trust for replicas?</strong></p>
 <ul>
 <li>Prevents Sybil attacks (fake nodes offering replicas)</li>
@@ -493,7 +489,7 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <li>Known (0.1-0.4): Higher risk of unreliable replicas</li>
 <li>Isolated (0.0-0.1): <strong>NOT RECOMMENDED</strong> - no trust relationship</li>
 </ul>
-<h3>Replica Verification</h3>
+<h3 id="replica-verification">Replica Verification</h3>
 <p><strong>Current (Phase 17):</strong></p>
 <ul>
 <li>Trust-based replica selection</li>
@@ -505,26 +501,26 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <li>Challenge-response proofs of storage</li>
 <li>Byzantine fault detection for corrupt replicas</li>
 </ul>
-<h2>Future Enhancements</h2>
-<h3>Phase 18: Pre-Pilot Hardening</h3>
+<h2 id="future-enhancements">Future Enhancements</h2>
+<h3 id="phase-18-pre-pilot-hardening">Phase 18: Pre-Pilot Hardening</h3>
 <ul>
 <li><strong>Storage quotas</strong>: Per-peer capacity limits</li>
 <li><strong>Byzantine detection</strong>: Identify corrupt/malicious replicas</li>
 <li><strong>Conflict resolution</strong>: Handle replica disagreements</li>
 </ul>
-<h3>Phase 19: Post-Pilot Improvements</h3>
+<h3 id="phase-19-post-pilot-improvements">Phase 19: Post-Pilot Improvements</h3>
 <ul>
 <li><strong>Geo-diverse replication</strong>: Spread replicas across regions</li>
 <li><strong>Erasure coding</strong>: N-of-M recovery (reduce storage 3x)</li>
 <li><strong>Priority-based replication</strong>: Critical data replicated first</li>
 </ul>
-<h2>Related Documentation</h2>
+<h2 id="related-documentation">Related Documentation</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE#74-data-durability--replication#74-data-durability--replication">ARCHITECTURE.md Section 7.4</a> - Technical design</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Roadmap-Live#phase-17-storage-hardening--replication-4-weeks#phase-17-storage-hardening--replication-4-weeks">ROADMAP.md Phase 17</a> - Implementation timeline</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CHANGELOG">CHANGELOG.md</a> - Release notes</li>
 </ul>
-<h2>Support</h2>
+<h2 id="support">Support</h2>
 <p>For operational questions or issues:</p>
 <ul>
 <li>GitHub Issues: <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/issues</a></li>
@@ -534,7 +530,10 @@ journalctl -u icnd | grep &lt;peer_did&gt;
 <hr>
 <p><strong>Document Version</strong>: 1.0 (Phase 17 Week 4)
 <strong>Next Review</strong>: After Phase 17 completion and pilot deployment feedback</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/replication-operations.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

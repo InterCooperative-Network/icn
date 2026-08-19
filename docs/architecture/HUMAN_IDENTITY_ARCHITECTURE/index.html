@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Human Identity in ICN — a first-principles architecture | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Re-derives ICN's human-identity model from requirements rather than from the existing Did abstraction. Records the verified current state at b26bf681 including twenty findings that correct or extend PRINCIPAL_MODEL §2 (the gateway multi-device path is unreachable because IdentityManager::get_or_create_document has zero production callers; ~50% of hash-derived DIDs fail Ed25519 deserialization; icn-zkp silently substitutes an all-zero issuer key; two independent production sites compute the VUI as a plain hash of the public DID, so no deployed anchor carries the uniqueness or unlinkability SDIS claims for it, while the acting principal in enrollment is already the device key; icn_time returns 0 on clock error so every expiry fails open; RPC recovery lets a caller name an arbitrary victim while the node signs the trustee attestation). Establishes that a durable human subject identifier must not be a public key, and argues -- as a bounded claim, explicitly NOT a theorem-level impossibility -- that global convergent device revocation is unavailable under ICN's currently chosen premises, since achieving it would require adopting a synchrony assumption, randomization/failure detectors, or an ordering authority, all of which ICN declines (FLP 1985 forbids only deterministic consensus in pure asynchrony; Chandra-Toueg 1996 is itself a positive result). The escape adopted is single-writer logs, whose consensus number is 1 (Guerraoui et al. PODC 2019), given Byzantine reliable broadcast that ICN does not yet have. Compares five candidate models against 25 adversarial scenarios and recommends context-scoped identity with a private continuity root: Did narrowed to a cryptographic principal, per-context self-addressing subject identifiers, a per-subject single-writer authority log with pre-rotation, and revocation semantics stated per act class. Supersedes PRINCIPAL_MODEL §4-§16; retains its §1-§3. The architecture remains proposed; the N1 library primitive is implemented but not production-wired."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Human Identity in ICN — a first-principles architecture | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HUMAN IDENTITY ARCHITECTURE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Human Identity in ICN — a first-principles architecture</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HUMAN IDENTITY ARCHITECTURE</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-18</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="human-identity-in-icn--a-first-principles-architecture">Human Identity in ICN — a first-principles architecture</h1>
 <p>What a human identity <em>should</em> be in ICN, how cryptographic authority over it
 should evolve, what institutions and peers should observe, and how devices act
 for humans.</p>
@@ -188,7 +185,7 @@ key must derive from a <strong>pre-subject context nonce</strong> (§11.1).</p>
 <a href="/docs/design/passport-keyring-position-receipt">passport-keyring-position-receipt</a>
 (vocabulary doctrine)</p>
 <hr>
-<h2>1. The executive answer</h2>
+<h2 id="1-the-executive-answer">1. The executive answer</h2>
 <p><strong>A human identity in ICN should not be a globally published identifier at all.</strong></p>
 <p>It should be three separable things, and ICN&#39;s current difficulty comes almost
 entirely from having collapsed them into one 32-byte string:</p>
@@ -266,13 +263,13 @@ broadcast alone (§6.1) — replacing six unbounded open questions about a globa
 namespace. That trade is the whole argument, and §9.6 states honestly what
 remains open.</p>
 <hr>
-<h2>2. Normative requirements</h2>
+<h2 id="2-normative-requirements">2. Normative requirements</h2>
 <p>Derived before any representation was chosen, from the mission brief, the
-<a href="/docs/ai/ICN_CONSTITUTIONAL_CORE">Constitutional Core</a> immutable principles,
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ai/ICN_CONSTITUTIONAL_CORE.md">Constitutional Core</a> immutable principles,
 #2469&#39;s invariants I1–I12, and PRINCIPAL_MODEL §1&#39;s five invariant tests.</p>
 <p>Labels: <strong>[HARD]</strong> a violation is a defect · <strong>[STRONG]</strong> tradeable only against
 another HARD/STRONG, explicitly · <strong>[SOFT]</strong> a goal whose cost may exceed benefit.</p>
-<h3>R1 Sovereignty</h3>
+<h3 id="r1-sovereignty">R1 Sovereignty</h3>
 <ul>
 <li><strong>R1.1 [HARD]</strong> Genesis requires no registrar, no network, no permission.</li>
 <li><strong>R1.2 [HARD]</strong> No institution, node, gateway or operator holds a key that lets
@@ -282,7 +279,7 @@ or their ability to establish identity elsewhere.</li>
 <li><strong>R1.4 [STRONG]</strong> No single institution may revoke a person&#39;s <em>identity</em>. It may
 revoke <em>standing within itself</em> only.</li>
 </ul>
-<h3>R2 Continuity — three properties that must not be conflated</h3>
+<h3 id="r2-continuity--three-properties-that-must-not-be-conflated">R2 Continuity — three properties that must not be conflated</h3>
 <ul>
 <li><strong>R2.1 [HARD] Continuity of subject.</strong> The same human remains the same subject
 across device replacement, key rotation, total device loss, algorithm change.</li>
@@ -300,7 +297,7 @@ for positions preceding the earliest fork.</p>
 <li><strong>R2.4 [STRONG]</strong> Subject continuity must not require a permanent master secret
 whose compromise is unrecoverable.</li>
 </ul>
-<h3>R3 Multi-device and least privilege</h3>
+<h3 id="r3-multi-device-and-least-privilege">R3 Multi-device and least privilege</h3>
 <ul>
 <li><strong>R3.1 [HARD]</strong> A device holds its own key and never receives another
 principal&#39;s key.</li>
@@ -313,7 +310,7 @@ authority to be online, except where root-only is a deliberate choice.</li>
 <li><strong>R3.5 [STRONG]</strong> Device classes differ by scope and custody strength, never by
 principal class.</li>
 </ul>
-<h3>R4 Determinism and partition tolerance <em>(inherited from #2469; non-negotiable)</em></h3>
+<h3 id="r4-determinism-and-partition-tolerance-inherited-from-2469-non-negotiable">R4 Determinism and partition tolerance <em>(inherited from #2469; non-negotiable)</em></h3>
 <ul>
 <li><strong>R4.1 [HARD]</strong> No validity decision depends on the receiver&#39;s wall clock.</li>
 <li><strong>R4.2 [HARD]</strong> No validity decision depends on the order in which a receiver
@@ -335,7 +332,7 @@ load-bearing: it is what makes §9 possible at all.</em></p>
 <li><strong>R4.6 [HARD]</strong> A legitimate act is eventually applied; nothing is permanently
 discarded because of arrival order. (I11/I12)</li>
 </ul>
-<h3>R5 Revocation — a requirement on <em>effect</em>, not on admission</h3>
+<h3 id="r5-revocation--a-requirement-on-effect-not-on-admission">R5 Revocation — a requirement on <em>effect</em>, not on admission</h3>
 <ul>
 <li><strong>R5.1 [HARD]</strong> A compromised device loses the ability to produce <strong>new
 effective</strong> acts within a bounded, stated window, without requiring a global
@@ -348,7 +345,7 @@ correctness bug, not a security win (PRINCIPAL_MODEL §6.5 established this).</l
 <li><strong>R5.4 [HARD]</strong> &quot;Could not determine whether this was revoked&quot; never resolves to
 &quot;not revoked&quot;. (AUTHORITY_SPINE §2)</li>
 </ul>
-<h3>R6 Privacy — structural</h3>
+<h3 id="r6-privacy--structural">R6 Privacy — structural</h3>
 <ul>
 <li><strong>R6.1 [STRONG]</strong> Two institutions cannot correlate a person by default from
 protocol-visible identifiers alone.</li>
@@ -361,13 +358,13 @@ control, but must not be made worse.</li>
 <li><strong>R6.6 [HARD]</strong> Sybil resistance must not require a public global person
 identifier. <strong>Uniqueness ≠ identification.</strong></li>
 </ul>
-<h3>R7 Offline and partitioned operation</h3>
+<h3 id="r7-offline-and-partitioned-operation">R7 Offline and partitioned operation</h3>
 <ul>
 <li><strong>R7.1 [HARD]</strong> Genesis works fully offline. <strong>R7.2 [HARD]</strong> Signing works fully
 offline. <strong>R7.3 [HARD]</strong> Delayed/reordered delivery is safe and converges.</li>
 <li><strong>R7.4 [STRONG]</strong> Multiple devices may act concurrently while partitioned.</li>
 </ul>
-<h3>R8 Authorship and governance</h3>
+<h3 id="r8-authorship-and-governance">R8 Authorship and governance</h3>
 <ul>
 <li><strong>R8.1 [HARD]</strong> Infrastructure never manufactures human authorship.</li>
 <li><strong>R8.2 [HARD]</strong> These five stay distinct: session authentication · content
@@ -376,7 +373,7 @@ authorship · delegated authority · institutional authority · transport identi
 authenticated local state — never from unauthenticated state.</li>
 <li><strong>R8.4 [STRONG]</strong> A relay relays without holding any key of the author.</li>
 </ul>
-<h3>R9 Recovery</h3>
+<h3 id="r9-recovery">R9 Recovery</h3>
 <ul>
 <li><strong>R9.1 [HARD]</strong> Recovery is possible from total device loss.</li>
 <li><strong>R9.2 [HARD]</strong> Recovery is an authenticated, auditable event, never a silent
@@ -388,7 +385,7 @@ losing attempt is visible.</li>
 catastrophic failure.</li>
 <li><strong>R9.6 [STRONG]</strong> Recovery is contestable by the legitimate subject (delay + veto).</li>
 </ul>
-<h3>R10 Usability</h3>
+<h3 id="r10-usability">R10 Usability</h3>
 <ul>
 <li><strong>R10.1 [HARD]</strong> A member never needs to understand DIDs, PKI, Merkle trees,
 quorums or key-event logs to join and participate.</li>
@@ -396,19 +393,19 @@ quorums or key-event logs to join and participate.</li>
 <strong>by default</strong> — not a degraded one to repair later.</li>
 <li><strong>R10.3 [STRONG]</strong> At most one irreversible user decision at onboarding.</li>
 </ul>
-<h3>R11 Infrastructure independence</h3>
+<h3 id="r11-infrastructure-independence">R11 Infrastructure independence</h3>
 <ul>
 <li><strong>R11.1 [HARD]</strong> Identity works with no node / one personal node / many personal
 nodes / hosted-only. Moving between them changes <em>hosting</em>, never identity.</li>
 </ul>
-<h3>R12 Evolvability</h3>
+<h3 id="r12-evolvability">R12 Evolvability</h3>
 <ul>
 <li><strong>R12.1 [HARD]</strong> Signature algorithm replaceable without &quot;create a new person&quot;.</li>
 <li><strong>R12.2 [HARD]</strong> New device classes without protocol change.</li>
 <li><strong>R12.3 [STRONG]</strong> A migration has an enforceable end state. <em>A dual-stack that
 never ends is not a migration</em> (#2469 / O13).</li>
 </ul>
-<h3>R13 Meaning Firewall <em>(constitutional)</em></h3>
+<h3 id="r13-meaning-firewall-constitutional">R13 Meaning Firewall <em>(constitutional)</em></h3>
 <ul>
 <li><strong>R13.1 [HARD]</strong> The kernel holds keys, identifiers and opaque scopes — never
 <code>Person</code>, <code>member</code>, <code>role</code>, <code>cooperative</code>.<blockquote>
@@ -418,17 +415,17 @@ resolves it.</p>
 </blockquote>
 </li>
 </ul>
-<h3>Invariant tests (PRINCIPAL_MODEL §1, retained verbatim)</h3>
+<h3 id="invariant-tests-principal_model-1-retained-verbatim">Invariant tests (PRINCIPAL_MODEL §1, retained verbatim)</h3>
 <p>T1 replacing a phone must not create a new human · T2 replacing a node must not
 create a new cooperative · T3 hosting a cooperative must not make the host the
 cooperative · T4 assigning a personal node to a coop must not rewrite the node&#39;s
 identity · T5 running one institution&#39;s workload must not change the node&#39;s species.</p>
 <hr>
-<h2>3. What ICN implements today</h2>
+<h2 id="3-what-icn-implements-today">3. What ICN implements today</h2>
 <p>Verified at <code>b26bf681</code>. <strong>This section is descriptive.</strong> It does not restate
 PRINCIPAL_MODEL §2, which remains accurate on the points it covers; it records
 what this pass found <em>in addition to and in correction of</em> it.</p>
-<h3>3.0 Corrections to PRINCIPAL_MODEL §2, and new findings</h3>
+<h3 id="30-corrections-to-principal_model-2-and-new-findings">3.0 Corrections to PRINCIPAL_MODEL §2, and new findings</h3>
 <p>Rows marked <strong>verified</strong> were re-read in source by hand during this pass; rows
 marked <em>(agent-traced)</em> were produced by a source-tracing pass and spot-checked
 rather than fully re-read. <strong>One agent-traced claim was checked and found wrong</strong>
@@ -571,7 +568,7 @@ deleting code.</p>
 <td><strong>Live-state note for #2448</strong>, which was verified at <code>b34cd3f6</code>: the <strong>write</strong> half of that issue is no longer reachable as described, while the <strong>unauthenticated read</strong> half stands. Reported, not acted on.</td>
 </tr>
 </tbody></table>
-<h3>3.1 What a <code>Did</code> actually is</h3>
+<h3 id="31-what-a-did-actually-is">3.1 What a <code>Did</code> actually is</h3>
 <p><code>pub struct Did(String)</code> (<code>icn-identity/src/lib.rs:177</code>). <code>from_str</code> (<code>:209-244</code>)
 requires <code>did:icn:</code> + multibase decode + exactly 32 bytes + a valid Ed25519 point.
 <code>from_public_key</code> (<code>:193-196</code>) always emits base58btc; <code>from_str</code> accepts any
@@ -588,10 +585,10 @@ from 16 bytes zero-padded to 32), a ZKP holder pseudonym
 <p><strong>ESTABLISHED: <code>Did</code> is a key identifier, and every non-key use of it is type
 reuse the type cannot support.</strong> F1 and F2 are that reuse failing in production
 code, not in theory.</p>
-<h3>3.2 Genesis is already sovereign — and that part is right</h3>
+<h3 id="32-genesis-is-already-sovereign--and-that-part-is-right">3.2 Genesis is already sovereign — and that part is right</h3>
 <p><code>KeyPair::generate()</code> (<code>:341</code>) → <code>Did::from_public_key</code> (<code>:191</code>). No registry, no
 network. <strong>R1.1 and R7.1 are already met and must be preserved.</strong></p>
-<h3>3.3 The device model is built, unreachable, and unverifiable</h3>
+<h3 id="33-the-device-model-is-built-unreachable-and-unverifiable">3.3 The device model is built, unreachable, and unverifiable</h3>
 <p>F8, F9 and F10 together: <code>multi_device.rs</code> implements a coherent roster and
 rotation model; the gateway path that would use it can never find a document; the
 verifier has no callers; and the one production signer signs a different message
@@ -603,14 +600,14 @@ their <em>urgency</em> without changing their <em>validity</em>: they are correc
 fix before the path is wired, not live exploited surface. This document does not
 propose closing them here; it proposes (§19) that they be fixed as part of
 whatever wires device authority, so the wiring cannot ship the defects.</p>
-<h3>3.4 Authority is a bearer token over an HMAC, and one mint path proves nothing</h3>
+<h3 id="34-authority-is-a-bearer-token-over-an-hmac-and-one-mint-path-proves-nothing">3.4 Authority is a bearer token over an HMAC, and one mint path proves nothing</h3>
 <p>Confirmed against source: <code>join_via_invite</code> (<code>api/invites.rs:245-296</code>) takes
 <code>req.did</code> from the request body with form validation only, takes no
 <code>HttpRequest</code>, and mints a token for it (<code>:280</code>) — <strong>#2589 confirmed
 line-for-line.</strong> The challenge paths do prove key control, but the signed payload
 is the <strong>raw nonce bytes only</strong> (<code>auth.rs:315</code>), with no domain separator and no
 binding to the requested <code>coop_id</code> or <code>scopes</code>.</p>
-<h3>3.5 SDIS held two incompatible models of its own anchor, simultaneously</h3>
+<h3 id="35-sdis-held-two-incompatible-models-of-its-own-anchor-simultaneously">3.5 SDIS held two incompatible models of its own anchor, simultaneously</h3>
 <p>This is the most important historical finding, and it is a genuine unreconciled
 split rather than a decision that was made and lost:</p>
 <ul>
@@ -637,7 +634,7 @@ specified under <em>&quot;Task S2.1.2: Implement DID format extension&quot;</em>
 instruction <strong>&quot;Add backward compatibility&quot;</strong> — an interop bridge to the
 pre-existing key-derived <code>Did</code>, not a doctrine that a person&#39;s public identifier
 should be their anchor.</p>
-<h3>3.6 Documented contradictions nobody has adjudicated</h3>
+<h3 id="36-documented-contradictions-nobody-has-adjudicated">3.6 Documented contradictions nobody has adjudicated</h3>
 <p>The sharpest, which PRINCIPAL_MODEL does not record: <strong>does recovery preserve the
 DID?</strong> <code>design/multi-device-identity-design.md:664</code> says the DID stays stable;
 <code>design/social-recovery-design.md:26,29</code> says recovery <strong>creates a new DID</strong> and
@@ -645,7 +642,7 @@ installs a <code>did_mapping:&lt;old_did&gt;</code> indirection. Those are incom
 &quot;PARTIALLY CURRENT&quot;, and each has code. Also unadjudicated: whether keys are
 exportable (<code>CLIENT_MODEL</code> says never; MDI ships an encrypted <code>BackupSeed</code>), and
 whether a person has one DID or many (<code>CLIENT_MODEL:99</code> vs PRINCIPAL_MODEL:1144).</p>
-<h3>3.7 There is no ordering substrate. At all.</h3>
+<h3 id="37-there-is-no-ordering-substrate-at-all">3.7 There is no ordering substrate. At all.</h3>
 <p>This is the fact that decides the architecture, so it is stated flatly.</p>
 <table>
 <thead>
@@ -705,7 +702,7 @@ operation lands on, and no per-cooperative or per-domain order that a governance
 operation and an identity event could share.</strong> The nearest specification of one is
 #2469 §5.6, and it is unbuilt.</p>
 <hr>
-<h2>4. What &quot;identity&quot; collapses today</h2>
+<h2 id="4-what-identity-collapses-today">4. What &quot;identity&quot; collapses today</h2>
 <p>Testing the mission&#39;s decomposition hypothesis against §3, <code>Did</code> is currently
 serving as <strong>eight</strong> distinct concepts:</p>
 <table>
@@ -781,7 +778,7 @@ just revoked</strong> (<code>multi_device.rs:21-22</code>, <code>:426-447</code>
 <p>Concepts 2, 3, 6 and 8 must therefore each get their own representation. §9 gives
 them one; §10 states what is left for <code>Did</code>.</p>
 <hr>
-<h2>5. The structural diagnosis: one choice, six blockers</h2>
+<h2 id="5-the-structural-diagnosis-one-choice-six-blockers">5. The structural diagnosis: one choice, six blockers</h2>
 <p>PRINCIPAL_MODEL accumulated O8, O9, O13, O16, O17 and O18 across twenty review
 rounds. They are not six problems. They are six consequences of <strong>one</strong> decision:</p>
 <blockquote>
@@ -839,8 +836,8 @@ blockers is downstream of that.</p>
 <p>O9 is the one blocker that is <strong>not</strong> dissolved by fixing the identifier, because
 it is not a consequence of the choice — it is a consequence of physics. §6.1.</p>
 <hr>
-<h2>6. The reframe: three moves, two of them forced</h2>
-<h3>6.1 Move 1 — stop asking for global convergent revocation</h3>
+<h2 id="6-the-reframe-three-moves-two-of-them-forced">6. The reframe: three moves, two of them forced</h2>
+<h3 id="61-move-1--stop-asking-for-global-convergent-revocation">6.1 Move 1 — stop asking for global convergent revocation</h3>
 <p><strong>Classification: RECOMMENDED, on a bounded formal argument — not ESTABLISHED.</strong>
 <em>(An earlier draft called this &quot;provably unachievable&quot; and classified it
 ESTABLISHED. That was an overstatement, corrected in adversarial review; the
@@ -909,7 +906,7 @@ broadcast&quot;, not &quot;add a topic&quot;. §19.1 slice N3 is costed accordin
 independently author authority changes for the same subject, k &gt; 1 and the
 system is back in consensus territory.</p>
 </blockquote>
-<h3>6.2 Move 2 — make the identifier commit to an <em>event</em>, not to a key</h3>
+<h3 id="62-move-2--make-the-identifier-commit-to-an-event-not-to-a-key">6.2 Move 2 — make the identifier commit to an <em>event</em>, not to a key</h3>
 <p>A <strong>self-addressing identifier</strong> — <code>SAID = H(inception_event)</code> — is
 self-certifying without being a key. Given the identifier and the inception
 event, any peer verifies the binding by hashing. This is KERI&#39;s construction, and
@@ -951,7 +948,7 @@ that race condition.&quot;</em></p>
 <em>recoverable but racy</em>. Residual policy is <strong>O16′</strong> (§17), and it is a liveness
 question, not only a selection question.</p>
 </blockquote>
-<h3>6.3 Move 3 — let the acceptor set recency, and let the subject own the order</h3>
+<h3 id="63-move-3--let-the-acceptor-set-recency-and-let-the-subject-own-the-order">6.3 Move 3 — let the acceptor set recency, and let the subject own the order</h3>
 <p>Rivest, <em>Can We Eliminate Certificate Revocation Lists?</em>, FC&#39;98 — 28 years old and
 still the correct architecture here:</p>
 <blockquote>
@@ -971,7 +968,7 @@ exactly the scope in which it already has legitimate authority.</p>
 gateway token revocation (AUTHORITY_SPINE §2) is scoped to a single relying party
 with a durable store and a fail-closed read. It is not an accident; it is the only
 shape that can work.</p>
-<h3>6.4 What the external survey teaches, architecture by architecture</h3>
+<h3 id="64-what-the-external-survey-teaches-architecture-by-architecture">6.4 What the external survey teaches, architecture by architecture</h3>
 <p>Primary specifications, not summaries. <strong>Adopted</strong> means the idea is used in §9;
 <strong>rejected</strong> means it was examined and does not fit ICN&#39;s premises.</p>
 <table>
@@ -1043,7 +1040,7 @@ discovers current authority with <strong>no online authority, no clock and no
 consensus</strong> — KERI, by replaying a single-writer log anchored at a self-certifying
 inception. That is not a coincidence: it is the only one built from the same
 premises ICN&#39;s R1/R4/R7 state.</p>
-<h3>6.5 What the three moves buy</h3>
+<h3 id="65-what-the-three-moves-buy">6.5 What the three moves buy</h3>
 <p><strong>This table is a summary of §18 and must never diverge from it.</strong> <em>(An earlier
 draft marked O13 and O17 &quot;dissolved&quot; here while §18 correctly called both partial;
 review caught the mismatch, and readers of the summary alone could have treated
@@ -1088,10 +1085,10 @@ unresolved prerequisites as closed.)</em></p>
 </tr>
 </tbody></table>
 <hr>
-<h2>7. Candidate models</h2>
+<h2 id="7-candidate-models">7. Candidate models</h2>
 <p>Five models, each stated at its strongest. None is a straw man; A is the repo&#39;s
 own current proposal and D is the position most of the external ecosystem holds.</p>
-<h3>Model A — Key-as-Person <em>(the status quo, plus the A0 program)</em></h3>
+<h3 id="model-a--key-as-person-the-status-quo-plus-the-a0-program">Model A — Key-as-Person <em>(the status quo, plus the A0 program)</em></h3>
 <p>The Person identifier is a self-certifying key-derived <code>Did</code>. Authority evolves
 through an authenticated identity-document chain anchored at the genesis key the
 DID encodes. Device authority travels as a carried, self-contained
@@ -1107,7 +1104,7 @@ exist: capability checks, Ed25519 verification, strict <code>+1</code> monotonic
 and the root of O16. O8, O17, O13 and O18 follow. It also fails R6.1 outright —
 one permanent 32-byte value in every membership record, every <code>gov:vote:{pid}:{voter}</code>
 key and every gossiped op. <strong>REJECTED.</strong></p>
-<h3>Model B — Stable non-key Person anchor, globally resolvable</h3>
+<h3 id="model-b--stable-non-key-person-anchor-globally-resolvable">Model B — Stable non-key Person anchor, globally resolvable</h3>
 <p>A durable Person identifier exists independent of keys (random bytes, or a hash);
 keys and devices are authorized <em>for</em> it. This is what SDIS&#39;s <code>Anchor</code> actually is
 (F3).</p>
@@ -1124,7 +1121,7 @@ concedes detection needs <em>&quot;a connected graph of all users&quot;</em>. (i
 is worse than Model A</strong>, because a permanent non-rotating anchor cannot even be
 changed. <strong>REJECTED</strong> as a <em>global</em> identifier; its core idea — a durable non-key
 subject — is retained in §9 and made self-certifying and <em>per-context</em>.</p>
-<h3>Model C — Context-scoped identity with a private continuity root</h3>
+<h3 id="model-c--context-scoped-identity-with-a-private-continuity-root">Model C — Context-scoped identity with a private continuity root</h3>
 <p>There is no global Person identifier. The person holds keys and a private
 continuity root. Each institution knows them by a distinct, self-certifying
 subject identifier whose authority evolves in a log the subject alone writes. The
@@ -1159,7 +1156,7 @@ so the dependency is per-relationship rather than global and universal — but
 &quot;no centralization dependence&quot; is too clean, and the matrix below is corrected.</li>
 </ol>
 </blockquote>
-<h3>Model D — Credential-centric, no person identifier at all</h3>
+<h3 id="model-d--credential-centric-no-person-identifier-at-all">Model D — Credential-centric, no person identifier at all</h3>
 <p>The person holds keys; institutions issue verifiable credentials; every
 relationship is a credential. Standing is proven by presentation.</p>
 <p><strong>Strongest case.</strong> Maximum portability — standing provable to a third party that
@@ -1174,7 +1171,7 @@ and the ecosystem&#39;s answer is BitstringStatusList, which mandates an online 
 correlation below ~131 072 entries — unattainable per cooperative. (iii) It
 supplies <strong>no continuity mechanism</strong>: lose every device and there is nothing that
 is still you. <strong>REJECTED as the whole answer; adopted as a layer</strong> (§11.2, §14).</p>
-<h3>Model E — Hybrid identity/authority graph</h3>
+<h3 id="model-e--hybrid-identityauthority-graph">Model E — Hybrid identity/authority graph</h3>
 <p>Continuity anchor + authority keys + pairwise identities + recovery authorities +
 institutional credentials, all first-class.</p>
 <p><strong>Strongest case.</strong> It can express every requirement, and every component has a
@@ -1188,7 +1185,7 @@ incompatible <code>DidDocument</code> types, two contradictory definitions of &q
 E institutionalizes that failure mode. <strong>REJECTED</strong> — but note that C <em>is</em> E with
 four of the five concepts demoted from protocol objects to client-side or
 app-layer concerns, which is the whole point.</p>
-<h3>Evaluation matrix</h3>
+<h3 id="evaluation-matrix">Evaluation matrix</h3>
 <p>Qualitative, with reasons rather than false precision.
 <strong>✔</strong> meets · <strong>~</strong> partial / costed · <strong>✘</strong> fails · <strong>n/a</strong> not applicable.</p>
 <table>
@@ -1394,7 +1391,7 @@ availability. §9.6 carries them forward; a reader who weighs R9.1 above
 correlation resistance should reach a different answer, and that is a legitimate
 reading of the same evidence.</p>
 <hr>
-<h2>8. Adversarial scenarios</h2>
+<h2 id="8-adversarial-scenarios">8. Adversarial scenarios</h2>
 <p>All 25 mission scenarios, walked against <strong>Model C as specified in §9</strong>, with the
 discriminating failures of the rival models noted. A scenario that Model C cannot
 answer is marked <strong>OPEN</strong> and appears in §17 — none are silently absorbed.</p>
@@ -1562,10 +1559,10 @@ answer is marked <strong>OPEN</strong> and appears in §17 — none are silently
 policy), 3 (cross-context divergence under concurrent recovery), 5 (guardian
 collusion), 7 (irreducible — §6.1), 11 (relay withholding).</p>
 <hr>
-<h2>9. The recommended architecture</h2>
+<h2 id="9-the-recommended-architecture">9. The recommended architecture</h2>
 <p><strong>Classification: RECOMMENDED.</strong> It is the strongest model after comparison, not a
 forced conclusion. §17 lists what would reopen it.</p>
-<h3>9.1 Four objects, each with exactly one job</h3>
+<h3 id="91-four-objects-each-with-exactly-one-job">9.1 Four objects, each with exactly one job</h3>
 <table>
 <thead>
 <tr>
@@ -1617,7 +1614,7 @@ inception event, any peer verifies the binding by hashing — self-certifying wi
 no registrar, no resolver and no trusted starting document. That answers <strong>O17&#39;s
 authenticity half only</strong> — completeness of the prefix you were handed is a separate,
 still-open question (§18).</p>
-<h3>9.2 How authority evolves</h3>
+<h3 id="92-how-authority-evolves">9.2 How authority evolves</h3>
 <p>The inception event declares the subject&#39;s initial authorized keys <strong>and commits
 to a digest of the next key set</strong> (pre-rotation). Each later event is signed by a
 key authorized in the immediately preceding state and advances the position by
@@ -1649,7 +1646,7 @@ independently author authority events for one subject, k &gt; 1 and consensus is
 required again (§6.1). Concurrency here is a <strong>correctness boundary</strong>, not a
 feature request.</p>
 </blockquote>
-<h3>9.2.1 The replicated state model</h3>
+<h3 id="921-the-replicated-state-model">9.2.1 The replicated state model</h3>
 <p><em>Three successive drafts got this wrong, and all three errors are recorded because
 each is instructive. <strong>(a)</strong> The first called the merge &quot;a monotone join, i.e. a
 CRDT&quot; while also saying holders &quot;refuse to advance past the fork&quot; — which cannot
@@ -1660,7 +1657,7 @@ review pointed out that Ed25519 admits more than one valid signature per message
 that is really a keyed map with an undefined value merge — and any rule for picking
 a signature is a content-based tiebreak that breaks commutativity. The lesson each
 time: <strong>a verified prefix is a conclusion, and a signature is not part of identity.</strong></em></p>
-<h4>Digests, stated once and used everywhere</h4>
+<h4 id="digests-stated-once-and-used-everywhere">Digests, stated once and used everywhere</h4>
 <pre><code>event_id     = H(canonical_body)          ← signatures are OUTSIDE every digest
 SubjectId σ  = event_id(inception body)
 prev_digest  = event_id(parent body)
@@ -1670,7 +1667,7 @@ event, a hedged or retrying signer re-signing an identical body would mint a sec
 <code>SubjectId</code> — or a child would name a parent variant that dedup discards, wedging
 the chain permanently. That is precisely the false duplicity the body rule exists to
 remove, relocated one layer down.</p>
-<h4>Durable state — two grow-only sets, whose elements are bodies</h4>
+<h4 id="durable-state--two-grow-only-sets-whose-elements-are-bodies">Durable state — two grow-only sets, whose elements are bodies</h4>
 <p>For subject σ:</p>
 <pre><code>Bodies(σ)   = { b : ∃ s. admissible(b, s) ∧ b.subject = σ }     -- canonical bodies
 Witness(σ)  = { (event_id(b), s) : admissible(b, s) }           -- signatures, never compared
@@ -1764,7 +1761,7 @@ makes the far-future case decidable — but until that rule is specified,
 pressure</strong>, and this document does not claim otherwise. Recorded as <strong>O-N8</strong>
 (which now covers admission <em>and</em> compaction), with <strong>O-N5</strong> for the topology.</p>
 </blockquote>
-<h4>Derived view — a pure function of <code>Bodies(σ)</code></h4>
+<h4 id="derived-view--a-pure-function-of-bodies">Derived view — a pure function of <code>Bodies(σ)</code></h4>
 <pre><code>derive(Bodies(σ)):
     b₀ ← the unique b with σ = event_id(b)          # unique by construction
     if none: return Unknown
@@ -1792,7 +1789,7 @@ inside an event — device, guardian, recovery authority — must be a raw <code
 verifiable from bytes. If a guardian were named by <code>SubjectId</code>, <code>authorized</code> would
 depend on <em>another</em> subject&#39;s log, which may itself be gapped or halted, and mutual
 guardianship would make the recursion non-well-founded. <strong>Normative for N1.</strong></p>
-<h4><code>supersede</code> — the one selection rule, and the constraints that make it safe</h4>
+<h4 id="supersede--the-one-selection-rule-and-the-constraints-that-make-it-safe"><code>supersede</code> — the one selection rule, and the constraints that make it safe</h4>
 <pre><code>supersede(C) = if C contains any establishment event
                then { b ∈ C : b is an establishment event }
                else C
@@ -1849,7 +1846,7 @@ guardian recovery</strong> (§12.2, §19.1) — it is necessary and, on its own,
 sufficient.</p>
 </li>
 </ol>
-<h4>What this does and does not give</h4>
+<h4 id="what-this-does-and-does-not-give">What this does and does not give</h4>
 <table>
 <thead>
 <tr>
@@ -1902,7 +1899,7 @@ reclassified from a liveness question to a settlement-safety question</strong>. 
 is answered, <strong>this authority model is not by itself a sufficient basis for
 irreversible settlement</strong>, and §9.3 class 2 must be read with that limit attached |</p>
 </blockquote>
-<h3>9.2.2 The model against adversarial delivery orders</h3>
+<h3 id="922-the-model-against-adversarial-delivery-orders">9.2.2 The model against adversarial delivery orders</h3>
 <p>Every case reasoned through against §9.2.1. The requirement in each: <strong>the same
 durable joined state and the same derived verdict for all honest replicas given
 the same eventual event set.</strong></p>
@@ -2038,7 +2035,7 @@ they can author an authorized establishment event at <code>n</code>. If the vict
 agree, so it is convergent, but the subject is dead rather than recovered. If only
 the attacker does, they take over. Both are the backup-compromise case §12.2
 records as unrecoverable, and the residual policy is <strong>O16′</strong>.</p>
-<h3>9.3 Revocation, stated per act class — the replacement for O9</h3>
+<h3 id="93-revocation-stated-per-act-class--the-replacement-for-o9">9.3 Revocation, stated per act class — the replacement for O9</h3>
 <p>Because §6.1 forbids a single global answer, the semantics is stated per class.
 <strong>R5.2 requires this table to be explicit; silence would be the defect.</strong></p>
 <table>
@@ -2175,7 +2172,7 @@ it degrades to exactly today&#39;s behaviour rather than introducing a new failu
 mode. It is a <strong>known R5.1 violation held open until O-N6 is answered</strong>, not a
 safe default, and it must be described that way wherever class 1 is claimed.</p>
 </blockquote>
-<h3>9.4 Governance authorship</h3>
+<h3 id="94-governance-authorship">9.4 Governance authorship</h3>
 <pre><code>Person holds continuity root (offline / backup)
    │
    ├── subject S_A in Coop A, with its own authority log
@@ -2243,7 +2240,7 @@ Folded into <strong>O-N5</strong>.</p>
 converge on its own. #2469 §7.0.1&#39;s second barrier — a receiver cannot
 deterministically evaluate standing/suspension because that state is
 unauthenticated (F17) — is untouched by anything here, and remains #2441&#39;s.</p>
-<h3>9.5 Where the Meaning Firewall falls</h3>
+<h3 id="95-where-the-meaning-firewall-falls">9.5 Where the Meaning Firewall falls</h3>
 <p>PRINCIPAL_MODEL §1.1 forbids <code>Person</code> in the kernel and §4 then proposes it as a
 principal class. This model resolves that tension <strong>as a required invariant</strong> —
 the table below states the target, not the measured present:</p>
@@ -2303,7 +2300,7 @@ sitting inside the identity layer. Keep the identity layer&#39;s interface to an
 opaque destination set supplied from above, or R13.1 erodes here first. Flagged
 in adversarial review; folded into <strong>O-N5</strong>.</p>
 </blockquote>
-<h3>9.6 What this does not solve — read this before building on it</h3>
+<h3 id="96-what-this-does-not-solve--read-this-before-building-on-it">9.6 What this does not solve — read this before building on it</h3>
 <ol>
 <li><strong>The N1 per-subject authority-log primitive exists as additive library code in
 <code>icn-identity</code>, but is not production-integrated.</strong> Its canonical bodies, durable join and
@@ -2356,7 +2353,7 @@ it also needs enforced canonical body derivation and one next-authority
 commitment per position (§9.2.1 constraint 3).</li>
 </ol>
 <hr>
-<h2>10. What <code>Did</code> should mean</h2>
+<h2 id="10-what-did-should-mean">10. What <code>Did</code> should mean</h2>
 <p><strong>RECOMMENDED: option B of the mission&#39;s list — <code>Did</code> names a cryptographic
 principal, and nothing else.</strong></p>
 <p>That is what the type already is (§3.1); the change is to stop projecting other
@@ -2402,8 +2399,8 @@ not <em>identification</em> (R6.6). Every mechanism whose sole purpose was to ma
 global identifier work — global current-root discovery, global fork selection,
 global genesis bootstrap — is cost with no corresponding requirement.</p>
 <hr>
-<h2>11. Privacy and correlation</h2>
-<h3>11.1 What each observer learns</h3>
+<h2 id="11-privacy-and-correlation">11. Privacy and correlation</h2>
+<h3 id="111-what-each-observer-learns">11.1 What each observer learns</h3>
 <table>
 <thead>
 <tr>
@@ -2477,7 +2474,7 @@ two requirements, not an oversight.</li>
 </ol>
 <p>This is <strong>protocol-level unlinkability against a passive observer of distinct
 contexts, not anonymity</strong>, and nothing here should be described as the latter.</p>
-<h3>11.2 Sybil resistance without identification</h3>
+<h3 id="112-sybil-resistance-without-identification">11.2 Sybil resistance without identification</h3>
 <p>SDIS&#39;s genuine contribution is <code>VUI</code> — <em>&quot;proves uniqueness without revealing the
 underlying identity data&quot;</em>. The correct shape is a <strong>per-context nullifier</strong>
 derived from a uniqueness credential: an institution learns &quot;this is one distinct
@@ -2486,14 +2483,14 @@ verified human, and not one it has already admitted&quot; without learning which
 protocol to close a hole. Interim honest posture: uniqueness is a <em>steward
 attestation</em> against a registry the steward holds — which is what SDIS actually
 does — and that registry is a correlation surface. Recorded as <strong>OPEN (O-N2)</strong>.</p>
-<h3>11.3 Proving two personas are one human</h3>
+<h3 id="113-proving-two-personas-are-one-human">11.3 Proving two personas are one human</h3>
 <p>The person signs a linkage statement with the current authorized keys of both
 subjects, naming both <code>SubjectId</code>s and a purpose. Cheap, consent-gated,
 verifiable, and revealing nothing until the person chooses. This is the property
 Model A gets backwards: there, linkage is <em>always on</em> and cannot be withheld.</p>
 <hr>
-<h2>12. Recovery</h2>
-<h3>12.1 Pre-rotation is the recovery mechanism</h3>
+<h2 id="12-recovery">12. Recovery</h2>
+<h3 id="121-pre-rotation-is-the-recovery-mechanism">12.1 Pre-rotation is the recovery mechanism</h3>
 <p>The inception event commits to a digest of the next key set. If that next key set
 is derived from the <strong>continuity root</strong>, held in backup and not on any device,
 then total device loss is recovered by restoring the root, deriving the
@@ -2512,7 +2509,7 @@ only one answer — guardians (path (b) below) — and a person who chose path (
 and lost both has lost the subject. Describing O14 as fully closed would be
 exactly the invented-protocol failure the review discipline forbids.</p>
 </blockquote>
-<h3>12.2 Two paths; the person chooses</h3>
+<h3 id="122-two-paths-the-person-chooses">12.2 Two paths; the person chooses</h3>
 <table>
 <thead>
 <tr>
@@ -2590,7 +2587,7 @@ was simply wrong.</p>
 phone; the <em>pre-rotation</em> material is backed up off-device at onboarding. R10.2 is
 met — phone-only onboarding is secure and recoverable by default rather than
 degraded — at the cost of exactly one irreversible user decision (R10.3).</p>
-<h3>12.3 Constraints any recovery must satisfy</h3>
+<h3 id="123-constraints-any-recovery-must-satisfy">12.3 Constraints any recovery must satisfy</h3>
 <ul>
 <li><strong>R9.4 — distinct authenticated participants.</strong> Today both threshold paths fail:
 <code>sync.rs:263-269</code> neither verifies signatures nor deduplicates; SDIS&#39;s
@@ -2629,7 +2626,7 @@ inception event, which recovery does not rewrite. <code>social-recovery-design.m
 <code>did_mapping:&lt;old_did&gt;</code> indirection becomes unnecessary and should be retired.</li>
 </ul>
 <hr>
-<h2>13. Offline and partition semantics</h2>
+<h2 id="13-offline-and-partition-semantics">13. Offline and partition semantics</h2>
 <table>
 <thead>
 <tr>
@@ -2717,8 +2714,8 @@ R4.1 violation.</em> The first and third above cannot. <strong>The second can, a
 therefore declared an exception in §12.3 rather than defended as compliant.</strong></p>
 </blockquote>
 <hr>
-<h2>14. Institutions and nodes</h2>
-<h3>14.1 The pattern generalizes — and that is a result, not an aesthetic</h3>
+<h2 id="14-institutions-and-nodes">14. Institutions and nodes</h2>
+<h3 id="141-the-pattern-generalizes--and-that-is-a-result-not-an-aesthetic">14.1 The pattern generalizes — and that is a result, not an aesthetic</h3>
 <blockquote>
 <p>durable subject ≠ current authority</p>
 </blockquote>
@@ -2737,7 +2734,7 @@ A generic &quot;durable identifier over an evolving authority set&quot; abstract
 and creating one is explicit, reviewable work, not a side effect of a later
 slice.</p>
 </blockquote>
-<h3>14.2 Institutions: PRINCIPAL_MODEL §4.1 is upheld, with a caveat</h3>
+<h3 id="142-institutions-principal_model-41-is-upheld-with-a-caveat">14.2 Institutions: PRINCIPAL_MODEL §4.1 is upheld, with a caveat</h3>
 <p>Its conclusion — an institution holds no signing key, because <code>Did</code> models custody
 and institutions are constituted by governance — <strong>stands, and this model
 strengthens the reasoning</strong>: <code>Did</code> is <em>only</em> a key here, so it is even more clearly
@@ -2770,7 +2767,7 @@ standing (#2441), which does not exist today.</p>
 <p><code>FounderSignature</code> (F18) is the existing primitive to build on: an institution&#39;s
 inception event, signed by its founding persons, is a natural <code>EntityId</code> binding
 and resolves PRINCIPAL_MODEL&#39;s O11 by construction (the id commits to the event).</p>
-<h3>14.3 Nodes</h3>
+<h3 id="143-nodes">14.3 Nodes</h3>
 <p>Node identity is the strongest binding ICN has — the Hello three-fact cert check
 (<code>icn-net/src/handlers/hello.rs:62-97</code>) is genuinely sound, and is <strong>per
 connection, not per peer</strong> (<code>handlers/mod.rs:76-78</code>). Nothing here changes it.</p>
@@ -2802,10 +2799,10 @@ sending Principal</strong>, which is what lets #2480 proceed without node-subjec
 machinery that does not exist.</p>
 </blockquote>
 <hr>
-<h2>15. Migration</h2>
+<h2 id="15-migration">15. Migration</h2>
 <p>Classification per mechanism: <strong>KEEP · MIGRATE · DEPRECATE · REMOVE ·
 COMPATIBILITY-ONLY</strong>.</p>
-<h3>15.1 Key-derived Person DIDs — KEEP the key, allocate a new subject</h3>
+<h3 id="151-key-derived-person-dids--keep-the-key-allocate-a-new-subject">15.1 Key-derived Person DIDs — KEEP the key, allocate a new subject</h3>
 <blockquote>
 <p><strong>[SUPERSEDED IN PART by IDENTITY_SEMANTICS — read this first.]</strong> This section&#39;s
 <em>direction</em> survives: the legacy key remains a cryptographic principal, and a new
@@ -2872,7 +2869,7 @@ It preserves the identifier but destroys inception uniqueness — two different
 inception bodies could then claim one <code>σ</code>, producing duplicity at position 0, which
 §9.2.1 relies on being impossible.</p>
 </blockquote>
-<h3>15.2 SDIS anchor-derived DIDs — DEPRECATE, at near-zero cost</h3>
+<h3 id="152-sdis-anchor-derived-dids--deprecate-at-near-zero-cost">15.2 SDIS anchor-derived DIDs — DEPRECATE, at near-zero cost</h3>
 <p>PRINCIPAL_MODEL rates O18 <strong>critical</strong> on the assumption that anchor-derived
 Persons are a live identity class with deployed authority. Anchors <em>are</em> created
 in production (F4) — but two verified facts show they carry no authority:</p>
@@ -2956,7 +2953,7 @@ lookup behind.</p>
 <td><strong>KEEP the concept, MIGRATE the wiring</strong> — uniqueness is a real requirement (R6.6); <code>compute_temporary_vui = SHA256(did)</code> (F6) must go, and <code>combine_prf_partials</code> is not a threshold scheme (F7)</td>
 </tr>
 </tbody></table>
-<h3>15.3 Everything else</h3>
+<h3 id="153-everything-else">15.3 Everything else</h3>
 <table>
 <thead>
 <tr>
@@ -3027,7 +3024,7 @@ lookup behind.</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>16. Rejected alternatives</h2>
+<h2 id="16-rejected-alternatives">16. Rejected alternatives</h2>
 <table>
 <thead>
 <tr>
@@ -3077,7 +3074,7 @@ lookup behind.</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>17. Open decisions</h2>
+<h2 id="17-open-decisions">17. Open decisions</h2>
 <p>Carried forward from PRINCIPAL_MODEL where still live, plus new ones from this
 pass. <strong>A correct OPEN is better than an invented answer.</strong></p>
 <table>
@@ -3182,7 +3179,7 @@ mechanism only, custody remains; <strong>O16</strong> — narrowed to O16′; <s
 authenticity ≠ acquisition; <strong>O18</strong> — closed as an identity class, but see the
 untraced anchor↔member keying question in §15.2.</p>
 <hr>
-<h2>18. Consequences for the recorded open decisions and slices</h2>
+<h2 id="18-consequences-for-the-recorded-open-decisions-and-slices">18. Consequences for the recorded open decisions and slices</h2>
 <table>
 <thead>
 <tr>
@@ -3252,8 +3249,8 @@ untraced anchor↔member keying question in §15.2.</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>19. Revised dependency graph and the next slice</h2>
-<h3>19.1 The graph</h3>
+<h2 id="19-revised-dependency-graph-and-the-next-slice">19. Revised dependency graph and the next slice</h2>
+<h3 id="191-the-graph">19.1 The graph</h3>
 <pre><code>  N1  authority-log primitive          (library only; no wiring)
    │      SubjectId = H(inception) · pre-rotation · +1 monotone
    │      canonical domain-separated preimage  [absorbs O10, F12]
@@ -3292,7 +3289,7 @@ untraced anchor↔member keying question in §15.2.</p>
 <p>The old order — <code>[O18] → A0 → (B ∥ C) → [A blocked on O9; D blocked on O9+O13] → …</code>
 — is <strong>replaced</strong>. O18 no longer precedes anything (§15.2), and A/D are no longer
 blocked on O9 because O9 is not a prerequisite; it was an unachievable goal.</p>
-<h3>19.2 The exact next slice — <strong>N1: the authority-log primitive</strong></h3>
+<h3 id="192-the-exact-next-slice--n1-the-authority-log-primitive">19.2 The exact next slice — <strong>N1: the authority-log primitive</strong></h3>
 <p>Smallest slice that either validates or refutes the architecture, with <strong>no
 wiring, no gateway change, no <code>SignedGovernanceOp</code> change</strong>.</p>
 <ul>
@@ -3384,7 +3381,7 @@ no revocation policy, no <code>Did</code> change, no migration.</p>
 <li><p><strong>Migration impact.</strong> None — additive library code.</p>
 </li>
 </ul>
-<h3>19.3 Findings that warrant issues before any of this</h3>
+<h3 id="193-findings-that-warrant-issues-before-any-of-this">19.3 Findings that warrant issues before any of this</h3>
 <p>Listed, <strong>not filed</strong> — filing is a separate decision for the maintainer. The
 tracking column reflects a GitHub issue search performed at review round 2; it is a
 point-in-time result, not a standing guarantee.</p>
@@ -3437,7 +3434,7 @@ point-in-time result, not a standing guarantee.</p>
 <td><strong>#2448 is OPEN and partially stale</strong>: verified at <code>b34cd3f6</code>, its <em>write</em> attack is no longer reachable at <code>b26bf681</code>; the <em>unauthenticated read</em> half stands</td>
 </tr>
 </tbody></table>
-<h3>19.4 Entry conditions for the N1 session</h3>
+<h3 id="194-entry-conditions-for-the-n1-session">19.4 Entry conditions for the N1 session</h3>
 <p>N1 is a design-and-test slice, not a wiring task. Before writing code it must
 settle three things this document deliberately left open, because each changes
 the event field set and freezing the format first would repeat the mistake
@@ -3481,7 +3478,7 @@ longest chain.</li>
 </ol>
 <p>Everything else in §19.2 is testable once those four are fixed.</p>
 <hr>
-<h2>20. Decision classification index</h2>
+<h2 id="20-decision-classification-index">20. Decision classification index</h2>
 <table>
 <thead>
 <tr>
@@ -3610,7 +3607,10 @@ longest chain.</li>
 <td><strong>REJECTED</strong> (§16)</td>
 </tr>
 </tbody></table>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

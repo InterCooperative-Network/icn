@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Canonical Encoding Specification | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Specification for deterministic serialization of ICN data structures"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Canonical Encoding Specification | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CANONICAL ENCODING</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/CANONICAL_ENCODING.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Canonical Encoding Specification</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CANONICAL ENCODING</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="canonical-encoding-specification">Canonical Encoding Specification</h1>
 <p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
-<h2>Abstract</h2>
+<h2 id="abstract">Abstract</h2>
 <p>This document specifies the deterministic serialization rules for ICN federation protocol objects. Canonical encoding ensures that identical logical objects produce byte-identical serializations, enabling cryptographic verification across implementations.</p>
-<h2>Keywords</h2>
+<h2 id="keywords">Keywords</h2>
 <p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
 <hr>
-<h2>1. Overview</h2>
+<h2 id="1-overview">1. Overview</h2>
 <p>Canonical encoding is REQUIRED for:</p>
 <ul>
 <li>Objects that are cryptographically signed</li>
@@ -60,10 +57,10 @@ View source on GitHub →
 <li>Debug output and logging</li>
 </ul>
 <hr>
-<h2>2. Encoding Format</h2>
-<h3>2.1 Primary Format: CBOR</h3>
+<h2 id="2-encoding-format">2. Encoding Format</h2>
+<h3 id="21-primary-format-cbor">2.1 Primary Format: CBOR</h3>
 <p>ICN uses <strong>CBOR (RFC 8949)</strong> as its canonical encoding format with the following constraints:</p>
-<h4>2.1.1 Definite Length Encoding</h4>
+<h4 id="211-definite-length-encoding">2.1.1 Definite Length Encoding</h4>
 <p>All CBOR objects MUST use definite-length encoding:</p>
 <ul>
 <li>Arrays MUST use definite-length array encoding (major type 4)</li>
@@ -72,7 +69,7 @@ View source on GitHub →
 <li>Text strings MUST use definite-length encoding (major type 3)</li>
 </ul>
 <p>Indefinite-length encoding (break stop code 0xFF) MUST NOT be used.</p>
-<h4>2.1.2 Integer Encoding</h4>
+<h4 id="212-integer-encoding">2.1.2 Integer Encoding</h4>
 <p>Integers MUST be encoded in their shortest form:</p>
 <ul>
 <li>Values 0-23: Encode in initial byte (major type 0 or 1)</li>
@@ -82,7 +79,7 @@ View source on GitHub →
 <li>Values ≥4294967296: Use 8-byte argument (additional information 27)</li>
 </ul>
 <p>Negative integers MUST use major type 1 (negative integer).</p>
-<h4>2.1.3 Map Key Ordering</h4>
+<h4 id="213-map-key-ordering">2.1.3 Map Key Ordering</h4>
 <p>All CBOR maps MUST have keys sorted in bytewise lexicographic order:</p>
 <pre><code class="language-rust">// CORRECT: Keys sorted by byte representation
 {
@@ -103,7 +100,7 @@ View source on GitHub →
 }
 </code></pre>
 <p><strong>Implementation Note:</strong> Use <code>BTreeMap&lt;K, V&gt;</code> in Rust, not <code>HashMap&lt;K, V&gt;</code>.</p>
-<h4>2.1.4 Floating Point</h4>
+<h4 id="214-floating-point">2.1.4 Floating Point</h4>
 <p>Floating-point numbers SHOULD be avoided in canonical encoding contexts.</p>
 <p>If floating-point values are unavoidable, they MUST be encoded as:</p>
 <ul>
@@ -112,9 +109,9 @@ View source on GitHub →
 <li>Negative zero MUST be normalized to positive zero</li>
 </ul>
 <p><strong>Rationale:</strong> Floating-point representations are non-deterministic across architectures and rounding modes. Use rational numbers or fixed-point arithmetic instead.</p>
-<h3>2.2 Fallback Format: Canonical JSON</h3>
+<h3 id="22-fallback-format-canonical-json">2.2 Fallback Format: Canonical JSON</h3>
 <p>For human-readable serialization (e.g., debugging, configuration), <strong>Canonical JSON (RFC 8785)</strong> MAY be used:</p>
-<h4>2.2.1 Key Ordering</h4>
+<h4 id="221-key-ordering">2.2.1 Key Ordering</h4>
 <p>Object keys MUST be sorted lexicographically by UTF-16 code unit:</p>
 <pre><code class="language-json">{
   &quot;action_hash&quot;: &quot;...&quot;,
@@ -124,26 +121,26 @@ View source on GitHub →
   &quot;timestamp&quot;: 1735905000
 }
 </code></pre>
-<h4>2.2.2 Whitespace</h4>
+<h4 id="222-whitespace">2.2.2 Whitespace</h4>
 <p>Canonical JSON MUST NOT contain:</p>
 <ul>
 <li>Insignificant whitespace (spaces, tabs, newlines outside strings)</li>
 <li>Comments</li>
 </ul>
-<h4>2.2.3 Number Encoding</h4>
+<h4 id="223-number-encoding">2.2.3 Number Encoding</h4>
 <p>Numbers MUST be encoded without leading zeros or trailing decimal points:</p>
 <ul>
 <li><code>42</code> (not <code>042</code> or <code>42.0</code>)</li>
 <li><code>-123</code> (not <code>-0123</code>)</li>
 </ul>
-<h4>2.2.4 String Escaping</h4>
+<h4 id="224-string-escaping">2.2.4 String Escaping</h4>
 <p>String escaping MUST follow JSON rules:</p>
 <ul>
 <li>Control characters (U+0000 to U+001F) MUST be escaped</li>
 <li>Forward slash (U+002F) MAY be escaped (optional)</li>
 <li>Unicode escapes MUST use lowercase hexadecimal</li>
 </ul>
-<h3>2.3 Wire Format: Postcard</h3>
+<h3 id="23-wire-format-postcard">2.3 Wire Format: Postcard</h3>
 <p>For network transmission, ICN uses <strong>Postcard</strong> (compact binary format):</p>
 <pre><code class="language-rust">use serde::{Serialize, Deserialize};
 
@@ -162,8 +159,8 @@ let decoded: Message = postcard::from_bytes(&amp;encoded)?;
 <li>Consensus state</li>
 </ul>
 <hr>
-<h2>3. Data Type Constraints</h2>
-<h3>3.1 Ordered Collections</h3>
+<h2 id="3-data-type-constraints">3. Data Type Constraints</h2>
+<h3 id="31-ordered-collections">3.1 Ordered Collections</h3>
 <p><strong>CRITICAL:</strong> Data structures that are hashed or signed MUST use ordered collections:</p>
 <pre><code class="language-rust">// CORRECT: Deterministic ordering
 use std::collections::BTreeMap;
@@ -192,7 +189,7 @@ pub struct BadGovernanceProof {
 <li>Use <code>BTreeSet&lt;T&gt;</code>, not <code>HashSet&lt;T&gt;</code> (deterministic element ordering)</li>
 <li>For <code>Vec&lt;T&gt;</code> representing sets, explicitly sort before encoding (see 3.2)</li>
 </ul>
-<h3>3.2 Set-Like Vectors</h3>
+<h3 id="32-set-like-vectors">3.2 Set-Like Vectors</h3>
 <p>When using <code>Vec&lt;T&gt;</code> to represent a set (unordered collection), elements MUST be sorted before canonical encoding:</p>
 <pre><code class="language-rust">impl GovernanceProof {
     pub fn canonicalize(&amp;mut self) {
@@ -210,7 +207,7 @@ pub struct BadGovernanceProof {
 <li>Numeric types: Numeric ascending order</li>
 <li>Compound types: Sort by first differing field (lexicographic tuple order)</li>
 </ul>
-<h3>3.3 Optional Fields</h3>
+<h3 id="33-optional-fields">3.3 Optional Fields</h3>
 <p>Optional fields MUST be handled consistently:</p>
 <pre><code class="language-rust">#[derive(Serialize)]
 pub struct Proposal {
@@ -228,7 +225,7 @@ pub struct Proposal {
 <li>Empty strings MUST be encoded as empty strings, not omitted</li>
 <li>Empty collections (Vec, BTreeMap) MUST be encoded as empty, not omitted</li>
 </ul>
-<h3>3.4 Binary Data</h3>
+<h3 id="34-binary-data">3.4 Binary Data</h3>
 <p>Binary data MUST be encoded as:</p>
 <ul>
 <li><strong>CBOR:</strong> Byte string (major type 2)</li>
@@ -240,7 +237,7 @@ pub struct SignedData {
     pub signature: [u8; 64],  // JSON: &quot;0xabcd...&quot; / CBOR: byte string
 }
 </code></pre>
-<h3>3.5 Enum Serialization</h3>
+<h3 id="35-enum-serialization">3.5 Enum Serialization</h3>
 <p>Enum types (such as <code>ActionType</code>, <code>ProposalState</code>, <code>DecisionOutcome</code>) MUST serialize consistently across implementations:</p>
 <p><strong>String Serialization (for JSON and human-readable formats):</strong></p>
 <ul>
@@ -262,9 +259,9 @@ ActionType::DIDRotate         → &quot;did_rotate&quot;  // Acronym treated as 
 <p><strong>Cross-Language Consistency:</strong>
 All implementations MUST produce identical string and numeric representations for the same enum variant to ensure interoperability.</p>
 <hr>
-<h2>4. Cryptographic Primitives</h2>
-<h3>4.1 Hash Functions</h3>
-<h4>4.1.1 BLAKE3</h4>
+<h2 id="4-cryptographic-primitives">4. Cryptographic Primitives</h2>
+<h3 id="41-hash-functions">4.1 Hash Functions</h3>
+<h4 id="411-blake3">4.1.1 BLAKE3</h4>
 <p>ICN uses <strong>BLAKE3</strong> for content hashing:</p>
 <pre><code class="language-rust">use blake3;
 
@@ -278,7 +275,7 @@ fn hash_content(data: &amp;[u8]) -&gt; [u8; 32] {
 <li>Collision resistance: 128-bit security</li>
 <li>Preimage resistance: 256-bit security</li>
 </ul>
-<h4>4.1.2 Domain Separation</h4>
+<h4 id="412-domain-separation">4.1.2 Domain Separation</h4>
 <p>All hashes MUST use domain separation to prevent cross-protocol attacks:</p>
 <pre><code class="language-rust">fn typed_hash(domain: &amp;str, data: &amp;[u8]) -&gt; [u8; 32] {
     let mut hasher = blake3::Hasher::new();
@@ -300,8 +297,8 @@ fn hash_content(data: &amp;[u8]) -&gt; [u8; 32] {
 <li><code>icn-ledger:settlement:v1</code></li>
 <li><code>icn-ledger:journal-entry:v1</code></li>
 </ul>
-<h3>4.2 Signatures</h3>
-<h4>4.2.1 Ed25519</h4>
+<h3 id="42-signatures">4.2 Signatures</h3>
+<h4 id="421-ed25519">4.2.1 Ed25519</h4>
 <p>ICN uses <strong>Ed25519</strong> (RFC 8032) for digital signatures:</p>
 <pre><code class="language-rust">use ed25519_dalek::{Signer, Verifier, SigningKey, VerifyingKey};
 
@@ -318,7 +315,7 @@ verifying_key.verify(canonical_payload, &amp;signature)?;
 <li>Security: ~128-bit (curve25519)</li>
 </ul>
 <p><strong>Payload:</strong> MUST be the canonical CBOR encoding of the signed object.</p>
-<h4>4.2.2 ML-DSA (Post-Quantum)</h4>
+<h4 id="422-ml-dsa-post-quantum">4.2.2 ML-DSA (Post-Quantum)</h4>
 <p>For post-quantum security, ICN uses <strong>ML-DSA (Dilithium)</strong> in hybrid mode:</p>
 <pre><code class="language-rust">pub struct HybridSignature {
     pub ed25519: ed25519_dalek::Signature,  // 64 bytes
@@ -326,7 +323,7 @@ verifying_key.verify(canonical_payload, &amp;signature)?;
 }
 </code></pre>
 <p>Verification MUST succeed for BOTH signatures.</p>
-<h4>4.2.3 Signature Encoding</h4>
+<h4 id="423-signature-encoding">4.2.3 Signature Encoding</h4>
 <p>Signatures in canonical objects MUST be encoded as:</p>
 <ul>
 <li><strong>CBOR:</strong> Byte string (64 bytes for Ed25519, struct for hybrid)</li>
@@ -340,8 +337,8 @@ pub struct GovernanceProof {
 }
 </code></pre>
 <hr>
-<h2>5. Identifier Normalization</h2>
-<h3>5.1 DID (Decentralized Identifier)</h3>
+<h2 id="5-identifier-normalization">5. Identifier Normalization</h2>
+<h3 id="51-did-decentralized-identifier">5.1 DID (Decentralized Identifier)</h3>
 <p>DIDs MUST be normalized before encoding:</p>
 <p><strong>Format:</strong> <code>did:icn:&lt;base58btc-pubkey&gt;</code></p>
 <p><strong>Normalization:</strong></p>
@@ -370,7 +367,7 @@ pub struct GovernanceProof {
     }
 }
 </code></pre>
-<h3>5.2 CurrencyId</h3>
+<h3 id="52-currencyid">5.2 CurrencyId</h3>
 <p>Currency identifiers MUST be normalized:</p>
 <p><strong>Format:</strong> <code>&lt;scope&gt;:&lt;symbol&gt;</code> (e.g., <code>food-coop:HOURS</code>)</p>
 <p><strong>Normalization:</strong></p>
@@ -402,7 +399,7 @@ pub struct GovernanceProof {
     }
 }
 </code></pre>
-<h3>5.3 CellId</h3>
+<h3 id="53-cellid">5.3 CellId</h3>
 <p>Cell identifiers MUST be normalized:</p>
 <p><strong>Format:</strong> <code>cell:&lt;base58btc-hash&gt;</code> (e.g., <code>cell:z3v8AqW...</code>)</p>
 <p><strong>Normalization:</strong></p>
@@ -413,8 +410,8 @@ pub struct GovernanceProof {
 <li>Verify the decoded hash is exactly 32 bytes</li>
 </ol>
 <hr>
-<h2>6. Integer Overflow Protection</h2>
-<h3>6.1 Checked Arithmetic</h3>
+<h2 id="6-integer-overflow-protection">6. Integer Overflow Protection</h2>
+<h3 id="61-checked-arithmetic">6.1 Checked Arithmetic</h3>
 <p>All arithmetic operations in canonical encoding contexts MUST use checked arithmetic:</p>
 <pre><code class="language-rust">impl Settlement {
     pub fn compute_balance(&amp;self) -&gt; Result&lt;i64&gt; {
@@ -437,7 +434,7 @@ pub struct GovernanceProof {
 <li>Return <code>Error::IntegerOverflow</code> on overflow</li>
 <li>Explicitly document overflow behavior in spec</li>
 </ul>
-<h3>6.2 Range Validation</h3>
+<h3 id="62-range-validation">6.2 Range Validation</h3>
 <p>Numeric fields MUST validate ranges before encoding:</p>
 <pre><code class="language-rust">impl GovernanceProof {
     pub fn validate(&amp;self) -&gt; Result&lt;()&gt; {
@@ -456,8 +453,8 @@ pub struct GovernanceProof {
 }
 </code></pre>
 <hr>
-<h2>7. Canonical Encoding Trait</h2>
-<h3>7.1 Canonicalize Trait</h3>
+<h2 id="7-canonical-encoding-trait">7. Canonical Encoding Trait</h2>
+<h3 id="71-canonicalize-trait">7.1 Canonicalize Trait</h3>
 <p>All objects that require canonical encoding MUST implement the <code>Canonicalize</code> trait:</p>
 <pre><code class="language-rust">pub trait Canonicalize {
     /// Modify self to canonical form (sort collections, normalize identifiers)
@@ -484,7 +481,7 @@ pub trait CanonicalEncode: Canonicalize + Serialize {
     }
 }
 </code></pre>
-<h3>7.2 Example Implementation</h3>
+<h3 id="72-example-implementation">7.2 Example Implementation</h3>
 <pre><code class="language-rust">impl Canonicalize for GovernanceProof {
     fn canonicalize(&amp;mut self) {
         // Sort confirmations (DIDs)
@@ -531,8 +528,8 @@ pub trait CanonicalEncode: Canonicalize + Serialize {
 impl CanonicalEncode for GovernanceProof {}
 </code></pre>
 <hr>
-<h2>8. Test Vectors</h2>
-<h3>8.1 Minimal GovernanceProof</h3>
+<h2 id="8-test-vectors">8. Test Vectors</h2>
+<h3 id="81-minimal-governanceproof">8.1 Minimal GovernanceProof</h3>
 <p><strong>Input:</strong></p>
 <pre><code class="language-json">{
   &quot;federation_id&quot;: &quot;fed:z5AqBkLuA...&quot;,
@@ -578,7 +575,7 @@ impl CanonicalEncode for GovernanceProof {}
 <p><strong>Typed Hash (domain: <code>icn-federation:governance-proof:v1</code>):</strong></p>
 <pre><code>0x3f8c9d2e1a7b6c4d5e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d
 </code></pre>
-<h3>8.2 Action Hash Computation</h3>
+<h3 id="82-action-hash-computation">8.2 Action Hash Computation</h3>
 <p><strong>Input FederationAction (SettleCrossCoop):</strong></p>
 <pre><code class="language-json">{
   &quot;settlements&quot;: [
@@ -609,9 +606,9 @@ impl CanonicalEncode for GovernanceProof {}
 <pre><code>0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b
 </code></pre>
 <hr>
-<h2>9. Compliance Checklist</h2>
+<h2 id="9-compliance-checklist">9. Compliance Checklist</h2>
 <p>Implementations MUST satisfy the following requirements:</p>
-<h3>9.1 Encoding Format</h3>
+<h3 id="91-encoding-format">9.1 Encoding Format</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses CBOR for canonical encoding</li>
 <li><input disabled="" type="checkbox"> Uses definite-length encoding (no break codes)</li>
@@ -621,7 +618,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li><input disabled="" type="checkbox"> Uses <code>BTreeSet&lt;T&gt;</code>, not <code>HashSet&lt;T&gt;</code></li>
 <li><input disabled="" type="checkbox"> Sorts set-like <code>Vec&lt;T&gt;</code> before encoding</li>
 </ul>
-<h3>9.2 Cryptographic Primitives</h3>
+<h3 id="92-cryptographic-primitives">9.2 Cryptographic Primitives</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses BLAKE3 for content hashing</li>
 <li><input disabled="" type="checkbox"> Uses typed hashing with domain separation</li>
@@ -629,26 +626,26 @@ impl CanonicalEncode for GovernanceProof {}
 <li><input disabled="" type="checkbox"> Supports ML-DSA for post-quantum signatures</li>
 <li><input disabled="" type="checkbox"> Verifies signatures against canonical payloads</li>
 </ul>
-<h3>9.3 Identifiers</h3>
+<h3 id="93-identifiers">9.3 Identifiers</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Normalizes DIDs before encoding</li>
 <li><input disabled="" type="checkbox"> Normalizes CurrencyIds before encoding</li>
 <li><input disabled="" type="checkbox"> Normalizes CellIds before encoding</li>
 <li><input disabled="" type="checkbox"> Validates identifier formats</li>
 </ul>
-<h3>9.4 Arithmetic</h3>
+<h3 id="94-arithmetic">9.4 Arithmetic</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses checked arithmetic for all consensus-critical operations</li>
 <li><input disabled="" type="checkbox"> Validates numeric ranges before encoding</li>
 <li><input disabled="" type="checkbox"> Returns errors on overflow/underflow</li>
 </ul>
-<h3>9.5 Trait Implementation</h3>
+<h3 id="95-trait-implementation">9.5 Trait Implementation</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Implements <code>Canonicalize</code> trait for all signed/hashed objects</li>
 <li><input disabled="" type="checkbox"> Implements <code>CanonicalEncode</code> trait</li>
 <li><input disabled="" type="checkbox"> Provides <code>is_canonical()</code> verification</li>
 </ul>
-<h3>9.6 Test Coverage</h3>
+<h3 id="96-test-coverage">9.6 Test Coverage</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Includes test vectors for all canonical objects</li>
 <li><input disabled="" type="checkbox"> Tests hash stability across versions</li>
@@ -656,8 +653,8 @@ impl CanonicalEncode for GovernanceProof {}
 <li><input disabled="" type="checkbox"> Tests edge cases (empty collections, max values, special characters)</li>
 </ul>
 <hr>
-<h2>10. Security Considerations</h2>
-<h3>10.1 Hash Collision Attacks</h3>
+<h2 id="10-security-considerations">10. Security Considerations</h2>
+<h3 id="101-hash-collision-attacks">10.1 Hash Collision Attacks</h3>
 <p><strong>Threat:</strong> An attacker creates two different objects with the same hash.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -665,7 +662,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li>Use typed hashing to prevent cross-protocol collisions</li>
 <li>Validate object structure before hashing</li>
 </ul>
-<h3>10.2 Signature Malleability</h3>
+<h3 id="102-signature-malleability">10.2 Signature Malleability</h3>
 <p><strong>Threat:</strong> An attacker modifies a signature without invalidating it.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -673,7 +670,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li>Verify signatures against canonical payloads only</li>
 <li>Reject non-canonical encodings</li>
 </ul>
-<h3>10.3 Integer Overflow</h3>
+<h3 id="103-integer-overflow">10.3 Integer Overflow</h3>
 <p><strong>Threat:</strong> Arithmetic overflow causes incorrect state transitions.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -681,7 +678,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li>Validate ranges before encoding</li>
 <li>Use larger integer types where appropriate (i64, u64)</li>
 </ul>
-<h3>10.4 Identifier Confusion</h3>
+<h3 id="104-identifier-confusion">10.4 Identifier Confusion</h3>
 <p><strong>Threat:</strong> Similar-looking identifiers are confused (homograph attack).</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -689,7 +686,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li>Validate identifier formats</li>
 <li>Use case-sensitive comparison for Base58btc components</li>
 </ul>
-<h3>10.5 Canonicalization Bypass</h3>
+<h3 id="105-canonicalization-bypass">10.5 Canonicalization Bypass</h3>
 <p><strong>Threat:</strong> An attacker submits non-canonical objects that pass validation.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -698,7 +695,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li>Implement <code>is_canonical()</code> checks</li>
 </ul>
 <hr>
-<h2>11. References</h2>
+<h2 id="11-references">11. References</h2>
 <ul>
 <li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for use in RFCs</li>
 <li><a href="https://www.rfc-editor.org/rfc/rfc8949" target="_blank" rel="noopener">RFC 8949</a> - Concise Binary Object Representation (CBOR)</li>
@@ -708,7 +705,7 @@ impl CanonicalEncode for GovernanceProof {}
 <li><a href="https://github.com/multiformats/multibase" target="_blank" rel="noopener">Multibase Specification</a></li>
 </ul>
 <hr>
-<h2>Appendix A: Rust Implementation Example</h2>
+<h2 id="appendix-a-rust-implementation-example">Appendix A: Rust Implementation Example</h2>
 <pre><code class="language-rust">use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
 
@@ -780,7 +777,10 @@ impl CanonicalEncode for GovernanceProof {}
 <ul>
 <li>2026-02-02: Initial version 1.0</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/CANONICAL_ENCODING.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

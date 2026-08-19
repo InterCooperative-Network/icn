@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance / Receipts — Repo State &amp; Gap Analysis | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Historical document, kept for the record. Not current ICN project state."><meta name="robots" content="noindex, follow"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance / Receipts — Repo State &amp; Gap Analysis (archived) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,20 +35,25 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans scratch</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance receipts</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2026/plans-scratch/governance-receipts.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <a href="/docs/archive" data-astro-cid-uadgga6g>Archive</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2026</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans scratch</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance receipts</span> </nav>  <aside class="callout callout-archive doc-banner" aria-labelledby="doc-banner-title" data-astro-cid-w3hnbhco><span class="callout-label" id="doc-banner-title" data-astro-cid-w3hnbhco>
+Historical document — not current project state
+</span><p data-astro-cid-w3hnbhco>
+This page is kept for the record. It described the project at the time it
+        was written and has not been maintained since. Do not read it as a
+        statement about how ICN works today.
+</p><dl class="doc-banner-meta" data-astro-cid-w3hnbhco><div data-astro-cid-w3hnbhco><dt data-astro-cid-w3hnbhco>Classification</dt><dd data-astro-cid-w3hnbhco>registry role=archive</dd></div></dl><p class="doc-banner-actions" data-astro-cid-w3hnbhco>
+For current material, start at <a href="/docs" data-astro-cid-w3hnbhco>the documentation index</a>,
+        or read <a href="/whats-real-now" data-astro-cid-w3hnbhco>What's real now</a> for the maturity
+        account of each subsystem.
+</p></aside> <article class="prose" data-astro-cid-uadgga6g><!-- Relocated from docs/plans/.scratch/ (tranche 3). -->
 
-<h1>Governance / Receipts — Repo State &amp; Gap Analysis</h1>
+<h1 id="governance--receipts--repo-state--gap-analysis">Governance / Receipts — Repo State &amp; Gap Analysis</h1>
 <p><strong>Date</strong>: 2026-02-14
 <strong>Analyst</strong>: icn-architect agent (governance-receipts)
 <strong>Codebase</strong>: 414K LOC, ~5,060 tests</p>
 <hr>
-<h2>1. Current State</h2>
-<h3>1.1 Proposal Types</h3>
+<h2 id="1-current-state">1. Current State</h2>
+<h3 id="11-proposal-types">1.1 Proposal Types</h3>
 <p><code>ProposalPayload</code> enum — <strong>16 variants</strong> at <code>icn-governance/src/proposal.rs:396</code>:</p>
 <table>
 <thead>
@@ -170,7 +175,7 @@ View source on GitHub →
 </tbody></table>
 <p><strong>Federation sub-proposals</strong> (created via gateway helpers): JoinFederation, LeaveFederation, EstablishClearing, TerminateClearing, Vouch, RevokeVouch, UpdateFederationPolicy.</p>
 <p><strong>TreasuryProposalOperation</strong> sub-variants: <code>Spend</code>, <code>CreateBudget</code>, <code>CancelBudget</code>, <code>ModifySpendingRules</code>, <code>TransferBetweenBudgets</code>, <code>Withdraw</code>.</p>
-<h3>1.2 Voting Mechanics</h3>
+<h3 id="12-voting-mechanics">1.2 Voting Mechanics</h3>
 <p><strong>Core types</strong> at <code>icn-governance/src/vote.rs</code>:</p>
 <ul>
 <li><code>VoteChoice</code>: <code>For</code>, <code>Against</code>, <code>Abstain</code></li>
@@ -194,7 +199,7 @@ View source on GitHub →
 </ul>
 <p><strong>Weighted Voting</strong>: Vote has <code>weight: usize</code> field. <code>VoteTally</code> sums weights. The gateway <code>cast_vote</code> handler sets weight=1 by default (<code>governance.rs:1455</code>). No trust-based weighting is wired up.</p>
 <p><strong>Deliberation</strong>: Proposals can enter a deliberation period via <code>POST /proposals/{id}/deliberation/start</code> and <code>POST /proposals/{id}/deliberation/end</code>. Comments system: <code>POST /proposals/{id}/comments</code>, <code>GET /proposals/{id}/comments</code>, reactions on comments.</p>
-<h3>1.3 Decision → Receipt Chain</h3>
+<h3 id="13-decision--receipt-chain">1.3 Decision → Receipt Chain</h3>
 <p><strong>GovernanceProof (V1)</strong> at <code>icn-governance/src/proof.rs:54</code>:</p>
 <ul>
 <li>Node-local proof with: <code>proposal_id</code>, <code>domain_id</code>, <code>outcome</code>, <code>vote_tally</code>, <code>vote_hash</code>, <code>timestamp</code>, <code>signer_did</code>, <code>proof_hash</code>, <code>signature</code></li>
@@ -225,7 +230,7 @@ View source on GitHub →
 </ul>
 <p><strong>Where receipt is created</strong>: In standalone mode (<code>governance_mgr.rs:638</code>), <code>close_proposal</code> DOES NOT create a GovernanceProof or GovernanceDecisionReceipt. It only updates <code>ProposalState</code> to Accepted/Rejected/NoQuorum. In actor-backed mode, the <code>GovernanceActor</code> (via <code>handle.close_proposal()</code>) would generate proofs, but the gateway delegates to <code>handle.get_proof()</code> which returns <code>None</code> in standalone mode (<code>governance_mgr.rs:790</code>).</p>
 <p><strong>Critical Gap</strong>: The receipt generation happens ONLY in actor-backed mode (daemon with GovernanceActor). The gateway standalone mode (which is what the pilot currently uses) does NOT generate GovernanceDecisionReceipt or GovernanceProofV2 on close.</p>
-<h3>1.4 Effect Path: Decision → Treasury → Settlement → Ledger</h3>
+<h3 id="14-effect-path-decision--treasury--settlement--ledger">1.4 Effect Path: Decision → Treasury → Settlement → Ledger</h3>
 <p><strong>The intended chain:</strong></p>
 <pre><code>GovernanceDecisionReceipt → AllocationReceipt → SettlementIntent(s) → LedgerEntry
 </code></pre>
@@ -278,7 +283,7 @@ View source on GitHub →
 <li>In standalone mode, <code>close_proposal</code> sets outcome to Accepted but no effect execution occurs</li>
 <li>The <code>KernelGovernanceExecutor</code> effect path is not wired into the standalone gateway</li>
 </ul>
-<h3>1.5 Receipt Store &amp; Provenance</h3>
+<h3 id="15-receipt-store--provenance">1.5 Receipt Store &amp; Provenance</h3>
 <p><strong>CanonicalReceipt trait</strong> at <code>icn-kernel-api/src/receipts.rs:77</code>:</p>
 <pre><code class="language-rust">pub trait CanonicalReceipt {
     fn canonical_hash(&amp;self) -&gt; Hash;      // Deterministic cross-node hash
@@ -306,8 +311,8 @@ View source on GitHub →
 <li>Different from the gateway ReceiptStore — this is for RPC operation tracking, not governance receipts</li>
 </ul>
 <p><strong>Two separate ReceiptStores exist</strong>: Gateway (sled-backed, for AllocationReceipt/SettlementIntent) and RPC (in-memory LRU, for RPC operation receipts). Neither stores GovernanceDecisionReceipt/GovernanceProofV2.</p>
-<h3>1.6 Gateway Endpoints</h3>
-<h4>Governance Endpoints (prefix: <code>/v1/governance/</code>)</h4>
+<h3 id="16-gateway-endpoints">1.6 Gateway Endpoints</h3>
+<h4 id="governance-endpoints-prefix-v1governance">Governance Endpoints (prefix: <code>/v1/governance/</code>)</h4>
 <table>
 <thead>
 <tr>
@@ -520,7 +525,7 @@ View source on GitHub →
 <li><code>POST /proposals/federation/vouch/revoke</code></li>
 <li><code>POST /proposals/federation/policy</code></li>
 </ul>
-<h4>Governance Dashboard</h4>
+<h4 id="governance-dashboard">Governance Dashboard</h4>
 <table>
 <thead>
 <tr>
@@ -537,7 +542,7 @@ View source on GitHub →
 <td>Aggregate stats (amendments/appeals)</td>
 </tr>
 </tbody></table>
-<h4>Receipt Endpoints (prefix: <code>/v1/receipts/</code>)</h4>
+<h4 id="receipt-endpoints-prefix-v1receipts">Receipt Endpoints (prefix: <code>/v1/receipts/</code>)</h4>
 <table>
 <thead>
 <tr>
@@ -579,7 +584,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Total: 5 receipt endpoints</strong>, focused on AllocationReceipt and SettlementIntent. GovernanceDecisionReceipt served via <code>/proposals/{id}/proof</code>.</p>
-<h4>Constitutional Endpoints (prefix: <code>/v1/constitutional/</code>)</h4>
+<h4 id="constitutional-endpoints-prefix-v1constitutional">Constitutional Endpoints (prefix: <code>/v1/constitutional/</code>)</h4>
 <p><strong>Amendment endpoints</strong> (8):</p>
 <table>
 <thead>
@@ -768,7 +773,7 @@ View source on GitHub →
 <td>Metrics + recent appeals</td>
 </tr>
 </tbody></table>
-<h4>Ledger Provenance Endpoints (prefix: <code>/v1/ledger/</code>)</h4>
+<h4 id="ledger-provenance-endpoints-prefix-v1ledger">Ledger Provenance Endpoints (prefix: <code>/v1/ledger/</code>)</h4>
 <table>
 <thead>
 <tr>
@@ -792,7 +797,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Grand total: ~76 governance-related endpoints across governance, constitutional, receipts, ledger, and treasury modules.</strong></p>
-<h4>Treasury Endpoints (prefix: <code>/v1/treasury/</code>)</h4>
+<h4 id="treasury-endpoints-prefix-v1treasury">Treasury Endpoints (prefix: <code>/v1/treasury/</code>)</h4>
 <table>
 <thead>
 <tr>
@@ -857,7 +862,7 @@ View source on GitHub →
 <td>Propose spend (creates governance proposal)</td>
 </tr>
 </tbody></table>
-<h3>1.7 Appeals System</h3>
+<h3 id="17-appeals-system">1.7 Appeals System</h3>
 <p><strong>AppealType</strong> at <code>icn-governance/src/appeal.rs:66</code> — 7 variants:</p>
 <ol>
 <li><code>Revocation</code> — appeal revocation of membership/anchor/holder status</li>
@@ -914,7 +919,7 @@ View source on GitHub →
 <p><strong>Appeal evidence</strong>: <code>AppealEvidence</code> struct with <code>evidence_type</code> (Document, Testimony, Record, Communication, SystemLog, Other), hash, submitted_at.</p>
 <p><strong>Receipt integration</strong>: Appeals have NO connection to the receipt system. No <code>decision_hash</code> or <code>ProvenanceAnchors</code> on Appeal. The <code>GovernanceDecision</code> appeal type stores only <code>proposal_id</code> (string) and <code>decision</code> (string description), not a <code>decision_hash</code>.</p>
 <hr>
-<h2>2. Chain Completeness Audit</h2>
+<h2 id="2-chain-completeness-audit">2. Chain Completeness Audit</h2>
 <table>
 <thead>
 <tr>
@@ -984,7 +989,7 @@ View source on GitHub →
 </tbody></table>
 <p><strong>Summary</strong>: The top half (Proposal→Vote→Decision) works in both modes. In daemon mode (icnd with GovernanceActor), the full chain works: decision→receipt→effect execution→treasury→ledger entry with provenance. In gateway standalone mode (current pilot default), the chain is <strong>broken at Decision→Receipt</strong> — no receipt generated, no effect execution. The gap is a <strong>mode gap</strong>, not a missing-types gap.</p>
 <hr>
-<h2>3. Issue #1012 Analysis</h2>
+<h2 id="3-issue-1012-analysis">3. Issue #1012 Analysis</h2>
 <p>Issue #1012 specifies &quot;Constraints with Receipts&quot; pattern:</p>
 <ul>
 <li><strong>What</strong>: constraint value(s)</li>
@@ -992,7 +997,7 @@ View source on GitHub →
 <li><strong>Who</strong>: authority</li>
 <li><strong>When</strong>: timestamp</li>
 </ul>
-<h3>Fields ALREADY available:</h3>
+<h3 id="fields-already-available">Fields ALREADY available:</h3>
 <table>
 <thead>
 <tr>
@@ -1022,7 +1027,7 @@ View source on GitHub →
 <td>Available</td>
 </tr>
 </tbody></table>
-<h3>Fields MISSING:</h3>
+<h3 id="fields-missing">Fields MISSING:</h3>
 <ol>
 <li><p><strong>Policy Reference on ConstraintSet</strong>: When the kernel enforces a constraint, there is no field saying &quot;this constraint came from TrustPolicyOracle evaluating policy X&quot;. The <code>custom</code> hashmap COULD carry this, but no oracle currently sets a <code>policy_ref</code> key.</p>
 </li>
@@ -1034,8 +1039,8 @@ View source on GitHub →
 </li>
 </ol>
 <hr>
-<h2>4. Gap Analysis</h2>
-<h3>Gap G1: Decision Receipt Not Generated in Standalone Mode</h3>
+<h2 id="4-gap-analysis">4. Gap Analysis</h2>
+<h3 id="gap-g1-decision-receipt-not-generated-in-standalone-mode">Gap G1: Decision Receipt Not Generated in Standalone Mode</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;View decision receipt for a closed proposal&quot; — returns 404 in standalone gateway</li>
 <li><strong>Missing</strong>: Runtime receipt generation outside GovernanceActor</li>
@@ -1043,7 +1048,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: GovernanceDecisionReceipt with canonical hash, verified attestation</li>
 <li><strong>Phase</strong>: 0</li>
 </ul>
-<h3>Gap G2: Effect Execution Only Available in Daemon Mode</h3>
+<h3 id="gap-g2-effect-execution-only-available-in-daemon-mode">Gap G2: Effect Execution Only Available in Daemon Mode</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;Treasury spend proposal passes → money actually moves&quot; (in standalone gateway)</li>
 <li><strong>In daemon mode</strong>: <code>KernelGovernanceExecutor</code> at <code>icn-core/src/supervisor/governance_executor.rs</code> handles Treasury, Protocol, Federation, Control, Membership effects. Treasury spends go through <code>KernelTreasuryExecutor</code> → <code>LedgerService.submit_treasury_entry()</code> with provenance. <strong>This works.</strong></li>
@@ -1052,7 +1057,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: AllocationReceipt → SettlementIntent(s) → JournalEntry chain with provenance</li>
 <li><strong>Phase</strong>: 0 (ensure daemon mode used for pilot) / 1 (bring effect execution to standalone or make standalone unnecessary)</li>
 </ul>
-<h3>Gap G3: Receipt Chain Not Populated at Runtime</h3>
+<h3 id="gap-g3-receipt-chain-not-populated-at-runtime">Gap G3: Receipt Chain Not Populated at Runtime</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;View economic chain for a governance decision&quot; — <code>/v1/receipts/chain?decision_hash=...</code> returns empty</li>
 <li><strong>Missing</strong>: Code that creates and stores AllocationReceipt + SettlementIntent when a decision takes effect</li>
@@ -1060,7 +1065,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: Full chain visible via API</li>
 <li><strong>Phase</strong>: 0 (for display of existing data) / 1 (for runtime generation)</li>
 </ul>
-<h3>Gap G4: SettlementIntent ≠ SettlementRequest Type Mismatch</h3>
+<h3 id="gap-g4-settlementintent--settlementrequest-type-mismatch">Gap G4: SettlementIntent ≠ SettlementRequest Type Mismatch</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;Governance treasury spend settles in ledger&quot;</li>
 <li><strong>Missing</strong>: Converter from <code>SettlementIntent</code> (governance path) to <code>SettlementRequest</code> (ledger engine) or unified type</li>
@@ -1068,7 +1073,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: Unified settlement path</li>
 <li><strong>Phase</strong>: 1</li>
 </ul>
-<h3>Gap G5: Appeal Not Linked to Receipt Chain</h3>
+<h3 id="gap-g5-appeal-not-linked-to-receipt-chain">Gap G5: Appeal Not Linked to Receipt Chain</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;File appeal against decision with decision_hash&quot;</li>
 <li><strong>Missing</strong>: <code>AppealType::GovernanceDecision</code> uses string <code>proposal_id</code>, not <code>decision_hash</code></li>
@@ -1076,7 +1081,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: Appeal records decision_hash, appeal resolution produces own receipt</li>
 <li><strong>Phase</strong>: 1</li>
 </ul>
-<h3>Gap G6: Delegation Not Applied in Vote Tally</h3>
+<h3 id="gap-g6-delegation-not-applied-in-vote-tally">Gap G6: Delegation Not Applied in Vote Tally</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;Delegate my vote to a trusted representative&quot;</li>
 <li><strong>Missing</strong>: Delegation application in <code>close_proposal</code> tally computation</li>
@@ -1084,7 +1089,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: Vote tally includes delegated votes</li>
 <li><strong>Phase</strong>: 1</li>
 </ul>
-<h3>Gap G7: No Constraint Provenance (Issue #1012)</h3>
+<h3 id="gap-g7-no-constraint-provenance-issue-1012">Gap G7: No Constraint Provenance (Issue #1012)</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;See WHY this rate limit was imposed on me&quot;</li>
 <li><strong>Missing</strong>: Policy reference / authority / timestamp on ConstraintSet or PolicyDecision</li>
@@ -1092,7 +1097,7 @@ View source on GitHub →
 <li><strong>Receipt expectation</strong>: &quot;What / Why / Who / When&quot; visible in dashboard</li>
 <li><strong>Phase</strong>: 0 (stub with available data) / 1 (full provenance chain)</li>
 </ul>
-<h3>Gap G8: No GovernanceDecisionReceipt Storage</h3>
+<h3 id="gap-g8-no-governancedecisionreceipt-storage">Gap G8: No GovernanceDecisionReceipt Storage</h3>
 <ul>
 <li><strong>User story blocked</strong>: &quot;Look up any past governance decision by decision_hash&quot;</li>
 <li><strong>Missing</strong>: Persistent storage for GovernanceDecisionReceipt (not just in GovernanceActor memory)</li>
@@ -1101,36 +1106,36 @@ View source on GitHub →
 <li><strong>Phase</strong>: 0</li>
 </ul>
 <hr>
-<h2>5. Phase 0 Tasks (5 tasks)</h2>
-<h3>P0-GOV-T01: Generate GovernanceDecisionReceipt in standalone close_proposal</h3>
+<h2 id="5-phase-0-tasks-5-tasks">5. Phase 0 Tasks (5 tasks)</h2>
+<h3 id="p0-gov-t01-generate-governancedecisionreceipt-in-standalone-close_proposal">P0-GOV-T01: Generate GovernanceDecisionReceipt in standalone close_proposal</h3>
 <ul>
 <li><strong>What</strong>: When <code>close_proposal</code> runs in standalone mode, compute <code>GovernanceDecisionReceipt</code> from the votes and store it</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code> (close_proposal standalone branch), add <code>decision_receipts: RwLock&lt;HashMap&lt;ProposalId, GovernanceDecisionReceipt&gt;&gt;</code> storage</li>
 <li><strong>Test</strong>: Close a proposal → <code>get_proof</code> returns a valid GovernanceDecisionReceipt with <code>verify()</code> == true</li>
 <li><strong>Demo</strong>: Create proposal → vote → close → GET <code>/proposals/{id}/proof</code> returns valid receipt</li>
 </ul>
-<h3>P0-GOV-T02: Store GovernanceDecisionReceipt in ReceiptStore</h3>
+<h3 id="p0-gov-t02-store-governancedecisionreceipt-in-receiptstore">P0-GOV-T02: Store GovernanceDecisionReceipt in ReceiptStore</h3>
 <ul>
 <li><strong>What</strong>: Extend <code>receipt_store.rs</code> to store/index GovernanceDecisionReceipt by decision_hash and proposal_id</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/receipt_store.rs</code> (add GovernanceDecisionReceipt methods), <code>icn-gateway/src/api/receipts.rs</code> (add endpoint)</li>
 <li><strong>Test</strong>: Put receipt → get by hash → get by proposal_id → all return same receipt</li>
 <li><strong>Demo</strong>: GET <code>/v1/receipts/decisions/{hash}</code> returns GovernanceDecisionReceipt</li>
 </ul>
-<h3>P0-GOV-T03: Wire close_proposal → ReceiptStore</h3>
+<h3 id="p0-gov-t03-wire-close_proposal--receiptstore">P0-GOV-T03: Wire close_proposal → ReceiptStore</h3>
 <ul>
 <li><strong>What</strong>: After generating GovernanceDecisionReceipt in close_proposal, store it in ReceiptStore</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code>, <code>icn-gateway/src/server.rs</code> (inject ReceiptStore dependency)</li>
 <li><strong>Test</strong>: Full flow: create → vote → close → receipt stored → queryable via API</li>
 <li><strong>Demo</strong>: Receipts Explorer can show decision receipt for any closed proposal</li>
 </ul>
-<h3>P0-GOV-T04: Receipts Explorer data contract</h3>
+<h3 id="p0-gov-t04-receipts-explorer-data-contract">P0-GOV-T04: Receipts Explorer data contract</h3>
 <ul>
 <li><strong>What</strong>: Define and serve the data needed for a Receipt Explorer UI — decision receipt + linked chain (even if chain is empty for now)</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/api/receipts.rs</code> (add unified chain endpoint that includes GovernanceDecisionReceipt)</li>
 <li><strong>Test</strong>: API contract test returning <code>{ decision: GovernanceDecisionReceipt, allocations: [], intents: [] }</code></li>
 <li><strong>Demo</strong>: Frontend can render a receipt with &quot;Verified&quot; badge when <code>verify()</code> passes</li>
 </ul>
-<h3>P0-GOV-T05: Constraint provenance stub (#1012)</h3>
+<h3 id="p0-gov-t05-constraint-provenance-stub-1012">P0-GOV-T05: Constraint provenance stub (#1012)</h3>
 <ul>
 <li><strong>What</strong>: Add <code>policy_domain: Option&lt;String&gt;</code> and <code>evaluated_at: Option&lt;u64&gt;</code> to PolicyDecision or a new <code>ConstraintProvenance</code> struct. TrustPolicyOracle sets these when returning constraints.</li>
 <li><strong>Files</strong>: <code>icn-kernel-api/src/authz.rs</code> (add provenance fields or struct), <code>apps/trust/src/</code> (set fields)</li>
@@ -1138,36 +1143,36 @@ View source on GitHub →
 <li><strong>Demo</strong>: Dashboard shows &quot;Rate limit: 20 msg/sec | Source: Trust Policy | Trust Score: 0.35&quot;</li>
 </ul>
 <hr>
-<h2>6. Phase 1 Tasks (5 tasks)</h2>
-<h3>P1-GOV-T01: Effect execution engine for treasury proposals</h3>
+<h2 id="6-phase-1-tasks-5-tasks">6. Phase 1 Tasks (5 tasks)</h2>
+<h3 id="p1-gov-t01-effect-execution-engine-for-treasury-proposals">P1-GOV-T01: Effect execution engine for treasury proposals</h3>
 <ul>
 <li><strong>What</strong>: When a Treasury::Spend proposal is accepted, create AllocationReceipt + SettlementIntent(s), store in ReceiptStore, and execute the spend against the ledger</li>
 <li><strong>Files</strong>: New <code>icn-gateway/src/effect_executor.rs</code> or within <code>governance_mgr.rs</code>, <code>receipt_store.rs</code></li>
 <li><strong>Test</strong>: Treasury spend proposal accepted → AllocationReceipt created → SettlementIntent stored → balance changes in ledger</li>
 <li><strong>Demo</strong>: Full treasury spend lifecycle visible in Receipts Explorer</li>
 </ul>
-<h3>P1-GOV-T02: Unify SettlementIntent → SettlementRequest</h3>
+<h3 id="p1-gov-t02-unify-settlementintent--settlementrequest">P1-GOV-T02: Unify SettlementIntent → SettlementRequest</h3>
 <ul>
 <li><strong>What</strong>: Either make SettlementEngine accept SettlementIntent directly, or create a converter. The governance path and compute path should both reach the ledger.</li>
 <li><strong>Files</strong>: <code>icn-ledger/src/settlement.rs</code>, <code>icn-kernel-api/src/economics.rs</code></li>
 <li><strong>Test</strong>: SettlementIntent from governance → settled in ledger → JournalEntry created</li>
 <li><strong>Demo</strong>: Provenance chain: decision_hash → allocation → intent → journal entry</li>
 </ul>
-<h3>P1-GOV-T03: Appeal receipt chain integration</h3>
+<h3 id="p1-gov-t03-appeal-receipt-chain-integration">P1-GOV-T03: Appeal receipt chain integration</h3>
 <ul>
 <li><strong>What</strong>: Add <code>decision_hash: Option&lt;Hash&gt;</code> to <code>AppealType::GovernanceDecision</code>. When an appeal resolves, create an AppealReceipt linking to the original decision.</li>
 <li><strong>Files</strong>: <code>icn-governance/src/appeal.rs</code>, new <code>AppealReceipt</code> type (or extend CanonicalReceipt)</li>
 <li><strong>Test</strong>: File appeal with decision_hash → resolve → receipt links back to original decision</li>
 <li><strong>Demo</strong>: Appeal shows &quot;Appealing decision 0xABC123...&quot; with link to original receipt</li>
 </ul>
-<h3>P1-GOV-T04: Apply delegated votes in tally</h3>
+<h3 id="p1-gov-t04-apply-delegated-votes-in-tally">P1-GOV-T04: Apply delegated votes in tally</h3>
 <ul>
 <li><strong>What</strong>: When computing vote tally in close_proposal, check for active delegations and include delegated votes</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/governance_mgr.rs</code> (close_proposal), delegation lookup</li>
 <li><strong>Test</strong>: Alice delegates to Bob, Bob votes For, tally includes Alice&#39;s delegated weight</li>
 <li><strong>Demo</strong>: Vote tally shows &quot;3 For (including 1 delegated)&quot; in proposal detail</li>
 </ul>
-<h3>P1-GOV-T05: Full provenance navigation in receipt API</h3>
+<h3 id="p1-gov-t05-full-provenance-navigation-in-receipt-api">P1-GOV-T05: Full provenance navigation in receipt API</h3>
 <ul>
 <li><strong>What</strong>: Add upstream/downstream navigation to receipt endpoints. Given any receipt hash, return its upstream chain (provenance) and downstream dependents.</li>
 <li><strong>Files</strong>: <code>icn-gateway/src/receipt_store.rs</code> (add reverse index), <code>icn-gateway/src/api/receipts.rs</code> (add navigation endpoints)</li>
@@ -1175,7 +1180,7 @@ View source on GitHub →
 <li><strong>Demo</strong>: Receipts Explorer shows clickable chain: Decision → Allocation → Settlement → Ledger Entry</li>
 </ul>
 <hr>
-<h2>7. Relevant Open Issues</h2>
+<h2 id="7-relevant-open-issues">7. Relevant Open Issues</h2>
 <ul>
 <li><strong>#1012</strong>: Legibility Dashboards UX Spec — &quot;Constraints with Receipts&quot; pattern (What/Why/Who/When). Directly drives P0-GOV-T05 and P1-GOV-T05.</li>
 <li><strong>#246</strong>: Treasury operations — drives the treasury proposal types and P1-GOV-T01 (effect execution).</li>
@@ -1184,7 +1189,7 @@ View source on GitHub →
 <li><strong>#389</strong>: Labor share operations — SurplusAllocation and ShareRedemption proposal variants exist.</li>
 </ul>
 <hr>
-<h2>Summary: Chain Status</h2>
+<h2 id="summary-chain-status">Summary: Chain Status</h2>
 <pre><code>Proposal → Vote → Decision    [WORKS in standalone + daemon mode]
                     ↓
     GovernanceDecisionReceipt  [WORKS in daemon mode, BROKEN in standalone]
@@ -1202,7 +1207,10 @@ View source on GitHub →
     Merkle-DAG                 [IMMUTABLE, PARENTS LINKED]
 </code></pre>
 <p><strong>Bottom line</strong>: The governance decision chain is ~60% connected in daemon mode (icnd), but ~30% in standalone gateway mode (current pilot default). The full effect execution path exists: <code>KernelGovernanceExecutor</code> → <code>KernelTreasuryExecutor</code> → <code>LedgerService</code> → <code>JournalEntry</code> with provenance. The gap is a <strong>mode gap</strong>: standalone gateway doesn&#39;t use the daemon&#39;s execution infrastructure. Phase 0 should either (a) make standalone generate receipts, or (b) ensure the pilot uses daemon mode. Phase 1 connects the receipt store and makes everything queryable via API.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2026/plans-scratch/governance-receipts.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs/archive" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to archive </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0013: Federation Clearing Adoption Contract | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Step 3 architecture for federation clearing adoption (3a–3d implemented). Open items remain: FederationProvenance not Sled-persisted, coop_a_did empty in execution handler, store-isolation tests not written. Verified unresolved 2026-04-26."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0013: Federation Clearing Adoption Contract | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,17 +35,14 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0013 federation clearing adoption contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0013-federation-clearing-adoption-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR 0013: Federation Clearing Adoption Contract</h1>
-<h2>Status</h2>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0013 federation clearing adoption contract</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Decision record</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-04-26</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="adr-0013-federation-clearing-adoption-contract">ADR 0013: Federation Clearing Adoption Contract</h1>
+<h2 id="status">Status</h2>
 <p><strong>Accepted (2026-04-01); 2026-04-26 verification gaps closed; Step 3
 integration tests against <code>FederationServiceImpl</code> remain future work.</strong></p>
 <p>Steps 3a (terms propagation), 3b (source reference), 3c (read surface), and 3d (adoption
 proposal endpoint) are all implemented. Step 3a/b/c landed in PRs #1478/#1479.
 Step 3d landed on branch <code>feat/clearing-adoption-step3d</code>.</p>
-<h3>Open items — status update (2026-04-26 → 2026-04-26)</h3>
+<h3 id="open-items--status-update-2026-04-26--2026-04-26">Open items — status update (2026-04-26 → 2026-04-26)</h3>
 <p>The three open items recorded in the previous status note are now closed by
 landed work. They are listed here as a journal entry so anyone reading the ADR
 can trace the evidence chain.</p>
@@ -69,7 +66,7 @@ and disjoint list surfaces. The tests construct two <code>ClearingManager</code>
 instances backed by separate <code>SledStore::temporary()</code> instances — the same
 composition the gateway and supervisor use in production.</li>
 </ul>
-<h3>Remaining work (separate from the verification gaps above)</h3>
+<h3 id="remaining-work-separate-from-the-verification-gaps-above">Remaining work (separate from the verification gaps above)</h3>
 <p>The Phase 5 <em>Step 3 adoption-specific</em> tests prescribed below
 (<code>test_establish_clearing_uses_provided_terms_not_defaults</code>,
 <code>test_establish_clearing_with_source_agreement_id_stores_provenance</code>,
@@ -79,7 +76,7 @@ composition the gateway and supervisor use in production.</li>
 scoped to that crate&#39;s test surface and are not in scope for this PR. The
 substrate-level isolation tests landing here are the precondition for those
 higher-layer tests; the canonical record contract they assume is now proven.</p>
-<h2>Context</h2>
+<h2 id="context">Context</h2>
 <p>ADR 0012 established Model C (Explicit Parallel): two independent clearing paths —
 gateway/direct-management and governance/supervisor-owned — intentionally separate, with
 origin labeling at the read surface. Steps 1a, 1b, and 2 are complete.</p>
@@ -88,8 +85,8 @@ complexity.&quot; This ADR derives the exact Step 3 architecture from code reali
 a prerequisite capability gap in the existing governance path, and produces the design
 artifact that the next implementation pass can execute from.</p>
 <hr>
-<h2>Phase 1: Post-Merge Origin Path Map (as of 2026-04-01)</h2>
-<h3>Path 1: Direct-Management (gateway-local)</h3>
+<h2 id="phase-1-post-merge-origin-path-map-as-of-2026-04-01">Phase 1: Post-Merge Origin Path Map (as of 2026-04-01)</h2>
+<h3 id="path-1-direct-management-gateway-local">Path 1: Direct-Management (gateway-local)</h3>
 <table>
 <thead>
 <tr>
@@ -138,7 +135,7 @@ artifact that the next implementation pass can execute from.</p>
 <td>No</td>
 </tr>
 </tbody></table>
-<h3>Path 2: Governance (supervisor-owned)</h3>
+<h3 id="path-2-governance-supervisor-owned">Path 2: Governance (supervisor-owned)</h3>
 <table>
 <thead>
 <tr>
@@ -187,7 +184,7 @@ artifact that the next implementation pass can execute from.</p>
 <td>Yes — full audit trail</td>
 </tr>
 </tbody></table>
-<h3>Path 3: Compute/Receipt-Derived</h3>
+<h3 id="path-3-computereceipt-derived">Path 3: Compute/Receipt-Derived</h3>
 <table>
 <thead>
 <tr>
@@ -232,7 +229,7 @@ artifact that the next implementation pass can execute from.</p>
 <td>Position is observable; receipt is backing evidence</td>
 </tr>
 </tbody></table>
-<h3>Critical Gap: Terms Propagation (PREREQUISITE for Step 3)</h3>
+<h3 id="critical-gap-terms-propagation-prerequisite-for-step-3">Critical Gap: Terms Propagation (PREREQUISITE for Step 3)</h3>
 <p><strong>Discovery</strong>: <code>FederationEffect::EstablishClearing</code> carries only:</p>
 <pre><code class="language-rust">EstablishClearing {
     coop_a_did: String,
@@ -262,10 +259,10 @@ existing correctness gap, not introduced by this design pass.</p>
 <p><strong>This gap MUST be fixed before or alongside Step 3</strong> — adoption cannot carry real terms
 through a path that ignores terms.</p>
 <hr>
-<h2>Phase 2: Adoption Model Selection</h2>
-<h3>The question</h3>
+<h2 id="phase-2-adoption-model-selection">Phase 2: Adoption Model Selection</h2>
+<h3 id="the-question">The question</h3>
 <p>When a direct-management agreement is &quot;adopted&quot; into governance, what changes?</p>
-<h3>Options considered</h3>
+<h3 id="options-considered">Options considered</h3>
 <p><strong>Option A: In-place promotion</strong></p>
 <p>The gateway-local agreement is mutated/moved to become the governance-owned canonical record.</p>
 <ul>
@@ -317,7 +314,7 @@ record is canonical when both stores have the same ID? The read preference (Fede
 over FederationManager) masks the conflict rather than resolving it. The two positions would
 accumulate separately and diverge.</li>
 </ul>
-<h3>Chosen model: B — Ratified Re-instantiation</h3>
+<h3 id="chosen-model-b--ratified-re-instantiation">Chosen model: B — Ratified Re-instantiation</h3>
 <p><strong>State transition</strong>:</p>
 <pre><code>Before adoption:
   gateway store:     agreement_id = &quot;agr-001&quot; (direct-management, no provenance)
@@ -337,8 +334,8 @@ governance action (<code>FederationEffect::SettleClearing</code> on the source, 
 agreement starts at zero). Silent position inheritance would violate the store-isolation
 invariant.</p>
 <hr>
-<h2>Phase 3: Contract Boundary Design</h2>
-<h3>Prerequisite 3a: Terms Propagation Fix</h3>
+<h2 id="phase-3-contract-boundary-design">Phase 3: Contract Boundary Design</h2>
+<h3 id="prerequisite-3a-terms-propagation-fix">Prerequisite 3a: Terms Propagation Fix</h3>
 <p>Before adoption can work, <code>FederationEffect::EstablishClearing</code> must carry agreement terms.
 These are the minimum term fields, validated against the direct-management creation path:</p>
 <p><strong>New fields for <code>FederationEffect::EstablishClearing</code></strong> (all with <code>#[serde(default)]</code> for
@@ -378,7 +375,7 @@ backward wire compat):</p>
     .with_max_imbalance(request.max_imbalance)
 // exchange_rates applied via iterator
 </code></pre>
-<h3>Step 3b: Source Reference in Provenance</h3>
+<h3 id="step-3b-source-reference-in-provenance">Step 3b: Source Reference in Provenance</h3>
 <p><code>FederationProvenance</code> (or a new <code>ClearingProvenance</code> struct) must be extended:</p>
 <pre><code class="language-rust">struct ClearingProvenance {
     decision_receipt_id: String,
@@ -388,7 +385,7 @@ backward wire compat):</p>
 </code></pre>
 <p>This is persisted alongside the clearing agreement in the supervisor store. The provenance
 map key is <code>agreement_id</code> (canonical id of the governance record).</p>
-<h3>Step 3c: Read Surface Honesty</h3>
+<h3 id="step-3c-read-surface-honesty">Step 3c: Read Surface Honesty</h3>
 <p><code>ClearingAgreementView</code> gains one new field:</p>
 <pre><code class="language-rust">pub struct ClearingAgreementView {
     // ... existing fields ...
@@ -398,7 +395,7 @@ map key is <code>agreement_id</code> (canonical id of the governance record).</p
 </code></pre>
 <p>When <code>origin == &quot;governance&quot;</code> and <code>source_agreement_id == Some(...)</code>, clients know this is
 an adopted agreement and can trace back to the source.</p>
-<h3>Step 3d: Adoption Proposal Endpoint</h3>
+<h3 id="step-3d-adoption-proposal-endpoint">Step 3d: Adoption Proposal Endpoint</h3>
 <p>A gateway API endpoint that reads the direct-management agreement and forms a governance
 adoption proposal. This does NOT execute the effect directly — it prepares the proposal for
 the governance voting flow.</p>
@@ -419,7 +416,7 @@ the governance voting flow.</p>
 </ol>
 <p>The actual <code>FederationEffect::EstablishClearing</code> fires after governance approval — not
 immediately on proposal submission.</p>
-<h3>Lifecycle Sequence</h3>
+<h3 id="lifecycle-sequence">Lifecycle Sequence</h3>
 <pre><code>1. Direct-management agreement exists:
    POST /v1/federation/clearing → &quot;agr-001&quot; in gateway store
    (origin: &quot;direct-management&quot;, no provenance, no position query)
@@ -462,8 +459,8 @@ immediately on proposal submission.</p>
    → nets position, emits ledger entry with full provenance
 </code></pre>
 <hr>
-<h2>Phase 4: Minimum Implementation-Ready Slice</h2>
-<h3>What is NOT yet ripe for implementation</h3>
+<h2 id="phase-4-minimum-implementation-ready-slice">Phase 4: Minimum Implementation-Ready Slice</h2>
+<h3 id="what-is-not-yet-ripe-for-implementation">What is NOT yet ripe for implementation</h3>
 <p><strong>Step 3d (adoption proposal endpoint)</strong> requires:</p>
 <ul>
 <li>The governance voting flow to accept a clearing adoption proposal type</li>
@@ -471,7 +468,7 @@ immediately on proposal submission.</p>
 <li>Tested round-trip from proposal → vote → effect execution</li>
 <li>These are non-trivial and should not be rushed</li>
 </ul>
-<h3>What IS implementation-ready now</h3>
+<h3 id="what-is-implementation-ready-now">What IS implementation-ready now</h3>
 <p><strong>Step 3a (terms propagation fix)</strong> is independently valuable and low-risk:</p>
 <ul>
 <li>Fix <code>FederationEffect::EstablishClearing</code> to carry terms (<code>#[serde(default)]</code> for compat)</li>
@@ -529,8 +526,8 @@ alongside 3a/3b.</p>
 reference fields.&quot; No governance flow changes, no new API endpoints, no CCL contract types.
 ~5 files changed.</p>
 <hr>
-<h2>Phase 5: Verification Strategy</h2>
-<h3>Store-isolation tests (land BEFORE Step 3 implementation)</h3>
+<h2 id="phase-5-verification-strategy">Phase 5: Verification Strategy</h2>
+<h3 id="store-isolation-tests-land-before-step-3-implementation">Store-isolation tests (land BEFORE Step 3 implementation)</h3>
 <p>These tests must be green before any adoption mechanics are written. They establish the
 invariants that adoption must not violate:</p>
 <p><strong><code>test_gateway_clearing_and_governance_clearing_do_not_share_positions</code></strong></p>
@@ -550,7 +547,7 @@ invariants that adoption must not violate:</p>
 <li>Assert <code>FederationServiceImpl::list_cooperatives()</code> returns only &quot;coop-b&quot;</li>
 <li>Proves: cooperative registries are isolated — not merged, not visible cross-path</li>
 </ul>
-<h3>Step 3 adoption-specific tests (land with 3a/3b/3c PR)</h3>
+<h3 id="step-3-adoption-specific-tests-land-with-3a3b3c-pr">Step 3 adoption-specific tests (land with 3a/3b/3c PR)</h3>
 <p><strong><code>test_establish_clearing_uses_provided_terms_not_defaults</code></strong></p>
 <ul>
 <li>Call <code>FederationServiceImpl::establish_clearing()</code> with a request carrying explicit terms
@@ -584,14 +581,14 @@ invariants that adoption must not violate:</p>
 <li>Assert response has <code>origin: &quot;governance&quot;</code> and <code>source_agreement_id: &quot;agr-001&quot;</code></li>
 <li>Proves: read surface exposes adoption lineage honestly</li>
 </ul>
-<h3>Timing of store-isolation tests vs. Step 3</h3>
+<h3 id="timing-of-store-isolation-tests-vs-step-3">Timing of store-isolation tests vs. Step 3</h3>
 <p>Store-isolation tests MUST land before any Step 3 implementation begins. They are
 standalone tests against existing code — they require no new types or endpoints. If they
 fail, something is already broken and must be fixed before proceeding.</p>
 <p>Step 3a/b/c tests land in the same PR as the implementation changes.</p>
 <p>Step 3d tests land when the adoption proposal endpoint is implemented.</p>
 <hr>
-<h2>Phase 6: Open Questions Before Implementation</h2>
+<h2 id="phase-6-open-questions-before-implementation">Phase 6: Open Questions Before Implementation</h2>
 <p>These must be resolved before writing Step 3a:</p>
 <p><strong>Q1: Agreement ID for adopted record</strong>
 Should the governance-canonical agreement use:</p>
@@ -623,8 +620,8 @@ persisted to Sled. This means provenance is lost on daemon restart. This gap exi
 for join_federation provenance too. Step 3 should persist provenance to Sled alongside the
 agreement as part of the 3b implementation.</p>
 <hr>
-<h2>Consequences</h2>
-<h3>What Step 3a/b/c locks in</h3>
+<h2 id="consequences">Consequences</h2>
+<h3 id="what-step-3abc-locks-in">What Step 3a/b/c locks in</h3>
 <ol>
 <li><code>FederationEffect::EstablishClearing</code> is the canonical governance effect for creating
 clearing agreements — fresh AND adopted. No new effect variant needed for adoption.</li>
@@ -632,7 +629,7 @@ clearing agreements — fresh AND adopted. No new effect variant needed for adop
 <li>Clearing positions start fresh at governance establishment. No implicit inheritance.</li>
 <li>Provenance is persisted to Sled (Step 3b fixes the in-memory gap).</li>
 </ol>
-<h3>What Step 3a/b/c does NOT do</h3>
+<h3 id="what-step-3abc-does-not-do">What Step 3a/b/c does NOT do</h3>
 <ol>
 <li>Does not change the gateway write path (direct-management still works as-is).</li>
 <li>Does not add an adoption proposal endpoint (that is Step 3d).</li>
@@ -641,7 +638,7 @@ clearing agreements — fresh AND adopted. No new effect variant needed for adop
 <li>Does not void or supersede source agreements.</li>
 <li>Does not merge stores.</li>
 </ol>
-<h3>What Step 3d adds (implemented 2026-04-01)</h3>
+<h3 id="what-step-3d-adds-implemented-2026-04-01">What Step 3d adds (implemented 2026-04-01)</h3>
 <ol>
 <li><code>POST /v1/federation/clearing/{id}/propose-adoption</code> endpoint — <strong>IMPLEMENTED</strong></li>
 <li>Proposal payload mapping to <code>FederationEffect::EstablishClearing</code> with terms + source_id — <strong>IMPLEMENTED</strong></li>
@@ -655,7 +652,7 @@ clearing agreements — fresh AND adopted. No new effect variant needed for adop
 <li><code>establish_clearing()</code> in core supervisor populates <code>coop_a_did</code> correctly (currently <code>String::new()</code>)</li>
 </ul>
 <hr>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <ul>
 <li>ADR 0011: Canonical Truth Ownership — Gateway vs Supervisor</li>
 <li>ADR 0012: Federation State Origin Model (Step 1a/1b/2 complete; Step 3 here)</li>
@@ -665,7 +662,10 @@ clearing agreements — fresh AND adopted. No new effect variant needed for adop
 <li><code>crates/icn-federation/src/clearing.rs</code> — <code>BilateralClearingAgreement::new()</code> (Weekly/10000 defaults)</li>
 <li><code>crates/icn-core/src/supervisor/governance_executor.rs</code> — federation_effect_to_operation()</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0013-federation-clearing-adoption-contract.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

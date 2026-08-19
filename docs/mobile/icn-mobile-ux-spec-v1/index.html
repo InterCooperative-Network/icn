@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Mobile Member UX Spec v1 | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Mobile application UX specification"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Mobile Member UX Spec v1 | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>mobile</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>icn mobile ux spec v1</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/mobile/icn-mobile-ux-spec-v1.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Mobile Member UX Spec v1</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>mobile</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>icn mobile ux spec v1</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-mobile-member-ux-spec-v1">ICN Mobile Member UX Spec v1</h1>
 <p><strong>Status:</strong> Draft
 <strong>Date:</strong> 2026-03-18
 <strong>Author:</strong> Matt Faherty
@@ -63,7 +60,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li><code>docs/mobile/</code> (IN REPO) — 5 historical mobile docs from Dec 2024; SUPERSEDED by this spec</li>
 </ul>
 <hr>
-<h2>1. Member Shell</h2>
+<h2 id="1-member-shell">1. Member Shell</h2>
 <p>The app is organized around a persistent member, not an organization.</p>
 <p>A member is a person who:</p>
 <ul>
@@ -80,7 +77,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li><strong>Participation surface</strong> — where the member sees what they can do and acts on it</li>
 <li><strong>Continuity layer</strong> — preserves member identity and context across scope transitions</li>
 </ul>
-<h3>What follows the member across the network (portable)</h3>
+<h3 id="what-follows-the-member-across-the-network-portable">What follows the member across the network (portable)</h3>
 <ul>
 <li>Core identity (DID, keys, device metadata)</li>
 <li>Membership list (all entities the member belongs to)</li>
@@ -90,7 +87,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li>Saved filters and views</li>
 <li>Cross-scope action queue (Home)</li>
 </ul>
-<h3>What stays scoped to an entity</h3>
+<h3 id="what-stays-scoped-to-an-entity">What stays scoped to an entity</h3>
 <ul>
 <li>Charter rules and governance configuration</li>
 <li>Role powers and permissions</li>
@@ -100,7 +97,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li>Scope-specific activity records</li>
 <li>Scope-specific governance context</li>
 </ul>
-<h3>Onboarding flow (member-first, not org-first)</h3>
+<h3 id="onboarding-flow-member-first-not-org-first">Onboarding flow (member-first, not org-first)</h3>
 <ol>
 <li>Establish or import identity on device (<code>icnctl id create</code> equivalent)</li>
 <li>Secure device (biometric unlock for signing, recovery setup)</li>
@@ -109,7 +106,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li>Land on member Home (cross-scope action queue), not an org dashboard</li>
 </ol>
 <hr>
-<h2>2. Navigation Contract</h2>
+<h2 id="2-navigation-contract">2. Navigation Contract</h2>
 <p>Five tabs. Mobile bottom nav. No more.</p>
 <table>
 <thead>
@@ -151,7 +148,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <td>Org-specific settings (those live in Groups)</td>
 </tr>
 </tbody></table>
-<h3>Rules</h3>
+<h3 id="rules">Rules</h3>
 <ul>
 <li><strong>Participate</strong> is the core working surface. It reunifies governance + obligations + flows into one participation experience. The kernel separates these concerns architecturally; the UX reunifies them for the member.</li>
 <li><strong>Home</strong> aggregates across memberships. A member should not have to visit each coop separately to discover pending actions.</li>
@@ -160,9 +157,9 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li><strong>Profile</strong> includes the honest state of device management (v1 limitations included).</li>
 </ul>
 <hr>
-<h2>3. Gateway-to-View Projection Map</h2>
+<h2 id="3-gateway-to-view-projection-map">3. Gateway-to-View Projection Map</h2>
 <p>Every mobile view renders projections of real ICN types. Cards are rendering primitives, not data ontologies.</p>
-<h3>3.1 Proposal → Action Card (Home + Participate)</h3>
+<h3 id="31-proposal--action-card-home--participate">3.1 Proposal → Action Card (Home + Participate)</h3>
 <p><strong>Source:</strong> <code>GET /v1/gov/proposals/{id}</code> + <code>GET /v1/gov/proposals/{id}/tally</code></p>
 <table>
 <thead>
@@ -234,7 +231,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </tr>
 </tbody></table>
 <p><strong>Appears in:</strong> Home (if vote needed), Participate (always in active scope)</p>
-<h3>3.2 Obligation → Action Card (Home + Participate)</h3>
+<h3 id="32-obligation--action-card-home--participate">3.2 Obligation → Action Card (Home + Participate)</h3>
 <p><strong>Source:</strong> Obligation state machine (issue #1306 — <code>Issued → Accepted → Settled → Defaulted → Disputed</code>)</p>
 <table>
 <thead>
@@ -289,7 +286,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <blockquote>
 <p><strong>v0.2 refinement.</strong> Sync-state chip and stale-confirmation row apply to <strong>every</strong> ActionCard the shell renders, not just proposals and obligations. See <a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> §&quot;v0.2 rendering refinements&quot; for the contract. Promoted from the v0.2 Claude Design seed per <a href="/docs/design/claude-design-seed/CHANGELOG">`docs/design/claude-design-seed/CHANGELOG.md`</a>.</p>
 </blockquote>
-<h3>3.3 GovernanceProof → Detail Panel (Participate + Activity)</h3>
+<h3 id="33-governanceproof--detail-panel-participate--activity">3.3 GovernanceProof → Detail Panel (Participate + Activity)</h3>
 <p><strong>Source:</strong> <code>GET /v1/gov/proposals/{id}/proof</code></p>
 <p>Renders the provenance chain for a closed proposal:</p>
 <ul>
@@ -299,11 +296,11 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li>Link to related ExecutionReceipt if one exists</li>
 </ul>
 <p><strong>Appears in:</strong> Participate (detail view on closed proposals), Activity (as proof-backed event)</p>
-<h3>3.4 ExecutionReceipt → Provenance Link (Participate + Activity)</h3>
+<h3 id="34-executionreceipt--provenance-link-participate--activity">3.4 ExecutionReceipt → Provenance Link (Participate + Activity)</h3>
 <p><strong>Source:</strong> <code>icnctl audit receipt-chain</code> equivalent via gateway</p>
 <p>Shows the chain: Proposal → GovernanceProof → AllocationReceipt → ExecutionReceipt</p>
 <p><strong>Appears in:</strong> Detail views on obligations and allocations, Activity stream</p>
-<h3>3.5 Trust Dimensions → Trust Panel (Profile + Groups)</h3>
+<h3 id="35-trust-dimensions--trust-panel-profile--groups">3.5 Trust Dimensions → Trust Panel (Profile + Groups)</h3>
 <p><strong>Source:</strong> <code>icn-trust</code> crate — three independent graphs</p>
 <table>
 <thead>
@@ -337,7 +334,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </ul>
 <p>Never collapse into a single score. &quot;Trusted economically but unknown socially&quot; is meaningful information.</p>
 <p><strong>Appears in:</strong> Profile (own trust standing), Groups (trust context for entities), Participate (trust badges on counterparties)</p>
-<h3>3.6 Entity → Membership Card (Groups)</h3>
+<h3 id="36-entity--membership-card-groups">3.6 Entity → Membership Card (Groups)</h3>
 <p><strong>Source:</strong> <code>GET /v1/coops/{id}</code> + entity model (<code>entity:icn:&lt;type&gt;:&lt;identifier&gt;</code>)</p>
 <table>
 <thead>
@@ -379,7 +376,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </tr>
 </tbody></table>
 <p><strong>Appears in:</strong> Groups</p>
-<h3>3.7 Activity Event → Event Card (Activity)</h3>
+<h3 id="37-activity-event--event-card-activity">3.7 Activity Event → Event Card (Activity)</h3>
 <p><strong>Source:</strong> Gateway WebSocket event stream + cached activity records</p>
 <table>
 <thead>
@@ -422,9 +419,9 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </tbody></table>
 <p><strong>Appears in:</strong> Activity (primary), Home (important recent events)</p>
 <hr>
-<h2>4. Vocabulary Contract</h2>
+<h2 id="4-vocabulary-contract">4. Vocabulary Contract</h2>
 <p>The ICN codebase enforces regulatory-safe language via CI linter (issue #1312). The mobile UX must match.</p>
-<h3>Required substitutions</h3>
+<h3 id="required-substitutions">Required substitutions</h3>
 <table>
 <thead>
 <tr>
@@ -494,7 +491,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <td>Codebase type is <code>GovernanceProof</code>; member sees &quot;verified decision&quot;</td>
 </tr>
 </tbody></table>
-<h3>Seven Invariants (must be reflected in UX behavior)</h3>
+<h3 id="seven-invariants-must-be-reflected-in-ux-behavior">Seven Invariants (must be reflected in UX behavior)</h3>
 <ol>
 <li><strong>User-signed transitions only</strong> — no action happens without the member&#39;s cryptographic signature</li>
 <li><strong>No hosted balances</strong> — positions are computed views, not custodial holdings</li>
@@ -504,7 +501,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li><strong>Matching/market features are opt-in</strong> — and governance-authorized</li>
 <li><strong>Execution receipts close the governance loop</strong> — every resource action traces back to a governance decision</li>
 </ol>
-<h3>UX copy principles</h3>
+<h3 id="ux-copy-principles">UX copy principles</h3>
 <ul>
 <li>Use &quot;position&quot; not &quot;balance&quot; in summary views</li>
 <li>Use &quot;flow history&quot; not &quot;transaction history&quot;</li>
@@ -516,7 +513,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li>When showing trust: &quot;Known through [evidence]&quot; not &quot;Trust score: 82&quot;</li>
 </ul>
 <hr>
-<h2>5. Provenance Rendering Contract</h2>
+<h2 id="5-provenance-rendering-contract">5. Provenance Rendering Contract</h2>
 <p>The actual provenance chain in the codebase:</p>
 <pre><code>Proposal
   → GovernanceProof (blake3 hash, voter attestations, Ed25519 signatures)
@@ -525,36 +522,36 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
         → Obligation state change (Issued → Accepted → Settled)
           → JournalEntry (Merkle-DAG linked, required ProvenanceRef)
 </code></pre>
-<h3>How this renders on mobile</h3>
+<h3 id="how-this-renders-on-mobile">How this renders on mobile</h3>
 <p><strong>Every important object should expose a &quot;Why this exists&quot; affordance.</strong></p>
-<h4>On a Proposal detail view:</h4>
+<h4 id="on-a-proposal-detail-view">On a Proposal detail view:</h4>
 <ul>
 <li><strong>What this changes</strong> — derived from payload type</li>
 <li><strong>Who authorized</strong> — governance domain + quorum rules</li>
 <li><strong>Current proof</strong> — link to GovernanceProof (if closed)</li>
 <li><strong>What followed</strong> — link to any AllocationReceipt or ExecutionReceipt</li>
 </ul>
-<h4>On an Obligation card:</h4>
+<h4 id="on-an-obligation-card">On an Obligation card:</h4>
 <ul>
 <li><strong>Authorized by</strong> — link to originating Proposal</li>
 <li><strong>Proof</strong> — link to GovernanceProof that authorized it</li>
 <li><strong>Execution</strong> — link to ExecutionReceipt if settled</li>
 </ul>
-<h4>On an Activity event:</h4>
+<h4 id="on-an-activity-event">On an Activity event:</h4>
 <ul>
 <li><strong>Source</strong> — what governance decision or obligation triggered this</li>
 <li><strong>Proof</strong> — cryptographic proof reference (if proof-backed)</li>
 <li><strong>Chain position</strong> — where in the Merkle-DAG this sits</li>
 </ul>
-<h3>Receipt verification happens on device</h3>
+<h3 id="receipt-verification-happens-on-device">Receipt verification happens on device</h3>
 <p>Per ICN-Scenarios.md (Scenario 6), receipt verification works locally on the member&#39;s device via the React Native SDK. The member does NOT need to contact the issuing organization&#39;s daemon to verify a receipt. This is a critical security and offline property — verification is self-contained once the receipt data is cached.</p>
-<h3>Progressive disclosure pattern</h3>
+<h3 id="progressive-disclosure-pattern">Progressive disclosure pattern</h3>
 <ol>
 <li><strong>Card view:</strong> One-line provenance summary (&quot;Authorized by Proposal: Roof Repair&quot;)</li>
 <li><strong>Tap to expand:</strong> Full provenance chain with links to each step</li>
 <li><strong>Deep inspection:</strong> Raw proof data, hashes, attestation signatures</li>
 </ol>
-<h3>CLI audit equivalents on mobile</h3>
+<h3 id="cli-audit-equivalents-on-mobile">CLI audit equivalents on mobile</h3>
 <table>
 <thead>
 <tr>
@@ -576,8 +573,8 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </tr>
 </tbody></table>
 <hr>
-<h2>6. Scope + Role Switching Spec</h2>
-<h3>The scope model</h3>
+<h2 id="6-scope--role-switching-spec">6. Scope + Role Switching Spec</h2>
+<h3 id="the-scope-model">The scope model</h3>
 <p>A member&#39;s active context is defined by:</p>
 <pre><code>ActiveContext:
   entity_id: EntityId          # entity:icn:&lt;type&gt;:&lt;identifier&gt;
@@ -586,7 +583,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
   charter: CharterRef          # which governance rules apply
   permissions: Vec&lt;Scope&gt;      # governance:read, governance:write, coop:write, etc
 </code></pre>
-<h3>Switching behavior</h3>
+<h3 id="switching-behavior">Switching behavior</h3>
 <p>When scope changes:</p>
 <ul>
 <li><strong>Participate</strong> reloads with the new entity&#39;s proposals, obligations, and flow records</li>
@@ -595,7 +592,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <li><strong>Vocabulary may change</strong> (charter-specific terminology)</li>
 <li><strong>Threshold displays change</strong> (different charters have different quorum/approval rules)</li>
 </ul>
-<h3>Scope switcher UI</h3>
+<h3 id="scope-switcher-ui">Scope switcher UI</h3>
 <p>Persistent element accessible from any tab (likely top bar or Groups tab):</p>
 <pre><code>[Scope indicator: Entity name + Role badge]
   ↓ tap to open
@@ -605,7 +602,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
   - Finger Lakes CDN (Delegate)        [federation charter]
   - Self (no active entity scope)
 </code></pre>
-<h3>Entity type indicators</h3>
+<h3 id="entity-type-indicators">Entity type indicators</h3>
 <table>
 <thead>
 <tr>
@@ -630,7 +627,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <td>Shows cross-entity coordination, federation proposals</td>
 </tr>
 </tbody></table>
-<h3>Cooperatives and Communities are co-equal</h3>
+<h3 id="cooperatives-and-communities-are-co-equal">Cooperatives and Communities are co-equal</h3>
 <p>The scope switcher must NOT present these as a hierarchy:</p>
 <ul>
 <li>❌ Individual → Cooperative → Community → Federation (ladder)</li>
@@ -638,9 +635,9 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 </ul>
 <p>A person can be a steward in a cooperative and a member of a community simultaneously. These are parallel memberships, not nested containers.</p>
 <hr>
-<h2>7. Charter-Adaptive Rendering Rules</h2>
+<h2 id="7-charter-adaptive-rendering-rules">7. Charter-Adaptive Rendering Rules</h2>
 <p>When the active scope changes, the charter determines what the member sees and can do.</p>
-<h3>What the charter controls (from <code>icn-governance</code> crate)</h3>
+<h3 id="what-the-charter-controls-from-icn-governance-crate">What the charter controls (from <code>icn-governance</code> crate)</h3>
 <pre><code class="language-toml"># Example: contracts/templates/worker-coop.yaml
 [membership]
 admission = &quot;application_plus_vote&quot;
@@ -658,7 +655,7 @@ decision_method = &quot;consensus&quot;
 fallback = &quot;simple_majority&quot;
 receipt_required = true
 </code></pre>
-<h3>What changes in the UI per charter</h3>
+<h3 id="what-changes-in-the-ui-per-charter">What changes in the UI per charter</h3>
 <table>
 <thead>
 <tr>
@@ -698,7 +695,7 @@ receipt_required = true
 <td>If true, every allocation shows execution receipt status</td>
 </tr>
 </tbody></table>
-<h3>Rendering strategy</h3>
+<h3 id="rendering-strategy">Rendering strategy</h3>
 <p>The mobile app does NOT hardcode governance semantics. It reads charter configuration and adapts:</p>
 <ol>
 <li><strong>Proposal creation</strong> — only shows proposal types enabled by the charter</li>
@@ -707,7 +704,7 @@ receipt_required = true
 <li><strong>Role labels</strong> — uses charter-appropriate terminology</li>
 <li><strong>Action availability</strong> — only offers actions the member&#39;s role permits under this charter</li>
 </ol>
-<h3>Charter fallback</h3>
+<h3 id="charter-fallback">Charter fallback</h3>
 <p><strong>Charter templates are deployed as of Phase 1 complete (2026-03-18).</strong> Five templates exist at <code>contracts/templates/</code> (worker-coop, consumer-coop, housing-coop, community-org, federation). The ratification flow (<code>ProposalPayload::Charter</code>, PRs #1336+#1337) is merged. If a cooperative has not yet ratified a charter, the app falls back to a default governance profile:</p>
 <ul>
 <li>Simple majority voting</li>
@@ -716,7 +713,7 @@ receipt_required = true
 <li>No charter badge on scope switcher</li>
 </ul>
 <hr>
-<h2>8. Demo-Flow Mapping</h2>
+<h2 id="8-demo-flow-mapping">8. Demo-Flow Mapping</h2>
 <p>The four October 2026 demo flows map to specific mobile screens and transitions.</p>
 <p><strong>Dependency:</strong> This mapping is designed against the gateway API endpoints (which exist with real handler logic — 70+ endpoints, zero stubs per the vertical slice assessment). However, the demo scripts currently run simulated responses, not real gateway calls. Phase 2 Track D converts them to real <code>icnctl</code>/gateway calls. The governance demo (Flow 1) was validated end-to-end via CLI on March 17 (19 steps, exit 0, cryptographic receipt generated), but this was the CLI path, not the gateway-mediated path the mobile app will consume. Mobile implementation should proceed against the gateway API spec with the understanding that end-to-end integration testing requires Track D completion.</p>
 <p><strong>Gap Analysis Reality (from <code>docs/strategy/ICN-Gap-Analysis-March-2026.md</code>):</strong></p>
@@ -727,7 +724,7 @@ receipt_required = true
 <li><strong>Flow 4 (Reporting):</strong> Merged but unverified. Depends on receipt chain completion (#1311).</li>
 </ul>
 <p><strong>Priority:</strong> Build mobile v1 around Flow 1 (governance). Add other flows as they&#39;re verified by the Sprint (Mar 17-30).</p>
-<h3>Flow 1: Governance (&quot;Did the vote that authorized this action actually happen?&quot;)</h3>
+<h3 id="flow-1-governance-did-the-vote-that-authorized-this-action-actually-happen">Flow 1: Governance (&quot;Did the vote that authorized this action actually happen?&quot;)</h3>
 <p><strong>Demo script:</strong> <code>demo/scripts/flow-1-governance.sh</code>
 <strong>Persona:</strong> Harbor Homes Housing Cooperative</p>
 <table>
@@ -777,7 +774,7 @@ receipt_required = true
 </tr>
 </tbody></table>
 <p><strong>Key mobile moment:</strong> The proof panel. Member taps &quot;View proof&quot; and sees every voter&#39;s Ed25519 attestation, the decision hash, and verification status. This is where ICN&#39;s value becomes tangible.</p>
-<h3>Flow 2: Patronage (&quot;Why did this member get this distribution?&quot;)</h3>
+<h3 id="flow-2-patronage-why-did-this-member-get-this-distribution">Flow 2: Patronage (&quot;Why did this member get this distribution?&quot;)</h3>
 <p><strong>Demo script:</strong> <code>demo/scripts/flow-2-patronage.sh</code>
 <strong>Persona:</strong> BrightWorks Worker Cooperative</p>
 <table>
@@ -805,7 +802,7 @@ receipt_required = true
 </tr>
 </tbody></table>
 <p><strong>Key mobile moment:</strong> Tapping &quot;Why this amount?&quot; on a patronage allocation and seeing the entire chain from governance vote to formula application.</p>
-<h3>Flow 3: Federation (&quot;How do independent co-ops coordinate without a bureaucracy?&quot;)</h3>
+<h3 id="flow-3-federation-how-do-independent-co-ops-coordinate-without-a-bureaucracy">Flow 3: Federation (&quot;How do independent co-ops coordinate without a bureaucracy?&quot;)</h3>
 <p><strong>Demo script:</strong> <code>demo/scripts/flow-3-federation.sh</code>
 <strong>Persona:</strong> Finger Lakes CDN (federation of Harbor Homes, BrightWorks, River City Tool Library)</p>
 <table>
@@ -838,7 +835,7 @@ receipt_required = true
 </tr>
 </tbody></table>
 <p><strong>Key mobile moment:</strong> Scope switching from &quot;Harbor Homes (Member)&quot; to &quot;Finger Lakes CDN (Delegate)&quot; and seeing the governance context change entirely — different proposal types, different threshold rules, different scope of authority.</p>
-<h3>Flow 4: Reporting (&quot;Can this produce trustworthy reporting without admin overhead?&quot;)</h3>
+<h3 id="flow-4-reporting-can-this-produce-trustworthy-reporting-without-admin-overhead">Flow 4: Reporting (&quot;Can this produce trustworthy reporting without admin overhead?&quot;)</h3>
 <p><strong>Demo script:</strong> <code>demo/scripts/flow-4-reporting.sh</code></p>
 <table>
 <thead>
@@ -871,8 +868,8 @@ receipt_required = true
 </tbody></table>
 <p><strong>Key mobile moment:</strong> The Activity stream itself — showing that every record is proof-backed, every flow is traceable, and the audit trail is self-generating without manual overhead.</p>
 <hr>
-<h2>9. Identity and Device Reality Spec</h2>
-<h3>What v1 honestly supports</h3>
+<h2 id="9-identity-and-device-reality-spec">9. Identity and Device Reality Spec</h2>
+<h3 id="what-v1-honestly-supports">What v1 honestly supports</h3>
 <table>
 <thead>
 <tr>
@@ -927,12 +924,12 @@ receipt_required = true
 <td>Must be added for mobile (Android Keystore / iOS Secure Enclave)</td>
 </tr>
 </tbody></table>
-<h3>Honest mobile UX for identity</h3>
+<h3 id="honest-mobile-ux-for-identity">Honest mobile UX for identity</h3>
 <p><strong>Onboarding:</strong> Show the reality. &quot;Your identity is stored on this device. If you lose this device, you will need your recovery phrase or recovery contacts to regain access.&quot;</p>
 <p><strong>Device management:</strong> Show current device, with clear indication that multi-device is limited. &quot;To use ICN on another device, you&#39;ll need to export your identity from this device.&quot;</p>
 <p><strong>Recovery:</strong> Surface recovery setup prominently. Do not bury it. &quot;Set up recovery now&quot; should be a persistent prompt until completed.</p>
 <p><strong>Key operations:</strong> All signing happens locally via biometric unlock (when built) or device authentication. Never transmit private keys.</p>
-<h3>What the member sees in Profile → Identity</h3>
+<h3 id="what-the-member-sees-in-profile--identity">What the member sees in Profile → Identity</h3>
 <pre><code>Identity
   DID: did:icn:z6MkhaXg...  [copy]
   Created: 2026-03-15
@@ -951,14 +948,14 @@ Export
   [Export identity to another device]
 </code></pre>
 <hr>
-<h2>10. QR Schema v1</h2>
-<h3>Practical constraints</h3>
+<h2 id="10-qr-schema-v1">10. QR Schema v1</h2>
+<h3 id="practical-constraints">Practical constraints</h3>
 <ul>
 <li>Maximum payload: 2000 bytes (for reliable scanning across devices, per <code>icnctl</code> implementation using <code>qrcode</code> crate)</li>
 <li>Encoding: JSON, optionally signed</li>
 <li>Must work in low-light, at distance, on cheap screens</li>
 </ul>
-<h3>QR payload format</h3>
+<h3 id="qr-payload-format">QR payload format</h3>
 <pre><code class="language-json">{
   &quot;v&quot;: 1,
   &quot;type&quot;: &quot;entity&quot; | &quot;proposal&quot; | &quot;obligation&quot; | &quot;identity&quot; | &quot;action&quot;,
@@ -969,7 +966,7 @@ Export
   &quot;sig&quot;: &quot;&lt;optional Ed25519 signature over payload minus sig field&gt;&quot;
 }
 </code></pre>
-<h3>Use cases (v1 only — no NFC, no AR)</h3>
+<h3 id="use-cases-v1-only--no-nfc-no-ar">Use cases (v1 only — no NFC, no AR)</h3>
 <table>
 <thead>
 <tr>
@@ -1010,7 +1007,7 @@ Export
 <td>Opens relevant flow (demo-specific)</td>
 </tr>
 </tbody></table>
-<h3>Scan flow</h3>
+<h3 id="scan-flow">Scan flow</h3>
 <ol>
 <li>User opens scan mode (persistent camera, auto-detect, no &quot;press to scan&quot; button)</li>
 <li>QR detected → instant transition to relevant view</li>
@@ -1018,7 +1015,7 @@ Export
 <li>If expired: show &quot;This code has expired&quot; with option to proceed to the referenced object anyway</li>
 <li>If scope mismatch: prompt scope switch before opening</li>
 </ol>
-<h3>Dynamic QR (for person-to-person interactions)</h3>
+<h3 id="dynamic-qr-for-person-to-person-interactions">Dynamic QR (for person-to-person interactions)</h3>
 <p>For actions requiring counterparty confirmation (e.g., exchange settlement):</p>
 <ol>
 <li>Person A generates dynamic QR (rotating, short-lived, signed)</li>
@@ -1027,14 +1024,14 @@ Export
 <li>Action confirmation screen appears on both devices</li>
 <li>Both confirm → operations queued and synced</li>
 </ol>
-<h3>Non-QR fallbacks (for devices without cameras or in low-light)</h3>
+<h3 id="non-qr-fallbacks-for-devices-without-cameras-or-in-low-light">Non-QR fallbacks (for devices without cameras or in low-light)</h3>
 <ul>
 <li><strong>Manual entry:</strong> User can type an entity ID or DID directly</li>
 <li><strong>Nearby devices (future):</strong> Bluetooth proximity discovery</li>
 <li><strong>Share link:</strong> Deep links that open the same views as QR scans</li>
 </ul>
 <hr>
-<h2>Appendix A: Existing Surfaces and Their Relationship to Mobile</h2>
+<h2 id="appendix-a-existing-surfaces-and-their-relationship-to-mobile">Appendix A: Existing Surfaces and Their Relationship to Mobile</h2>
 <p>The ecosystem map (icn-ecosystem-map.md) defines five front-end surfaces plus supporting tools. The mobile member app is a sixth surface that must converge with, not duplicate, these.</p>
 <table>
 <thead>
@@ -1094,12 +1091,12 @@ Export
 <td>Summit attendees will scan QR codes pointing here. QR schema (Section 10) should support website deep links.</td>
 </tr>
 </tbody></table>
-<h2>Appendix B: Gateway Endpoints Relevant to Mobile v1</h2>
-<h3>Auth (required for all protected calls)</h3>
+<h2 id="appendix-b-gateway-endpoints-relevant-to-mobile-v1">Appendix B: Gateway Endpoints Relevant to Mobile v1</h2>
+<h3 id="auth-required-for-all-protected-calls">Auth (required for all protected calls)</h3>
 <pre><code>POST /v1/auth/challenge  →  { nonce, expires_in }
 POST /v1/auth/verify     →  { token (JWT), expires_in }
 </code></pre>
-<h3>Core governance (the demo-critical path)</h3>
+<h3 id="core-governance-the-demo-critical-path">Core governance (the demo-critical path)</h3>
 <pre><code>POST   /v1/gov/domains                        Create governance domain
 GET    /v1/gov/domains                         List domains
 POST   /v1/gov/proposals                       Create proposal
@@ -1114,31 +1111,31 @@ GET    /v1/gov/proposals/{id}/discussion       Discussion thread
 POST   /v1/gov/proposals/{id}/discussion/comments  Add comment
 POST   /v1/gov/delegations                     Delegate vote
 </code></pre>
-<h3>Cooperative management</h3>
+<h3 id="cooperative-management">Cooperative management</h3>
 <pre><code>POST   /v1/coops                    Create cooperative
 GET    /v1/coops/{id}               Get cooperative
 POST   /v1/coops/{id}/members       Add member
 DELETE /v1/coops/{id}/members       Remove member
 PUT    /v1/coops/{id}/members/role  Update role
 </code></pre>
-<h3>Federation</h3>
+<h3 id="federation">Federation</h3>
 <pre><code>GET    /v1/federation/status                    Federation status
 POST   /v1/federation/init                      Initialize federation
 GET    /v1/federation/coops                     List federated coops
 POST   /v1/federation/coops/{id}/vouch          Vouch for cooperative
 POST   /v1/federation/attestations              Issue attestation
 </code></pre>
-<h3>Identity</h3>
+<h3 id="identity">Identity</h3>
 <pre><code>GET    /v1/identity/resolve/{did}    DID resolution
 GET    /v1/members/{coop_id}/{did}   Member profile
 </code></pre>
-<h3>WebSocket (real-time events)</h3>
+<h3 id="websocket-real-time-events">WebSocket (real-time events)</h3>
 <p>Gateway supports WebSocket event streaming for live activity updates.</p>
-<h2>Appendix C: Sync State Model</h2>
+<h2 id="appendix-c-sync-state-model">Appendix C: Sync State Model</h2>
 <p>Every operation on mobile moves through:</p>
 <pre><code>local_pending → syncing → network_confirmed → (optional: disputed | superseded)
 </code></pre>
-<h3>Member-facing state labels</h3>
+<h3 id="member-facing-state-labels">Member-facing state labels</h3>
 <table>
 <thead>
 <tr>
@@ -1173,7 +1170,7 @@ GET    /v1/members/{coop_id}/{did}   Member profile
 <td>Orange</td>
 </tr>
 </tbody></table>
-<h3>Offline behavior</h3>
+<h3 id="offline-behavior">Offline behavior</h3>
 <table>
 <thead>
 <tr>
@@ -1213,7 +1210,7 @@ GET    /v1/members/{coop_id}/{did}   Member profile
 <td>Requires WebSocket connection</td>
 </tr>
 </tbody></table>
-<h3>Conflict handling</h3>
+<h3 id="conflict-handling">Conflict handling</h3>
 <p>If state changes before sync (e.g., proposal amended while offline vote is pending):</p>
 <ol>
 <li>UI shows: &quot;This proposal changed before your vote was confirmed&quot;</li>
@@ -1223,7 +1220,10 @@ GET    /v1/members/{coop_id}/{did}   Member profile
 </ol>
 <hr>
 <p><em>Spec generated 2026-03-18. Updated 2026-03-18: charter templates shipped (Phase 1 complete, PRs #1336+#1337). Next update triggers: gateway scope expansion (treasury:read/write), mobile implementation reveals missing assumptions.</em></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/mobile/icn-mobile-ux-spec-v1.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

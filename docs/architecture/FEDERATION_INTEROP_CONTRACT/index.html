@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation Interoperability Contract | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Specification of contracts and interfaces for federation interoperability"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation Interoperability Contract | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,19 +35,16 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FEDERATION INTEROP CONTRACT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/FEDERATION_INTEROP_CONTRACT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Federation Interoperability Contract</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FEDERATION INTEROP CONTRACT</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="federation-interoperability-contract">Federation Interoperability Contract</h1>
 <p><strong>Version:</strong> 1.0<br><strong>Status:</strong> NORMATIVE<br><strong>Last Updated:</strong> 2026-02-02</p>
-<h2>Abstract</h2>
+<h2 id="abstract">Abstract</h2>
 <p>This document defines the normative protocol-enforced contract for ICN federations. It specifies the kernel invariants, governance proof structure, verification algorithm, and interoperability requirements that enable adversarial interoperability across ICN implementations.</p>
 <p>This specification transforms the ICN federation layer from &quot;interesting architecture&quot; into &quot;protocol law&quot; — a cross-implementation compliance contract that implementations MUST follow to participate in the federation network.</p>
-<h2>Keywords</h2>
+<h2 id="keywords">Keywords</h2>
 <p>The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a>.</p>
 <hr>
-<h2>1. Overview</h2>
-<h3>1.1 Purpose</h3>
+<h2 id="1-overview">1. Overview</h2>
+<h3 id="11-purpose">1.1 Purpose</h3>
 <p>The ICN Federation Interoperability Contract defines:</p>
 <ul>
 <li><strong>Kernel invariants</strong>: Non-overridable protocol rules enforced by all implementations</li>
@@ -55,7 +52,7 @@ View source on GitHub →
 <li><strong>Verification algorithm</strong>: Steps to validate governance proofs across implementations</li>
 <li><strong>Interoperability requirements</strong>: Compliance checklist for cross-implementation compatibility</li>
 </ul>
-<h3>1.2 Design Principles</h3>
+<h3 id="12-design-principles">1.2 Design Principles</h3>
 <ol>
 <li><strong>Separation of Concerns</strong>: Kernel enforces invariants; governance (Policy Oracle) determines policies</li>
 <li><strong>Adversarial Interoperability</strong>: Implementations verify proofs without trusting senders</li>
@@ -63,7 +60,7 @@ View source on GitHub →
 <li><strong>Cryptographic Accountability</strong>: All actions are cryptographically attributable</li>
 <li><strong>Anti-Equivocation</strong>: Double-signing is automatically detected and penalized</li>
 </ol>
-<h3>1.3 Terminology</h3>
+<h3 id="13-terminology">1.3 Terminology</h3>
 <ul>
 <li><strong>Federation</strong>: Group of ≥2 cooperatives coordinating via a shared governance protocol</li>
 <li><strong>Cell</strong>: Distributed gossip topic where federation members synchronize state</li>
@@ -74,7 +71,7 @@ View source on GitHub →
 <li><strong>Constitution</strong>: Immutable governance rules locked at proposal submission</li>
 </ul>
 <hr>
-<h2>2. Kernel Invariants</h2>
+<h2 id="2-kernel-invariants">2. Kernel Invariants</h2>
 <p>These are <strong>non-overridable</strong> protocol rules enforced by the ICN kernel. Governance MAY NOT override these invariants.</p>
 <blockquote>
 <p><strong>Architecture Note (Meaning Firewall):</strong> Per ICN&#39;s kernel/app separation, the kernel enforces
@@ -82,7 +79,7 @@ constraints WITHOUT understanding their semantic origin. The invariants below ar
 safety properties that the kernel can enforce blindly. Domain-specific policies (membership
 rules, governance thresholds, etc.) belong in PolicyOracles and are covered in Section 2.4.</p>
 </blockquote>
-<h3>2.1 Settlement Conservation</h3>
+<h3 id="21-settlement-conservation">2.1 Settlement Conservation</h3>
 <p><strong>Invariant 2.1.1:</strong> Cross-cooperative settlements MUST sum to zero per currency.</p>
 <p><strong>Rationale:</strong> Prevents value creation/destruction exploits.</p>
 <p><strong>Enforcement:</strong></p>
@@ -114,7 +111,7 @@ rules, governance thresholds, etc.) belong in PolicyOracles and are covered in S
 </code></pre>
 <p><strong>Invariant 2.1.2:</strong> Settlement amounts MUST be positive integers.</p>
 <p><strong>Rationale:</strong> Prevents negative-amount exploits and ambiguous direction.</p>
-<h3>2.2 Anti-Equivocation</h3>
+<h3 id="22-anti-equivocation">2.2 Anti-Equivocation</h3>
 <p><strong>Invariant 2.2.1:</strong> A cooperative signing two different actions at the same sequence number is AUTOMATICALLY penalized.</p>
 <p><strong>Rationale:</strong> Byzantine fault tolerance requires equivocation detection.</p>
 <p><strong>Penalty Mechanism:</strong></p>
@@ -147,7 +144,7 @@ rules, governance thresholds, etc.) belong in PolicyOracles and are covered in S
     None
 }
 </code></pre>
-<h3>2.3 Arithmetic Safety</h3>
+<h3 id="23-arithmetic-safety">2.3 Arithmetic Safety</h3>
 <p><strong>Invariant 2.3.1:</strong> All arithmetic operations MUST use checked arithmetic (no overflow/underflow).</p>
 <p><strong>Rationale:</strong> Prevents integer overflow exploits.</p>
 <p><strong>Enforcement:</strong></p>
@@ -156,7 +153,7 @@ rules, governance thresholds, etc.) belong in PolicyOracles and are covered in S
 <li>Return <code>Error::IntegerOverflow</code> on overflow</li>
 <li>Use i64 for balances (signed to represent debt/credit)</li>
 </ul>
-<h3>2.4 Default Federation Policies</h3>
+<h3 id="24-default-federation-policies">2.4 Default Federation Policies</h3>
 <blockquote>
 <p><strong>Note:</strong> These policies are enforced by the <strong>FederationPolicyOracle</strong> (app layer), not the kernel.
 Federations MAY customize these through their constitution, but the defaults below represent
@@ -178,8 +175,8 @@ state synchronization.</p>
 <li><strong>Replication</strong>: ≥3 nodes per member cooperative</li>
 </ul>
 <hr>
-<h2>3. GovernanceProof Structure</h2>
-<h3>3.1 Field Specification</h3>
+<h2 id="3-governanceproof-structure">3. GovernanceProof Structure</h2>
+<h3 id="31-field-specification">3.1 Field Specification</h3>
 <pre><code class="language-rust">use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
 
@@ -215,7 +212,7 @@ pub struct GovernanceProof {
     pub signatures: BTreeMap&lt;String, [u8; 64]&gt;,
 }
 </code></pre>
-<h3>3.2 Field Constraints</h3>
+<h3 id="32-field-constraints">3.2 Field Constraints</h3>
 <table>
 <thead>
 <tr>
@@ -270,14 +267,14 @@ pub struct GovernanceProof {
 <td>Multi-sig: DID → Ed25519 signature, ≥ threshold signers</td>
 </tr>
 </tbody></table>
-<h3>3.3 Required Fields</h3>
+<h3 id="33-required-fields">3.3 Required Fields</h3>
 <p>All fields are REQUIRED except:</p>
 <ul>
 <li><code>decision_records</code> MAY be empty if no proposals are recorded in this proof</li>
 </ul>
 <hr>
-<h2>4. Canonical Signature Payload</h2>
-<h3>4.1 Payload Construction</h3>
+<h2 id="4-canonical-signature-payload">4. Canonical Signature Payload</h2>
+<h3 id="41-payload-construction">4.1 Payload Construction</h3>
 <p>The signature payload MUST be the canonical CBOR encoding of:</p>
 <pre><code class="language-rust">#[derive(Serialize)]
 struct SignaturePayload {
@@ -290,7 +287,7 @@ struct SignaturePayload {
 }
 </code></pre>
 <p><strong>Note:</strong> <code>decision_records</code> and <code>signatures</code> are EXCLUDED from the signature payload to avoid circular dependencies (signatures can&#39;t sign themselves).</p>
-<h3>4.2 Domain Separation</h3>
+<h3 id="42-domain-separation">4.2 Domain Separation</h3>
 <p>The signature MUST use typed hashing with domain separation:</p>
 <p><strong>Domain:</strong> <code>icn-federation:governance-proof:v1</code></p>
 <p><strong>Signature Computation:</strong></p>
@@ -317,7 +314,7 @@ fn sign_proof(proof: &amp;GovernanceProof, signing_key: &amp;SigningKey) -&gt; [
     signing_key.sign(&amp;payload_hash).to_bytes()
 }
 </code></pre>
-<h3>4.3 Multi-Signature Aggregation</h3>
+<h3 id="43-multi-signature-aggregation">4.3 Multi-Signature Aggregation</h3>
 <p>For multi-signature proofs:</p>
 <ol>
 <li>Each cooperative signs the SAME payload hash</li>
@@ -326,15 +323,15 @@ fn sign_proof(proof: &amp;GovernanceProof, signing_key: &amp;SigningKey) -&gt; [
 </ol>
 <p><strong>Note:</strong> ICN does not use signature aggregation (e.g., BLS). Each signature is verified independently.</p>
 <hr>
-<h2>5. Consensus-Visible Sequence</h2>
-<h3>5.1 Sequence Commitment</h3>
+<h2 id="5-consensus-visible-sequence">5. Consensus-Visible Sequence</h2>
+<h3 id="51-sequence-commitment">5.1 Sequence Commitment</h3>
 <p>The sequence number MUST be:</p>
 <ul>
 <li><strong>Monotonically increasing</strong>: <code>sequence &gt; prev_sequence</code></li>
 <li><strong>Globally visible</strong>: Included in signature payload</li>
 <li><strong>Partition-safe</strong>: Used for anti-replay across network partitions</li>
 </ul>
-<h3>5.2 Sequence Gaps</h3>
+<h3 id="52-sequence-gaps">5.2 Sequence Gaps</h3>
 <p>Sequence gaps are PERMITTED if:</p>
 <ul>
 <li>Previous state root is valid (matches known state at prev_sequence)</li>
@@ -357,15 +354,15 @@ fn sign_proof(proof: &amp;GovernanceProof, signing_key: &amp;SigningKey) -&gt; [
     Ok(())
 }
 </code></pre>
-<h3>5.3 Sequence Reset</h3>
+<h3 id="53-sequence-reset">5.3 Sequence Reset</h3>
 <p>Sequence numbers MUST NOT reset except:</p>
 <ul>
 <li>Genesis of a new federation (sequence = 1)</li>
 <li>Hard fork with new constitution (constitution_version increments)</li>
 </ul>
 <hr>
-<h2>6. Governance State Chain</h2>
-<h3>6.1 State Root Computation</h3>
+<h2 id="6-governance-state-chain">6. Governance State Chain</h2>
+<h3 id="61-state-root-computation">6.1 State Root Computation</h3>
 <p>The state root is a Merkle root over:</p>
 <ol>
 <li><strong>Member registry</strong>: <code>{coop_did -&gt; MemberInfo}</code></li>
@@ -423,7 +420,7 @@ fn compute_state_root(state: &amp;GovernanceState) -&gt; [u8; 32] {
 <blockquote>
 <p><strong>Normative Reference:</strong> See <a href="https://github.com/InterCooperative-Network/icn/blob/main/GOVERNANCE_STATE_MACHINE#41-state-root-computation#41-state-root-computation">GOVERNANCE_STATE_MACHINE.md §4.1</a> for the complete specification including proposal and decision hashing.</p>
 </blockquote>
-<h3>6.2 State Root Chain</h3>
+<h3 id="62-state-root-chain">6.2 State Root Chain</h3>
 <p>State roots form an append-only chain:</p>
 <pre><code>Genesis:  state_root_0 (prev = 0x00...00)
             ↓
@@ -454,7 +451,7 @@ Proof 2:  state_root_2 (prev = state_root_1)
     Ok(())
 }
 </code></pre>
-<h3>6.3 Fork Detection</h3>
+<h3 id="63-fork-detection">6.3 Fork Detection</h3>
 <p>If two proofs have:</p>
 <ul>
 <li>Same <code>sequence</code></li>
@@ -468,8 +465,8 @@ Proof 2:  state_root_2 (prev = state_root_1)
 <li>Halt new actions until resolution</li>
 </ol>
 <hr>
-<h2>7. Constitution Binding</h2>
-<h3>7.1 Constitution Lock</h3>
+<h2 id="7-constitution-binding">7. Constitution Binding</h2>
+<h3 id="71-constitution-lock">7.1 Constitution Lock</h3>
 <p>The constitution hash MUST be locked at proposal submission time and included in the governance proof.</p>
 <p><strong>Rationale:</strong> Prevents retroactive rule changes after votes are cast.</p>
 <p><strong>Enforcement:</strong></p>
@@ -496,7 +493,7 @@ fn validate_constitution_binding(
     Ok(())
 }
 </code></pre>
-<h3>7.2 Constitution Versioning</h3>
+<h3 id="72-constitution-versioning">7.2 Constitution Versioning</h3>
 <p>Constitutions MUST include:</p>
 <ul>
 <li><strong>Version number</strong>: Monotonically increasing</li>
@@ -504,8 +501,8 @@ fn validate_constitution_binding(
 <li><strong>Transition rules</strong>: How to migrate from previous version</li>
 </ul>
 <hr>
-<h2>8. Decision Record Handling</h2>
-<h3>8.1 Structure</h3>
+<h2 id="8-decision-record-handling">8. Decision Record Handling</h2>
+<h3 id="81-structure">8.1 Structure</h3>
 <p>Decision records map proposal IDs to decision hashes:</p>
 <pre><code class="language-rust">pub decision_records: BTreeMap&lt;String, Vec&lt;u8&gt;&gt;
 </code></pre>
@@ -518,7 +515,7 @@ struct Decision {
     pub timestamp: u64,
 }
 </code></pre>
-<h3>8.2 Size Limits</h3>
+<h3 id="82-size-limits">8.2 Size Limits</h3>
 <p>Decision records MUST be bounded:</p>
 <ul>
 <li>Maximum total size: 10 MB per proof</li>
@@ -526,7 +523,7 @@ struct Decision {
 <li>Maximum decision hash size: 32 bytes (BLAKE3)</li>
 </ul>
 <p><strong>Rationale:</strong> Prevents DoS attacks via oversized proofs.</p>
-<h3>8.3 Verification</h3>
+<h3 id="83-verification">8.3 Verification</h3>
 <p>Implementations MUST verify:</p>
 <ol>
 <li>Decision record keys (proposal IDs) are valid UUIDs or federation-local IDs</li>
@@ -535,11 +532,11 @@ struct Decision {
 <li>Decision outcomes are consistent with vote tallies</li>
 </ol>
 <hr>
-<h2>9. Action Type Derivation</h2>
-<h3>9.1 Trust Model</h3>
+<h2 id="9-action-type-derivation">9. Action Type Derivation</h2>
+<h3 id="91-trust-model">9.1 Trust Model</h3>
 <p>The <code>action_type</code> field in GovernanceProof is <strong>informational only</strong> and MUST NOT be trusted.</p>
 <p><strong>Rationale:</strong> Prevents action type spoofing attacks.</p>
-<h3>9.2 Derivation Algorithm</h3>
+<h3 id="92-derivation-algorithm">9.2 Derivation Algorithm</h3>
 <p>Verifiers MUST derive the action type from the action structure:</p>
 <pre><code class="language-rust">impl FederationAction {
     pub fn action_type(&amp;self) -&gt; ActionType {
@@ -558,7 +555,7 @@ struct Decision {
     }
 }
 </code></pre>
-<h3>9.3 Verification</h3>
+<h3 id="93-verification">9.3 Verification</h3>
 <pre><code class="language-rust">fn verify_action_type(proof: &amp;GovernanceProof, action: &amp;FederationAction) -&gt; Result&lt;()&gt; {
     let derived_type = action.action_type();
     
@@ -574,15 +571,15 @@ struct Decision {
 }
 </code></pre>
 <hr>
-<h2>10. Verification Modes</h2>
-<h3>10.1 Mode Taxonomy</h3>
+<h2 id="10-verification-modes">10. Verification Modes</h2>
+<h3 id="101-mode-taxonomy">10.1 Mode Taxonomy</h3>
 <p>Three verification modes are supported:</p>
 <ol>
 <li><strong>Replay Verification</strong>: Full state replay from genesis</li>
 <li><strong>Attested Verification</strong>: Trust bootstrap from signed checkpoint</li>
 <li><strong>ZkProof Verification</strong>: Zero-knowledge proof of valid state transition (future)</li>
 </ol>
-<h3>10.2 Replay Verification</h3>
+<h3 id="102-replay-verification">10.2 Replay Verification</h3>
 <p><strong>Requirements:</strong></p>
 <ul>
 <li>Access to full history from genesis</li>
@@ -610,7 +607,7 @@ struct Decision {
     Ok(state)
 }
 </code></pre>
-<h3>10.3 Attested Verification</h3>
+<h3 id="103-attested-verification">10.3 Attested Verification</h3>
 <p><strong>Requirements:</strong></p>
 <ul>
 <li>Signed checkpoint from trusted quorum</li>
@@ -648,7 +645,7 @@ struct Decision {
     Ok(state)
 }
 </code></pre>
-<h3>10.4 ZkProof Verification (Future)</h3>
+<h3 id="104-zkproof-verification-future">10.4 ZkProof Verification (Future)</h3>
 <p><strong>Requirements:</strong></p>
 <ul>
 <li>Zero-knowledge proof system (e.g., PLONK, Halo2)</li>
@@ -657,8 +654,8 @@ struct Decision {
 </ul>
 <p><strong>Status:</strong> Planned for future versions. Not required for initial interoperability.</p>
 <hr>
-<h2>11. Complete Verifier Algorithm</h2>
-<h3>11.1 Entry Point</h3>
+<h2 id="11-complete-verifier-algorithm">11. Complete Verifier Algorithm</h2>
+<h3 id="111-entry-point">11.1 Entry Point</h3>
 <pre><code class="language-rust">pub fn verify_governance_proof(
     proof: &amp;GovernanceProof,
     action: &amp;FederationAction,
@@ -697,8 +694,8 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h3>11.2 Step-by-Step Breakdown</h3>
-<h4>Step 1: Validate Proof Structure</h4>
+<h3 id="112-step-by-step-breakdown">11.2 Step-by-Step Breakdown</h3>
+<h4 id="step-1-validate-proof-structure">Step 1: Validate Proof Structure</h4>
 <pre><code class="language-rust">fn validate_proof_structure(proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
     // Check required fields are present
     if proof.federation_id.is_empty() {
@@ -734,7 +731,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 2: Verify Action Hash</h4>
+<h4 id="step-2-verify-action-hash">Step 2: Verify Action Hash</h4>
 <pre><code class="language-rust">fn verify_action_hash(
     proof: &amp;GovernanceProof,
     action: &amp;FederationAction,
@@ -752,7 +749,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 3: Verify Action Type</h4>
+<h4 id="step-3-verify-action-type">Step 3: Verify Action Type</h4>
 <pre><code class="language-rust">fn verify_action_type(
     proof: &amp;GovernanceProof,
     action: &amp;FederationAction,
@@ -768,7 +765,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 4: Verify State Chain</h4>
+<h4 id="step-4-verify-state-chain">Step 4: Verify State Chain</h4>
 <pre><code class="language-rust">fn validate_state_chain(
     proof: &amp;GovernanceProof,
     current_state: &amp;GovernanceState,
@@ -785,7 +782,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 5: Verify Sequence</h4>
+<h4 id="step-5-verify-sequence">Step 5: Verify Sequence</h4>
 <pre><code class="language-rust">fn validate_sequence(
     proof: &amp;GovernanceProof,
     current_state: &amp;GovernanceState,
@@ -807,7 +804,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 6: Verify Timestamp</h4>
+<h4 id="step-6-verify-timestamp">Step 6: Verify Timestamp</h4>
 <pre><code class="language-rust">fn validate_timestamp(proof: &amp;GovernanceProof) -&gt; Result&lt;()&gt; {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -833,7 +830,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 7: Verify Signatures (Multi-Sig)</h4>
+<h4 id="step-7-verify-signatures-multi-sig">Step 7: Verify Signatures (Multi-Sig)</h4>
 <pre><code class="language-rust">fn verify_signatures(
     proof: &amp;GovernanceProof,
     current_state: &amp;GovernanceState,
@@ -882,7 +879,7 @@ struct Decision {
 <li>All signers are active members</li>
 <li>Total governance weight meets the threshold</li>
 </ol>
-<h4>Step 8: Verify Action-Specific Constraints</h4>
+<h4 id="step-8-verify-action-specific-constraints">Step 8: Verify Action-Specific Constraints</h4>
 <pre><code class="language-rust">fn verify_action_constraints(
     action: &amp;FederationAction,
     current_state: &amp;GovernanceState,
@@ -935,7 +932,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 9: Verify Decision Records</h4>
+<h4 id="step-9-verify-decision-records">Step 9: Verify Decision Records</h4>
 <pre><code class="language-rust">fn verify_decision_records(
     proof: &amp;GovernanceProof,
     current_state: &amp;GovernanceState,
@@ -957,7 +954,7 @@ struct Decision {
     Ok(())
 }
 </code></pre>
-<h4>Step 10: Verify Governance Threshold</h4>
+<h4 id="step-10-verify-governance-threshold">Step 10: Verify Governance Threshold</h4>
 <pre><code class="language-rust">fn verify_governance_threshold(
     proof: &amp;GovernanceProof,
     current_state: &amp;GovernanceState,
@@ -991,9 +988,9 @@ struct Decision {
 }
 </code></pre>
 <hr>
-<h2>12. Interop Compliance Checklist</h2>
+<h2 id="12-interop-compliance-checklist">12. Interop Compliance Checklist</h2>
 <p>Implementations MUST satisfy the following requirements to be interoperable:</p>
-<h3>12.1 Data Structures</h3>
+<h3 id="121-data-structures">12.1 Data Structures</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses <code>BTreeMap&lt;K, V&gt;</code> for all map fields in signed/hashed objects</li>
 <li><input disabled="" type="checkbox"> Uses <code>BTreeSet&lt;T&gt;</code> for all set fields in signed/hashed objects</li>
@@ -1001,7 +998,7 @@ struct Decision {
 <li><input disabled="" type="checkbox"> Implements <code>Canonicalize</code> trait for all governance objects</li>
 <li><input disabled="" type="checkbox"> Implements <code>CanonicalEncode</code> trait</li>
 </ul>
-<h3>12.2 Cryptography</h3>
+<h3 id="122-cryptography">12.2 Cryptography</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses BLAKE3 for content hashing</li>
 <li><input disabled="" type="checkbox"> Uses Ed25519 for signatures</li>
@@ -1009,26 +1006,26 @@ struct Decision {
 <li><input disabled="" type="checkbox"> Verifies signatures against canonical payloads</li>
 <li><input disabled="" type="checkbox"> Supports ML-DSA (Dilithium) for post-quantum (optional)</li>
 </ul>
-<h3>12.3 Encoding</h3>
+<h3 id="123-encoding">12.3 Encoding</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses CBOR for canonical encoding</li>
 <li><input disabled="" type="checkbox"> Uses definite-length CBOR encoding</li>
 <li><input disabled="" type="checkbox"> Encodes integers in shortest form</li>
 <li><input disabled="" type="checkbox"> Sorts CBOR map keys bytewise lexicographically</li>
 </ul>
-<h3>12.4 Identifiers</h3>
+<h3 id="124-identifiers">12.4 Identifiers</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Normalizes DIDs before encoding</li>
 <li><input disabled="" type="checkbox"> Normalizes CurrencyIds before encoding</li>
 <li><input disabled="" type="checkbox"> Validates identifier formats</li>
 </ul>
-<h3>12.5 Arithmetic</h3>
+<h3 id="125-arithmetic">12.5 Arithmetic</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Uses checked arithmetic for all consensus-critical operations</li>
 <li><input disabled="" type="checkbox"> Validates numeric ranges before encoding</li>
 <li><input disabled="" type="checkbox"> Returns errors on overflow/underflow</li>
 </ul>
-<h3>12.6 Protocol Rules</h3>
+<h3 id="126-protocol-rules">12.6 Protocol Rules</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Enforces ≥2 member federations</li>
 <li><input disabled="" type="checkbox"> Enforces settlement conservation</li>
@@ -1039,7 +1036,7 @@ struct Decision {
 <li><input disabled="" type="checkbox"> Derives action type from structure</li>
 <li><input disabled="" type="checkbox"> Validates governance thresholds</li>
 </ul>
-<h3>12.7 Verification</h3>
+<h3 id="127-verification">12.7 Verification</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Implements complete verifier algorithm (§11)</li>
 <li><input disabled="" type="checkbox"> Supports replay verification mode</li>
@@ -1047,7 +1044,7 @@ struct Decision {
 <li><input disabled="" type="checkbox"> Handles sequence gaps correctly</li>
 <li><input disabled="" type="checkbox"> Detects and reports forks</li>
 </ul>
-<h3>12.8 Test Coverage</h3>
+<h3 id="128-test-coverage">12.8 Test Coverage</h3>
 <ul>
 <li><input disabled="" type="checkbox"> Includes test vectors for all action types</li>
 <li><input disabled="" type="checkbox"> Tests cross-implementation compatibility</li>
@@ -1055,8 +1052,8 @@ struct Decision {
 <li><input disabled="" type="checkbox"> Tests attack scenarios (conservation violation, equivocation, etc.)</li>
 </ul>
 <hr>
-<h2>13. Security Considerations</h2>
-<h3>13.1 Threat Model</h3>
+<h2 id="13-security-considerations">13. Security Considerations</h2>
+<h3 id="131-threat-model">13.1 Threat Model</h3>
 <p><strong>Assumptions:</strong></p>
 <ul>
 <li>Adversary controls ≤1/3 of governance weight</li>
@@ -1064,7 +1061,7 @@ struct Decision {
 <li>Adversary may attempt double-spending, equivocation, replay attacks</li>
 <li>Cryptographic primitives (Ed25519, BLAKE3) are secure</li>
 </ul>
-<h3>13.2 Conservation Violation</h3>
+<h3 id="132-conservation-violation">13.2 Conservation Violation</h3>
 <p><strong>Threat:</strong> Attacker creates settlement that doesn&#39;t sum to zero.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1072,7 +1069,7 @@ struct Decision {
 <li>All verifiers independently validate</li>
 <li>Invalid proofs are rejected</li>
 </ul>
-<h3>13.3 Equivocation Attack</h3>
+<h3 id="133-equivocation-attack">13.3 Equivocation Attack</h3>
 <p><strong>Threat:</strong> Attacker signs two conflicting actions at same sequence.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1080,7 +1077,7 @@ struct Decision {
 <li>Automatic penalty (governance weight → 0)</li>
 <li>Provable evidence for dispute resolution</li>
 </ul>
-<h3>13.4 Replay Attack</h3>
+<h3 id="134-replay-attack">13.4 Replay Attack</h3>
 <p><strong>Threat:</strong> Attacker reuses old governance proof in new context.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1088,7 +1085,7 @@ struct Decision {
 <li>State root chain prevents cross-sequence replay</li>
 <li>Timestamp bounds prevent ancient replays</li>
 </ul>
-<h3>13.5 Fork Attack</h3>
+<h3 id="135-fork-attack">13.5 Fork Attack</h3>
 <p><strong>Threat:</strong> Network partition leads to conflicting state branches.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1096,7 +1093,7 @@ struct Decision {
 <li>Conflicting proofs trigger reconciliation protocol</li>
 <li>Manual resolution if automatic reconciliation fails</li>
 </ul>
-<h3>13.6 Timestamp Manipulation</h3>
+<h3 id="136-timestamp-manipulation">13.6 Timestamp Manipulation</h3>
 <p><strong>Threat:</strong> Attacker claims future or ancient timestamps.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1104,14 +1101,14 @@ struct Decision {
 <li>1-year expiry for ancient proofs</li>
 <li>Reject proofs outside bounds</li>
 </ul>
-<h3>13.7 Signature Malleability</h3>
+<h3 id="137-signature-malleability">13.7 Signature Malleability</h3>
 <p><strong>Threat:</strong> Attacker modifies signature without invalidating.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
 <li>Ed25519 signatures are non-malleable</li>
 <li>Canonical encoding prevents payload manipulation</li>
 </ul>
-<h3>13.8 Integer Overflow</h3>
+<h3 id="138-integer-overflow">13.8 Integer Overflow</h3>
 <p><strong>Threat:</strong> Arithmetic overflow corrupts balances.</p>
 <p><strong>Mitigation:</strong></p>
 <ul>
@@ -1120,7 +1117,7 @@ struct Decision {
 <li>Explicit overflow errors</li>
 </ul>
 <hr>
-<h2>14. References</h2>
+<h2 id="14-references">14. References</h2>
 <ul>
 <li><a href="https://www.rfc-editor.org/rfc/rfc2119" target="_blank" rel="noopener">RFC 2119</a> - Key words for use in RFCs</li>
 <li><a href="https://www.rfc-editor.org/rfc/rfc8949" target="_blank" rel="noopener">RFC 8949</a> - CBOR</li>
@@ -1136,7 +1133,10 @@ struct Decision {
 <ul>
 <li>2026-02-02: Initial version 1.0</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/FEDERATION_INTEROP_CONTRACT.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

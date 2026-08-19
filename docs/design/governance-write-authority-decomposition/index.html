@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Write Authority Decomposition | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Current-state design/control map for #1868 after the original hybrid governance:write decomposition began landing. Enumerates all 51 current governance HTTP handlers still accepting the broad scope, including six newer direct-only paths; confirms the hybrid of bounded class scopes plus app-side mandate/process/entity authority; maps the seven landed class scopes and proposes governance:process:write for four real process-receipt handlers; maps DomainPolicy adoption and InstitutionalDomain declaration to the landed charter class; distinguishes technical capability, entity-aware subject/target authorization, MandateGate authority, and receipt evidence; and explains why #1868/#2061/#2080/#2081 must advance before AccessReceipt runtime. Docs only: no runtime, scope, handler, route, receipt, token, enforcement, vault, encryption, UI, fixture, downstream-repo, or readiness change."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Write Authority Decomposition | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,10 +35,7 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance write authority decomposition</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance-write-authority-decomposition.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance Write Authority Decomposition</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance write authority decomposition</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-07-05</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="governance-write-authority-decomposition">Governance Write Authority Decomposition</h1>
 <p><strong>Status:</strong> draft - design/control map
 <strong>Truth class:</strong> descriptive
 <strong>Canonical:</strong> no - implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
@@ -48,7 +45,7 @@ View source on GitHub →
 <blockquote>
 <p>This document is a current-state completion map for the <code>governance:write</code> decomposition. It supplements, and does not replace, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance-write-decomposition">`governance-write-decomposition.md`</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/mandate-gate-design">`mandate-gate-design.md`</a>. It chooses no runtime behavior in this PR and changes no capability, handler, route, receipt, authorization rule, or token. The design keeps the Meaning Firewall intact: the kernel enforces opaque constraints and scope strings, while governance and gateway apps evaluate institutional authority. A capability is not a mandate. A receipt records evidence and grants zero authority.</p>
 </blockquote>
-<h2>1. Why this design exists</h2>
+<h2 id="1-why-this-design-exists">1. Why this design exists</h2>
 <!-- truth: descriptive -->
 
 <p>Issue #1868 began from a broad technical gate: <code>GOVERNANCE_WRITE = &quot;governance:write&quot;</code> let one bearer scope reach many unrelated governance mutation families. The original decomposition design chose a hybrid path and several implementation slices have landed since then:</p>
@@ -62,10 +59,10 @@ View source on GitHub →
 </ul>
 <p>The work is therefore partially landed, not undecided. The remaining problem is that broad fallback still authorizes every handler in the current inventory, and six newer handlers use the broad scope directly with no class alternative. A token with only <code>governance:write</code> still has an unnecessarily large technical blast radius.</p>
 <p>This matters directly to the private-access lane established by #2337. A future <code>AccessReceipt</code> may cite an opaque authority-basis fingerprint, but it cannot substitute for a clear act-time authority decision. The subject, target, action, scope, validity, and revocation posture must be evaluated before the receipt records the result. Otherwise strong-looking evidence would wrap a weak gate.</p>
-<h2>2. Current state and complete handler inventory</h2>
+<h2 id="2-current-state-and-complete-handler-inventory">2. Current state and complete handler inventory</h2>
 <!-- truth: descriptive -->
 
-<h3>2.1 Code anchors</h3>
+<h3 id="21-code-anchors">2.1 Code anchors</h3>
 <ul>
 <li>Broad scope: <code>icn/crates/icn-rpc/src/auth.rs:947</code>.</li>
 <li>Existing class scopes: <code>icn/crates/icn-rpc/src/auth.rs:966-986</code>.</li>
@@ -76,7 +73,7 @@ View source on GitHub →
 <li>Entity-aware route authority: <code>icn/crates/icn-gateway/src/authority.rs</code> and <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a>.</li>
 </ul>
 <p>The inventory below was produced from the live handler source, then matched to route registration. It contains <strong>51 HTTP handlers</strong>: 44 with inline broad scope or broad accepted-also fallback, plus seven federation-proposal handlers gated through <code>extract_federation_common</code>.</p>
-<h3>2.2 Evidence notation</h3>
+<h3 id="22-evidence-notation">2.2 Evidence notation</h3>
 <p>The final column uses these short forms:</p>
 <ul>
 <li><strong>Admission only:</strong> the scope is checked, but this handler does not capture which accepted-also candidate matched for a receipt.</li>
@@ -84,7 +81,7 @@ View source on GitHub →
 <li><strong>Fact receipt only:</strong> the handler emits a bounded process receipt, but that receipt does not itself establish or grant the recorder&#39;s authority.</li>
 <li><strong>MandateGate:</strong> a real app-side <code>DefaultMandateGate</code> resolves actor, domain, act, target, and time before persistence.</li>
 </ul>
-<h3>2.3 Handler table</h3>
+<h3 id="23-handler-table">2.3 Handler table</h3>
 <p>The proposed authority posture is descriptive and must be frozen by a later implementation/ADR review. <code>Representation</code>, <code>Execution</code>, and <code>Attestation</code> use ADR-0014 vocabulary. <code>Standing/ownership</code> means the operation may remain mandate-exempt but still needs class scope plus existing membership or resource-ownership checks.</p>
 <table>
 <thead>
@@ -559,7 +556,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p>The table deliberately excludes read-only handlers whose comments mention <code>governance:write</code> but whose implementation does not require it. It also excludes test-only injected claims.</p>
-<h2>3. Design choice</h2>
+<h2 id="3-design-choice">3. Design choice</h2>
 <!-- truth: descriptive -->
 
 <p><strong>Choose and complete the hybrid path.</strong> This confirms the original #1868 decision against current code rather than reopening it.</p>
@@ -569,7 +566,7 @@ View source on GitHub →
 <li><strong>Evidence records the basis without becoming the basis.</strong> A receipt may bind the matched class scope and a <code>MandateGrantRef</code>, <code>ProcessAuthorized</code> posture, or explicit <code>NoMandateRequired</code> reason. The receipt does not validate itself into authority.</li>
 </ol>
 <p>Pure per-handler scope strings are rejected because 51 route strings would still fail to bind actor, target, domain, time, delegation, or revocation. Pure mandate gating is rejected because a missed app check would leave the broad technical capability as a full bypass. The hybrid gives defense in depth at two different layers.</p>
-<h2>4. Proposed scope taxonomy</h2>
+<h2 id="4-proposed-scope-taxonomy">4. Proposed scope taxonomy</h2>
 <!-- truth: descriptive -->
 
 <p>Seven class strings are landed:</p>
@@ -591,7 +588,7 @@ declare_institutional_domain -&gt; governance:charter:write
 </code></pre>
 <p>No <code>governance:evidence:export</code> or <code>governance:access:write</code> scope is proposed here because no corresponding handler is in this inventory. Scope names should follow real enforcement surfaces, not anticipated products.</p>
 <p><code>governance:write</code> remains a compatibility fallback today. The completion target is to remove it from production handler candidate lists only after trusted issuance can mint all required class scopes and clients have migrated. Retirement must be measured, tested, and fail-closed, not a flag-day string replacement.</p>
-<h2>5. Mandate-bundle and authority-basis surface</h2>
+<h2 id="5-mandate-bundle-and-authority-basis-surface">5. Mandate-bundle and authority-basis surface</h2>
 <!-- truth: descriptive -->
 
 <p>The app-side foundation is landed. <code>MandateRequest</code> currently carries:</p>
@@ -625,7 +622,7 @@ ProcessAuthorized
 <li>validity, expiry, and revocation posture.</li>
 </ul>
 <p>These are not all landed fields on one object. The current <code>MandateRequest</code>/<code>MandateGrantRef</code> is the implemented mandate slice; <code>actor_entity_id</code>, private-object target, policy-clause evidence, and access-purpose binding belong to later #2061/private-access design. This map does not pretend they already exist.</p>
-<h2>6. Relationship to #2061 entity-aware authorization</h2>
+<h2 id="6-relationship-to-2061-entity-aware-authorization">6. Relationship to #2061 entity-aware authorization</h2>
 <!-- truth: descriptive -->
 
 <p>The two lanes answer different halves of one authorization question:</p>
@@ -643,7 +640,7 @@ ProcessAuthorized
   -&gt; then record evidence
 </code></pre>
 <p>Flat <code>coop_id</code> equality remains the enforced same-namespace baseline on many gateway routes. It is the degenerate same-entity case, not the final delegation model. Federation/community delegation must never be inferred from federation sync, peer trust, route reachability, or receipt propagation.</p>
-<h2>7. Relationship to #2080 and #2081</h2>
+<h2 id="7-relationship-to-2080-and-2081">7. Relationship to #2080 and #2081</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -651,10 +648,10 @@ ProcessAuthorized
 <li><strong>#2081 supplies an observe-to-enforce migration precedent.</strong> Treasury currently keeps the flat guard authoritative while entity-aware decisions are measured. Governance class-scope retirement should follow the same discipline: accept both during a bounded compatibility window, record which matched, measure broad-only callers, then enforce the narrower class.</li>
 </ul>
 <p>Neither issue is solved by this document. This document also does not copy treasury&#39;s entity-action taxonomy into governance. It adopts only the migration discipline.</p>
-<h2>8. What changes in kernel and receipt evidence</h2>
+<h2 id="8-what-changes-in-kernel-and-receipt-evidence">8. What changes in kernel and receipt evidence</h2>
 <!-- truth: descriptive -->
 
-<h3>Current</h3>
+<h3 id="current">Current</h3>
 <ul>
 <li>The RPC/kernel-side authorization layer knows <code>governance:write</code> and seven opaque class strings.</li>
 <li>Five JSON-RPC methods prefer charter/proposal class strings but accept broad fallback.</li>
@@ -664,7 +661,7 @@ ProcessAuthorized
 <li><code>adopt_domain_policy</code> and <code>declare_institutional_domain</code> use a real <code>DefaultMandateGate</code>, but still require the broad technical scope.</li>
 <li>Process receipts record bounded facts and actor/time/proof links, but their existence does not prove that <code>governance:write</code> was an adequate authority basis.</li>
 </ul>
-<h3>Completion target</h3>
+<h3 id="completion-target">Completion target</h3>
 <ul>
 <li>The technical gate identifies one class scope per mutation family, including a separately reviewed process class if accepted.</li>
 <li>Broad fallback is retired after trusted issuance and compatibility measurement.</li>
@@ -673,7 +670,7 @@ ProcessAuthorized
 <li><code>AccessReceipt</code> may later cite that basis by fingerprint only after #2061 subject/target authorization and private-object policy enforcement have decided the request.</li>
 </ul>
 <p>The kernel still does not parse <code>MandateAct</code>, <code>EntityId</code> membership meaning, policy clauses, process meaning, or private-object semantics. It enforces opaque strings and constraints. The app supplies the decision and evidence.</p>
-<h2>9. What does not change</h2>
+<h2 id="9-what-does-not-change">9. What does not change</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -690,7 +687,7 @@ ProcessAuthorized
 <li>No authority is granted by a receipt, sync result, trust score, or routing proof.</li>
 <li>No production, pilot, organizer-ready, member-ready, live-federation, NYCN, Phase-2, or #2041 completion claim.</li>
 </ul>
-<h2>10. Implementation sequence after this document</h2>
+<h2 id="10-implementation-sequence-after-this-document">10. Implementation sequence after this document</h2>
 <!-- truth: descriptive -->
 
 <ol>
@@ -705,7 +702,7 @@ ProcessAuthorized
 <li>Only then open the <code>AccessReceipt</code> runtime decision rung. Private access additionally requires artifact registry, <code>PrivateObjectRef</code>, scoped-vault enforcement, disclosure policy, enumeration-safe outcomes, and visibility/retention decisions.</li>
 </ol>
 <p>The recommended first implementation lane after this docs PR is step 2: close the six direct-only handler gaps without changing the meaning of any handler.</p>
-<h2>11. Non-goals</h2>
+<h2 id="11-non-goals">11. Non-goals</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -729,7 +726,7 @@ ProcessAuthorized
 <li>No production, pilot, organizer-ready, member-ready, live-federation, NYCN, Phase-2, or #2041 completion claim.</li>
 <li>No closure of #1748, #2141, #2041, #1868, #2061, #2080, #2081, or #1907.</li>
 </ul>
-<h2>References</h2>
+<h2 id="references">References</h2>
 <!-- truth: descriptive -->
 
 <ul>
@@ -753,7 +750,10 @@ Refs #2336.
 Refs #1748.
 Refs #2141.
 Refs #2041.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance-write-authority-decomposition.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

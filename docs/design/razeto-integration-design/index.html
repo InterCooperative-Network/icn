@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design for integrating external systems via Razeto protocol"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,12 +35,9 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>razeto integration design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/razeto-integration-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>razeto integration design</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="razetos-four-intercooperative-bodies-icn-integration-design">Razeto&#39;s Four Intercooperative Bodies: ICN Integration Design</h1>
 <p>This document describes the integration of Luis Razeto&#39;s four intercooperative bodies from &quot;Cooperative Enterprise and Market Economy&quot; (Chapter 14) into ICN&#39;s infrastructure.</p>
-<h2>Background</h2>
+<h2 id="background">Background</h2>
 <p>Razeto identifies four key institutions that enable cooperatives to transcend individual limitations while preserving their cooperative character:</p>
 <ol>
 <li><strong>Cooperative Share Exchange</strong> - Labor shares representing accumulated value</li>
@@ -49,7 +46,7 @@ View source on GitHub →
 <li><strong>Technology/R&amp;D Service</strong> - Shared technology development</li>
 </ol>
 <p>These institutions allow cooperatives to achieve economies of scale, efficient capital allocation, and labor mobility without sacrificing worker ownership or democratic control.</p>
-<h2>Design Principles</h2>
+<h2 id="design-principles">Design Principles</h2>
 <p>From Razeto&#39;s analysis, these principles guide our implementation:</p>
 <ol>
 <li><strong>No severance of capital from labor</strong> - Labor shares remain tied to membership</li>
@@ -59,8 +56,8 @@ View source on GitHub →
 <li><strong>Solidarity over profit</strong> - CFE operates at cost-recovery, not profit</li>
 <li><strong>Technology as commons</strong> - R&amp;D outputs default to cooperative licensing</li>
 </ol>
-<h2>Current State Analysis</h2>
-<h3>ICN Strengths (Already Aligned with Razeto)</h3>
+<h2 id="current-state-analysis">Current State Analysis</h2>
+<h3 id="icn-strengths-already-aligned-with-razeto">ICN Strengths (Already Aligned with Razeto)</h3>
 <table>
 <thead>
 <tr>
@@ -100,7 +97,7 @@ View source on GitHub →
 <td>Anti-speculation</td>
 </tr>
 </tbody></table>
-<h3>Gaps to Fill</h3>
+<h3 id="gaps-to-fill">Gaps to Fill</h3>
 <table>
 <thead>
 <tr>
@@ -146,7 +143,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <hr>
-<h2>Part 1: Cooperative Share Exchange</h2>
+<h2 id="part-1-cooperative-share-exchange">Part 1: Cooperative Share Exchange</h2>
 <p>Labor shares represent accumulated value from worker contributions. Unlike traditional equity, labor shares:</p>
 <ul>
 <li>Are earned through labor, not purchased</li>
@@ -154,7 +151,7 @@ View source on GitHub →
 <li>Are redeemed at unit value when leaving</li>
 <li>Accumulate allocated surplus proportionally</li>
 </ul>
-<h3>New Types</h3>
+<h3 id="new-types">New Types</h3>
 <p><strong>Location:</strong> <code>icn-ledger/src/labor_shares.rs</code></p>
 <pre><code class="language-rust">use serde::{Deserialize, Serialize};
 use icn_identity::Did;
@@ -290,7 +287,7 @@ pub struct SurplusAllocation {
     pub allocated_at: u64,
 }
 </code></pre>
-<h3>Treasury Integration</h3>
+<h3 id="treasury-integration">Treasury Integration</h3>
 <p>Extend <code>TreasuryOperation</code> in <code>icn-ledger/src/treasury.rs</code>:</p>
 <pre><code class="language-rust">pub enum TreasuryOperation {
     // ... existing variants ...
@@ -326,7 +323,7 @@ pub enum BondPaymentType {
     Combined,
 }
 </code></pre>
-<h3>Governance Integration</h3>
+<h3 id="governance-integration">Governance Integration</h3>
 <p>Add to <code>ProposalPayload</code> in <code>icn-governance/src/proposal.rs</code>:</p>
 <pre><code class="language-rust">pub enum ProposalPayload {
     // ... existing variants ...
@@ -359,16 +356,16 @@ pub struct BondOffering {
     pub payment_schedule: PaymentSchedule,
 }
 </code></pre>
-<h3>Gossip Topics</h3>
+<h3 id="gossip-topics">Gossip Topics</h3>
 <ul>
 <li><code>labor-shares:allocations</code> - Surplus allocation announcements</li>
 <li><code>bonds:issuance</code> - New bond offerings</li>
 <li><code>bonds:payments</code> - Bond payment notifications</li>
 </ul>
 <hr>
-<h2>Part 2: Cooperative Labor Exchange</h2>
+<h2 id="part-2-cooperative-labor-exchange">Part 2: Cooperative Labor Exchange</h2>
 <p>Enables worker mobility between cooperatives while preserving membership ties and ensuring credits flow appropriately.</p>
-<h3>New Types</h3>
+<h3 id="new-types-1">New Types</h3>
 <p><strong>Location:</strong> <code>icn-entity/src/labor_exchange.rs</code></p>
 <pre><code class="language-rust">use serde::{Deserialize, Serialize};
 
@@ -499,7 +496,7 @@ pub struct LaborPool {
     pub open_needs: Vec&lt;LaborNeed&gt;,
 }
 </code></pre>
-<h3>Membership Integration</h3>
+<h3 id="membership-integration">Membership Integration</h3>
 <p>Extend <code>Membership</code> in <code>icn-entity/src/membership.rs</code>:</p>
 <pre><code class="language-rust">pub struct Membership {
     // ... existing fields ...
@@ -514,7 +511,7 @@ pub struct LaborPool {
     pub is_primary: bool,
 }
 </code></pre>
-<h3>Federation Clearing Integration</h3>
+<h3 id="federation-clearing-integration">Federation Clearing Integration</h3>
 <p>Extend <code>CrossCoopTransfer</code> in <code>icn-federation/src/clearing.rs</code>:</p>
 <pre><code class="language-rust">pub enum TransferType {
     // ... existing variants ...
@@ -531,23 +528,23 @@ pub struct LaborPool {
     },
 }
 </code></pre>
-<h3>Gossip Topics</h3>
+<h3 id="gossip-topics-1">Gossip Topics</h3>
 <ul>
 <li><code>labor-pool:registrations</code> - Worker availability announcements</li>
 <li><code>labor-pool:needs</code> - Open position postings</li>
 <li><code>assignments:status</code> - Assignment updates (trust-gated)</li>
 </ul>
 <hr>
-<h2>Part 3: Cooperative Financial Entity (CFE)</h2>
+<h2 id="part-3-cooperative-financial-entity-cfe">Part 3: Cooperative Financial Entity (CFE)</h2>
 <p>A cooperative of cooperatives providing capital market functions without profit motive.</p>
-<h3>Key Characteristics</h3>
+<h3 id="key-characteristics">Key Characteristics</h3>
 <ul>
 <li><strong>Not a bank</strong> - No fractional reserve, no profit extraction</li>
 <li><strong>Member-owned</strong> - Each cooperative has governance rights</li>
 <li><strong>Cost-recovery</strong> - Interest rates cover admin costs only</li>
 <li><strong>Solidarity-based</strong> - Stronger coops support developing ones</li>
 </ul>
-<h3>New Types</h3>
+<h3 id="new-types-2">New Types</h3>
 <p><strong>Location:</strong> <code>icn-federation/src/financial_entity.rs</code></p>
 <pre><code class="language-rust">use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -674,7 +671,7 @@ pub struct CooperativeFinancialEntity {
     pub governance_domain: String,
 }
 </code></pre>
-<h3>Governance Integration</h3>
+<h3 id="governance-integration-1">Governance Integration</h3>
 <pre><code class="language-rust">pub enum ProposalPayload {
     // ... existing variants ...
 
@@ -715,7 +712,7 @@ pub struct LoanRequest {
     pub collateral_offered: Vec&lt;Collateral&gt;,
 }
 </code></pre>
-<h3>Gossip Topics</h3>
+<h3 id="gossip-topics-2">Gossip Topics</h3>
 <ul>
 <li><code>cfe:deposits</code> - Deposit availability</li>
 <li><code>cfe:loans</code> - Loan requests/approvals (trust-gated)</li>
@@ -723,9 +720,9 @@ pub struct LoanRequest {
 <li><code>cfe:rates</code> - Rate policy updates</li>
 </ul>
 <hr>
-<h2>Part 4: Technology/R&amp;D Service</h2>
+<h2 id="part-4-technologyrd-service">Part 4: Technology/R&amp;D Service</h2>
 <p>Shared technology development and service provision across cooperatives.</p>
-<h3>New Types</h3>
+<h3 id="new-types-3">New Types</h3>
 <p><strong>Location:</strong> <code>icn-federation/src/shared_services.rs</code></p>
 <pre><code class="language-rust">use serde::{Deserialize, Serialize};
 
@@ -883,7 +880,7 @@ pub struct TechRegistry {
     pub technologies: Vec&lt;TechEntry&gt;,
 }
 </code></pre>
-<h3>Integration with icn-compute</h3>
+<h3 id="integration-with-icn-compute">Integration with icn-compute</h3>
 <p><code>SharedService::Compute</code> integrates with <code>icn-compute</code> scheduler:</p>
 <pre><code class="language-rust">impl SharedService {
     pub fn as_compute_provider(&amp;self) -&gt; Option&lt;ComputeProvider&gt; {
@@ -899,7 +896,7 @@ pub struct TechRegistry {
     }
 }
 </code></pre>
-<h3>Governance Integration</h3>
+<h3 id="governance-integration-2">Governance Integration</h3>
 <pre><code class="language-rust">pub enum ProposalPayload {
     // ... existing variants ...
 
@@ -920,16 +917,16 @@ pub struct TechRegistry {
     },
 }
 </code></pre>
-<h3>Gossip Topics</h3>
+<h3 id="gossip-topics-3">Gossip Topics</h3>
 <ul>
 <li><code>services:catalog</code> - Shared service announcements</li>
 <li><code>rd:projects</code> - R&amp;D project coordination</li>
 <li><code>tech:registry</code> - Technology registry updates</li>
 </ul>
 <hr>
-<h2>Part 5: Scheduler (Cross-Cutting)</h2>
+<h2 id="part-5-scheduler-cross-cutting">Part 5: Scheduler (Cross-Cutting)</h2>
 <p>All four bodies require scheduled operations. CCL has <code>Trigger</code> AST but no executor.</p>
-<h3>New Crate: <code>icn-scheduler</code></h3>
+<h3 id="new-crate-icn-scheduler">New Crate: <code>icn-scheduler</code></h3>
 <pre><code class="language-rust">use serde::{Deserialize, Serialize};
 
 /// Schedule specification
@@ -984,7 +981,7 @@ pub struct TaskRun {
     pub output: Option&lt;String&gt;,
 }
 </code></pre>
-<h3>Use Cases</h3>
+<h3 id="use-cases">Use Cases</h3>
 <table>
 <thead>
 <tr>
@@ -1021,7 +1018,7 @@ pub struct TaskRun {
 <td>Milestone deadline reminders</td>
 </tr>
 </tbody></table>
-<h3>Supervisor Integration</h3>
+<h3 id="supervisor-integration">Supervisor Integration</h3>
 <p>Add to <code>icn-core/src/supervisor.rs</code>:</p>
 <pre><code class="language-rust">impl Supervisor {
     pub async fn spawn_scheduler(&amp;self, config: SchedulerConfig) -&gt; Result&lt;SchedulerHandle&gt; {
@@ -1034,8 +1031,8 @@ pub struct TaskRun {
 }
 </code></pre>
 <hr>
-<h2>Implementation Roadmap</h2>
-<h3>Phase 1: Labor Shares Foundation (4-6 weeks)</h3>
+<h2 id="implementation-roadmap">Implementation Roadmap</h2>
+<h3 id="phase-1-labor-shares-foundation-4-6-weeks">Phase 1: Labor Shares Foundation (4-6 weeks)</h3>
 <ol>
 <li>Add <code>LaborShare</code>, <code>CooperativeBond</code> types to <code>icn-ledger</code></li>
 <li>Add <code>TreasuryOperation::AllocateSurplus</code>, <code>RedeemShare</code>, <code>IssueBond</code></li>
@@ -1044,7 +1041,7 @@ pub struct TaskRun {
 <li>Create gossip topics</li>
 <li>Unit tests</li>
 </ol>
-<h3>Phase 2: Labor Exchange (4-6 weeks)</h3>
+<h3 id="phase-2-labor-exchange-4-6-weeks">Phase 2: Labor Exchange (4-6 weeks)</h3>
 <ol>
 <li>Add <code>LaborAssignment</code>, <code>CreditRouting</code> to <code>icn-entity</code></li>
 <li>Extend <code>Membership</code> with assignments</li>
@@ -1053,7 +1050,7 @@ pub struct TaskRun {
 <li>Create labor pool primitives</li>
 <li>Integration tests</li>
 </ol>
-<h3>Phase 3: CFE Core (6-8 weeks)</h3>
+<h3 id="phase-3-cfe-core-6-8-weeks">Phase 3: CFE Core (6-8 weeks)</h3>
 <ol>
 <li>Add CFE types to <code>icn-federation</code></li>
 <li>Implement deposit/loan lifecycle</li>
@@ -1062,7 +1059,7 @@ pub struct TaskRun {
 <li>Wire to treasury for settlements</li>
 <li>End-to-end tests</li>
 </ol>
-<h3>Phase 4: Scheduler (3-4 weeks, parallel with Phase 2-3)</h3>
+<h3 id="phase-4-scheduler-3-4-weeks-parallel-with-phase-2-3">Phase 4: Scheduler (3-4 weeks, parallel with Phase 2-3)</h3>
 <ol>
 <li>Create <code>icn-scheduler</code> crate</li>
 <li>Implement cron-style scheduling</li>
@@ -1070,7 +1067,7 @@ pub struct TaskRun {
 <li>Add to supervisor spawn</li>
 <li>Tests for scheduling edge cases</li>
 </ol>
-<h3>Phase 5: Shared Services (4-6 weeks)</h3>
+<h3 id="phase-5-shared-services-4-6-weeks">Phase 5: Shared Services (4-6 weeks)</h3>
 <ol>
 <li>Add service types to <code>icn-federation</code></li>
 <li>Link <code>ServiceType::Compute</code> to <code>icn-compute</code></li>
@@ -1078,7 +1075,7 @@ pub struct TaskRun {
 <li>Add governance proposals</li>
 <li>Tests</li>
 </ol>
-<h3>Phase 6: R&amp;D Coordination (4-6 weeks)</h3>
+<h3 id="phase-6-rd-coordination-4-6-weeks">Phase 6: R&amp;D Coordination (4-6 weeks)</h3>
 <ol>
 <li>Add R&amp;D project types</li>
 <li>Implement technology registry</li>
@@ -1087,7 +1084,7 @@ pub struct TaskRun {
 <li>Integration tests</li>
 </ol>
 <hr>
-<h2>Critical Files Reference</h2>
+<h2 id="critical-files-reference">Critical Files Reference</h2>
 <table>
 <thead>
 <tr>
@@ -1125,13 +1122,16 @@ pub struct TaskRun {
 </tr>
 </tbody></table>
 <hr>
-<h2>Related Documents</h2>
+<h2 id="related-documents">Related Documents</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/economics/contribution-credits-design">contribution-credits-design.md</a> - Mutual credit and demurrage design</li>
 <li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture overview</li>
 <li><a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a> - Development phase history</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/razeto-integration-design.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

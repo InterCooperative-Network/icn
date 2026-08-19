@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Complete Build - Detailed Plan | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Detailed SDIS build plan from API to mobile"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>SDIS Complete Build - Detailed Plan | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,23 +35,20 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS BUILD PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_BUILD_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS Complete Build - Detailed Plan</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>sdis</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SDIS BUILD PLAN</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="sdis-complete-build---detailed-plan">SDIS Complete Build - Detailed Plan</h1>
 <p><strong>Session Start:</strong> 2025-12-12 20:30 UTC
 <strong>Target:</strong> Complete SDIS from API to Mobile
 <strong>Status:</strong> IN PROGRESS</p>
 <hr>
-<h2>✅ What Already Exists</h2>
-<h3>Crypto &amp; Core (100% Complete)</h3>
+<h2 id="-what-already-exists">✅ What Already Exists</h2>
+<h3 id="crypto--core-100-complete">Crypto &amp; Core (100% Complete)</h3>
 <ul>
 <li>✅ icn-crypto-pq (51 tests passing)</li>
 <li>✅ icn-steward (66 tests passing)  </li>
 <li>✅ icn-zkp (42 tests passing)</li>
 <li>✅ icn-identity (anchor, keybundle, VUI)</li>
 </ul>
-<h3>Gateway API (Partial - 60% Complete)</h3>
+<h3 id="gateway-api-partial---60-complete">Gateway API (Partial - 60% Complete)</h3>
 <ul>
 <li>✅ Ephemeral proof generation</li>
 <li>✅ QR code encoding</li>
@@ -61,7 +58,7 @@ View source on GitHub →
 <li>❌ Anchor management</li>
 <li>❌ Steward integration</li>
 </ul>
-<h3>UI (0% Complete)</h3>
+<h3 id="ui-0-complete">UI (0% Complete)</h3>
 <ul>
 <li>❌ Pilot UI enrollment wizard</li>
 <li>❌ Pilot UI identity viewer</li>
@@ -70,9 +67,9 @@ View source on GitHub →
 <li>❌ Mobile credential wallet</li>
 </ul>
 <hr>
-<h2>🎯 Build Sequence</h2>
-<h3>STEP 1: Gateway API Completion (2-3 hours)</h3>
-<h4>1.1 Enrollment Endpoints</h4>
+<h2 id="-build-sequence">🎯 Build Sequence</h2>
+<h3 id="step-1-gateway-api-completion-2-3-hours">STEP 1: Gateway API Completion (2-3 hours)</h3>
+<h4 id="11-enrollment-endpoints">1.1 Enrollment Endpoints</h4>
 <p>Create <code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code>:</p>
 <pre><code class="language-rust">POST /v1/sdis/enrollment/start
 Request:
@@ -111,7 +108,7 @@ Response:
   &quot;keybundle_version&quot;: 1
 }
 </code></pre>
-<h4>1.2 Recovery Endpoints</h4>
+<h4 id="12-recovery-endpoints">1.2 Recovery Endpoints</h4>
 <p>Create <code>icn/crates/icn-gateway/src/api/sdis/recovery.rs</code>:</p>
 <pre><code class="language-rust">POST /v1/sdis/recovery/start
 Request:
@@ -143,7 +140,7 @@ Response:
   &quot;anchor_id&quot;: &quot;...&quot;  // Same anchor, new keys
 }
 </code></pre>
-<h4>1.3 Anchor Management</h4>
+<h4 id="13-anchor-management">1.3 Anchor Management</h4>
 <p>Create <code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:</p>
 <pre><code class="language-rust">GET /v1/sdis/anchor/:anchor_id
 Response:
@@ -168,7 +165,7 @@ Response:
   &quot;keybundle_version&quot;: 2
 }
 </code></pre>
-<h4>1.4 Steward Integration</h4>
+<h4 id="14-steward-integration">1.4 Steward Integration</h4>
 <p>Modify <code>icn/crates/icn-gateway/src/server.rs</code>:</p>
 <pre><code class="language-rust">// Add StewardHandle to server state
 use icn_steward::StewardHandle;
@@ -182,8 +179,8 @@ struct AppState {
 let steward_handle = icn_steward::StewardActor::spawn(...);
 </code></pre>
 <hr>
-<h3>STEP 2: Pilot UI (1-2 days)</h3>
-<h4>2.1 Enrollment Wizard Component</h4>
+<h3 id="step-2-pilot-ui-1-2-days">STEP 2: Pilot UI (1-2 days)</h3>
+<h4 id="21-enrollment-wizard-component">2.1 Enrollment Wizard Component</h4>
 <p>Create <code>web/pilot-ui/src/components/EnrollmentWizard.js</code>:</p>
 <pre><code class="language-javascript">Screens:
 1. Choose Pathway
@@ -213,7 +210,7 @@ let steward_handle = icn_steward::StewardActor::spawn(...);
    - Download backup codes
    - Setup recovery contacts
 </code></pre>
-<h4>2.2 Identity Viewer Component</h4>
+<h4 id="22-identity-viewer-component">2.2 Identity Viewer Component</h4>
 <p>Create <code>web/pilot-ui/src/components/IdentityViewer.js</code>:</p>
 <pre><code class="language-javascript">Display:
 - Anchor ID (permanent)
@@ -231,7 +228,7 @@ Actions:
 - Update recovery contacts
 - Export credentials
 </code></pre>
-<h4>2.3 Proof Generator Component</h4>
+<h4 id="23-proof-generator-component">2.3 Proof Generator Component</h4>
 <p>Create <code>web/pilot-ui/src/components/ProofGenerator.js</code>:</p>
 <pre><code class="language-javascript">Proof Types:
 - Age (prove &gt; 18, &gt; 21, etc.)
@@ -245,7 +242,7 @@ Flow:
 3. Generate ZK proof
 4. Show QR code or send via network
 </code></pre>
-<h4>2.4 Recovery Flow Component</h4>
+<h4 id="24-recovery-flow-component">2.4 Recovery Flow Component</h4>
 <p>Create <code>web/pilot-ui/src/components/RecoveryFlow.js</code>:</p>
 <pre><code class="language-javascript">Steps:
 1. Enter anchor ID or VUI hint
@@ -256,8 +253,8 @@ Flow:
 6. Update all devices
 </code></pre>
 <hr>
-<h3>STEP 3: Mobile (CoopWallet) (1-2 days)</h3>
-<h4>3.1 Enrollment Screen</h4>
+<h3 id="step-3-mobile-coopwallet-1-2-days">STEP 3: Mobile (CoopWallet) (1-2 days)</h3>
+<h4 id="31-enrollment-screen">3.1 Enrollment Screen</h4>
 <p>Create <code>sdk/react-native/examples/CoopWallet/src/screens/EnrollmentScreen.tsx</code>:</p>
 <pre><code class="language-typescript">Features:
 - Camera integration (react-native-camera)
@@ -268,7 +265,7 @@ Flow:
 - Progress tracking
 - Success celebration
 </code></pre>
-<h4>3.2 Identity Screen Enhancement</h4>
+<h4 id="32-identity-screen-enhancement">3.2 Identity Screen Enhancement</h4>
 <p>Update <code>src/screens/IdentityScreen.tsx</code>:</p>
 <pre><code class="language-typescript">Add SDIS Support:
 - Show anchor ID
@@ -278,7 +275,7 @@ Flow:
 - Recovery setup
 - Backup codes
 </code></pre>
-<h4>3.3 Credential Wallet Screen</h4>
+<h4 id="33-credential-wallet-screen">3.3 Credential Wallet Screen</h4>
 <p>Create <code>src/screens/CredentialWalletScreen.tsx</code>:</p>
 <pre><code class="language-typescript">Features:
 - List issued credentials
@@ -288,7 +285,7 @@ Flow:
 - Network verification
 - Credential expiration tracking
 </code></pre>
-<h4>3.4 Proof Presentation Screen</h4>
+<h4 id="34-proof-presentation-screen">3.4 Proof Presentation Screen</h4>
 <p>Create <code>src/screens/PresentationScreen.tsx</code>:</p>
 <pre><code class="language-typescript">Tiers:
 1. QR Code (offline, low security)
@@ -307,13 +304,13 @@ Flow:
    - Transaction-grade security
 </code></pre>
 <hr>
-<h2>📦 Dependencies to Add</h2>
-<h3>Gateway</h3>
+<h2 id="-dependencies-to-add">📦 Dependencies to Add</h2>
+<h3 id="gateway">Gateway</h3>
 <pre><code class="language-toml">[dependencies]
 # Add to icn-gateway/Cargo.toml
 icn-steward = { path = &quot;../icn-steward&quot; }
 </code></pre>
-<h3>Mobile</h3>
+<h3 id="mobile">Mobile</h3>
 <pre><code class="language-json">// Add to CoopWallet/package.json
 &quot;dependencies&quot;: {
   &quot;react-native-camera&quot;: &quot;^4.2.1&quot;,
@@ -324,8 +321,8 @@ icn-steward = { path = &quot;../icn-steward&quot; }
 }
 </code></pre>
 <hr>
-<h2>🧪 Testing Strategy</h2>
-<h3>Unit Tests</h3>
+<h2 id="-testing-strategy">🧪 Testing Strategy</h2>
+<h3 id="unit-tests">Unit Tests</h3>
 <pre><code class="language-bash"># Gateway API
 cargo test -p icn-gateway sdis::
 
@@ -335,7 +332,7 @@ cargo test -p icn-gateway sdis::
 - test_anchor_rotation
 - test_steward_coordination
 </code></pre>
-<h3>Integration Tests</h3>
+<h3 id="integration-tests">Integration Tests</h3>
 <pre><code class="language-bash"># End-to-end enrollment
 1. Start enrollment via API
 2. Mock steward approvals
@@ -350,7 +347,7 @@ cargo test -p icn-gateway sdis::
 4. Verify anchor unchanged
 5. Verify new DID
 </code></pre>
-<h3>Manual Testing</h3>
+<h3 id="manual-testing">Manual Testing</h3>
 <pre><code>1. Web enrollment flow
 2. Mobile enrollment flow
 3. QR proof generation
@@ -358,8 +355,8 @@ cargo test -p icn-gateway sdis::
 5. Recovery from lost device
 </code></pre>
 <hr>
-<h2>📊 Progress Tracking</h2>
-<h3>Phase 1: Gateway API (Target: 3 hours)</h3>
+<h2 id="-progress-tracking">📊 Progress Tracking</h2>
+<h3 id="phase-1-gateway-api-target-3-hours">Phase 1: Gateway API (Target: 3 hours)</h3>
 <ul>
 <li><input disabled="" type="checkbox"> enrollment.rs created</li>
 <li><input disabled="" type="checkbox"> recovery.rs created</li>
@@ -369,7 +366,7 @@ cargo test -p icn-gateway sdis::
 <li><input disabled="" type="checkbox"> Tests written</li>
 <li><input disabled="" type="checkbox"> Build passes</li>
 </ul>
-<h3>Phase 2: Pilot UI (Target: 1-2 days)</h3>
+<h3 id="phase-2-pilot-ui-target-1-2-days">Phase 2: Pilot UI (Target: 1-2 days)</h3>
 <ul>
 <li><input disabled="" type="checkbox"> EnrollmentWizard component</li>
 <li><input disabled="" type="checkbox"> IdentityViewer component</li>
@@ -378,7 +375,7 @@ cargo test -p icn-gateway sdis::
 <li><input disabled="" type="checkbox"> Integration with Gateway API</li>
 <li><input disabled="" type="checkbox"> Styling complete</li>
 </ul>
-<h3>Phase 3: Mobile (Target: 1-2 days)</h3>
+<h3 id="phase-3-mobile-target-1-2-days">Phase 3: Mobile (Target: 1-2 days)</h3>
 <ul>
 <li><input disabled="" type="checkbox"> EnrollmentScreen</li>
 <li><input disabled="" type="checkbox"> CredentialWallet</li>
@@ -388,12 +385,12 @@ cargo test -p icn-gateway sdis::
 <li><input disabled="" type="checkbox"> Biometric auth</li>
 </ul>
 <hr>
-<h2>🚀 Let&#39;s Start Building!</h2>
+<h2 id="-lets-start-building">🚀 Let&#39;s Start Building!</h2>
 <p>Beginning with Gateway API enrollment endpoints...</p>
 <hr>
-<h2>✅ SESSION PROGRESS UPDATE - 2025-12-12 20:35 UTC</h2>
-<h3>Phase 1: Gateway API - IN PROGRESS ✨</h3>
-<h4>Completed:</h4>
+<h2 id="-session-progress-update---2025-12-12-2035-utc">✅ SESSION PROGRESS UPDATE - 2025-12-12 20:35 UTC</h2>
+<h3 id="phase-1-gateway-api---in-progress-">Phase 1: Gateway API - IN PROGRESS ✨</h3>
+<h4 id="completed">Completed:</h4>
 <ul>
 <li><p><input checked="" disabled="" type="checkbox"> enrollment.rs created (456 lines)</p>
 <ul>
@@ -420,7 +417,7 @@ cargo test -p icn-gateway sdis::
 <li><p><input checked="" disabled="" type="checkbox"> 10 new tests passing</p>
 </li>
 </ul>
-<h4>Next Steps:</h4>
+<h4 id="next-steps">Next Steps:</h4>
 <ul>
 <li><input disabled="" type="checkbox"> Create anchor.rs (anchor management API)</li>
 <li><input disabled="" type="checkbox"> Register routes in server.rs</li>
@@ -430,7 +427,10 @@ cargo test -p icn-gateway sdis::
 </ul>
 <p><strong>Time Elapsed:</strong> 35 minutes
 <strong>Estimated Remaining:</strong> 1.5-2 hours for Phase 1</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/SDIS_BUILD_PLAN.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

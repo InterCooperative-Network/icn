@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Threat Model | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Comprehensive threat model covering attack vectors, adversary capabilities, and mitigations"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Threat Model | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,15 +35,12 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>threat model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/threat-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Threat Model</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>threat model</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-15</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-threat-model">ICN Threat Model</h1>
 <p><strong>Version</strong>: 1.2
 <strong>Date</strong>: 2026-02-01
 <strong>Status</strong>: Updated for Trust Score Timing Analysis
 <strong>Authors</strong>: Security Review Team</p>
-<h2>Executive Summary</h2>
+<h2 id="executive-summary">Executive Summary</h2>
 <p>This document provides a formal threat model for the InterCooperative Network (ICN) using the STRIDE framework. It identifies adversary classes, maps attack surfaces by system layer, analyzes threats for each component, and documents mitigations.</p>
 <p><strong>Security Posture Summary</strong>:</p>
 <ul>
@@ -53,7 +50,7 @@ View source on GitHub →
 <li><strong>Known gaps documented</strong> with priority rankings</li>
 </ul>
 <hr>
-<h2>Table of Contents</h2>
+<h2 id="table-of-contents">Table of Contents</h2>
 <ol>
 <li><a href="#1-adversary-classes">Adversary Classes</a></li>
 <li><a href="#2-system-architecture-overview">System Architecture Overview</a></li>
@@ -65,8 +62,8 @@ View source on GitHub →
 <li><a href="#8-references">References</a></li>
 </ol>
 <hr>
-<h2>1. Adversary Classes</h2>
-<h3>1.1 Outsider (Network Attacker)</h3>
+<h2 id="1-adversary-classes">1. Adversary Classes</h2>
+<h3 id="11-outsider-network-attacker">1.1 Outsider (Network Attacker)</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>No ICN identity (no DID)</li>
@@ -87,7 +84,7 @@ View source on GitHub →
 <li>TCP/UDP amplification</li>
 <li>DNS hijacking of discovery endpoints</li>
 </ul>
-<h3>1.2 Malicious Peer (Byzantine Node)</h3>
+<h3 id="12-malicious-peer-byzantine-node">1.2 Malicious Peer (Byzantine Node)</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>Valid ICN identity (DID with keypair)</li>
@@ -111,7 +108,7 @@ View source on GitHub →
 <li>Vote manipulation</li>
 <li>Trust inflation via collusion</li>
 </ul>
-<h3>1.3 Compromised Node (Stolen Keys)</h3>
+<h3 id="13-compromised-node-stolen-keys">1.3 Compromised Node (Stolen Keys)</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>Full access to legitimate user&#39;s identity</li>
@@ -133,7 +130,7 @@ View source on GitHub →
 <li>Trust relationship manipulation</li>
 <li>Identity destruction</li>
 </ul>
-<h3>1.4 Economic Attacker</h3>
+<h3 id="14-economic-attacker">1.4 Economic Attacker</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>One or more valid ICN identities</li>
@@ -154,7 +151,7 @@ View source on GitHub →
 <li>Social recovery abuse (fake recoveries to duplicate balances)</li>
 <li>Demurrage avoidance schemes</li>
 </ul>
-<h3>1.5 Governance Attacker</h3>
+<h3 id="15-governance-attacker">1.5 Governance Attacker</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>Valid ICN identity with voting rights</li>
@@ -175,7 +172,7 @@ View source on GitHub →
 <li>Quorum manipulation (prevent voting)</li>
 <li>Emergency mechanism abuse</li>
 </ul>
-<h3>1.6 Contract Attacker</h3>
+<h3 id="16-contract-attacker">1.6 Contract Attacker</h3>
 <p><strong>Capabilities</strong>:</p>
 <ul>
 <li>Ability to deploy CCL contracts</li>
@@ -197,7 +194,7 @@ View source on GitHub →
 <li>Non-deterministic execution exploitation</li>
 </ul>
 <hr>
-<h2>2. System Architecture Overview</h2>
+<h2 id="2-system-architecture-overview">2. System Architecture Overview</h2>
 <pre><code>┌─────────────────────────────────────────────────────────────────────┐
 │                        APPLICATION LAYER                             │
 │  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌─────────┐  ┌─────────┐ │
@@ -224,7 +221,7 @@ View source on GitHub →
 │  └─────────────┘  └─────────────┘  └─────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 </code></pre>
-<h3>Security Boundaries</h3>
+<h3 id="security-boundaries">Security Boundaries</h3>
 <ol>
 <li><strong>Network Boundary</strong>: QUIC/TLS separates untrusted network from authenticated peers</li>
 <li><strong>Trust Boundary</strong>: Trust graph determines access levels within authenticated peers</li>
@@ -232,8 +229,8 @@ View source on GitHub →
 <li><strong>Capability Boundary</strong>: CCL capabilities constrain contract operations</li>
 </ol>
 <hr>
-<h2>3. Attack Surface by Layer</h2>
-<h3>3.1 Identity Layer</h3>
+<h2 id="3-attack-surface-by-layer">3. Attack Surface by Layer</h2>
+<h3 id="31-identity-layer">3.1 Identity Layer</h3>
 <table>
 <thead>
 <tr>
@@ -269,7 +266,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-identity/</code>, <code>icn-net/src/tls.rs</code></p>
-<h3>3.2 Network Layer</h3>
+<h3 id="32-network-layer">3.2 Network Layer</h3>
 <table>
 <thead>
 <tr>
@@ -300,7 +297,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-net/src/actor.rs</code>, <code>icn-net/src/protocol.rs</code></p>
-<h3>3.3 Trust Layer</h3>
+<h3 id="33-trust-layer">3.3 Trust Layer</h3>
 <table>
 <thead>
 <tr>
@@ -331,7 +328,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-trust/src/lib.rs</code>, <code>icn-trust/src/compute.rs</code></p>
-<h3>3.4 Gossip Layer</h3>
+<h3 id="34-gossip-layer">3.4 Gossip Layer</h3>
 <table>
 <thead>
 <tr>
@@ -362,7 +359,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-gossip/src/gossip.rs</code>, <code>icn-gossip/src/bloom.rs</code></p>
-<h3>3.5 Ledger Layer</h3>
+<h3 id="35-ledger-layer">3.5 Ledger Layer</h3>
 <table>
 <thead>
 <tr>
@@ -398,7 +395,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-ledger/src/ledger.rs</code>, <code>icn-ledger/src/credit_policy.rs</code></p>
-<h3>3.6 Governance Layer</h3>
+<h3 id="36-governance-layer">3.6 Governance Layer</h3>
 <table>
 <thead>
 <tr>
@@ -429,7 +426,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-governance/src/</code>, <code>icn-gateway/src/api/governance.rs</code></p>
-<h3>3.7 Compute Layer</h3>
+<h3 id="37-compute-layer">3.7 Compute Layer</h3>
 <table>
 <thead>
 <tr>
@@ -460,7 +457,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-compute/src/actor.rs</code>, <code>icn-compute/src/executor.rs</code></p>
-<h3>3.8 Gateway Layer</h3>
+<h3 id="38-gateway-layer">3.8 Gateway Layer</h3>
 <table>
 <thead>
 <tr>
@@ -492,9 +489,9 @@ View source on GitHub →
 </tbody></table>
 <p><strong>Files</strong>: <code>icn-gateway/src/auth.rs</code>, <code>icn-gateway/src/rate_limit.rs</code></p>
 <hr>
-<h2>4. STRIDE Analysis by Component</h2>
-<h3>4.1 Identity System</h3>
-<h4>Spoofing</h4>
+<h2 id="4-stride-analysis-by-component">4. STRIDE Analysis by Component</h2>
+<h3 id="41-identity-system">4.1 Identity System</h3>
+<h4 id="spoofing">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -529,7 +526,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -558,7 +555,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -581,7 +578,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -610,7 +607,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -633,7 +630,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -656,8 +653,8 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.2 Network System</h3>
-<h4>Spoofing</h4>
+<h3 id="42-network-system">4.2 Network System</h3>
+<h4 id="spoofing-1">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -686,7 +683,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-1">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -715,7 +712,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-1">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -732,7 +729,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-1">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -761,7 +758,7 @@ View source on GitHub →
 <td>🟡 Partial</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-1">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -796,7 +793,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-1">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -819,8 +816,8 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.3 Trust System</h3>
-<h4>Spoofing</h4>
+<h3 id="43-trust-system">4.3 Trust System</h3>
+<h4 id="spoofing-2">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -843,7 +840,7 @@ View source on GitHub →
 <td>🔴 Gap</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-2">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -866,7 +863,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-2">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -883,7 +880,7 @@ View source on GitHub →
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-2">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -944,7 +941,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <li>Planned trust score caching layer in the trust service (forward-looking; implementation location TBD)</li>
 <li><code>TrustScoreResult</code> definition in <code>icn/crates/icn-kernel-api/src/services.rs:116-144</code></li>
 </ul>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-2">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -967,7 +964,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-2">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -990,8 +987,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.4 Gossip System</h3>
-<h4>Spoofing</h4>
+<h3 id="44-gossip-system">4.4 Gossip System</h3>
+<h4 id="spoofing-3">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -1014,7 +1011,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-3">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -1037,7 +1034,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-3">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -1054,7 +1051,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-3">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -1077,7 +1074,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>🟡 Partial</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-3">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -1112,7 +1109,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-3">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -1135,8 +1132,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.5 Ledger System</h3>
-<h4>Spoofing</h4>
+<h3 id="45-ledger-system">4.5 Ledger System</h3>
+<h4 id="spoofing-4">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -1159,7 +1156,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-4">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -1188,7 +1185,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-4">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -1211,7 +1208,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-4">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -1234,7 +1231,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-4">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -1257,7 +1254,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-4">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -1286,8 +1283,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.6 Governance System</h3>
-<h4>Spoofing</h4>
+<h3 id="46-governance-system">4.6 Governance System</h3>
+<h4 id="spoofing-5">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -1310,7 +1307,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-5">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -1339,7 +1336,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-5">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -1362,7 +1359,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-5">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -1379,7 +1376,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>🟡 By Design</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-5">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -1402,7 +1399,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>🟡 By Design</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-5">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -1431,8 +1428,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.7 Compute System</h3>
-<h4>Spoofing</h4>
+<h3 id="47-compute-system">4.7 Compute System</h3>
+<h4 id="spoofing-6">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -1455,7 +1452,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-6">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -1478,7 +1475,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-6">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -1501,7 +1498,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-6">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -1524,7 +1521,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>🟡 By Design</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-6">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -1559,7 +1556,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-6">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -1588,8 +1585,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h3>4.8 Gateway API</h3>
-<h4>Spoofing</h4>
+<h3 id="48-gateway-api">4.8 Gateway API</h3>
+<h4 id="spoofing-7">Spoofing</h4>
 <table>
 <thead>
 <tr>
@@ -1612,7 +1609,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Tampering</h4>
+<h4 id="tampering-7">Tampering</h4>
 <table>
 <thead>
 <tr>
@@ -1635,7 +1632,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Repudiation</h4>
+<h4 id="repudiation-7">Repudiation</h4>
 <table>
 <thead>
 <tr>
@@ -1652,7 +1649,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Information Disclosure</h4>
+<h4 id="information-disclosure-7">Information Disclosure</h4>
 <table>
 <thead>
 <tr>
@@ -1681,7 +1678,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Denial of Service</h4>
+<h4 id="denial-of-service-7">Denial of Service</h4>
 <table>
 <thead>
 <tr>
@@ -1710,7 +1707,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td>✅ Mitigated</td>
 </tr>
 </tbody></table>
-<h4>Elevation of Privilege</h4>
+<h4 id="elevation-of-privilege-7">Elevation of Privilege</h4>
 <table>
 <thead>
 <tr>
@@ -1740,8 +1737,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>5. Mitigations Reference</h2>
-<h3>5.1 Transport Layer Security</h3>
+<h2 id="5-mitigations-reference">5. Mitigations Reference</h2>
+<h3 id="51-transport-layer-security">5.1 Transport Layer Security</h3>
 <table>
 <thead>
 <tr>
@@ -1771,7 +1768,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td><code>icn-net/src/session.rs</code></td>
 </tr>
 </tbody></table>
-<h3>5.2 Message Layer Security</h3>
+<h3 id="52-message-layer-security">5.2 Message Layer Security</h3>
 <table>
 <thead>
 <tr>
@@ -1801,7 +1798,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td><code>icn-net/src/protocol.rs</code></td>
 </tr>
 </tbody></table>
-<h3>5.3 Trust-Based Rate Limiting</h3>
+<h3 id="53-trust-based-rate-limiting">5.3 Trust-Based Rate Limiting</h3>
 <table>
 <thead>
 <tr>
@@ -1837,7 +1834,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 </tr>
 </tbody></table>
 <p><strong>Implementation</strong>: <code>icn-net/src/rate_limit.rs</code></p>
-<h3>5.4 Authentication &amp; Authorization</h3>
+<h3 id="54-authentication--authorization">5.4 Authentication &amp; Authorization</h3>
 <table>
 <thead>
 <tr>
@@ -1867,7 +1864,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td><code>icn-gateway/src/rate_limit.rs</code></td>
 </tr>
 </tbody></table>
-<h3>5.5 Economic Controls</h3>
+<h3 id="55-economic-controls">5.5 Economic Controls</h3>
 <table>
 <thead>
 <tr>
@@ -1897,7 +1894,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td><code>icn-ledger/src/ledger.rs</code></td>
 </tr>
 </tbody></table>
-<h3>5.6 Contract Security</h3>
+<h3 id="56-contract-security">5.6 Contract Security</h3>
 <table>
 <thead>
 <tr>
@@ -1927,7 +1924,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <td><code>icn-ccl/src/ast.rs</code></td>
 </tr>
 </tbody></table>
-<h3>5.7 Byzantine Detection (Phase 18)</h3>
+<h3 id="57-byzantine-detection-phase-18">5.7 Byzantine Detection (Phase 18)</h3>
 <table>
 <thead>
 <tr>
@@ -2015,7 +2012,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 <li><strong>Quarantine Threshold</strong>: &lt; 0.5</li>
 <li><strong>Rate Limit</strong>: Max 10 violations/hour before auto-ban</li>
 </ul>
-<h3>5.8 SDIS Identity Verification</h3>
+<h3 id="58-sdis-identity-verification">5.8 SDIS Identity Verification</h3>
 <table>
 <thead>
 <tr>
@@ -2071,8 +2068,8 @@ attestations from multiple parties simultaneously (coordination event).</p>
 </tr>
 </tbody></table>
 <hr>
-<h2>6. Gap Analysis</h2>
-<h3>6.1 High Priority Gaps</h3>
+<h2 id="6-gap-analysis">6. Gap Analysis</h2>
+<h3 id="61-high-priority-gaps">6.1 High Priority Gaps</h3>
 <table>
 <thead>
 <tr>
@@ -2114,7 +2111,7 @@ attestations from multiple parties simultaneously (coordination event).</p>
 reputation scoring (0.0-1.0), automatic quarantine at score &lt; 0.5, and auto-ban for critical violations.
 See <a href="#57-byzantine-detection">Section 5.7 Byzantine Detection</a> for details.</p>
 </blockquote>
-<h3>6.2 Medium Priority Gaps</h3>
+<h3 id="62-medium-priority-gaps">6.2 Medium Priority Gaps</h3>
 <table>
 <thead>
 <tr>
@@ -2202,7 +2199,7 @@ network formation (who attested for whom, and when).</li>
 <li><code>icn-privacy</code> traffic obfuscation module (implemented in <code>icn-privacy/src/traffic_obfuscation.rs</code>)</li>
 <li>Trust score caching and invalidation strategy</li>
 </ul>
-<h3>6.3 Low Priority Gaps</h3>
+<h3 id="63-low-priority-gaps">6.3 Low Priority Gaps</h3>
 <table>
 <thead>
 <tr>
@@ -2235,7 +2232,7 @@ network formation (who attested for whom, and when).</li>
 <td>Medium</td>
 </tr>
 </tbody></table>
-<h3>6.4 By-Design Limitations</h3>
+<h3 id="64-by-design-limitations">6.4 By-Design Limitations</h3>
 <p>These are intentional design decisions, not gaps:</p>
 <table>
 <thead>
@@ -2257,7 +2254,7 @@ network formation (who attested for whom, and when).</li>
 <td>Cannot force participation in democratic systems</td>
 </tr>
 </tbody></table>
-<h3>6.5 Pilot Deployment Specific Risks</h3>
+<h3 id="65-pilot-deployment-specific-risks">6.5 Pilot Deployment Specific Risks</h3>
 <p>The K3s homelab deployment introduces deployment-specific attack surfaces:</p>
 <table>
 <thead>
@@ -2348,8 +2345,8 @@ network formation (who attested for whom, and when).</li>
 </ul>
 <p>See <a href="/docs/operations/deployment/incident-response">incident-response.md</a> for K3s-specific incident procedures.</p>
 <hr>
-<h2>7. Security Assumptions</h2>
-<h3>7.1 What This System Provides</h3>
+<h2 id="7-security-assumptions">7. Security Assumptions</h2>
+<h3 id="71-what-this-system-provides">7.1 What This System Provides</h3>
 <ul>
 <li><strong>Authenticated communication</strong> between known identities</li>
 <li><strong>Integrity</strong> of messages and stored data</li>
@@ -2358,7 +2355,7 @@ network formation (who attested for whom, and when).</li>
 <li><strong>Economic safety rails</strong> against common abuse patterns</li>
 <li><strong>Capability-constrained</strong> contract execution</li>
 </ul>
-<h3>7.2 What This System Does NOT Provide</h3>
+<h3 id="72-what-this-system-does-not-provide">7.2 What This System Does NOT Provide</h3>
 <ul>
 <li><strong>Anonymous communication</strong> - All actions tied to DIDs</li>
 <li><del><strong>Byzantine fault tolerance</strong></del> - <strong>Now partially provided</strong> via MisbehaviorDetector (Phase 18)</li>
@@ -2367,7 +2364,7 @@ network formation (who attested for whom, and when).</li>
 <li><del><strong>Sybil resistance</strong></del> - <strong>Now partially provided</strong> via SDIS steward verification</li>
 <li><strong>Legal enforceability</strong> - Technical system only</li>
 </ul>
-<h3>7.3 Trust Assumptions</h3>
+<h3 id="73-trust-assumptions">7.3 Trust Assumptions</h3>
 <table>
 <thead>
 <tr>
@@ -2401,15 +2398,15 @@ network formation (who attested for whom, and when).</li>
 </tr>
 </tbody></table>
 <hr>
-<h2>8. References</h2>
-<h3>Internal Documentation</h3>
+<h2 id="8-references">8. References</h2>
+<h3 id="internal-documentation">Internal Documentation</h3>
 <ul>
 <li><a href="/docs/ARCHITECTURE">ARCHITECTURE.md</a> - System architecture</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Security fixes</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Security implementation plan</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/phase-10c-security-analysis">phase-10c-security-analysis.md</a> - Contract security</li>
 </ul>
-<h3>External References</h3>
+<h3 id="external-references">External References</h3>
 <ul>
 <li><a href="https://docs.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats" target="_blank" rel="noopener">STRIDE Threat Modeling</a></li>
 <li><a href="https://owasp.org/www-project-top-ten/" target="_blank" rel="noopener">OWASP Top 10</a></li>
@@ -2418,7 +2415,7 @@ network formation (who attested for whom, and when).</li>
 <li><a href="https://www.rfc-editor.org/rfc/rfc8032.html" target="_blank" rel="noopener">Ed25519 RFC 8032</a></li>
 </ul>
 <hr>
-<h2>Changelog</h2>
+<h2 id="changelog">Changelog</h2>
 <ul>
 <li><strong>2026-02-01</strong>: Trust score timing attack documentation (v1.2)<ul>
 <li>Added TR-I2 threat: <code>inputs_hash</code> timing side-channel</li>
@@ -2438,7 +2435,10 @@ network formation (who attested for whom, and when).</li>
 </li>
 <li><strong>2025-11-29</strong>: Initial comprehensive STRIDE analysis (v1.0)</li>
 </ul>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/threat-model.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

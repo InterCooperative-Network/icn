@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel/App Separation Transition Plan | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Historical document, kept for the record. Not current ICN project state."><meta name="robots" content="noindex, follow"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Kernel/App Separation Transition Plan (archived) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,16 +35,22 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TRANSITION PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/TRANSITION_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Kernel/App Separation Transition Plan</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <a href="/docs/archive" data-astro-cid-uadgga6g>Archive</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>archive</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>2025</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TRANSITION PLAN</span> </nav>  <aside class="callout callout-archive doc-banner" aria-labelledby="doc-banner-title" data-astro-cid-w3hnbhco><span class="callout-label" id="doc-banner-title" data-astro-cid-w3hnbhco>
+Historical document — not current project state
+</span><p data-astro-cid-w3hnbhco>
+This page is kept for the record. It described the project at the time it
+        was written and has not been maintained since. Do not read it as a
+        statement about how ICN works today.
+</p><dl class="doc-banner-meta" data-astro-cid-w3hnbhco><div data-astro-cid-w3hnbhco><dt data-astro-cid-w3hnbhco>Classification</dt><dd data-astro-cid-w3hnbhco>registry role=archive</dd></div></dl><p class="doc-banner-actions" data-astro-cid-w3hnbhco>
+For current material, start at <a href="/docs" data-astro-cid-w3hnbhco>the documentation index</a>,
+        or read <a href="/whats-real-now" data-astro-cid-w3hnbhco>What's real now</a> for the maturity
+        account of each subsystem.
+</p></aside> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-kernelapp-separation-transition-plan">ICN Kernel/App Separation Transition Plan</h1>
 <blockquote>
 <p><strong>Archived Document Notice (2026-02-12):</strong> This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
 Use active documentation under <code>docs/</code> as authoritative.</p>
 </blockquote>
-<h2>Overview</h2>
+<h2 id="overview">Overview</h2>
 <p>Transform ICN from a tightly-coupled 27-crate system to a clean kernel/app architecture where:</p>
 <ul>
 <li><strong>Kernel</strong> provides 8 generic primitives (Identity, Authorization, State, Compute, Communication, Time, Coordination, Naming)</li>
@@ -53,7 +59,7 @@ Use active documentation under <code>docs/</code> as authoritative.</p>
 <p><strong>Breaking changes acceptable</strong> - no production deployment exists.</p>
 <p><strong>Core Principle</strong>: We are not refactoring code. We are <strong>deleting privilege</strong>. Every direct trust import removed is removing implicit authority from kernel.</p>
 <hr>
-<h2>Phase Ordering</h2>
+<h2 id="phase-ordering">Phase Ordering</h2>
 <table>
 <thead>
 <tr>
@@ -110,12 +116,12 @@ Use active documentation under <code>docs/</code> as authoritative.</p>
 </tbody></table>
 <p><strong>Critical ordering rationale</strong>: Runtime MUST exist before extraction. Otherwise supervisor becomes the new god-object that hardcodes first-party apps.</p>
 <hr>
-<h2>Phase 0: PolicyOracle Infrastructure ✅</h2>
+<h2 id="phase-0-policyoracle-infrastructure-">Phase 0: PolicyOracle Infrastructure ✅</h2>
 <p><strong>Status</strong>: Complete</p>
 <p><strong>Goal</strong>: Generalize PolicyDecision beyond rate limiting. Split PolicyRequest for caching performance.</p>
 <p><strong>Implementation</strong>: <code>icn/crates/icn-kernel-api/src/authz.rs</code> and <code>icn/crates/icn-kernel-api/src/bootstrap.rs</code></p>
-<h3>Design</h3>
-<h4>Generalized PolicyDecision</h4>
+<h3 id="design">Design</h3>
+<h4 id="generalized-policydecision">Generalized PolicyDecision</h4>
 <pre><code class="language-rust">/// Result of a policy evaluation.
 /// Kernel enforces these constraints WITHOUT understanding their semantic origin.
 pub enum PolicyDecision {
@@ -157,7 +163,7 @@ pub struct RateLimit {
     pub burst_size: u32,
 }
 </code></pre>
-<h4>Split PolicyRequest for Caching</h4>
+<h4 id="split-policyrequest-for-caching">Split PolicyRequest for Caching</h4>
 <pre><code class="language-rust">/// Cacheable core - small, hashable, no allocations on hot path
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct PolicyRequestCore {
@@ -192,7 +198,7 @@ pub enum ActionKind {
     Custom(String),
 }
 </code></pre>
-<h4>Atomic Oracle Registry</h4>
+<h4 id="atomic-oracle-registry">Atomic Oracle Registry</h4>
 <pre><code class="language-rust">pub struct OracleRegistry {
     oracles: ArcSwap&lt;HashMap&lt;Domain, Arc&lt;dyn PolicyOracle&gt;&gt;&gt;,
     cache: Cache&lt;PolicyRequestCore, CachedDecision&gt;,
@@ -242,7 +248,7 @@ impl OracleRegistry {
     }
 }
 </code></pre>
-<h4>Expiring Genesis Capabilities</h4>
+<h4 id="expiring-genesis-capabilities">Expiring Genesis Capabilities</h4>
 <pre><code class="language-rust">#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BootstrapPhase {
     Genesis = 0,    // Initial startup, AllowAllOracle
@@ -275,20 +281,20 @@ impl GenesisCapabilities {
     }
 }
 </code></pre>
-<h3>Files to Modify</h3>
+<h3 id="files-to-modify">Files to Modify</h3>
 <ul>
 <li><code>icn/crates/icn-kernel-api/src/authz.rs</code> - Generalize PolicyDecision, add ConstraintSet</li>
 <li><code>icn/crates/icn-kernel-api/src/lib.rs</code> - Add bootstrap module</li>
 <li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> - New: OracleRegistry, BootstrapPhase, GenesisCapabilities</li>
 </ul>
-<h3>Verification</h3>
+<h3 id="verification">Verification</h3>
 <ul>
 <li><code>cargo test -p icn-kernel-api</code> passes</li>
 <li>Benchmark: CachingOracle lookup &lt; 1μs (core-only cache key)</li>
 <li>No domain-specific types in authz module</li>
 </ul>
 <hr>
-<h2>Phase 1: Minimal App Runtime ✅</h2>
+<h2 id="phase-1-minimal-app-runtime-">Phase 1: Minimal App Runtime ✅</h2>
 <p><strong>Status</strong>: Complete</p>
 <p><strong>Goal</strong>: Runtime that can load ONE app via manifest before extracting trust.</p>
 <p><strong>Implementation</strong>: <code>icn/crates/icn-core/src/apps/</code> module with:</p>
@@ -298,7 +304,7 @@ impl GenesisCapabilities {
 <li><code>dispatcher.rs</code> - ComputeDispatcher with Reducer/Service split</li>
 <li><code>runtime.rs</code> - AppRuntime for lifecycle management (install, start, stop, uninstall)</li>
 </ul>
-<h3>Manifest Schema</h3>
+<h3 id="manifest-schema">Manifest Schema</h3>
 <pre><code class="language-yaml"># apps/echo/manifest.yaml - Example
 name: echo
 version: 1.0.0
@@ -360,7 +366,7 @@ oracle:
   domain: trust
   implementation: TrustOracle
 </code></pre>
-<h3>Compute Dispatcher with Event Routing</h3>
+<h3 id="compute-dispatcher-with-event-routing">Compute Dispatcher with Event Routing</h3>
 <pre><code class="language-rust">pub struct ComputeDispatcher {
     reducers: HashMap&lt;EventType, Box&lt;dyn ErasedReducer&gt;&gt;,
     services: HashMap&lt;RequestType, Box&lt;dyn ErasedService&gt;&gt;,
@@ -389,7 +395,7 @@ impl ComputeDispatcher {
     }
 }
 </code></pre>
-<h3>Reducer Purity Enforcement</h3>
+<h3 id="reducer-purity-enforcement">Reducer Purity Enforcement</h3>
 <p>Rust cannot enforce purity at compile time, but runtime enforces isolation:</p>
 <pre><code class="language-rust">/// Reducers: pure, deterministic, state-in → state-out
 pub trait Reducer: Send + Sync {
@@ -421,7 +427,7 @@ pub trait Service: Send + Sync {
     ) -&gt; Result&lt;Self::Response&gt;;
 }
 </code></pre>
-<h3>Capability Granting from Manifest</h3>
+<h3 id="capability-granting-from-manifest">Capability Granting from Manifest</h3>
 <pre><code class="language-rust">impl AppRuntime {
     pub fn install(
         &amp;mut self,
@@ -458,7 +464,7 @@ pub trait Service: Send + Sync {
     }
 }
 </code></pre>
-<h3>Supervisor Constraint</h3>
+<h3 id="supervisor-constraint">Supervisor Constraint</h3>
 <pre><code class="language-rust">// icn-core/src/supervisor/mod.rs - THE RULE
 
 impl Supervisor {
@@ -496,7 +502,7 @@ impl Supervisor {
     }
 }
 </code></pre>
-<h3>App Isolation (Current + Future)</h3>
+<h3 id="app-isolation-current--future">App Isolation (Current + Future)</h3>
 <p><strong>Current (namespace isolation)</strong>:</p>
 <ul>
 <li>Each app gets isolated state namespace</li>
@@ -510,7 +516,7 @@ impl Supervisor {
 <li>Metered execution</li>
 </ul>
 <p>Runtime interface is designed to support WASM sandbox later without API changes.</p>
-<h3>Files to Create</h3>
+<h3 id="files-to-create">Files to Create</h3>
 <ul>
 <li><code>icn/crates/icn-core/src/runtime/mod.rs</code> - AppRuntime</li>
 <li><code>icn/crates/icn-core/src/runtime/manifest.rs</code> - Manifest parser</li>
@@ -518,14 +524,14 @@ impl Supervisor {
 <li><code>icn/crates/icn-core/src/runtime/state_factory.rs</code> - Namespaced state creation</li>
 <li><code>icn/crates/icn-core/src/runtime/capabilities.rs</code> - Capability granting</li>
 </ul>
-<h3>Verification</h3>
+<h3 id="verification-1">Verification</h3>
 <ul>
 <li>Can install echo app from manifest</li>
 <li>Supervisor has zero domain-specific code</li>
 <li>Events flow: Service → event_tx → Dispatcher → Reducer → State</li>
 </ul>
 <hr>
-<h2>Phase 1.5: Echo Test App ✅</h2>
+<h2 id="phase-15-echo-test-app-">Phase 1.5: Echo Test App ✅</h2>
 <p><strong>Status</strong>: Complete</p>
 <p><strong>Goal</strong>: Validate runtime works before extracting trust.</p>
 <p><strong>Implementation</strong>: <code>apps/echo/</code> with:</p>
@@ -534,7 +540,7 @@ impl Supervisor {
 <li><code>src/lib.rs</code> - EchoReducer (pure state updates) and EchoService (async queries)</li>
 <li>Integration test validating full lifecycle: prepare → install → start → dispatch → query → stop → uninstall</li>
 </ul>
-<h3>Structure</h3>
+<h3 id="structure">Structure</h3>
 <pre><code>apps/
   echo/
     Cargo.toml
@@ -544,7 +550,7 @@ impl Supervisor {
       reducer.rs    # Echoes events to state
       service.rs    # Responds to queries
 </code></pre>
-<h3>Implementation</h3>
+<h3 id="implementation">Implementation</h3>
 <pre><code class="language-rust">// apps/echo/src/reducer.rs
 pub struct EchoReducer;
 
@@ -586,7 +592,7 @@ impl Service for EchoService {
     }
 }
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-2">Verification</h3>
 <ul>
 <li><code>cargo test -p echo</code> passes</li>
 <li>Echo app installs via runtime</li>
@@ -594,9 +600,9 @@ impl Service for EchoService {
 <li>State is queryable</li>
 </ul>
 <hr>
-<h2>Phase 2: Trust Extraction</h2>
+<h2 id="phase-2-trust-extraction">Phase 2: Trust Extraction</h2>
 <p><strong>Goal</strong>: Replace all direct TrustGraph/TrustClass usage with PolicyOracle calls.</p>
-<h3>Infection Points</h3>
+<h3 id="infection-points">Infection Points</h3>
 <table>
 <thead>
 <tr>
@@ -626,7 +632,7 @@ impl Service for EchoService {
 <td>Direct TrustGraph calls</td>
 </tr>
 </tbody></table>
-<h3>Order of Changes</h3>
+<h3 id="order-of-changes">Order of Changes</h3>
 <ol>
 <li><p><strong>Create Trust App using runtime</strong></p>
 <pre><code>apps/trust/
@@ -657,7 +663,7 @@ impl Service for EchoService {
 <li><p><strong>Update supervisor</strong> - Load trust app via runtime, not direct wiring</p>
 </li>
 </ol>
-<h3>Trust Oracle Implementation</h3>
+<h3 id="trust-oracle-implementation">Trust Oracle Implementation</h3>
 <pre><code class="language-rust">// apps/trust/src/oracle.rs
 pub struct TrustOracle {
     graph: Arc&lt;RwLock&lt;TrustGraph&gt;&gt;,
@@ -694,7 +700,7 @@ fn score_to_rate_limit(score: f64) -&gt; RateLimit {
     }
 }
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-3">Verification</h3>
 <ul>
 <li><code>cargo check --workspace</code> - no TrustGraph/TrustClass imports in kernel crates</li>
 <li><code>cargo test -p icn-net -p icn-gossip -p icn-ledger</code> passes</li>
@@ -702,9 +708,9 @@ fn score_to_rate_limit(score: f64) -&gt; RateLimit {
 <li>Supervisor contains zero trust-specific code</li>
 </ul>
 <hr>
-<h2>Phase 3: State Generalization</h2>
+<h2 id="phase-3-state-generalization">Phase 3: State Generalization</h2>
 <p><strong>Goal</strong>: Formalize state trait contracts. Move domain logic out of icn-store.</p>
-<h3>Formalized Trait Contracts</h3>
+<h3 id="formalized-trait-contracts">Formalized Trait Contracts</h3>
 <pre><code class="language-rust">/// Ordering guarantee for logs
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ordering {
@@ -745,7 +751,7 @@ pub struct LogSnapshot {
     pub timestamp: LogicalTimestamp,
 }
 </code></pre>
-<h3>Files to Move</h3>
+<h3 id="files-to-move">Files to Move</h3>
 <table>
 <thead>
 <tr>
@@ -766,7 +772,7 @@ pub struct LogSnapshot {
 <td><code>apps/ledger/src/recurring.rs</code></td>
 </tr>
 </tbody></table>
-<h3>icn-store Final Structure</h3>
+<h3 id="icn-store-final-structure">icn-store Final Structure</h3>
 <pre><code>icn-store/src/
   lib.rs          # Only generic exports
   kv.rs           # KvService implementation
@@ -774,21 +780,21 @@ pub struct LogSnapshot {
   blob.rs         # BlobService implementation
   namespace.rs    # Namespace isolation
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-4">Verification</h3>
 <ul>
 <li>icn-store has no domain-specific types</li>
 <li><code>cargo test -p icn-store</code> passes</li>
 <li>Ordering is per-log, not per-service</li>
 </ul>
 <hr>
-<h2>Phase 4: Governance Extraction</h2>
+<h2 id="phase-4-governance-extraction">Phase 4: Governance Extraction</h2>
 <p><strong>Goal</strong>: Move governance from kernel to app. Remove WitnessPolicy from supervisor.</p>
-<h3>Files to Remove from icn-core</h3>
+<h3 id="files-to-remove-from-icn-core">Files to Remove from icn-core</h3>
 <ul>
 <li><code>icn-core/src/governance/</code> (entire directory if exists)</li>
 <li>Any governance-specific handler code in supervisor</li>
 </ul>
-<h3>Create Governance App</h3>
+<h3 id="create-governance-app">Create Governance App</h3>
 <pre><code>apps/governance/
   Cargo.toml
   manifest.yaml
@@ -801,7 +807,7 @@ pub struct LogSnapshot {
     reducer.rs      # Vote processing
     service.rs      # Proposal queries
 </code></pre>
-<h3>WitnessPolicy Migration</h3>
+<h3 id="witnesspolicy-migration">WitnessPolicy Migration</h3>
 <p>WitnessPolicy must become:</p>
 <ol>
 <li>A governance rule stored in app state</li>
@@ -825,16 +831,16 @@ impl PolicyOracle for GovernanceOracle {
     }
 }
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-5">Verification</h3>
 <ul>
 <li>Supervisor contains no governance branching</li>
 <li><code>cargo check --workspace</code> - no governance imports in kernel</li>
 <li>Governance app uses PolicyOracle for all decisions</li>
 </ul>
 <hr>
-<h2>Phase 5: Membership Consolidation</h2>
+<h2 id="phase-5-membership-consolidation">Phase 5: Membership Consolidation</h2>
 <p><strong>Goal</strong>: Merge icn-entity, icn-coop, icn-community into single app with canonical Entity model.</p>
-<h3>Canonical Entity Abstraction</h3>
+<h3 id="canonical-entity-abstraction">Canonical Entity Abstraction</h3>
 <pre><code class="language-rust">/// Unique entity identifier
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct EntityId(pub String);
@@ -864,7 +870,7 @@ pub struct Membership&lt;E: Entity&gt; {
     pub _phantom: PhantomData&lt;E&gt;,
 }
 </code></pre>
-<h3>Create Membership App</h3>
+<h3 id="create-membership-app">Create Membership App</h3>
 <pre><code>apps/membership/
   Cargo.toml
   manifest.yaml
@@ -878,22 +884,22 @@ pub struct Membership&lt;E: Entity&gt; {
     reducer.rs
     service.rs
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-6">Verification</h3>
 <ul>
 <li>Single canonical Entity model</li>
 <li>Old crates (icn-entity, icn-coop, icn-community) deprecated</li>
 <li>No parallel membership models</li>
 </ul>
 <hr>
-<h2>Phase 6: Naming Primitive</h2>
+<h2 id="phase-6-naming-primitive">Phase 6: Naming Primitive</h2>
 <p><strong>Goal</strong>: Implement naming/discovery for app-to-app communication.</p>
-<h3>Design Constraints</h3>
+<h3 id="design-constraints">Design Constraints</h3>
 <ul>
 <li>Naming depends ONLY on State + Identity</li>
 <li>Do NOT entangle with gossip/protocol layer</li>
 <li>This is capability advertisement + dependency resolution</li>
 </ul>
-<h3>Implementation</h3>
+<h3 id="implementation-1">Implementation</h3>
 <pre><code class="language-rust">pub trait NamingService: Send + Sync {
     /// Register a name with authority signature
     fn register(
@@ -927,23 +933,23 @@ pub enum NameKind {
     Federation,
 }
 </code></pre>
-<h3>Files to Create</h3>
+<h3 id="files-to-create-1">Files to Create</h3>
 <pre><code>icn-core/src/naming/
   mod.rs
   service.rs        # NamingService impl
   discovery.rs      # Discovery impl (uses NamingService)
   records.rs        # NameRecord storage
 </code></pre>
-<h3>Verification</h3>
+<h3 id="verification-7">Verification</h3>
 <ul>
 <li>Naming uses only State + Identity primitives</li>
 <li>No gossip dependencies</li>
 <li>Apps can discover each other by name</li>
 </ul>
 <hr>
-<h2>Phase 7: Crate Consolidation</h2>
+<h2 id="phase-7-crate-consolidation">Phase 7: Crate Consolidation</h2>
 <p><strong>Goal</strong>: Reduce kernel crates from 17+ to ~12. Do this LAST.</p>
-<h3>Merge Plan</h3>
+<h3 id="merge-plan">Merge Plan</h3>
 <table>
 <thead>
 <tr>
@@ -964,7 +970,7 @@ pub enum NameKind {
 <td>icn-crypto-pq + crypto from icn-identity</td>
 </tr>
 </tbody></table>
-<h3>Final Kernel Structure (12 crates)</h3>
+<h3 id="final-kernel-structure-12-crates">Final Kernel Structure (12 crates)</h3>
 <pre><code>icn-kernel-api/   # Trait definitions
 icn-identity/     # DID + keystore
 icn-store/        # Generic storage
@@ -978,7 +984,7 @@ icn-encoding/     # Serialization
 icn-time/         # Time primitives
 icn-testkit/      # Test utilities
 </code></pre>
-<h3>Rules</h3>
+<h3 id="rules">Rules</h3>
 <ul>
 <li>Do NOT consolidate during extraction phases</li>
 <li>Complete all extractions first</li>
@@ -986,7 +992,7 @@ icn-testkit/      # Test utilities
 <li>Document all path changes in CHANGELOG</li>
 </ul>
 <hr>
-<h2>Critical Files Summary</h2>
+<h2 id="critical-files-summary">Critical Files Summary</h2>
 <ol>
 <li><strong><code>icn-kernel-api/src/authz.rs</code></strong> - Generalize PolicyDecision</li>
 <li><strong><code>icn-kernel-api/src/bootstrap.rs</code></strong> - OracleRegistry, BootstrapPhase</li>
@@ -999,20 +1005,20 @@ icn-testkit/      # Test utilities
 <li><strong><code>icn-core/src/supervisor/mod.rs</code></strong> - Wire runtime, no domain knowledge</li>
 </ol>
 <hr>
-<h2>Verification Strategy</h2>
-<h3>Per-Phase Checks</h3>
+<h2 id="verification-strategy">Verification Strategy</h2>
+<h3 id="per-phase-checks">Per-Phase Checks</h3>
 <pre><code class="language-bash">cargo check --workspace
 cargo test --workspace
 cargo clippy --workspace -- -D warnings
 </code></pre>
-<h3>Integration Tests</h3>
+<h3 id="integration-tests">Integration Tests</h3>
 <ul>
 <li>Echo app lifecycle (install, start, query, stop)</li>
 <li>Multi-node convergence with trust app</li>
 <li>Cross-app communication via naming</li>
 <li>Capability delegation chain</li>
 </ul>
-<h3>Success Criteria</h3>
+<h3 id="success-criteria">Success Criteria</h3>
 <ul>
 <li>No domain logic in kernel crates</li>
 <li>All apps use same kernel APIs</li>
@@ -1024,7 +1030,7 @@ rg &quot;TrustGraph|TrustClass|credit_limit|voting_weight|membership&quot; \
    icn/crates/icn-{kernel-api,core,store,net,gossip,security,crypto,obs,encoding,time,testkit}
 </code></pre>
 <hr>
-<h2>Timeline</h2>
+<h2 id="timeline">Timeline</h2>
 <table>
 <thead>
 <tr>
@@ -1071,7 +1077,7 @@ rg &quot;TrustGraph|TrustClass|credit_limit|voting_weight|membership&quot; \
 </tbody></table>
 <p><strong>Total: ~30-40 days</strong></p>
 <hr>
-<h2>Risk Mitigation</h2>
+<h2 id="risk-mitigation">Risk Mitigation</h2>
 <table>
 <thead>
 <tr>
@@ -1105,7 +1111,7 @@ rg &quot;TrustGraph|TrustClass|credit_limit|voting_weight|membership&quot; \
 </tr>
 </tbody></table>
 <hr>
-<h2>The Meaning Firewall</h2>
+<h2 id="the-meaning-firewall">The Meaning Firewall</h2>
 <p>Before adding ANY code to kernel crates, ask:</p>
 <ol>
 <li>Does this interpret domain semantics? → Must be an app</li>
@@ -1115,7 +1121,10 @@ rg &quot;TrustGraph|TrustClass|credit_limit|voting_weight|membership&quot; \
 </ol>
 <p>The kernel is deliberately dumb. It provides pipes, not policies.</p>
 <p><strong>We are not refactoring code. We are deleting privilege.</strong></p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/archive/2025/TRANSITION_PLAN.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs/archive" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to archive </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 

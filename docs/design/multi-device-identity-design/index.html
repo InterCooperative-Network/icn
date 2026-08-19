@@ -1,13 +1,13 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Multi-Device Identity Design (Phase 11) | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design for managing identity across multiple devices within a single agent"><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Multi-Device Identity Design (Phase 11) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
     if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
-  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
-<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
-</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
   const theme = (() => {
     if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
       return localStorage.getItem('theme');
@@ -35,14 +35,11 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>multi device identity design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/multi-device-identity-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
-View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Multi-Device Identity Design (Phase 11)</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>multi device identity design</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>draft</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-03-10</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="multi-device-identity-design-phase-11">Multi-Device Identity Design (Phase 11)</h1>
 <p><strong>Status</strong>: Design Phase
 <strong>Started</strong>: 2025-01-13
 <strong>Target</strong>: 3-4 weeks to implementation complete</p>
-<h2>Problem Statement</h2>
+<h2 id="problem-statement">Problem Statement</h2>
 <p><strong>Current State</strong>: ICN identity = single Ed25519 keypair stored in Age-encrypted keystore.</p>
 <p><strong>Failure Modes</strong>:</p>
 <ol>
@@ -53,7 +50,7 @@ View source on GitHub →
 </ol>
 <p><strong>Real-World Blocker</strong>: No community will trust their economic coordination to a system where hardware failure = total loss.</p>
 <hr>
-<h2>Design Goals</h2>
+<h2 id="design-goals">Design Goals</h2>
 <ol>
 <li><strong>Multi-Device Support</strong>: Same DID usable from multiple devices</li>
 <li><strong>Key Rotation</strong>: Clean rotation without breaking trust/ledger history</li>
@@ -62,8 +59,8 @@ View source on GitHub →
 <li><strong>Security</strong>: No single point of failure, clear revocation semantics</li>
 </ol>
 <hr>
-<h2>Architecture Overview</h2>
-<h3>Core Components</h3>
+<h2 id="architecture-overview">Architecture Overview</h2>
+<h3 id="core-components">Core Components</h3>
 <pre><code>┌─────────────────────────────────────────────────────────────┐
 │                      DID Document v2                         │
 │  (Canonical list of authorized keys + capabilities)         │
@@ -97,8 +94,8 @@ View source on GitHub →
 └─────────────────────────────────────────────────────────────┘
 </code></pre>
 <hr>
-<h2>Data Structures</h2>
-<h3>DID Document v2</h3>
+<h2 id="data-structures">Data Structures</h2>
+<h3 id="did-document-v2">DID Document v2</h3>
 <pre><code class="language-rust">/// DID Document version 2: Multi-device identity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DidDocument {
@@ -192,7 +189,7 @@ pub enum RecoveryMethod {
     None,
 }
 </code></pre>
-<h3>Key Rotation Event</h3>
+<h3 id="key-rotation-event">Key Rotation Event</h3>
 <pre><code class="language-rust">/// Represents a key rotation or device change event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RotationEvent {
@@ -271,7 +268,7 @@ pub struct RecoveryProof {
     pub timestamp: u64,
 }
 </code></pre>
-<h3>Keystore v3 Format</h3>
+<h3 id="keystore-v3-format">Keystore v3 Format</h3>
 <pre><code class="language-rust">/// Keystore version 3: Multi-device with DID Document
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeystoreV3 {
@@ -292,8 +289,8 @@ pub struct KeystoreV3 {
 }
 </code></pre>
 <hr>
-<h2>Key Workflows</h2>
-<h3>1. Initial Setup (Fresh Identity)</h3>
+<h2 id="key-workflows">Key Workflows</h2>
+<h3 id="1-initial-setup-fresh-identity">1. Initial Setup (Fresh Identity)</h3>
 <pre><code>User runs: icnctl id init --device-name &quot;Laptop&quot;
 
 1. Generate Ed25519 keypair (primary)
@@ -310,7 +307,7 @@ pub struct KeystoreV3 {
 6. Encrypt and save to {data_dir}/identity.age
 </code></pre>
 <p><strong>Output</strong>: User has a working identity, ready to add more devices.</p>
-<h3>2. Add a Second Device</h3>
+<h3 id="2-add-a-second-device">2. Add a Second Device</h3>
 <pre><code>User runs on NEW device: icnctl device add --name &quot;Phone&quot;
 
 Flow:
@@ -335,7 +332,7 @@ Flow:
    - device_id = &quot;device-2&quot;
 </code></pre>
 <p><strong>Result</strong>: Both laptop and phone can sign as the same DID.</p>
-<h3>3. Revoke a Device</h3>
+<h3 id="3-revoke-a-device">3. Revoke a Device</h3>
 <pre><code>User runs: icnctl device revoke device-2 --reason &quot;Lost phone&quot;
 
 1. Check: Does current device have RevokeDevice capability? (Yes, device-1 does)
@@ -351,7 +348,7 @@ Flow:
 5. All nodes see the update, stop accepting signatures from device-2
 </code></pre>
 <p><strong>Result</strong>: Old device can no longer act as this DID.</p>
-<h3>4. Key Rotation (Proactive Security)</h3>
+<h3 id="4-key-rotation-proactive-security">4. Key Rotation (Proactive Security)</h3>
 <pre><code>User runs: icnctl key rotate --device device-1
 
 1. Generate new Ed25519 keypair
@@ -372,7 +369,7 @@ Flow:
 5. Update local keystore with new keypair
 </code></pre>
 <p><strong>Result</strong>: Underlying key changed, but DID and trust/ledger history intact.</p>
-<h3>5. Social Recovery (Total Device Loss)</h3>
+<h3 id="5-social-recovery-total-device-loss">5. Social Recovery (Total Device Loss)</h3>
 <pre><code>Setup (one-time):
 icnctl recovery setup --method social --threshold 3 --trustees did:icn:alice,did:icn:bob,did:icn:carol
 
@@ -406,15 +403,15 @@ icnctl recovery initiate --did did:icn:abc123
 </code></pre>
 <p><strong>Result</strong>: User regains control of their DID without losing history.</p>
 <hr>
-<h2>Security Considerations</h2>
-<h3>1. <strong>Capability Hierarchy</strong></h3>
+<h2 id="security-considerations">Security Considerations</h2>
+<h3 id="1-capability-hierarchy">1. <strong>Capability Hierarchy</strong></h3>
 <p>Not all devices are equal:</p>
 <ul>
 <li><strong>Primary device</strong> (e.g., laptop): Full capabilities (AddDevice, RevokeDevice, RotateKey)</li>
 <li><strong>Secondary device</strong> (e.g., phone): Limited to Sign, Encrypt</li>
 <li><strong>Rationale</strong>: If phone is lost, can&#39;t be used to add malicious devices</li>
 </ul>
-<h3>2. <strong>Revocation Checking</strong></h3>
+<h3 id="2-revocation-checking">2. <strong>Revocation Checking</strong></h3>
 <p>Every signature verification must:</p>
 <ol>
 <li>Extract DID from signature</li>
@@ -423,21 +420,21 @@ icnctl recovery initiate --did did:icn:abc123
 <li>Check key has <code>Sign</code> capability</li>
 </ol>
 <p><strong>Implementation</strong>: NetworkActor caches DID Documents, gossip keeps them synced.</p>
-<h3>3. <strong>Replay Protection Across Devices</strong></h3>
+<h3 id="3-replay-protection-across-devices">3. <strong>Replay Protection Across Devices</strong></h3>
 <p>Current <code>ReplayGuard</code> uses per-peer sequence numbers. With multi-device:</p>
 <ul>
 <li><strong>Option A</strong>: Shared sequence counter across devices (requires coordination)</li>
 <li><strong>Option B</strong>: Per-device sequences, check against revocation</li>
 <li><strong>Recommendation</strong>: Option B (simpler, no coordination overhead)</li>
 </ul>
-<h3>4. <strong>Recovery Attack Prevention</strong></h3>
+<h3 id="4-recovery-attack-prevention">4. <strong>Recovery Attack Prevention</strong></h3>
 <p>Malicious actor could try to initiate fake recovery:</p>
 <ul>
 <li><strong>Mitigation</strong>: Recovery requires M-of-N trustees to verify identity out-of-band</li>
 <li><strong>Threshold</strong>: Recommend M ≥ 3, N ≥ 5 (balance security vs. availability)</li>
 <li><strong>Trustee selection</strong>: Should be high-trust, long-term relationships</li>
 </ul>
-<h3>5. <strong>DID Document Sync</strong></h3>
+<h3 id="5-did-document-sync">5. <strong>DID Document Sync</strong></h3>
 <p>DID Documents propagate via gossip:</p>
 <ul>
 <li><strong>Topic</strong>: <code>identity:updates</code> (trust-gated, only visible to trust edges)</li>
@@ -450,8 +447,8 @@ icnctl recovery initiate --did did:icn:abc123
 </li>
 </ul>
 <hr>
-<h2>Migration Path (v2.1 → v3)</h2>
-<h3>Automatic Migration on First Unlock</h3>
+<h2 id="migration-path-v21--v3">Migration Path (v2.1 → v3)</h2>
+<h3 id="automatic-migration-on-first-unlock">Automatic Migration on First Unlock</h3>
 <pre><code class="language-rust">impl Keystore {
     pub fn unlock(passphrase: &amp;[u8]) -&gt; Result&lt;KeystoreV3&gt; {
         let data = decrypt(passphrase)?;
@@ -530,8 +527,8 @@ icnctl recovery initiate --did did:icn:abc123
 <li>Automatic, invisible to user</li>
 </ul>
 <hr>
-<h2>Implementation Plan</h2>
-<h3>Phase 11.1: Data Structures (Week 1)</h3>
+<h2 id="implementation-plan">Implementation Plan</h2>
+<h3 id="phase-111-data-structures-week-1">Phase 11.1: Data Structures (Week 1)</h3>
 <p><strong>Crate</strong>: <code>icn-identity</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> Define <code>DidDocument</code>, <code>VerificationMethod</code>, <code>Capability</code> types</li>
@@ -541,7 +538,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Write unit tests for data structures</li>
 </ul>
 <p><strong>Deliverable</strong>: Core types compile, serialize correctly.</p>
-<h3>Phase 11.2: DID Document Management (Week 1-2)</h3>
+<h3 id="phase-112-did-document-management-week-1-2">Phase 11.2: DID Document Management (Week 1-2)</h3>
 <p><strong>Crate</strong>: <code>icn-identity</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> Implement <code>DidDocument::new()</code> (create initial doc)</li>
@@ -553,7 +550,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Write tests for each operation</li>
 </ul>
 <p><strong>Deliverable</strong>: DID Document CRUD operations work.</p>
-<h3>Phase 11.3: Keystore v3 Migration (Week 2)</h3>
+<h3 id="phase-113-keystore-v3-migration-week-2">Phase 11.3: Keystore v3 Migration (Week 2)</h3>
 <p><strong>Crate</strong>: <code>icn-identity</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> Implement <code>KeystoreV3</code> type</li>
@@ -563,7 +560,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Test idempotence (migrating twice is safe)</li>
 </ul>
 <p><strong>Deliverable</strong>: Existing keystores auto-upgrade to v3.</p>
-<h3>Phase 11.4: icnctl Device Commands (Week 2-3)</h3>
+<h3 id="phase-114-icnctl-device-commands-week-2-3">Phase 11.4: icnctl Device Commands (Week 2-3)</h3>
 <p><strong>Crate</strong>: <code>icnctl</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> <code>icnctl device list</code> - Show all devices for this DID</li>
@@ -574,7 +571,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Test workflows end-to-end</li>
 </ul>
 <p><strong>Deliverable</strong>: Users can manage devices via CLI.</p>
-<h3>Phase 11.5: Identity Sync Protocol (Week 3)</h3>
+<h3 id="phase-115-identity-sync-protocol-week-3">Phase 11.5: Identity Sync Protocol (Week 3)</h3>
 <p><strong>Crates</strong>: <code>icn-gossip</code>, <code>icn-core</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> Define gossip topic <code>identity:updates</code></li>
@@ -585,7 +582,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Test: Two nodes, add device on node1, node2 sees update</li>
 </ul>
 <p><strong>Deliverable</strong>: DID Document changes propagate across network.</p>
-<h3>Phase 11.6: Recovery Mechanisms (Week 3-4)</h3>
+<h3 id="phase-116-recovery-mechanisms-week-3-4">Phase 11.6: Recovery Mechanisms (Week 3-4)</h3>
 <p><strong>Crate</strong>: <code>icn-identity</code>, <code>icnctl</code></p>
 <ul>
 <li><input disabled="" type="checkbox"> Implement <code>icnctl recovery setup</code></li>
@@ -596,7 +593,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li><input disabled="" type="checkbox"> Document recovery best practices</li>
 </ul>
 <p><strong>Deliverable</strong>: Users can recover from total device loss.</p>
-<h3>Phase 11.7: Integration &amp; Testing (Week 4)</h3>
+<h3 id="phase-117-integration--testing-week-4">Phase 11.7: Integration &amp; Testing (Week 4)</h3>
 <p><strong>All crates</strong></p>
 <ul>
 <li><input disabled="" type="checkbox"> Update Runtime to load DID Documents on startup</li>
@@ -608,8 +605,8 @@ icnctl recovery initiate --did did:icn:abc123
 </ul>
 <p><strong>Deliverable</strong>: Phase 11 complete, all tests pass.</p>
 <hr>
-<h2>Open Questions</h2>
-<h3>1. <strong>Device Add Flow: Interactive or File-Based?</strong></h3>
+<h2 id="open-questions">Open Questions</h2>
+<h3 id="1-device-add-flow-interactive-or-file-based">1. <strong>Device Add Flow: Interactive or File-Based?</strong></h3>
 <p><strong>Option A: Interactive (QR code)</strong></p>
 <ul>
 <li>New device generates request, shows QR</li>
@@ -626,7 +623,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li>Cons: Manual file transfer</li>
 </ul>
 <p><strong>Recommendation</strong>: Start with Option B (simpler), add Option A later.</p>
-<h3>2. <strong>Recovery: Social vs. Backup Seed?</strong></h3>
+<h3 id="2-recovery-social-vs-backup-seed">2. <strong>Recovery: Social vs. Backup Seed?</strong></h3>
 <p><strong>Social Recovery</strong>:</p>
 <ul>
 <li>Pros: No single point of failure, social trust</li>
@@ -638,7 +635,7 @@ icnctl recovery initiate --did did:icn:abc123
 <li>Cons: Single point of failure (if backup stolen/lost)</li>
 </ul>
 <p><strong>Recommendation</strong>: Support both, let users choose. Default: Social recovery.</p>
-<h3>3. <strong>DID Stability: What if root key rotates?</strong></h3>
+<h3 id="3-did-stability-what-if-root-key-rotates">3. <strong>DID Stability: What if root key rotates?</strong></h3>
 <p><strong>Current Design</strong>: DID = hash of original Ed25519 public key, never changes.</p>
 <p><strong>Implication</strong>: Root key can rotate (via RotationEvent), but DID stays stable.</p>
 <p><strong>Alternative</strong>: DID = hash of DID Document, changes on rotation.</p>
@@ -647,12 +644,12 @@ icnctl recovery initiate --did did:icn:abc123
 <li>Cons: Breaks trust edges, ledger references, every rotation</li>
 </ul>
 <p><strong>Recommendation</strong>: Stick with stable DID (original key). Rotation updates the mapping.</p>
-<h3>4. <strong>Capability Granularity: Per-Device or Per-Key?</strong></h3>
+<h3 id="4-capability-granularity-per-device-or-per-key">4. <strong>Capability Granularity: Per-Device or Per-Key?</strong></h3>
 <p><strong>Current Design</strong>: Capabilities attached to VerificationMethod (per-key).</p>
 <p><strong>Alternative</strong>: Capabilities at device level, keys inherit.</p>
 <p><strong>Recommendation</strong>: Per-key is more flexible (can have signing key + encryption key on same device with different caps).</p>
 <hr>
-<h2>Success Criteria</h2>
+<h2 id="success-criteria">Success Criteria</h2>
 <p>Phase 11 is complete when:</p>
 <ol>
 <li>✅ User can add a second device to their identity</li>
@@ -666,14 +663,17 @@ icnctl recovery initiate --did did:icn:abc123
 </ol>
 <p><strong>Target</strong>: 3-4 weeks (end of February 2025)</p>
 <hr>
-<h2>Next Steps (Today)</h2>
+<h2 id="next-steps-today">Next Steps (Today)</h2>
 <ol>
 <li><strong>Review this design doc</strong> - Any objections? Changes?</li>
 <li><strong>Start Phase 11.1</strong> - Implement data structures in <code>icn-identity</code></li>
 <li><strong>Set up test infrastructure</strong> - Multi-device test helpers in <code>icn-testkit</code></li>
 </ol>
 <p>Let&#39;s build this.</p>
-</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/multi-device-identity-design.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
 
