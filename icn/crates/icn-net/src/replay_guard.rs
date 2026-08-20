@@ -1766,7 +1766,8 @@ impl ReplayGuard {
             tracing::error!(
                 peer = %sender,
                 sequence,
-                "Replay identity could not be derived; reporting the sequence as finalized                  rather than answering for a sender that cannot be identified"
+                "Replay identity could not be derived; reporting the sequence as finalized \
+                 rather than answering for a sender that cannot be identified"
             );
             return true;
         };
@@ -6276,6 +6277,10 @@ mod respelled_identity_tests {
         data: std::sync::Mutex<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
         puts: std::sync::atomic::AtomicUsize,
         deletes: std::sync::atomic::AtomicUsize,
+        /// Every mutating call in the order it happened, so the crash-safety *ordering* can
+        /// be asserted and not merely the call counts. Counting proves how much was written;
+        /// only the order proves a crash cannot land between them and lose a floor.
+        ops: std::sync::Mutex<Vec<String>>,
         fail_scan: bool,
     }
 
@@ -6283,6 +6288,11 @@ mod respelled_identity_tests {
         fn reset_counters(&self) {
             self.puts.store(0, Ordering::SeqCst);
             self.deletes.store(0, Ordering::SeqCst);
+            self.ops.lock().unwrap().clear();
+        }
+
+        fn op_log(&self) -> Vec<String> {
+            self.ops.lock().unwrap().clone()
         }
         fn counts(&self) -> (usize, usize) {
             (
@@ -6298,6 +6308,10 @@ mod respelled_identity_tests {
         }
         fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
             self.puts.fetch_add(1, Ordering::SeqCst);
+            self.ops
+                .lock()
+                .unwrap()
+                .push(format!("put:{}", String::from_utf8_lossy(key)));
             self.data
                 .lock()
                 .unwrap()
@@ -6306,6 +6320,10 @@ mod respelled_identity_tests {
         }
         fn delete(&self, key: &[u8]) -> Result<()> {
             self.deletes.fetch_add(1, Ordering::SeqCst);
+            self.ops
+                .lock()
+                .unwrap()
+                .push(format!("delete:{}", String::from_utf8_lossy(key)));
             self.data.lock().unwrap().remove(key);
             Ok(())
         }
@@ -6323,6 +6341,7 @@ mod respelled_identity_tests {
                 .collect())
         }
         fn flush(&self) -> Result<()> {
+            self.ops.lock().unwrap().push("flush".to_string());
             Ok(())
         }
         fn get_replica_metadata(
@@ -6395,6 +6414,147 @@ mod respelled_identity_tests {
             "re-running the merge on an already-merged store must be a no-op"
         );
         assert_eq!(guard.get_max_seq(&canonical), Some(9));
+    }
+
+    /// The merged canonical row is durable **before** any alias row is retired.
+    ///
+    /// Call *counts* cannot see this: a delete-first implementation writes exactly one row
+    /// and retires exactly one, which is what the idempotence test above already asserts.
+    /// Only the order distinguishes them, and the difference is a lost floor — a crash
+    /// between a delete-first retire and the canonical write leaves the sender with **no**
+    /// durable high-water at all, so its whole sequence space is replayable on the next boot.
+    /// The safe interruption point is the one that leaves a duplicate row, because duplicates
+    /// re-merge to the identical value (maximum, strongest, union are all idempotent).
+    #[test]
+    fn the_canonical_row_is_durable_before_any_alias_is_retired() {
+        let store = Arc::new(CountingStore::default());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            5,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            9,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        store.reset_counters();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let ops = store.op_log();
+        let canonical_op = format!(
+            "put:{}",
+            String::from_utf8_lossy(&ReplayGuard::make_max_seq_key(&pk(&canonical)))
+        );
+        let alias_op = format!(
+            "delete:{}",
+            String::from_utf8_lossy(&spelled_key(MAX_SEQ_PREFIX, &alias))
+        );
+
+        // CONTROL: both operations must actually be in the log, or the ordering assertions
+        // below would hold vacuously over an empty or half-empty sequence.
+        let put_at = ops
+            .iter()
+            .position(|o| *o == canonical_op)
+            .unwrap_or_else(|| panic!("CONTROL: the canonical row must be written; ops={ops:?}"));
+        let delete_at = ops
+            .iter()
+            .position(|o| *o == alias_op)
+            .unwrap_or_else(|| panic!("CONTROL: the alias row must be retired; ops={ops:?}"));
+        let flush_at = ops
+            .iter()
+            .skip(put_at)
+            .position(|o| o == "flush")
+            .map(|i| i + put_at)
+            .unwrap_or_else(|| panic!("CONTROL: the canonical write must be flushed; ops={ops:?}"));
+
+        assert!(
+            put_at < flush_at && flush_at < delete_at,
+            "the merged canonical row must be written AND flushed before any alias row is \
+             retired; a crash in the other order loses the sender's floor entirely. \
+             put={put_at} flush={flush_at} delete={delete_at} ops={ops:?}"
+        );
+
+        // And no alias is retired ahead of the canonical write under any spelling.
+        let first_delete = ops.iter().position(|o| o.starts_with("delete:")).unwrap();
+        assert!(
+            put_at < first_delete,
+            "no row may be retired before the merged row exists; ops={ops:?}"
+        );
+    }
+
+    /// The merge keeps the **most restrictive** semantic version, not the newest.
+    ///
+    /// Ranked by how much the load pass refuses: an unrecognised version holds with no
+    /// deadline, the legacy version holds for the freshness horizon and discards the number,
+    /// and the current version yields a usable floor. Taking the *less* restrictive of two
+    /// spellings would let an alias row written under a regime this binary can still bound be
+    /// laundered into a current-regime floor — adopting a number whose meaning was never
+    /// established, which is the one merge outcome that can admit traffic rather than refuse
+    /// it.
+    #[test]
+    fn alias_merge_keeps_the_most_restrictive_semantic_version() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // The canonical row is current-regime and carries the higher number; the alias row
+        // predates semantic versioning. Taking the newer version would produce a clean floor
+        // of 10 and accept sequence 11 as ordinary traffic.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            3,
+            LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        // CONTROL: the two regimes must genuinely differ, or "most restrictive" is untested.
+        assert_ne!(
+            REPLAY_STATE_SEMANTIC_VERSION, LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            "CONTROL: the seeded versions must differ"
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            stored_max_seq(store.as_ref(), &canonical).map(|e| e.semantic_version),
+            Some(LEGACY_REPLAY_STATE_SEMANTIC_VERSION),
+            "the merged row must carry the most restrictive regime of the two spellings"
+        );
+
+        // Observable consequence: the legacy regime is a bounded hold that discards the
+        // number, so the sender is refused outright rather than admitted against a floor
+        // whose meaning was never established.
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("a sender merged onto a legacy-regime row must be held, not admitted");
+        assert!(
+            err.downcast_ref::<ReplayStateLegacy>().is_some(),
+            "expected the merged semantic version to be the legacy one; got: {err}"
+        );
     }
 
     /// A load that fails must not disarm the guard.
