@@ -558,6 +558,21 @@ is flushed before any alias row is retired. A re-spelled captured envelope is th
 the replay guard, and the self-DID drop in `handlers/signed.rs` (§10.2's "related sub-instance")
 now compares keys rather than strings.
 
+**Rows #1 and #2 are also joined *across* keyspaces, under a rule of their own.** Row #2 carries a
+number together with a `sender_regime` field naming the namespace that produced it; row #1 is one
+version-less `u32` naming the namespace the sender was last known to have established, written at
+state transitions and deliberately outliving the number beside it (`cleanup()` retires row #2 and
+keeps row #1). Row #1 therefore settles the common aged-out case, where it is the only evidence —
+but where a *current-version* row #2 has already placed the number in a different namespace, both
+facts are true and they disagree, and row #1 may re-establish the regime without re-tagging the
+number (#2644). Durable provenance meeting a legacy-tagged current-version floor enters the
+ordinary sender-regime migration rather than reinterpreting that floor as a durable bound; a
+promotion discards the retained number only when the namespace being retired is the one that
+produced it. Detaching a number from its namespace fails in whichever direction the detachment
+runs: relabelling a legacy floor as durable turns an honest peer's legitimate low sequences into
+scored `Violation::ReplayAttack` events, while discarding a durable floor under a fossil
+transition record hands an authenticated sender back every sequence that floor rejected.
+
 **Canonicalization is deliberately partial; two shapes stay physically distinct.** There is exactly
 one canonical key per `SenderPrincipal`, so a merged row can record only one interpretation. Where a
 principal's rows carry two, converging them destructively would lose one, so the pass writes nothing
@@ -574,8 +589,9 @@ and deletes nothing in these cases:
   over it would erase the evidence that quarantines the sender and replace it with a floor derived
   only from the spellings that could be read. Every readable alias in that group is left standing
   and the load pass joins them — for row #1 through a provenance-specific join that ranks
-  `DurableV1` above a superseded `TransitionToDurableV1`, because the latter's promotion resets
-  `max_seq` and `floor_seq` to 0 and would discard a floor the durable row licensed (#2644).
+  `DurableV1` above a superseded `TransitionToDurableV1`, because the latter installs a
+  migration hold whose promotion retires the retained number, and a fossil row must not impose
+  that on a principal a durable sibling already proved (#2644).
 
 **Consequence, and it is a real cost.** Alias rows left by either case are never retired, and
 `cleanup()` deletes only the canonical key, so normal cleanup cannot reach them. A principal with a

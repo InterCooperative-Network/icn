@@ -397,6 +397,44 @@ enum SenderRegimeState {
     DurableV1,
 }
 
+/// Which of the sender's two sequence namespaces produced the number a window holds
+/// (#2644).
+///
+/// Deliberately **not** [`SenderRegimeState`], and deliberately only two variants. The two
+/// types answer different questions and are set by different evidence:
+///
+/// * `SenderRegimeState` is what this receiver believes about the *sender* — including
+///   `TransitionToDurableV1`, which is a statement about a migration in flight and names no
+///   namespace at all. A transitioning window still holds a **legacy** number; that is
+///   exactly what `persist_max_seq_durable(.., legacy_max_seq, TRANSITION)` records.
+/// * This is what produced `max_seq` / `floor_seq`. A number is comparable only inside it.
+///
+/// It exists because the two were previously read off one field, and the promotion at the
+/// end of a sender-regime migration discards the retained number — correct when that number
+/// belongs to the namespace being retired, and a replay fail-open when it is already a
+/// durable-v1 bound that a current-version row established.
+///
+/// Not persisted. Like [`SequenceWindow::sender_regime_from_current_version`] it is
+/// re-derived from the stored rows on every load, so it cannot drift from the rows it
+/// describes, and its `LegacyOrUnproven` default is the direction that discards rather than
+/// keeps — the one that costs a bound rather than inventing one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumericNamespace {
+    /// The number is the sender's previous, unproven numbering — or there is no number.
+    ///
+    /// Both spellings collapse here on purpose: a completed migration discards the retained
+    /// number, and discarding `0` is what `SequenceWindow::new` already holds. Splitting
+    /// "absent" out would create a distinction nothing downstream could act on, and would
+    /// invite exactly the `max_seq == 0` proxy this type exists to avoid.
+    LegacyOrUnproven,
+
+    /// The number was produced by the sender's durable-v1 numbering.
+    ///
+    /// It survives a sender-regime promotion, because a promotion retires the namespace
+    /// *before* durable-v1 and this number is not in it.
+    DurableV1,
+}
+
 /// The replay high-water could not be made durable, so the message was not
 /// accepted.
 ///
@@ -735,6 +773,19 @@ struct SequenceWindow {
     /// cannot drift from the rows it describes, and its `false` default is the fail-closed
     /// direction — demote, costing the peer a hold — rather than the fail-open one.
     sender_regime_from_current_version: bool,
+
+    /// Which sender namespace produced [`SequenceWindow::max_seq`] and
+    /// [`SequenceWindow::floor_seq`] (#2644).
+    ///
+    /// Read in exactly one place: the [`PeerHold::MigratingSenderRegime`] promotion in
+    /// [`ReplayGuard::check_replay_only`], which discards the retained number only when the
+    /// namespace being retired is the one that produced it.
+    ///
+    /// Kept beside [`SequenceWindow::sender_regime`] rather than derived from it because
+    /// `sender_regime` is overwritten by evidence that says nothing about any number —
+    /// provenance establishes a namespace, a hold expiry demotes one — and each of those
+    /// writes used to silently re-tag the number too. See [`NumericNamespace`].
+    numeric_namespace: NumericNamespace,
 }
 
 /// Why a peer's traffic is being refused because of *our* replay state.
@@ -1183,6 +1234,10 @@ impl ReplayGuard {
                             window.floor_seq = window.floor_seq.max(entry.max_seq);
                             window.sender_regime = SenderRegimeState::DurableV1;
                             window.sender_regime_from_current_version = true;
+                            // The number came out of the sender's durable-v1 numbering,
+                            // and stays comparable against it however this window's
+                            // *regime* is later re-established (#2644).
+                            window.numeric_namespace = NumericNamespace::DurableV1;
 
                             tracing::debug!(
                                 peer = %principal,
@@ -1204,6 +1259,11 @@ impl ReplayGuard {
                             window.floor_seq = window.floor_seq.max(entry.max_seq);
                             window.sender_regime = SenderRegimeState::LegacyOrUnproven;
                             window.sender_regime_from_current_version = true;
+                            // Recorded explicitly, because it is the fact the provenance
+                            // pass below must not overwrite: this number is a *legacy*
+                            // number, said so by a row this binary can read in full
+                            // (#2644).
+                            window.numeric_namespace = NumericNamespace::LegacyOrUnproven;
 
                             tracing::debug!(
                                 peer = %principal,
@@ -1225,6 +1285,11 @@ impl ReplayGuard {
                             window.floor_seq = window.floor_seq.max(entry.max_seq);
                             window.sender_regime = SenderRegimeState::TransitionToDurableV1;
                             window.sender_regime_from_current_version = true;
+                            // A transition retains the *legacy* high-water — that is
+                            // literally what `persist_max_seq_durable(.., legacy_max_seq,
+                            // TRANSITION)` wrote — so the promotion that ends this hold is
+                            // right to discard it (#2644).
+                            window.numeric_namespace = NumericNamespace::LegacyOrUnproven;
                             window.install_hold_conservatively(PeerHold::MigratingSenderRegime {
                                 until: quarantine_until,
                             });
@@ -1315,11 +1380,22 @@ impl ReplayGuard {
 
         // Apply established sender-regime provenance (#2517).
         //
-        // Authoritative, and applied *after* the max_seq entries so it wins: the
-        // high-water tag describes the number, but provenance describes whether this
-        // DID's legacy namespace was ever proven retired, and only the latter licenses
-        // interpreting a durable claim. Provenance also outlives the high-water, so a
-        // peer aged out by `cleanup()` is found here with no numeric state at all.
+        // Authoritative about **one** thing, and applied *after* the max_seq entries so it
+        // settles that thing: whether this DID's legacy namespace was ever proven retired.
+        // Only that licenses interpreting a durable claim, and no high-water row records it
+        // — provenance outlives the high-water by design, so a peer aged out by `cleanup()`
+        // is found here with no numeric state at all.
+        //
+        // It is NOT authoritative about the number, and running last does not make it so
+        // (#2644). The two keyspaces are separate evidence axes: a `replay_max_seq` row
+        // carries a `sender_regime` field that says which namespace produced *that number*,
+        // while provenance is a lone version-less `u32` that says which namespace the sender
+        // was last known to have established. Where both are present and they disagree, this
+        // pass may re-establish the regime but must never re-tag the number — a bound
+        // detached from the namespace that produced it is not a bound, and the direction the
+        // detachment runs decides whether the result over-blocks an honest peer or hands an
+        // attacker a replay window. The arms below therefore route a disagreement into the
+        // existing migration rather than resolving it by assignment.
         //
         // Two passes, for the same reason the high-water load above has two (#2644). Where
         // canonicalization declined to rewrite storage — an unreadable *canonical* row leaves
@@ -1406,7 +1482,44 @@ impl ReplayGuard {
                     // from provenance would let a version-less record suppress that
                     // demotion and hand a legacy-only sender a durable namespace it never
                     // proved under this binary's regime (`ea599560`).
-                    window.sender_regime = SenderRegimeState::DurableV1;
+                    //
+                    // What it establishes is a *namespace*, never a *number* (#2644). Where
+                    // a current-version `replay_max_seq` row has explicitly said this
+                    // window's number is a legacy one, both facts are true and they
+                    // disagree, and assigning the regime here resolves that disagreement by
+                    // silently re-tagging the number — the legacy bound `N` becomes a
+                    // durable bound `N`, with no transition and no hold, and the sender's
+                    // legitimate durable sequences at or below `N` come back as an ordinary
+                    // `Replay detected` that `handlers::signed` scores as an attack.
+                    //
+                    // The disagreement has an existing, correct resolution: it is the same
+                    // shape as a live `(LegacyOrUnproven, ObservedSenderRegime::DurableV1)`
+                    // message, and it takes the same path. The legacy number is kept as
+                    // legacy evidence for the full horizon — captured old-namespace traffic
+                    // stays rejected — and the promotion at the end retires it.
+                    if window.sender_regime == SenderRegimeState::LegacyOrUnproven
+                        && window.sender_regime_from_current_version
+                    {
+                        window.sender_regime = SenderRegimeState::TransitionToDurableV1;
+                        window.install_hold_conservatively(PeerHold::MigratingSenderRegime {
+                            until: quarantine_until,
+                        });
+                        tracing::warn!(
+                            peer = %principal,
+                            legacy_max_seq = window.max_seq,
+                            hold_secs = self.envelope_validity_horizon().as_secs(),
+                            "Durable-v1 provenance meets a current-version high-water tagged \
+                             legacy; entering the sender sequence-regime migration rather \
+                             than reinterpreting that number as a durable-v1 bound. This is \
+                             a local migration, not peer misbehaviour"
+                        );
+                    } else {
+                        // Nothing has placed this window's number in a different namespace:
+                        // either no row established a regime at all — the ordinary
+                        // aged-out-high-water case provenance exists to serve, and the one
+                        // that must NOT pay a migration hold — or the row that did agrees.
+                        window.sender_regime = SenderRegimeState::DurableV1;
+                    }
                 }
                 SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => {
                     // Reached only when no readable sibling row proved the migration
@@ -1781,22 +1894,48 @@ impl ReplayGuard {
                     }));
                 }
 
-                // Promote. The old namespace is retired and a clean durable-v1 one
-                // begins: the legacy high-water is dropped rather than carried over,
-                // because carrying it would reimpose exactly the incomparable bound
-                // this migration exists to remove.
+                // Promote. The namespace the sender used *before* durable-v1 is retired.
+                //
+                // The number this window holds is dropped when it belongs to that retired
+                // namespace, because carrying it over would reimpose exactly the
+                // incomparable bound this migration exists to remove — and kept when it does
+                // not (#2644). A durable-v1 number is already on the far side of this
+                // migration: it was produced by the numbering being promoted *to*, so
+                // nothing about retiring the old one makes it stale. Discarding it anyway
+                // would let a fossil transition record — provenance outlives the high-water
+                // by design, and an unreadable canonical provenance row leaves stale alias
+                // rows standing — reset a floor that a current-version durable row
+                // established, handing an authenticated sender back every sequence that
+                // floor rejects. Read while the borrow is still live; the persist below
+                // needs `&self`.
+                //
+                // This is the same decision as `SequenceWindow::numeric_namespace` exists
+                // for, and its only consumer. Deliberately not `max_seq == 0`: a legitimate
+                // current-version row carries `max_seq == 0` — it is precisely what the
+                // previous promotion wrote — so the number cannot testify about its own
+                // namespace.
                 //
                 // Persisted *before* the message is accepted, and before any durable-v1
                 // high-water is written, so a crash here cannot leave a durable-v1
                 // number under a transition tag. If the flush fails the promotion does
                 // not happen and the hold stands.
-                // Ordering matters: the numeric namespace is reset first, and the
+                // Ordering matters: the numeric namespace is settled first, and the
                 // provenance record — the authority — is written last. A crash between
                 // them leaves provenance still saying "transition", so the restart
                 // re-runs the hold rather than accepting under a namespace it never
                 // finished proving. The safe direction to be interrupted in is the one
                 // that repeats work.
-                self.persist_max_seq_durable(&principal, 0, SENDER_REGIME_DURABLE_V1)
+                //
+                // Both bindings read `window`, which is why they are taken here: the
+                // persist below needs `&self`, so the borrow must already have ended.
+                let discard_retired_number =
+                    window.numeric_namespace != NumericNamespace::DurableV1;
+                let retained_seq = if discard_retired_number {
+                    0
+                } else {
+                    window.max_seq
+                };
+                self.persist_max_seq_durable(&principal, retained_seq, SENDER_REGIME_DURABLE_V1)
                     .and_then(|()| self.persist_sender_regime(&principal, SENDER_REGIME_DURABLE_V1))
                     .map_err(|e| {
                         anyhow::Error::new(ReplayStateNotDurable {
@@ -1812,13 +1951,21 @@ impl ReplayGuard {
                     .or_insert_with(SequenceWindow::new);
                 window.hold = None;
                 window.sender_regime = SenderRegimeState::DurableV1;
-                window.max_seq = 0;
-                window.floor_seq = 0;
-                window.recent = BloomFilter::new(BLOOM_CAPACITY, 0.001);
-                window.insertion_count = 0;
+                if discard_retired_number {
+                    window.max_seq = 0;
+                    window.floor_seq = 0;
+                    window.recent = BloomFilter::new(BLOOM_CAPACITY, 0.001);
+                    window.insertion_count = 0;
+                }
+                // Either way the window's number is now a durable-v1 number: the retained
+                // one already was, and the discarded one has been replaced by 0, which is
+                // the durable namespace's own starting bound.
+                window.numeric_namespace = NumericNamespace::DurableV1;
 
                 tracing::info!(
                     peer = %envelope.from,
+                    retained_floor_seq = window.floor_seq,
+                    discarded_retired_number = discard_retired_number,
                     "Sender sequence-regime migration complete; durable-v1 replay namespace \
                      established and made durable"
                 );
@@ -1884,6 +2031,12 @@ impl ReplayGuard {
                     .entry(principal)
                     .or_insert_with(SequenceWindow::new);
                 window.sender_regime = SenderRegimeState::TransitionToDurableV1;
+                // The number just persisted under a `TRANSITION` tag *is* the legacy
+                // high-water (`legacy_max_seq` above), so memory says what the row says
+                // (#2644). Assigned rather than left alone: this is the write that makes
+                // the retained number legacy evidence, and it must not depend on the
+                // window having happened to carry that already.
+                window.numeric_namespace = NumericNamespace::LegacyOrUnproven;
                 // Assigned directly rather than through
                 // `install_hold_conservatively`, and audited as such: this is a
                 // runtime transition with a single evidence source, reached only
@@ -1975,6 +2128,31 @@ impl ReplayGuard {
             );
         }
 
+        // The namespace this window is *established in*, never the one this binary
+        // implements (#2517).
+        //
+        // This single expression is the fix. Stamping the current regime here — which is
+        // what a receiver that versions only its own semantics does — records a number
+        // learned from an unproven sender as durable-v1 state. Nothing downstream can then
+        // tell it apart from a real durable high-water, so when that sender upgrades and
+        // its durable counter starts low, the receiver rejects it against a bound that
+        // never applied and no migration can fire, because nothing looks legacy any more.
+        //
+        // One fold, two consumers (#2644): the tag persisted beside the number and the
+        // namespace the in-memory window records for it are the same statement, and are
+        // derived together so they cannot be spelled differently at the two sites.
+        let (regime_tag, accepted_namespace) = match established_regime {
+            SenderRegimeState::DurableV1 => (SENDER_REGIME_DURABLE_V1, NumericNamespace::DurableV1),
+            // `TransitionToDurableV1` cannot reach here — it always returns. It
+            // folds to the conservative tag rather than being spelled out, so a
+            // future variant cannot silently acquire durable-v1 semantics merely
+            // by being added to the enum.
+            _ => (
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                NumericNamespace::LegacyOrUnproven,
+            ),
+        };
+
         // Make the advance durable BEFORE accepting.
         //
         // This is what makes `D == A`: the restored floor is the highest
@@ -1989,24 +2167,6 @@ impl ReplayGuard {
         // eliminate.
         let max_seq_changed = envelope.sequence > window.max_seq;
         if max_seq_changed {
-            // The namespace this window is *established in*, never the one this
-            // binary implements (#2517).
-            //
-            // This single expression is the fix. Stamping the current regime here —
-            // which is what a receiver that versions only its own semantics does —
-            // records a number learned from an unproven sender as durable-v1 state.
-            // Nothing downstream can then tell it apart from a real durable
-            // high-water, so when that sender upgrades and its durable counter
-            // starts low, the receiver rejects it against a bound that never applied
-            // and no migration can fire, because nothing looks legacy any more.
-            let regime_tag = match established_regime {
-                SenderRegimeState::DurableV1 => SENDER_REGIME_DURABLE_V1,
-                // `TransitionToDurableV1` cannot reach here — it always returns. It
-                // folds to the conservative tag rather than being spelled out, so a
-                // future variant cannot silently acquire durable-v1 semantics merely
-                // by being added to the enum.
-                _ => SENDER_REGIME_LEGACY_OR_UNPROVEN,
-            };
             if let Err(e) = self.persist_max_seq_durable(&principal, envelope.sequence, regime_tag)
             {
                 return Err(anyhow::Error::new(ReplayStateNotDurable {
@@ -2024,6 +2184,7 @@ impl ReplayGuard {
             .or_insert_with(SequenceWindow::new);
         if max_seq_changed {
             window.max_seq = envelope.sequence;
+            window.numeric_namespace = accepted_namespace;
         }
         window.insert_sequence(&seq_hash);
         window.last_update = Instant::now();
@@ -3058,6 +3219,9 @@ impl SequenceWindow {
             sender_regime: SenderRegimeState::LegacyOrUnproven,
             // No row has been read yet, let alone a current-version one.
             sender_regime_from_current_version: false,
+            // `max_seq` is 0 and nothing established it, so there is no durable bound to
+            // protect from a promotion. The variant that discards is the safe default.
+            numeric_namespace: NumericNamespace::LegacyOrUnproven,
         }
     }
 
@@ -10368,6 +10532,971 @@ mod respelled_identity_tests {
                 )),
                 "held:unreadable",
                 "{label}: the superseded transition alias must install no migration hold"
+            );
+        }
+    }
+    // ------------------------------------------------------------------
+    // Cross-keyspace joins: provenance against the high-water (#2644)
+    // ------------------------------------------------------------------
+    //
+    // `replay_max_seq` and `replay_sender_regime` are two keyspaces holding two different
+    // kinds of evidence about one sender, and the load pass joins them. The rule these tests
+    // pin is the same one `5be3fdf0` established *between* spelling-distinct `max_seq` rows,
+    // now applied *across* the two keyspaces:
+    //
+    //   Provenance may establish which sender namespace has been proven. It may not
+    //   reinterpret a number that a readable current-version row has already placed in a
+    //   different one.
+    //
+    // Provenance is one version-less `u32`, written at state transitions and deliberately
+    // outliving the high-water beside it (`cleanup()` retires the number and keeps the
+    // proof). So it is the only evidence in the common aged-out case and must settle it — but
+    // where a current-version `replay_max_seq` row *has* spoken, the two facts are both true
+    // and can disagree, and the number keeps the namespace that produced it.
+    //
+    // The two directions the join can fail are opposites and both are covered: relabelling a
+    // legacy number as durable over-blocks an honest peer and scores it, while discarding a
+    // durable number under a fossil transition record hands an authenticated sender a replay
+    // window.
+
+    fn boot_merge(store: &Arc<icn_store::SledStore>, clock: Arc<MergeClock>) -> ReplayGuard {
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+        guard
+    }
+
+    /// **A — THE REPORTED BUG.** Durable provenance must not relabel a legacy-tagged floor.
+    ///
+    /// The store holds two true facts about one sender: a current-version high-water saying
+    /// "10, and it is a number from the sender's *unproven* numbering", and provenance saying
+    /// "this sender did once establish durable-v1". Before this fix the provenance pass
+    /// assigned `window.sender_regime = DurableV1` over the top of the first, leaving the
+    /// number 10 in place and installing no hold. The window then read as an ordinary
+    /// established durable-v1 sender with a durable floor of 10, so the sender's legitimate
+    /// durable sequences 1..=10 came back as a bare `Replay detected` — which
+    /// `handlers::signed` records as `Violation::ReplayAttack` against the peer.
+    ///
+    /// Both spelling positions are exercised. The reachable history the reviewer described
+    /// runs through an alias — a pre-#2640 store keyed rows by the DID *as spelled*, so a
+    /// legacy row and a durable provenance row can sit under different spellings of one key —
+    /// and #2644's canonicalization is what brings them onto one principal. The defect does
+    /// not actually need the alias: once canonicalization has run, the shape is an ordinary
+    /// canonical high-water beside an ordinary canonical provenance row, which is why the
+    /// third case seeds exactly that.
+    #[test]
+    fn durable_provenance_does_not_relabel_a_current_version_legacy_floor() {
+        for (label, max_seq_spelling, provenance_spelling) in [
+            ("both canonical", false, false),
+            ("legacy number on the alias", true, false),
+            ("provenance on the alias", false, true),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let alias = alias_of(&canonical);
+            let spell = |on_alias: bool| if on_alias { &alias } else { &canonical };
+
+            seed_max_seq(
+                store.as_ref(),
+                spell(max_seq_spelling),
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+            seed_provenance(
+                store.as_ref(),
+                spell(provenance_spelling),
+                &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+            );
+
+            let clock = MergeClock::new();
+            let mut guard = boot_merge(&store, clock.clone());
+
+            // CONTROL: both rows were actually read. A load that skipped either would make
+            // every assertion below pass for the wrong reason — a window with no numeric
+            // state also refuses a durable claim, and so does one with no provenance.
+            let window = guard
+                .sequences
+                .get(&pk(&canonical))
+                .unwrap_or_else(|| panic!("{label}: one window must exist for the principal"));
+            assert_eq!(
+                window.floor_seq, 10,
+                "{label}: CONTROL: the legacy high-water must have been restored"
+            );
+            assert_eq!(
+                window.numeric_namespace,
+                NumericNamespace::LegacyOrUnproven,
+                "{label}: the number must keep the namespace the row gave it"
+            );
+
+            // THE PROPERTY: the sender's legitimate durable sequence 5 is not an ordinary
+            // replay. The two facts disagree, and the disagreement is resolved by the
+            // existing migration, not by relabelling the number.
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .expect_err("a durable-v1 sequence under an unresolved namespace must be held");
+            assert!(
+                err.downcast_ref::<SenderRegimeTransition>().is_some(),
+                "{label}: expected the typed sender-regime transition; got: {err}"
+            );
+            assert!(
+                !err.to_string().contains("Replay detected"),
+                "{label}: the legacy floor must not be reused as a durable floor; got: {err}"
+            );
+            assert!(
+                matches!(
+                    guard.sequences[&pk(&canonical)].hold,
+                    Some(PeerHold::MigratingSenderRegime { .. })
+                ),
+                "{label}: the migration hold must be installed"
+            );
+            assert_eq!(
+                guard.sequences[&pk(&canonical)].floor_seq,
+                10,
+                "{label}: the legacy number is retained as legacy evidence for the hold, so \
+                 captured old-namespace traffic stays rejected"
+            );
+        }
+    }
+
+    /// **A′ — the discriminating control for A.** Provenance must only ever *add* refusal.
+    ///
+    /// Same store minus the provenance row. If A passed because the legacy floor alone always
+    /// produces a transition, this control passes identically and A proves nothing about the
+    /// join. It is here to show the two inputs reach the same safe answer — which is the
+    /// point: the presence of durable provenance used to *weaken* the outcome from a typed,
+    /// unscored migration refusal to a scored replay verdict.
+    #[test]
+    fn a_legacy_floor_without_provenance_reaches_the_same_safe_answer() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+
+        // CONTROL: no provenance row exists, so this is the other half of the pair.
+        assert!(
+            store
+                .get(&ReplayGuard::make_sender_regime_key(&pk(&canonical)))
+                .unwrap()
+                .is_none(),
+            "CONTROL: this case must have no provenance at all"
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("a durable claim against a legacy floor must be held");
+        assert!(
+            err.downcast_ref::<SenderRegimeTransition>().is_some(),
+            "expected the transition path with no provenance either; got: {err}"
+        );
+    }
+
+    /// **B — the migration the reported shape enters actually completes, and only correctly.**
+    ///
+    /// Three gates in one test, because each is only meaningful against the others: elapsed
+    /// time alone must not promote, live durable-v1 evidence alone must not shorten the
+    /// horizon, and the promotion must retire the legacy number rather than carry it into the
+    /// new namespace.
+    #[test]
+    fn the_relabel_refusal_completes_through_the_ordinary_transition() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        // Before the horizon: typed refusal, and the legacy number still rejects captured
+        // old-namespace traffic on its own terms.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "before the horizon the namespace is unresolved"
+        );
+
+        // Horizon reached, but the peer is no longer advertising the capability: elapsed time
+        // alone must not promote (#2517 Phase 11).
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )),
+            "held:sender-regime-transition",
+            "the horizon alone must not promote — promotion needs evidence from now"
+        );
+        assert_eq!(
+            guard.sequences[&pk(&canonical)].floor_seq,
+            10,
+            "CONTROL: the legacy floor must still be standing, so the next step is a real \
+             promotion rather than a floor that was already 0"
+        );
+
+        // Horizon plus live durable-v1 evidence: the migration completes, the incomparable
+        // legacy number is retired, and the sender's durable sequence 5 becomes usable.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "with the horizon elapsed and live durable-v1 evidence the migration completes"
+        );
+        let window = &guard.sequences[&pk(&canonical)];
+        assert_eq!(
+            window.floor_seq, 0,
+            "the legacy number is incomparable with the new namespace and must be retired"
+        );
+        assert_eq!(window.sender_regime, SenderRegimeState::DurableV1);
+        assert_eq!(window.numeric_namespace, NumericNamespace::DurableV1);
+    }
+
+    /// **C — provenance-only state must NOT pay a migration hold.**
+    ///
+    /// The case provenance exists for: `cleanup()` retires the numeric high-water of a peer
+    /// that went quiet and deliberately keeps the proof that its legacy namespace was
+    /// retired. Such a peer resumes as an established durable-v1 sender with no numeric bound.
+    /// A fix that routed every durable provenance row through the migration would make routine
+    /// garbage collection cost every quiet peer a ten-minute outage.
+    #[test]
+    fn provenance_without_a_high_water_resumes_durable_with_no_hold() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        // CONTROL: there is genuinely no numeric row — the distinction under test is
+        // "no evidence" versus "evidence that says legacy", not a difference in numbers.
+        assert!(
+            stored_max_seq(store.as_ref(), &canonical).is_none(),
+            "CONTROL: no high-water row may exist"
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        let window = &guard.sequences[&pk(&canonical)];
+        assert_eq!(window.sender_regime, SenderRegimeState::DurableV1);
+        assert_eq!(window.floor_seq, 0, "no numeric bound survives cleanup");
+        assert!(
+            window.hold.is_none(),
+            "no hold may be imposed: {:?}",
+            window.hold
+        );
+        assert!(
+            !window.sender_regime_from_current_version,
+            "provenance is version-less and must not claim a current-version row said this"
+        );
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "an established durable-v1 sender with no numeric state resumes immediately"
+        );
+    }
+
+    /// **D — a durable floor beside agreeing provenance is preserved, permanently.**
+    #[test]
+    fn a_durable_floor_with_durable_provenance_is_preserved_permanently() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "rejected:replay",
+            "a durable sequence at or below a durable floor is an ordinary replay"
+        );
+        clock.advance(HORIZON_SECS * 10);
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "rejected:replay",
+            "no amount of elapsed time may retire a durable floor — nothing is being migrated"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "CONTROL: the window is a working durable namespace, not a blanket refusal"
+        );
+    }
+
+    /// **E — stale transition provenance must not reset a valid durable floor.**
+    ///
+    /// The mirror-image failure, and the dangerous direction. Provenance outlives the
+    /// high-water by design and an unreadable *canonical* provenance row leaves readable alias
+    /// rows standing (`fd7665c8`), so a fossil `TransitionToDurableV1` record can meet a
+    /// current-version durable high-water. Entering the migration is the conservative answer —
+    /// it refuses strictly more, and it is what the promotion's own write ordering asks for
+    /// after a crash between the two persists. What must not follow is the promotion
+    /// *discarding* the number: that number was produced by the namespace being promoted to,
+    /// so retiring the previous namespace says nothing about it, and zeroing it hands an
+    /// authenticated sender back every sequence the floor was rejecting.
+    #[test]
+    fn stale_transition_provenance_does_not_reset_a_durable_floor() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        // CONTROL: the transition provenance really did install its hold. Without this the
+        // test could pass on a build that ignored the provenance row outright, which is a
+        // different (and less safe) fix.
+        assert!(
+            matches!(
+                guard.sequences[&pk(&canonical)].hold,
+                Some(PeerHold::MigratingSenderRegime { .. })
+            ),
+            "CONTROL: transition provenance must still impose its hold"
+        );
+        assert_eq!(
+            guard.sequences[&pk(&canonical)].numeric_namespace,
+            NumericNamespace::DurableV1,
+            "the number stays a durable-v1 number through the regime change"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "CONTROL: the hold is real and refuses during the horizon"
+        );
+
+        // The hold runs its full course and promotes on live durable evidence.
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+        // THE PROPERTY: the promotion completed, and the durable floor survived it.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "rejected:replay",
+            "a fossil transition record must not hand back sequences a durable floor rejects"
+        );
+        assert_eq!(
+            guard.sequences[&pk(&canonical)].floor_seq,
+            10,
+            "the durable floor must survive the promotion intact"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "CONTROL: the sender is not bricked — its next real sequence is accepted"
+        );
+        assert_eq!(
+            stored_max_seq(store.as_ref(), &canonical)
+                .expect("the promotion rewrote the row")
+                .max_seq,
+            11,
+            "and the retained floor was persisted rather than zeroed, so a restart keeps it"
+        );
+    }
+
+    /// **F — durable provenance must not release a migration the high-water requires.**
+    ///
+    /// The canonical-keyspace form of `durable_provenance_does_not_release_the_mixed_regime_
+    /// migration_hold`, which pins the same rule for spelling-distinct `max_seq` rows. A
+    /// current-version row tagged `TransitionToDurableV1` is a receiver-local statement that a
+    /// namespace change was in flight when this node stopped; a provenance row saying the
+    /// sender once reached durable-v1 does not establish that this node finished retiring the
+    /// old numbering, and must not cut the hold short.
+    #[test]
+    fn durable_provenance_does_not_release_a_transition_high_waters_hold() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        assert!(
+            matches!(
+                guard.sequences[&pk(&canonical)].hold,
+                Some(PeerHold::MigratingSenderRegime { .. })
+            ),
+            "the hold the high-water requires must survive the provenance pass"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "provenance must not release the hold early"
+        );
+        // CONTROL: the hold is bounded, not permanent — it is a migration, not a refusal.
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "CONTROL: the transition still completes at the horizon on live evidence"
+        );
+    }
+
+    /// **G — a legacy floor beside transition provenance keeps the existing behaviour.**
+    ///
+    /// Unchanged by this fix, and asserted so a future edit to the `DurableV1` arm cannot
+    /// silently drag its neighbour with it: the number is legacy, the migration is in flight,
+    /// and the promotion at the end retires the number.
+    #[test]
+    fn a_legacy_floor_with_transition_provenance_still_migrates_coherently() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        // The legacy number is retained as legacy evidence: a captured old-namespace envelope
+        // stays rejected for the whole hold.
+        assert_eq!(
+            guard.sequences[&pk(&canonical)].floor_seq,
+            10,
+            "CONTROL: the legacy bound must still be standing during the migration"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition"
+        );
+
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "the legacy number is incomparable with the new namespace and is retired"
+        );
+        assert_eq!(
+            guard.sequences[&pk(&canonical)].floor_seq,
+            0,
+            "a legacy number must NOT survive its own migration — only a durable one does"
+        );
+    }
+
+    /// **H — unsupported provenance stays fail-closed beside any interpretable high-water.**
+    ///
+    /// Both high-water regimes, because the fix added a branch to the arm next door and an
+    /// unsupported value must reach neither side of it. There is no deadline here: elapsed
+    /// time cannot make an unknown namespace tag interpretable.
+    #[test]
+    fn unsupported_provenance_holds_any_high_water_indefinitely() {
+        const UNSUPPORTED: u32 = 77;
+        for (label, regime) in [
+            ("legacy high-water", SENDER_REGIME_LEGACY_OR_UNPROVEN),
+            ("durable high-water", SENDER_REGIME_DURABLE_V1),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                regime,
+            );
+            seed_provenance(store.as_ref(), &canonical, &UNSUPPORTED.to_be_bytes());
+
+            let clock = MergeClock::new();
+            let mut guard = boot_merge(&store, clock.clone());
+
+            for elapsed in [Duration::ZERO, HORIZON_SECS * 100] {
+                clock.advance(elapsed);
+                assert_eq!(
+                    outcome(guard.check_replay_only(
+                        &envelope(&sender, &canonical, 5),
+                        ObservedSenderRegime::DurableV1,
+                    )),
+                    "held:unsupported-sender-regime",
+                    "{label}: an unsupported provenance value has no deadline to reach"
+                );
+            }
+        }
+    }
+
+    /// **I — unreadable provenance contributes a bounded hold and relabels nothing.**
+    ///
+    /// Unreadable provenance answers a different question from any provenance *value*: "a
+    /// record exists here whose meaning is unavailable". Its whole contribution is the
+    /// quarantine, and when that expires the window must be exactly what the readable
+    /// evidence establishes on its own — a legacy floor still legacy, a durable floor still
+    /// durable. An expiry that resolved the corrupt row into a `DurableV1` reading would
+    /// reintroduce the reported defect through the back door.
+    #[test]
+    fn unreadable_provenance_expires_without_relabelling_a_floor() {
+        for (label, regime, after_expiry) in [
+            (
+                "legacy floor",
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                "held:sender-regime-transition",
+            ),
+            ("durable floor", SENDER_REGIME_DURABLE_V1, "rejected:replay"),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                regime,
+            );
+            // Not four bytes: a record that exists and cannot be read as a regime.
+            store
+                .put(&spelled_key(SENDER_REGIME_PREFIX, &canonical), b"xx")
+                .unwrap();
+
+            let clock = MergeClock::new();
+            let mut guard = boot_merge(&store, clock.clone());
+
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unreadable",
+                "{label}: CONTROL: the corrupt row must quarantine the sender"
+            );
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                after_expiry,
+                "{label}: the expiry clears the hold and must leave the floor's namespace \
+                 exactly as the readable row set it"
+            );
+            assert_eq!(
+                guard.sequences[&pk(&canonical)].floor_seq,
+                10,
+                "{label}: and the number itself must still be standing"
+            );
+        }
+    }
+
+    /// **J — `max_seq == 0` is not a proxy for "no numeric evidence".**
+    ///
+    /// The distinction the fix turns on is "a readable current-version row placed this number
+    /// in the legacy namespace" versus "nothing established a namespace at all", and it must
+    /// be carried by an explicit bit rather than by the number. A current-version row
+    /// legitimately carries `max_seq == 0` — it is exactly what a completed promotion writes —
+    /// so a zero cannot testify about its own provenance. Seeded here with a legacy tag, which
+    /// is the adversarial half: read as "no evidence" it would resolve straight to an
+    /// established durable-v1 sender on provenance alone.
+    #[test]
+    fn a_zero_legacy_high_water_is_still_explicit_legacy_evidence() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            0,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        // CONTROL: the row really is there and really says zero, so the assertion below is
+        // about how a zero is read and not about a row that failed to load.
+        assert_eq!(
+            stored_max_seq(store.as_ref(), &canonical)
+                .expect("CONTROL: the row must exist")
+                .max_seq,
+            0
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("an explicit legacy row must be honoured whatever number it carries");
+        assert!(
+            err.downcast_ref::<SenderRegimeTransition>().is_some(),
+            "expected the transition path; got: {err}"
+        );
+
+        // And the contrast that makes it a distinction rather than a blanket refusal: the same
+        // provenance with genuinely *no* row resumes immediately — covered in full by
+        // `provenance_without_a_high_water_resumes_durable_with_no_hold`, asserted here
+        // side-by-side so the two inputs cannot drift apart.
+        let bare = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let other = KeyPair::generate().unwrap();
+        seed_provenance(
+            bare.as_ref(),
+            other.did(),
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+        let mut bare_guard = boot_merge(&bare, MergeClock::new());
+        assert_eq!(
+            outcome(bare_guard.check_replay_only(
+                &envelope(&other, other.did(), 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "CONTROL: absence of a row is not the same fact as a row saying legacy"
+        );
+    }
+
+    /// **K — the property survives a restart, because it is re-derived and never latched.**
+    ///
+    /// The window is rebuilt from the rows on every load, so a receiver that restarts mid-hold
+    /// restarts the *full* horizon rather than resuming a remembered deadline, and one that
+    /// restarts after the promotion comes back as an ordinary durable-v1 sender with the
+    /// legacy number gone from the store as well as from memory.
+    #[test]
+    fn the_cross_axis_resolution_is_rebuilt_from_the_store_on_every_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        // First boot, most of the way through the hold, then crash.
+        let first_clock = MergeClock::new();
+        let mut first = boot_merge(&store, first_clock.clone());
+        assert_eq!(
+            outcome(first.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition"
+        );
+        first_clock.advance(HORIZON_SECS - Duration::from_secs(1));
+        drop(first);
+
+        // Second boot on a fresh clock: the load re-derives the same disagreement and the
+        // hold starts over. Nothing about the near-expired first hold survived.
+        let second_clock = MergeClock::new();
+        let mut second = boot_merge(&store, second_clock.clone());
+        assert_eq!(
+            second.sequences[&pk(&canonical)].floor_seq,
+            10,
+            "the legacy number is still on disk and still legacy"
+        );
+        assert_eq!(
+            outcome(second.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "a restart restarts the full hold; it must not inherit the elapsed one"
+        );
+
+        // Complete the migration, then restart again.
+        second_clock.advance(HORIZON_SECS + Duration::from_secs(1));
+        assert_eq!(
+            outcome(second.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted"
+        );
+        drop(second);
+
+        let stored = stored_max_seq(store.as_ref(), &canonical).expect("the row survives");
+        assert_eq!(
+            stored.sender_regime, SENDER_REGIME_DURABLE_V1,
+            "the promotion re-tagged the row, so the legacy number is gone from the store too"
+        );
+
+        let mut third = boot_merge(&store, MergeClock::new());
+        let window = &third.sequences[&pk(&canonical)];
+        assert_eq!(window.sender_regime, SenderRegimeState::DurableV1);
+        assert!(window.hold.is_none(), "no second migration may be imposed");
+        assert_eq!(
+            outcome(third.check_replay_only(
+                &envelope(&sender, &canonical, 6),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "the sender resumes in its durable namespace with no further hold"
+        );
+    }
+
+    /// **L — the ambiguous case must not be scored against the peer.**
+    ///
+    /// This is the whole cost of the defect, stated as a property. `handlers::signed` splits
+    /// replay-guard errors into two classes: a set of typed local-state faults that are
+    /// logged and dropped, and everything else, which records
+    /// `icn_security::Violation::ReplayAttack` against `envelope.from`. `SenderRegimeTransition`
+    /// is in the first set and a bare `Replay detected` is in the second, so relabelling the
+    /// legacy floor did not merely refuse an honest peer's traffic — it accumulated
+    /// misbehaviour severity against it for a state-reconstruction ambiguity that is entirely
+    /// ours.
+    #[test]
+    fn an_unresolved_namespace_is_a_local_fault_and_never_a_scored_replay() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard = boot_merge(&store, clock.clone());
+
+        // Every sequence at or below the retained legacy floor — the whole range the defect
+        // converted into scored replay verdicts.
+        for sequence in 1..=10 {
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, sequence),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .expect_err("every sequence at or below the retained legacy floor is held");
+            assert!(
+                err.downcast_ref::<SenderRegimeTransition>().is_some(),
+                "sequence {sequence} must be a typed migration refusal; got: {err}"
+            );
+            assert!(
+                !err.to_string().contains("Replay detected"),
+                "sequence {sequence} must not reach the scoring branch of handlers::signed; \
+                 got: {err}"
+            );
+        }
+
+        // CONTROL: the classification is a property of this state, not of the error type
+        // always being returned. An established durable sender really does produce the scored
+        // form for the very same sequence.
+        let clean = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let other = KeyPair::generate().unwrap();
+        seed_max_seq(
+            clean.as_ref(),
+            other.did(),
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        let mut clean_guard = boot_merge(&clean, MergeClock::new());
+        let scored = clean_guard
+            .check_replay_only(
+                &envelope(&other, other.did(), 5),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("a real durable replay must still be reported as one");
+        assert!(
+            scored.downcast_ref::<SenderRegimeTransition>().is_none()
+                && scored.to_string().contains("Replay detected"),
+            "CONTROL: a genuine replay against a proven durable floor is still scored; got: \
+             {scored}"
+        );
+    }
+
+    /// **M — a live acceptance records in memory exactly the namespace it persists.**
+    ///
+    /// The accept path writes the number's namespace twice: as the `sender_regime` field of
+    /// the persisted `MaxSeqEntry`, and as the window's `numeric_namespace`. They are folded
+    /// out of one `match` for that reason, and this pins that they cannot drift — a build that
+    /// persisted `DURABLE_V1` while leaving the window's number tagged legacy would hold a
+    /// window whose memory and disk disagree, and the disagreement would surface only at the
+    /// next promotion, as a silently discarded durable floor.
+    ///
+    /// Asserted as state rather than through a rejection, deliberately. Today nothing
+    /// downstream can tell the difference *within one process*: the only consumer is the
+    /// promotion, and no in-memory path installs a `MigratingSenderRegime` hold on a window
+    /// that is already established `DurableV1`. That makes the property one another layer
+    /// currently supplies — the load pass re-derives it from the persisted tag on the next
+    /// restart — which is precisely the kind of invariant that survives a mutation unless the
+    /// state itself is asserted.
+    #[test]
+    fn an_accepted_number_records_the_same_namespace_it_persists() {
+        for (label, observed, provenance, expected_tag, expected_namespace) in [
+            (
+                "durable sender resumed from provenance alone",
+                ObservedSenderRegime::DurableV1,
+                Some(SENDER_REGIME_DURABLE_V1),
+                SENDER_REGIME_DURABLE_V1,
+                NumericNamespace::DurableV1,
+            ),
+            (
+                "unproven sender",
+                ObservedSenderRegime::LegacyOrUnproven,
+                None,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                NumericNamespace::LegacyOrUnproven,
+            ),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            if let Some(regime) = provenance {
+                seed_provenance(store.as_ref(), &canonical, &regime.to_be_bytes());
+            }
+
+            let mut guard = boot_merge(&store, MergeClock::new());
+            guard
+                .check_replay_only(&envelope(&sender, &canonical, 5), observed)
+                .unwrap_or_else(|e| panic!("{label}: this traffic must be accepted: {e}"));
+
+            let window = &guard.sequences[&pk(&canonical)];
+            assert_eq!(
+                window.max_seq, 5,
+                "{label}: CONTROL: the acceptance must have raised the high-water, otherwise \
+                 neither half of the property was exercised"
+            );
+            assert_eq!(
+                stored_max_seq(store.as_ref(), &canonical)
+                    .unwrap_or_else(|| panic!("{label}: the acceptance must be durable"))
+                    .sender_regime,
+                expected_tag,
+                "{label}: the persisted half"
+            );
+            assert_eq!(
+                window.numeric_namespace, expected_namespace,
+                "{label}: the in-memory half must be the same statement as the persisted tag"
             );
         }
     }
