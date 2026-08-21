@@ -1031,19 +1031,55 @@ impl ReplayGuard {
         // `envelope_validity_horizon` for the derivation.
         let quarantine_until = self.clock.elapsed() + self.envelope_validity_horizon();
 
-        // Load max sequences
+        // Load max sequences.
+        //
+        // Two passes, and the split is the security property rather than a tidy-up. Where
+        // canonicalization declined to rewrite storage — an unreadable canonical row leaves
+        // its readable alias rows in place — several physical rows for one principal reach
+        // this loop, and each of them used to *assign* `max_seq` and `floor_seq`. That is
+        // last-write-wins over an order which is a property of the spellings an attacker
+        // chose, so a lower high-water could overwrite a higher one, and the floor left
+        // standing once the bounded hold expired was the weaker of the two.
+        //
+        // Pass one combines the rows; pass two interprets the results and joins their
+        // *effects*. The unit that is merged is one `semantic_version`, because that is the
+        // unit within which a number is interpretable at all:
+        //
+        // * **Within** a version, `merge_max_seq` — literally the function canonicalization
+        //   uses, not a second implementation of it — keeps `(max_seq, sender_regime)`
+        //   coupled, so mixed sender namespaces still resolve to a transition rather than
+        //   laundering one namespace's number under another's label (#2517, `5be3fdf0`).
+        // * **Across** versions the arms below are not comparable: the current-version arm
+        //   establishes a floor, the legacy arm establishes a bounded hold and deliberately
+        //   establishes no floor. Merging those into one row lets whichever arm won discard
+        //   the other's contribution — a `v0` sibling row would erase an interpretable
+        //   current-version floor outright. Each arm is therefore run and its effects joined:
+        //   holds by `install_hold_conservatively`, the floor by maximum. The join refuses at
+        //   least as much as any single row did, which is the whole invariant.
+        //
+        // Only the current-version arm assigns a number or a regime, and a principal has at
+        // most one current-version group, so the joins below are in practice single-sourced.
+        // They are written as joins anyway: the safety must be structural rather than a
+        // coincidence of which arms happen to assign today.
         let entries = store
             .scan(MAX_SEQ_PREFIX)
             .context("Failed to scan replay max_seq entries")?;
 
+        // One combined high-water per (principal, semantic_version), established before
+        // anything interprets it.
+        let mut high_water: HashMap<(SenderPrincipal, u32), MaxSeqEntry> = HashMap::new();
+
         for (key, value) in entries {
-            if let Some(did) = Self::parse_max_seq_key(&key) {
-                // Rows are keyed by the sender's key, never by its spelling (#2640).
-                let Ok(principal) = Self::window_key(&did, "replay max_seq") else {
-                    continue;
-                };
-                let parsed = serde_json::from_slice::<MaxSeqEntry>(&value);
-                if let Err(ref e) = parsed {
+            let Some(did) = Self::parse_max_seq_key(&key) else {
+                continue;
+            };
+            // Rows are keyed by the sender's key, never by its spelling (#2640).
+            let Ok(principal) = Self::window_key(&did, "replay max_seq") else {
+                continue;
+            };
+            let entry = match serde_json::from_slice::<MaxSeqEntry>(&value) {
+                Ok(entry) => entry,
+                Err(e) => {
                     // The key's existence proves we had state for this peer, but
                     // its high-water is unreadable, so no sequence can be shown
                     // to be new. Failing open would hand an attacker a replay
@@ -1060,169 +1096,197 @@ impl ReplayGuard {
                         "Corrupt replay state entry; quarantining this peer until captured \
                          traffic can no longer be fresh"
                     );
+                    continue;
                 }
-                if let Ok(entry) = parsed {
-                    let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
+            };
 
-                    // The entry parsed, but parsing is a statement about schema and
-                    // this decision is about semantics. Enumerated deliberately
-                    // rather than tested with `!= current`: "we know exactly what
-                    // this used to mean" and "we have no idea what this means" are
-                    // different facts and must not share a branch. A future regime
-                    // added here needs its own arm with an explicit migration; until
-                    // it has one it falls to the catch-all and fails closed, which is
-                    // the safe direction to forget something in.
-                    match entry.semantic_version {
-                        REPLAY_STATE_SEMANTIC_VERSION => {
-                            // Our own regime is current. That settles only half the
-                            // question — `max_seq` is still uninterpretable until we
-                            // also know whose namespace produced it (#2517).
-                            match entry.sender_regime {
-                                SENDER_REGIME_DURABLE_V1 => {
-                                    // Both axes current: the ordinary #2514 path.
-                                    // The floor is the durable high-water, which —
-                                    // because the high-water is flushed before
-                                    // acceptance is returned — is exactly the highest
-                                    // sequence ever accepted. Everything accepted
-                                    // before the crash is at or below it and the
-                                    // sender's next emission is above it, so this
-                                    // rejects all of the former and none of the
-                                    // latter. The Bloom filter is empty after
-                                    // restart, which is why the floor carries
-                                    // pre-restart replay rejection.
-                                    window.max_seq = entry.max_seq;
-                                    window.floor_seq = entry.max_seq;
-                                    window.sender_regime = SenderRegimeState::DurableV1;
+            match high_water.entry((principal, entry.semantic_version)) {
+                std::collections::hash_map::Entry::Occupied(mut occupied) => {
+                    let combined = Self::merge_max_seq(occupied.get(), &entry);
+                    tracing::warn!(
+                        peer = %principal,
+                        combined_max_seq = combined.max_seq,
+                        combined_sender_regime = combined.sender_regime,
+                        combined_semantic_version = combined.semantic_version,
+                        "Combining spelling-distinct replay high-water rows that \
+                         canonicalization left in place (#2640). The combined row can only \
+                         refuse at least as much as any single one of them did"
+                    );
+                    *occupied.get_mut() = combined;
+                }
+                std::collections::hash_map::Entry::Vacant(vacant) => {
+                    vacant.insert(entry);
+                }
+            }
+        }
 
-                                    tracing::debug!(
-                                        peer = %principal,
-                                        max_seq = entry.max_seq,
-                                        floor_seq = entry.max_seq,
-                                        "Loaded replay guard state"
-                                    );
-                                }
+        // `count` is peers rather than physical rows, which is what the field it is logged
+        // under has always claimed, and is identical for the one-row-per-sender store every
+        // honest deployment has.
+        count += high_water
+            .keys()
+            .map(|(principal, _)| *principal)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
 
-                                SENDER_REGIME_LEGACY_OR_UNPROVEN => {
-                                    // A number from an unproven namespace, recorded
-                                    // by a current receiver. It is a valid bound
-                                    // *within that namespace* and is restored as one,
-                                    // so captured legacy traffic stays rejected. What
-                                    // it must never become is a bound on durable-v1
-                                    // sequences — that conversion is gated behind the
-                                    // explicit transition below.
-                                    window.max_seq = entry.max_seq;
-                                    window.floor_seq = entry.max_seq;
-                                    window.sender_regime = SenderRegimeState::LegacyOrUnproven;
+        // Interpret each version group and join its effect into the window. `merge_max_seq`
+        // is commutative and associative and the joins below are commutative, so the result
+        // does not depend on the scan order that produced any of it.
+        for ((principal, _semantic_version), entry) in high_water {
+            let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
 
-                                    tracing::debug!(
-                                        peer = %principal,
-                                        max_seq = entry.max_seq,
-                                        "Loaded replay state from an unproven sender regime"
-                                    );
-                                }
+            // The entry parsed, but parsing is a statement about schema and this
+            // decision is about semantics. Enumerated deliberately rather than tested
+            // with `!= current`: "we know exactly what this used to mean" and "we have
+            // no idea what this means" are different facts and must not share a branch.
+            // A future regime added here needs its own arm with an explicit migration;
+            // until it has one it falls to the catch-all and fails closed, which is the
+            // safe direction to forget something in.
+            match entry.semantic_version {
+                REPLAY_STATE_SEMANTIC_VERSION => {
+                    // Our own regime is current. That settles only half the
+                    // question — `max_seq` is still uninterpretable until we
+                    // also know whose namespace produced it (#2517).
+                    match entry.sender_regime {
+                        SENDER_REGIME_DURABLE_V1 => {
+                            // Both axes current: the ordinary #2514 path.
+                            // The floor is the durable high-water, which —
+                            // because the high-water is flushed before
+                            // acceptance is returned — is exactly the highest
+                            // sequence ever accepted. Everything accepted
+                            // before the crash is at or below it and the
+                            // sender's next emission is above it, so this
+                            // rejects all of the former and none of the
+                            // latter. The Bloom filter is empty after
+                            // restart, which is why the floor carries
+                            // pre-restart replay rejection.
+                            window.max_seq = window.max_seq.max(entry.max_seq);
+                            window.floor_seq = window.floor_seq.max(entry.max_seq);
+                            window.sender_regime = SenderRegimeState::DurableV1;
 
-                                SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => {
-                                    // A namespace change was underway when we stopped.
-                                    // Restart the hold from the *full* horizon rather
-                                    // than resuming a remembered deadline: nothing
-                                    // durable records how much of it had elapsed, and
-                                    // the only safe way to be wrong is long. The
-                                    // legacy high-water is kept as legacy evidence so
-                                    // captured old-namespace traffic stays rejected
-                                    // for the duration.
-                                    window.max_seq = entry.max_seq;
-                                    window.floor_seq = entry.max_seq;
-                                    window.sender_regime = SenderRegimeState::TransitionToDurableV1;
-                                    window.install_hold_conservatively(
-                                        PeerHold::MigratingSenderRegime {
-                                            until: quarantine_until,
-                                        },
-                                    );
-
-                                    tracing::warn!(
-                                        peer = %principal,
-                                        legacy_max_seq = entry.max_seq,
-                                        hold_secs = self.envelope_validity_horizon().as_secs(),
-                                        "Resuming an incomplete sender sequence-regime migration; \
-                                         restarting the full safety hold rather than trusting a \
-                                         remembered deadline"
-                                    );
-                                }
-
-                                found_regime => {
-                                    // A namespace tag written by a binary that knows
-                                    // something this one does not. Same principle as
-                                    // an unknown receiver regime, applied to the other
-                                    // axis: waiting cannot make an unknown numbering
-                                    // interpretable, so there is no deadline here.
-                                    window.install_hold_conservatively(
-                                        PeerHold::UnsupportedSenderRegime { found_regime },
-                                    );
-
-                                    tracing::error!(
-                                        peer = %principal,
-                                        found_regime,
-                                        "Replay state is tagged with a sender sequence regime this \
-                                         binary has no migration for; refusing this peer \
-                                         indefinitely. Most likely an older binary against a store \
-                                         a newer one wrote — upgrade it or repair the state"
-                                    );
-                                }
-                            }
-                        }
-
-                        LEGACY_REPLAY_STATE_SEMANTIC_VERSION => {
-                            // Known obsolete regime, and this binary has an explicit
-                            // migration for it: the old meaning is understood well
-                            // enough to bound how long anything produced under it
-                            // stays dangerous. That bound is what licenses retiring
-                            // the value rather than trusting it.
-                            window.install_hold_conservatively(PeerHold::MigratingFromLegacy {
-                                until: quarantine_until,
-                                from_version: entry.semantic_version,
-                            });
-
-                            // max_seq and floor_seq stay at their SequenceWindow::new
-                            // defaults of 0. Freshness, not the floor, carries replay
-                            // rejection for the duration of the hold.
-                            tracing::warn!(
+                            tracing::debug!(
                                 peer = %principal,
-                                found_version = entry.semantic_version,
-                                current_version = REPLAY_STATE_SEMANTIC_VERSION,
-                                discarded_max_seq = entry.max_seq,
-                                hold_secs = self.envelope_validity_horizon().as_secs(),
-                                "Replay state predates semantic versioning; holding this \
-                                 peer until no envelope from that regime can still be \
-                                 fresh, then rebuilding from live traffic"
+                                max_seq = entry.max_seq,
+                                floor_seq = entry.max_seq,
+                                "Loaded replay guard state"
                             );
                         }
 
-                        found_version => {
-                            // No migration exists from this regime, so its meaning
-                            // cannot be established at all — it may have changed
-                            // sequence interpretation, window semantics, freshness
-                            // assumptions, or something this binary has no name for.
-                            // Held with no deadline: elapsed time cannot make an
-                            // unknown regime interpretable, and quietly adopting it
-                            // as current after a wait would be a silent downgrade.
-                            window.install_hold_conservatively(PeerHold::UnsupportedVersion {
-                                found_version,
+                        SENDER_REGIME_LEGACY_OR_UNPROVEN => {
+                            // A number from an unproven namespace, recorded
+                            // by a current receiver. It is a valid bound
+                            // *within that namespace* and is restored as one,
+                            // so captured legacy traffic stays rejected. What
+                            // it must never become is a bound on durable-v1
+                            // sequences — that conversion is gated behind the
+                            // explicit transition below.
+                            window.max_seq = window.max_seq.max(entry.max_seq);
+                            window.floor_seq = window.floor_seq.max(entry.max_seq);
+                            window.sender_regime = SenderRegimeState::LegacyOrUnproven;
+
+                            tracing::debug!(
+                                peer = %principal,
+                                max_seq = entry.max_seq,
+                                "Loaded replay state from an unproven sender regime"
+                            );
+                        }
+
+                        SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => {
+                            // A namespace change was underway when we stopped.
+                            // Restart the hold from the *full* horizon rather
+                            // than resuming a remembered deadline: nothing
+                            // durable records how much of it had elapsed, and
+                            // the only safe way to be wrong is long. The
+                            // legacy high-water is kept as legacy evidence so
+                            // captured old-namespace traffic stays rejected
+                            // for the duration.
+                            window.max_seq = window.max_seq.max(entry.max_seq);
+                            window.floor_seq = window.floor_seq.max(entry.max_seq);
+                            window.sender_regime = SenderRegimeState::TransitionToDurableV1;
+                            window.install_hold_conservatively(PeerHold::MigratingSenderRegime {
+                                until: quarantine_until,
+                            });
+
+                            tracing::warn!(
+                                peer = %principal,
+                                legacy_max_seq = entry.max_seq,
+                                hold_secs = self.envelope_validity_horizon().as_secs(),
+                                "Resuming an incomplete sender sequence-regime migration; \
+                                 restarting the full safety hold rather than trusting a \
+                                 remembered deadline"
+                            );
+                        }
+
+                        found_regime => {
+                            // A namespace tag written by a binary that knows
+                            // something this one does not. Same principle as
+                            // an unknown receiver regime, applied to the other
+                            // axis: waiting cannot make an unknown numbering
+                            // interpretable, so there is no deadline here.
+                            window.install_hold_conservatively(PeerHold::UnsupportedSenderRegime {
+                                found_regime,
                             });
 
                             tracing::error!(
                                 peer = %principal,
-                                found_version,
-                                current_version = REPLAY_STATE_SEMANTIC_VERSION,
-                                "Replay state was written under a semantic regime this binary \
-                                 has no migration for; refusing this peer indefinitely. This \
-                                 node is most likely running an older binary against a store a \
-                                 newer one wrote — upgrade it or repair the state. This will \
-                                 not clear on its own"
+                                found_regime,
+                                "Replay state is tagged with a sender sequence regime this \
+                                 binary has no migration for; refusing this peer \
+                                 indefinitely. Most likely an older binary against a store \
+                                 a newer one wrote — upgrade it or repair the state"
                             );
                         }
                     }
+                }
 
-                    count += 1;
+                LEGACY_REPLAY_STATE_SEMANTIC_VERSION => {
+                    // Known obsolete regime, and this binary has an explicit
+                    // migration for it: the old meaning is understood well
+                    // enough to bound how long anything produced under it
+                    // stays dangerous. That bound is what licenses retiring
+                    // the value rather than trusting it.
+                    window.install_hold_conservatively(PeerHold::MigratingFromLegacy {
+                        until: quarantine_until,
+                        from_version: entry.semantic_version,
+                    });
+
+                    // max_seq and floor_seq stay at their SequenceWindow::new
+                    // defaults of 0. Freshness, not the floor, carries replay
+                    // rejection for the duration of the hold.
+                    tracing::warn!(
+                        peer = %principal,
+                        found_version = entry.semantic_version,
+                        current_version = REPLAY_STATE_SEMANTIC_VERSION,
+                        discarded_max_seq = entry.max_seq,
+                        hold_secs = self.envelope_validity_horizon().as_secs(),
+                        "Replay state predates semantic versioning; holding this \
+                         peer until no envelope from that regime can still be \
+                         fresh, then rebuilding from live traffic"
+                    );
+                }
+
+                found_version => {
+                    // No migration exists from this regime, so its meaning
+                    // cannot be established at all — it may have changed
+                    // sequence interpretation, window semantics, freshness
+                    // assumptions, or something this binary has no name for.
+                    // Held with no deadline: elapsed time cannot make an
+                    // unknown regime interpretable, and quietly adopting it
+                    // as current after a wait would be a silent downgrade.
+                    window.install_hold_conservatively(PeerHold::UnsupportedVersion {
+                        found_version,
+                    });
+
+                    tracing::error!(
+                        peer = %principal,
+                        found_version,
+                        current_version = REPLAY_STATE_SEMANTIC_VERSION,
+                        "Replay state was written under a semantic regime this binary \
+                         has no migration for; refusing this peer indefinitely. This \
+                         node is most likely running an older binary against a store a \
+                         newer one wrote — upgrade it or repair the state. This will \
+                         not clear on its own"
+                    );
                 }
             }
         }
@@ -7923,6 +7987,732 @@ mod respelled_identity_tests {
                     )
                     .is_err(),
                 "{position}: the merged floor must still reject a replayed sequence"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // #2644 review — conservative numeric floor composition across alias rows
+    // ---------------------------------------------------------------------
+    //
+    // The counterpart to the hold-composition block above, on the other axis of the same
+    // window. Canonicalization declines to rewrite a group whose canonical row is unreadable,
+    // so several readable rows reach the load pass; combining their holds was fixed first, and
+    // these pin that combining their *numbers* is conservative too.
+
+    /// One representative `MaxSeqEntry`, spelled where the permutation property can read it.
+    fn row(max_seq: u64, semantic_version: u32, sender_regime: u32) -> MaxSeqEntry {
+        MaxSeqEntry {
+            max_seq,
+            updated_at_ms: ReplayGuard::current_time_ms(),
+            semantic_version,
+            sender_regime,
+        }
+    }
+
+    /// Reduce a probe to one comparable tag, so two load paths can be asserted *identical*
+    /// rather than merely both-non-empty.
+    fn outcome(result: Result<()>) -> &'static str {
+        match result {
+            Ok(()) => "accepted",
+            Err(e) => {
+                if e.downcast_ref::<ReplayStateUnreadable>().is_some() {
+                    "held:unreadable"
+                } else if e.downcast_ref::<SenderRegimeTransition>().is_some() {
+                    "held:sender-regime-transition"
+                } else if e.downcast_ref::<ReplayStateUnsupportedVersion>().is_some() {
+                    "held:unsupported-version"
+                } else if e.downcast_ref::<UnsupportedSenderRegime>().is_some() {
+                    "held:unsupported-sender-regime"
+                } else if e.downcast_ref::<ReplayStateLegacy>().is_some() {
+                    "held:legacy"
+                } else if e.to_string().contains("Replay detected") {
+                    "rejected:replay"
+                } else {
+                    "rejected:other"
+                }
+            }
+        }
+    }
+
+    /// THE BUG. Several readable rows for one sender must not resolve by scan order.
+    ///
+    /// An unreadable *canonical* row makes `install_canonical_row` decline to rewrite the
+    /// group, so its readable alias rows stay physically present and all reach the load pass.
+    /// Each of them used to assign `window.max_seq` and `window.floor_seq`, so the row `sled`
+    /// handed over last won — and `sled` scans lexicographically over keys built from the
+    /// spellings, which is to say over an order the attacker who wrote the alias rows chose.
+    ///
+    /// `PeerHold::Unreadable` covers the horizon and then clears, and the whole justification
+    /// for clearing it is that the window's *floor* is left standing (see `PeerHold::rank`).
+    /// If that floor is the lower of two durable high-waters, evidence the store still holds
+    /// has stopped rejecting sequences it rejected before the restart.
+    ///
+    /// Both value arrangements are run, because with last-write-wins exactly one of them
+    /// happens to produce the right answer: a test that seeded only "high last" would pass on
+    /// the defect.
+    #[test]
+    fn surviving_alias_rows_never_lower_the_numeric_replay_floor() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let early = alias_of(&canonical);
+        let late = late_sorting_alias_of(&canonical);
+
+        // CONTROL: the physical scan order is known, and it is not the seeding order.
+        assert!(
+            spelled_key(MAX_SEQ_PREFIX, &early) < spelled_key(MAX_SEQ_PREFIX, &canonical)
+                && spelled_key(MAX_SEQ_PREFIX, &canonical) < spelled_key(MAX_SEQ_PREFIX, &late),
+            "CONTROL: base16 sorts before the canonical row and base256-emoji after it"
+        );
+
+        for (label, early_seq, late_seq) in [
+            ("high scanned first, low scanned last", 10u64, 3u64),
+            ("low scanned first, high scanned last", 3u64, 10u64),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            for (did, seq) in [(&early, early_seq), (&late, late_seq)] {
+                seed_max_seq(
+                    store.as_ref(),
+                    did,
+                    seq,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_DURABLE_V1,
+                );
+            }
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // CONTROL: all three rows really did survive canonicalization, so three evidence
+            // sources genuinely meet in one window. Without this the test could pass by the
+            // aliases having been merged away, proving nothing about the load pass.
+            for (what, key) in [
+                (
+                    "unreadable canonical",
+                    spelled_key(MAX_SEQ_PREFIX, &canonical),
+                ),
+                ("early alias", spelled_key(MAX_SEQ_PREFIX, &early)),
+                ("late alias", spelled_key(MAX_SEQ_PREFIX, &late)),
+            ] {
+                assert!(
+                    store.get(&key).unwrap().is_some(),
+                    "{label}: CONTROL: the {what} row must still be present"
+                );
+            }
+
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(10),
+                "{label}: the loaded high-water must be the maximum across surviving rows"
+            );
+
+            // CONTROL: the bounded hold really is standing, so the assertion below is about
+            // the floor rather than about the quarantine.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unreadable",
+                "{label}: CONTROL: the unreadable canonical row must quarantine the sender"
+            );
+
+            // THE PROPERTY: past the horizon the hold is gone and only the floor is left. It
+            // must still be the floor the store had evidence for.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "rejected:replay",
+                "{label}: durable evidence of high-water 10 must keep rejecting sequence 5 \
+                 once the bounded hold expires"
+            );
+
+            // And the floor did not become a blanket refusal: the sender's next legitimate
+            // sequence is still accepted.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "accepted",
+                "{label}: sequence 11 is above every surviving high-water and must be accepted"
+            );
+        }
+    }
+
+    /// The design, stated as a property: declining to rewrite storage changes the **hold**
+    /// and nothing else.
+    ///
+    /// Two stores, same readable evidence. In one the canonical key is free, so
+    /// canonicalization collapses the aliases and the load pass sees a single merged row. In
+    /// the other the canonical key holds an unreadable row, so canonicalization declines and
+    /// the load pass sees all three. The interpretation must be identical — same high-water,
+    /// same post-horizon verdict — with the quarantine as the only difference.
+    ///
+    /// This is what "one auditable rule, shared" means operationally: the load pass calls
+    /// `merge_max_seq`, the same function canonicalization calls, so the two paths cannot
+    /// drift into two subtly different merge semantics.
+    #[test]
+    fn declining_to_rewrite_storage_changes_only_the_hold_not_the_interpretation() {
+        for (label, early_regime, late_regime, observed) in [
+            (
+                "same namespace",
+                SENDER_REGIME_DURABLE_V1,
+                SENDER_REGIME_DURABLE_V1,
+                ObservedSenderRegime::DurableV1,
+            ),
+            (
+                "mixed namespaces",
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                SENDER_REGIME_DURABLE_V1,
+                ObservedSenderRegime::DurableV1,
+            ),
+        ] {
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let early = alias_of(&canonical);
+            let late = late_sorting_alias_of(&canonical);
+
+            let mut results = Vec::new();
+            for canonical_row in ["absent", "unreadable"] {
+                let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+                if canonical_row == "unreadable" {
+                    store
+                        .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                        .unwrap();
+                }
+                seed_max_seq(
+                    store.as_ref(),
+                    &early,
+                    10,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    early_regime,
+                );
+                seed_max_seq(
+                    store.as_ref(),
+                    &late,
+                    3,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    late_regime,
+                );
+
+                let clock = MergeClock::new();
+                let mut guard =
+                    ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+                guard.load_persisted_state().unwrap();
+
+                // CONTROL: the two stores really did take different canonicalization paths.
+                let merged_away = stored_max_seq(store.as_ref(), &early).is_none();
+                assert_eq!(
+                    merged_away,
+                    canonical_row == "absent",
+                    "{label}/{canonical_row}: CONTROL: canonicalization must collapse the \
+                     aliases only when the canonical key is free"
+                );
+
+                clock.advance(HORIZON_SECS + Duration::from_secs(1));
+                results.push((
+                    guard.get_max_seq(&canonical),
+                    outcome(guard.check_replay_only(&envelope(&sender, &canonical, 4), observed)),
+                ));
+            }
+
+            assert_eq!(
+                results[0], results[1],
+                "{label}: a store canonicalization declined to rewrite must be interpreted \
+                 exactly as the rewritten one is; got {results:?}"
+            );
+        }
+    }
+
+    /// Over-correction control on the namespace axis (the `5be3fdf0` property, reached
+    /// through the load pass instead of through `merge_max_seq`).
+    ///
+    /// "Always take the maximum" is the wrong fix. A legacy high-water of 10 and a durable-v1
+    /// high-water of 3 are numbers from different namespaces; adopting 10 as a durable-v1
+    /// floor rejects the sender's legitimate durable sequences 4..=10 as replays, which
+    /// `handlers::signed` scores as peer misbehaviour — so the receiver would ban an honest
+    /// peer for its own merge. The pair must enter the transition instead.
+    #[test]
+    fn mixed_regime_alias_rows_enter_the_migration_rather_than_inheriting_the_maximum() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let early = alias_of(&canonical);
+        let late = late_sorting_alias_of(&canonical);
+
+        for (label, legacy_alias, durable_alias) in [
+            ("legacy scanned first", &early, &late),
+            ("legacy scanned last", &late, &early),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            seed_max_seq(
+                store.as_ref(),
+                legacy_alias,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                durable_alias,
+                3,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // Held for the horizon, as a namespace change requires — and by the transition
+            // hold, which outranks the unreadable one.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 4),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:sender-regime-transition",
+                "{label}: incomparable high-waters must enter the migration, not resolve to a \
+                 number"
+            );
+
+            // THE PROPERTY: past the horizon, live durable-v1 evidence completes the
+            // promotion and the legacy 10 is discarded rather than reimposed. Under a naive
+            // `max` this is "rejected:replay" — an honest peer banned for our merge.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 4),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "accepted",
+                "{label}: a legitimate low durable-v1 sequence must not be blocked by a \
+                 legacy-namespace number laundered into durable-v1 state"
+            );
+        }
+    }
+
+    /// A readable, current-version, lower-numbered alias must not rescue a row whose
+    /// semantic version this binary cannot interpret.
+    ///
+    /// The numeric merge runs over rows whose *meaning* differs, so it must not be able to
+    /// hand the load pass a usable floor built from the half it happens to understand.
+    /// `most_restrictive_semantic_version` keeps the unreadable meaning, and the resulting
+    /// hold has no deadline to reach.
+    #[test]
+    fn an_unsupported_semantic_version_is_not_rescued_by_a_readable_current_alias() {
+        const UNSUPPORTED_VERSION: u32 = 9_999;
+        assert_ne!(UNSUPPORTED_VERSION, REPLAY_STATE_SEMANTIC_VERSION);
+        assert_ne!(UNSUPPORTED_VERSION, LEGACY_REPLAY_STATE_SEMANTIC_VERSION);
+
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let early = alias_of(&canonical);
+        let late = late_sorting_alias_of(&canonical);
+
+        for (label, unsupported_alias, current_alias) in [
+            ("unsupported scanned first", &early, &late),
+            ("unsupported scanned last", &late, &early),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            seed_max_seq(
+                store.as_ref(),
+                unsupported_alias,
+                10,
+                UNSUPPORTED_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                current_alias,
+                3,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unsupported-version",
+                "{label}: no numeric fallback may make an uninterpretable regime usable"
+            );
+        }
+    }
+
+    /// The same, on the sender-namespace axis: an unrecognised regime tag outranks every
+    /// recognised one, so the combined row is refused with no deadline and its number is
+    /// never read.
+    #[test]
+    fn an_unsupported_sender_regime_is_not_rescued_by_a_readable_current_alias() {
+        const UNSUPPORTED_REGIME: u32 = 7_777;
+        assert!(
+            !ReplayGuard::is_recognised_sender_regime(UNSUPPORTED_REGIME),
+            "CONTROL: the seeded regime must be one this binary has no migration for"
+        );
+
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let early = alias_of(&canonical);
+        let late = late_sorting_alias_of(&canonical);
+
+        for (label, unsupported_alias, current_alias) in [
+            ("unsupported scanned first", &early, &late),
+            ("unsupported scanned last", &late, &early),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            seed_max_seq(
+                store.as_ref(),
+                unsupported_alias,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                UNSUPPORTED_REGIME,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                current_alias,
+                3,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unsupported-sender-regime",
+                "{label}: an unrecognised namespace tag must never expire into acceptance"
+            );
+        }
+    }
+
+    /// The stronger hold still wins while the numbers are being combined, in either row
+    /// order — the `067bb7e6` property, re-run now that the numeric axis also composes.
+    ///
+    /// One row is a current-version durable high-water, the other is tagged with a sender
+    /// regime this binary cannot interpret. The numeric merge must not produce a usable floor
+    /// *and* the indefinite hold must survive: neither axis may rescue the other.
+    #[test]
+    fn hold_composition_survives_the_numeric_merge_in_either_row_order() {
+        const UNSUPPORTED_REGIME: u32 = 4_242;
+        assert!(!ReplayGuard::is_recognised_sender_regime(
+            UNSUPPORTED_REGIME
+        ));
+
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            // The canonical row is readable but carries the unrecognised tag; the alias is
+            // an ordinary current durable row that would otherwise supply a usable floor.
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                3,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                UNSUPPORTED_REGIME,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                &alias,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unsupported-sender-regime",
+                "{position}: the indefinite hold must survive the numeric merge"
+            );
+        }
+    }
+
+    /// The controls a rule that simply held everything, or installed a floor of 0, cannot
+    /// satisfy: the ordinary one-row and clean-pair load paths are byte-for-byte unchanged.
+    #[test]
+    fn the_single_row_and_clean_pair_load_paths_are_unchanged() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (shape, alias) in [
+            ("one clean row", None),
+            ("clean canonicalized pair", Some(alias_of(&canonical))),
+            (
+                "clean canonicalized pair, alias scanned last",
+                Some(late_sorting_alias_of(&canonical)),
+            ),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            if let Some(alias) = &alias {
+                seed_max_seq(
+                    store.as_ref(),
+                    alias,
+                    4,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_DURABLE_V1,
+                );
+            }
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            assert_eq!(
+                guard.peer_count(),
+                1,
+                "{shape}: one key must reconstruct exactly one window"
+            );
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(10),
+                "{shape}: the exact-restore floor is unchanged"
+            );
+
+            // No hold: ordinary traffic above the floor is accepted immediately, with no
+            // horizon to wait out.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "accepted",
+                "{shape}: a clean load must install no hold"
+            );
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 10),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "rejected:replay",
+                "{shape}: and the restored floor must still reject"
+            );
+            if let Some(alias) = &alias {
+                assert!(
+                    stored_max_seq(store.as_ref(), alias).is_none(),
+                    "{shape}: CONTROL: a clean alias row is still retired by canonicalization"
+                );
+            }
+        }
+    }
+
+    /// `merge_max_seq` is commutative **and associative**, which is what licenses folding it
+    /// over rows in whatever order the scan produced.
+    ///
+    /// Canonicalization already folded it over N rows; the load pass now does too, so the
+    /// property is load-bearing twice over. Asserting only "all orders agree" would pass on a
+    /// constant, so the maximum is asserted alongside it: the number may never be lowered.
+    #[test]
+    fn combining_high_water_rows_is_order_independent_and_never_lowers_the_number() {
+        const UNSUPPORTED_VERSION: u32 = 9_999;
+        const UNSUPPORTED_REGIME: u32 = 7_777;
+
+        let sets: [[MaxSeqEntry; 3]; 4] = [
+            // One namespace throughout: the maximum, and nothing else.
+            [
+                row(10, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+                row(3, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+                row(7, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+            ],
+            // Mixed recognised namespaces: resolves to the transition, from any direction.
+            [
+                row(10, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+                row(
+                    3,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                ),
+                row(
+                    7,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+                ),
+            ],
+            // An unrecognised regime present: it outranks all three recognised states.
+            [
+                row(10, REPLAY_STATE_SEMANTIC_VERSION, UNSUPPORTED_REGIME),
+                row(
+                    3,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                ),
+                row(7, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+            ],
+            // Versions differ too, so both merge axes are exercised at once.
+            [
+                row(10, UNSUPPORTED_VERSION, SENDER_REGIME_DURABLE_V1),
+                row(
+                    3,
+                    LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_LEGACY_OR_UNPROVEN,
+                ),
+                row(7, REPLAY_STATE_SEMANTIC_VERSION, SENDER_REGIME_DURABLE_V1),
+            ],
+        ];
+
+        const PERMUTATIONS: [[usize; 3]; 6] = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+
+        for (index, set) in sets.iter().enumerate() {
+            let highest = set.iter().map(|e| e.max_seq).max().unwrap();
+            let mut answers = Vec::new();
+            for order in PERMUTATIONS {
+                let mut acc = set[order[0]].clone();
+                for position in &order[1..] {
+                    acc = ReplayGuard::merge_max_seq(&acc, &set[*position]);
+                }
+                assert_eq!(
+                    acc.max_seq, highest,
+                    "set {index} order {order:?}: combining rows must never lower the number"
+                );
+                answers.push((acc.max_seq, acc.semantic_version, acc.sender_regime));
+            }
+            answers.dedup();
+            assert_eq!(
+                answers.len(),
+                1,
+                "set {index}: every fold order must reach one answer; got {answers:?}"
+            );
+        }
+    }
+
+    /// A `v0` sibling row must not erase an interpretable current-version floor.
+    ///
+    /// The over-correction control for the *version* axis, and the reason the load pass
+    /// merges within one `semantic_version` rather than across all of them. The two arms are
+    /// not comparable: the current-version arm establishes a floor and no hold, the legacy
+    /// arm establishes a bounded hold and deliberately no floor. Collapsing both rows into
+    /// one row forces one arm to run, and if `most_restrictive_semantic_version` picks `v0`
+    /// — which it must, so the hold stands — the current row's floor is discarded outright.
+    /// Sequence 5 was then accepted after the horizon against durable evidence of 10.
+    ///
+    /// Both effects must survive: the bounded hold *and* the floor.
+    #[test]
+    fn a_legacy_sibling_row_cannot_erase_an_interpretable_current_version_floor() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let early = alias_of(&canonical);
+        let late = late_sorting_alias_of(&canonical);
+
+        for (label, current_alias, legacy_alias) in [
+            ("current row scanned first", &early, &late),
+            ("current row scanned last", &late, &early),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            // Unreadable canonical row, so canonicalization declines and both readable rows
+            // reach the load pass.
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            seed_max_seq(
+                store.as_ref(),
+                current_alias,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            // Byte-for-byte what a pre-#2517 receiver wrote: neither field present, so both
+            // read back as their `serde(default)`.
+            store
+                .put(
+                    &spelled_key(MAX_SEQ_PREFIX, legacy_alias),
+                    &serde_json::to_vec(&serde_json::json!({
+                        "max_seq": 3,
+                        "updated_at_ms": ReplayGuard::current_time_ms(),
+                    }))
+                    .unwrap(),
+                )
+                .unwrap();
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(10),
+                "{label}: an uninterpretable sibling row must not discard an interpretable \
+                 current-version high-water"
+            );
+
+            // CONTROL: the legacy row's own effect survived too — this is a join, not a
+            // preference for the current-version row.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )),
+                "held:unreadable",
+                "{label}: CONTROL: the bounded holds must still stand"
+            );
+
+            // THE PROPERTY: past the horizon the floor is what is left, and it is the
+            // interpretable one.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "rejected:replay",
+                "{label}: sequence 5 must stay rejected against the surviving floor of 10"
             );
         }
     }
