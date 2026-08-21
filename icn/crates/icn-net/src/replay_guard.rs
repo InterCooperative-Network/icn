@@ -2090,18 +2090,32 @@ impl ReplayGuard {
     ///
     /// # The merge rule, axis by axis, and why each is the conservative direction
     ///
-    /// **`max_seq` — maximum.** The floor rejects `sequence <= floor`, so a larger floor
-    /// rejects a superset; it is the only direction that cannot admit a replay. An alias
-    /// number may belong to a namespace the canonical number does not, which makes the
-    /// maximum potentially *over*-restrictive — that is the accepted cost. What happened
-    /// before is the opposite: two rows landed in one window by last-`sled`-key-wins, so a
-    /// **lower** floor could win (N2-A0 inventory, row #2).
+    /// **`max_seq` and `sender_regime` — merged as one unit, never axis by axis.** A
+    /// high-water is only meaningful relative to the namespace that produced it, so the pair
+    /// is the thing being merged. Within *one* namespace the maximum is the conservative
+    /// choice: the floor rejects `sequence <= floor`, so a larger floor rejects a superset
+    /// and cannot admit a replay. What happened before this fix is the opposite: two rows
+    /// landed in one window by last-`sled`-key-wins, so a **lower** floor could win (N2-A0
+    /// inventory, row #2).
     ///
-    /// **`sender_regime` — `DurableV1` > `TransitionToDurableV1` > `LegacyOrUnproven`.** A
-    /// safety ordering, not a recency one. Both lower states reach a promotion that resets
-    /// `max_seq` and `floor_seq` to 0; `DurableV1` never does. Choosing the strongest is the
-    /// only choice that cannot destroy the merged floor. An unrecognised tag is preserved
-    /// as-is and the existing unsupported-regime hold refuses the sender with no deadline.
+    /// Across *different* namespaces the maximum is not conservative, it is meaningless.
+    /// Taking `max(legacy 10, durable-v1 3)` and labelling the result `DurableV1` states a
+    /// pair that never existed, and the load pass then installs a durable floor of 10 with no
+    /// hold — so the sender's legitimate durable sequences 4..=10 are rejected as replays.
+    /// That rejection is an ordinary `Replay detected`, which
+    /// [`crate::handlers::signed`] scores as peer misbehaviour, so laundering the number
+    /// bans an honest peer for our own merge. Mixed **recognised** namespaces therefore
+    /// resolve to `TransitionToDurableV1`, the state that already exists for exactly this
+    /// situation: the number is retained as legacy evidence only, the sender is held for the
+    /// envelope validity horizon, and the promotion at the end of that hold — which requires
+    /// live durable-v1 attribution, not merely elapsed time — resets `max_seq` and
+    /// `floor_seq` to 0. Captured traffic from either namespace stays blocked throughout, and
+    /// legitimate durable traffic becomes acceptable at the point the #2517 state machine
+    /// already authorises. See [`Self::merge_high_water`].
+    ///
+    /// An unrecognised tag is preserved as-is and outranks all three recognised states, so the
+    /// existing unsupported-regime hold refuses the sender with no deadline and never reads
+    /// the number at all.
     ///
     /// **`semantic_version` — the most restrictive.** Any unrecognised version wins (a
     /// no-deadline hold), else the legacy version wins (a bounded hold that discards the
@@ -2114,10 +2128,25 @@ impl ReplayGuard {
     ///
     /// # What is refused rather than merged
     ///
-    /// A row whose value does not deserialize is **not** merged and **not** deleted. The load
-    /// pass turns exactly that row into a quarantine hold on the merged sender, which is the
-    /// fail-closed answer to "we had state here and cannot read it". Silently dropping it
-    /// would be the one merge outcome that loses a bound.
+    /// A row whose value does not deserialize is **not** merged and **not** deleted, in all
+    /// three keyspaces. Silently dropping it would be the one merge outcome that loses a
+    /// bound.
+    ///
+    /// What the *load* pass then does with that retained row differs by keyspace, and only
+    /// two of the three are fail-closed:
+    ///
+    /// * `replay_max_seq:` and `replay_sender_regime:` — the unreadable value becomes a
+    ///   [`PeerHold::Unreadable`] quarantine on the merged sender, the fail-closed answer to
+    ///   "we had state here and cannot read it".
+    /// * `replay_finalized:` — the unreadable value is **skipped with no hold**, so a
+    ///   finalized block whose `(sender, sequence)` has no other readable row is lost
+    ///   silently. This arm is byte-identical to base: the behaviour predates #2640 and is
+    ///   not a bypass introduced by it. It is survivable only because a finalized entry can
+    ///   just add blocking — the floor comes from `replay_max_seq:` — and because
+    ///   [`Self::finalize`] and [`Self::is_finalized`] have zero production callers
+    ///   workspace-wide today. Making this arm quarantine-consistent with the other two is a
+    ///   prerequisite before `finalize()` gains one; see
+    ///   `docs/architecture/n2-a0-stored-key-inventory.md`.
     ///
     /// # Ordering and crash safety
     ///
@@ -2143,15 +2172,66 @@ impl ReplayGuard {
 
     /// The merge itself, for one `replay_max_seq` row against another.
     fn merge_max_seq(a: &MaxSeqEntry, b: &MaxSeqEntry) -> MaxSeqEntry {
+        let (max_seq, sender_regime) = Self::merge_high_water(a, b);
         MaxSeqEntry {
-            max_seq: a.max_seq.max(b.max_seq),
+            max_seq,
             updated_at_ms: a.updated_at_ms.max(b.updated_at_ms),
             semantic_version: Self::most_restrictive_semantic_version(
                 a.semantic_version,
                 b.semantic_version,
             ),
-            sender_regime: Self::strongest_sender_regime(a.sender_regime, b.sender_regime),
+            sender_regime,
         }
+    }
+
+    /// Merge `(max_seq, sender_regime)` as one value, because that is what it is.
+    ///
+    /// The number and the namespace are stored in the same row on purpose (see
+    /// [`MaxSeqEntry::sender_regime`]); merging them independently is the one operation that
+    /// can break that pairing, by producing a number from one namespace under another's
+    /// label. Three cases, and only the third is a judgement call:
+    ///
+    /// 1. **Same namespace** — the numbers are comparable, so the maximum is the strongest
+    ///    bound that genuinely existed. This is every merge between two spellings of a sender
+    ///    that never changed regime, which is the overwhelmingly common case.
+    /// 2. **An unrecognised tag is present** — it outranks everything, the load pass refuses
+    ///    the sender with no deadline, and no arm ever reads `max_seq`. The number is carried
+    ///    through as the maximum purely so the result is deterministic.
+    /// 3. **Mixed recognised namespaces** — the numbers are incomparable. Resolved to
+    ///    `TransitionToDurableV1`: a bounded hold, then a promotion that discards the number.
+    ///
+    /// In case 3 the retained number is the maximum across both namespaces, which may be a
+    /// durable-v1 number now labelled legacy evidence. That is deliberate and cannot mislead:
+    /// under a transition the value is never compared against a durable-v1 sequence, the hold
+    /// rejects everything while it stands, and the promotion resets it to 0. Its only effect
+    /// is to reject at least as much as the true legacy bound would, for the duration.
+    ///
+    /// Order-independent and idempotent in every case, as the crash-safety argument on
+    /// [`Self::canonicalize_durable_identities`] requires: `max` and `strongest` are both
+    /// commutative, and the mixed-namespace answer does not depend on which row is `a`.
+    fn merge_high_water(a: &MaxSeqEntry, b: &MaxSeqEntry) -> (u64, u32) {
+        let strongest = Self::strongest_sender_regime(a.sender_regime, b.sender_regime);
+        let highest = a.max_seq.max(b.max_seq);
+
+        if a.sender_regime == b.sender_regime || !Self::is_recognised_sender_regime(strongest) {
+            return (highest, strongest);
+        }
+
+        (highest, SENDER_REGIME_TRANSITION_TO_DURABLE_V1)
+    }
+
+    /// Whether this binary has an explicit meaning for a persisted sender-regime tag.
+    ///
+    /// Spelled as an exhaustive `matches!` over the three known constants rather than a range
+    /// or a `< N` test, so a regime added later cannot be silently absorbed as recognised
+    /// without someone deciding what merging it against the others means.
+    fn is_recognised_sender_regime(regime: u32) -> bool {
+        matches!(
+            regime,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN
+                | SENDER_REGIME_TRANSITION_TO_DURABLE_V1
+                | SENDER_REGIME_DURABLE_V1
+        )
     }
 
     /// Ranked by how much the load pass will refuse, not by how new the version is.
@@ -2212,13 +2292,18 @@ impl ReplayGuard {
         }
 
         // The canonical key is exactly where an unreadable row must be left alone. Writing the
-        // merge over it would erase the one fact the load pass turns into a quarantine — "state
-        // existed here and we cannot read it" — and replace it with a floor derived only from
-        // the spellings we *could* read, which may be lower. The whole group is therefore left
-        // as it is: nothing is written and nothing is retired, and the load pass holds the
-        // sender exactly as it would have before this migration existed. That hold is bounded
-        // by the envelope validity horizon, after which no pre-restart capture can pass
-        // freshness anyway, so leaving the readable floors unmerged costs nothing.
+        // merge over it would erase the fact that "state existed here and we cannot read it"
+        // and replace it with a floor derived only from the spellings we *could* read, which
+        // may be lower. The whole group is therefore left as it is: nothing is written and
+        // nothing is retired, and the load pass treats the sender exactly as it would have
+        // before this migration existed.
+        //
+        // In the two quarantining keyspaces that means a hold bounded by the envelope validity
+        // horizon, after which no pre-restart capture can pass freshness anyway, so leaving the
+        // readable floors unmerged costs nothing. In `replay_finalized:` there is no hold — see
+        // the keyspace table on `canonicalize_durable_identities` — but nothing is lost by
+        // *not* merging there either: the load pass derives each row's principal from the
+        // decoded key, so an un-retired alias row still lands on the canonical window.
         if unreadable.contains(canonical_key) {
             tracing::error!(
                 keyspace,
@@ -5842,6 +5927,9 @@ mod respelled_identity_tests {
     use crate::envelope::PayloadType;
     use icn_identity::KeyPair;
 
+    /// The production envelope-validity horizon at `max_clock_skew = 300`.
+    const HORIZON_SECS: Duration = Duration::from_secs(600);
+
     /// The base16-lower spelling of the same key. `f` is multibase's base16-lower code.
     fn alias_of(canonical: &Did) -> Did {
         let hex: String = canonical
@@ -6066,17 +6154,31 @@ mod respelled_identity_tests {
         );
     }
 
-    /// The strongest established sender regime wins the merge, because the weaker ones each
-    /// reach a promotion that would reset the merged floor to zero.
+    /// The merge must never take its regime from whichever row happened to supply the number.
+    ///
+    /// Narrower than
+    /// `mixed_regime_alias_rows_hold_for_migration_rather_than_laundering_the_legacy_high_water`,
+    /// which pins the whole migration. This pins only the half that a "carry the winning row's
+    /// tag along with its number" implementation would get wrong: the higher number here is
+    /// tagged unproven, so such an implementation yields `LegacyOrUnproven` with a floor of 10
+    /// — the ordinary steady state, in which sequence 11 is simply accepted and the durable
+    /// establishment this sender already paid for is silently forgotten.
+    ///
+    /// This test previously asserted the opposite resolution — `DurableV1` with a floor of 10 —
+    /// on the reasoning that the weaker regimes each reach a promotion that would reset the
+    /// merged floor to zero. That reasoning had the sign backwards. The two numbers belong to
+    /// different namespaces, so there is no floor here worth preserving across them, and the
+    /// reset is the *correct* outcome rather than the hazard: it is what lets the sender's
+    /// legitimate durable sequences 4..=10 be used again. Adopting either row's tag is wrong;
+    /// only the migration is right.
     #[test]
-    fn alias_merge_keeps_the_strongest_sender_regime() {
+    fn alias_merge_never_adopts_the_regime_of_the_row_that_supplied_the_number() {
         let store = Arc::new(icn_store::SledStore::temporary().unwrap());
         let sender = KeyPair::generate().unwrap();
         let canonical = sender.did().clone();
         let alias = alias_of(&canonical);
 
-        // The higher number is tagged unproven; the lower one is tagged durable. A merge that
-        // took the regime from whichever row supplied the number would end up unproven.
+        // The higher number is tagged unproven; the lower one is tagged durable.
         seed_max_seq(
             store.as_ref(),
             &canonical,
@@ -6095,24 +6197,394 @@ mod respelled_identity_tests {
         let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
         guard.load_persisted_state().unwrap();
 
-        assert_eq!(
-            guard.get_max_seq(&canonical),
-            Some(10),
-            "the floor is still the maximum across spellings"
+        assert_ne!(
+            stored_max_seq(store.as_ref(), &canonical)
+                .unwrap()
+                .sender_regime,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            "the merged row must not inherit the unproven tag from the row that supplied 10"
         );
 
-        // Observable consequence: an established DurableV1 sender presenting as unproven is a
-        // downgrade and is refused. Had the merge kept `LegacyOrUnproven`, this would be the
-        // ordinary steady state and sequence 11 would be accepted.
+        // Observable consequence, and the reason the tag matters rather than just the number:
+        // had the merge landed on `LegacyOrUnproven`, this is the ordinary steady state and
+        // sequence 11 is accepted outright.
         let err = guard
             .check_replay_only(
                 &envelope(&sender, &canonical, 11),
                 ObservedSenderRegime::LegacyOrUnproven,
             )
-            .expect_err("a durable-established sender must not be accepted as unproven");
+            .expect_err("a sender with incomparable merged state must not be silently accepted");
         assert!(
-            err.downcast_ref::<SenderRegimeDowngrade>().is_some(),
-            "expected the merged regime to be DurableV1; got: {err}"
+            err.downcast_ref::<SenderRegimeTransition>().is_some(),
+            "expected the merged state to be a migration hold; got: {err}"
+        );
+    }
+
+    /// A virtual clock, so a 600s migration hold can be waited out without sleeping.
+    struct MergeClock {
+        nanos: std::sync::atomic::AtomicU64,
+    }
+
+    impl MergeClock {
+        fn new() -> Arc<Self> {
+            Arc::new(MergeClock {
+                nanos: std::sync::atomic::AtomicU64::new(0),
+            })
+        }
+        fn advance(&self, by: Duration) {
+            self.nanos
+                .fetch_add(by.as_nanos() as u64, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    impl MonotonicClock for MergeClock {
+        fn elapsed(&self) -> Duration {
+            Duration::from_nanos(self.nanos.load(std::sync::atomic::Ordering::SeqCst))
+        }
+    }
+
+    /// An envelope spelled `from` and genuinely stamped `age` in the past, so the freshness
+    /// layer sees it as old rather than merely notionally so.
+    fn captured(sender: &KeyPair, from: &Did, sequence: u64, age: Duration) -> SignedEnvelope {
+        let mut envelope =
+            SignedEnvelope::new(from, sender, sequence, PayloadType::Gossip, b"cap".to_vec())
+                .unwrap();
+        envelope.timestamp = ReplayGuard::current_time_ms() - age.as_millis() as u64;
+        let sig_input = envelope.canonical_encoding();
+        envelope.signature = sender.sign(&sig_input).to_vec();
+        envelope
+    }
+
+    /// Two spellings whose high-waters belong to **different** namespaces must not be merged
+    /// into a number/namespace pair that never existed.
+    ///
+    /// Before this fix the two axes were merged independently — `max(10, 3)` and
+    /// `strongest(Legacy, DurableV1)` — producing `(DurableV1, 10)`. The load pass installed
+    /// that as a durable floor of 10 with no hold, so the sender's legitimate durable
+    /// sequences 4..=10 came back as an ordinary `Replay detected`, which
+    /// `handlers::signed` scores as peer misbehaviour. Merging axis-by-axis is safe on each
+    /// axis alone and unsafe jointly, which is exactly why it needs its own test.
+    #[test]
+    fn mixed_regime_alias_rows_hold_for_migration_rather_than_laundering_the_legacy_high_water() {
+        // Both role assignments. `sled` scans lexicographically and the base16 alias (`…:f…`)
+        // sorts before the base58btc canonical (`…:z…`), so pinning which spelling carries the
+        // legacy number would let a first-row-wins or last-row-wins bug pass in one direction.
+        for legacy_on_alias in [true, false] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let alias = alias_of(&canonical);
+
+            let (legacy_spelling, durable_spelling) = if legacy_on_alias {
+                (&alias, &canonical)
+            } else {
+                (&canonical, &alias)
+            };
+
+            // The pre-#2640 store this migration exists to consume. Each spelling ran its own
+            // #2517 state machine, so one completed its Legacy→DurableV1 promotion — which
+            // resets the number to 0, hence a low 3 — while the other never did and still
+            // holds the pre-migration legacy high-water of 10.
+            seed_max_seq(
+                store.as_ref(),
+                legacy_spelling,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                durable_spelling,
+                3,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            let merged = stored_max_seq(store.as_ref(), &canonical)
+                .expect("both spellings must merge onto the canonical key");
+            assert_eq!(
+                merged.sender_regime, SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+                "incomparable namespaces must resolve to a migration, never to DurableV1 \
+                 (direction: legacy_on_alias={legacy_on_alias})"
+            );
+
+            // THE REGRESSION: this was `Replay detected (floor: 10)` before the fix.
+            let held = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 4),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .expect_err("a sender with incomparable merged state must be held, not admitted");
+            assert!(
+                held.downcast_ref::<SenderRegimeTransition>().is_some(),
+                "the refusal must be the typed migration hold, which `handlers::signed` \
+                 exempts from peer scoring — an ordinary replay rejection would ban an \
+                 honest peer for our own merge; got: {held}"
+            );
+
+            // Captured traffic from the legacy namespace stays blocked throughout the hold.
+            assert!(
+                guard
+                    .check_replay_only(
+                        &captured(&sender, &canonical, 7, Duration::from_secs(30)),
+                        ObservedSenderRegime::LegacyOrUnproven,
+                    )
+                    .is_err(),
+                "captured legacy traffic must not be admitted during the migration hold"
+            );
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+            // Elapsed time alone must not promote: the release point is the policy-authorized
+            // one — the horizon *and* live durable-v1 attribution on the connection.
+            assert!(
+                guard
+                    .check_replay_only(
+                        &envelope(&sender, &canonical, 4),
+                        ObservedSenderRegime::LegacyOrUnproven,
+                    )
+                    .is_err(),
+                "the horizon alone must not release the hold without durable-v1 evidence"
+            );
+
+            // With that evidence the namespace is retired, the incomparable number is
+            // discarded, and the sender's legitimate sequence 4 is finally usable.
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 4),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .expect("legitimate durable traffic must be usable once the migration completes");
+
+            // And the discarded floor did not reopen a replay window: a genuinely old capture
+            // is now refused by freshness instead, which is what bounds the hold in the first
+            // place. `check` — not `check_replay_only` — because that is the layer that runs
+            // `verify`.
+            assert!(
+                guard
+                    .check(
+                        &captured(
+                            &sender,
+                            &canonical,
+                            7,
+                            HORIZON_SECS + Duration::from_secs(1)
+                        ),
+                        ObservedSenderRegime::DurableV1,
+                    )
+                    .is_err(),
+                "a pre-migration capture must still be refused after the promotion"
+            );
+        }
+    }
+
+    /// The realistic shape of the mixed-regime store: the durable spelling also carries a
+    /// **provenance** row, which the load pass applies *after* the high-waters and treats as
+    /// authoritative for the namespace.
+    ///
+    /// Worth its own test because provenance is the one thing that could quietly undo the
+    /// correction. `SENDER_REGIME_DURABLE_V1` provenance sets the window's regime to
+    /// `DurableV1` — if that arm also cleared the hold, the merged sender would go straight
+    /// back to a durable floor of 10 and the laundering would be back with an extra step. It
+    /// does not: provenance answers "was this key's legacy namespace ever proven retired",
+    /// which is a different question from "is the number in this row comparable to a
+    /// durable-v1 sequence". Only the second one gates the floor, and only the migration
+    /// answers it.
+    #[test]
+    fn durable_provenance_does_not_release_the_mixed_regime_migration_hold() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // The alias never migrated: legacy high-water, and no provenance row at all — an
+        // unpromoted spelling never writes one.
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        // The canonical spelling completed its promotion, so it has both a reset high-water
+        // and the durable provenance record that promotion writes last.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            3,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        store
+            .put(
+                &spelled_key(SENDER_REGIME_PREFIX, &canonical),
+                &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+            )
+            .unwrap();
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        // CONTROL: the provenance really did survive the merge and really is durable — so the
+        // assertion below is about the hold outranking it, not about it being absent.
+        assert_eq!(
+            store
+                .get(&ReplayGuard::make_sender_regime_key(&pk(&canonical)))
+                .unwrap()
+                .as_deref(),
+            Some(&SENDER_REGIME_DURABLE_V1.to_be_bytes()[..]),
+            "CONTROL: durable provenance must be present on the canonical key after the merge"
+        );
+
+        // THE PROPERTY: authoritative provenance does not license the incomparable number.
+        let held = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 4),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("durable provenance must not release the migration hold");
+        assert!(
+            held.downcast_ref::<SenderRegimeTransition>().is_some(),
+            "expected the migration hold to stand over durable provenance; got: {held}"
+        );
+
+        // And the migration still completes normally from there.
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+        guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 4),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect("the hold must still resolve into a usable durable namespace");
+    }
+
+    /// The correction above must not fire when both spellings share a namespace: those numbers
+    /// *are* comparable, and turning every alias merge into a hold would be its own regression.
+    ///
+    /// The control for the test above. `alias_rows_merge_to_the_maximum_floor_in_both_directions`
+    /// pins the resulting floor; this pins that no migration hold was introduced to get it.
+    #[test]
+    fn same_regime_alias_rows_still_merge_to_the_maximum_without_a_hold() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            3,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        guard.load_persisted_state().unwrap();
+
+        let merged = stored_max_seq(store.as_ref(), &canonical).unwrap();
+        assert_eq!(merged.sender_regime, SENDER_REGIME_DURABLE_V1);
+        assert_eq!(
+            merged.max_seq, 10,
+            "one namespace: the maximum is the true bound"
+        );
+
+        // Immediately usable — no hold — and the merged floor is enforced.
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1
+                )
+                .is_err(),
+            "sequence 5 is below the merged floor of 10 and must be rejected"
+        );
+        guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect("a same-namespace merge must not impose a migration hold");
+    }
+
+    /// An unrecognised regime tag still outranks every recognised one and still refuses with no
+    /// deadline — the mixed-namespace correction must not downgrade it into a bounded hold.
+    #[test]
+    fn an_unrecognised_regime_mixed_with_a_recognised_one_still_holds_indefinitely() {
+        const FUTURE_REGIME: u32 = 9;
+        assert!(
+            !ReplayGuard::is_recognised_sender_regime(FUTURE_REGIME),
+            "CONTROL: the probe tag must be one this binary has no migration for"
+        );
+
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &alias,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            FUTURE_REGIME,
+        );
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            3,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            stored_max_seq(store.as_ref(), &canonical)
+                .unwrap()
+                .sender_regime,
+            FUTURE_REGIME,
+            "an unrecognised tag must survive the merge rather than be resolved away"
+        );
+
+        let err = guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 4),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect_err("an unrecognised regime must refuse the sender");
+        assert!(
+            err.downcast_ref::<UnsupportedSenderRegime>().is_some(),
+            "expected the no-deadline unsupported-regime hold; got: {err}"
+        );
+
+        // Waiting does not make an unknown numbering interpretable.
+        clock.advance(HORIZON_SECS * 10);
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 4),
+                    ObservedSenderRegime::DurableV1
+                )
+                .expect_err("still refused")
+                .downcast_ref::<UnsupportedSenderRegime>()
+                .is_some(),
+            "the unsupported-regime hold must have no deadline to reach"
         );
     }
 
