@@ -738,7 +738,11 @@ struct SequenceWindow {
 /// `&mut SequenceWindow` and then clears it, which is only sound while every field
 /// is `Copy`. Adding a non-`Copy` field is therefore a compile error at the derive
 /// rather than a silent change in how that match borrows.
-#[derive(Clone, Copy)]
+///
+/// `Debug` carries no sender-supplied material — every field is a version tag, a regime tag,
+/// or a receiver-local duration — and is what lets the hold-ordering properties name the
+/// offending variant when they fail.
+#[derive(Clone, Copy, Debug)]
 enum PeerHold {
     /// Durable state exists but could not be read, so no sequence can be proven
     /// new (#2514). Bounded by the envelope validity horizon.
@@ -776,6 +780,109 @@ enum PeerHold {
     /// Resolving this needs an operator: upgrade the binary, or explicitly repair
     /// the state. It must never resolve itself by elapsed time.
     UnsupportedVersion { found_version: u32 },
+}
+
+impl PeerHold {
+    /// How much this hold refuses, as a total order. Higher refuses more.
+    ///
+    /// Derived from what each hold *permits*, never from declaration order — see
+    /// [`SequenceWindow::install_hold_conservatively`] for why the load pass needs an order at
+    /// all. One arm per variant, and [`Self::ranks_are_distinct`] pins that the ranks stay
+    /// distinct, so "equal rank" means "same variant" and adding a variant without deciding
+    /// where it sits is a compile error rather than a silent tie.
+    ///
+    /// The order, weakest first, and the reason for each step:
+    ///
+    /// 1. [`PeerHold::MigratingFromLegacy`] — bounded by elapsed time, and its expiry
+    ///    **destroys the replay floor** (`max_seq` and `floor_seq` are reset to 0). That is
+    ///    correct when it is the only evidence, because the number it discards is its own
+    ///    uninterpretable one. It is the weakest hold to hold *jointly*, because a floor
+    ///    another row established is destroyed with it.
+    /// 2. [`PeerHold::Unreadable`] — bounded by the same elapsed time, but its expiry clears
+    ///    only the hold and leaves the window's floor standing. Ranked above
+    ///    `MigratingFromLegacy` because a retained floor rejects a superset **permanently**,
+    ///    whereas `MigratingFromLegacy`'s one advantage — demoting the regime to
+    ///    `LegacyOrUnproven`, so a durable claim must re-earn a transition hold — only
+    ///    *delays* an acceptance that then lands on a floor of 0 anyway. Permanent protection
+    ///    outranks a delay.
+    /// 3. [`PeerHold::MigratingSenderRegime`] — bounded by elapsed time **and** by live
+    ///    durable-v1 evidence on the message that would release it (#2517). It therefore
+    ///    refuses everything the two above refuse, for at least as long, plus every case where
+    ///    the evidence never arrives. Ranking it *below* `Unreadable` would be the real
+    ///    hazard: a window loaded as `TransitionToDurableV1` whose bounded hold clears without
+    ///    promoting falls into the `(TransitionToDurableV1, _)` arm of the regime match, which
+    ///    fails closed with no way out — one corrupt alias row would permanently brick a
+    ///    sender that was only mid-migration.
+    /// 4. [`PeerHold::UnsupportedSenderRegime`] — no deadline. Nothing elapsed time can do
+    ///    makes an unknown namespace tag interpretable, so it outranks every bounded hold.
+    /// 5. [`PeerHold::UnsupportedVersion`] — no deadline either, and refuses exactly as much
+    ///    as (4). It is ranked above only so the combination is deterministic, and this way
+    ///    round because it is the broader statement of ignorance: a row whose semantic version
+    ///    has no meaning in this binary has no established meaning for its `sender_regime`
+    ///    field either, so it is the more accurate thing to put in front of an operator. The
+    ///    same tie-break convention as [`ReplayGuard::most_restrictive_semantic_version`].
+    fn rank(&self) -> u8 {
+        match self {
+            PeerHold::MigratingFromLegacy { .. } => 1,
+            PeerHold::Unreadable { .. } => 2,
+            PeerHold::MigratingSenderRegime { .. } => 3,
+            PeerHold::UnsupportedSenderRegime { .. } => 4,
+            PeerHold::UnsupportedVersion { .. } => 5,
+        }
+    }
+
+    /// The hold that refuses more, or — for two holds of the same kind — the one that refuses
+    /// for longer.
+    ///
+    /// Commutative and idempotent, which is what lets the load pass apply it row by row in
+    /// whatever order the store hands the rows over and still reach one answer.
+    fn stronger_of(a: PeerHold, b: PeerHold) -> PeerHold {
+        match a.rank().cmp(&b.rank()) {
+            std::cmp::Ordering::Less => b,
+            std::cmp::Ordering::Greater => a,
+            std::cmp::Ordering::Equal => match (a, b) {
+                // Same kind twice: keep the later deadline, so no combination can shorten a
+                // hold, and the larger tag, so the operator-facing diagnostic is deterministic.
+                (PeerHold::Unreadable { until: x }, PeerHold::Unreadable { until: y }) => {
+                    PeerHold::Unreadable { until: x.max(y) }
+                }
+                (
+                    PeerHold::MigratingSenderRegime { until: x },
+                    PeerHold::MigratingSenderRegime { until: y },
+                ) => PeerHold::MigratingSenderRegime { until: x.max(y) },
+                (
+                    PeerHold::MigratingFromLegacy {
+                        until: x,
+                        from_version: vx,
+                    },
+                    PeerHold::MigratingFromLegacy {
+                        until: y,
+                        from_version: vy,
+                    },
+                ) => PeerHold::MigratingFromLegacy {
+                    until: x.max(y),
+                    from_version: vx.max(vy),
+                },
+                (
+                    PeerHold::UnsupportedSenderRegime { found_regime: x },
+                    PeerHold::UnsupportedSenderRegime { found_regime: y },
+                ) => PeerHold::UnsupportedSenderRegime {
+                    found_regime: x.max(y),
+                },
+                (
+                    PeerHold::UnsupportedVersion { found_version: x },
+                    PeerHold::UnsupportedVersion { found_version: y },
+                ) => PeerHold::UnsupportedVersion {
+                    found_version: x.max(y),
+                },
+                // Unreachable while `rank` has one arm per variant, which
+                // `ranks_are_distinct` pins. Kept rather than `unreachable!()` because the
+                // fail-safe direction for a rule whose whole job is "never weaken" is to keep
+                // what is already installed, not to panic a receiver at load time.
+                (incumbent, _) => incumbent,
+            },
+        }
+    }
 }
 
 impl ReplayGuard {
@@ -893,8 +1000,14 @@ impl ReplayGuard {
         }
 
         // #2640 — collapse spelling-distinct rows onto one canonical key *before* anything
-        // below interprets them, so the #2514 / #2517 state machine keeps seeing at most one
-        // readable row per sender and is not modified by this fix at all.
+        // below interprets them, so the #2514 / #2517 state machine sees one readable row per
+        // sender in every case where a merge is installed at all.
+        //
+        // It is not every case: a row this pass cannot parse is neither merged nor deleted,
+        // and when the *canonical* row is that unreadable one the whole group is left as it
+        // is. Several rows for one sender therefore still reach the loop below, which is why
+        // the per-row holds it derives are combined with `install_hold_conservatively` rather
+        // than assigned.
         //
         // Taken before `store` is bound because it needs `&self` for the clock-independent
         // helpers and writes through the store itself.
@@ -937,7 +1050,7 @@ impl ReplayGuard {
                     // window; instead reject this peer's traffic until anything
                     // captured before the restart is too old to be replayed.
                     let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
-                    window.hold = Some(PeerHold::Unreadable {
+                    window.install_hold_conservatively(PeerHold::Unreadable {
                         until: quarantine_until,
                     });
                     tracing::error!(
@@ -1020,9 +1133,11 @@ impl ReplayGuard {
                                     window.max_seq = entry.max_seq;
                                     window.floor_seq = entry.max_seq;
                                     window.sender_regime = SenderRegimeState::TransitionToDurableV1;
-                                    window.hold = Some(PeerHold::MigratingSenderRegime {
-                                        until: quarantine_until,
-                                    });
+                                    window.install_hold_conservatively(
+                                        PeerHold::MigratingSenderRegime {
+                                            until: quarantine_until,
+                                        },
+                                    );
 
                                     tracing::warn!(
                                         peer = %principal,
@@ -1040,8 +1155,9 @@ impl ReplayGuard {
                                     // an unknown receiver regime, applied to the other
                                     // axis: waiting cannot make an unknown numbering
                                     // interpretable, so there is no deadline here.
-                                    window.hold =
-                                        Some(PeerHold::UnsupportedSenderRegime { found_regime });
+                                    window.install_hold_conservatively(
+                                        PeerHold::UnsupportedSenderRegime { found_regime },
+                                    );
 
                                     tracing::error!(
                                         peer = %principal,
@@ -1061,7 +1177,7 @@ impl ReplayGuard {
                             // enough to bound how long anything produced under it
                             // stays dangerous. That bound is what licenses retiring
                             // the value rather than trusting it.
-                            window.hold = Some(PeerHold::MigratingFromLegacy {
+                            window.install_hold_conservatively(PeerHold::MigratingFromLegacy {
                                 until: quarantine_until,
                                 from_version: entry.semantic_version,
                             });
@@ -1089,7 +1205,9 @@ impl ReplayGuard {
                             // Held with no deadline: elapsed time cannot make an
                             // unknown regime interpretable, and quietly adopting it
                             // as current after a wait would be a silent downgrade.
-                            window.hold = Some(PeerHold::UnsupportedVersion { found_version });
+                            window.install_hold_conservatively(PeerHold::UnsupportedVersion {
+                                found_version,
+                            });
 
                             tracing::error!(
                                 peer = %principal,
@@ -1133,7 +1251,7 @@ impl ReplayGuard {
                 // downgrade to unproven — which then permits establishing a fresh
                 // durable namespace after a hold, on evidence we cannot actually read.
                 let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
-                window.hold = Some(PeerHold::Unreadable {
+                window.install_hold_conservatively(PeerHold::Unreadable {
                     until: quarantine_until,
                 });
                 tracing::error!(peer = %principal, "Corrupt sender regime provenance; quarantining");
@@ -1151,7 +1269,7 @@ impl ReplayGuard {
                 }
                 SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => {
                     window.sender_regime = SenderRegimeState::TransitionToDurableV1;
-                    window.hold = Some(PeerHold::MigratingSenderRegime {
+                    window.install_hold_conservatively(PeerHold::MigratingSenderRegime {
                         until: quarantine_until,
                     });
                     tracing::warn!(
@@ -1162,7 +1280,7 @@ impl ReplayGuard {
                     );
                 }
                 other => {
-                    window.hold = Some(PeerHold::UnsupportedSenderRegime {
+                    window.install_hold_conservatively(PeerHold::UnsupportedSenderRegime {
                         found_regime: other,
                     });
                     tracing::error!(
@@ -1588,6 +1706,13 @@ impl ReplayGuard {
                     .entry(principal)
                     .or_insert_with(SequenceWindow::new);
                 window.sender_regime = SenderRegimeState::TransitionToDurableV1;
+                // Assigned directly rather than through
+                // `install_hold_conservatively`, and audited as such: this is a
+                // runtime transition with a single evidence source, reached only
+                // below the hold match, which either took the `None` arm or cleared
+                // the hold it found. There is nothing here for a conservative
+                // combination to preserve. The rule exists for the load pass, where
+                // several persisted rows for one principal genuinely meet.
                 window.hold = Some(PeerHold::MigratingSenderRegime {
                     until: now + horizon,
                 });
@@ -2084,9 +2209,15 @@ impl ReplayGuard {
 
     /// Collapse spelling-distinct durable rows for one sender onto one canonical key.
     ///
-    /// Runs *before* the ordinary load, so everything downstream sees at most one readable
-    /// row per sender (and per `(sender, sequence)` for finalized rows) and the #2514 / #2517
-    /// state machine is left exactly as it was.
+    /// Runs *before* the ordinary load, so where a merge is installed everything downstream
+    /// sees one readable row per sender (and per `(sender, sequence)` for finalized rows) and
+    /// the #2514 / #2517 state machine is left exactly as it was.
+    ///
+    /// Two groups are deliberately left unmerged, and for those the load pass still meets
+    /// several rows for one principal: a row that does not parse is neither merged nor
+    /// deleted, and when the canonical row is the unreadable one its readable alias rows are
+    /// left in place too. The conservative rules below therefore do not run for those rows,
+    /// and combining them is [`SequenceWindow::install_hold_conservatively`]'s job instead.
     ///
     /// # The merge rule, axis by axis, and why each is the conservative direction
     ///
@@ -2572,6 +2703,41 @@ impl ReplayGuard {
 }
 
 impl SequenceWindow {
+    /// Install a hold derived from one piece of persisted evidence, keeping the stronger of it
+    /// and whatever is already installed.
+    ///
+    /// # Why the load pass needs this at all
+    ///
+    /// One principal can legitimately reach [`ReplayGuard::load_persisted_state`] with several
+    /// physical rows, because [`ReplayGuard::canonicalize_durable_identities`] deliberately
+    /// declines to merge two groups: a row it cannot parse is neither merged nor deleted, and
+    /// when the *canonical* row is the unreadable one the whole group — every readable alias
+    /// row included — is left exactly as it was. Both are the right call at the store level;
+    /// what they mean here is that the merge's conservative rules
+    /// ([`ReplayGuard::most_restrictive_semantic_version`],
+    /// [`ReplayGuard::strongest_sender_regime`]) do not run for those rows, and the load pass
+    /// inherits the job of combining them.
+    ///
+    /// Before this existed each row simply assigned `window.hold`, so the row `sled` happened
+    /// to hand over last won. That is a fail-open in one direction: an unreadable alias row
+    /// arriving after a readable row whose semantics this binary cannot interpret replaced a
+    /// hold with **no deadline** by one bounded at the envelope validity horizon, after which
+    /// [`ReplayGuard::check_replay_only`] clears it and the sender is admitted against a floor
+    /// of 0 — every sequence it ever sent replayable.
+    ///
+    /// # The invariant
+    ///
+    /// Combining persisted evidence for one principal may only preserve or strengthen refusal.
+    /// A later physical row can raise the hold, never lower it, and never shorten one.
+    /// [`PeerHold::stronger_of`] is commutative, so the answer does not depend on key order —
+    /// which is the point, since that order is a property of the spellings an attacker chose.
+    fn install_hold_conservatively(&mut self, candidate: PeerHold) {
+        self.hold = Some(match self.hold.take() {
+            Some(incumbent) => PeerHold::stronger_of(incumbent, candidate),
+            None => candidate,
+        });
+    }
+
     /// Create a new sequence window
     ///
     /// Bloom filter sized for:
@@ -7300,5 +7466,464 @@ mod respelled_identity_tests {
             None,
             "no high-water can be reported for a sender that cannot be identified"
         );
+    }
+
+    // ---------------------------------------------------------------------
+    // #2644 review — conservative hold composition across alias rows
+    // ---------------------------------------------------------------------
+
+    /// The base256-emoji spelling of the same key, which sorts **after** the canonical
+    /// base58btc one. [`alias_of`] sorts before it.
+    ///
+    /// Both are needed because the property under test is exactly that the answer does not
+    /// depend on which physical row the scan hands over last — and that order is a property
+    /// of the spelling an attacker picked, not of anything this node controls.
+    fn late_sorting_alias_of(canonical: &Did) -> Did {
+        let key_bytes = canonical.to_verifying_key().unwrap();
+        let alias = Did::from_str(&format!(
+            "did:icn:{}",
+            multibase::encode(multibase::Base::Base256Emoji, key_bytes.as_bytes())
+        ))
+        .expect("the base256-emoji spelling of a key parses under current policy");
+        assert_ne!(
+            alias.as_str(),
+            canonical.as_str(),
+            "CONTROL: the alias must be a different string"
+        );
+        assert_eq!(
+            alias.to_verifying_key().unwrap().as_bytes(),
+            canonical.to_verifying_key().unwrap().as_bytes(),
+            "CONTROL: the alias must decode to the same key"
+        );
+        alias
+    }
+
+    /// One alias that `sled` scans *before* the canonical row and one it scans *after*, with
+    /// the ordering asserted rather than assumed.
+    ///
+    /// Every scenario below runs under both, so no fix can be accidentally pinned to one key
+    /// spelling: with last-write-wins, exactly one of the two positions happens to produce the
+    /// right answer, and a test that ran only that one would pass on the defect.
+    fn both_scan_positions(canonical: &Did) -> [(&'static str, Did); 2] {
+        let early = alias_of(canonical);
+        let late = late_sorting_alias_of(canonical);
+        assert!(
+            spelled_key(MAX_SEQ_PREFIX, &early) < spelled_key(MAX_SEQ_PREFIX, canonical),
+            "CONTROL: the base16 alias must sort BEFORE the canonical row"
+        );
+        assert!(
+            spelled_key(MAX_SEQ_PREFIX, canonical) < spelled_key(MAX_SEQ_PREFIX, &late),
+            "CONTROL: the base256-emoji alias must sort AFTER the canonical row"
+        );
+        [
+            ("base16 alias, scanned first", early),
+            ("base256-emoji alias, scanned last", late),
+        ]
+    }
+
+    /// One of each `PeerHold`, for the ordering properties below.
+    fn every_hold() -> [PeerHold; 5] {
+        [
+            PeerHold::MigratingFromLegacy {
+                until: Duration::from_secs(600),
+                from_version: LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            },
+            PeerHold::Unreadable {
+                until: Duration::from_secs(600),
+            },
+            PeerHold::MigratingSenderRegime {
+                until: Duration::from_secs(600),
+            },
+            PeerHold::UnsupportedSenderRegime { found_regime: 7 },
+            PeerHold::UnsupportedVersion { found_version: 9 },
+        ]
+    }
+
+    /// The control the `PeerHold::rank` doc claims: equal rank means one variant.
+    ///
+    /// `stronger_of`'s equal-rank arm falls back to keeping the incumbent for pairs it does
+    /// not name. That fallback is safe but silent, so the thing that must not rot is the
+    /// premise that it is unreachable.
+    #[test]
+    fn hold_ranks_are_distinct_so_equal_rank_means_one_variant() {
+        let ranks: Vec<u8> = every_hold().iter().map(PeerHold::rank).collect();
+        let mut sorted = ranks.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(
+            sorted.len(),
+            ranks.len(),
+            "every PeerHold variant must have its own rank; got {ranks:?}"
+        );
+    }
+
+    /// The invariant itself, over every pair: combining may only preserve or strengthen, and
+    /// the answer may not depend on which row arrived first.
+    #[test]
+    fn combining_holds_never_weakens_and_never_depends_on_order() {
+        for a in every_hold() {
+            for b in every_hold() {
+                let forward = PeerHold::stronger_of(a, b);
+                let reverse = PeerHold::stronger_of(b, a);
+                assert_eq!(
+                    forward.rank(),
+                    reverse.rank(),
+                    "combining {a:?} and {b:?} must not depend on their order"
+                );
+                assert!(
+                    forward.rank() >= a.rank() && forward.rank() >= b.rank(),
+                    "combining {a:?} and {b:?} produced {forward:?}, which refuses less than \
+                     one of its inputs"
+                );
+                // Idempotent, so re-applying the same evidence cannot drift.
+                assert_eq!(
+                    PeerHold::stronger_of(forward, forward).rank(),
+                    forward.rank(),
+                    "combining {forward:?} with itself must be a no-op"
+                );
+            }
+        }
+    }
+
+    /// Two bounded holds of the same kind keep the **later** deadline, so no combination of
+    /// rows can shorten a quarantine.
+    #[test]
+    fn two_bounded_holds_of_one_kind_keep_the_later_deadline() {
+        let early = Duration::from_secs(100);
+        let late = Duration::from_secs(900);
+
+        for (a, b) in [
+            (
+                PeerHold::Unreadable { until: early },
+                PeerHold::Unreadable { until: late },
+            ),
+            (
+                PeerHold::MigratingSenderRegime { until: early },
+                PeerHold::MigratingSenderRegime { until: late },
+            ),
+        ] {
+            for (x, y) in [(a, b), (b, a)] {
+                let combined = PeerHold::stronger_of(x, y);
+                let until = match combined {
+                    PeerHold::Unreadable { until } | PeerHold::MigratingSenderRegime { until } => {
+                        until
+                    }
+                    other => panic!("expected the same kind back, got {other:?}"),
+                };
+                assert_eq!(until, late, "combining {x:?} with {y:?} shortened the hold");
+            }
+        }
+    }
+
+    /// A: an unreadable alias row must not downgrade an indefinite unsupported-version hold.
+    ///
+    /// The reported defect (#2644 review). Canonicalization leaves an unreadable row in place
+    /// deliberately — it is the evidence that quarantines the sender — so a principal really
+    /// can arrive at the load pass with a readable row this binary cannot interpret *and* an
+    /// unreadable alias row. Assigning `window.hold` per row let the later one win, replacing
+    /// a hold with no deadline by one bounded at the freshness horizon. After that horizon
+    /// `check_replay_only` clears the bounded hold, and — because the unsupported-version arm
+    /// never establishes a floor — the sender is admitted against `floor_seq = 0`, which makes
+    /// every sequence it ever sent replayable.
+    #[test]
+    fn an_unreadable_alias_row_cannot_downgrade_an_unsupported_version_hold() {
+        const UNSUPPORTED_VERSION: u32 = 9_999;
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        assert_ne!(
+            UNSUPPORTED_VERSION, REPLAY_STATE_SEMANTIC_VERSION,
+            "CONTROL: the seeded version must be one this binary cannot interpret"
+        );
+        assert_ne!(
+            UNSUPPORTED_VERSION, LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            "CONTROL: and one it has no migration for"
+        );
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                UNSUPPORTED_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &alias), b"{not json")
+                .unwrap();
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // CONTROL: both rows really did survive canonicalization, so two evidence
+            // sources genuinely meet in one window. Without this the test could pass by
+            // the alias row having been merged away, proving nothing about composition.
+            assert!(
+                store
+                    .get(&spelled_key(MAX_SEQ_PREFIX, &alias))
+                    .unwrap()
+                    .is_some(),
+                "{position}: CONTROL: the unreadable alias row must still be present"
+            );
+            assert!(
+                store
+                    .get(&spelled_key(MAX_SEQ_PREFIX, &canonical))
+                    .unwrap()
+                    .is_some(),
+                "{position}: CONTROL: the readable canonical row must still be present"
+            );
+
+            // Past the freshness horizon, where only a hold with no deadline still refuses.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .expect_err(
+                    "persisted state whose semantics this binary cannot interpret must never \
+                     expire into acceptance",
+                );
+            assert!(
+                err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                    .is_some(),
+                "{position}: expected the indefinite unsupported-version refusal to survive \
+                 the unreadable alias row; got: {err}"
+            );
+        }
+    }
+
+    /// B: the same, on the sender-namespace axis — no bounded hold may replace indefinite
+    /// refusal of an unrecognised sender regime.
+    #[test]
+    fn an_unreadable_alias_row_cannot_downgrade_an_unsupported_sender_regime_hold() {
+        const UNSUPPORTED_REGIME: u32 = 7_777;
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        assert!(
+            !ReplayGuard::is_recognised_sender_regime(UNSUPPORTED_REGIME),
+            "CONTROL: the seeded regime must be one this binary has no migration for"
+        );
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                UNSUPPORTED_REGIME,
+            );
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &alias), b"{not json")
+                .unwrap();
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .expect_err("an unrecognised sender regime must never expire into acceptance");
+            assert!(
+                err.downcast_ref::<UnsupportedSenderRegime>().is_some(),
+                "{position}: expected the indefinite sender-regime refusal to survive the \
+                 unreadable alias row; got: {err}"
+            );
+        }
+    }
+
+    /// C: two bounded holds meet — keep the one whose expiry preserves the replay floor.
+    ///
+    /// `Unreadable` and `MigratingFromLegacy` are incomparable in the abstract: the first
+    /// clears leaving the window's floor standing, the second clears by resetting `max_seq`
+    /// and `floor_seq` to 0 and demoting the regime to unproven. The tie is broken toward
+    /// `Unreadable` because its advantage is permanent — a retained floor rejects a superset
+    /// forever — while `MigratingFromLegacy`'s advantage is only that a durable claim must
+    /// re-earn a transition hold, which delays an acceptance that then lands on a floor of 0
+    /// anyway.
+    ///
+    /// Reached through the other place canonicalization declines to merge: when the
+    /// *canonical* row is the unreadable one, its readable alias rows are left unmerged too,
+    /// so their per-row holds meet here rather than in `merge_max_seq`.
+    #[test]
+    fn two_bounded_alias_holds_resolve_to_the_floor_preserving_one() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            // The canonical row is the unreadable one, so the whole group is left unmerged.
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            seed_max_seq(
+                store.as_ref(),
+                &alias,
+                3,
+                LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // CONTROL: the readable alias row survived, so a legacy hold really is one of the
+            // two pieces of evidence being combined.
+            assert!(
+                stored_max_seq(store.as_ref(), &alias).is_some(),
+                "{position}: CONTROL: the readable alias row must be left unmerged"
+            );
+
+            let err = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .expect_err("a sender with unreadable state must be held");
+            assert!(
+                err.downcast_ref::<ReplayStateUnreadable>().is_some(),
+                "{position}: the unreadable hold must outrank the legacy one, whichever row \
+                 the scan hands over last; got: {err}"
+            );
+
+            // And it is still a *bounded* hold: the composition must not have invented an
+            // indefinite refusal out of two temporary ones.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "{position}: two bounded holds must not compose into a permanent one: {e}"
+                    )
+                });
+        }
+    }
+
+    /// D: a corrupt alias row must not permanently brick a sender that is only mid-migration.
+    ///
+    /// The over-correction control for the ranking. `MigratingSenderRegime` is ranked *above*
+    /// `Unreadable` precisely so this case survives: a window loaded as `TransitionToDurableV1`
+    /// whose hold cleared without promoting falls into the `(TransitionToDurableV1, _)` arm of
+    /// the regime match, which fails closed with no way out. Ranking the bounded holds the
+    /// other way round would turn one unparseable alias row into a permanent outage for a peer
+    /// that did nothing wrong.
+    #[test]
+    fn a_corrupt_alias_row_does_not_brick_a_migrating_sender() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                5,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+            );
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &alias), b"{not json")
+                .unwrap();
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // Held while the horizon stands, as both pieces of evidence require.
+            let held = guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 1),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .expect_err("the migration hold must stand for the full horizon");
+            assert!(
+                held.downcast_ref::<SenderRegimeTransition>().is_some(),
+                "{position}: expected the migration hold to outrank the unreadable one; \
+                 got: {held}"
+            );
+
+            // THE PROPERTY: past the horizon, live durable evidence still completes the
+            // migration. Nothing about the corrupt alias row made this refusal permanent.
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 1),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("{position}: a legitimate durable-v1 promotion was over-blocked: {e}")
+                });
+        }
+    }
+
+    /// E: with nothing in conflict, loading is exactly what it was.
+    ///
+    /// The control that a rule which simply made every hold permanent — or installed one where
+    /// there was none — cannot satisfy this suite.
+    #[test]
+    fn a_clean_pair_of_alias_rows_still_loads_with_no_hold_at_all() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (position, alias) in both_scan_positions(&canonical) {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+            seed_max_seq(
+                store.as_ref(),
+                &alias,
+                4,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            );
+
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_persisted_state().unwrap();
+
+            // Ordinary traffic above the merged floor is accepted immediately — no hold, no
+            // wait, no horizon.
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::LegacyOrUnproven,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("{position}: a clean two-spelling load must not install a hold: {e}")
+                });
+
+            // And the merged floor still rejects, so "no hold" did not become "no bound".
+            assert!(
+                guard
+                    .check_replay_only(
+                        &envelope(&sender, &canonical, 10),
+                        ObservedSenderRegime::LegacyOrUnproven,
+                    )
+                    .is_err(),
+                "{position}: the merged floor must still reject a replayed sequence"
+            );
+        }
     }
 }
