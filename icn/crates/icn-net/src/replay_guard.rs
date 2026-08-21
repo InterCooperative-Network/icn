@@ -1320,10 +1320,30 @@ impl ReplayGuard {
         // DID's legacy namespace was ever proven retired, and only the latter licenses
         // interpreting a durable claim. Provenance also outlives the high-water, so a
         // peer aged out by `cleanup()` is found here with no numeric state at all.
+        //
+        // Two passes, for the same reason the high-water load above has two (#2644). Where
+        // canonicalization declined to rewrite storage — an unreadable *canonical* row leaves
+        // every readable alias row standing, by design — several readable provenance rows for
+        // one principal reach this point, and each of them used to apply its own effect in
+        // turn. A row still reading `TransitionToDurableV1` therefore installed a
+        // `MigratingSenderRegime` hold even when a sibling row proved that migration had
+        // already finished, and that hold's expiry with live durable-v1 evidence promotes,
+        // resetting `max_seq` and `floor_seq` to 0. A stale alias could so destroy a floor
+        // that a current-version high-water and a durable provenance sibling both licensed,
+        // handing an authenticated sender back the very sequence numbers that floor rejected.
+        //
+        // Pass one folds the readable rows per principal with
+        // `joined_sender_regime_provenance`; pass two applies the one logical value once.
+        // Unreadable rows answer a different question — "a record exists here whose meaning
+        // is unavailable" — so they contribute only a bounded quarantine and are composed
+        // through `install_hold_conservatively`, which is already commutative. Nothing below
+        // depends on the order `sled` hands the rows over, which is a property of the
+        // spellings an attacker picked.
         let provenance = store
             .scan(SENDER_REGIME_PREFIX)
             .context("Failed to scan sender regime provenance")?;
 
+        let mut joined_provenance: HashMap<SenderPrincipal, u32> = HashMap::new();
         for (key, value) in provenance {
             let Some(did) = Self::parse_sender_regime_key(&key) else {
                 continue;
@@ -1336,6 +1356,11 @@ impl ReplayGuard {
                 // meaning we cannot establish, and reading it as absent would silently
                 // downgrade to unproven — which then permits establishing a fresh
                 // durable namespace after a hold, on evidence we cannot actually read.
+                //
+                // Applied here rather than folded into the join above because it is not a
+                // provenance *value*: it establishes no namespace, and it must not be able
+                // to outvote a readable sibling in either direction. Its whole contribution
+                // is the bounded hold, and that composes conservatively on its own.
                 let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
                 window.install_hold_conservatively(PeerHold::Unreadable {
                     until: quarantine_until,
@@ -1344,6 +1369,26 @@ impl ReplayGuard {
                 continue;
             };
             let found = u32::from_be_bytes(raw);
+            match joined_provenance.entry(principal) {
+                std::collections::hash_map::Entry::Occupied(mut occupied) => {
+                    let combined = Self::joined_sender_regime_provenance(*occupied.get(), found);
+                    tracing::warn!(
+                        peer = %principal,
+                        combined_regime = combined,
+                        "Joining spelling-distinct sender regime provenance rows that \
+                         canonicalization left in place (#2644); the strongest established \
+                         regime wins, because the weaker ones each reach a promotion that \
+                         would reset the replay floor"
+                    );
+                    *occupied.get_mut() = combined;
+                }
+                std::collections::hash_map::Entry::Vacant(vacant) => {
+                    vacant.insert(found);
+                }
+            }
+        }
+
+        for (principal, found) in joined_provenance {
             let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
 
             match found {
@@ -1351,9 +1396,22 @@ impl ReplayGuard {
                     // Already proven. If the high-water aged out, this peer resumes
                     // with no numeric bound but keeps its established namespace, so it
                     // pays no second migration hold.
+                    //
+                    // `sender_regime_from_current_version` is deliberately NOT set here.
+                    // Provenance is version-less — one `u32`, with no semantic version
+                    // beside it — so it cannot state that a *current-version* row
+                    // established this regime. That bit is set only by the current-version
+                    // arms of the high-water load above, and it is what a
+                    // `MigratingFromLegacy` expiry consults before demoting. Setting it
+                    // from provenance would let a version-less record suppress that
+                    // demotion and hand a legacy-only sender a durable namespace it never
+                    // proved under this binary's regime (`ea599560`).
                     window.sender_regime = SenderRegimeState::DurableV1;
                 }
                 SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => {
+                    // Reached only when no readable sibling row proved the migration
+                    // finished — the join above resolves `{DurableV1, TransitionToDurableV1}`
+                    // to `DurableV1` precisely so this arm cannot fire on a fossil.
                     window.sender_regime = SenderRegimeState::TransitionToDurableV1;
                     window.install_hold_conservatively(PeerHold::MigratingSenderRegime {
                         until: quarantine_until,
@@ -1366,6 +1424,11 @@ impl ReplayGuard {
                     );
                 }
                 other => {
+                    // Includes `SENDER_REGIME_LEGACY_OR_UNPROVEN`, which no writer in this
+                    // crate ever puts in this keyspace — see
+                    // `joined_sender_regime_provenance`. The join ranks every such value
+                    // above both legal ones, so one unreadable-in-meaning alias refuses the
+                    // principal here even when a `DurableV1` sibling would have admitted it.
                     window.install_hold_conservatively(PeerHold::UnsupportedSenderRegime {
                         found_regime: other,
                     });
@@ -2521,6 +2584,67 @@ impl ReplayGuard {
         }
     }
 
+    /// The join over rows in the **provenance** keyspace: `DurableV1` beats
+    /// `TransitionToDurableV1`, and any value this keyspace never legally holds beats both.
+    ///
+    /// # Why this is not [`Self::strongest_sender_regime`]
+    ///
+    /// The two agree on every value they share, which is exactly what makes reusing the
+    /// other one tempting and wrong. `strongest_sender_regime` joins the `sender_regime`
+    /// **field of a `max_seq` row**, where `SENDER_REGIME_LEGACY_OR_UNPROVEN` is a legal and
+    /// fully interpretable value: it is the `serde` default for every pre-#2517 row, and the
+    /// load pass has an arm for it that establishes a floor. Ranking it lowest there is
+    /// correct.
+    ///
+    /// This keyspace has a different alphabet. `persist_sender_regime` is reached from
+    /// exactly two places and writes only `SENDER_REGIME_DURABLE_V1` and
+    /// `SENDER_REGIME_TRANSITION_TO_DURABLE_V1`; nothing in this crate ever writes
+    /// `SENDER_REGIME_LEGACY_OR_UNPROVEN` here. A `0` in a provenance row is therefore
+    /// exactly as uninterpretable as a `7`, and the load pass already refuses both with no
+    /// deadline. Ranking it lowest — as `strongest_sender_regime` does — would let a planted
+    /// `0` alias be absorbed by a `DurableV1` sibling and admit a sender that the unfixed
+    /// load pass refuses forever.
+    ///
+    /// Correcting `strongest_sender_regime` instead is not available: [`Self::merge_high_water`]
+    /// needs LEGACY ranked lowest for the ordinary legacy-plus-durable high-water merge, and
+    /// moving it up with the unrecognised tags there would resolve honest mid-migration peers
+    /// to an unrecognised regime and refuse them with no deadline.
+    ///
+    /// # Why `DurableV1` outranks `TransitionToDurableV1`
+    ///
+    /// Not recency, and not "the stronger hold wins". `TransitionToDurableV1` installs
+    /// [`PeerHold::MigratingSenderRegime`], and that hold's expiry with live durable-v1
+    /// evidence *promotes*, resetting `max_seq` and `floor_seq` to 0. Adopting it therefore
+    /// destroys a replay floor that a sibling row licensed; `DurableV1` has no such path.
+    /// The same argument [`Self::strongest_sender_regime`] documents, re-derived here for a
+    /// keyspace whose other end differs.
+    ///
+    /// It is also, for one principal, strictly the later state of one process. Promotion
+    /// writes `SENDER_REGIME_DURABLE_V1` to `make_sender_regime_key` — the canonical spelling
+    /// — and never touches an alias, so an alias still reading `TransitionToDurableV1`
+    /// alongside a `DurableV1` sibling is the fossil of a migration that finished, not
+    /// evidence of one still running (#2644).
+    ///
+    /// Commutative, associative and idempotent, which is what lets the load pass fold the
+    /// rows in whatever order `sled` hands them over — an order that is a property of the
+    /// spellings an attacker picked, not of anything this node controls.
+    fn joined_sender_regime_provenance(a: u32, b: u32) -> u32 {
+        let rank = |v: u32| match v {
+            SENDER_REGIME_TRANSITION_TO_DURABLE_V1 => 0u8,
+            SENDER_REGIME_DURABLE_V1 => 1,
+            // Everything else, `SENDER_REGIME_LEGACY_OR_UNPROVEN` included: no meaning in
+            // this keyspace, and no amount of elapsed time can give it one.
+            _ => 2,
+        };
+        match rank(a).cmp(&rank(b)) {
+            std::cmp::Ordering::Less => b,
+            std::cmp::Ordering::Greater => a,
+            // Two unrecognised tags resolve to the larger purely so the operator-facing
+            // diagnostic is deterministic; both refuse the sender indefinitely either way.
+            std::cmp::Ordering::Equal => a.max(b),
+        }
+    }
+
     /// Write the merged row, flush it, and only then retire the spellings it absorbed.
     ///
     /// Returns without writing anything when the sender's only row is already the canonical
@@ -2726,7 +2850,7 @@ impl ReplayGuard {
             match grouped.entry(principal) {
                 Entry::Occupied(mut occupied) => {
                     let (acc, keys) = occupied.get_mut();
-                    *acc = Self::strongest_sender_regime(*acc, regime);
+                    *acc = Self::joined_sender_regime_provenance(*acc, regime);
                     keys.push(key);
                 }
                 Entry::Vacant(vacant) => {
@@ -2889,8 +3013,9 @@ impl SequenceWindow {
     /// row included — is left exactly as it was. Both are the right call at the store level;
     /// what they mean here is that the merge's conservative rules
     /// ([`ReplayGuard::most_restrictive_semantic_version`],
-    /// [`ReplayGuard::strongest_sender_regime`]) do not run for those rows, and the load pass
-    /// inherits the job of combining them.
+    /// [`ReplayGuard::strongest_sender_regime`],
+    /// [`ReplayGuard::joined_sender_regime_provenance`]) do not run for those rows, and the
+    /// load pass inherits the job of combining them.
     ///
     /// Before this existed each row simply assigned `window.hold`, so the row `sled` happened
     /// to hand over last won. That is a fail-open in one direction: an unreadable alias row
@@ -9597,6 +9722,652 @@ mod respelled_identity_tests {
                 )),
                 "rejected:replay",
                 "{label}: sequence 5 must stay rejected against the surviving floor of 10"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // #2644 review — readable provenance rows must be joined, not applied row by row
+    // ---------------------------------------------------------------------
+
+    /// One provenance row spelled exactly as a pre-#2640 receiver wrote it.
+    fn seed_provenance(store: &dyn Store, did: &Did, value: &[u8]) {
+        store
+            .put(&spelled_key(SENDER_REGIME_PREFIX, did), value)
+            .unwrap();
+    }
+
+    /// The escape hatch that puts several readable provenance rows in front of the load pass.
+    ///
+    /// `install_canonical_row` deliberately writes and deletes nothing when the *canonical*
+    /// row is the unreadable one, so every readable alias for that principal survives
+    /// canonicalization. Both spellings therefore reach the provenance loop, and one of them
+    /// still carries a transition tag the other has already superseded.
+    #[test]
+    fn a_stale_transition_alias_cannot_destroy_a_durable_provenance_floor() {
+        for durable_goes_late in [false, true] {
+            let label = if durable_goes_late {
+                "durable alias scanned last"
+            } else {
+                "durable alias scanned first"
+            };
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let [(_, early), (_, late)] = both_scan_positions(&canonical);
+            let (durable_alias, transition_alias) = if durable_goes_late {
+                (late, early)
+            } else {
+                (early, late)
+            };
+
+            // Current-version durable evidence: the floor that must survive.
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            // Unreadable canonical provenance: what makes canonicalization decline.
+            seed_provenance(store.as_ref(), &canonical, &[0xff, 0xff, 0xff]);
+            seed_provenance(
+                store.as_ref(),
+                &durable_alias,
+                &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+            );
+            seed_provenance(
+                store.as_ref(),
+                &transition_alias,
+                &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // CONTROL: canonicalization really did decline, so all three physical rows are
+            // still there and this is a test about interpreting them.
+            for (what, did) in [
+                ("canonical", &canonical),
+                ("durable alias", &durable_alias),
+                ("transition alias", &transition_alias),
+            ] {
+                assert!(
+                    store
+                        .get(&spelled_key(SENDER_REGIME_PREFIX, did))
+                        .unwrap()
+                        .is_some(),
+                    "{label}: CONTROL: the {what} provenance row must survive canonicalization"
+                );
+            }
+
+            // CONTROL: the floor really was established by the current-version row.
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(10),
+                "{label}: CONTROL: current-version durable evidence must establish floor 10"
+            );
+
+            // CONTROL: the bounded hold stands for its horizon.
+            assert_ne!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "accepted",
+                "{label}: CONTROL: a bounded hold must stand before the horizon"
+            );
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+            // THE PROPERTY: sequence 5 sits below a floor of 10 that both a current-version
+            // row and a durable provenance alias license. A staler alias carrying the
+            // superseded transition tag must not route this sender into the migration
+            // promotion, whose reset would zero that floor.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 5),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "rejected:replay",
+                "{label}: a stale transition alias must not zero a durable replay floor"
+            );
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(10),
+                "{label}: the floor must still be standing afterwards"
+            );
+        }
+    }
+
+    /// The discriminating control: identical numeric state, identical unreadable canonical
+    /// row, but no transition alias. The floor must be rejected permanently, which is what
+    /// makes the test above a statement about the transition alias and not about the floor.
+    #[test]
+    fn a_durable_alias_alone_keeps_the_floor_permanently() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_provenance(store.as_ref(), &canonical, &[0xff, 0xff, 0xff]);
+        seed_provenance(
+            store.as_ref(),
+            &alias,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:unreadable",
+            "CONTROL: the unreadable canonical row must quarantine for its horizon"
+        );
+
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "rejected:replay",
+            "an unreadable quarantine clears the hold and leaves the floor standing"
+        );
+    }
+
+    /// The join's algebra, over every value that can physically appear in a provenance row.
+    ///
+    /// The load pass folds rows in `sled`'s order, which is a property of the spellings an
+    /// attacker picked. Commutativity is therefore the security property, not a nicety.
+    #[test]
+    fn the_provenance_join_is_commutative_associative_and_idempotent() {
+        let values = [
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+            SENDER_REGIME_DURABLE_V1,
+            SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+            7,
+            u32::MAX,
+        ];
+        for a in values {
+            assert_eq!(
+                ReplayGuard::joined_sender_regime_provenance(a, a),
+                a,
+                "joining {a} with itself must be a no-op"
+            );
+            for b in values {
+                assert_eq!(
+                    ReplayGuard::joined_sender_regime_provenance(a, b),
+                    ReplayGuard::joined_sender_regime_provenance(b, a),
+                    "joining {a} and {b} must not depend on their order"
+                );
+                for c in values {
+                    let left = ReplayGuard::joined_sender_regime_provenance(
+                        ReplayGuard::joined_sender_regime_provenance(a, b),
+                        c,
+                    );
+                    let right = ReplayGuard::joined_sender_regime_provenance(
+                        a,
+                        ReplayGuard::joined_sender_regime_provenance(b, c),
+                    );
+                    assert_eq!(
+                        left, right,
+                        "joining {a}, {b}, {c} must not depend on grouping"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The two orderings the join is derived from, stated directly.
+    #[test]
+    fn the_provenance_join_prefers_durable_and_refuses_anything_uninterpretable() {
+        assert_eq!(
+            ReplayGuard::joined_sender_regime_provenance(
+                SENDER_REGIME_DURABLE_V1,
+                SENDER_REGIME_TRANSITION_TO_DURABLE_V1
+            ),
+            SENDER_REGIME_DURABLE_V1,
+            "a finished migration outranks the fossil of the migration that finished"
+        );
+        for uninterpretable in [SENDER_REGIME_LEGACY_OR_UNPROVEN, 7, u32::MAX] {
+            assert_eq!(
+                ReplayGuard::joined_sender_regime_provenance(
+                    SENDER_REGIME_DURABLE_V1,
+                    uninterpretable
+                ),
+                uninterpretable,
+                "{uninterpretable} has no meaning in the provenance keyspace and must not be \
+                 absorbed by a DurableV1 sibling"
+            );
+        }
+        // CONTROL: the value that separates this join from `strongest_sender_regime`. That
+        // helper ranks `SENDER_REGIME_LEGACY_OR_UNPROVEN` as the weakest *legal* value, which
+        // is right for a `max_seq` row's field and wrong here — nothing writes it here.
+        assert_eq!(
+            ReplayGuard::strongest_sender_regime(
+                SENDER_REGIME_DURABLE_V1,
+                SENDER_REGIME_LEGACY_OR_UNPROVEN
+            ),
+            SENDER_REGIME_DURABLE_V1,
+            "CONTROL: the high-water field join really does disagree, so this is two joins \
+             and not one renamed"
+        );
+    }
+
+    /// Matrix 3 — a transition row with no sibling still behaves exactly as #2517 requires.
+    #[test]
+    fn a_lone_transition_row_still_holds_and_still_promotes() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "an unfinished migration must restart its full hold"
+        );
+
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+        // THE PROPERTY: the join did not disturb the one-row path — promotion still happens,
+        // and still requires live durable evidence to do it.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "the migration must still complete on live durable-v1 evidence"
+        );
+        assert_eq!(
+            store
+                .get(&ReplayGuard::make_sender_regime_key(&pk(&canonical)))
+                .unwrap()
+                .as_deref(),
+            Some(&SENDER_REGIME_DURABLE_V1.to_be_bytes()[..]),
+            "promotion must record the finished migration on the canonical key"
+        );
+    }
+
+    /// Matrix 4 / 10 — the clean single-row paths, unchanged and holdless.
+    #[test]
+    fn a_clean_canonical_provenance_row_costs_no_hold_in_either_regime() {
+        for (label, regime, seq, expected) in [
+            ("durable", SENDER_REGIME_DURABLE_V1, 11u64, "accepted"),
+            (
+                "durable replay",
+                SENDER_REGIME_DURABLE_V1,
+                5,
+                "rejected:replay",
+            ),
+        ] {
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            seed_provenance(store.as_ref(), &canonical, &regime.to_be_bytes());
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // No hold at all: an established sender must not pay for the join existing.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, seq),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                expected,
+                "{label}: the ordinary established-sender path must be unchanged"
+            );
+            // CONTROL: canonicalization left the single canonical row exactly as it was.
+            assert_eq!(
+                store
+                    .get(&ReplayGuard::make_sender_regime_key(&pk(&canonical)))
+                    .unwrap()
+                    .as_deref(),
+                Some(&regime.to_be_bytes()[..]),
+                "{label}: CONTROL: a lone canonical row must not be rewritten"
+            );
+        }
+    }
+
+    /// Matrix 5 — an uninterpretable alias refuses the principal even beside a durable one,
+    /// and no elapsed time releases it.
+    ///
+    /// Run for `SENDER_REGIME_LEGACY_OR_UNPROVEN` as well as an unrecognised tag, because
+    /// that value is exactly where the provenance join and `strongest_sender_regime` part
+    /// company: nothing in this crate writes `0` to this keyspace, so a `0` here is a foreign
+    /// or corrupt writer and the load pass has always refused it with no deadline. Merging it
+    /// away under a `DurableV1` sibling would make canonicalization *more permissive than the
+    /// load pass it feeds*, which is the escape hatch this whole review round is about.
+    #[test]
+    fn an_uninterpretable_provenance_alias_refuses_indefinitely_beside_a_durable_one() {
+        for uninterpretable in [SENDER_REGIME_LEGACY_OR_UNPROVEN, 7] {
+            for durable_goes_late in [false, true] {
+                let label = format!("value {uninterpretable}, durable late = {durable_goes_late}");
+                let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+                let sender = KeyPair::generate().unwrap();
+                let canonical = sender.did().clone();
+                let [(_, early), (_, late)] = both_scan_positions(&canonical);
+                let (durable_alias, other_alias) = if durable_goes_late {
+                    (late, early)
+                } else {
+                    (early, late)
+                };
+
+                seed_max_seq(
+                    store.as_ref(),
+                    &canonical,
+                    10,
+                    REPLAY_STATE_SEMANTIC_VERSION,
+                    SENDER_REGIME_DURABLE_V1,
+                );
+                seed_provenance(
+                    store.as_ref(),
+                    &durable_alias,
+                    &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+                );
+                seed_provenance(store.as_ref(), &other_alias, &uninterpretable.to_be_bytes());
+
+                let clock = MergeClock::new();
+                let mut guard =
+                    ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+                guard.load_persisted_state().unwrap();
+
+                // THE PROPERTY: fail-closed wins, and it has no deadline.
+                for stage in ["immediately", "after the envelope validity horizon"] {
+                    assert_eq!(
+                        outcome(guard.check_replay_only(
+                            &envelope(&sender, &canonical, 11),
+                            ObservedSenderRegime::DurableV1,
+                        )),
+                        "held:unsupported-sender-regime",
+                        "{label}: an uninterpretable provenance value must refuse {stage}"
+                    );
+                    clock.advance(HORIZON_SECS + Duration::from_secs(1));
+                }
+            }
+        }
+    }
+
+    /// Matrix 6 — an unreadable row contributes its bounded quarantine and nothing else: the
+    /// durable state a readable sibling established is still there when the hold clears.
+    #[test]
+    fn an_unreadable_row_quarantines_without_disturbing_the_durable_state_it_sits_beside() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_provenance(store.as_ref(), &canonical, &[0xff, 0xff, 0xff]);
+        seed_provenance(
+            store.as_ref(),
+            &alias,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:unreadable",
+            "the unreadable row must quarantine for its bounded horizon"
+        );
+
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+        // THE PROPERTY: the hold cleared, and the durable regime plus its floor survived it.
+        // A `DurableV1` observation is accepted without a transition hold, which is only true
+        // if the window's regime is still `DurableV1`.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 11),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "accepted",
+            "the durable regime the readable sibling established must survive the quarantine"
+        );
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 5),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "rejected:replay",
+            "and so must its floor"
+        );
+    }
+
+    /// Matrix 7 — provenance outlives the high-water, so the join must work with no numeric
+    /// row at all and must not invent one.
+    #[test]
+    fn joined_provenance_without_any_high_water_row_invents_no_floor() {
+        for durable_goes_late in [false, true] {
+            let label = if durable_goes_late {
+                "durable alias scanned last"
+            } else {
+                "durable alias scanned first"
+            };
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let [(_, early), (_, late)] = both_scan_positions(&canonical);
+            let (durable_alias, transition_alias) = if durable_goes_late {
+                (late, early)
+            } else {
+                (early, late)
+            };
+
+            seed_provenance(store.as_ref(), &canonical, &[0xff, 0xff, 0xff]);
+            seed_provenance(
+                store.as_ref(),
+                &durable_alias,
+                &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+            );
+            seed_provenance(
+                store.as_ref(),
+                &transition_alias,
+                &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            assert_eq!(
+                guard.get_max_seq(&canonical),
+                Some(0),
+                "{label}: provenance rows carry no number and must not manufacture a floor"
+            );
+
+            clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+            // THE PROPERTY: the joined regime is `DurableV1`, so an aged-out peer resumes on
+            // its established namespace and pays no second migration hold — and sequence 1 is
+            // accepted because there genuinely is no floor, not because one was destroyed.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 1),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "accepted",
+                "{label}: an established sender with no high-water resumes without a hold"
+            );
+        }
+    }
+
+    /// Matrix 8 — the `ea599560` distinction survives the join.
+    ///
+    /// Provenance is version-less. A `DurableV1` the join derived from provenance must NOT
+    /// set `sender_regime_from_current_version`, so a `MigratingFromLegacy` expiry still
+    /// demotes it and a durable claim still re-earns its transition hold. If the join were to
+    /// set that bit, this sender would keep a durable namespace it never proved under the
+    /// current semantic regime.
+    ///
+    /// Exercises the *canonicalization* side of the shared join on purpose: the load-side
+    /// join is only reachable when the canonical row is unreadable, and an `Unreadable` hold
+    /// outranks `MigratingFromLegacy`, which would mask the demotion this test is about.
+    #[test]
+    fn a_join_derived_durable_regime_still_demotes_at_a_legacy_migration_expiry() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let alias = alias_of(&canonical);
+
+        // Only legacy-version numeric state, so the window's regime cannot come from a
+        // current-version arm.
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            4,
+            LEGACY_REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_LEGACY_OR_UNPROVEN,
+        );
+        seed_provenance(
+            store.as_ref(),
+            &canonical,
+            &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+        );
+        seed_provenance(
+            store.as_ref(),
+            &alias,
+            &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+        );
+
+        let clock = MergeClock::new();
+        let mut guard =
+            ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+        guard.load_persisted_state().unwrap();
+
+        // CONTROL: the join really did run and really did resolve to `DurableV1` — otherwise
+        // the assertion below would be about a transition row, not a durable one.
+        assert_eq!(
+            store
+                .get(&ReplayGuard::make_sender_regime_key(&pk(&canonical)))
+                .unwrap()
+                .as_deref(),
+            Some(&SENDER_REGIME_DURABLE_V1.to_be_bytes()[..]),
+            "CONTROL: the join must have resolved the alias pair to DurableV1"
+        );
+
+        clock.advance(HORIZON_SECS + Duration::from_secs(1));
+
+        // THE PROPERTY: version-less provenance did not become current-version provenance.
+        assert_eq!(
+            outcome(guard.check_replay_only(
+                &envelope(&sender, &canonical, 9),
+                ObservedSenderRegime::DurableV1,
+            )),
+            "held:sender-regime-transition",
+            "a provenance-derived durable regime must not survive the legacy migration expiry"
+        );
+    }
+
+    /// The stronger reading of matrix 1: the fossil does not merely fail to win, it never
+    /// installs a `MigratingSenderRegime` hold at all. Stated separately so the floor
+    /// assertion in the test above stays the discriminator that reproduced the finding.
+    #[test]
+    fn a_superseded_transition_alias_installs_no_migration_hold() {
+        for durable_goes_late in [false, true] {
+            let label = if durable_goes_late {
+                "durable late"
+            } else {
+                "durable first"
+            };
+            let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let [(_, early), (_, late)] = both_scan_positions(&canonical);
+            let (durable_alias, transition_alias) = if durable_goes_late {
+                (late, early)
+            } else {
+                (early, late)
+            };
+
+            seed_max_seq(
+                store.as_ref(),
+                &canonical,
+                10,
+                REPLAY_STATE_SEMANTIC_VERSION,
+                SENDER_REGIME_DURABLE_V1,
+            );
+            seed_provenance(store.as_ref(), &canonical, &[0xff, 0xff, 0xff]);
+            seed_provenance(
+                store.as_ref(),
+                &durable_alias,
+                &SENDER_REGIME_DURABLE_V1.to_be_bytes(),
+            );
+            seed_provenance(
+                store.as_ref(),
+                &transition_alias,
+                &SENDER_REGIME_TRANSITION_TO_DURABLE_V1.to_be_bytes(),
+            );
+
+            let clock = MergeClock::new();
+            let mut guard =
+                ReplayGuard::new_persistent(300, 3600, store.clone()).with_clock(clock.clone());
+            guard.load_persisted_state().unwrap();
+
+            // The only hold is the unreadable canonical row's bounded quarantine. A
+            // `MigratingSenderRegime` hold would outrank it and show up here instead.
+            assert_eq!(
+                outcome(guard.check_replay_only(
+                    &envelope(&sender, &canonical, 11),
+                    ObservedSenderRegime::DurableV1,
+                )),
+                "held:unreadable",
+                "{label}: the superseded transition alias must install no migration hold"
             );
         }
     }
