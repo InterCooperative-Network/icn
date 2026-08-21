@@ -855,12 +855,18 @@ impl ReplayGuard {
         match self.load_persisted_state_inner() {
             Ok(loaded) => Ok(loaded),
             Err(e) => {
-                // Nothing was loaded, so every in-memory window is absent and every floor is
-                // 0. Leaving `initialized` set would make the *next* call skip the load
-                // entirely and run against that empty state — which accepts every replay the
-                // store was holding evidence of. Clearing it makes a load failure stay a
+                // No interpretation of the store was installed. That is a property of the
+                // loader, not an assumption about where it failed: it builds every window in
+                // a local map and assigns `self.sequences` only after the last fallible step,
+                // so an error here means the guard still holds exactly what it held before.
+                //
+                // Leaving `initialized` set would make the *next* call skip the load entirely
+                // and run against that state — which, on a first load, accepts every replay
+                // the store was holding evidence of. Clearing it makes a load failure stay a
                 // failure until it is fixed, instead of resolving itself into a fail-open on
-                // the second message.
+                // the second message. Together the two give the retry a clean base: it
+                // re-derives everything from the repaired store and inherits nothing from the
+                // attempt that failed.
                 //
                 // Load-outcome hardening, not the #2640 canonicalization itself: this file
                 // now performs durable writes during the load, so the failure path had to
@@ -899,6 +905,11 @@ impl ReplayGuard {
             None => return Ok(0),
         };
 
+        // Every window this load derives, built off to the side. Nothing below touches
+        // `self.sequences`, so a failure at any `?` after this point leaves the guard exactly
+        // as it was rather than half-rewritten — see the commit at the end of this function.
+        let mut loaded: HashMap<SenderPrincipal, SequenceWindow> = HashMap::new();
+
         let mut count = 0;
 
         // Peers whose durable state is unreadable are quarantined until every
@@ -925,10 +936,7 @@ impl ReplayGuard {
                     // to be new. Failing open would hand an attacker a replay
                     // window; instead reject this peer's traffic until anything
                     // captured before the restart is too old to be replayed.
-                    let window = self
-                        .sequences
-                        .entry(principal)
-                        .or_insert_with(SequenceWindow::new);
+                    let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
                     window.hold = Some(PeerHold::Unreadable {
                         until: quarantine_until,
                     });
@@ -941,10 +949,7 @@ impl ReplayGuard {
                     );
                 }
                 if let Ok(entry) = parsed {
-                    let window = self
-                        .sequences
-                        .entry(principal)
-                        .or_insert_with(SequenceWindow::new);
+                    let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
 
                     // The entry parsed, but parsing is a statement about schema and
                     // this decision is about semantics. Enumerated deliberately
@@ -1127,10 +1132,7 @@ impl ReplayGuard {
                 // meaning we cannot establish, and reading it as absent would silently
                 // downgrade to unproven — which then permits establishing a fresh
                 // durable namespace after a hold, on evidence we cannot actually read.
-                let window = self
-                    .sequences
-                    .entry(principal)
-                    .or_insert_with(SequenceWindow::new);
+                let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
                 window.hold = Some(PeerHold::Unreadable {
                     until: quarantine_until,
                 });
@@ -1138,10 +1140,7 @@ impl ReplayGuard {
                 continue;
             };
             let found = u32::from_be_bytes(raw);
-            let window = self
-                .sequences
-                .entry(principal)
-                .or_insert_with(SequenceWindow::new);
+            let window = loaded.entry(principal).or_insert_with(SequenceWindow::new);
 
             match found {
                 SENDER_REGIME_DURABLE_V1 => {
@@ -1196,13 +1195,34 @@ impl ReplayGuard {
                         // initialized from max_seq (with safety gap and floor applied).
                         // This avoids creating new windows with floor_seq=0 based solely
                         // on finalized state, which could allow replay of older sequences.
-                        if let Some(window) = self.sequences.get_mut(&principal) {
+                        if let Some(window) = loaded.get_mut(&principal) {
                             window.finalized.insert(seq, now);
                         }
                     }
                 }
             }
         }
+
+        // Commit. Every fallible step is behind us, so this is the single point at which the
+        // guard adopts an interpretation of the store — all of it or none of it.
+        //
+        // A whole-map replacement rather than a merge, because at this point `self.sequences`
+        // can only be residue of a *previous failed attempt*, never live state:
+        //
+        // * `load_persisted_state` gates this function behind the `initialized` latch, so it
+        //   runs only while the guard is uninitialized, and a successful load latches it for
+        //   good — this function is never re-entered after it returns `Ok`.
+        // * The only production path that inserts a window is `check_replay_only`, and it
+        //   propagates a load failure (`self.load_persisted_state()?`) *before* it reaches
+        //   `self.sequences`. So no live traffic can install a window while a load is failing.
+        // * `finalize` uses `get_mut` and errors on an unknown sender, so it cannot create
+        //   one; `cleanup` only removes and prunes.
+        //
+        // Merging into the old map instead would carry a failed attempt's holds and finalized
+        // entries into the retry — `entry().or_insert_with()` returns the *stale* window and
+        // no arm below clears `hold` — so a repaired store would stay quarantined by an
+        // artifact of the failure that repairing it was supposed to erase.
+        self.sequences = loaded;
 
         tracing::info!(
             loaded_peers = count,
@@ -6592,6 +6612,179 @@ mod respelled_identity_tests {
              into an empty-state acceptance"
         );
         assert!(!guard.is_initialized());
+    }
+
+    /// A store whose sender-regime scan can be made to fail on a chosen call.
+    ///
+    /// Failing *every* scan (as `CountingStore { fail_scan: true }` does) aborts the load at
+    /// its very first read, before any window exists — which is precisely the case that cannot
+    /// exhibit a partial-state bug. The provenance scan is the interesting one: the load calls
+    /// it once during canonicalization and again during the load proper, so failing only the
+    /// second lands the error *after* the max_seq loop has already built windows.
+    #[derive(Default)]
+    struct PartialLoadStore {
+        data: std::sync::Mutex<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
+        regime_scans: std::sync::atomic::AtomicU32,
+        /// 1-based index of the `SENDER_REGIME_PREFIX` scan to fail; `None` never fails.
+        fail_regime_scan_number: std::sync::Mutex<Option<u32>>,
+    }
+
+    impl PartialLoadStore {
+        fn failing_on_regime_scan(n: u32) -> Arc<Self> {
+            let store = Arc::new(PartialLoadStore::default());
+            *store.fail_regime_scan_number.lock().unwrap() = Some(n);
+            store
+        }
+        fn repair(&self) {
+            *self.fail_regime_scan_number.lock().unwrap() = None;
+        }
+    }
+
+    impl Store for PartialLoadStore {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            Ok(self.data.lock().unwrap().get(key).cloned())
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.data
+                .lock()
+                .unwrap()
+                .insert(key.to_vec(), value.to_vec());
+            Ok(())
+        }
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.data.lock().unwrap().remove(key);
+            Ok(())
+        }
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            if prefix == SENDER_REGIME_PREFIX {
+                let n = self.regime_scans.fetch_add(1, Ordering::SeqCst) + 1;
+                if *self.fail_regime_scan_number.lock().unwrap() == Some(n) {
+                    anyhow::bail!("simulated unreadable sender-regime keyspace");
+                }
+            }
+            Ok(self
+                .data
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        }
+        fn flush(&self) -> Result<()> {
+            Ok(())
+        }
+        fn get_replica_metadata(
+            &self,
+            _h: &icn_store::ContentHash,
+        ) -> Result<Option<icn_store::ReplicaMetadata>> {
+            Ok(None)
+        }
+        fn put_replica_metadata(&self, _m: &icn_store::ReplicaMetadata) -> Result<()> {
+            Ok(())
+        }
+        fn list_replica_hashes(&self) -> Result<Vec<icn_store::ContentHash>> {
+            Ok(vec![])
+        }
+    }
+
+    /// A load that fails partway through must install nothing, so the retry after a repair
+    /// derives its replay state from the repaired store alone.
+    ///
+    /// `a_failed_load_leaves_the_guard_disarmed_for_nobody` covers the *latch*: a failure must
+    /// not mark the guard initialized. This covers the other half, which the latch does not
+    /// give on its own — the windows themselves. `load_persisted_state_inner` populates
+    /// `sequences` from the max_seq keyspace and only afterwards scans provenance and
+    /// finalized, either of which can fail. Merging a retry into whatever the failed attempt
+    /// left behind carries its holds forward: `entry().or_insert_with()` returns the stale
+    /// window and no arm below clears `hold`, so a peer quarantined by a corrupt row stays
+    /// quarantined after the row is fixed.
+    #[test]
+    fn a_failed_load_installs_no_partial_state_for_the_retry_to_inherit() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        // CONTROL: with the provenance scan healthy, this corrupt row really does install a
+        // quarantine hold. Without this, the rollback assertion below could pass simply
+        // because phase one never produced any state to roll back.
+        {
+            let store = Arc::new(PartialLoadStore::default());
+            store
+                .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+                .unwrap();
+            let mut control = ReplayGuard::new_persistent(300, 3600, store.clone());
+            control.load_persisted_state().unwrap();
+            assert!(
+                control
+                    .sequences
+                    .get(&pk(&canonical))
+                    .is_some_and(|w| w.hold.is_some()),
+                "CONTROL: the corrupt max_seq row must quarantine the peer, or this test \
+                 proves nothing about rolling that quarantine back"
+            );
+        }
+
+        // Fail the *second* provenance scan: canonicalization takes the first, so the error
+        // lands after the max_seq loop has already installed the hold proven above.
+        let store = PartialLoadStore::failing_on_regime_scan(2);
+        store
+            .put(&spelled_key(MAX_SEQ_PREFIX, &canonical), b"{not json")
+            .unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+        assert!(
+            guard.load_persisted_state().is_err(),
+            "CONTROL: the provenance scan must actually fail"
+        );
+        assert!(
+            !guard.is_initialized(),
+            "a failed load must not latch (see the sibling test)"
+        );
+
+        // THE REGRESSION. Before this fix the window built by the max_seq loop survived here.
+        assert!(
+            guard.sequences.is_empty(),
+            "a failed load must install no windows at all; found {} left behind",
+            guard.sequences.len()
+        );
+
+        // Repair the store completely: a readable durable row, and a working provenance scan.
+        store.repair();
+        seed_max_seq(
+            store.as_ref(),
+            &canonical,
+            5,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+
+        assert_eq!(
+            guard.load_persisted_state().unwrap(),
+            1,
+            "the retry must load the repaired row"
+        );
+
+        let window = guard
+            .sequences
+            .get(&pk(&canonical))
+            .expect("the repaired row must produce a window");
+        assert!(
+            window.hold.is_none(),
+            "the quarantine from the failed attempt must not outlive it — the store that \
+             justified it no longer exists"
+        );
+        assert_eq!(
+            window.floor_seq, 5,
+            "and the floor must come from the repaired row"
+        );
+
+        // The observable consequence: the peer is usable again.
+        guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 6),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect("a repaired store must admit the peer's next durable sequence");
     }
 
     /// The replay identity fails closed. There is no fallback to the DID's spelling.
