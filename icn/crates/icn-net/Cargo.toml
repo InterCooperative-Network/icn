@@ -47,6 +47,10 @@ zstd = "0.13"
 
 [dev-dependencies]
 icn-store.workspace = true
+# Test-only: enumerate every multibase spelling `Did::from_str` accepts, so the #2640
+# regression suite pins the whole equivalence class rather than one arbitrary example.
+# Already in the lockfile as a direct dependency of `icn-identity`; same version.
+multibase = "0.9"
 tracing-subscriber.workspace = true
 rand_core.workspace = true
 criterion = "0.5"

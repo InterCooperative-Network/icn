@@ -3647,6 +3647,7 @@ dependencies = [
  "mdns-sd",
  "metrics",
  "metrics-util 0.19.1",
+ "multibase",
  "portpicker",
  "quinn",
  "rand 0.9.4",
