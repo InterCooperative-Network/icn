@@ -553,9 +553,20 @@ are written under the principal's canonical base58btc spelling, and a migration 
 `load_persisted_state` merges pre-existing spelling-distinct rows onto that one key —
 **maximum** high-water, **strongest** sender regime, most restrictive semantic version, **union**
 of finalized sequences; the canonical row is flushed before any alias row is retired, and an
-unreadable alias row is neither merged nor deleted but quarantines the merged sender. A
-re-spelled captured envelope is therefore rejected by the replay guard, and the self-DID drop in
-`handlers/signed.rs` (§10.2's "related sub-instance") now compares keys rather than strings.
+unreadable alias row is neither merged nor deleted. A re-spelled captured envelope is therefore
+rejected by the replay guard, and the self-DID drop in `handlers/signed.rs` (§10.2's "related
+sub-instance") now compares keys rather than strings.
+
+**Unreadable rows quarantine in two of the three keyspaces, not all three.** For row #1
+(`replay_sender_regime:`) and row #2 (`replay_max_seq:`), the load pass turns an unreadable value
+into a quarantine hold on the merged sender. Row #3 (`replay_finalized:`) is the exception: an
+unparseable value is left in place but *skipped*, with no hold, so a finalized block whose
+`(sender, sequence)` has no other readable row is lost silently. That arm is byte-identical to
+base (`5f86610f:icn/crates/icn-net/src/replay_guard.rs:1008`) — the behaviour predates #2640 and
+is not a #2640 bypass — and `ReplayGuard::finalize` / `is_finalized` have **zero production
+callers** workspace-wide, so the keyspace is unreachable machinery today. Making the finalized
+load pass quarantine-consistent with rows #1–#2 is a prerequisite before `finalize()` gains a
+production caller.
 
 **Not fixed, and unchanged by it.** `SignedEnvelope::canonical_encoding` still does not cover
 `from`, so the field is still unauthenticated and a re-spelled envelope still *verifies*; only
@@ -570,6 +581,20 @@ window map would collapse spellings anyway — but the durable rows would not, s
 replaces it with a canonical `Did`, keep writing rows #1–#3 under a key-derived spelling and keep
 the merge pass until no store can contain a legacy alias row. Dropping the migration would
 silently restore the durable half of this defect.
+
+Row #57 (`peer_connections`) carries a second invariant, surfaced by the independent security
+review of this change. That map is still spelling-keyed, so a re-spelled envelope from a sender
+that has established `DurableV1` misses its row-#57 lookup, reads as `LegacyOrUnproven`, and is
+refused by `handlers/signed.rs` with `SenderRegimeDowngrade` **before** the canonical replay floor
+becomes the rejecting mechanism. That is redundant defence in the safe direction — the floor
+rejects the same envelope on its own in both regime arms — but the redundancy disappears the
+moment N2-A makes row #57 alias-tolerant. N2-A must therefore (a) keep the canonical replay floor
+independently rejecting the re-spelled replay once that lookup starts hitting, and (b) retain or
+add a regression for exactly that case. It must also stop classifying the attacker-driven
+re-spelling path as a local fault: `SenderRegimeDowngrade` records no violation and logs "an
+operator must upgrade a binary or roll a downgraded peer forward", which is the wrong diagnosis
+for an attacker-chosen input arriving at an attacker-chosen rate. §12.1 item 6 covers the
+#57/#60 partner-map *desync*; it does not cover this.
 
 ### 10.3 Vote double-counting, and a re-cast guard that cannot fire
 `GovernanceError::AlreadyVoted` (`icn-governance/src/error.rs:33`) has **zero constructors anywhere
