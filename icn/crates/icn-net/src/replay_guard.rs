@@ -940,7 +940,8 @@ impl PeerHold {
     ///
     /// Derived from what each hold *permits*, never from declaration order — see
     /// [`SequenceWindow::install_hold_conservatively`] for why the load pass needs an order at
-    /// all. One arm per variant, and [`Self::ranks_are_distinct`] pins that the ranks stay
+    /// all. One arm per variant, and the regression test
+    /// `hold_ranks_are_distinct_so_equal_rank_means_one_variant` pins that the ranks stay
     /// distinct, so "equal rank" means "same variant" and adding a variant without deciding
     /// where it sits is a compile error rather than a silent tie.
     ///
@@ -1035,10 +1036,11 @@ impl PeerHold {
                 ) => PeerHold::UnsupportedVersion {
                     found_version: x.max(y),
                 },
-                // Unreachable while `rank` has one arm per variant, which
-                // `ranks_are_distinct` pins. Kept rather than `unreachable!()` because the
-                // fail-safe direction for a rule whose whole job is "never weaken" is to keep
-                // what is already installed, not to panic a receiver at load time.
+                // Unreachable while `rank` has one arm per variant, which the regression test
+                // `hold_ranks_are_distinct_so_equal_rank_means_one_variant` pins. Kept rather
+                // than `unreachable!()` because the fail-safe direction for a rule whose whole
+                // job is "never weaken" is to keep what is already installed, not to panic a
+                // receiver at load time.
                 (incumbent, _) => incumbent,
             },
         }
