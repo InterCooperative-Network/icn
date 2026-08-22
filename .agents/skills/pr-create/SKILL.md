@@ -4,6 +4,18 @@ description: Create a PR following ICN conventions with invariants checklist, pr
 argument-hint: "[base-branch]"
 user-invocable: true
 allowed-tools: "Bash, Read, Grep, Glob"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required checks, branch naming conventions
+    - ops/state/config/repo-map.json    # workspace root
+  live_load_required:
+    - "git branch --show-current"
+    - "git diff --name-only $(git merge-base HEAD origin/main)..HEAD"
+  examples_only: []
+  never_hardcode:
+    - branch name
+    - base branch (always confirm with git)
+    - required check list
 ---
 
 Create a pull request following ICN conventions.
@@ -78,5 +90,6 @@ Title: `<type>(<scope>): <description>` (under 70 chars)
 
 - Base branch defaults to `main` unless `$ARGUMENTS` specifies otherwise
 - Push the branch with `-u` flag before creating PR
-- Include `Co-Authored-By: Codex Opus 4.6 <noreply@anthropic.com>` in commits
+- Include a `Co-Authored-By:` trailer naming the assisting model actually used for the change.
+  Do not copy a model name from this file — it is not the owner of that fact.
 - Never create PRs without running verification first

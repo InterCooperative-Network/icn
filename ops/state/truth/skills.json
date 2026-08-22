@@ -1,49 +1,421 @@
 {
-  "schema": "icn-skills/v1",
-  "description": "Registry of all skills with canonical paths and ownership. Generated indexes and routing tables should derive from here. Do not maintain separate skill lists in prompt files.",
+  "schema": "icn-skills/v2",
+  "description": "Registry of every skill in a declared scope, with its canonical owner and the exact relationship each provider-facing copy is allowed to have with it. Generated indexes and routing tables derive from here. Do not maintain a separate skill list in a prompt file or a shell script \u2014 scan scope and enforcement both derive from this file.",
   "canonical_skill_sources": {
     "ops_automation": "ops/automation/skills/",
     "icn_level": ".agents/skills/",
-    "project_level": "../../../.claude/skills/"
+    "provider_mirror": ".claude/skills/"
   },
-  "note_on_duplication": "ops/automation/skills/ is the canonical source for shared operational skills. ICN-level skills are canonical under .agents/skills/. Provider-facing .claude/skills copies are compatibility mirrors/adapters, not independent owners. Project-level .claude/skills for {status, sync-and-build, worktree} MUST be symlinks to ops/automation/skills/. Run ops/scripts/setup-skill-symlinks.sh to create/verify project-level symlinks.",
+  "declared_scope": {
+    "in_scope": [
+      "ops/automation/skills/ \u2014 canonical shared operational skills",
+      ".agents/skills/ \u2014 canonical ICN-level skills",
+      ".claude/skills/ \u2014 provider-facing mirrors/adapters and provider-only skills"
+    ],
+    "out_of_scope": [
+      ".claude/agents/, .github/agents/, .claude/commands/ and tools/claude-code/plugins/** are specialist/provider PROMPT surfaces, not skills. They are tracked by icn#2632 and by ops/state/truth/agents.json, not here.",
+      "Skill directories a developer creates outside the repository (for example under a personal ~/.claude) are machine-local and are neither registered nor enforced here."
+    ],
+    "completeness_claim": "Within in_scope, this registry is exhaustive: every skill directory present on disk has an entry, and every entry names a path that exists. scripts/check-skill-registry.py fails if either direction breaks."
+  },
+  "mirror_model": {
+    "exact_mirror": "The provider copy carries no provider-specific behaviour and MUST be byte-identical to its canonical source. Divergence or absence is a failure. This is the default and, today, the only relationship in use for ICN-level skills.",
+    "adapter": "The provider copy genuinely needs provider mechanics. It MUST be declared with policy: \"adapter\" and an explicit adapter_fields list. Its body must still be byte-identical to the canonical body \u2014 only the declared front-matter keys may differ. Workflow semantics, truth ownership, safety constraints, and current-fact policy always come from the canonical skill.",
+    "symlink": "A provider copy may instead BE a symlink to its canonical directory or SKILL.md. That is structurally drift-proof and always passes, whatever the declared policy. Supported by the checker but not adopted repo-wide \u2014 see symlink_tradeoff.",
+    "provider_only": "A skill with no ICN-level counterpart by design. It lives only in the provider tree and MUST have a project_level_only entry stating why. It has no canonical source to diverge from.",
+    "none": "A canonical skill with no provider-facing copy in the repository. Nothing to mirror, nothing to enforce beyond the canonical file itself.",
+    "unregistered": "NOT a category. A skill directory on disk with no registry entry is a checker failure, because it makes completeness_claim false."
+  },
+  "adapter_policy": {
+    "body_must_be_identical": true,
+    "permitted_front_matter_keys": [
+      "allowed-tools",
+      "argument-hint",
+      "user-invocable",
+      "disable-model-invocation"
+    ],
+    "note": "Any front-matter key NOT in permitted_front_matter_keys \u2014 name, description, version, and above all truth_contract \u2014 is semantics, not mechanics. A provider copy that changes one of those has become an independent truth owner, which the ownership contract forbids. An adapter must also list, in adapter_fields, the subset of permitted keys it actually differs in; differing in an undeclared key fails."
+  },
+  "symlink_tradeoff": {
+    "for": "A symlinked mirror cannot drift. No content check, no reconciliation, no CI diff.",
+    "against": [
+      "Provider skill-discovery behaviour through a symlinked directory is not verified in this repository, and a silently undiscovered skill is worse than a divergent one.",
+      "Symlinks are a representation change across the whole provider tree; git and editors handle them, but reviewers stop seeing content in a diff."
+    ],
+    "decision": "icn#2633 keeps real files plus byte-identity enforced in CI, which achieves the same no-drift guarantee with no runtime risk. The checker already accepts symlinks, so adopting them later needs no enforcement change \u2014 only evidence that discovery works."
+  },
+  "enforcement": {
+    "checker": "scripts/check-skill-registry.py",
+    "tests": "scripts/tests/test_skill_registry_invariants.py",
+    "invoked_by": [
+      "ops/scripts/drift-check.sh",
+      "scripts/check-preflight-consistency.sh",
+      ".github/workflows/agent-drift-check.yml"
+    ],
+    "scan_scope": {
+      "canonical_trees": [
+        "ops/automation/skills",
+        ".agents/skills"
+      ],
+      "provider_trees": [
+        ".claude/skills"
+      ]
+    },
+    "require_truth_contract": true,
+    "forbidden_patterns": [
+      {
+        "id": "retired-machine-root",
+        "pattern": "/home/ubuntu(?!/[^\\s]*\\bexample\\b)",
+        "allow_if_line_matches": "ubuntu@",
+        "why": "A machine-specific absolute path. Resolve the root with git rev-parse --show-toplevel."
+      },
+      {
+        "id": "retired-repo-root",
+        "pattern": "projects/icn|icn-wt",
+        "allow_if_line_matches": "(?i)legacy|older|retired|not truth|never treat|do not assume",
+        "why": "The standalone ~/projects/icn clone and the repo-adjacent ../icn-wt worktree layout are retired. Mentions are allowed only where they are marked as legacy."
+      },
+      {
+        "id": "dead-icn-prefixed-path",
+        "pattern": "\\bicn/(docs|ops)/",
+        "allow_if_line_matches": null,
+        "why": "Written from outside the monorepo. Inside it, icn/ is the Cargo workspace: canonical are docs/ and ops/."
+      },
+      {
+        "id": "state-phase-canonicality",
+        "pattern": "STATE\\.md|PHASE_PROGRESS\\.md",
+        "allow_if_line_matches": "(?i)do not|not canonical|history|evidence",
+        "why": "The V2 agent contract forbids presenting docs/STATE.md or docs/PHASE_PROGRESS.md as current project state. They may be named only in a limiting statement."
+      }
+    ],
+    "extension_point": "forbidden_patterns and scan_scope are data, not code. Adding .claude/agents, .github/agents or tools/claude-code/plugins/** to scan_scope is a one-line change once icn#2632 has cleaned those surfaces. It is deliberately NOT done here: those trees carry known violations that icn#2632 owns, and pulling them in would make this issue depend on that one. A hardcoded-issue/PR-number rule was evaluated and deliberately NOT enforced here: on the current tree it fires almost entirely on illustrative output-format blocks and on deliberate historical citations, so it would have shipped with more exemptions than teeth. Stale issue lists in prompt surfaces are icn#2632's scope; a rule that distinguishes a live claim from an illustration belongs with that work."
+  },
   "skills": {
     "ops_automation_canonical": [
       {
         "name": "status",
         "canonical_path": "ops/automation/skills/status/SKILL.md",
-        "symlinked_at": ["../../../.claude/skills/status/SKILL.md"],
-        "description": "Full development status dashboard — MCP-powered"
+        "provider_mirrors": [],
+        "mirror_policy": "none",
+        "description": "Full development status dashboard \u2014 MCP-powered"
       },
       {
         "name": "sync-and-build",
         "canonical_path": "ops/automation/skills/sync-and-build/SKILL.md",
-        "symlinked_at": ["../../../.claude/skills/sync-and-build/SKILL.md"],
-        "description": "Website build pipeline — no sync script needed"
+        "provider_mirrors": [],
+        "mirror_policy": "none",
+        "description": "Website build pipeline \u2014 no sync script needed"
       },
       {
         "name": "worktree",
         "canonical_path": "ops/automation/skills/worktree/SKILL.md",
-        "symlinked_at": ["../../../.claude/skills/worktree/SKILL.md"],
+        "provider_mirrors": [],
+        "mirror_policy": "none",
         "description": "Git worktree management"
       }
     ],
     "icn_level": [
-      "bench", "changelog", "ci-status", "demo-validate", "devnet", "diag-infra",
-      "firewall-check", "fix-ci", "fix-rust-lints", "handoff", "icn-dev",
-      "icn-preflight", "integrate-pr-stack", "merge-pr", "merge-prs",
-      "pr-create", "preflight", "push", "repair-gh-workflow",
-      "resolve-pr-branch", "resolve-rust-targets", "review-apply",
-      "sync-docs", "verify", "watch-ci-and-advance"
+      {
+        "name": "bench",
+        "canonical_path": ".agents/skills/bench/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/bench/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "changelog",
+        "canonical_path": ".agents/skills/changelog/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/changelog/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "ci-status",
+        "canonical_path": ".agents/skills/ci-status/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/ci-status/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "demo-validate",
+        "canonical_path": ".agents/skills/demo-validate/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/demo-validate/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "devnet",
+        "canonical_path": ".agents/skills/devnet/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/devnet/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "diag-infra",
+        "canonical_path": ".agents/skills/diag-infra/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/diag-infra/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "firewall-check",
+        "canonical_path": ".agents/skills/firewall-check/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/firewall-check/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "fix-ci",
+        "canonical_path": ".agents/skills/fix-ci/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/fix-ci/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "authority_note": "Both ICN- and provider-level surfaces may expose this workflow. The canonical copy is authoritative for ICN-specific CI work; live failure logs and policy.json supply current facts."
+      },
+      {
+        "name": "fix-rust-lints",
+        "canonical_path": ".agents/skills/fix-rust-lints/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/fix-rust-lints/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "handoff",
+        "canonical_path": ".agents/skills/handoff/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/handoff/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "icn-commons-design",
+        "canonical_path": ".agents/skills/icn-commons-design/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/icn-commons-design/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "authority_note": "Registered ICN-level as of icn#2633. Its subject matter is ICN design doctrine owned by docs/design/**, so the canonical owner is the ICN tree; the .claude copy is an exact mirror like every other ICN-level skill."
+      },
+      {
+        "name": "icn-dev",
+        "canonical_path": ".agents/skills/icn-dev/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/icn-dev/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "icn-preflight",
+        "canonical_path": ".agents/skills/icn-preflight/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/icn-preflight/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "authority_note": "Both ICN- and provider-level surfaces may expose preflight. The canonical copy is authoritative; provider copies must preserve its owner-driven bootstrap semantics."
+      },
+      {
+        "name": "integrate-pr-stack",
+        "canonical_path": ".agents/skills/integrate-pr-stack/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/integrate-pr-stack/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "canonical_assertions": {
+          "rationale": "icn#2633: the stack-integration workflow classifies PRs against the same gate sets and must resolve them from the policy owner, not restate them.",
+          "must_reference": [
+            "ops/state/truth/policy.json"
+          ],
+          "must_not_match": [
+            {
+              "pattern": "\\bBuild Release\\b",
+              "why": "a literal required-check name is a snapshot of policy.json#merge.required_checks"
+            },
+            {
+              "pattern": "\\b(all\\s+)?\\d+\\s+required\\s+(CI\\s+)?checks\\b",
+              "why": "a required-check count rots the moment branch protection changes"
+            }
+          ]
+        }
+      },
+      {
+        "name": "merge-pr",
+        "canonical_path": ".agents/skills/merge-pr/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/merge-pr/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "merge-prs",
+        "canonical_path": ".agents/skills/merge-prs/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/merge-prs/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "authority_note": "The canonical copy is authoritative for ICN merging and MUST derive required checks, merge strategy, and admin-bypass rules from ops/state/truth/policy.json and live branch protection. Enforced by canonical_assertions, not by prose.",
+        "canonical_assertions": {
+          "rationale": "icn#2633: the merge workflow must derive merge requirements from the registered policy owner and live branch protection, and must never carry a snapshot of them.",
+          "must_reference": [
+            "ops/state/truth/policy.json",
+            "branches/main/protection",
+            "explicit, per-PR maintainer authorization"
+          ],
+          "must_not_match": [
+            {
+              "pattern": "\\bBuild Release\\b",
+              "why": "a literal required-check name is a snapshot of policy.json#merge.required_checks"
+            },
+            {
+              "pattern": "\\b(all\\s+)?\\d+\\s+required\\s+(CI\\s+)?checks\\b",
+              "why": "a required-check count rots the moment branch protection changes"
+            }
+          ]
+        }
+      },
+      {
+        "name": "pr-create",
+        "canonical_path": ".agents/skills/pr-create/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/pr-create/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "preflight",
+        "canonical_path": ".agents/skills/preflight/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/preflight/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "push",
+        "canonical_path": ".agents/skills/push/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/push/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "repair-gh-workflow",
+        "canonical_path": ".agents/skills/repair-gh-workflow/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/repair-gh-workflow/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "resolve-pr-branch",
+        "canonical_path": ".agents/skills/resolve-pr-branch/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/resolve-pr-branch/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "resolve-rust-targets",
+        "canonical_path": ".agents/skills/resolve-rust-targets/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/resolve-rust-targets/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "review-apply",
+        "canonical_path": ".agents/skills/review-apply/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/review-apply/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "sync-docs",
+        "canonical_path": ".agents/skills/sync-docs/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/sync-docs/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "verify",
+        "canonical_path": ".agents/skills/verify/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/verify/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      },
+      {
+        "name": "watch-ci-and-advance",
+        "canonical_path": ".agents/skills/watch-ci-and-advance/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/watch-ci-and-advance/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ]
+      }
     ],
-    "project_level_only": [
-      "close-sprint", "existing-tool-inventory", "preflight-repo",
-      "resume-session", "rust-verify", "update-session-state"
-    ],
-    "overlapping_ownership_notes": {
-      "fix-ci": "Both ICN- and project-level surfaces may expose this workflow. .agents/skills/fix-ci is authoritative for ICN-specific CI work; live failure logs and policy.json supply current facts.",
-      "icn-preflight": "Both ICN- and provider/project-level surfaces may expose preflight. .agents/skills/icn-preflight is authoritative; provider copies must preserve its owner-driven bootstrap semantics.",
-      "merge-prs": "Both ICN- and project-level surfaces may expose merging. .agents/skills/merge-prs is authoritative for ICN and MUST load required checks/strategy dynamically from ops/state/truth/policy.json and live branch protection rather than hardcoding a check count."
-    }
-  }
+    "project_level_only": []
+  },
+  "project_level_only_note": "Empty by observation, not by policy. Every skill directory in .claude/skills/ today mirrors a canonical ICN-level skill. A genuinely provider-only skill is legitimate \u2014 add an entry here with {name, path, rationale} and the checker will accept it with no canonical counterpart. Until then, an unmatched directory in the provider tree is an unregistered orphan and fails.",
+  "ops_automation_note": "ops/automation/skills/ is the canonical source for shared operational skills. As of icn#2633 none of them has a provider-facing copy inside this repository, so mirror_policy is \"none\". A previous revision claimed .claude/skills/{status,sync-and-build,worktree} were symlinks; no such path has ever existed in the repository. ops/scripts/setup-skill-symlinks.sh creates machine-local convenience links for a developer who wants these exposed to a provider; those links live outside the repository, are not tracked, and are not a claim of this registry."
 }

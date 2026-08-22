@@ -25,6 +25,7 @@ gate set, classifies any lint failures by known remediation class, then pushes.
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+CARGO_ROOT="${REPO_ROOT}/icn"                  # Cargo workspace root: all cargo commands run here
 bash "${REPO_ROOT}/ops/scripts/drift-check.sh" 2>/dev/null | tail -3 || true
 ```
 
@@ -44,8 +45,8 @@ CI may evaluate your PR with stale policy. Fix drift or acknowledge explicitly b
    # Files changed on this branch
    git diff --name-only $(git merge-base HEAD origin/main)..HEAD
 
-   # Map to workspace package names (never guess)
-   cargo metadata --no-deps --format-version 1 \
+   # Map to workspace package names (never guess) — from CARGO_ROOT, never the monorepo root
+   cd "${CARGO_ROOT}" && cargo metadata --no-deps --format-version 1 \
      | python3 -c "
    import sys, json
    md = json.load(sys.stdin)
@@ -61,11 +62,13 @@ CI may evaluate your PR with stale policy. Fix drift or acknowledge explicitly b
 
 3. **Run format check** (always workspace-wide, fast):
    ```bash
-   cargo fmt --all --check
+   cd "${CARGO_ROOT}" && cargo fmt --all --check
    ```
 
 4. **Run clippy** (scoped if possible):
    ```bash
+   cd "${CARGO_ROOT}"
+
    # Scoped (preferred — must use --all-targets to match CI):
    cargo clippy -p <pkg1> -p <pkg2> --all-targets -- -D warnings
 
@@ -80,6 +83,7 @@ CI may evaluate your PR with stale policy. Fix drift or acknowledge explicitly b
 
 5. **Run tests** (unless `$ARGUMENTS` includes `--skip-test`):
    ```bash
+   cd "${CARGO_ROOT}"
    cargo test -p <pkg1> -p <pkg2>   # scoped
    cargo test --workspace            # workspace
    ```

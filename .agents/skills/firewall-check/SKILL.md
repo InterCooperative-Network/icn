@@ -3,6 +3,15 @@ name: firewall-check
 description: Check for meaning firewall violations - kernel crates must never import domain crates
 user-invocable: true
 allowed-tools: "Bash, Grep, Glob, Read"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root (grep from icn/)
+  live_load_required:
+    - "cargo metadata --no-deps --format-version 1"   # kernel vs app crate classification
+  examples_only: []
+  never_hardcode:
+    - kernel crate list (derive from Cargo.toml [features] or crate names)
+    - workspace paths (use git rev-parse --show-toplevel)
 ---
 
 Check for meaning firewall violations in the ICN codebase.

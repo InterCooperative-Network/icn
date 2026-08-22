@@ -26,14 +26,20 @@ That cost two dead-end compile attempts. `cargo metadata` answers this in one ca
 
 ## Steps
 
+### Mode 0: Resolve the Cargo workspace root (always first)
+
+```bash
+CARGO_ROOT="$(git rev-parse --show-toplevel)/icn"   # never the monorepo root — it has no Cargo.toml
+```
+
 ### Mode 1: Resolve from changed files (`$ARGUMENTS` is `--touched` or empty)
 
 ```bash
-# Get files changed on this branch
+# Get files changed on this branch — path relative to repo root regardless of cwd
 git diff --name-only $(git merge-base HEAD origin/main)..HEAD
 
 # Get all workspace package names and their root dirs
-cargo metadata --no-deps --format-version 1 \
+(cd "${CARGO_ROOT}" && cargo metadata --no-deps --format-version 1) \
   | python3 -c "
 import sys, json
 md = json.load(sys.stdin)
@@ -48,7 +54,7 @@ Then for each changed file, find its containing package by matching path prefix 
 ### Mode 2: Resolve a human label (`$ARGUMENTS` is a name like "ledger")
 
 ```bash
-cargo metadata --no-deps --format-version 1 \
+(cd "${CARGO_ROOT}" && cargo metadata --no-deps --format-version 1) \
   | python3 -c "
 import sys, json, difflib
 name = '$ARGUMENTS'
@@ -70,9 +76,11 @@ else:
 
 ### Mode 3: Generate verification commands for a set of packages
 
-Given a list of resolved package names, produce the minimal cargo command set:
+Given a list of resolved package names, produce the minimal cargo command set (run from `${CARGO_ROOT}`):
 
 ```bash
+cd "${CARGO_ROOT}"
+
 # For scoped verification (preferred — faster):
 cargo clippy -p <pkg1> -p <pkg2> --all-targets -- -D warnings
 cargo test -p <pkg1> -p <pkg2>

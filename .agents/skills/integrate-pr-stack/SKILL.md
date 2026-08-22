@@ -116,8 +116,8 @@ git checkout <branch> && git rebase origin/main
 
 After rebase, run scoped local verification before force-pushing:
 ```bash
-# Use resolve-rust-targets to find the right scope
-cargo clippy -p <affected-packages> --all-targets -- -D warnings
+# Use resolve-rust-targets to find the right scope — from the Cargo workspace root, never the monorepo root
+(cd "$(git rev-parse --show-toplevel)/icn" && cargo clippy -p <affected-packages> --all-targets -- -D warnings)
 ```
 
 Only force-push if verification passes:
@@ -140,8 +140,8 @@ gh run list --branch main --limit 3 --json status,conclusion,name,databaseId \
 
 Print batch summary:
 ```
-Merged:   #1389, #1391, #1392, #1390
-Rebased:  feat/s22-compute-policy-config (after #1389), feat/s22-obs-attestation-config (after #1391)
+Merged:   #<n1>, #<n2>, #<n3>, #<n4>
+Rebased:  <branch-b> (after #<n1>), <branch-c> (after #<n2>)
 Main CI:  in_progress (non-blocking only)
 Lessons:  none new
 ```
@@ -160,8 +160,15 @@ Lessons:  none new
 
 ## ICN-specific notes
 
-- Required gates: `Build Release`, `Test`, `Clippy`, `Format Check` (from branch protection API).
-- Non-blocking: `Test Coverage`, `Compare Against Base`, `Benchmarks`, `Codex-review`.
+- Required and non-blocking gate sets are owned by `ops/state/truth/policy.json`
+  (`merge.required_checks` / `merge.non_blocking_checks`) and by live branch protection.
+  Read them at run time; never restate the sets or their count here:
+
+  ```bash
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  python3 -c "import json,sys; m=json.load(open(sys.argv[1]))['merge']; print('required:', m['required_checks']); print('non-blocking:', m['non_blocking_checks'])" "${REPO_ROOT}/ops/state/truth/policy.json"
+  gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'
+  ```
 - Single self-hosted runner (`ci-runner` at operator-supplied host) means parallel PRs queue up. A PR
   showing `pending / 0s` for >30 min is likely queue-stalled, not failing.
 - `mergeStateStatus=UNSTABLE` with `mergeable=MERGEABLE` means only non-blocking checks failed.

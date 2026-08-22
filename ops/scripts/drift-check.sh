@@ -20,6 +20,23 @@ fail() { echo "FAIL: $*" >&2; ERRORS=$((ERRORS + 1)); }
 warn() { echo "WARN: $*" >&2; WARNINGS=$((WARNINGS + 1)); }
 ok()   { [[ "${VERBOSE}" == "--verbose" ]] && echo "OK:   $*" || true; }
 
+# Skill scan scope is DATA, not a list in this script. ops/state/truth/skills.json owns which
+# trees are canonical and which are provider-facing; adding a tree or a skill must never require
+# editing a shell array here (icn#2633).
+REGISTRY="${REPO_ROOT}/ops/state/truth/skills.json"
+mapfile -t SKILL_TREES < <(python3 -c "
+import json,sys
+try: d=json.load(open('${REGISTRY}'))
+except Exception: sys.exit(0)
+s=d.get('enforcement',{}).get('scan_scope',{})
+for t in s.get('canonical_trees',[])+s.get('provider_trees',[]):
+    if t.strip(): print(t.strip())
+" 2>/dev/null || true)
+if [[ "${#SKILL_TREES[@]}" -eq 0 ]]; then
+  fail "could not derive skill scan scope from ops/state/truth/skills.json#enforcement.scan_scope"
+  SKILL_TREES=(".agents/skills" ".claude/skills" "ops/automation/skills")
+fi
+
 # ─── Check 1: Canonical truth files must exist ──────────────────────────────
 
 TRUTH_FILES=(
@@ -39,64 +56,64 @@ for f in "${TRUTH_FILES[@]}"; do
   fi
 done
 
-# ─── Check 2: Skill symlinks must be valid ───────────────────────────────────
+# ─── Check 2: Optional machine-local skill symlinks ──────────────────────────
 #
-# PROJECT_SKILLS lives outside the repo (project-level .claude/skills on dev machines).
-# This directory does not exist in CI checkouts — the check is skipped when absent.
-# To verify symlinks locally: bash ops/scripts/setup-skill-symlinks.sh
+# ops/state/truth/skills.json declares that the ops-automation skills have NO provider-facing
+# copy in this repository. ops/scripts/setup-skill-symlinks.sh can create convenience links for
+# a developer who wants them exposed to a provider; those links live OUTSIDE the repository, are
+# untracked, and are not a claim of the registry — so a problem with them is a WARN, never a FAIL.
+#
+# icn#2633 removed a second, undeclared model from this check (it asserted that three ICN-level
+# skills must also be symlinked at that out-of-repo path, which no registry ever said).
+# In-repo skill ownership is enforced by Check 2b below.
 
 PROJECT_SKILLS="${REPO_ROOT}/../.claude/skills"
 CANONICAL_SKILLS="${REPO_ROOT}/ops/automation/skills"
-ICN_SKILLS="${REPO_ROOT}/.claude/skills"
 
 if [[ -d "${PROJECT_SKILLS}" ]]; then
-  # ops/automation/skills canonical skills — must be symlinked from project-level
-  SYMLINK_SKILLS=("status" "sync-and-build" "worktree")
-
-  # icn-level canonical skills that also exist in project-level — must be symlinks there
-  declare -A ICN_SYMLINK_SKILLS
-  ICN_SYMLINK_SKILLS["fix-ci"]="${ICN_SKILLS}/fix-ci"
-  ICN_SYMLINK_SKILLS["icn-preflight"]="${ICN_SKILLS}/icn-preflight"
-  ICN_SYMLINK_SKILLS["merge-prs"]="${ICN_SKILLS}/merge-prs"
+  mapfile -t SYMLINK_SKILLS < <(python3 -c "
+import json,sys
+try: d=json.load(open('${REGISTRY}'))
+except Exception: sys.exit(0)
+print('\n'.join(e['name'] for e in d['skills'].get('ops_automation_canonical', [])))
+" 2>/dev/null || true)
 
   for skill in "${SYMLINK_SKILLS[@]}"; do
     link="${PROJECT_SKILLS}/${skill}"
     canonical="${CANONICAL_SKILLS}/${skill}"
-
     if [[ -L "${link}" ]]; then
       resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
       if [[ "${resolved}" == "${canonical}" ]]; then
-        ok "Symlink valid: .claude/skills/${skill}"
+        ok "machine-local symlink valid: ${skill}"
       else
-        fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+        warn "machine-local symlink points elsewhere: ${link} -> ${resolved} (expected ${canonical})"
       fi
     elif [[ -d "${link}" ]]; then
-      fail "Skill is plain directory, not symlink (duplicate writable source): .claude/skills/${skill} — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
-    else
-      fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
-    fi
-  done
-
-  # Check icn-level skill symlinks at project level
-  for skill in "${!ICN_SYMLINK_SKILLS[@]}"; do
-    link="${PROJECT_SKILLS}/${skill}"
-    canonical="${ICN_SYMLINK_SKILLS[$skill]}"
-
-    if [[ -L "${link}" ]]; then
-      resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
-      if [[ "${resolved}" == "${canonical}" ]]; then
-        ok "Symlink valid: .claude/skills/${skill} → icn/.claude/skills/${skill}"
-      else
-        fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
-      fi
-    elif [[ -d "${link}" ]]; then
-      fail "Duplicate writable skill: .claude/skills/${skill} is a directory (must be symlink to ${canonical}) — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
-    else
-      fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
+      warn "machine-local copy is a plain directory, not a symlink: ${link} — it can drift from ${canonical}"
     fi
   done
 else
-  ok "PROJECT_SKILLS (${PROJECT_SKILLS}) not present — skipping project-level symlink check (CI-only path)"
+  ok "no machine-local project skills directory at ${PROJECT_SKILLS} — nothing to verify"
+fi
+
+# ─── Check 2b: In-repo skill ownership must be mechanically true ─────────────
+#
+# The registry declares a canonical owner and an exact mirror relationship for every skill in
+# its declared scope. scripts/check-skill-registry.py is the enforcement; it derives scope,
+# mirror policy and per-skill assertions from the registry, so nothing is listed twice.
+
+SKILL_REGISTRY_CHECK="${REPO_ROOT}/scripts/check-skill-registry.py"
+if [[ -f "${SKILL_REGISTRY_CHECK}" ]]; then
+  if skill_out="$(python3 "${SKILL_REGISTRY_CHECK}" --repo-root "${REPO_ROOT}" 2>&1)"; then
+    ok "skill registry ownership: ${skill_out}"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && echo "  ${line}" >&2
+    done <<< "${skill_out}"
+    fail "skill registry ownership is not mechanically true (see check-skill-registry output above)"
+  fi
+else
+  fail "scripts/check-skill-registry.py missing — in-repo skill ownership is unenforced"
 fi
 
 # ─── Check 3: Stale path patterns must not appear in agent tooling files ─────
@@ -112,9 +129,8 @@ WARN_PATTERNS["10\\.8\\.10\\.[4][012]"]="Old VLAN 10 K3s IP — post-Feb-2026 cl
 
 # Files to scan (tracked in git, agent-facing)
 SCAN_DIRS=(
+  "${SKILL_TREES[@]}"
   ".claude/agents"
-  ".claude/skills"
-  "ops/automation/skills"
   "ops/CLAUDE.md"
 )
 
@@ -148,9 +164,8 @@ done
 # in executable code blocks — only in examples clearly marked as illustrative.
 
 MACHINE_PATH_SCAN=(
+  "${SKILL_TREES[@]}"
   ".claude/agents"
-  ".claude/skills"
-  "ops/automation/skills"
 )
 
 for dir in "${MACHINE_PATH_SCAN[@]}"; do
@@ -160,12 +175,13 @@ for dir in "${MACHINE_PATH_SCAN[@]}"; do
   # Follow symlinks so we scan the canonical files, not just symlink metadata
   hits=$(find -L "${full}" -name "*.md" -exec grep -ln "/home/ubuntu" {} \; 2>/dev/null \
     | while read -r f; do
-        # Allow paths in Markdown table rows (lines starting with |)
         # Allow paths after ubuntu@ (SSH targets - legitimate)
         # Allow lines marked as examples/illustrative
+        # NOTE: there is deliberately no Markdown-table exemption. It used to exist and it
+        # failed open — a "repo topology" table kept /home/ubuntu/projects/icn alive in a
+        # skill through a green gate for months (icn#2633).
         grep -n "/home/ubuntu" "$f" \
           | grep -v "ubuntu@" \
-          | grep -Pv "^[^:]*:[[:space:]]*\|" \
           | grep -v "# example\|# machine\|# illustrative\|# topology\|examples_only" \
           && true || true
       done || true)
@@ -187,9 +203,8 @@ done
 # Correct pattern: load from policy.json via python3 or jq
 
 HARDCODE_BAN_DIRS=(
-  ".claude/skills"
+  "${SKILL_TREES[@]}"
   ".claude/agents"
-  "ops/automation/skills"
 )
 
 for dir in "${HARDCODE_BAN_DIRS[@]}"; do
@@ -272,10 +287,7 @@ fi
 # truth_contract is required in every skill — it makes drift detectable.
 # Missing it means the skill can silently encode volatile state.
 
-SKILL_TRUTH_DIRS=(
-  ".claude/skills"
-  "ops/automation/skills"
-)
+SKILL_TRUTH_DIRS=("${SKILL_TREES[@]}")
 
 for dir in "${SKILL_TRUTH_DIRS[@]}"; do
   full="${REPO_ROOT}/${dir}"
