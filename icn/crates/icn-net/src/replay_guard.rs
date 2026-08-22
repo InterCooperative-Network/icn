@@ -3037,8 +3037,9 @@ impl ReplayGuard {
     /// [`PeerHold::MigratingSenderRegime`], and that hold's expiry with live durable-v1
     /// evidence *promotes*, resetting `max_seq` and `floor_seq` to 0. Adopting it therefore
     /// destroys a replay floor that a sibling row licensed; `DurableV1` has no such path.
-    /// The same argument [`Self::strongest_sender_regime`] documents, re-derived here for a
-    /// keyspace whose other end differs.
+    /// That is the argument the deleted `strongest_sender_regime` rule used to carry on the
+    /// high-water side, re-derived here for the one keyspace that still joins rather than
+    /// groups.
     ///
     /// It is also, for one principal, strictly the later state of one process. Promotion
     /// writes `SENDER_REGIME_DURABLE_V1` to `make_sender_regime_key` — the canonical spelling
@@ -3445,14 +3446,22 @@ impl SequenceWindow {
     ///
     /// One principal can legitimately reach [`ReplayGuard::load_persisted_state`] with several
     /// physical rows, because [`ReplayGuard::canonicalize_durable_identities`] deliberately
-    /// declines to merge two groups: a row it cannot parse is neither merged nor deleted, and
+    /// declines to collapse three groups: a row it cannot parse is neither merged nor deleted;
     /// when the *canonical* row is the unreadable one the whole group — every readable alias
-    /// row included — is left exactly as it was. Both are the right call at the store level;
-    /// what they mean here is that the merge's conservative rules
-    /// ([`ReplayGuard::most_restrictive_semantic_version`],
-    /// [`ReplayGuard::strongest_sender_regime`],
-    /// [`ReplayGuard::joined_sender_regime_provenance`]) do not run for those rows, and the
-    /// load pass inherits the job of combining them.
+    /// row included — is left exactly as it was; and a principal whose readable rows span more
+    /// than one `(semantic_version, sender_regime)` interpretation is left uncollapsed
+    /// entirely, because one canonical key cannot encode two independent effects (#2644).
+    ///
+    /// All three are the right call at the store level. What they mean here is that
+    /// canonicalization groups and merges numbers only *within* one exact interpretation — the
+    /// pairing that gives a number its meaning — where [`ReplayGuard::merge_max_seq`] is a
+    /// plain maximum over comparable values. Nothing is merged *across* interpretations, so
+    /// rows carrying independent effects arrive here still distinct and composing them is the
+    /// load pass's job: [`HighWaterEvidence`] keeps each namespace's floor in its own field,
+    /// and [`HighWaterEvidence::apply_to`] routes every blocking refusal it derives through
+    /// this function. Sender-regime *provenance* is the one axis that does have a lattice join
+    /// ([`ReplayGuard::joined_sender_regime_provenance`]), applied by canonicalization on its
+    /// own keyspace.
     ///
     /// Before this existed each row simply assigned `window.hold`, so the row `sled` happened
     /// to hand over last won. That is a fail-open in one direction: an unreadable alias row
@@ -3467,6 +3476,9 @@ impl SequenceWindow {
     /// A later physical row can raise the hold, never lower it, and never shorten one.
     /// [`PeerHold::stronger_of`] is commutative, so the answer does not depend on key order —
     /// which is the point, since that order is a property of the spellings an attacker chose.
+    /// That ranking settles *refusals* only. It is not a general merge rule: numeric floors are
+    /// never combined here, and the expiry obligation a `MigratingFromLegacy` row carries is
+    /// recorded separately below, so losing the ranking cannot cancel it.
     fn install_hold_conservatively(&mut self, candidate: PeerHold) {
         // Recorded *before* the ranking, and independently of its outcome (#2644). The
         // obligation belongs to the evidence, not to whichever variant wins the comparison —
@@ -9965,10 +9977,11 @@ mod respelled_identity_tests {
     /// A readable, current-version, lower-numbered alias must not rescue a row whose
     /// semantic version this binary cannot interpret.
     ///
-    /// The numeric merge runs over rows whose *meaning* differs, so it must not be able to
-    /// hand the load pass a usable floor built from the half it happens to understand.
-    /// `most_restrictive_semantic_version` keeps the unreadable meaning, and the resulting
-    /// hold has no deadline to reach.
+    /// Rows whose *meaning* differs are never reduced to one number, so no floor built from
+    /// the half this binary happens to understand can reach the load pass as the whole story.
+    /// `HighWaterEvidence` records the uninterpretable version as a fact of its own, and
+    /// `HighWaterEvidence::apply_to` installs an `UnsupportedVersion` hold that has no
+    /// deadline to reach — so the readable alias raises a floor and rescues nothing.
     #[test]
     fn an_unsupported_semantic_version_is_not_rescued_by_a_readable_current_alias() {
         const UNSUPPORTED_VERSION: u32 = 9_999;
@@ -10787,8 +10800,9 @@ mod respelled_identity_tests {
     /// and no elapsed time releases it.
     ///
     /// Run for `SENDER_REGIME_LEGACY_OR_UNPROVEN` as well as an unrecognised tag, because
-    /// that value is exactly where the provenance join and `strongest_sender_regime` part
-    /// company: nothing in this crate writes `0` to this keyspace, so a `0` here is a foreign
+    /// that value is exactly where the provenance join parted company with the deleted
+    /// `strongest_sender_regime` rule: nothing in this crate writes `0` to this keyspace, so a
+    /// `0` here is a foreign
     /// or corrupt writer and the load pass has always refused it with no deadline. Merging it
     /// away under a `DurableV1` sibling would make canonicalization *more permissive than the
     /// load pass it feeds*, which is the escape hatch this whole review round is about.
