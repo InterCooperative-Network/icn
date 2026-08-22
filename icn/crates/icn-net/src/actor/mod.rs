@@ -16,7 +16,7 @@ use icn_identity::{Did, IdentityBundle, PersonhoodStoreTrait};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 use crate::{
     protocol::NetworkMessage,
@@ -1096,6 +1096,7 @@ pub struct NetworkActor {
     topology_config: Option<TopologyConfig>,
     /// Per-peer connection metadata (version, capabilities, X25519 keys)
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+    capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
     /// Blob location registry for data locality (Phase 16C Week 2)
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
     /// Byzantine fault detector (Phase 18 Week 1-2)
@@ -1229,7 +1230,18 @@ impl NetworkActor {
             // is exactly the highest sequence ever accepted because it is
             // flushed before acceptance returns (#2514).
             if let Err(e) = guard.load_persisted_state() {
-                warn!("Failed to load replay guard state: {}. Starting fresh.", e);
+                // Deliberately NOT "starting fresh" (#2644). The guard fails closed: it
+                // installs no interpretation of the store, leaves itself uninitialized, and
+                // refuses every signed message — retrying the load on each one — until the
+                // store is usable. Saying it started fresh described the pre-#2640 behaviour,
+                // where a failed load silently disarmed replay protection, and would now send
+                // an operator looking for the wrong problem while the node accepts nothing.
+                error!(
+                    error = %e,
+                    "Replay state could not be loaded. Replay protection is NOT armed and \
+                     this node will REFUSE all signed traffic, retrying the load on each \
+                     message, until the replay store is usable. Repair or replace it"
+                );
             }
             info!("Replay protection enabled with persistence (300s clock skew, 3600s peer age limit)");
             Arc::new(RwLock::new(guard))
@@ -1240,6 +1252,12 @@ impl NetworkActor {
 
         // Create peer connection info store (version, capabilities, X25519 keys)
         let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        // Live capability evidence, indexed by signing key (#2644). Deliberately *not* derived
+        // from `peer_connections`: that map keeps a row after its connection ends and gains rows
+        // from snapshot restore, so it answers "ever" where the replay guard has to ask "now".
+        let capability_registry =
+            Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new());
 
         // Initialize neighbor sets if topology is enabled
         let neighbor_sets = if let Some(ref topo_cfg) = topology_config {
@@ -1287,6 +1305,7 @@ impl NetworkActor {
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
             let peer_connections_clone = peer_connections.clone();
+            let capability_registry_clone = capability_registry.clone();
             let blob_registry_clone = blob_registry.clone();
             let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
@@ -1302,6 +1321,7 @@ impl NetworkActor {
                     neighbor_sets_clone,
                     topology_config_clone,
                     peer_connections_clone,
+                    capability_registry_clone,
                     blob_registry_clone,
                     misbehavior_detector_clone,
                     identity_bundle_clone,
@@ -1396,6 +1416,7 @@ impl NetworkActor {
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
             peer_connections: peer_connections.clone(),
+            capability_registry: capability_registry.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             nat_status: Arc::new(RwLock::new(NatStatus {
@@ -2209,5 +2230,77 @@ mod tests {
         let err_msg = "direct dial failed and no peer relay candidate provided; cannot TURN-relay";
         assert!(err_msg.contains("relay candidate"));
         assert!(err_msg.contains("TURN-relay"));
+    }
+
+    /// Snapshot restoration recreates capability rows for peers that are not connected.
+    ///
+    /// This is the reachability half of #2644: `handlers::signed` may only read a
+    /// `peer_connections` row as evidence about the sender's *current* sequence regime, and
+    /// this is the path that fills that map with rows describing a previous process. The row
+    /// carries `DURABLE_SIGNING_SEQUENCE` and no Hello has been exchanged, so there is no
+    /// session behind it and no connection it could have been proved on.
+    ///
+    /// Restoration itself is intentionally left alone — the cached version, X25519 and PQ
+    /// material is what it exists for, and #2504-era reconnection depends on it. What must not
+    /// happen is a restored row being read as a live capability claim; that is asserted by
+    /// `handlers::signed::tests::a_snapshot_restored_row_is_not_current_evidence`.
+    #[tokio::test]
+    async fn a_snapshot_restored_row_is_a_capability_claim_with_no_session() {
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+        let session_manager = Arc::new(RwLock::new(SessionManager::new()));
+        let peer_did = KeyPair::generate().unwrap().did().clone();
+
+        let (tx, _rx) = mpsc::channel(1);
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: Some(peer_connections.clone()),
+            session_manager: session_manager.clone(),
+            own_did: KeyPair::generate().unwrap().did().clone(),
+            blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+
+        let mut snapshot = std::collections::HashMap::new();
+        snapshot.insert(
+            peer_did.to_string(),
+            icn_snapshot::PeerConnectionInfo {
+                did: peer_did.to_string(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::DURABLE_SIGNING_SEQUENCE.bits(),
+                peer_software: "icnd-before-the-restart".to_string(),
+                x25519_key: [7u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+        handle
+            .restore_state(icn_snapshot::NetworkState {
+                peer_connections: snapshot,
+                peer_x25519_keys: std::collections::HashMap::new(),
+                peer_addresses: std::collections::HashMap::new(),
+            })
+            .await
+            .expect("restoring a well-formed snapshot");
+
+        let restored = peer_connections
+            .read()
+            .await
+            .get(&peer_did)
+            .cloned()
+            .expect("restore_state recreates the row from disk");
+        assert!(
+            restored
+                .peer_capabilities
+                .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+            "the capability bits survive the round trip, which is what makes a restored row \
+             indistinguishable from a freshly authenticated one by capability alone"
+        );
+        assert!(
+            session_manager.read().await.connections().await.is_empty(),
+            "and nothing has authenticated anything in this process: there is no connection \
+             this claim could have been proved on"
+        );
     }
 }

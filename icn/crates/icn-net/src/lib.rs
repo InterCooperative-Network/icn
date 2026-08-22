@@ -11,6 +11,7 @@ pub mod actor;
 pub mod blob_registry;
 pub mod candidate;
 pub mod candidate_cache;
+pub mod capability_evidence;
 pub mod discovery;
 pub mod encryption;
 pub mod envelope;
@@ -63,7 +64,7 @@ pub use rate_limit::{
     PREAUTH_SOURCE_BURST, PREAUTH_SOURCE_RENEWAL_WINDOW,
 };
 pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
-pub use replay_guard::ReplayGuard;
+pub use replay_guard::{ReplayGuard, ReplayIdentityUndecodable, SenderPrincipal};
 pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::{DialOutcome, SessionManager};
 pub use signing_sequence::SigningSequenceCounter;
