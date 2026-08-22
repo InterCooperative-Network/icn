@@ -992,6 +992,55 @@ impl PeerHold {
         }
     }
 
+    /// Whether nothing that merely elapses can discharge this hold (#2645).
+    ///
+    /// The two answers already exist in the type docs above — this is the place they become
+    /// something [`ReplayGuard::cleanup`] can consult, rather than a claim only prose makes.
+    ///
+    /// # Why liveness GC has to ask
+    ///
+    /// `cleanup` evicts a window when `last_update` is older than `max_peer_age_secs`, and a
+    /// held peer is *refused*: every refusal in [`ReplayGuard::check_replay_only`] returns
+    /// before the accept path's `window.last_update = Instant::now()`, which
+    /// `test_rejecting_window_does_not_refresh_liveness` pins deliberately. So a peer under a
+    /// deadline-free hold is guaranteed to reach the inactivity threshold — the refusal
+    /// starves the very timestamp that decides whether the refusal survives. Age alone was
+    /// therefore able to retire a state whose whole point is that age cannot retire it.
+    ///
+    /// # Why this is not `hold.is_some()`
+    ///
+    /// Three of the five variants are bounded because this binary knows exactly what the
+    /// state it is refusing to use meant, and can bound how long anything produced under it
+    /// stays dangerous. Those are quarantines and migrations in flight, and they are supposed
+    /// to end. Retaining them here would make an ordinary upgrade hold permanent and turn
+    /// `sequences` into a map nothing can ever remove from — trading a replay fail-open for
+    /// an unbounded leak, on state that was never the hazard.
+    ///
+    /// # Exhaustive on purpose
+    ///
+    /// No wildcard arm. A variant added later cannot inherit either answer by default: it has
+    /// to be classified here, at the same moment its deadline — or absence of one — is
+    /// decided. `only_the_two_deadline_free_holds_block_liveness_gc` pins both directions,
+    /// because protecting too little re-opens #2645 and protecting too much is the leak above.
+    ///
+    /// Deliberately says nothing about [`SequenceWindow::pending_legacy_migration`]. That is a
+    /// *bounded* obligation with its own deadline (#2644), kept beside the ranked hold rather
+    /// than inside it; reading it here would make every legacy migration permanent, which is
+    /// the opposite of what recording it separately was for.
+    fn is_indefinite(&self) -> bool {
+        match self {
+            // Bounded by the envelope validity horizon, and released strictly after it.
+            PeerHold::Unreadable { .. } => false,
+            PeerHold::MigratingFromLegacy { .. } => false,
+            PeerHold::MigratingSenderRegime { .. } => false,
+            // No deadline. Waiting does not make an unknown meaning knowable, so nothing
+            // measured in elapsed time — a hold's own expiry or a liveness sweep — may
+            // discharge these. Only an operator can: upgrade the binary, or repair the state.
+            PeerHold::UnsupportedSenderRegime { .. } => true,
+            PeerHold::UnsupportedVersion { .. } => true,
+        }
+    }
+
     /// The hold that refuses more, or — for two holds of the same kind — the one that refuses
     /// for longer.
     ///
@@ -2547,6 +2596,28 @@ impl ReplayGuard {
     /// - Old finalized sequences (>24 hours old)
     ///
     /// Also cleans up corresponding persistent storage.
+    ///
+    /// # Liveness GC is not a release valve for structural safety state (#2645)
+    ///
+    /// Inactivity is a policy input for *ordinary and bounded* state: a numeric window a peer
+    /// stopped using, a quarantine that has served its horizon, a migration that has ended.
+    /// It is not an argument about state whose interpretation is unavailable. A hold that
+    /// [`PeerHold::is_indefinite`] identifies is retained here regardless of `last_update`,
+    /// together with the canonical `replay_max_seq` row that produced it, so a restart
+    /// re-derives the same refusal.
+    ///
+    /// This is not a general retention rule, and deliberately claims nothing broader. An
+    /// ordinary window with no hold still ages out and still has its row deleted; so does a
+    /// window under any of the three bounded holds, and so does one carrying an undischarged
+    /// [`SequenceWindow::pending_legacy_migration`]. Only the two states documented as having
+    /// no deadline are exempt.
+    ///
+    /// The retained set stays bounded. Nothing on the message path installs a deadline-free
+    /// hold — [`Self::check_replay_only`]'s only hold is the bounded `MigratingSenderRegime`
+    /// of a live namespace transition — so every one of them comes from a row read during the
+    /// single [`Self::load_persisted_state`] pass. The exempt set is therefore a subset of one
+    /// load's output: bounded by the store, never by traffic. That is the same argument the
+    /// sender-regime provenance retention below already rests on.
     pub fn cleanup(&mut self) {
         let max_age = Duration::from_secs(self.max_peer_age_secs);
         let finalized_max_age = Duration::from_secs(24 * 60 * 60); // 24 hours
@@ -2555,9 +2626,21 @@ impl ReplayGuard {
         // Collect senders to remove from storage
         let mut principals_to_remove: Vec<SenderPrincipal> = Vec::new();
 
-        // Remove inactive peer windows
+        // Remove inactive peer windows.
+        //
+        // Two independent reasons to keep one, and the second is not a liveness statement at
+        // all (#2645). A peer under a hold with no deadline is refused, and a refusal returns
+        // before the accept path refreshes `last_update` — so being refused is exactly what
+        // drives such a window past `max_age`. Evicting it there let elapsed time discharge a
+        // refusal documented as one that "will not clear on its own", and, through
+        // `principals_to_remove` below, delete the durable evidence that produced it.
+        //
+        // Deliberately `PeerHold::is_indefinite` rather than `window.hold.is_some()`: the
+        // bounded holds are quarantines and migrations that are supposed to end, and keeping
+        // those forever would make an ordinary upgrade permanent and leak the window with it.
         self.sequences.retain(|principal, window| {
-            let keep = now.duration_since(window.last_update) < max_age;
+            let indefinitely_held = window.hold.as_ref().is_some_and(PeerHold::is_indefinite);
+            let keep = indefinitely_held || now.duration_since(window.last_update) < max_age;
             if !keep {
                 principals_to_remove.push(*principal);
             }
@@ -2565,6 +2648,12 @@ impl ReplayGuard {
         });
 
         // Delete the numeric high-water from storage.
+        //
+        // Driven by `principals_to_remove`, so a window the retain above kept keeps its row
+        // too — the two must not be able to disagree (#2645). Deleting the row of a window
+        // held under an uninterpretable semantic version or regime tag would destroy the only
+        // durable record of that condition, and a restart would come back with no hold, no
+        // floor, and the peer admitted from zero.
         //
         // Deliberately NOT the sender-regime provenance record (#2517). The high-water
         // is a window that legitimately ages out; the provenance answers "did we ever
@@ -12773,5 +12862,796 @@ mod respelled_identity_tests {
             .expect("honest traffic above the floor must be accepted on a healthy store");
         assert!(guard.is_initialized());
         assert_eq!(guard.peer_count(), 2);
+    }
+}
+
+/// `cleanup()` is liveness GC, and liveness GC may not retire structural safety state (#2645).
+///
+/// The defect these pin is reachable *because* the peer is being refused. A hold makes
+/// `check_replay_only` return before the accept path's `window.last_update = Instant::now()`,
+/// which `test_rejecting_window_does_not_refresh_liveness` pins deliberately — so a peer under
+/// a hold with **no deadline** is guaranteed to reach `max_peer_age_secs` of apparent
+/// inactivity, at which point the pre-fix `retain` evicted its window and deleted the
+/// canonical `replay_max_seq` row that produced the hold. The refusal starved the timestamp
+/// that decided whether the refusal survived.
+///
+/// Two independent losses, and both are exercised below:
+///
+/// * **Across a restart** — the `replay_max_seq` row is the only durable record of an
+///   unsupported semantic version, so deleting it means a reboot cannot re-derive the hold.
+/// * **Within the live process** — `load_persisted_state` is behind a once-only latch, so an
+///   evicted window is never rebuilt from the store. A hold whose evidence lives in the
+///   *retained* `replay_sender_regime` keyspace therefore disappears until the next start,
+///   with the row that proves it still sitting on disk.
+#[cfg(test)]
+mod cleanup_hold_tests {
+    use super::*;
+    use crate::envelope::PayloadType;
+    use icn_identity::KeyPair;
+
+    /// Production settings, as `NetworkActor` constructs the guard:
+    /// `ReplayGuard::new_persistent(300, 3600, store)`.
+    const SKEW: u64 = 300;
+    const MAX_PEER_AGE_SECS: u64 = 3600;
+    /// `2 * SKEW` — the envelope validity horizon every bounded hold is measured in.
+    const HORIZON: Duration = Duration::from_secs(2 * SKEW);
+
+    /// Deterministic monotonic clock, so the 600s horizon can be crossed without sleeping.
+    struct TestClock {
+        nanos: std::sync::atomic::AtomicU64,
+    }
+
+    impl TestClock {
+        fn new() -> Arc<Self> {
+            Arc::new(TestClock {
+                nanos: std::sync::atomic::AtomicU64::new(0),
+            })
+        }
+
+        fn advance(&self, by: Duration) {
+            self.nanos.fetch_add(by.as_nanos() as u64, Ordering::SeqCst);
+        }
+    }
+
+    impl MonotonicClock for TestClock {
+        fn elapsed(&self) -> Duration {
+            Duration::from_nanos(self.nanos.load(Ordering::SeqCst))
+        }
+    }
+
+    fn boot(store: &Arc<icn_store::SledStore>, clock: Arc<TestClock>) -> ReplayGuard {
+        let mut guard =
+            ReplayGuard::new_persistent(SKEW, MAX_PEER_AGE_SECS, store.clone()).with_clock(clock);
+        guard.load_persisted_state().unwrap();
+        guard
+    }
+
+    fn envelope(sender: &KeyPair, sequence: u64) -> SignedEnvelope {
+        SignedEnvelope::new(
+            sender.did(),
+            sender,
+            sequence,
+            PayloadType::Gossip,
+            b"m".to_vec(),
+        )
+        .unwrap()
+    }
+
+    /// Write one canonical `replay_max_seq` row. Canonical rather than alias-spelled, so
+    /// canonicalization rewrites it in place and the interpretation under test is the only
+    /// thing the load pass has to work with.
+    fn seed_max_seq(
+        store: &dyn Store,
+        did: &Did,
+        max_seq: u64,
+        semantic_version: u32,
+        sender_regime: u32,
+    ) {
+        let entry = MaxSeqEntry {
+            max_seq,
+            updated_at_ms: ReplayGuard::current_time_ms(),
+            semantic_version,
+            sender_regime,
+        };
+        store
+            .put(
+                &ReplayGuard::make_max_seq_key(&pk(did)),
+                &serde_json::to_vec(&entry).unwrap(),
+            )
+            .unwrap();
+    }
+
+    fn seed_provenance(store: &dyn Store, did: &Did, regime: u32) {
+        store
+            .put(
+                &ReplayGuard::make_sender_regime_key(&pk(did)),
+                &regime.to_be_bytes(),
+            )
+            .unwrap();
+    }
+
+    fn max_seq_row(store: &Arc<icn_store::SledStore>, did: &Did) -> Option<MaxSeqEntry> {
+        store
+            .get(&ReplayGuard::make_max_seq_key(&pk(did)))
+            .unwrap()
+            .map(|raw| serde_json::from_slice(&raw).unwrap())
+    }
+
+    fn max_seq_row_present(store: &Arc<icn_store::SledStore>, did: &Did) -> bool {
+        store
+            .get(&ReplayGuard::make_max_seq_key(&pk(did)))
+            .unwrap()
+            .is_some()
+    }
+
+    fn provenance_present(store: &Arc<icn_store::SledStore>, did: &Did) -> bool {
+        store
+            .get(&ReplayGuard::make_sender_regime_key(&pk(did)))
+            .unwrap()
+            .is_some()
+    }
+
+    /// The furthest-past `Instant` this host can represent.
+    ///
+    /// `cleanup` compares `now.duration_since(last_update)` against `max_peer_age_secs`, so
+    /// "stale" has no upper bound to saturate at. Backdating as far as the platform allows is
+    /// what makes the very-late assertions bite against a predicate that keeps an indefinite
+    /// hold only up to some larger constant, rather than unconditionally.
+    fn far_past() -> Instant {
+        let now = Instant::now();
+        for secs in [
+            50 * 365 * 24 * 3600,
+            365 * 24 * 3600,
+            30 * 24 * 3600,
+            2 * 3600,
+        ] {
+            if let Some(t) = now.checked_sub(Duration::from_secs(secs)) {
+                return t;
+            }
+        }
+        now
+    }
+
+    /// Make a peer look inactive to `cleanup` without touching anything else about it.
+    ///
+    /// This is not a contrivance: it is precisely what a held peer does to itself. Every
+    /// refusal returns before the accept path refreshes `last_update`, so a peer under an
+    /// indefinite hold reaches this state by being refused for `max_peer_age_secs`.
+    fn go_quiet(guard: &mut ReplayGuard, did: &Did) {
+        guard
+            .sequences
+            .get_mut(&pk(did))
+            .expect("window must exist to be aged out")
+            .last_update = far_past();
+    }
+
+    fn hold_of(guard: &ReplayGuard, did: &Did) -> Option<PeerHold> {
+        guard.sequences.get(&pk(did)).and_then(|w| w.hold)
+    }
+
+    // -----------------------------------------------------------------------
+    // The predicate itself
+    // -----------------------------------------------------------------------
+
+    /// Exactly the two variants documented as deadline-free block liveness GC — no more.
+    ///
+    /// Asserted variant by variant rather than through `cleanup`, because the two failure
+    /// directions are opposite and a behavioural test only ever shows one at a time:
+    /// protecting too little re-opens #2645, and protecting too much makes every quarantined
+    /// migration window immortal, which is the leak the issue's own control forbids.
+    #[test]
+    fn only_the_two_deadline_free_holds_block_liveness_gc() {
+        assert!(
+            PeerHold::UnsupportedVersion { found_version: 9 }.is_indefinite(),
+            "documented as `this will not clear on its own`"
+        );
+        assert!(
+            PeerHold::UnsupportedSenderRegime { found_regime: 9 }.is_indefinite(),
+            "documented as having no deadline, for the same reason"
+        );
+
+        assert!(
+            !PeerHold::Unreadable {
+                until: Duration::from_secs(1)
+            }
+            .is_indefinite(),
+            "bounded by the envelope validity horizon; GC must still reach it"
+        );
+        assert!(
+            !PeerHold::MigratingFromLegacy {
+                until: Duration::from_secs(1),
+                from_version: 0
+            }
+            .is_indefinite(),
+            "bounded; a migration that never ends is not a migration"
+        );
+        assert!(
+            !PeerHold::MigratingSenderRegime {
+                until: Duration::from_secs(1)
+            }
+            .is_indefinite(),
+            "bounded; making this permanent would brick every upgrading sender"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 1-2. UnsupportedVersion
+    // -----------------------------------------------------------------------
+
+    /// A window under `UnsupportedVersion` survives `cleanup()`, and so does the row.
+    #[test]
+    fn unsupported_version_survives_cleanup_with_its_canonical_high_water() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(store.as_ref(), did, 400, 9999, SENDER_REGIME_DURABLE_V1);
+        let mut guard = boot(&store, TestClock::new());
+
+        let before = guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("an uninterpretable semantic version refuses everything");
+        let before = before
+            .downcast_ref::<ReplayStateUnsupportedVersion>()
+            .expect("PRECONDITION: the typed indefinite refusal")
+            .clone();
+        assert_eq!(before.found_version, 9999);
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            guard.sequences.contains_key(&pk(did)),
+            "#2645: a hold with no deadline must not be evicted by inactivity — the hold is \
+             what stops `last_update` advancing in the first place"
+        );
+        assert!(
+            matches!(
+                hold_of(&guard, did),
+                Some(PeerHold::UnsupportedVersion {
+                    found_version: 9999
+                })
+            ),
+            "the surviving hold must be the same one, with the same diagnostic version"
+        );
+        let row = max_seq_row(&store, did).expect(
+            "#2645: the canonical high-water that produced the hold must survive too, or a \
+             restart cannot re-derive it",
+        );
+        assert_eq!(row.semantic_version, 9999);
+        assert_eq!(row.max_seq, 400);
+
+        let after = guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("still refused");
+        let after = after
+            .downcast_ref::<ReplayStateUnsupportedVersion>()
+            .expect("the SAME typed refusal, not a bounded successor");
+        assert_eq!(after.found_version, before.found_version);
+    }
+
+    /// …and a restart after that cleanup re-derives the identical indefinite refusal.
+    ///
+    /// Separate from the assertion above on purpose: keeping the in-memory window while still
+    /// deleting the row passes that one and fails this one.
+    #[test]
+    fn unsupported_version_survives_a_restart_after_cleanup() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(store.as_ref(), did, 400, 9999, SENDER_REGIME_DURABLE_V1);
+
+        let mut guard = boot(&store, TestClock::new());
+        guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("PRECONDITION: refused before cleanup");
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+        drop(guard);
+
+        let mut restarted = boot(&store, TestClock::new());
+        let err = restarted
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("a restart must reconstruct the same indefinite refusal");
+        assert_eq!(
+            err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                .expect("same typed refusal after reload")
+                .found_version,
+            9999
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 3-5. UnsupportedSenderRegime, from both of its evidence sources
+    // -----------------------------------------------------------------------
+
+    /// The `replay_max_seq` source: a current-version row tagged with an unknown regime.
+    #[test]
+    fn unsupported_sender_regime_survives_cleanup_with_its_canonical_high_water() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(
+            store.as_ref(),
+            did,
+            400,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            7777,
+        );
+        let mut guard = boot(&store, TestClock::new());
+
+        guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("PRECONDITION: an uninterpretable regime tag refuses everything")
+            .downcast_ref::<UnsupportedSenderRegime>()
+            .expect("PRECONDITION: the typed indefinite refusal");
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            matches!(
+                hold_of(&guard, did),
+                Some(PeerHold::UnsupportedSenderRegime { found_regime: 7777 })
+            ),
+            "#2645: the second deadline-free variant is not a special case of the first"
+        );
+        assert_eq!(
+            max_seq_row(&store, did)
+                .expect("its canonical high-water must survive")
+                .sender_regime,
+            7777
+        );
+        assert_eq!(
+            guard
+                .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+                .expect_err("still refused")
+                .downcast_ref::<UnsupportedSenderRegime>()
+                .expect("the same typed refusal")
+                .found_regime,
+            7777
+        );
+    }
+
+    #[test]
+    fn unsupported_sender_regime_survives_a_restart_after_cleanup() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(
+            store.as_ref(),
+            did,
+            400,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            7777,
+        );
+
+        let mut guard = boot(&store, TestClock::new());
+        guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("PRECONDITION: refused before cleanup");
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+        drop(guard);
+
+        let mut restarted = boot(&store, TestClock::new());
+        assert_eq!(
+            restarted
+                .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+                .expect_err("a restart must reconstruct the same indefinite refusal")
+                .downcast_ref::<UnsupportedSenderRegime>()
+                .expect("same typed refusal after reload")
+                .found_regime,
+            7777
+        );
+    }
+
+    /// The `replay_sender_regime` source, which `cleanup` deliberately never deletes.
+    ///
+    /// This is the half of #2645 that a store inspection cannot see: the evidence is *still on
+    /// disk*, and the fail-open is entirely in memory. `load_persisted_state` is latched
+    /// once-only, so an evicted window is never rebuilt from the store — the running process
+    /// simply forgets a refusal it is still holding the proof of, and admits the peer against
+    /// a floor of zero until someone happens to restart it.
+    #[test]
+    fn unsupported_sender_regime_from_provenance_survives_cleanup_in_the_live_process() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_provenance(store.as_ref(), did, 7777);
+        let mut guard = boot(&store, TestClock::new());
+
+        guard
+            .check_replay_only(
+                &envelope(&sender, 4),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("PRECONDITION: unreadable-in-meaning provenance refuses this peer")
+            .downcast_ref::<UnsupportedSenderRegime>()
+            .expect("PRECONDITION: the typed indefinite refusal");
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            provenance_present(&store, did),
+            "CONTROL: cleanup never deletes provenance, so the evidence is still on disk"
+        );
+        assert!(
+            guard
+                .check_replay_only(
+                    &envelope(&sender, 4),
+                    ObservedSenderRegime::LegacyOrUnproven
+                )
+                .expect_err("the live process must not forget a refusal it still holds proof of")
+                .downcast_ref::<UnsupportedSenderRegime>()
+                .is_some(),
+            "#2645: eviction alone is a fail-open, because the once-only load latch means an \
+             evicted window is never re-derived from the store"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 6-9. The bounded and unheld controls — nothing here becomes immortal
+    // -----------------------------------------------------------------------
+
+    /// An ordinary window with no hold ages out and takes its row with it, exactly as before.
+    ///
+    /// The fix is a semantic exception, not a new retention policy: turning GC off would trade
+    /// a replay fail-open for an unbounded memory leak.
+    #[test]
+    fn an_ordinary_unheld_window_still_ages_out_and_its_row_is_still_deleted() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        let mut guard = boot(&store, TestClock::new());
+
+        guard
+            .check_replay_only(
+                &envelope(&sender, 500),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect("an ordinary legacy sender is accepted");
+        assert!(hold_of(&guard, did).is_none(), "PRECONDITION: no hold");
+        assert!(
+            max_seq_row_present(&store, did),
+            "PRECONDITION: a row exists"
+        );
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            !guard.sequences.contains_key(&pk(did)),
+            "an unheld stale window must still be evicted"
+        );
+        assert!(
+            !max_seq_row_present(&store, did),
+            "and its canonical high-water must still be deleted — this fix does not claim \
+             ReplayGuard now retains every replay floor forever"
+        );
+    }
+
+    /// `Unreadable` is bounded, so having a hold at all must not confer immortality.
+    #[test]
+    fn a_bounded_unreadable_hold_does_not_confer_immortality() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        store
+            .put(
+                &ReplayGuard::make_max_seq_key(&pk(did)),
+                b"{ this is not a MaxSeqEntry",
+            )
+            .unwrap();
+        let mut guard = boot(&store, TestClock::new());
+
+        assert!(
+            matches!(hold_of(&guard, did), Some(PeerHold::Unreadable { .. })),
+            "PRECONDITION: a corrupt row quarantines the peer for the bounded horizon"
+        );
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            !guard.sequences.contains_key(&pk(did)),
+            "a bounded hold must not survive GC merely by being a hold — `hold.is_some()` is \
+             the wrong predicate"
+        );
+        assert!(
+            !max_seq_row_present(&store, did),
+            "and the unreadable row it derived from is still collected"
+        );
+    }
+
+    /// `MigratingSenderRegime` is bounded, and making it permanent would brick every
+    /// upgrading sender rather than protect anything.
+    #[test]
+    fn a_bounded_migrating_sender_regime_hold_does_not_confer_immortality() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(
+            store.as_ref(),
+            did,
+            400,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_TRANSITION_TO_DURABLE_V1,
+        );
+        let mut guard = boot(&store, TestClock::new());
+
+        assert!(
+            matches!(
+                hold_of(&guard, did),
+                Some(PeerHold::MigratingSenderRegime { .. })
+            ),
+            "PRECONDITION: an interrupted namespace migration resumes behind a bounded hold"
+        );
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            !guard.sequences.contains_key(&pk(did)),
+            "a migration in flight is bounded state, not structural safety state"
+        );
+        assert!(!max_seq_row_present(&store, did));
+    }
+
+    /// `PendingLegacyMigration` is an independent **bounded** obligation (#2644 F3), not a
+    /// hold rank and not a reason to retain anything.
+    ///
+    /// Seeded so the ranked hold is `Unreadable` while the obligation is live, which is the
+    /// exact composition #2644 introduced the separate field for: the obligation must outlive
+    /// a competing hold's ranking, and must still be finite.
+    #[test]
+    fn a_pending_legacy_migration_does_not_confer_immortality() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        let alias = alias_of(did);
+
+        // Canonical row unreadable, alias row legacy-versioned. Canonicalization declines to
+        // rewrite a group whose canonical row it cannot parse, so both reach the load pass.
+        store
+            .put(&ReplayGuard::make_max_seq_key(&pk(did)), b"not json at all")
+            .unwrap();
+        let legacy = serde_json::json!({
+            "max_seq": 400u64,
+            "updated_at_ms": ReplayGuard::current_time_ms(),
+        });
+        let mut alias_key = MAX_SEQ_PREFIX.to_vec();
+        alias_key.extend_from_slice(alias.as_str().as_bytes());
+        store
+            .put(&alias_key, &serde_json::to_vec(&legacy).unwrap())
+            .unwrap();
+
+        let mut guard = boot(&store, TestClock::new());
+        assert!(
+            guard
+                .sequences
+                .get(&pk(did))
+                .is_some_and(|w| w.pending_legacy_migration.is_some()),
+            "PRECONDITION: the legacy row recorded an obligation beside the ranked hold"
+        );
+        assert!(
+            matches!(hold_of(&guard, did), Some(PeerHold::Unreadable { .. })),
+            "PRECONDITION: and `Unreadable` outranks it, which is the #2644 composition"
+        );
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        assert!(
+            !guard.sequences.contains_key(&pk(did)),
+            "an obligation with a deadline is bounded state; treating it as indefinite would \
+             make every legacy migration permanent and reverse #2644's F3 repair"
+        );
+    }
+
+    /// Independently of GC: a legacy migration still converges in finite time.
+    #[test]
+    fn a_legacy_migration_still_converges_in_finite_time() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let clock = TestClock::new();
+        let legacy = serde_json::json!({
+            "max_seq": 400u64,
+            "updated_at_ms": ReplayGuard::current_time_ms(),
+        });
+        store
+            .put(
+                &ReplayGuard::make_max_seq_key(&pk(sender.did())),
+                &serde_json::to_vec(&legacy).unwrap(),
+            )
+            .unwrap();
+
+        let mut guard = boot(&store, clock.clone());
+        guard
+            .check_replay_only(
+                &envelope(&sender, 401),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("PRECONDITION: held while anything from the old regime can be fresh");
+
+        clock.advance(HORIZON + Duration::from_secs(1));
+        guard
+            .check_replay_only(
+                &envelope(&sender, 401),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect("the bounded migration must still end on its own");
+    }
+
+    // -----------------------------------------------------------------------
+    // 10-12. The fail-open itself, and how it is not being papered over
+    // -----------------------------------------------------------------------
+
+    /// The fix must not work by refreshing timestamps.
+    ///
+    /// Making a refusal touch `last_update` would also hide the bug — and would resurrect the
+    /// property `test_rejecting_window_does_not_refresh_liveness` exists to forbid, letting a
+    /// peer keep its window alive by sending traffic that is never accepted.
+    #[test]
+    fn refusing_an_indefinitely_held_peer_still_does_not_refresh_its_liveness() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        seed_max_seq(store.as_ref(), did, 400, 9999, SENDER_REGIME_DURABLE_V1);
+        let mut guard = boot(&store, TestClock::new());
+
+        go_quiet(&mut guard, did);
+        let stale = guard.sequences.get(&pk(did)).unwrap().last_update;
+
+        guard
+            .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+            .expect_err("refused");
+
+        assert_eq!(
+            guard.sequences.get(&pk(did)).unwrap().last_update,
+            stale,
+            "the refusal must leave liveness alone; the window survives GC because the hold \
+             is structural, not because the peer looks active"
+        );
+    }
+
+    /// The pre-fix fail-open, pinned end to end.
+    ///
+    /// On `main` this history reached `Ok(())`: cleanup deleted the row, the next message
+    /// built a fresh window with `floor_seq = 0`, an observed durable-v1 regime opened a
+    /// bounded 600s `SenderRegimeTransition`, and the promotion at the end of that horizon
+    /// admitted sequence 4 — which the original evidence refused outright. Advancing the clock
+    /// must never reach acceptance now, however far it runs.
+    #[test]
+    fn the_pre_fix_acceptance_path_is_unreachable_however_long_the_clock_runs() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        let clock = TestClock::new();
+        seed_max_seq(store.as_ref(), did, 400, 9999, SENDER_REGIME_DURABLE_V1);
+        let mut guard = boot(&store, clock.clone());
+
+        go_quiet(&mut guard, did);
+        guard.cleanup();
+
+        // Every bounded horizon the pre-fix path needed, plus the live durable-v1 evidence
+        // its promotion required, several times over.
+        for _ in 0..8 {
+            clock.advance(HORIZON + Duration::from_secs(1));
+            let err = guard
+                .check_replay_only(&envelope(&sender, 4), ObservedSenderRegime::DurableV1)
+                .expect_err("must never be admitted against a fresh zero floor");
+            assert!(
+                err.downcast_ref::<ReplayStateUnsupportedVersion>()
+                    .is_some(),
+                "and must stay the same indefinite refusal, not decay into a bounded one: {err}"
+            );
+        }
+
+        // The other observed regime too: on `main` this one needed no wait at all.
+        assert!(guard
+            .check_replay_only(
+                &envelope(&sender, 4),
+                ObservedSenderRegime::LegacyOrUnproven
+            )
+            .expect_err("still refused")
+            .downcast_ref::<ReplayStateUnsupportedVersion>()
+            .is_some());
+
+        assert!(
+            max_seq_row_present(&store, did),
+            "and the durable evidence is still there for the next restart"
+        );
+    }
+
+    /// Cleanup is idempotent against an indefinite hold, at arbitrarily late times.
+    #[test]
+    fn repeated_cleanup_cannot_erase_an_indefinite_hold() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let did = sender.did();
+        let clock = TestClock::new();
+        seed_max_seq(store.as_ref(), did, 400, 9999, SENDER_REGIME_DURABLE_V1);
+        let mut guard = boot(&store, clock.clone());
+
+        for round in 0..40 {
+            clock.advance(Duration::from_secs(86_400));
+            go_quiet(&mut guard, did);
+            guard.cleanup();
+            assert!(
+                matches!(
+                    hold_of(&guard, did),
+                    Some(PeerHold::UnsupportedVersion {
+                        found_version: 9999
+                    })
+                ),
+                "round {round}: elapsed time alone must never convert a deadline-free hold \
+                 into a bounded one, or erase it"
+            );
+            assert!(
+                max_seq_row_present(&store, did),
+                "round {round}: row survives"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 13. Genuine replays are still replays
+    // -----------------------------------------------------------------------
+
+    /// The control that the fix has not blunted ordinary replay detection.
+    ///
+    /// A healthy durable window still rejects a re-delivered sequence with the untyped
+    /// `Replay detected` error — the one `handlers::signed` scores as `ReplayAttack` — while
+    /// every hold above stays typed and unscored.
+    #[test]
+    fn a_genuine_replay_under_a_healthy_window_is_still_scored_as_a_replay() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let mut guard = boot(&store, TestClock::new());
+
+        guard
+            .check_replay_only(
+                &envelope(&sender, 7),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect("first delivery");
+        let replay = guard
+            .check_replay_only(
+                &envelope(&sender, 7),
+                ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect_err("second delivery of the same sequence is a replay");
+
+        assert!(
+            replay.to_string().contains("Replay detected"),
+            "genuine replays must remain distinguishable from local holds: {replay}"
+        );
+        for typed in [
+            replay
+                .downcast_ref::<ReplayStateUnsupportedVersion>()
+                .is_some(),
+            replay.downcast_ref::<UnsupportedSenderRegime>().is_some(),
+            replay.downcast_ref::<ReplayStateUnreadable>().is_some(),
+            replay.downcast_ref::<SenderRegimeTransition>().is_some(),
+        ] {
+            assert!(
+                !typed,
+                "a replay must not be typed as a local replay-state fault"
+            );
+        }
+    }
+
+    /// The base16-lower spelling of the same key, so two readable rows can reach the load
+    /// pass for one principal (#2640).
+    fn alias_of(canonical: &Did) -> Did {
+        let hex: String = canonical
+            .to_verifying_key()
+            .unwrap()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        Did::from_str(&format!("did:icn:f{hex}")).expect("base16 spelling parses")
     }
 }

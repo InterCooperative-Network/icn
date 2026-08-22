@@ -2057,6 +2057,102 @@ mod tests {
         );
     }
 
+    /// A peer under a deadline-free replay hold is refused across `cleanup()`, and is still
+    /// never scored for it (#2645).
+    ///
+    /// Two things are being pinned at once, and they pull in opposite directions. The refusal
+    /// must survive liveness GC — before this fix `cleanup` retired the hold and the very next
+    /// message was admitted against a floor of zero — and it must keep arriving as the *local*
+    /// fault it always was. A repair that held the traffic but re-typed it into the
+    /// `ReplayAttack` path would ban an honest sender for a rollback on our own disk.
+    ///
+    /// `max_peer_age_secs = 0` is the point of the construction: every window is stale the
+    /// instant it exists, so `cleanup` is at its most aggressive and cannot be accused of
+    /// simply not having reached this peer yet.
+    #[tokio::test]
+    async fn a_deadline_free_hold_survives_cleanup_and_is_still_never_scored_against_the_peer() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let held = KeyPair::generate().unwrap();
+        let healthy = KeyPair::generate().unwrap();
+
+        // Replay state written by a binary this one has no migration for.
+        let mut key = b"replay_max_seq:".to_vec();
+        key.extend_from_slice(held.did().as_str().as_bytes());
+        let row = serde_json::json!({
+            "max_seq": 400u64,
+            "updated_at_ms": 0u64,
+            "semantic_version": 9999u32,
+            "sender_regime": 0u32,
+        });
+        let store_ref: &dyn icn_store::Store = store.as_ref();
+        store_ref
+            .put(&key, &serde_json::to_vec(&row).unwrap())
+            .unwrap();
+
+        let guard = ReplayGuard::new_persistent(300, 0, store.clone());
+        let (ctx, forward_count) = create_test_context_with_guard(Some(detector.clone()), guard);
+
+        // Cleanup between every message, which is what the actor's timer does — and what used
+        // to convert this indefinite refusal into a bounded one and then into acceptance.
+        for round in 0..5 {
+            let envelope = create_signed_envelope(&held, 4 + round);
+            ctx.handle_signed(create_network_message(&envelope), &envelope)
+                .await;
+            ctx.replay_guard.write().await.cleanup();
+        }
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "#2645: liveness GC must not release a hold documented as one that will not clear              on its own"
+        );
+        assert!(
+            store_ref.get(&key).unwrap().is_some(),
+            "#2645: and the canonical high-water that produced it must still be on disk"
+        );
+        {
+            let detector_guard = detector.read().await;
+            let violations = detector_guard.get_violations(held.did());
+            assert!(
+                violations.is_empty(),
+                "a rollback on our own disk is not peer misbehaviour; got {violations:?}"
+            );
+        }
+
+        // CONTROL: the same handler and detector deliver for an unaffected peer, so "nothing
+        // forwarded, nothing scored" above is about this peer's state and not a dead harness.
+        let clean = create_signed_envelope(&healthy, 1);
+        ctx.handle_signed(create_network_message(&clean), &clean)
+            .await;
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            1,
+            "CONTROL: an unaffected peer is still served"
+        );
+
+        // CONTROL: and scoring still fires, so the emptiness above is a classification result
+        // rather than a detector that stopped recording. No cleanup in between: with
+        // `max_peer_age_secs = 0` a sweep here would evict this peer's window and its row,
+        // which is the ordinary GC behaviour this fix deliberately leaves alone.
+        ctx.handle_signed(create_network_message(&clean), &clean)
+            .await;
+        assert_eq!(forward_count.load(Ordering::SeqCst), 1);
+        let detector_guard = detector.read().await;
+        assert!(
+            detector_guard
+                .get_violations(healthy.did())
+                .iter()
+                .any(|v| matches!(
+                    v.violation,
+                    icn_security::Violation::ReplayAttack { sequence: 1, .. }
+                )),
+            "CONTROL: a genuine replay is still scored"
+        );
+    }
+
     // ==================================================================================
     // #2644 (second round): current-versus-historical capability evidence
     // ==================================================================================

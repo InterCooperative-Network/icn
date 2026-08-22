@@ -182,8 +182,8 @@ negotiable in that trade: the invariant remains *durable replay fact before sema
 ## 7. Forgetting replay state
 
 `ReplayGuard::cleanup()` runs periodically and, for any peer with no **accepted** traffic in
-`max_peer_age_secs`, removes the in-memory window **and deletes the persisted
-`replay_max_seq:<did>` key**.
+`max_peer_age_secs` *and no deadline-free hold*, removes the in-memory window **and deletes the
+persisted `replay_max_seq:<did>` key**. The exemption is §7.3.
 
 Two properties matter:
 
@@ -238,6 +238,51 @@ below `A`, so the exposure is confined to the corrupt-state case (§8), which ha
 This is a property of ICN's time contract, not something `ReplayGuard` can solve. Recorded here so
 it is not mistaken for a replay-guard defect: **bounded monotonic wall-clock progress on each node
 is a prerequisite for signed-envelope freshness**, and therefore for replay-state expiry.
+
+### 7.3 Liveness GC is not a release valve for structural safety state (#2645)
+
+Property 1 above is the whole reason this exemption is needed, and it took a while to see: a peer
+under a hold is *refused*, and a refusal never refreshes `last_update`. So a peer under a hold with
+**no deadline** is not merely eligible for eviction — it is *guaranteed* to reach it. Being refused
+is what drove the window past `max_peer_age_secs`, and eviction then discharged the refusal and
+deleted the durable evidence that produced it. The refusal starved the timestamp that decided
+whether the refusal survived.
+
+Freshness (property 2) does not license that deletion. Freshness bounds how long an envelope
+produced under a regime we *understand* stays dangerous. `PeerHold::UnsupportedVersion` and
+`PeerHold::UnsupportedSenderRegime` exist precisely because the regime is **not** understood: the
+state might have changed sequence interpretation, window semantics, or freshness assumptions
+themselves. There is no interval after which an unknown meaning becomes known, which is why those
+two holds carry no deadline and the operator-facing error says *this will not clear on its own*.
+
+> **Invariant.** Liveness GC may discard ordinary and bounded replay state according to policy, but
+> it must not retire persistent evidence whose interpretation requires an indefinite fail-closed
+> hold. Refusing a peer must not itself cause the evidence responsible for that refusal to age out.
+
+Scope, stated narrowly on purpose:
+
+- **Exempt:** a window whose hold satisfies `PeerHold::is_indefinite()` — `UnsupportedVersion` and
+  `UnsupportedSenderRegime`. The window and its `replay_max_seq:<did>` row are both retained, so a
+  restart reconstructs the same typed refusal.
+- **Not exempt:** everything else. A window with no hold still ages out and still has its row
+  deleted. So does one under any of the three **bounded** holds (`Unreadable`,
+  `MigratingFromLegacy`, `MigratingSenderRegime`), and one carrying an undischarged
+  `pending_legacy_migration` obligation. Those are quarantines and migrations in flight; they are
+  supposed to end, and retaining them would make an ordinary upgrade permanent.
+
+This is not a claim that ReplayGuard now retains every replay floor forever. It does not, and §9.3
+of `protocol-state-migration-invariants.md` still describes the ordinary aged-out-high-water case
+that provenance exists to serve.
+
+**The retained set stays bounded.** No deadline-free hold is installable from the message path —
+`check_replay_only`'s only hold is the bounded `MigratingSenderRegime` of a live namespace
+transition — so every one of them originates in a row read during the single
+`load_persisted_state` pass. The exempt set is a subset of one load's output: bounded by the store,
+never by traffic. Same argument §9.3 already rests on for provenance.
+
+Pinned by `replay_guard::cleanup_hold_tests` (both directions: the deadline-free holds survive
+cleanup and restart; the bounded holds and the unheld control still age out) and, at the handler
+boundary, `a_deadline_free_hold_survives_cleanup_and_is_still_never_scored_against_the_peer`.
 
 ## 8. Storage rollback, corruption, and other degenerate states
 
