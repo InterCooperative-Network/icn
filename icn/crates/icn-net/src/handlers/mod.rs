@@ -35,6 +35,24 @@ pub struct ConnectionContext {
     pub topology_config: Option<TopologyConfig>,
     pub session_manager: Arc<RwLock<SessionManager>>,
     pub peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+    /// Which signing keys a live connection is *currently* claiming a durable sequence for.
+    ///
+    /// Node-global and shared by every context, like `peer_connections` — but unlike it, an
+    /// entry exists only while some connection is holding a lease on it. That is what makes it
+    /// answerable to "now" rather than "ever" (#2644), and what keeps its size tied to live
+    /// connections rather than to every DID this node has seen.
+    pub capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
+    /// *This* connection's claim, for as long as this connection is up.
+    ///
+    /// Held rather than registered-and-forgotten: dropping the lease is the release, and this
+    /// field is owned by the `ConnectionContext` that the connection handler keeps on its own
+    /// stack, so every way that handler can exit releases it. There is deliberately no
+    /// `release()` for a future exit path to forget to call — the same reason
+    /// [`crate::preauth_admission::AdmissionGuard`] is held here the same way.
+    ///
+    /// Replaced, not accumulated, when a repeated Hello re-states the peer's capabilities: one
+    /// connection makes one claim at a time, and the newest Hello is the current one.
+    durable_claim: std::sync::Mutex<Option<crate::capability_evidence::LiveCapabilityClaim>>,
     pub blob_registry: Option<Arc<RwLock<BlobLocationRegistry>>>,
     pub misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
     pub identity_bundle: IdentityBundle,
@@ -169,6 +187,7 @@ impl ConnectionContext {
         topology_config: Option<TopologyConfig>,
         session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+        capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
         blob_registry: Option<Arc<RwLock<BlobLocationRegistry>>>,
         misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
@@ -190,6 +209,8 @@ impl ConnectionContext {
             topology_config,
             session_manager,
             peer_connections,
+            capability_registry,
+            durable_claim: std::sync::Mutex::new(None),
             blob_registry,
             misbehavior_detector,
             identity_bundle,
@@ -212,6 +233,22 @@ impl ConnectionContext {
             expected_peer,
             expectation_mismatch_reported: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// Replace this connection's durable-sequence claim with `claim`.
+    ///
+    /// The previous claim is dropped here, which is its release. Separate from the Hello path
+    /// so the lock discipline lives with the field: the registry's lock is a `std` one taken
+    /// inside `Drop`, so it must never be held across an await, and nothing here awaits.
+    pub(crate) fn replace_durable_claim(
+        &self,
+        claim: Option<crate::capability_evidence::LiveCapabilityClaim>,
+    ) {
+        let mut slot = self
+            .durable_claim
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *slot = claim;
     }
 
     /// Whether this node participates in peer exchange.
