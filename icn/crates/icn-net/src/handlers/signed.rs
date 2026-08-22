@@ -45,11 +45,18 @@ impl ConnectionContext {
         // "drop" rather than "admit" anyway, because the cost of a wrong drop is one message
         // and the cost of a wrong admit is our own DID inside remote-peer replay and
         // misbehaviour state (#2506), which is self-defeating after a restart.
-        let is_self = match (
+        //
+        // Kept rather than discarded once the comparison is done (#2644). Every later
+        // security decision keyed to *who sent this* has to ask the same question with the
+        // same equivalence class, and the capability lookup below was still asking it
+        // textually — so the answer to "is this my own key" and the answer to "what did this
+        // key prove" could disagree about the same sender.
+        let sender_principal = match (
             crate::replay_guard::SenderPrincipal::from_did(&envelope.from),
             crate::replay_guard::SenderPrincipal::from_did(&self.own_did),
         ) {
-            (Ok(sender), Ok(own)) => sender == own,
+            (Ok(sender), Ok(own)) if sender != own => Some(sender),
+            (Ok(_), Ok(_)) => None,
             _ => {
                 error!(
                     from = %envelope.from,
@@ -57,17 +64,17 @@ impl ConnectionContext {
                      dropping rather than risking self-sourced traffic entering remote-peer \
                      state (#2506/#2640)"
                 );
-                true
+                None
             }
         };
-        if is_self {
+        let Some(sender_principal) = sender_principal else {
             warn!(
                 sequence = envelope.sequence,
                 "Dropping network message from our own DID without recording remote-peer state; \
                  a self-connection reached the signed-message path (#2506)"
             );
             return;
-        }
+        };
 
         // Verify signature and age - use cached PQ key for hybrid envelopes
         let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
@@ -97,28 +104,80 @@ impl ConnectionContext {
 
         // Which sequence namespace does this envelope's number belong to? (#2517)
         //
-        // Read from the capabilities recorded for `envelope.from`, which
-        // `handle_hello` writes only after binding the claimed DID to the certificate
-        // on the live QUIC connection (#2520). So a `DurableV1` answer here means the
-        // peer proved, on a connection it actually authenticated, that its signing
-        // sequence is durable DID state — not merely that some Hello somewhere once
-        // said so.
+        // Read from the capabilities `handle_hello` records, which it writes only after
+        // binding the claimed DID to the certificate on the live QUIC connection (#2520). So
+        // a `DurableV1` answer here means the peer proved, on a connection it actually
+        // authenticated, that its signing sequence is durable DID state — not merely that
+        // some Hello somewhere once said so.
         //
-        // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no
-        // recorded connection info, a peer that predates the capability, and a
-        // genuinely pre-#2510 ephemeral sender are indistinguishable from here, and
-        // the safe reading is the one that does not promise durability.
+        // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no recorded
+        // connection info, a peer that predates the capability, and a genuinely pre-#2510
+        // ephemeral sender are indistinguishable from here, and the safe reading is the one
+        // that does not promise durability.
+        //
+        // # Asked about the sender's *key*, not the spelling of `from` (#2644)
+        //
+        // This lookup was `connections.get(&envelope.from)`, which is `Did`'s string
+        // equality — the same primitive #2640 removed from the replay guard, left standing
+        // one line above the guard it feeds. `peer_connections` is keyed by the wire spelling
+        // the peer used in its Hello, so re-spelling a captured envelope's `from` made the
+        // lookup miss and the sender read as `LegacyOrUnproven`. Against an **empty** replay
+        // window that is not a redundant refusal, it is the accept path: `(LegacyOrUnproven,
+        // LegacyOrUnproven)` is steady state, so the captured pre-upgrade envelope was
+        // forwarded to the application instead of entering the retirement hold that
+        // `(LegacyOrUnproven, DurableV1)` installs. The floor that rejects this replay in an
+        // established window did not exist yet, so nothing else refused it.
+        //
+        // The guard beneath this and the signature check above both identify the sender by
+        // its decoded Ed25519 key; this now asks the same question of the same equivalence
+        // class, so one signing principal cannot select two different capability states.
+        // There is deliberately no textual fallback — that fallback *is* the defect — and
+        // none is needed: `sender_principal` was derived above and a failure there already
+        // dropped the message.
+        //
+        // # Several authenticated rows can name one principal, and any one of them proves it
+        //
+        // A key holder can authenticate under more than one spelling of itself: the #2520
+        // DID-TLS checks in `handle_hello` compare the binding's DID to `from` as strings and
+        // then verify with that DID's own key, so every spelling it signs for passes. The
+        // join across those rows is therefore part of the security property, not an
+        // implementation detail, and it is **any**: one authenticated row proving
+        // `DURABLE_SIGNING_SEQUENCE` makes the principal durable.
+        //
+        // That is the sound direction on both axes. #2520 means no row exists for a key whose
+        // holder did not prove possession of it on a live connection, so every row for this
+        // principal is that principal's own claim and combining them crosses no trust
+        // boundary; and the capability describes the sender's signing *store* (#2510:
+        // crash-safe, monotonic, never reissued), which is per-DID state rather than per
+        // connection. It is also the only join that cannot be *suppressed* by adding a row —
+        // and adding rows is precisely what a key holder (a second Hello) and an attacker (a
+        // re-spelled `from`) can do. `all`, first-write-wins and last-write-wins each let one
+        // legacy-looking row erase a durable proof, which is this defect again.
+        //
+        // Order-independent by construction: `any` over a set is commutative, so the answer
+        // does not depend on `HashMap` iteration order (AGENTS.md §3, determinism).
+        //
+        // Cost: rows that do not advertise the capability cannot make the disjunction true,
+        // so they are rejected on a flag test and never decoded, and `any` stops at the first
+        // row that does prove it. A durable peer talking under its own spelling is one hash
+        // lookup's worth of work in a map sized by *connected peers*, which `broadcast_message`
+        // already parses a `Did` per entry of on every broadcast.
         let observed_regime = {
             let connections = self.peer_connections.read().await;
-            match connections.get(&envelope.from) {
-                Some(info)
-                    if info
-                        .peer_capabilities
-                        .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE) =>
-                {
-                    crate::replay_guard::ObservedSenderRegime::DurableV1
-                }
-                _ => crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            let proved_durable = connections.iter().any(|(spelling, info)| {
+                info.peer_capabilities
+                    .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE)
+                    // A key stored under a spelling that decodes to nothing names no
+                    // principal at all, so it is evidence about nobody and is skipped rather
+                    // than matched. It loses nothing the textual lookup had: `envelope.from`
+                    // always decodes, so any row that string-matched it decoded too.
+                    && crate::replay_guard::SenderPrincipal::from_did(spelling)
+                        .is_ok_and(|row_principal| row_principal == sender_principal)
+            });
+            if proved_durable {
+                crate::replay_guard::ObservedSenderRegime::DurableV1
+            } else {
+                crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven
             }
         };
 
@@ -433,7 +492,7 @@ mod tests {
     use crate::protocol::MessagePayload;
     use crate::replay_guard::ReplayGuard;
     use crate::{RateLimitConfig, RateLimiter, SessionManager};
-    use icn_identity::{IdentityBundle, KeyPair};
+    use icn_identity::{Did, IdentityBundle, KeyPair};
     use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1192,6 +1251,475 @@ mod tests {
                 .downcast_ref::<crate::replay_guard::SenderRegimeTransition>()
                 .is_some(),
             "a durable-advertising peer must be on the durable establishment path: {state}"
+        );
+    }
+    // ---------------------------------------------------------------------------------
+    // #2644 — capability attribution runs on the sender's key, not on its spelling
+    // ---------------------------------------------------------------------------------
+
+    /// Every base `Did::from_str` accepts other than the canonical base58btc.
+    ///
+    /// The same class `tests/respelled_envelope_replay.rs` drives against the guard, restated
+    /// here because that file is a separate test binary and `ConnectionContext` is private to
+    /// this crate. `Identity` is absent because `multibase::encode` panics on non-UTF-8 key
+    /// bytes; `Base58Btc` is absent because it *is* the canonical spelling. If that file's
+    /// list ever grows, this one narrows silently rather than going green wrongly — the count
+    /// control below is what makes the narrowing visible.
+    const ALTERNATE_SPELLINGS: [(&str, multibase::Base); 22] = [
+        ("base2", multibase::Base::Base2),
+        ("base8", multibase::Base::Base8),
+        ("base10", multibase::Base::Base10),
+        ("base16-lower", multibase::Base::Base16Lower),
+        ("base16-upper", multibase::Base::Base16Upper),
+        ("base32-lower", multibase::Base::Base32Lower),
+        ("base32-upper", multibase::Base::Base32Upper),
+        ("base32-pad-lower", multibase::Base::Base32PadLower),
+        ("base32-pad-upper", multibase::Base::Base32PadUpper),
+        ("base32-hex-lower", multibase::Base::Base32HexLower),
+        ("base32-hex-upper", multibase::Base::Base32HexUpper),
+        ("base32-hex-pad-lower", multibase::Base::Base32HexPadLower),
+        ("base32-hex-pad-upper", multibase::Base::Base32HexPadUpper),
+        ("base32-z", multibase::Base::Base32Z),
+        ("base36-lower", multibase::Base::Base36Lower),
+        ("base36-upper", multibase::Base::Base36Upper),
+        ("base58-flickr", multibase::Base::Base58Flickr),
+        ("base64", multibase::Base::Base64),
+        ("base64-pad", multibase::Base::Base64Pad),
+        ("base64-url", multibase::Base::Base64Url),
+        ("base64-url-pad", multibase::Base::Base64UrlPad),
+        ("base256-emoji", multibase::Base::Base256Emoji),
+    ];
+
+    /// Re-spell one key under one base, asserting the two controls that make the result mean
+    /// anything: a *different string* that decodes to the *same key*.
+    fn alias_in(base: multibase::Base, label: &str, canonical: &Did) -> Did {
+        let key = canonical.to_verifying_key().expect("canonical DID decodes");
+        let alias = Did::from_str(&format!(
+            "did:icn:{}",
+            multibase::encode(base, key.as_bytes())
+        ))
+        .unwrap_or_else(|e| {
+            panic!(
+                "the {label} spelling is accepted by `Did::from_str` under current policy \
+                     and this suite's coverage depends on that; it was rejected: {e}"
+            )
+        });
+        assert_ne!(
+            alias.as_str(),
+            canonical.as_str(),
+            "CONTROL: the {label} alias must be a different string, or the case proves nothing"
+        );
+        assert_eq!(
+            alias.to_verifying_key().unwrap().as_bytes(),
+            key.as_bytes(),
+            "CONTROL: the {label} alias must decode to the same key, or it is another sender"
+        );
+        alias
+    }
+
+    /// Rewrite only the spelling of `from` on a captured envelope. The whole attacker
+    /// capability: no key material, no re-signing.
+    fn respell(captured: &SignedEnvelope, alias: &Did) -> SignedEnvelope {
+        let mut forged = captured.clone();
+        forged.from = alias.clone();
+        assert_eq!(
+            forged.signature, captured.signature,
+            "CONTROL: the attacker must not have touched the signature bytes"
+        );
+        assert!(
+            forged.verify(3600).is_ok(),
+            "CONTROL: the re-spelled envelope must still verify, or the signature layer would \
+             already be handling this"
+        );
+        forged
+    }
+
+    /// The row `handle_hello` writes once a peer has authenticated.
+    ///
+    /// `handlers::hello` stores `connections.insert(from.clone(), PeerConnectionInfo { did:
+    /// from.clone(), peer_capabilities: common_caps, .. })` — keyed by the *wire spelling* of
+    /// `from`, after the three #2520 DID-TLS checks. Seeded directly rather than through a
+    /// live QUIC Hello, which would add a handshake to every case below without changing the
+    /// row under test; the sweeps compensate by never assuming *which* spelling that is —
+    /// they drive the stored spelling across the whole accepted class in both directions, so
+    /// no case rests on a claim about what `handle_hello` happened to write.
+    fn authenticated_row(
+        spelling: &Did,
+        caps: crate::CapabilityFlags,
+    ) -> crate::actor::PeerConnectionInfo {
+        crate::actor::PeerConnectionInfo {
+            did: spelling.clone(),
+            negotiated_version: 1,
+            peer_capabilities: caps,
+            peer_software: "seeded".to_string(),
+            x25519_key: [0u8; 32],
+            ml_dsa_public: None,
+            ml_kem_public: None,
+        }
+    }
+
+    /// Which regime the handler attributed to `envelope`, read off the only difference that
+    /// is visible from outside it.
+    ///
+    /// On an **empty** replay window the two attributions are behaviourally opposite:
+    /// `DurableV1` is `(LegacyOrUnproven, DurableV1)`, the #2517 namespace change, which
+    /// installs the retirement hold and refuses the message; `LegacyOrUnproven` is steady
+    /// state, which accepts it and forwards it. Forwarding is therefore an exact oracle for
+    /// the attribution, and it is the security-relevant one: the captured envelope either
+    /// reaches the application or it does not.
+    ///
+    /// A fresh context per call, because the empty window is half of the property.
+    async fn attributed_regime(
+        rows: &[(Did, crate::CapabilityFlags)],
+        envelope: &SignedEnvelope,
+    ) -> crate::replay_guard::ObservedSenderRegime {
+        let (ctx, forwarded) = create_test_context(None);
+        {
+            let mut connections = ctx.peer_connections.write().await;
+            for (spelling, caps) in rows {
+                connections.insert(spelling.clone(), authenticated_row(spelling, *caps));
+            }
+        }
+        ctx.handle_signed(create_network_message(envelope), envelope)
+            .await;
+        match forwarded.load(Ordering::SeqCst) {
+            0 => crate::replay_guard::ObservedSenderRegime::DurableV1,
+            1 => crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            n => panic!("one envelope cannot be forwarded {n} times"),
+        }
+    }
+
+    const DURABLE: crate::CapabilityFlags = crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE;
+    const NOT_DURABLE: crate::CapabilityFlags = crate::CapabilityFlags::E2E_ENCRYPTION;
+
+    /// THE REPORTED BYPASS (#2644).
+    ///
+    /// A sender that has authenticated and proved `DURABLE_SIGNING_SEQUENCE` under one
+    /// spelling; a still-fresh envelope captured from its *pre-upgrade* numbering; and a
+    /// replay window this receiver has never established anything in. Re-spelling `from`
+    /// alone made the capability lookup miss, which read the sender as `LegacyOrUnproven`,
+    /// which on an empty window is steady state — so the captured envelope was accepted and
+    /// forwarded instead of entering the retirement hold that exists precisely because
+    /// old-namespace envelopes can still be inside their validity window.
+    ///
+    /// Two distinct captured sequences, because one refusal could be an artefact of a hold
+    /// installed by something else; the bypass forwards *both*.
+    #[tokio::test]
+    async fn a_respelled_envelope_cannot_launder_a_durable_sender_into_the_legacy_steady_state() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, forwarded) = create_test_context(Some(detector.clone()));
+        let sender = KeyPair::generate().unwrap();
+
+        // Post-Hello authenticated state under the spelling the peer used.
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            authenticated_row(sender.did(), DURABLE),
+        );
+
+        let alias = alias_in(multibase::Base::Base16Lower, "base16-lower", sender.did());
+        for captured_sequence in [42, 43] {
+            let captured = create_signed_envelope(&sender, captured_sequence);
+            let forged = respell(&captured, &alias);
+            ctx.handle_signed(create_network_message(&forged), &forged)
+                .await;
+        }
+
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            0,
+            "a captured pre-upgrade envelope must not reach the application merely because \
+             `from` was re-spelled: the sender proved DURABLE_SIGNING_SEQUENCE, so an empty \
+             window owes it the #2517 retirement hold"
+        );
+
+        // The refusal is the migration hold, not a replay verdict: the peer did nothing, and
+        // the spelling the attacker chose must not become a reputation lever against it
+        // either. Checked under both spellings because the detector is keyed by
+        // `envelope.from`, which the attacker picked.
+        for did in [sender.did(), &alias] {
+            assert!(
+                detector.read().await.get_violations(did).is_empty(),
+                "the hold is a local migration, not peer misbehaviour ({did})"
+            );
+        }
+    }
+
+    /// SAME-SPELLING CONTROL. The stored spelling must reach the identical security result,
+    /// or the test above would pass on a build that simply refused everything re-spelled.
+    #[tokio::test]
+    async fn the_stored_spelling_reaches_the_same_security_result() {
+        let (ctx, forwarded) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            authenticated_row(sender.did(), DURABLE),
+        );
+
+        for captured_sequence in [42, 43] {
+            let captured = create_signed_envelope(&sender, captured_sequence);
+            ctx.handle_signed(create_network_message(&captured), &captured)
+                .await;
+        }
+
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            0,
+            "the canonical spelling already entered the retirement hold before this fix; it \
+             must still"
+        );
+    }
+
+    /// ALL ACCEPTED SPELLINGS, IN BOTH DIRECTIONS.
+    ///
+    /// The invariant is not "base16 is handled". It is that the authenticated capability a
+    /// sender proved is invariant under every respelling that leaves its key unchanged — so
+    /// the *stored* spelling is swept too, not just the envelope's. A peer can authenticate
+    /// under any of these: the #2520 DID-TLS checks compare the binding's DID to `from` as
+    /// strings and then verify with that DID's own key, so a key holder can bind, and be
+    /// stored under, any spelling of itself.
+    #[tokio::test]
+    async fn every_accepted_spelling_selects_the_same_durable_capability() {
+        assert_eq!(
+            ALTERNATE_SPELLINGS.len(),
+            22,
+            "the accepted spelling class is 22 alternates plus canonical; a smaller list here \
+             is narrower coverage, not a smaller attack surface"
+        );
+
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (label, base) in ALTERNATE_SPELLINGS {
+            let alias = alias_in(base, label, &canonical);
+            let captured = create_signed_envelope(&sender, 42);
+
+            // Stored canonical, envelope re-spelled — the reported direction.
+            assert_eq!(
+                attributed_regime(&[(canonical.clone(), DURABLE)], &respell(&captured, &alias))
+                    .await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "{label}: a re-spelled envelope must still find the capability its sender proved"
+            );
+
+            // Stored under the alias, envelope canonical — the same miss, mirrored.
+            assert_eq!(
+                attributed_regime(&[(alias.clone(), DURABLE)], &captured).await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "{label}: a peer that authenticated under {label} proved the same capability"
+            );
+        }
+    }
+
+    /// DIFFERENT-KEY CONTROL. The join must not be "some peer somewhere is durable".
+    #[tokio::test]
+    async fn a_different_key_never_inherits_a_durable_peers_capability() {
+        let durable = KeyPair::generate().unwrap();
+        let other = KeyPair::generate().unwrap();
+        assert_ne!(
+            durable.did().to_verifying_key().unwrap().as_bytes(),
+            other.did().to_verifying_key().unwrap().as_bytes(),
+            "CONTROL: two generated keys must differ"
+        );
+
+        assert_eq!(
+            attributed_regime(
+                &[(durable.did().clone(), DURABLE)],
+                &create_signed_envelope(&other, 1)
+            )
+            .await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "a durable row for one principal says nothing about another"
+        );
+    }
+
+    /// LEGACY-ONLY CONTROL. An authenticated row that genuinely lacks the capability stays
+    /// unproven — the fix must widen the *identity*, never invent evidence.
+    #[tokio::test]
+    async fn an_authenticated_row_without_the_capability_stays_unproven_under_every_spelling() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let captured = create_signed_envelope(&sender, 1);
+
+        assert_eq!(
+            attributed_regime(&[(canonical.clone(), NOT_DURABLE)], &captured).await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "no capability, no durable attribution"
+        );
+
+        let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", &canonical);
+        assert_eq!(
+            attributed_regime(&[(alias, NOT_DURABLE)], &captured).await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "matching a principal is not evidence of what that principal advertised"
+        );
+    }
+
+    /// NO CAPABILITY ENTRY AT ALL — the pre-existing safe answer, unchanged.
+    #[tokio::test]
+    async fn a_sender_with_no_authenticated_row_is_still_unproven() {
+        let sender = KeyPair::generate().unwrap();
+        assert_eq!(
+            attributed_regime(&[], &create_signed_envelope(&sender, 1)).await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "an empty map proves nothing about anyone"
+        );
+    }
+
+    /// MULTIPLE SPELLINGS, MULTIPLE ROWS, ONE PRINCIPAL.
+    ///
+    /// Both rows are the principal's *own* authenticated claims — #2520 means no row exists
+    /// for a key its holder did not prove possession of on a live connection — so combining
+    /// them crosses no trust boundary, and `DURABLE_SIGNING_SEQUENCE` describes the sender's
+    /// signing store (#2510: crash-safe, monotonic, never reissued) rather than a QUIC
+    /// connection. The join is therefore "any authenticated row for this principal proved
+    /// it", which is the only rule that cannot be *suppressed* by adding a row — and adding
+    /// rows is exactly what a key holder (Hello under a second spelling) and an attacker
+    /// (re-spelling `from`) can do.
+    ///
+    /// The envelope is spelled canonically and every row is an alias, so no textual lookup
+    /// can reach either row: what is under test is the join, not the identity fix alone.
+    #[tokio::test]
+    async fn one_durable_row_makes_the_principal_durable_whatever_else_it_authenticated_as() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let durable_row = alias_in(multibase::Base::Base64, "base64", &canonical);
+        let legacy_row = alias_in(multibase::Base::Base32Lower, "base32-lower", &canonical);
+        let captured = create_signed_envelope(&sender, 7);
+
+        for (order, rows) in [
+            (
+                "durable inserted first",
+                vec![
+                    (durable_row.clone(), DURABLE),
+                    (legacy_row.clone(), NOT_DURABLE),
+                ],
+            ),
+            (
+                "durable inserted second",
+                vec![
+                    (legacy_row.clone(), NOT_DURABLE),
+                    (durable_row.clone(), DURABLE),
+                ],
+            ),
+        ] {
+            assert_eq!(
+                attributed_regime(&rows, &captured).await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "{order}: a proof this principal gave cannot be erased by a row it also gave"
+            );
+        }
+    }
+
+    /// The join must not be *whichever row iteration reached first*.
+    ///
+    /// Insertion order is not the lever here — `HashMap` iteration order is a function of the
+    /// hasher, not of insertion — so this rotates *which* of 22 same-principal rows carries
+    /// the capability, rebuilding the map each time. A rule that reads one arbitrary row and
+    /// returns its capability has a 1-in-22 chance of surviving each rotation, so it does not
+    /// survive the sweep; `any` is order-independent by construction and survives all of it.
+    #[tokio::test]
+    async fn the_durable_row_is_found_wherever_iteration_happens_to_put_it() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let captured = create_signed_envelope(&sender, 3);
+        let aliases: Vec<Did> = ALTERNATE_SPELLINGS
+            .iter()
+            .map(|(label, base)| alias_in(*base, label, &canonical))
+            .collect();
+
+        for (durable_at, (label, _)) in ALTERNATE_SPELLINGS.iter().enumerate() {
+            let rows: Vec<(Did, crate::CapabilityFlags)> = aliases
+                .iter()
+                .enumerate()
+                .map(|(i, alias)| {
+                    (
+                        alias.clone(),
+                        if i == durable_at {
+                            DURABLE
+                        } else {
+                            NOT_DURABLE
+                        },
+                    )
+                })
+                .collect();
+            assert_eq!(
+                attributed_regime(&rows, &captured).await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "the capability was proved on the {label} row; which row iteration visits \
+                 first is not the protocol's to choose"
+            );
+        }
+    }
+
+    /// EXISTING DURABLE WINDOW — the older row-#57 case, preserved.
+    ///
+    /// Once a floor exists, the floor is what rejects the re-spelled replay, in either regime
+    /// arm. That is the redundancy the N2-A0 inventory described; this pins it, and the
+    /// empty-window case above is the half where the redundancy is absent.
+    #[tokio::test]
+    async fn a_respelled_replay_below_an_established_durable_floor_is_still_rejected() {
+        let (ctx, forwarded) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            authenticated_row(sender.did(), DURABLE),
+        );
+
+        // Establish a durable floor directly: the migration hold is not what is under test.
+        let accepted = create_signed_envelope(&sender, 9);
+        ctx.replay_guard
+            .write()
+            .await
+            .check_replay_only(
+                &accepted,
+                crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            )
+            .expect("an empty window accepts the sender's first sequence");
+
+        let alias = alias_in(multibase::Base::Base36Lower, "base36-lower", sender.did());
+        let forged = respell(&accepted, &alias);
+        ctx.handle_signed(create_network_message(&forged), &forged)
+            .await;
+
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            0,
+            "a re-spelled replay of an already-accepted sequence must stay rejected"
+        );
+    }
+
+    /// A stored DID that names no key at all is evidence about nobody.
+    ///
+    /// `Did::from_anchor_id` bypasses validation, and roughly half of the 32-byte strings it
+    /// wraps do not decompress to an Ed25519 point (N2-A0 inventory §10.1) — so a `Did` that
+    /// names no principal is representable, and `HashMap<Did, PeerConnectionInfo>` will hold
+    /// one. Neither production writer can put one there today (`handle_hello` binds a `from`
+    /// that `Did::deserialize` already validated, and the snapshot restore goes through
+    /// `Did::from_str`, which decompresses), so this pins the skip as defence in depth and as
+    /// the direction that cannot invent a match: a DID outside every equivalence class is not
+    /// an alias of the sender, and skipping it costs nothing the textual lookup had, because
+    /// `envelope.from` always decodes.
+    #[tokio::test]
+    async fn a_stored_did_that_decodes_to_no_key_is_skipped_rather_than_matched() {
+        let undecodable = (0u8..=255)
+            .map(|byte| Did::from_anchor_id(&[byte; 32]))
+            .find(|did| did.to_verifying_key().is_err())
+            .expect(
+                "CONTROL: some anchor id must fail to decompress to an Ed25519 point, or this \
+                 case is vacuous",
+            );
+
+        let sender = KeyPair::generate().unwrap();
+        assert_eq!(
+            attributed_regime(
+                &[(undecodable, DURABLE), (sender.did().clone(), NOT_DURABLE)],
+                &create_signed_envelope(&sender, 1)
+            )
+            .await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "an undecodable row must neither match nor lend its capability to anyone"
         );
     }
 

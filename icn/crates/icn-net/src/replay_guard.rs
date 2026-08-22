@@ -2836,32 +2836,43 @@ impl ReplayGuard {
     ///
     /// # The merge rule, axis by axis, and why each is the conservative direction
     ///
-    /// **`max_seq` and `sender_regime` — merged as one unit, never axis by axis.** A
-    /// high-water is only meaningful relative to the namespace that produced it, so the pair
-    /// is the thing being merged. Within *one* namespace the maximum is the conservative
-    /// choice: the floor rejects `sequence <= floor`, so a larger floor rejects a superset
-    /// and cannot admit a replay. What happened before this fix is the opposite: two rows
-    /// landed in one window by last-`sled`-key-wins, so a **lower** floor could win (N2-A0
-    /// inventory, row #2).
+    /// **`max_seq` is merged only among rows that mean the same thing, never axis by axis.**
+    /// A high-water is meaningful only relative to the namespace that produced it and to the
+    /// semantic version that says how to read it, so rows are grouped by `(principal,
+    /// semantic_version, sender_regime)` and merged only *within* a group. There the maximum
+    /// is the conservative choice: the floor rejects `sequence <= floor`, so a larger floor
+    /// rejects a superset and cannot admit a replay. What happened before this fix is the
+    /// opposite: two rows landed in one window by last-`sled`-key-wins, so a **lower** floor
+    /// could win (N2-A0 inventory, row #2).
     ///
-    /// Across *different* namespaces the maximum is not conservative, it is meaningless.
+    /// Across *different* interpretations the maximum is not conservative, it is meaningless.
     /// Taking `max(legacy 10, durable-v1 3)` and labelling the result `DurableV1` states a
     /// pair that never existed, and the load pass then installs a durable floor of 10 with no
     /// hold — so the sender's legitimate durable sequences 4..=10 are rejected as replays.
     /// That rejection is an ordinary `Replay detected`, which
     /// [`crate::handlers::signed`] scores as peer misbehaviour, so laundering the number
-    /// bans an honest peer for our own merge. Mixed **recognised** namespaces therefore
-    /// resolve to `TransitionToDurableV1`, the state that already exists for exactly this
-    /// situation: the number is retained as legacy evidence only, the sender is held for the
-    /// envelope validity horizon, and the promotion at the end of that hold — which requires
-    /// live durable-v1 attribution, not merely elapsed time — resets `max_seq` and
-    /// `floor_seq` to 0. Captured traffic from either namespace stays blocked throughout, and
-    /// legitimate durable traffic becomes acceptable at the point the #2517 state machine
-    /// already authorises. See [`Self::merge_high_water`].
+    /// bans an honest peer for our own merge.
     ///
-    /// An unrecognised tag is preserved as-is and outranks all three recognised states, so the
-    /// existing unsupported-regime hold refuses the sender with no deadline and never reads
-    /// the number at all.
+    /// So mixed interpretations are **not resolved to one row at all** — not even to
+    /// `TransitionToDurableV1`, which an earlier iteration of this pass used for exactly this
+    /// case. There is one canonical key per principal and two or more independent effects to
+    /// record, so collapsing them means deleting the rows carrying the others; relabelling a
+    /// durable-v1 high-water of 10 as the transition's legacy evidence is precisely how the
+    /// promotion at the end of the migration came to discard a floor no row ever retired.
+    /// A principal whose readable rows span more than one interpretation is therefore left
+    /// uncanonicalized, every physical row intact, and what composes them is the load pass:
+    /// [`HighWaterEvidence`] records each namespace's number in its own field, keeps a
+    /// durable floor under the namespace that produced it, turns legacy-namespace numbers
+    /// into a migration obligation rather than a bound when a durable floor also exists, and
+    /// joins holds with [`PeerHold::stronger_of`]. Captured traffic from either namespace
+    /// stays blocked throughout, and legitimate durable traffic becomes acceptable at the
+    /// point the #2517 state machine already authorises. See
+    /// [`Self::canonicalize_max_seq_rows`] for the grouping and
+    /// [`HighWaterEvidence::apply_to`] for the composition.
+    ///
+    /// An unrecognised tag is one such interpretation and is preserved as-is; the
+    /// unsupported-regime hold it produces outranks all three recognised states, so the
+    /// sender is refused with no deadline and the number is never read at all.
     ///
     /// **`semantic_version` — the most restrictive.** Any unrecognised version wins (a
     /// no-deadline hold), else the legacy version wins (a bounded hold that discards the

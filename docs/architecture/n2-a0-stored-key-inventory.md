@@ -643,18 +643,34 @@ the merge pass until no store can contain a legacy alias row. Dropping the migra
 silently restore the durable half of this defect.
 
 Row #57 (`peer_connections`) carries a second invariant, surfaced by the independent security
-review of this change. That map is still spelling-keyed, so a re-spelled envelope from a sender
-that has established `DurableV1` misses its row-#57 lookup, reads as `LegacyOrUnproven`, and is
-refused by `handlers/signed.rs` with `SenderRegimeDowngrade` **before** the canonical replay floor
-becomes the rejecting mechanism. That is redundant defence in the safe direction — the floor
-rejects the same envelope on its own in both regime arms — but the redundancy disappears the
-moment N2-A makes row #57 alias-tolerant. N2-A must therefore (a) keep the canonical replay floor
-independently rejecting the re-spelled replay once that lookup starts hitting, and (b) retain or
-add a regression for exactly that case. It must also stop classifying the attacker-driven
-re-spelling path as a local fault: `SenderRegimeDowngrade` records no violation and logs "an
-operator must upgrade a binary or roll a downgraded peer forward", which is the wrong diagnosis
-for an attacker-chosen input arriving at an attacker-chosen rate. §12.1 item 6 covers the
-#57/#60 partner-map *desync*; it does not cover this.
+review of this change. That map is spelling-keyed — `handlers/hello.rs` inserts under the wire
+spelling of `from` — so a re-spelled envelope from a sender that has established `DurableV1`
+missed its row-#57 lookup and read as `LegacyOrUnproven`.
+
+An earlier revision of this section called that redundant defence in the safe direction, on the
+grounds that the canonical replay floor rejects the same envelope on its own in both regime arms.
+**That is true only where a floor already exists, and it is the wrong half of the case.** A
+receiver that has authenticated the sender but not yet accepted a message from it holds an *empty*
+window, so there is no floor to be redundant with: `(LegacyOrUnproven, LegacyOrUnproven)` is
+steady state, and a still-fresh envelope captured from the sender's pre-upgrade numbering was
+accepted and forwarded to the application, instead of entering the `MigratingSenderRegime` hold
+that `(LegacyOrUnproven, DurableV1)` installs and that exists precisely because old-namespace
+captures can still be inside their validity window. Only the established-window half was
+redundantly defended. Both halves are pinned in `handlers/signed.rs`
+(`a_respelled_envelope_cannot_launder_a_durable_sender_into_the_legacy_steady_state` and
+`a_respelled_replay_below_an_established_durable_floor_is_still_rejected`).
+
+The lookup itself is fixed rather than deferred: `handlers/signed.rs` now resolves the sender's
+authenticated capabilities by `SenderPrincipal` — the same equivalence class the signature check
+and `ReplayGuard` already use — joining across every row that decodes to that principal with
+"any authenticated row proving `DURABLE_SIGNING_SEQUENCE` proves it". The map's *key* is
+unchanged, so the other row-#57 and row-#60 consumers are untouched. N2-A therefore still owes
+(a) the canonical replay floor independently rejecting the re-spelled replay once the map key
+itself becomes alias-tolerant, and (b) keeping these regressions. The earlier concern that this
+path misclassified an attacker-chosen input as the local fault `SenderRegimeDowngrade` no longer
+applies to re-spelling — the lookup no longer misses — and `SenderRegimeDowngrade` is again what
+it is named for, an operator rollback. §12.1 item 6 covers the #57/#60 partner-map *desync*; it
+does not cover this.
 
 ### 10.3 Vote double-counting, and a re-cast guard that cannot fire
 `GovernanceError::AlreadyVoted` (`icn-governance/src/error.rs:33`) has **zero constructors anywhere
