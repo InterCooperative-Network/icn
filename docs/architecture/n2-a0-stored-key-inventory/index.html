@@ -341,6 +341,9 @@ canonically before persisting (S11: <code>Did::from_public_key</code> has 42 non
 takes a keypair or <code>VerifyingKey</code> directly; zero re-derive from a parsed <code>Did</code>; no
 <code>canonical()</code>/<code>normalize()</code> helper exists), so the old <em>Normalization</em> column was &quot;none&quot; for
 every row and is replaced by the consumer column.</p>
+<p><strong>Rows #1–#3 have since been discharged</strong> for the <code>ReplayGuard</code> — see the §10.2 status note.
+They are left as measured here, because this table is the record of what was true at the basis
+commit and the fix is a later event.</p>
 <table>
 <thead>
 <tr>
@@ -1660,6 +1663,170 @@ it (the durable rows #1–#3 are spelling-keyed and <code>from</code> stays unsi
 <code>from</code> closes it. <strong>Disposition:</strong> no existing issue owned it (#2480 observed &quot;<code>from</code> is not in the
 signed bytes&quot; and concluded it did not matter; it did not consider spellings). <strong>Filed by this
 review as #2640</strong> (<code>epic:trust-hardening</code>, <code>security-review</code>).</p>
+<h4 id="102-status--closed-at-the-replay-protection-boundary-2026-08-19-2640">10.2 status — closed at the replay-protection boundary (2026-08-19, #2640)</h4>
+<p>The measurements above stand as taken; this records what changed underneath them.</p>
+<p><strong>Fixed, in <code>icn-net</code> only.</strong> The <code>ReplayGuard</code>&#39;s identity is now the sender&#39;s decoded Ed25519
+key (<code>SenderPrincipal</code>), not the wire spelling. In memory, map #37 is keyed by it. Durably, rows
+<strong>#1 (<code>make_sender_regime_key</code>)</strong>, <strong>#2 (<code>make_max_seq_key</code>)</strong> and <strong>#3 (<code>make_finalized_key</code>)</strong>
+are written under the principal&#39;s canonical base58btc spelling, and a migration pass at
+<code>load_persisted_state</code> collapses pre-existing spelling-distinct rows onto that one key <strong>wherever
+one key can carry their combined meaning</strong>: high-water rows merge to the <strong>maximum</strong> only inside a
+single <code>(semantic_version, sender_regime)</code> group — the unit within which two numbers are
+comparable at all — provenance rows join to the <strong>strongest established</strong> regime, and finalized
+sequences take the <strong>union</strong>. The canonical row
+is flushed before any alias row is retired. A re-spelled captured envelope is therefore rejected by
+the replay guard, and the self-DID drop in <code>handlers/signed.rs</code> (§10.2&#39;s &quot;related sub-instance&quot;)
+now compares keys rather than strings.</p>
+<p><strong>Rows #1 and #2 are also joined <em>across</em> keyspaces, under a rule of their own.</strong> Row #2 carries a
+number together with a <code>sender_regime</code> field naming the namespace that produced it; row #1 is one
+version-less <code>u32</code> naming the namespace the sender was last known to have established, written at
+state transitions and deliberately outliving the number beside it (<code>cleanup()</code> retires row #2 and
+keeps row #1). Row #1 therefore settles the common aged-out case, where it is the only evidence —
+but where a <em>current-version</em> row #2 has already placed the number in a different namespace, both
+facts are true and they disagree, and row #1 may re-establish the regime without re-tagging the
+number (#2644). Durable provenance meeting a legacy-tagged current-version floor enters the
+ordinary sender-regime migration rather than reinterpreting that floor as a durable bound; a
+promotion discards the retained number only when the namespace being retired is the one that
+produced it. Detaching a number from its namespace fails in whichever direction the detachment
+runs: relabelling a legacy floor as durable turns an honest peer&#39;s legitimate low sequences into
+scored <code>Violation::ReplayAttack</code> events, while discarding a durable floor under a fossil
+transition record hands an authenticated sender back every sequence that floor rejected.</p>
+<p><strong>Canonicalization is deliberately partial; two shapes stay physically distinct.</strong> There is exactly
+one canonical key per <code>SenderPrincipal</code>, so a merged row can record only one interpretation. Where a
+principal&#39;s rows carry two, converging them destructively would lose one, so the pass writes nothing
+and deletes nothing in these cases:</p>
+<ul>
+<li><p><strong>Readable rows spanning several semantic versions</strong> (<code>canonicalize_max_seq_rows</code>).
+<code>semantic_version</code> selects <em>how</em> a persisted number is to be read, not how large it is, so &quot;most
+restrictive version&quot; is not a safe tie-break here: the legacy version wins that comparison, and
+collapsing onto it would replace a current-version durable floor with a legacy row whose number
+the load pass discards — leaving a floor of 0 once the bounded migration hold expires.</p>
+</li>
+<li><p><strong>Readable rows spanning several sender regimes, within one version</strong> (#2644). The same argument
+one axis over, and the sharper case: <code>sender_regime</code> names the namespace that produced the
+number, and numbers from two namespaces are not comparable at all. An earlier pass resolved such
+a pair to a single <code>TransitionToDurableV1</code> row carrying <code>max(durable, legacy)</code> — a state that
+never existed, in which a <em>durable</em> high-water of 10 wore the legacy label, so the promotion
+ending that migration discarded it and every durable sequence at or below 10 became replayable.
+There is no correct scalar to collapse them into, so they are not collapsed.</p>
+<p>The load pass groups by <code>(principal, semantic_version, sender_regime)</code> on the same rule and
+<strong>composes the groups&#39; effects</strong> onto one window instead, through <code>HighWaterEvidence</code>: each floor
+stays under the namespace that produced it (<code>NumericNamespace</code>), legacy-namespace numbers beside
+a durable floor contribute a bounded <code>MigratingSenderRegime</code> obligation rather than a number, and
+holds join by <code>PeerHold::stronger_of</code>. The composition is order-independent, which matters
+because the order <code>sled</code> hands the rows over is a property of the spellings an attacker picked.</p>
+</li>
+<li><p><strong>A group whose canonical row is itself unreadable</strong> (<code>install_canonical_row</code>). Writing the merge
+over it would erase the evidence that quarantines the sender and replace it with a floor derived
+only from the spellings that could be read. Every readable alias in that group is left standing
+and the load pass joins them — for row #1 through a provenance-specific join that ranks
+<code>DurableV1</code> above a superseded <code>TransitionToDurableV1</code>, because the latter installs a
+migration hold whose promotion retires the retained number, and a fossil row must not impose
+that on a principal a durable sibling already proved (#2644).</p>
+</li>
+</ul>
+<p><strong>Consequence, and it is a real cost.</strong> Alias rows left by any of these cases are never retired, and
+<code>cleanup()</code> deletes only the canonical key, so normal cleanup cannot reach them. A principal with a
+surviving legacy-version alias row therefore pays a bounded <code>MigratingFromLegacy</code> hold <strong>again on
+every restart</strong>, and one with a surviving legacy-regime alias row pays a bounded
+<code>MigratingSenderRegime</code> hold on every restart, for as long as that row exists. The mixed-regime case
+does not converge on its own: a completed promotion writes the canonical key and never touches an
+alias, so the pair re-forms on the next start. The store converges — and the recurring hold stops —
+only once the principal&#39;s rows are back to a single <code>(semantic_version, sender_regime)</code> group, at
+which point the next start canonicalizes them normally. That is the deliberate trade: a bounded, self-clearing hold that
+can recur, against a permanent loss of replay protection.</p>
+<p><strong>Unreadable rows quarantine in two of the three keyspaces, not all three.</strong> For row #1
+(<code>replay_sender_regime:</code>) and row #2 (<code>replay_max_seq:</code>), the load pass turns an unreadable value
+into a quarantine hold on the merged sender. Row #3 (<code>replay_finalized:</code>) is the exception: an
+unparseable value is left in place but <em>skipped</em>, with no hold, so a finalized block whose
+<code>(sender, sequence)</code> has no other readable row is lost silently. That arm is byte-identical to
+base (<code>5f86610f:icn/crates/icn-net/src/replay_guard.rs:1008</code>) — the behaviour predates #2640 and
+is not a #2640 bypass — and <code>ReplayGuard::finalize</code> / <code>is_finalized</code> have <strong>zero production
+callers</strong> workspace-wide, so the keyspace is unreachable machinery today. Making the finalized
+load pass quarantine-consistent with rows #1–#2 is a prerequisite before <code>finalize()</code> gains a
+production caller.</p>
+<p><strong>Not fixed, and unchanged by it.</strong> <code>SignedEnvelope::canonical_encoding</code> still does not cover
+<code>from</code>, so the field is still unauthenticated and a re-spelled envelope still <em>verifies</em>; only
+its second acceptance is refused. <code>Did::from_str</code> still accepts all 23 spellings and <code>Did</code>
+equality is still string equality — I7 / N2-A (#2627) still owns both, and this fix deliberately
+did not begin it. Every other row in §5–§7 is untouched, including <code>apps/trust-app/src/sequence.rs</code>
+(#71), the fourth instance of this class named in §10.2 above.</p>
+<p><strong>What N2-A must preserve.</strong> When I7 lands, <code>Did</code> equality becomes key equality and the in-memory
+window map would collapse spellings anyway — but the durable rows would not, so the canonical
+<em>write</em> here must stay. N2-A must either keep <code>SenderPrincipal</code> as the guard&#39;s key or, if it
+replaces it with a canonical <code>Did</code>, keep writing rows #1–#3 under a key-derived spelling and keep
+the merge pass until no store can contain a legacy alias row. Dropping the migration would
+silently restore the durable half of this defect.</p>
+<p>Row #57 (<code>peer_connections</code>) carries a second invariant, surfaced by the independent security
+review of this change. That map is spelling-keyed — <code>handlers/hello.rs</code> inserts under the wire
+spelling of <code>from</code> — so a re-spelled envelope from a sender that has established <code>DurableV1</code>
+missed its row-#57 lookup and read as <code>LegacyOrUnproven</code>.</p>
+<p>An earlier revision of this section called that redundant defence in the safe direction, on the
+grounds that the canonical replay floor rejects the same envelope on its own in both regime arms.
+<strong>That is true only where a floor already exists, and it is the wrong half of the case.</strong> A
+receiver that has authenticated the sender but not yet accepted a message from it holds an <em>empty</em>
+window, so there is no floor to be redundant with: <code>(LegacyOrUnproven, LegacyOrUnproven)</code> is
+steady state, and a still-fresh envelope captured from the sender&#39;s pre-upgrade numbering was
+accepted and forwarded to the application, instead of entering the <code>MigratingSenderRegime</code> hold
+that <code>(LegacyOrUnproven, DurableV1)</code> installs and that exists precisely because old-namespace
+captures can still be inside their validity window. Only the established-window half was
+redundantly defended. Both halves are pinned in <code>handlers/signed.rs</code>
+(<code>a_respelled_envelope_cannot_launder_a_durable_sender_into_the_legacy_steady_state</code> and
+<code>a_respelled_replay_below_an_established_durable_floor_is_still_rejected</code>).</p>
+<p>The lookup itself is fixed rather than deferred: <code>handlers/signed.rs</code> now resolves the sender&#39;s
+authenticated capabilities by <code>SenderPrincipal</code> — the same equivalence class the signature check
+and <code>ReplayGuard</code> already use — joining across the rows that decode to that principal with
+&quot;any such row proving <code>DURABLE_SIGNING_SEQUENCE</code> proves it&quot;. The map&#39;s <em>key</em> is unchanged, so the
+other row-#57 and row-#60 consumers are untouched.</p>
+<p><strong>That join no longer reads row #57 at all.</strong> Row #57 is a <em>cache</em>, not a live-session
+registry: nothing removes an entry when a connection ends (<code>actor/connection.rs</code> returns on both
+the application-close and the error path without touching the map; the only removal anywhere is
+the administrative <code>NetworkHandle::disconnect_peer</code>), and <code>restore_state</code> recreates entries from
+the snapshot at startup with their capability bits intact and no Hello behind them. Joining on
+principal alone over such a map let a peer that proved <code>DurableV1</code> under spelling A,
+disconnected, and returned under spelling B <em>without</em> the capability keep reading as <code>DurableV1</code>
+from A&#39;s abandoned row — the <code>(DurableV1, LegacyOrUnproven)</code> downgrade never fired, and a
+captured old-namespace sequence above the retained durable floor was admitted as though it were
+a durable number. Reproduced end to end at floor 10 with a captured sequence of 100; the
+snapshot variant needs no key at all, since <code>actor/connection.rs</code> dispatches
+<code>MessagePayload::Signed</code> without binding <code>envelope.from</code> to the connection&#39;s authenticated peer.</p>
+<p>Sender-regime attribution therefore moved out of row #57 entirely, to
+<code>icn-net/src/capability_evidence.rs</code>. <code>LiveCapabilityRegistry</code> is indexed by <code>SenderPrincipal</code>
+and holds an entry only while some connection is <em>leasing</em> it: <code>handle_hello</code> takes a
+<code>LiveCapabilityClaim</code> after the three #2520 DID-TLS checks pass, the claim lives in that
+connection&#39;s <code>ConnectionContext</code>, and the connection handler owns that context on its own stack
+frame — so every exit path releases it, including ones added later. This is the same RAII shape
+<code>preauth_admission::AdmissionGuard</code> already uses for #2547 slots, and it is what makes the two
+axes independent by construction: the index answers <em>which</em> key, and the lease&#39;s lifetime
+answers <em>whether the claim is still true</em>. Claims are reference counted, because a key holder may
+authenticate under several spellings of itself and cross-dialling gives one pair two connections
+at once; the join across live claims is <code>any</code>, which is the only join that cannot be suppressed
+by adding one.</p>
+<p>Two consequences worth recording for N2-A. First, this removes a per-envelope scan of an
+unbounded structure: the interim fix walked row #57 once per signed message, and since nothing
+prunes that map, a peer reconnecting under one-off DIDs could grow it permanently and make every
+other peer&#39;s traffic pay for the scan. The registry is one hash lookup, and its cardinality is
+the number of connections currently <em>claiming</em> — each of which is a live QUIC connection the
+peer has to keep standing up, where the cache kept its entry after the connection was gone.
+<strong>This is deliberately not a #2547 bound</strong>, and should not be recorded as one:
+<code>record_authenticated_peer</code> drops the admission guard the moment a connection authenticates,
+while the capability claim is taken afterwards, so pre-authentication admission limits how many
+connections a source may hold <em>while anonymous</em> and says nothing about authenticated ones. A
+post-authentication connection bound, if one is wanted, is a separate piece of work this does
+not supply. Second, row #57&#39;s <em>remaining</em> consumers are unchanged — cached version, X25519 and PQ material,
+and #2504-era reconnection — so the migration this row still owes is unaffected. What changed is
+that replay-regime attribution is no longer one of them.</p>
+<p>Row #57 keeps one unfixed consumer of the same class: <code>verify_with_cached_pq_key</code> resolves the
+cached ML-DSA key with the same textual <code>connections.get(&amp;envelope.from)</code>, so a re-spelled hybrid
+envelope misses and downgrades to Ed25519-only. Latent behind <code>#[cfg(feature = &quot;post-quantum&quot;)]</code>
+and tracked as <strong>#2646</strong> — deliberately not folded in here, because a capability is a boolean
+that joins with <code>any</code> while a key is a value, and &quot;pick any live claim&quot; is not obviously right.</p>
+<p>N2-A therefore still owes (a) the canonical replay floor independently rejecting the re-spelled
+replay once the map key itself becomes alias-tolerant, and (b) keeping these regressions. The
+earlier concern that this path misclassified an attacker-chosen input as the local fault
+<code>SenderRegimeDowngrade</code> no longer applies to re-spelling — the lookup no longer misses — and
+<code>SenderRegimeDowngrade</code> is again what it is named for, an operator rollback. §12.1 item 6 covers
+the #57/#60 partner-map <em>desync</em>; it does not cover this.</p>
 <h3 id="103-vote-double-counting-and-a-re-cast-guard-that-cannot-fire">10.3 Vote double-counting, and a re-cast guard that cannot fire</h3>
 <p><code>GovernanceError::AlreadyVoted</code> (<code>icn-governance/src/error.rs:33</code>) has <strong>zero constructors anywhere
 in the workspace</strong> — confirmed live, matching IDENTITY_SEMANTICS §7.5&#39;s &quot;declared but never
