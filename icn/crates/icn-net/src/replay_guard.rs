@@ -2828,11 +2828,13 @@ impl ReplayGuard {
     /// sees one readable row per sender (and per `(sender, sequence)` for finalized rows) and
     /// the #2514 / #2517 state machine is left exactly as it was.
     ///
-    /// Two groups are deliberately left unmerged, and for those the load pass still meets
+    /// Three groups are deliberately left unmerged, and for those the load pass still meets
     /// several rows for one principal: a row that does not parse is neither merged nor
-    /// deleted, and when the canonical row is the unreadable one its readable alias rows are
-    /// left in place too. The conservative rules below therefore do not run for those rows,
-    /// and combining them is [`SequenceWindow::install_hold_conservatively`]'s job instead.
+    /// deleted; when the canonical row is the unreadable one its readable alias rows are left
+    /// in place too; and a principal whose readable rows span more than one *interpretation*
+    /// is not collapsed at all (see below). The conservative rules below therefore do not run
+    /// for those rows. Combining them is [`SequenceWindow::install_hold_conservatively`]'s job
+    /// for the two unreadable cases, and [`HighWaterEvidence`]'s for mixed interpretations.
     ///
     /// # The merge rule, axis by axis, and why each is the conservative direction
     ///
@@ -2874,11 +2876,21 @@ impl ReplayGuard {
     /// unsupported-regime hold it produces outranks all three recognised states, so the
     /// sender is refused with no deadline and the number is never read at all.
     ///
-    /// **`semantic_version` — the most restrictive.** Any unrecognised version wins (a
-    /// no-deadline hold), else the legacy version wins (a bounded hold that discards the
-    /// number), else the current one. Discarding a good number under a legacy hold is safe
-    /// for the reason that path already gives: the hold outlasts the freshness of anything
-    /// written under that regime, so the floor is not what is rejecting replays during it.
+    /// **`semantic_version` is a grouping key, not a merged axis** — and the rule that used
+    /// to sit here is the reason. An earlier iteration resolved it to "the most restrictive":
+    /// any unrecognised version wins, else the legacy version, else the current one. Most
+    /// restrictive is not the same as *interpretable*. The legacy version wins that
+    /// comparison, so a current-version durable floor of 10 was replaced by a legacy row whose
+    /// number the load pass discards, leaving a floor of 0 the moment the bounded migration
+    /// hold expired — a permanent loss of replay protection produced by the merge itself.
+    /// `most_restrictive_semantic_version` was deleted with the rule; nothing merges this axis
+    /// now.
+    ///
+    /// Rows disagreeing about semantic version are therefore left physically distinct, exactly
+    /// as rows disagreeing about sender regime are, and [`HighWaterEvidence`] composes their
+    /// effects at load with each floor kept under the version that produced it. Restoring a
+    /// "pick one version and delete the rest" rule here reintroduces that floor loss, which is
+    /// why the removed rule is described rather than merely absent.
     ///
     /// **`finalized` — set union**, keeping the later `finalized_at_ms` on collision so the
     /// entry survives the 24h prune at least as long. A union can only block more sequences.
