@@ -308,6 +308,7 @@ impl NetworkActor {
             let topology_config = self.topology_config.clone();
             let session_manager = self.session_manager.clone();
             let peer_connections = self.peer_connections.clone();
+            let capability_registry = self.capability_registry.clone();
             let blob_registry = self.blob_registry.clone();
             let misbehavior_detector = self.misbehavior_detector.clone();
             let identity_bundle = self.identity_bundle.clone();
@@ -325,6 +326,7 @@ impl NetworkActor {
                     topology_config,
                     session_manager,
                     peer_connections,
+                    capability_registry,
                     blob_registry,
                     misbehavior_detector,
                     identity_bundle,

@@ -1096,6 +1096,7 @@ pub struct NetworkActor {
     topology_config: Option<TopologyConfig>,
     /// Per-peer connection metadata (version, capabilities, X25519 keys)
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+    capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
     /// Blob location registry for data locality (Phase 16C Week 2)
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
     /// Byzantine fault detector (Phase 18 Week 1-2)
@@ -1252,6 +1253,12 @@ impl NetworkActor {
         // Create peer connection info store (version, capabilities, X25519 keys)
         let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
 
+        // Live capability evidence, indexed by signing key (#2644). Deliberately *not* derived
+        // from `peer_connections`: that map keeps a row after its connection ends and gains rows
+        // from snapshot restore, so it answers "ever" where the replay guard has to ask "now".
+        let capability_registry =
+            Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new());
+
         // Initialize neighbor sets if topology is enabled
         let neighbor_sets = if let Some(ref topo_cfg) = topology_config {
             let own_topology = TopologyInfo {
@@ -1298,6 +1305,7 @@ impl NetworkActor {
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
             let peer_connections_clone = peer_connections.clone();
+            let capability_registry_clone = capability_registry.clone();
             let blob_registry_clone = blob_registry.clone();
             let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
@@ -1313,6 +1321,7 @@ impl NetworkActor {
                     neighbor_sets_clone,
                     topology_config_clone,
                     peer_connections_clone,
+                    capability_registry_clone,
                     blob_registry_clone,
                     misbehavior_detector_clone,
                     identity_bundle_clone,
@@ -1407,6 +1416,7 @@ impl NetworkActor {
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
             peer_connections: peer_connections.clone(),
+            capability_registry: capability_registry.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             nat_status: Arc::new(RwLock::new(NatStatus {

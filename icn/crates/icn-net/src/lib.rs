@@ -11,6 +11,7 @@ pub mod actor;
 pub mod blob_registry;
 pub mod candidate;
 pub mod candidate_cache;
+pub mod capability_evidence;
 pub mod discovery;
 pub mod encryption;
 pub mod envelope;

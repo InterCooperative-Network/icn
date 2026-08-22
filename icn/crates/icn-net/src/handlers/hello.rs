@@ -256,6 +256,34 @@ impl ConnectionContext {
             );
         }
 
+        // Record what *this* connection proves about its peer's sequence regime, for as long
+        // as this connection lasts (#2644).
+        //
+        // The row written above cannot carry this. Nothing removes it when the connection ends,
+        // and `restore_state` recreates it from a snapshot before any Hello, so it says what a
+        // peer once proved rather than what it is proving now — and a peer that had rolled back
+        // to an unproven regime kept a durable one it no longer had. The lease below expires
+        // with the connection, because `ConnectionContext` is owned by the connection handler's
+        // own stack frame.
+        //
+        // Keyed by the decoded signing key, not by the spelling of `from`: `handle_signed` asks
+        // the same question of the same equivalence class the signature check and `ReplayGuard`
+        // use, so no spelling of one key can select a different answer (#2640).
+        //
+        // Assignment order matters. The new claim is taken *before* the old one is dropped, so a
+        // repeated Hello re-stating the same capability never leaves a window in which a
+        // concurrent message reads the peer as unproven. Assigning to the slot is what drops the
+        // previous claim, so a peer that stops advertising the capability on this connection
+        // stops proving it here too.
+        {
+            let claim = common_caps
+                .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE)
+                .then(|| crate::replay_guard::SenderPrincipal::from_did(from).ok())
+                .flatten()
+                .map(|principal| self.capability_registry.claim_durable(principal));
+            self.replace_durable_claim(claim);
+        }
+
         // Store the incoming QUIC connection in session_manager
         {
             // Route through the canonical installer so the replace-if-closed rule cannot drift
@@ -570,6 +598,9 @@ mod binding_before_authentication {
         ctx: ConnectionContext,
         connection: quinn::Connection,
         admission: Arc<PreAuthAdmission>,
+        /// The same registry `ctx` holds, kept separately so a test can outlive the context and
+        /// ask what its teardown released (#2644).
+        capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
         source: SocketAddr,
         _client_connection: quinn::Connection,
         _client_endpoint: Endpoint,
@@ -643,6 +674,9 @@ mod binding_before_authentication {
                 anyhow::anyhow!("test connection was not admitted: {}", refused.as_str())
             })?;
 
+            let capability_registry =
+                Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new());
+
             let ctx = ConnectionContext::new(
                 Arc::new(|_| {}),
                 Arc::new(RateLimiter::new(RateLimitConfig::default())),
@@ -651,6 +685,7 @@ mod binding_before_authentication {
                 None, // topology_config
                 Arc::new(RwLock::new(SessionManager::new())),
                 Arc::new(RwLock::new(HashMap::new())),
+                capability_registry.clone(),
                 None, // blob_registry
                 None, // misbehavior_detector
                 node.clone(),
@@ -666,6 +701,7 @@ mod binding_before_authentication {
                 ctx,
                 connection,
                 admission,
+                capability_registry,
                 source,
                 _client_connection: client_connection,
                 _client_endpoint: client_endpoint,
@@ -675,12 +711,27 @@ mod binding_before_authentication {
 
         /// Deliver a Hello, with the claimed DID and the binding supplied independently.
         async fn hello(&self, from: &Did, binding: &BindingInfo) -> Result<()> {
+            self.hello_advertising(from, binding, VersionInfo::new("icnd-test".to_string()))
+                .await
+        }
+
+        /// The same, with the peer's advertised capabilities chosen by the caller.
+        ///
+        /// `VersionInfo::new` carries `CapabilityFlags::current()`, which includes
+        /// `DURABLE_SIGNING_SEQUENCE` — so the default Hello is a durable one, and stating the
+        /// *absence* of the capability needs this.
+        async fn hello_advertising(
+            &self,
+            from: &Did,
+            binding: &BindingInfo,
+            version: VersionInfo,
+        ) -> Result<()> {
             self.ctx
                 .handle_hello(
                     &self.connection,
                     from,
                     binding,
-                    &Some(VersionInfo::new("icnd-test".to_string())),
+                    &Some(version),
                     &None,         // topology_info
                     &[0x2eu8; 32], // x25519_public
                     None,          // ml_dsa_public
@@ -693,6 +744,21 @@ mod binding_before_authentication {
         /// The identity proven for this connection. `None` means "we cannot say who this is".
         async fn authenticated(&self) -> Option<Did> {
             self.ctx.authenticated_peer().await
+        }
+
+        /// Does any live connection currently claim the durable signing sequence for `did`'s key?
+        fn proves_durable(&self, did: &Did) -> bool {
+            Self::proves_durable_in(&self.capability_registry, did)
+        }
+
+        /// The same question asked of a registry that has outlived its context.
+        fn proves_durable_in(
+            registry: &crate::capability_evidence::LiveCapabilityRegistry,
+            did: &Did,
+        ) -> bool {
+            let principal = crate::replay_guard::SenderPrincipal::from_did(did)
+                .expect("a generated DID decodes to a key");
+            registry.proves_durable_signing_sequence(&principal)
         }
 
         /// Pre-authentication slots this connection's source still holds: 1 while anonymous,
@@ -924,5 +990,222 @@ mod binding_before_authentication {
         fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
             vec![rustls::SignatureScheme::ED25519]
         }
+    }
+
+    // ==================================================================================
+    // #2644 — live capability evidence is leased for exactly one connection's lifetime
+    // ==================================================================================
+
+    /// A verified Hello claims the durable regime for the key it just authenticated.
+    ///
+    /// This is the write side of what `handlers::signed` reads. It has to be asserted through a
+    /// real Hello on a real connection rather than by seeding a registry, because what makes the
+    /// claim trustworthy is that it happens *after* the three #2520 DID-TLS checks — a claim
+    /// registered before them would be an unproven peer's claim.
+    ///
+    /// Asked by *key*, not by the spelling the Hello used: the registry is indexed by
+    /// `SenderPrincipal`, so an alias of the same key must find the same claim (#2640).
+    #[tokio::test]
+    async fn a_verified_hello_claims_the_durable_regime_for_the_key_it_authenticated() -> Result<()>
+    {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+
+        assert!(
+            !harness.proves_durable(peer.did()),
+            "precondition: nothing is claimed before the Hello"
+        );
+
+        harness.hello(peer.did(), &peer.binding_info()).await?;
+
+        assert!(
+            harness.proves_durable(peer.did()),
+            "a Hello passing every DID-TLS check and advertising DURABLE_SIGNING_SEQUENCE must \
+             make this key durable for as long as this connection lasts"
+        );
+
+        let key = peer.did().to_verifying_key().expect("the DID decodes");
+        let alias = Did::from_str(&format!(
+            "did:icn:{}",
+            multibase::encode(multibase::Base::Base16Lower, key.as_bytes())
+        ))?;
+        assert_ne!(
+            alias.as_str(),
+            peer.did().as_str(),
+            "CONTROL: a different string"
+        );
+        assert!(
+            harness.proves_durable(&alias),
+            "the claim is about the signing key, so another spelling of it must find the same \
+             claim rather than a missing one (#2640)"
+        );
+        Ok(())
+    }
+
+    /// The other half: the claim goes away with the connection that made it.
+    ///
+    /// Asserting only that a Hello registers would pin a leak — that is exactly the shape #2644
+    /// reported, where `peer_connections` kept a capability row forever because no exit path
+    /// removed it. Nothing here calls a release: the lease lives in the `ConnectionContext`,
+    /// which the connection handler owns on its own stack frame, so dropping the context *is*
+    /// the release and every way that handler can exit performs it.
+    #[tokio::test]
+    async fn a_connection_that_goes_away_stops_proving_the_capability() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let registry = {
+            let harness = Harness::accept(&node, Some(&peer)).await?;
+            harness.hello(peer.did(), &peer.binding_info()).await?;
+            assert!(harness.proves_durable(peer.did()), "precondition: claimed");
+            let registry = harness.capability_registry.clone();
+            drop(harness);
+            registry
+        };
+
+        assert!(
+            !Harness::proves_durable_in(&registry, peer.did()),
+            "a capability claim outliving the connection that made it is the #2644 defect: a \
+             peer that rolled back would keep a durable regime it no longer has"
+        );
+        assert_eq!(
+            registry.claimed_keys(),
+            0,
+            "and the entry must be gone, not merely zeroed, or the registry grows with every \
+             peer that has ever connected"
+        );
+        Ok(())
+    }
+
+    /// A peer that does not advertise the capability claims nothing.
+    ///
+    /// Without this, every test above would pass on a build that claimed unconditionally — and
+    /// unconditional claiming is worse than the bug, since it would promise durability for
+    /// genuinely pre-#2510 senders.
+    #[tokio::test]
+    async fn a_hello_without_the_capability_claims_nothing() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+
+        let mut legacy = VersionInfo::new("icnd-before-2510".to_string());
+        legacy
+            .capabilities
+            .remove(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE);
+        assert!(
+            !legacy
+                .capabilities
+                .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+            "CONTROL: the peer really is not advertising it"
+        );
+
+        harness
+            .hello_advertising(peer.did(), &peer.binding_info(), legacy)
+            .await?;
+
+        assert_eq!(
+            harness.authenticated().await.as_ref(),
+            Some(peer.did()),
+            "CONTROL: the connection still authenticated, so this is about the capability and \
+             not about a rejected Hello"
+        );
+        assert!(
+            !harness.proves_durable(peer.did()),
+            "no advertisement, no claim"
+        );
+        Ok(())
+    }
+
+    /// A Hello that fails the DID-TLS checks claims nothing for the DID it named.
+    ///
+    /// The claim must sit behind the same gate the authentication does, or an unauthenticated
+    /// peer could assert a durable regime for somebody else's key by naming it.
+    #[tokio::test]
+    async fn a_rejected_hello_claims_nothing_for_the_did_it_named() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let attacker = IdentityBundle::generate()?;
+        let victim = IdentityBundle::generate()?;
+
+        // The attacker's certificate is on the wire; the Hello names the victim.
+        let harness = Harness::accept(&node, Some(&attacker)).await?;
+        let outcome = harness.hello(victim.did(), &attacker.binding_info()).await;
+        assert!(
+            outcome.is_err(),
+            "CONTROL: the binding check must reject this"
+        );
+
+        assert!(
+            !harness.proves_durable(victim.did()),
+            "a rejected Hello must not leave a durable claim standing for the key it named"
+        );
+        assert!(
+            !harness.proves_durable(attacker.did()),
+            "nor for the key that was actually on the wire, which never claimed anything"
+        );
+        Ok(())
+    }
+
+    /// A repeated Hello re-states the claim; it does not stack a second one.
+    ///
+    /// The lease is reference counted, so a connection that registered twice would need two
+    /// drops to release — and only one ever happens. That would leave a permanent claim behind
+    /// a connection that has closed, which is the reported defect reintroduced by a different
+    /// route. Mirrors `a_verified_hello_authenticates_and_releases_exactly_its_own_slot`, which
+    /// pins the same idempotence for the admission slot.
+    #[tokio::test]
+    async fn a_repeated_hello_does_not_stack_a_second_claim() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let registry = {
+            let harness = Harness::accept(&node, Some(&peer)).await?;
+            harness.hello(peer.did(), &peer.binding_info()).await?;
+            harness.hello(peer.did(), &peer.binding_info()).await?;
+            harness.hello(peer.did(), &peer.binding_info()).await?;
+            assert!(harness.proves_durable(peer.did()), "precondition: claimed");
+            let registry = harness.capability_registry.clone();
+            drop(harness);
+            registry
+        };
+
+        assert!(
+            !Harness::proves_durable_in(&registry, peer.did()),
+            "three Hellos on one connection are one claim, so one teardown must release it"
+        );
+        Ok(())
+    }
+
+    /// A peer that stops advertising the capability mid-connection stops proving it.
+    ///
+    /// The claim tracks the peer's current statement rather than the best one it ever made.
+    /// Otherwise a downgrade would have to wait for the connection to close to take effect,
+    /// which is the same "once proved, always proved" error at a shorter timescale.
+    #[tokio::test]
+    async fn a_hello_that_drops_the_capability_retracts_the_claim() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+
+        harness.hello(peer.did(), &peer.binding_info()).await?;
+        assert!(harness.proves_durable(peer.did()), "precondition: claimed");
+
+        let mut rolled_back = VersionInfo::new("icnd-rolled-back".to_string());
+        rolled_back
+            .capabilities
+            .remove(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE);
+        harness
+            .hello_advertising(peer.did(), &peer.binding_info(), rolled_back)
+            .await?;
+
+        assert!(
+            !harness.proves_durable(peer.did()),
+            "the peer's current Hello does not advertise it, so it is no longer proved"
+        );
+        Ok(())
     }
 }

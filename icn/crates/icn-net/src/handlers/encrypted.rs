@@ -224,6 +224,8 @@ mod tests {
             topology_config: None,
             session_manager,
             peer_connections,
+            capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
+            durable_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector: None,
             identity_bundle,
@@ -383,6 +385,8 @@ mod tests {
             topology_config: None,
             session_manager: Arc::new(RwLock::new(SessionManager::new())),
             peer_connections: Arc::new(RwLock::new(HashMap::new())), // Empty!
+            capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
+            durable_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector: None,
             identity_bundle,

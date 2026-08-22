@@ -104,142 +104,84 @@ impl ConnectionContext {
 
         // Which sequence namespace does this envelope's number belong to? (#2517)
         //
-        // Read from the capabilities `handle_hello` records, which it writes only after
-        // binding the claimed DID to the certificate on the live QUIC connection (#2520) —
-        // and only counted while that connection is still up. So a `DurableV1` answer here
-        // means the peer is proving, on a connection it has authenticated and still holds,
-        // that its signing sequence is durable DID state.
+        // Answered from the capability claims live connections are *currently* holding, so a
+        // `DurableV1` answer means some connection this node holds right now has authenticated
+        // a spelling of this key (#2520) and advertised `DURABLE_SIGNING_SEQUENCE` on it.
         //
         // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no current
-        // connection info, a peer that predates the capability, and a genuinely pre-#2510
-        // ephemeral sender are indistinguishable from here, and the safe reading is the one
-        // that does not promise durability.
+        // claim, a peer that predates the capability, and a genuinely pre-#2510 ephemeral
+        // sender are indistinguishable from here, and the safe reading is the one that does
+        // not promise durability.
         //
-        // # Asked about the sender's *key*, not the spelling of `from` (#2644)
+        // # Asked about the sender's *key*, not the spelling of `from` (#2640)
         //
-        // This lookup was `connections.get(&envelope.from)`, which is `Did`'s string
-        // equality — the same primitive #2640 removed from the replay guard, left standing
-        // one line above the guard it feeds. `peer_connections` is keyed by the wire spelling
-        // the peer used in its Hello, so re-spelling a captured envelope's `from` made the
-        // lookup miss and the sender read as `LegacyOrUnproven`. Against an **empty** replay
-        // window that is not a redundant refusal, it is the accept path: `(LegacyOrUnproven,
-        // LegacyOrUnproven)` is steady state, so the captured pre-upgrade envelope was
-        // forwarded to the application instead of entering the retirement hold that
-        // `(LegacyOrUnproven, DurableV1)` installs. The floor that rejects this replay in an
-        // established window did not exist yet, so nothing else refused it.
+        // This was `peer_connections.get(&envelope.from)` — `Did`'s string equality, the same
+        // primitive #2640 removed from the replay guard, left standing one line above the guard
+        // it feeds. That map is keyed by the wire spelling the peer used in its Hello, so
+        // re-spelling a captured envelope's `from` made the lookup miss and the sender read as
+        // `LegacyOrUnproven`. Against an **empty** replay window that is not a redundant
+        // refusal, it is the accept path: `(LegacyOrUnproven, LegacyOrUnproven)` is steady
+        // state, so the captured pre-upgrade envelope was forwarded to the application instead
+        // of entering the retirement hold that `(LegacyOrUnproven, DurableV1)` installs. The
+        // floor that rejects this replay in an established window did not exist yet, so nothing
+        // else refused it.
         //
-        // The guard beneath this and the signature check above both identify the sender by
-        // its decoded Ed25519 key; this now asks the same question of the same equivalence
-        // class, so one signing principal cannot select two different capability states.
-        // There is deliberately no textual fallback — that fallback *is* the defect — and
-        // none is needed: `sender_principal` was derived above and a failure there already
-        // dropped the message.
+        // The registry is indexed by `SenderPrincipal`, so this asks the same question of the
+        // same equivalence class as the signature check above and the guard below, and one
+        // signing principal cannot select two different capability states. There is
+        // deliberately no textual fallback — that fallback *is* the defect.
         //
-        // # Naming the right principal is necessary but not sufficient: the row must be *current*
+        // # Naming the right principal is necessary but not sufficient: the claim must be *current*
         //
-        // `peer_connections` is a cache, not a live-session registry, and the difference is
-        // load-bearing here. Nothing removes a row when a connection ends: the connection
-        // handler returns on both the application-close and the error path without touching
-        // the map (`actor/connection.rs`), and the only removal anywhere is the
-        // administrative `NetworkHandle::disconnect_peer`. Worse, `NetworkHandle::restore_state`
-        // *recreates* rows from a snapshot at startup, capability bits and all, before any
-        // Hello has been exchanged in this process. So a row can be a historical record of
-        // something a peer once proved rather than something it is proving now.
+        // Keying by principal alone over `peer_connections` re-opened the defect from the other
+        // side, because that map is a cache rather than a live-session registry. Nothing removes
+        // a row when a connection ends — the connection handler returns on both the
+        // application-close and the error path without touching it — and `restore_state`
+        // recreates rows from a snapshot at startup with their capability bits intact. So a peer
+        // that proved the capability under spelling A, closed that connection, and came back
+        // under spelling B *without* it — an operator rollback, or a lost signing store — still
+        // read as `DurableV1` from A's abandoned row, since B's Hello only replaces B's own key.
+        // That is precisely the `(DurableV1, LegacyOrUnproven)` state the guard exists to
+        // refuse, and skipping it is not a missed alarm but an accept: a captured old-namespace
+        // sequence above the retained durable floor is then compared to that floor as though it
+        // were a durable number, admitted, and promoted into it.
         //
-        // Joining on principal alone over such a map re-opened the defect from the other
-        // side. A peer that proved `DURABLE_SIGNING_SEQUENCE` under spelling A, closed that
-        // connection, and reconnected under spelling B *without* the capability — an operator
-        // rollback, or a lost signing store — still read as `DurableV1`, because A's abandoned
-        // row satisfied the disjunction. The new Hello only replaces its own key, so the two
-        // rows coexist. That is precisely the state `(DurableV1, LegacyOrUnproven)` exists to
-        // refuse, and skipping it is not a missed alarm but an accept: a captured
-        // old-namespace sequence above the retained durable floor is then compared to that
-        // floor as though it were a durable number, admitted, and promoted into it.
+        // `capability_registry` holds only claims a live connection is leasing, so the two axes
+        // are separated by construction: the index answers *which* key, and the lease's lifetime
+        // answers *whether it is still true*. That restores the meaning
+        // `ObservedSenderRegime::DurableV1` documents — "the peer authenticated on the current
+        // connection" — and that `check_replay_only` relies on when it calls `observed_regime`
+        // "what the current authenticated connection proves". See `capability_evidence` for why
+        // the lease, rather than a second index somebody has to remember to update, is what
+        // makes that hold.
         //
-        // So the two axes are independent and both required. `SenderPrincipal` selects *which*
-        // peer's evidence is relevant; a live session for the row's own spelling selects
-        // *whether* that evidence is current at all. This is the meaning
-        // `ObservedSenderRegime::DurableV1` has always documented — "the peer authenticated on
-        // the current connection" — and the meaning `check_replay_only` relies on when it
-        // calls `observed_regime` "what the current authenticated connection proves".
+        // # Several live connections can claim one key, and any one of them proves it
         //
-        // # Liveness is paired to the row's own spelling, never to the principal
+        // A key holder can authenticate under more than one spelling of itself — the #2520
+        // DID-TLS checks compare the binding's DID to `from` as strings and then verify with
+        // that DID's own key, so every spelling it signs for passes — and cross-dialling gives
+        // one pair two connections at once. The registry reference-counts those claims, so the
+        // join across them is **any**: one live connection proving the capability makes the
+        // principal durable.
         //
-        // `session_manager` is keyed by `from.to_string()` and `peer_connections` by `from`,
-        // and `Did`'s `Display` writes the same bytes `as_str` returns, so the two maps agree
-        // key for key — `handle_hello` writes both from the same `from` on the same
-        // connection. The pairing is therefore exact, and it must stay exact: matching a
-        // stale row to *any* live session for the same principal would rebuild the bug, since
-        // the stale durable row A and the live legacy connection B in the case above decode
-        // to one key. A's evidence has to live or die with A's session.
+        // That is the sound direction. The capability describes the sender's signing *store*
+        // (#2510: crash-safe, monotonic, never reissued), which is per-key state rather than per
+        // connection, and `any` is the only join that cannot be *suppressed* by adding a claim —
+        // which is precisely what a key holder can do. `all`, first-wins and last-wins each let
+        // one connection that simply does not mention the capability erase a proof another
+        // connection is still making.
         //
-        // Map occupancy is not liveness either — a peer's restart leaves a dead entry behind
-        // until something replaces it (#2504) — so the session must additionally be open.
-        // This is the same test `connected_peer_endpoints` already applies to the same map.
-        //
-        // # Several *current* rows can name one principal, and any one of them proves it
-        //
-        // A key holder can authenticate under more than one spelling of itself: the #2520
-        // DID-TLS checks in `handle_hello` compare the binding's DID to `from` as strings and
-        // then verify with that DID's own key, so every spelling it signs for passes. The
-        // join across those rows is therefore part of the security property, not an
-        // implementation detail, and over *current* rows it is **any**: one live authenticated
-        // row proving `DURABLE_SIGNING_SEQUENCE` makes the principal durable.
-        //
-        // That is the sound direction on both axes. #2520 means no row exists for a key whose
-        // holder did not prove possession of it on a live connection, so every row for this
-        // principal is that principal's own claim and combining them crosses no trust
-        // boundary; and the capability describes the sender's signing *store* (#2510:
-        // crash-safe, monotonic, never reissued), which is per-DID state rather than per
-        // connection. It is also the only join that cannot be *suppressed* by adding a row —
-        // and adding rows is precisely what a key holder (a second Hello) can do. `all`,
-        // first-write-wins and last-write-wins each let one legacy-looking row erase a durable
-        // proof a live connection is still making.
-        //
-        // The currency filter is what keeps `any` honest. Before it, "adding a row" included
-        // *leaving one behind*, so the disjunction could never fall back to `LegacyOrUnproven`
-        // once anything durable had ever been recorded, and the downgrade arm was unreachable
-        // for any peer that changed spelling. Now the disjunction ranges only over rows a
-        // live session vouches for, so it empties out when the peer's durable connections do.
-        //
-        // Order-independent by construction: `any` over a set is commutative, so the answer
-        // does not depend on `HashMap` iteration order (AGENTS.md §3, determinism).
-        //
-        // Cost: the three conjuncts are ordered cheapest-first. Rows that do not advertise the
-        // capability cannot make the disjunction true, so they are rejected on a flag test;
-        // rows no live session vouches for are rejected on one hash lookup; only what survives
-        // both is decoded, and `any` stops at the first row that proves it.
-        let observed_regime = {
-            // The session map's `Arc` is cloned out first, so the session manager's own lock
-            // is released before either map is read. The two map guards are then taken
-            // sessions-before-peers, which nothing inverts: `handle_hello` drops its
-            // `peer_connections` write guard before installing the session, and
-            // `broadcast_message` releases the session map before reading `peer_connections`.
-            let live_sessions = self.session_manager.read().await.connections_arc();
-            let live_sessions = live_sessions.read().await;
-            let connections = self.peer_connections.read().await;
-            let proved_durable = connections.iter().any(|(spelling, info)| {
-                info.peer_capabilities
-                    .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE)
-                    // Current evidence, not a historical record: this row's own spelling must
-                    // still hold an open authenticated session. A closed handle, a spelling
-                    // whose connection ended, and a snapshot-restored row with no session at
-                    // all are all excluded here.
-                    && live_sessions
-                        .get(spelling.as_str())
-                        .is_some_and(|session| session.close_reason().is_none())
-                    // A key stored under a spelling that decodes to nothing names no
-                    // principal at all, so it is evidence about nobody and is skipped rather
-                    // than matched. It loses nothing the textual lookup had: `envelope.from`
-                    // always decodes, so any row that string-matched it decoded too.
-                    && crate::replay_guard::SenderPrincipal::from_did(spelling)
-                        .is_ok_and(|row_principal| row_principal == sender_principal)
-            });
-            if proved_durable {
-                crate::replay_guard::ObservedSenderRegime::DurableV1
-            } else {
-                crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven
-            }
+        // Cost: one hash lookup, whatever the peer population. The predecessor walked
+        // `peer_connections` per envelope, and since nothing prunes that map, a peer
+        // reconnecting under one-off DIDs could grow it without bound and make every other
+        // peer's traffic pay for the scan.
+        let observed_regime = if self
+            .capability_registry
+            .proves_durable_signing_sequence(&sender_principal)
+        {
+            crate::replay_guard::ObservedSenderRegime::DurableV1
+        } else {
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven
         };
 
         // Signature valid, now check for replay attack
@@ -611,6 +553,8 @@ mod tests {
             topology_config: None,
             session_manager,
             peer_connections,
+            capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
+            durable_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector,
             identity_bundle,
@@ -1419,150 +1363,59 @@ mod tests {
         }
     }
 
-    /// A pair of started QUIC endpoints, used to mint *real* connections.
-    ///
-    /// `close_reason()` is the predicate under test and it is a property of a live
-    /// `quinn::Connection`: a closed handle cannot be constructed, only produced by closing a
-    /// real one. Modelling the session map with anything else would prove that the test's
-    /// model is consistent, not that the handler reads liveness correctly.
-    struct QuicPair {
-        listener: SessionManager,
-        dialer: SessionManager,
-    }
-
-    /// One established connection, both ends.
-    ///
-    /// Holding the peer end is what keeps the receiver end open: a `quinn::Connection` closes
-    /// when its last handle drops, so a test that only kept our end would be closing
-    /// connections it meant to leave live.
-    struct LiveConn {
-        /// The end a receiver stores in its session map.
-        ours: quinn::Connection,
-        /// The peer's end. Closing this is how the peer goes away.
-        theirs: quinn::Connection,
-    }
-
-    impl LiveConn {
-        /// The peer disconnects normally, and we wait until our end observes it — so
-        /// `close_reason()` is `Some` by construction rather than by timing.
-        async fn peer_disconnects(&self) {
-            self.theirs.close(0u32.into(), b"peer disconnect");
-            tokio::time::timeout(std::time::Duration::from_secs(5), self.ours.closed())
-                .await
-                .expect("our end must observe the peer's close");
-            assert!(
-                self.ours.close_reason().is_some(),
-                "CONTROL: the connection must actually read as closed, or the case is vacuous"
-            );
-        }
-    }
-
-    impl QuicPair {
-        async fn new() -> Self {
-            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-            let mut listener = SessionManager::new();
-            listener
-                .start(
-                    &IdentityBundle::generate().unwrap(),
-                    "127.0.0.1:0".parse().unwrap(),
-                    None,
-                    None,
-                )
-                .await
-                .unwrap();
-            let mut dialer = SessionManager::new();
-            dialer
-                .start(
-                    &IdentityBundle::generate().unwrap(),
-                    "127.0.0.1:0".parse().unwrap(),
-                    None,
-                    None,
-                )
-                .await
-                .unwrap();
-            QuicPair { listener, dialer }
-        }
-
-        /// One more established connection.
-        async fn connect(&self, nonce: usize) -> LiveConn {
-            let endpoint = self.listener.endpoint_handle().await.unwrap();
-            let addr = endpoint.local_addr().unwrap();
-            let accepting = tokio::spawn(async move {
-                endpoint
-                    .accept()
-                    .await
-                    .expect("an incoming connection")
-                    .await
-                    .expect("the handshake completes")
-            });
-            let theirs = match self
-                .dialer
-                .dial(addr, format!("did:icn:zHarnessPeer{nonce}"))
-                .await
-                .unwrap()
-            {
-                crate::session::DialOutcome::Established(conn) => conn,
-                crate::session::DialOutcome::AlreadyConnected(_) => {
-                    panic!("the harness dialled a peer it already held a live session with")
-                }
-            };
-            let ours = accepting.await.unwrap();
-            LiveConn { ours, theirs }
-        }
-    }
-
-    /// What kind of `peer_connections` row this is — the axis #2644 is about.
+    /// What kind of `peer_connections` row this is, and whether a live connection is still
+    /// claiming the capability behind it — the axis #2644 is about.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Row {
-        /// A live authenticated connection: the capability row *and* an open session entry
-        /// under the same spelling, exactly as `handle_hello` leaves them.
+        /// A connection that authenticated and is still up: the cache row *and* a held lease,
+        /// exactly what `handle_hello` leaves behind while the peer is here.
         Live,
-        /// The peer authenticated and then disconnected normally. The capability row survives
-        /// — nothing removes it — and so does the session entry, but closed (#2504).
+        /// The peer authenticated and then went away. The cache row survives — nothing removes
+        /// it — but the lease its connection held has been released.
         Closed,
-        /// A capability row with no session entry at all: what `NetworkHandle::restore_state`
-        /// writes at startup from a snapshot, before any Hello in this process.
+        /// A cache row with no connection behind it, ever: what
+        /// `NetworkHandle::restore_state` writes at startup from a snapshot.
         Snapshot,
     }
 
-    /// Install one row in the shape `kind` describes, returning the connection so the caller
-    /// can keep it alive for the duration of the case.
+    /// Put one peer into the state `kind` describes, returning the lease so the caller can keep
+    /// the connection "up" for the duration of the case.
+    ///
+    /// The cache row is written for **every** kind, including the ones that must not count. That
+    /// is deliberate: it is what makes these tests evidence that the handler stopped reading the
+    /// cache, rather than evidence that the cache happened to be empty.
     async fn install_row(
         ctx: &ConnectionContext,
-        quic: &QuicPair,
-        nonce: usize,
         spelling: &Did,
         caps: crate::CapabilityFlags,
         kind: Row,
-    ) -> Option<LiveConn> {
-        // `handle_hello` writes the capability row for every authenticated Hello, whatever
-        // becomes of the connection afterwards.
+    ) -> Option<crate::capability_evidence::LiveCapabilityClaim> {
         ctx.peer_connections
             .write()
             .await
             .insert(spelling.clone(), authenticated_row(spelling, caps));
 
         if kind == Row::Snapshot {
-            // No session was ever installed for this spelling: a restored cache row.
+            // Restored from disk. No connection ever authenticated in this process, so there is
+            // nothing to have claimed anything.
             return None;
         }
 
-        // Routed through the canonical installer rather than writing the map directly, so the
-        // pairing under test is the one `handle_hello` actually produces (#2504/#2530).
-        let conn = quic.connect(nonce).await;
-        let arc = ctx.session_manager.read().await.connections_arc();
-        crate::session::install_incoming_connection(
-            &arc,
-            Some(ctx.own_did.as_str()),
-            spelling.to_string(),
-            conn.ours.clone(),
-        )
-        .await;
+        // What `handle_hello` does once the #2520 DID-TLS checks have passed: claim the durable
+        // regime for the key it just authenticated, keyed by principal rather than spelling.
+        let claim = caps
+            .contains(DURABLE)
+            .then(|| crate::replay_guard::SenderPrincipal::from_did(spelling).ok())
+            .flatten()
+            .map(|principal| ctx.capability_registry.claim_durable(principal));
 
-        if kind == Row::Closed {
-            conn.peer_disconnects().await;
+        match kind {
+            Row::Live => claim,
+            // The connection ends here. Returning `None` drops the lease, which is the release —
+            // the claim really was made and really was given back, rather than never made.
+            Row::Closed => None,
+            Row::Snapshot => unreachable!("returned above"),
         }
-        Some(conn)
     }
 
     /// Which regime the handler attributed to `envelope`, read off the only difference that
@@ -1585,10 +1438,9 @@ mod tests {
         envelope: &SignedEnvelope,
     ) -> crate::replay_guard::ObservedSenderRegime {
         let (ctx, forwarded) = create_test_context(None);
-        let quic = QuicPair::new().await;
         let mut held = Vec::new();
-        for (nonce, (spelling, caps, kind)) in rows.iter().enumerate() {
-            held.push(install_row(&ctx, &quic, nonce, spelling, *caps, *kind).await);
+        for (spelling, caps, kind) in rows {
+            held.push(install_row(&ctx, spelling, *caps, *kind).await);
         }
         ctx.handle_signed(create_network_message(envelope), envelope)
             .await;
@@ -1625,8 +1477,7 @@ mod tests {
         // Post-Hello authenticated state under the spelling the peer used, on a connection
         // the peer is still holding: capability row and live session together, which is the
         // only shape that counts as current evidence (#2644).
-        let quic = QuicPair::new().await;
-        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
+        let _live = install_row(&ctx, sender.did(), DURABLE, Row::Live).await;
 
         let alias = alias_in(multibase::Base::Base16Lower, "base16-lower", sender.did());
         for captured_sequence in [42, 43] {
@@ -1662,8 +1513,7 @@ mod tests {
     async fn the_stored_spelling_reaches_the_same_security_result() {
         let (ctx, forwarded) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-        let quic = QuicPair::new().await;
-        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
+        let _live = install_row(&ctx, sender.did(), DURABLE, Row::Live).await;
 
         for captured_sequence in [42, 43] {
             let captured = create_signed_envelope(&sender, captured_sequence);
@@ -1874,8 +1724,7 @@ mod tests {
     async fn a_respelled_replay_below_an_established_durable_floor_is_still_rejected() {
         let (ctx, forwarded) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-        let quic = QuicPair::new().await;
-        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
+        let _live = install_row(&ctx, sender.did(), DURABLE, Row::Live).await;
 
         // Establish a durable floor directly: the migration hold is not what is under test.
         let accepted = create_signed_envelope(&sender, 9);
@@ -1959,11 +1808,8 @@ mod tests {
 
         let migrating = KeyPair::generate().unwrap();
         let migrating_did = migrating.did().clone();
-        let quic = QuicPair::new().await;
         let _live = install_row(
             &ctx,
-            &quic,
-            0,
             &migrating_did,
             crate::CapabilityFlags::E2E_ENCRYPTION
                 | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
@@ -2322,20 +2168,19 @@ mod tests {
             Some(detector.clone()),
             ReplayGuard::new(300, 3600).with_clock(clock.clone()),
         );
-        let quic = QuicPair::new().await;
         let sender = KeyPair::generate().unwrap();
         let a = sender.did().clone();
         let b = alias_in(multibase::Base::Base16Lower, "base16-lower", &a);
 
         // The peer authenticates as A, advertising the durable capability, and establishes
         // its window.
-        let live_a = install_row(&ctx, &quic, 0, &a, DURABLE, Row::Live)
+        let live_a = install_row(&ctx, &a, DURABLE, Row::Live)
             .await
             .expect("A has a live session");
         establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
 
         // A disconnects normally. Nothing removes its capability row.
-        live_a.peer_disconnects().await;
+        drop(live_a);
         {
             let rows = ctx.peer_connections.read().await;
             let stale = rows.get(&a).expect(
@@ -2352,9 +2197,9 @@ mod tests {
         }
 
         // The same key comes back under a different accepted spelling, without the capability.
-        let _live_b = install_row(&ctx, &quic, 1, &b, NOT_DURABLE, Row::Live)
-            .await
-            .expect("B has a live session");
+        // A live legacy connection holds no lease: the registry tracks durable claims only,
+        // and "connected but not claiming" is exactly what a rolled-back peer looks like.
+        let _live_b = install_row(&ctx, &b, NOT_DURABLE, Row::Live).await;
         {
             let rows = ctx.peer_connections.read().await;
             assert!(rows.contains_key(&a) && rows.contains_key(&b));
@@ -2408,21 +2253,20 @@ mod tests {
             Some(detector.clone()),
             ReplayGuard::new(300, 3600).with_clock(clock.clone()),
         );
-        let quic = QuicPair::new().await;
         let sender = KeyPair::generate().unwrap();
         let a = sender.did().clone();
         let b = alias_in(multibase::Base::Base16Lower, "base16-lower", &a);
 
-        let live_a = install_row(&ctx, &quic, 0, &a, DURABLE, Row::Live)
+        let live_a = install_row(&ctx, &a, DURABLE, Row::Live)
             .await
             .expect("A has a live session");
         establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
-        live_a.peer_disconnects().await;
+        drop(live_a);
 
         // The only difference from the case above.
         ctx.peer_connections.write().await.remove(&a);
 
-        let _live_b = install_row(&ctx, &quic, 1, &b, NOT_DURABLE, Row::Live).await;
+        let _live_b = install_row(&ctx, &b, NOT_DURABLE, Row::Live).await;
         let captured = create_signed_envelope(&sender, 100);
         let forged = respell(&captured, &b);
         let before = forwarded.load(Ordering::SeqCst);
@@ -2453,10 +2297,9 @@ mod tests {
             None,
             ReplayGuard::new(300, 3600).with_clock(clock.clone()),
         );
-        let quic = QuicPair::new().await;
         let sender = KeyPair::generate().unwrap();
 
-        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live)
+        let _live = install_row(&ctx, sender.did(), DURABLE, Row::Live)
             .await
             .expect("a live session");
         establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
@@ -2611,19 +2454,16 @@ mod tests {
         let sender = KeyPair::generate().unwrap();
         let captured = create_signed_envelope(&sender, 5);
         let (ctx, forwarded) = create_test_context(None);
-        let quic = QuicPair::new().await;
 
         // Durable, then gone.
-        let first = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live)
+        let first = install_row(&ctx, sender.did(), DURABLE, Row::Live)
             .await
             .expect("a live session");
-        first.peer_disconnects().await;
+        drop(first);
 
         // Back under the *same* spelling, no capability. The row and the session entry are
         // both replaced by this connection's own.
-        let _second = install_row(&ctx, &quic, 1, sender.did(), NOT_DURABLE, Row::Live)
-            .await
-            .expect("a live session");
+        let _second = install_row(&ctx, sender.did(), NOT_DURABLE, Row::Live).await;
 
         ctx.handle_signed(create_network_message(&captured), &captured)
             .await;
@@ -2703,75 +2543,71 @@ mod tests {
         }
     }
 
-    /// DUPLICATE PHYSICAL CONNECTIONS FOR ONE SPELLING.
+    /// DUPLICATE PHYSICAL CONNECTIONS FOR ONE KEY.
     ///
     /// `handle_hello` writes `peer_connections[from]` unconditionally and only then calls
     /// `install_incoming_connection`, which *declines* — without closing — a duplicate when a
-    /// live entry already owns the key (#2504). So the capability row can be written by one
-    /// physical connection while the session entry proving liveness is another.
+    /// live entry already owns the key (#2504). Under the old cache-plus-session reading that
+    /// was a genuine mismatch: the capability row could be written by one physical connection
+    /// while the thing proving it was still up was another.
     ///
-    /// That mismatch is deliberately not treated as a defect, and this is the reasoning it
-    /// rests on. Writing a row for a spelling requires passing the three #2520 DID-TLS checks
-    /// for it, so both connections are the same key holder; `insert` is last-write-wins, so
-    /// the row is that holder's *most recent* claim; and the session entry proves it is still
-    /// here. "The latest claim this peer made, while this peer is still connected" is exactly
-    /// what current evidence should mean. Binding the row to one physical connection would be
-    /// stricter and *worse*: a declined duplicate would strand the peer with no usable row.
+    /// Leasing removes the mismatch instead of tolerating it. Each connection claims for
+    /// itself, whether or not it won the session map, and gives its claim back when it ends. So
+    /// this asserts the property that replaces it: the key stays proved while *any* of its
+    /// connections is up, and stops the moment the last one goes — not when the first does.
     ///
-    /// What must never happen is the cross-principal version, so that is asserted here: a live
-    /// session belonging to a different key cannot supply anyone else's capability.
+    /// Dropping on the first would let a peer cancel its own live proof by closing an unrelated
+    /// connection, which is the "adding a row must not suppress a proof" failure mirrored.
     #[tokio::test]
-    async fn a_second_connection_for_one_spelling_is_still_that_principals_own_claim() {
+    async fn a_key_stays_proved_until_its_last_connection_goes() {
         let sender = KeyPair::generate().unwrap();
-        let captured = create_signed_envelope(&sender, 4);
-        let (ctx, forwarded) = create_test_context(None);
-        let quic = QuicPair::new().await;
+        let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", sender.did());
 
-        // First connection authenticates and is installed as the session.
-        let _installed = install_row(&ctx, &quic, 0, sender.did(), NOT_DURABLE, Row::Live)
-            .await
-            .expect("a live session");
-
-        // A second physical connection for the same spelling: its Hello overwrites the row,
-        // but the installer keeps the first connection as the session.
-        let duplicate = quic.connect(1).await;
-        ctx.peer_connections.write().await.insert(
-            sender.did().clone(),
-            authenticated_row(sender.did(), DURABLE),
-        );
-        let arc = ctx.session_manager.read().await.connections_arc();
-        crate::session::install_incoming_connection(
-            &arc,
-            Some(ctx.own_did.as_str()),
-            sender.did().to_string(),
-            duplicate.ours.clone(),
-        )
-        .await;
+        // A fresh context per case: the first accepted message would install the retirement
+        // hold, and a hold left over from the setup would refuse the message under test for a
+        // reason that has nothing to do with the claim.
         {
-            let sessions = arc.read().await;
-            let held = sessions
-                .get(sender.did().as_str())
-                .expect("the spelling still has a session");
-            assert_ne!(
-                held.stable_id(),
-                duplicate.ours.stable_id(),
-                "CONTROL: the installer must have declined the duplicate, or this case is not \
-                 the mismatch it claims to be"
-            );
-            assert!(
-                held.close_reason().is_none(),
-                "CONTROL: and it is still live"
+            let (ctx, forwarded) = create_test_context(None);
+            let first = install_row(&ctx, sender.did(), DURABLE, Row::Live)
+                .await
+                .expect("a live claim");
+            let _second = install_row(&ctx, &alias, DURABLE, Row::Live)
+                .await
+                .expect("a live claim");
+            drop(first);
+
+            let captured = create_signed_envelope(&sender, 4);
+            ctx.handle_signed(create_network_message(&captured), &captured)
+                .await;
+            assert_eq!(
+                forwarded.load(Ordering::SeqCst),
+                0,
+                "one connection closing must not retract a claim another connection is still \
+                 making: an empty window still owes this sender the retirement hold"
             );
         }
 
-        ctx.handle_signed(create_network_message(&captured), &captured)
-            .await;
-        assert_eq!(
-            forwarded.load(Ordering::SeqCst),
-            0,
-            "the row is this principal's own most recent authenticated claim and this \
-             principal is still connected under this spelling, so it counts: an empty window \
-             owes it the retirement hold"
-        );
+        {
+            let (ctx, forwarded) = create_test_context(None);
+            let first = install_row(&ctx, sender.did(), DURABLE, Row::Live)
+                .await
+                .expect("a live claim");
+            let second = install_row(&ctx, &alias, DURABLE, Row::Live)
+                .await
+                .expect("a live claim");
+            drop(first);
+            drop(second);
+
+            let captured = create_signed_envelope(&sender, 4);
+            ctx.handle_signed(create_network_message(&captured), &captured)
+                .await;
+            assert_eq!(
+                forwarded.load(Ordering::SeqCst),
+                1,
+                "once the last connection is gone the key proves nothing, so this is the legacy \
+                 steady state and the envelope is forwarded — the cache rows both connections \
+                 wrote are still there and must not speak for them"
+            );
+        }
     }
 }

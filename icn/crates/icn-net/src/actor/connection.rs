@@ -211,6 +211,7 @@ impl NetworkActor {
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+        capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
@@ -300,6 +301,7 @@ impl NetworkActor {
             let topology_config_clone = topology_config.clone();
             let session_mgr_clone = session_manager.clone();
             let peer_connections_clone = peer_connections.clone();
+            let capability_registry_clone = capability_registry.clone();
             let blob_registry_clone = blob_registry.clone();
             let misbehavior_detector_clone = misbehavior_detector.clone();
             let identity_bundle_clone = identity_bundle.clone();
@@ -357,6 +359,7 @@ impl NetworkActor {
                     topology_config_clone,
                     session_mgr_clone,
                     peer_connections_clone,
+                    capability_registry_clone,
                     blob_registry_clone,
                     misbehavior_detector_clone,
                     identity_bundle_clone,
@@ -400,6 +403,7 @@ impl NetworkActor {
         topology_config: Option<TopologyConfig>,
         session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
+        capability_registry: Arc<crate::capability_evidence::LiveCapabilityRegistry>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         identity_bundle: IdentityBundle,
@@ -440,6 +444,7 @@ impl NetworkActor {
             topology_config.clone(),
             session_manager.clone(),
             peer_connections.clone(),
+            capability_registry.clone(),
             blob_registry.clone(),
             misbehavior_detector.clone(),
             identity_bundle.clone(),

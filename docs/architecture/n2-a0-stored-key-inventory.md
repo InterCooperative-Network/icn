@@ -666,41 +666,46 @@ and `ReplayGuard` already use — joining across the rows that decode to that pr
 "any such row proving `DURABLE_SIGNING_SEQUENCE` proves it". The map's *key* is unchanged, so the
 other row-#57 and row-#60 consumers are untouched.
 
-**That join ranges only over rows a live session still vouches for**, which is the second half of
-the same defect and was reported separately against the first fix. Row #57 is a *cache*, not a
-live-session registry: nothing removes an entry when a connection ends (`actor/connection.rs`
-returns on both the application-close and the error path without touching the map; the only
-removal anywhere is the administrative `NetworkHandle::disconnect_peer`), and `restore_state`
-recreates entries from the snapshot at startup with their capability bits intact and no Hello
-behind them. So joining on principal alone let a peer that proved `DurableV1` under spelling A,
+**That join no longer reads row #57 at all.** Row #57 is a *cache*, not a live-session
+registry: nothing removes an entry when a connection ends (`actor/connection.rs` returns on both
+the application-close and the error path without touching the map; the only removal anywhere is
+the administrative `NetworkHandle::disconnect_peer`), and `restore_state` recreates entries from
+the snapshot at startup with their capability bits intact and no Hello behind them. Joining on
+principal alone over such a map let a peer that proved `DurableV1` under spelling A,
 disconnected, and returned under spelling B *without* the capability keep reading as `DurableV1`
-from A's abandoned row — the `(DurableV1, LegacyOrUnproven)` downgrade never fired, and a captured
-old-namespace sequence above the retained durable floor was admitted as though it were a durable
-number. Reproduced end to end at floor 10 with a captured sequence of 100.
+from A's abandoned row — the `(DurableV1, LegacyOrUnproven)` downgrade never fired, and a
+captured old-namespace sequence above the retained durable floor was admitted as though it were
+a durable number. Reproduced end to end at floor 10 with a captured sequence of 100; the
+snapshot variant needs no key at all, since `actor/connection.rs` dispatches
+`MessagePayload::Signed` without binding `envelope.from` to the connection's authenticated peer.
 
-The rule is therefore two-dimensional and both dimensions are load-bearing: `SenderPrincipal`
-selects *which* peer's evidence is relevant, and an open session under the row's **own spelling**
-selects *whether* that evidence is current. The pairing is exact — `handlers/hello.rs` writes
-`peer_connections[from]` and `session_manager[from.to_string()]` from the same `from` on the same
-connection, and `Did`'s `Display` and `as_str` produce the same bytes — and it must stay exact:
-matching a stale row to any live session for the same *principal* rebuilds the defect, because the
-abandoned durable row and the live legacy connection decode to one key. Occupancy is not liveness
-either, so the session must additionally satisfy `close_reason().is_none()` — the same test
-`connected_peer_endpoints` already applies to the same map (#2504). This restores the meaning
-`ObservedSenderRegime` documents ("the peer authenticated on the current connection") and that
-`check_replay_only` relies on ("what the current authenticated connection proves").
+Sender-regime attribution therefore moved out of row #57 entirely, to
+`icn-net/src/capability_evidence.rs`. `LiveCapabilityRegistry` is indexed by `SenderPrincipal`
+and holds an entry only while some connection is *leasing* it: `handle_hello` takes a
+`LiveCapabilityClaim` after the three #2520 DID-TLS checks pass, the claim lives in that
+connection's `ConnectionContext`, and the connection handler owns that context on its own stack
+frame — so every exit path releases it, including ones added later. This is the same RAII shape
+`preauth_admission::AdmissionGuard` already uses for #2547 slots, and it is what makes the two
+axes independent by construction: the index answers *which* key, and the lease's lifetime
+answers *whether the claim is still true*. Claims are reference counted, because a key holder may
+authenticate under several spellings of itself and cross-dialling gives one pair two connections
+at once; the join across live claims is `any`, which is the only join that cannot be suppressed
+by adding one.
 
-Residual, deliberately not changed here: `handle_hello` writes the capability row before calling
-`install_incoming_connection`, which *declines without closing* a duplicate physical connection
-when a live entry already owns the key (#2504). The row can therefore have been written by a
-different physical connection than the one proving liveness. Both are the same key holder — the
-row is unreachable without passing the three #2520 DID-TLS checks for that spelling — and `insert`
-is last-write-wins, so the row is that holder's most recent claim and the session proves it is
-still present, which is what current evidence should mean. Binding the row to one physical
-connection would be stricter and worse: a declined duplicate would strand the peer with no usable
-row. The converse case, a declined connection outliving the installed one, leaves the spelling's
-session entry closed and fails **closed** (the peer's traffic is refused as a downgrade) until a
-reconnect replaces it — the same staleness `broadcast_message` already suffers on that entry.
+Two consequences worth recording for N2-A. First, this removes a per-envelope scan of an
+unbounded structure: the interim fix walked row #57 once per signed message, and since nothing
+prunes that map, a peer reconnecting under one-off DIDs could grow it permanently and make every
+other peer's traffic pay for the scan. The registry is one hash lookup and its cardinality is
+bounded by live claiming connections, which pre-authentication admission already bounds (#2547).
+Second, row #57's *remaining* consumers are unchanged — cached version, X25519 and PQ material,
+and #2504-era reconnection — so the migration this row still owes is unaffected. What changed is
+that replay-regime attribution is no longer one of them.
+
+Row #57 keeps one unfixed consumer of the same class: `verify_with_cached_pq_key` resolves the
+cached ML-DSA key with the same textual `connections.get(&envelope.from)`, so a re-spelled hybrid
+envelope misses and downgrades to Ed25519-only. Latent behind `#[cfg(feature = "post-quantum")]`
+and tracked as **#2646** — deliberately not folded in here, because a capability is a boolean
+that joins with `any` while a key is a value, and "pick any live claim" is not obviously right.
 
 N2-A therefore still owes (a) the canonical replay floor independently rejecting the re-spelled
 replay once the map key itself becomes alias-tolerant, and (b) keeping these regressions. The
