@@ -662,15 +662,52 @@ redundantly defended. Both halves are pinned in `handlers/signed.rs`
 
 The lookup itself is fixed rather than deferred: `handlers/signed.rs` now resolves the sender's
 authenticated capabilities by `SenderPrincipal` — the same equivalence class the signature check
-and `ReplayGuard` already use — joining across every row that decodes to that principal with
-"any authenticated row proving `DURABLE_SIGNING_SEQUENCE` proves it". The map's *key* is
-unchanged, so the other row-#57 and row-#60 consumers are untouched. N2-A therefore still owes
-(a) the canonical replay floor independently rejecting the re-spelled replay once the map key
-itself becomes alias-tolerant, and (b) keeping these regressions. The earlier concern that this
-path misclassified an attacker-chosen input as the local fault `SenderRegimeDowngrade` no longer
-applies to re-spelling — the lookup no longer misses — and `SenderRegimeDowngrade` is again what
-it is named for, an operator rollback. §12.1 item 6 covers the #57/#60 partner-map *desync*; it
-does not cover this.
+and `ReplayGuard` already use — joining across the rows that decode to that principal with
+"any such row proving `DURABLE_SIGNING_SEQUENCE` proves it". The map's *key* is unchanged, so the
+other row-#57 and row-#60 consumers are untouched.
+
+**That join ranges only over rows a live session still vouches for**, which is the second half of
+the same defect and was reported separately against the first fix. Row #57 is a *cache*, not a
+live-session registry: nothing removes an entry when a connection ends (`actor/connection.rs`
+returns on both the application-close and the error path without touching the map; the only
+removal anywhere is the administrative `NetworkHandle::disconnect_peer`), and `restore_state`
+recreates entries from the snapshot at startup with their capability bits intact and no Hello
+behind them. So joining on principal alone let a peer that proved `DurableV1` under spelling A,
+disconnected, and returned under spelling B *without* the capability keep reading as `DurableV1`
+from A's abandoned row — the `(DurableV1, LegacyOrUnproven)` downgrade never fired, and a captured
+old-namespace sequence above the retained durable floor was admitted as though it were a durable
+number. Reproduced end to end at floor 10 with a captured sequence of 100.
+
+The rule is therefore two-dimensional and both dimensions are load-bearing: `SenderPrincipal`
+selects *which* peer's evidence is relevant, and an open session under the row's **own spelling**
+selects *whether* that evidence is current. The pairing is exact — `handlers/hello.rs` writes
+`peer_connections[from]` and `session_manager[from.to_string()]` from the same `from` on the same
+connection, and `Did`'s `Display` and `as_str` produce the same bytes — and it must stay exact:
+matching a stale row to any live session for the same *principal* rebuilds the defect, because the
+abandoned durable row and the live legacy connection decode to one key. Occupancy is not liveness
+either, so the session must additionally satisfy `close_reason().is_none()` — the same test
+`connected_peer_endpoints` already applies to the same map (#2504). This restores the meaning
+`ObservedSenderRegime` documents ("the peer authenticated on the current connection") and that
+`check_replay_only` relies on ("what the current authenticated connection proves").
+
+Residual, deliberately not changed here: `handle_hello` writes the capability row before calling
+`install_incoming_connection`, which *declines without closing* a duplicate physical connection
+when a live entry already owns the key (#2504). The row can therefore have been written by a
+different physical connection than the one proving liveness. Both are the same key holder — the
+row is unreachable without passing the three #2520 DID-TLS checks for that spelling — and `insert`
+is last-write-wins, so the row is that holder's most recent claim and the session proves it is
+still present, which is what current evidence should mean. Binding the row to one physical
+connection would be stricter and worse: a declined duplicate would strand the peer with no usable
+row. The converse case, a declined connection outliving the installed one, leaves the spelling's
+session entry closed and fails **closed** (the peer's traffic is refused as a downgrade) until a
+reconnect replaces it — the same staleness `broadcast_message` already suffers on that entry.
+
+N2-A therefore still owes (a) the canonical replay floor independently rejecting the re-spelled
+replay once the map key itself becomes alias-tolerant, and (b) keeping these regressions. The
+earlier concern that this path misclassified an attacker-chosen input as the local fault
+`SenderRegimeDowngrade` no longer applies to re-spelling — the lookup no longer misses — and
+`SenderRegimeDowngrade` is again what it is named for, an operator rollback. §12.1 item 6 covers
+the #57/#60 partner-map *desync*; it does not cover this.
 
 ### 10.3 Vote double-counting, and a re-cast guard that cannot fire
 `GovernanceError::AlreadyVoted` (`icn-governance/src/error.rs:33`) has **zero constructors anywhere

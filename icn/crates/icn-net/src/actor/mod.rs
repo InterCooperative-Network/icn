@@ -2221,4 +2221,76 @@ mod tests {
         assert!(err_msg.contains("relay candidate"));
         assert!(err_msg.contains("TURN-relay"));
     }
+
+    /// Snapshot restoration recreates capability rows for peers that are not connected.
+    ///
+    /// This is the reachability half of #2644: `handlers::signed` may only read a
+    /// `peer_connections` row as evidence about the sender's *current* sequence regime, and
+    /// this is the path that fills that map with rows describing a previous process. The row
+    /// carries `DURABLE_SIGNING_SEQUENCE` and no Hello has been exchanged, so there is no
+    /// session behind it and no connection it could have been proved on.
+    ///
+    /// Restoration itself is intentionally left alone — the cached version, X25519 and PQ
+    /// material is what it exists for, and #2504-era reconnection depends on it. What must not
+    /// happen is a restored row being read as a live capability claim; that is asserted by
+    /// `handlers::signed::tests::a_snapshot_restored_row_is_not_current_evidence`.
+    #[tokio::test]
+    async fn a_snapshot_restored_row_is_a_capability_claim_with_no_session() {
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+        let session_manager = Arc::new(RwLock::new(SessionManager::new()));
+        let peer_did = KeyPair::generate().unwrap().did().clone();
+
+        let (tx, _rx) = mpsc::channel(1);
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: Some(peer_connections.clone()),
+            session_manager: session_manager.clone(),
+            own_did: KeyPair::generate().unwrap().did().clone(),
+            blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
+            peer_exchange_enabled: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+
+        let mut snapshot = std::collections::HashMap::new();
+        snapshot.insert(
+            peer_did.to_string(),
+            icn_snapshot::PeerConnectionInfo {
+                did: peer_did.to_string(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::DURABLE_SIGNING_SEQUENCE.bits(),
+                peer_software: "icnd-before-the-restart".to_string(),
+                x25519_key: [7u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+        handle
+            .restore_state(icn_snapshot::NetworkState {
+                peer_connections: snapshot,
+                peer_x25519_keys: std::collections::HashMap::new(),
+                peer_addresses: std::collections::HashMap::new(),
+            })
+            .await
+            .expect("restoring a well-formed snapshot");
+
+        let restored = peer_connections
+            .read()
+            .await
+            .get(&peer_did)
+            .cloned()
+            .expect("restore_state recreates the row from disk");
+        assert!(
+            restored
+                .peer_capabilities
+                .contains(CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+            "the capability bits survive the round trip, which is what makes a restored row \
+             indistinguishable from a freshly authenticated one by capability alone"
+        );
+        assert!(
+            session_manager.read().await.connections().await.is_empty(),
+            "and nothing has authenticated anything in this process: there is no connection \
+             this claim could have been proved on"
+        );
+    }
 }

@@ -105,12 +105,12 @@ impl ConnectionContext {
         // Which sequence namespace does this envelope's number belong to? (#2517)
         //
         // Read from the capabilities `handle_hello` records, which it writes only after
-        // binding the claimed DID to the certificate on the live QUIC connection (#2520). So
-        // a `DurableV1` answer here means the peer proved, on a connection it actually
-        // authenticated, that its signing sequence is durable DID state — not merely that
-        // some Hello somewhere once said so.
+        // binding the claimed DID to the certificate on the live QUIC connection (#2520) —
+        // and only counted while that connection is still up. So a `DurableV1` answer here
+        // means the peer is proving, on a connection it has authenticated and still holds,
+        // that its signing sequence is durable DID state.
         //
-        // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no recorded
+        // Every other outcome is `LegacyOrUnproven`, deliberately: a peer with no current
         // connection info, a peer that predates the capability, and a genuinely pre-#2510
         // ephemeral sender are indistinguishable from here, and the safe reading is the one
         // that does not promise durability.
@@ -135,14 +135,56 @@ impl ConnectionContext {
         // none is needed: `sender_principal` was derived above and a failure there already
         // dropped the message.
         //
-        // # Several authenticated rows can name one principal, and any one of them proves it
+        // # Naming the right principal is necessary but not sufficient: the row must be *current*
+        //
+        // `peer_connections` is a cache, not a live-session registry, and the difference is
+        // load-bearing here. Nothing removes a row when a connection ends: the connection
+        // handler returns on both the application-close and the error path without touching
+        // the map (`actor/connection.rs`), and the only removal anywhere is the
+        // administrative `NetworkHandle::disconnect_peer`. Worse, `NetworkHandle::restore_state`
+        // *recreates* rows from a snapshot at startup, capability bits and all, before any
+        // Hello has been exchanged in this process. So a row can be a historical record of
+        // something a peer once proved rather than something it is proving now.
+        //
+        // Joining on principal alone over such a map re-opened the defect from the other
+        // side. A peer that proved `DURABLE_SIGNING_SEQUENCE` under spelling A, closed that
+        // connection, and reconnected under spelling B *without* the capability — an operator
+        // rollback, or a lost signing store — still read as `DurableV1`, because A's abandoned
+        // row satisfied the disjunction. The new Hello only replaces its own key, so the two
+        // rows coexist. That is precisely the state `(DurableV1, LegacyOrUnproven)` exists to
+        // refuse, and skipping it is not a missed alarm but an accept: a captured
+        // old-namespace sequence above the retained durable floor is then compared to that
+        // floor as though it were a durable number, admitted, and promoted into it.
+        //
+        // So the two axes are independent and both required. `SenderPrincipal` selects *which*
+        // peer's evidence is relevant; a live session for the row's own spelling selects
+        // *whether* that evidence is current at all. This is the meaning
+        // `ObservedSenderRegime::DurableV1` has always documented — "the peer authenticated on
+        // the current connection" — and the meaning `check_replay_only` relies on when it
+        // calls `observed_regime` "what the current authenticated connection proves".
+        //
+        // # Liveness is paired to the row's own spelling, never to the principal
+        //
+        // `session_manager` is keyed by `from.to_string()` and `peer_connections` by `from`,
+        // and `Did`'s `Display` writes the same bytes `as_str` returns, so the two maps agree
+        // key for key — `handle_hello` writes both from the same `from` on the same
+        // connection. The pairing is therefore exact, and it must stay exact: matching a
+        // stale row to *any* live session for the same principal would rebuild the bug, since
+        // the stale durable row A and the live legacy connection B in the case above decode
+        // to one key. A's evidence has to live or die with A's session.
+        //
+        // Map occupancy is not liveness either — a peer's restart leaves a dead entry behind
+        // until something replaces it (#2504) — so the session must additionally be open.
+        // This is the same test `connected_peer_endpoints` already applies to the same map.
+        //
+        // # Several *current* rows can name one principal, and any one of them proves it
         //
         // A key holder can authenticate under more than one spelling of itself: the #2520
         // DID-TLS checks in `handle_hello` compare the binding's DID to `from` as strings and
         // then verify with that DID's own key, so every spelling it signs for passes. The
         // join across those rows is therefore part of the security property, not an
-        // implementation detail, and it is **any**: one authenticated row proving
-        // `DURABLE_SIGNING_SEQUENCE` makes the principal durable.
+        // implementation detail, and over *current* rows it is **any**: one live authenticated
+        // row proving `DURABLE_SIGNING_SEQUENCE` makes the principal durable.
         //
         // That is the sound direction on both axes. #2520 means no row exists for a key whose
         // holder did not prove possession of it on a live connection, so every row for this
@@ -150,23 +192,42 @@ impl ConnectionContext {
         // boundary; and the capability describes the sender's signing *store* (#2510:
         // crash-safe, monotonic, never reissued), which is per-DID state rather than per
         // connection. It is also the only join that cannot be *suppressed* by adding a row —
-        // and adding rows is precisely what a key holder (a second Hello) and an attacker (a
-        // re-spelled `from`) can do. `all`, first-write-wins and last-write-wins each let one
-        // legacy-looking row erase a durable proof, which is this defect again.
+        // and adding rows is precisely what a key holder (a second Hello) can do. `all`,
+        // first-write-wins and last-write-wins each let one legacy-looking row erase a durable
+        // proof a live connection is still making.
+        //
+        // The currency filter is what keeps `any` honest. Before it, "adding a row" included
+        // *leaving one behind*, so the disjunction could never fall back to `LegacyOrUnproven`
+        // once anything durable had ever been recorded, and the downgrade arm was unreachable
+        // for any peer that changed spelling. Now the disjunction ranges only over rows a
+        // live session vouches for, so it empties out when the peer's durable connections do.
         //
         // Order-independent by construction: `any` over a set is commutative, so the answer
         // does not depend on `HashMap` iteration order (AGENTS.md §3, determinism).
         //
-        // Cost: rows that do not advertise the capability cannot make the disjunction true,
-        // so they are rejected on a flag test and never decoded, and `any` stops at the first
-        // row that does prove it. A durable peer talking under its own spelling is one hash
-        // lookup's worth of work in a map sized by *connected peers*, which `broadcast_message`
-        // already parses a `Did` per entry of on every broadcast.
+        // Cost: the three conjuncts are ordered cheapest-first. Rows that do not advertise the
+        // capability cannot make the disjunction true, so they are rejected on a flag test;
+        // rows no live session vouches for are rejected on one hash lookup; only what survives
+        // both is decoded, and `any` stops at the first row that proves it.
         let observed_regime = {
+            // The session map's `Arc` is cloned out first, so the session manager's own lock
+            // is released before either map is read. The two map guards are then taken
+            // sessions-before-peers, which nothing inverts: `handle_hello` drops its
+            // `peer_connections` write guard before installing the session, and
+            // `broadcast_message` releases the session map before reading `peer_connections`.
+            let live_sessions = self.session_manager.read().await.connections_arc();
+            let live_sessions = live_sessions.read().await;
             let connections = self.peer_connections.read().await;
             let proved_durable = connections.iter().any(|(spelling, info)| {
                 info.peer_capabilities
                     .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE)
+                    // Current evidence, not a historical record: this row's own spelling must
+                    // still hold an open authenticated session. A closed handle, a spelling
+                    // whose connection ended, and a snapshot-restored row with no session at
+                    // all are all excluded here.
+                    && live_sessions
+                        .get(spelling.as_str())
+                        .is_some_and(|session| session.close_reason().is_none())
                     // A key stored under a spelling that decodes to nothing names no
                     // principal at all, so it is evidence about nobody and is skipped rather
                     // than matched. It loses nothing the textual lookup had: `envelope.from`
@@ -1358,6 +1419,152 @@ mod tests {
         }
     }
 
+    /// A pair of started QUIC endpoints, used to mint *real* connections.
+    ///
+    /// `close_reason()` is the predicate under test and it is a property of a live
+    /// `quinn::Connection`: a closed handle cannot be constructed, only produced by closing a
+    /// real one. Modelling the session map with anything else would prove that the test's
+    /// model is consistent, not that the handler reads liveness correctly.
+    struct QuicPair {
+        listener: SessionManager,
+        dialer: SessionManager,
+    }
+
+    /// One established connection, both ends.
+    ///
+    /// Holding the peer end is what keeps the receiver end open: a `quinn::Connection` closes
+    /// when its last handle drops, so a test that only kept our end would be closing
+    /// connections it meant to leave live.
+    struct LiveConn {
+        /// The end a receiver stores in its session map.
+        ours: quinn::Connection,
+        /// The peer's end. Closing this is how the peer goes away.
+        theirs: quinn::Connection,
+    }
+
+    impl LiveConn {
+        /// The peer disconnects normally, and we wait until our end observes it — so
+        /// `close_reason()` is `Some` by construction rather than by timing.
+        async fn peer_disconnects(&self) {
+            self.theirs.close(0u32.into(), b"peer disconnect");
+            tokio::time::timeout(std::time::Duration::from_secs(5), self.ours.closed())
+                .await
+                .expect("our end must observe the peer's close");
+            assert!(
+                self.ours.close_reason().is_some(),
+                "CONTROL: the connection must actually read as closed, or the case is vacuous"
+            );
+        }
+    }
+
+    impl QuicPair {
+        async fn new() -> Self {
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            let mut listener = SessionManager::new();
+            listener
+                .start(
+                    &IdentityBundle::generate().unwrap(),
+                    "127.0.0.1:0".parse().unwrap(),
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+            let mut dialer = SessionManager::new();
+            dialer
+                .start(
+                    &IdentityBundle::generate().unwrap(),
+                    "127.0.0.1:0".parse().unwrap(),
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+            QuicPair { listener, dialer }
+        }
+
+        /// One more established connection.
+        async fn connect(&self, nonce: usize) -> LiveConn {
+            let endpoint = self.listener.endpoint_handle().await.unwrap();
+            let addr = endpoint.local_addr().unwrap();
+            let accepting = tokio::spawn(async move {
+                endpoint
+                    .accept()
+                    .await
+                    .expect("an incoming connection")
+                    .await
+                    .expect("the handshake completes")
+            });
+            let theirs = match self
+                .dialer
+                .dial(addr, format!("did:icn:zHarnessPeer{nonce}"))
+                .await
+                .unwrap()
+            {
+                crate::session::DialOutcome::Established(conn) => conn,
+                crate::session::DialOutcome::AlreadyConnected(_) => {
+                    panic!("the harness dialled a peer it already held a live session with")
+                }
+            };
+            let ours = accepting.await.unwrap();
+            LiveConn { ours, theirs }
+        }
+    }
+
+    /// What kind of `peer_connections` row this is — the axis #2644 is about.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum Row {
+        /// A live authenticated connection: the capability row *and* an open session entry
+        /// under the same spelling, exactly as `handle_hello` leaves them.
+        Live,
+        /// The peer authenticated and then disconnected normally. The capability row survives
+        /// — nothing removes it — and so does the session entry, but closed (#2504).
+        Closed,
+        /// A capability row with no session entry at all: what `NetworkHandle::restore_state`
+        /// writes at startup from a snapshot, before any Hello in this process.
+        Snapshot,
+    }
+
+    /// Install one row in the shape `kind` describes, returning the connection so the caller
+    /// can keep it alive for the duration of the case.
+    async fn install_row(
+        ctx: &ConnectionContext,
+        quic: &QuicPair,
+        nonce: usize,
+        spelling: &Did,
+        caps: crate::CapabilityFlags,
+        kind: Row,
+    ) -> Option<LiveConn> {
+        // `handle_hello` writes the capability row for every authenticated Hello, whatever
+        // becomes of the connection afterwards.
+        ctx.peer_connections
+            .write()
+            .await
+            .insert(spelling.clone(), authenticated_row(spelling, caps));
+
+        if kind == Row::Snapshot {
+            // No session was ever installed for this spelling: a restored cache row.
+            return None;
+        }
+
+        // Routed through the canonical installer rather than writing the map directly, so the
+        // pairing under test is the one `handle_hello` actually produces (#2504/#2530).
+        let conn = quic.connect(nonce).await;
+        let arc = ctx.session_manager.read().await.connections_arc();
+        crate::session::install_incoming_connection(
+            &arc,
+            Some(ctx.own_did.as_str()),
+            spelling.to_string(),
+            conn.ours.clone(),
+        )
+        .await;
+
+        if kind == Row::Closed {
+            conn.peer_disconnects().await;
+        }
+        Some(conn)
+    }
+
     /// Which regime the handler attributed to `envelope`, read off the only difference that
     /// is visible from outside it.
     ///
@@ -1369,16 +1576,19 @@ mod tests {
     /// reaches the application or it does not.
     ///
     /// A fresh context per call, because the empty window is half of the property.
+    ///
+    /// Each row states not just what it advertises but whether its connection is still up
+    /// (#2644), because that is now half of what the handler reads. `Row::Live` is the shape
+    /// `handle_hello` leaves behind for a peer that is still here.
     async fn attributed_regime(
-        rows: &[(Did, crate::CapabilityFlags)],
+        rows: &[(Did, crate::CapabilityFlags, Row)],
         envelope: &SignedEnvelope,
     ) -> crate::replay_guard::ObservedSenderRegime {
         let (ctx, forwarded) = create_test_context(None);
-        {
-            let mut connections = ctx.peer_connections.write().await;
-            for (spelling, caps) in rows {
-                connections.insert(spelling.clone(), authenticated_row(spelling, *caps));
-            }
+        let quic = QuicPair::new().await;
+        let mut held = Vec::new();
+        for (nonce, (spelling, caps, kind)) in rows.iter().enumerate() {
+            held.push(install_row(&ctx, &quic, nonce, spelling, *caps, *kind).await);
         }
         ctx.handle_signed(create_network_message(envelope), envelope)
             .await;
@@ -1412,11 +1622,11 @@ mod tests {
         let (ctx, forwarded) = create_test_context(Some(detector.clone()));
         let sender = KeyPair::generate().unwrap();
 
-        // Post-Hello authenticated state under the spelling the peer used.
-        ctx.peer_connections.write().await.insert(
-            sender.did().clone(),
-            authenticated_row(sender.did(), DURABLE),
-        );
+        // Post-Hello authenticated state under the spelling the peer used, on a connection
+        // the peer is still holding: capability row and live session together, which is the
+        // only shape that counts as current evidence (#2644).
+        let quic = QuicPair::new().await;
+        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
 
         let alias = alias_in(multibase::Base::Base16Lower, "base16-lower", sender.did());
         for captured_sequence in [42, 43] {
@@ -1452,10 +1662,8 @@ mod tests {
     async fn the_stored_spelling_reaches_the_same_security_result() {
         let (ctx, forwarded) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-        ctx.peer_connections.write().await.insert(
-            sender.did().clone(),
-            authenticated_row(sender.did(), DURABLE),
-        );
+        let quic = QuicPair::new().await;
+        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
 
         for captured_sequence in [42, 43] {
             let captured = create_signed_envelope(&sender, captured_sequence);
@@ -1497,15 +1705,18 @@ mod tests {
 
             // Stored canonical, envelope re-spelled — the reported direction.
             assert_eq!(
-                attributed_regime(&[(canonical.clone(), DURABLE)], &respell(&captured, &alias))
-                    .await,
+                attributed_regime(
+                    &[(canonical.clone(), DURABLE, Row::Live)],
+                    &respell(&captured, &alias)
+                )
+                .await,
                 crate::replay_guard::ObservedSenderRegime::DurableV1,
                 "{label}: a re-spelled envelope must still find the capability its sender proved"
             );
 
             // Stored under the alias, envelope canonical — the same miss, mirrored.
             assert_eq!(
-                attributed_regime(&[(alias.clone(), DURABLE)], &captured).await,
+                attributed_regime(&[(alias.clone(), DURABLE, Row::Live)], &captured).await,
                 crate::replay_guard::ObservedSenderRegime::DurableV1,
                 "{label}: a peer that authenticated under {label} proved the same capability"
             );
@@ -1525,7 +1736,7 @@ mod tests {
 
         assert_eq!(
             attributed_regime(
-                &[(durable.did().clone(), DURABLE)],
+                &[(durable.did().clone(), DURABLE, Row::Live)],
                 &create_signed_envelope(&other, 1)
             )
             .await,
@@ -1543,14 +1754,14 @@ mod tests {
         let captured = create_signed_envelope(&sender, 1);
 
         assert_eq!(
-            attributed_regime(&[(canonical.clone(), NOT_DURABLE)], &captured).await,
+            attributed_regime(&[(canonical.clone(), NOT_DURABLE, Row::Live)], &captured).await,
             crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
             "no capability, no durable attribution"
         );
 
         let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", &canonical);
         assert_eq!(
-            attributed_regime(&[(alias, NOT_DURABLE)], &captured).await,
+            attributed_regime(&[(alias, NOT_DURABLE, Row::Live)], &captured).await,
             crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
             "matching a principal is not evidence of what that principal advertised"
         );
@@ -1592,15 +1803,15 @@ mod tests {
             (
                 "durable inserted first",
                 vec![
-                    (durable_row.clone(), DURABLE),
-                    (legacy_row.clone(), NOT_DURABLE),
+                    (durable_row.clone(), DURABLE, Row::Live),
+                    (legacy_row.clone(), NOT_DURABLE, Row::Live),
                 ],
             ),
             (
                 "durable inserted second",
                 vec![
-                    (legacy_row.clone(), NOT_DURABLE),
-                    (durable_row.clone(), DURABLE),
+                    (legacy_row.clone(), NOT_DURABLE, Row::Live),
+                    (durable_row.clone(), DURABLE, Row::Live),
                 ],
             ),
         ] {
@@ -1630,7 +1841,7 @@ mod tests {
             .collect();
 
         for (durable_at, (label, _)) in ALTERNATE_SPELLINGS.iter().enumerate() {
-            let rows: Vec<(Did, crate::CapabilityFlags)> = aliases
+            let rows: Vec<(Did, crate::CapabilityFlags, Row)> = aliases
                 .iter()
                 .enumerate()
                 .map(|(i, alias)| {
@@ -1641,6 +1852,7 @@ mod tests {
                         } else {
                             NOT_DURABLE
                         },
+                        Row::Live,
                     )
                 })
                 .collect();
@@ -1662,10 +1874,8 @@ mod tests {
     async fn a_respelled_replay_below_an_established_durable_floor_is_still_rejected() {
         let (ctx, forwarded) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-        ctx.peer_connections.write().await.insert(
-            sender.did().clone(),
-            authenticated_row(sender.did(), DURABLE),
-        );
+        let quic = QuicPair::new().await;
+        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live).await;
 
         // Establish a durable floor directly: the migration hold is not what is under test.
         let accepted = create_signed_envelope(&sender, 9);
@@ -1714,7 +1924,10 @@ mod tests {
         let sender = KeyPair::generate().unwrap();
         assert_eq!(
             attributed_regime(
-                &[(undecodable, DURABLE), (sender.did().clone(), NOT_DURABLE)],
+                &[
+                    (undecodable, DURABLE, Row::Live),
+                    (sender.did().clone(), NOT_DURABLE, Row::Live)
+                ],
                 &create_signed_envelope(&sender, 1)
             )
             .await,
@@ -1746,19 +1959,17 @@ mod tests {
 
         let migrating = KeyPair::generate().unwrap();
         let migrating_did = migrating.did().clone();
-        ctx.peer_connections.write().await.insert(
-            migrating_did.clone(),
-            crate::actor::PeerConnectionInfo {
-                did: migrating_did.clone(),
-                negotiated_version: 1,
-                peer_capabilities: crate::CapabilityFlags::E2E_ENCRYPTION
-                    | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
-                peer_software: "current".to_string(),
-                x25519_key: [0u8; 32],
-                ml_dsa_public: None,
-                ml_kem_public: None,
-            },
-        );
+        let quic = QuicPair::new().await;
+        let _live = install_row(
+            &ctx,
+            &quic,
+            0,
+            &migrating_did,
+            crate::CapabilityFlags::E2E_ENCRYPTION
+                | crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE,
+            Row::Live,
+        )
+        .await;
 
         // Sustained legitimate traffic for the whole hold, not one message. A hold that
         // scored only after N refusals would pass a single-message test.
@@ -1997,6 +2208,570 @@ mod tests {
                 icn_security::Violation::ReplayAttack { sequence: 1, .. }
             )),
             "a real replay must still reach the ReplayAttack path; got {violations:?}"
+        );
+    }
+
+    // ==================================================================================
+    // #2644 (second round): current-versus-historical capability evidence
+    // ==================================================================================
+
+    /// A monotonic clock the test drives, so the 600s retirement horizon can be crossed
+    /// without a 600s test. See `replay_guard`'s own `TestClock` for why the production
+    /// horizon rather than a scaled-down one is the right thing to cross.
+    struct HarnessClock {
+        nanos: std::sync::atomic::AtomicU64,
+    }
+
+    impl HarnessClock {
+        fn new() -> Arc<Self> {
+            Arc::new(HarnessClock {
+                nanos: std::sync::atomic::AtomicU64::new(0),
+            })
+        }
+
+        fn advance(&self, by: std::time::Duration) {
+            self.nanos.fetch_add(by.as_nanos() as u64, Ordering::SeqCst);
+        }
+    }
+
+    impl crate::replay_guard::MonotonicClock for HarnessClock {
+        fn elapsed(&self) -> std::time::Duration {
+            std::time::Duration::from_nanos(self.nanos.load(Ordering::SeqCst))
+        }
+    }
+
+    /// `max_clock_skew` is 300s in these contexts, so the retirement horizon is 600s.
+    const RETIREMENT_HORIZON: std::time::Duration = std::time::Duration::from_secs(601);
+
+    /// The keyspace agreement the whole pairing rests on.
+    ///
+    /// `peer_connections` is keyed by `Did` and the session map by `from.to_string()`. If
+    /// those two ever stop producing the same bytes, every capability row silently loses its
+    /// liveness partner and every durable peer reads as `LegacyOrUnproven` — a fail-closed
+    /// break, but a total one. Asserted across the whole accepted spelling class rather than
+    /// on one DID, because the failure would be per-encoding.
+    #[test]
+    fn the_two_maps_key_the_same_peer_the_same_way() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        for (label, base) in ALTERNATE_SPELLINGS {
+            let alias = alias_in(base, label, &canonical);
+            assert_eq!(
+                alias.to_string(),
+                alias.as_str(),
+                "{label}: the session map's key and the capability map's key must be the same \
+                 bytes, or the row and its session can never be paired"
+            );
+        }
+        assert_eq!(canonical.to_string(), canonical.as_str());
+    }
+
+    /// Drive one peer to an established `DurableV1` window with a durable floor of 10, using
+    /// only the handler's own path.
+    ///
+    /// There is no shortcut: first durable evidence costs a retirement hold, and the
+    /// promotion only lands once the horizon has passed.
+    async fn establish_durable_floor_10(
+        ctx: &ConnectionContext,
+        forwarded: &Arc<AtomicUsize>,
+        clock: &HarnessClock,
+        sender: &KeyPair,
+    ) {
+        let first = create_signed_envelope(sender, 10);
+        ctx.handle_signed(create_network_message(&first), &first)
+            .await;
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            0,
+            "precondition: first durable evidence must cost a retirement hold"
+        );
+        clock.advance(RETIREMENT_HORIZON);
+        ctx.handle_signed(create_network_message(&first), &first)
+            .await;
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            1,
+            "precondition: the promotion must land and establish the durable floor at 10"
+        );
+    }
+
+    /// THE REPORTED BYPASS, SECOND ROUND (#2644).
+    ///
+    /// A peer proves `DURABLE_SIGNING_SEQUENCE` under spelling A and establishes a durable
+    /// window with a floor of 10. It then closes that connection and comes back under
+    /// spelling B *without* the capability — an operator rollback, or a signing store it no
+    /// longer has. That is exactly the `(DurableV1, LegacyOrUnproven)` state, and the guard
+    /// refuses it precisely because a number from the peer's old namespace cannot be compared
+    /// with a durable floor.
+    ///
+    /// Nothing removes A's row when A's connection ends, and B's Hello only replaces B's own
+    /// key, so both rows sit in the map at once. Joining on principal alone therefore still
+    /// found A's abandoned durable row, and the downgrade was never seen — so a captured
+    /// old-namespace envelope numbered *above* the retained floor was compared to that floor
+    /// as if it were a durable number, and admitted.
+    ///
+    /// Sequence 100 against a floor of 10: high enough that every replay check below the
+    /// regime match passes, so the regime match is the only thing that can refuse it.
+    #[tokio::test]
+    async fn a_stale_alias_row_cannot_keep_a_rolled_back_sender_durable() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let clock = HarnessClock::new();
+        let (ctx, forwarded) = create_test_context_with_guard(
+            Some(detector.clone()),
+            ReplayGuard::new(300, 3600).with_clock(clock.clone()),
+        );
+        let quic = QuicPair::new().await;
+        let sender = KeyPair::generate().unwrap();
+        let a = sender.did().clone();
+        let b = alias_in(multibase::Base::Base16Lower, "base16-lower", &a);
+
+        // The peer authenticates as A, advertising the durable capability, and establishes
+        // its window.
+        let live_a = install_row(&ctx, &quic, 0, &a, DURABLE, Row::Live)
+            .await
+            .expect("A has a live session");
+        establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
+
+        // A disconnects normally. Nothing removes its capability row.
+        live_a.peer_disconnects().await;
+        {
+            let rows = ctx.peer_connections.read().await;
+            let stale = rows.get(&a).expect(
+                "peer_connections is a cache, not a live-session registry: the connection \
+                 handler returns on both the application-close and the error path without \
+                 removing anything",
+            );
+            assert!(
+                stale
+                    .peer_capabilities
+                    .contains(crate::CapabilityFlags::DURABLE_SIGNING_SEQUENCE),
+                "the abandoned row still advertises DurableV1, which is what made it usable"
+            );
+        }
+
+        // The same key comes back under a different accepted spelling, without the capability.
+        let _live_b = install_row(&ctx, &quic, 1, &b, NOT_DURABLE, Row::Live)
+            .await
+            .expect("B has a live session");
+        {
+            let rows = ctx.peer_connections.read().await;
+            assert!(rows.contains_key(&a) && rows.contains_key(&b));
+            assert_eq!(
+                crate::replay_guard::SenderPrincipal::from_did(&a).unwrap(),
+                crate::replay_guard::SenderPrincipal::from_did(&b).unwrap(),
+                "CONTROL: both rows must name one principal, or the case is about two peers"
+            );
+        }
+
+        // A still-fresh envelope captured from the peer's old numbering, above the floor.
+        let captured = create_signed_envelope(&sender, 100);
+        let forged = respell(&captured, &b);
+        let before = forwarded.load(Ordering::SeqCst);
+        ctx.handle_signed(create_network_message(&forged), &forged)
+            .await;
+
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            before,
+            "a captured old-namespace sequence above the durable floor must not reach the \
+             application: the peer's *current* connection does not advertise the durable \
+             regime, so this is the (DurableV1, LegacyOrUnproven) downgrade, and an abandoned \
+             row under another spelling is not evidence about the peer's numbering now"
+        );
+
+        // The refusal must be the typed local downgrade, not a replay verdict: an operator
+        // rollback is our incompatibility, not the peer's misbehaviour. Checked under both
+        // spellings because the detector is keyed by `envelope.from`.
+        for did in [&a, &b] {
+            assert!(
+                detector.read().await.get_violations(did).is_empty(),
+                "a sender-regime downgrade is a local migration fault, not peer misbehaviour \
+                 ({did})"
+            );
+        }
+    }
+
+    /// CONTROL: the same rollback with no stale row at all.
+    ///
+    /// Without this, the test above could pass on a build that refused the envelope for some
+    /// unrelated reason. The stale row must make *no difference*: same window, same current
+    /// Hello, same refusal.
+    #[tokio::test]
+    async fn the_same_rollback_is_refused_when_no_stale_row_exists() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let clock = HarnessClock::new();
+        let (ctx, forwarded) = create_test_context_with_guard(
+            Some(detector.clone()),
+            ReplayGuard::new(300, 3600).with_clock(clock.clone()),
+        );
+        let quic = QuicPair::new().await;
+        let sender = KeyPair::generate().unwrap();
+        let a = sender.did().clone();
+        let b = alias_in(multibase::Base::Base16Lower, "base16-lower", &a);
+
+        let live_a = install_row(&ctx, &quic, 0, &a, DURABLE, Row::Live)
+            .await
+            .expect("A has a live session");
+        establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
+        live_a.peer_disconnects().await;
+
+        // The only difference from the case above.
+        ctx.peer_connections.write().await.remove(&a);
+
+        let _live_b = install_row(&ctx, &quic, 1, &b, NOT_DURABLE, Row::Live).await;
+        let captured = create_signed_envelope(&sender, 100);
+        let forged = respell(&captured, &b);
+        let before = forwarded.load(Ordering::SeqCst);
+        ctx.handle_signed(create_network_message(&forged), &forged)
+            .await;
+
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            before,
+            "the downgrade refusal is the baseline this fix restores"
+        );
+        for did in [&a, &b] {
+            assert!(detector.read().await.get_violations(did).is_empty());
+        }
+    }
+
+    /// OVER-CORRECTION CONTROL. A peer that is *genuinely* still durable must still be served.
+    ///
+    /// The fix narrows what counts as evidence, and a narrowing that goes too far is invisible
+    /// to every test above: they all assert a refusal, and refusing everything satisfies them
+    /// all. This is the one that fails if the liveness rule stops recognising a peer that has
+    /// done nothing wrong — same window, same floor, same sequence 100, and the peer simply
+    /// stays connected under the spelling it proved on.
+    #[tokio::test]
+    async fn a_peer_that_is_still_durable_is_still_served() {
+        let clock = HarnessClock::new();
+        let (ctx, forwarded) = create_test_context_with_guard(
+            None,
+            ReplayGuard::new(300, 3600).with_clock(clock.clone()),
+        );
+        let quic = QuicPair::new().await;
+        let sender = KeyPair::generate().unwrap();
+
+        let _live = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live)
+            .await
+            .expect("a live session");
+        establish_durable_floor_10(&ctx, &forwarded, &clock, &sender).await;
+
+        let next = create_signed_envelope(&sender, 100);
+        ctx.handle_signed(create_network_message(&next), &next)
+            .await;
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            2,
+            "a durable peer that never went away must keep being read as durable; requiring a \
+             live session must not become requiring a *new* one"
+        );
+    }
+
+    /// SNAPSHOT-RESTORED ROW. Historical state from disk is not an observation.
+    ///
+    /// `NetworkHandle::restore_state` recreates `peer_connections` at startup from a snapshot,
+    /// capability bits included, before any Hello has happened in this process — see
+    /// `actor::tests::a_snapshot_restored_row_is_a_capability_claim_with_no_session`. A row in
+    /// that state names a real principal and records something that was once true, and it has
+    /// no bearing on what the sender's numbering is now.
+    ///
+    /// Strictly stronger than the reported case: reaching it needs no key at all, only a
+    /// captured envelope and a receiver that restarted.
+    #[tokio::test]
+    async fn a_snapshot_restored_row_is_not_current_evidence() {
+        let sender = KeyPair::generate().unwrap();
+        assert_eq!(
+            attributed_regime(
+                &[(sender.did().clone(), DURABLE, Row::Snapshot)],
+                &create_signed_envelope(&sender, 1)
+            )
+            .await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "a cache row restored from disk was authenticated once, in some previous process; \
+             it is not the current connection proving anything"
+        );
+    }
+
+    /// CLOSED SESSION HANDLE. Map occupancy is not liveness.
+    ///
+    /// A peer's disconnect leaves its session entry behind until something replaces it
+    /// (#2504), so the entry existing proves only that the peer was once here. This is the
+    /// same distinction `connected_peer_endpoints` already draws on the same map.
+    #[tokio::test]
+    async fn a_closed_session_entry_is_not_current_evidence() {
+        let sender = KeyPair::generate().unwrap();
+        assert_eq!(
+            attributed_regime(
+                &[(sender.did().clone(), DURABLE, Row::Closed)],
+                &create_signed_envelope(&sender, 1)
+            )
+            .await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "a session entry whose connection has closed is a record of a peer that left"
+        );
+    }
+
+    /// EXACT PARTNER COUPLING — the trap in the obvious fix.
+    ///
+    /// The tempting shortcut is to ask whether *this principal* has any live session and, if
+    /// so, treat its rows as current. That rebuilds the reported bug exactly: the abandoned
+    /// durable row A and the live legacy connection B decode to one key, so B's liveness would
+    /// vouch for A's capability and the downgrade would vanish again.
+    ///
+    /// A row's evidence has to live and die with its own session. Run for a closed partner and
+    /// for no partner at all, since a shortcut could be written either way round.
+    #[tokio::test]
+    async fn a_live_session_under_one_spelling_does_not_revive_another_spellings_row() {
+        let sender = KeyPair::generate().unwrap();
+        let a = sender.did().clone();
+        let b = alias_in(multibase::Base::Base32Lower, "base32-lower", &a);
+        let captured = create_signed_envelope(&sender, 5);
+
+        for stale in [Row::Closed, Row::Snapshot] {
+            assert_eq!(
+                attributed_regime(
+                    &[
+                        (a.clone(), DURABLE, stale),
+                        (b.clone(), NOT_DURABLE, Row::Live)
+                    ],
+                    &captured
+                )
+                .await,
+                crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+                "{stale:?}: the live connection is B's and says nothing durable; A's row is \
+                 not made current by sharing a key with it"
+            );
+        }
+    }
+
+    /// The mirror: a live durable row is not weakened by a stale legacy one.
+    ///
+    /// The currency filter removes rows from the disjunction, and a filter that removed the
+    /// wrong ones would show up here rather than in any refusal test.
+    #[tokio::test]
+    async fn a_stale_legacy_row_does_not_erase_a_live_durable_proof() {
+        let sender = KeyPair::generate().unwrap();
+        let a = sender.did().clone();
+        let b = alias_in(multibase::Base::Base64, "base64", &a);
+        let captured = create_signed_envelope(&sender, 5);
+
+        for order in 0..2 {
+            let rows = if order == 0 {
+                vec![
+                    (a.clone(), DURABLE, Row::Live),
+                    (b.clone(), NOT_DURABLE, Row::Closed),
+                ]
+            } else {
+                vec![
+                    (b.clone(), NOT_DURABLE, Row::Closed),
+                    (a.clone(), DURABLE, Row::Live),
+                ]
+            };
+            assert_eq!(
+                attributed_regime(&rows, &captured).await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "insertion order {order}: a connection the peer has closed cannot retract a \
+                 proof another connection is still making"
+            );
+        }
+    }
+
+    /// DIFFERENT-KEY CONTROL, liveness edition. A live durable session for someone else is
+    /// still someone else's.
+    #[tokio::test]
+    async fn a_live_durable_session_for_another_principal_does_not_bleed() {
+        let durable = KeyPair::generate().unwrap();
+        let other = KeyPair::generate().unwrap();
+        assert_eq!(
+            attributed_regime(
+                &[
+                    (durable.did().clone(), DURABLE, Row::Live),
+                    (other.did().clone(), NOT_DURABLE, Row::Live)
+                ],
+                &create_signed_envelope(&other, 1)
+            )
+            .await,
+            crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+            "liveness selects which rows are evidence; it never changes whose evidence they are"
+        );
+    }
+
+    /// SAME-SPELLING RECONNECT. An unchanged textual key must not preserve an old capability.
+    ///
+    /// The reported case needed a spelling change only because a same-spelling Hello
+    /// *replaces* the row. This pins that: nothing may merge the old capability into the new
+    /// claim, and the surviving live session must belong to the connection that made it.
+    #[tokio::test]
+    async fn a_same_spelling_reconnect_cannot_inherit_the_capability_it_dropped() {
+        let sender = KeyPair::generate().unwrap();
+        let captured = create_signed_envelope(&sender, 5);
+        let (ctx, forwarded) = create_test_context(None);
+        let quic = QuicPair::new().await;
+
+        // Durable, then gone.
+        let first = install_row(&ctx, &quic, 0, sender.did(), DURABLE, Row::Live)
+            .await
+            .expect("a live session");
+        first.peer_disconnects().await;
+
+        // Back under the *same* spelling, no capability. The row and the session entry are
+        // both replaced by this connection's own.
+        let _second = install_row(&ctx, &quic, 1, sender.did(), NOT_DURABLE, Row::Live)
+            .await
+            .expect("a live session");
+
+        ctx.handle_signed(create_network_message(&captured), &captured)
+            .await;
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            1,
+            "the peer's current claim is the only one it is making; on an empty window that is \
+             the legacy steady state, so this envelope is forwarded — if the dropped \
+             capability had survived, the retirement hold would have refused it instead"
+        );
+    }
+
+    /// MULTIPLE CURRENT ROWS, ONE PRINCIPAL. `any` over *current* rows, order-independent.
+    ///
+    /// A key holder can authenticate under more than one spelling of itself, so two live rows
+    /// for one principal is a legitimate state. The join stays `any`: a proof one live
+    /// connection is making cannot be cancelled by another connection that simply does not
+    /// mention it, or `all`/first-wins/last-wins would let a peer suppress its own proof by
+    /// opening a second session. Both insertion orders, because a `HashMap` gives no promise
+    /// about which the handler visits first.
+    #[tokio::test]
+    async fn two_live_rows_for_one_principal_join_the_same_way_in_either_order() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        let durable_row = alias_in(multibase::Base::Base36Lower, "base36-lower", &canonical);
+        let legacy_row = alias_in(
+            multibase::Base::Base32HexLower,
+            "base32-hex-lower",
+            &canonical,
+        );
+        let captured = create_signed_envelope(&sender, 9);
+
+        for (order, rows) in [
+            (
+                "durable first",
+                vec![
+                    (durable_row.clone(), DURABLE, Row::Live),
+                    (legacy_row.clone(), NOT_DURABLE, Row::Live),
+                ],
+            ),
+            (
+                "durable second",
+                vec![
+                    (legacy_row.clone(), NOT_DURABLE, Row::Live),
+                    (durable_row.clone(), DURABLE, Row::Live),
+                ],
+            ),
+        ] {
+            assert_eq!(
+                attributed_regime(&rows, &captured).await,
+                crate::replay_guard::ObservedSenderRegime::DurableV1,
+                "{order}: one live connection proving the capability is enough, whichever \
+                 order the rows were written in"
+            );
+        }
+    }
+
+    /// STALENESS IS SPELLING-INVARIANT TOO.
+    ///
+    /// `every_accepted_spelling_selects_the_same_durable_capability` proves a *live* proof is
+    /// found under all 22 alternates. The currency filter has to be just as encoding-blind, or
+    /// some spellings would keep their abandoned rows and others would not — which is the
+    /// original #2640 defect wearing a different hat.
+    #[tokio::test]
+    async fn an_abandoned_row_stops_counting_under_every_spelling() {
+        let sender = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+
+        for (label, base) in ALTERNATE_SPELLINGS {
+            let alias = alias_in(base, label, &canonical);
+            let captured = create_signed_envelope(&sender, 42);
+            assert_eq!(
+                attributed_regime(&[(alias, DURABLE, Row::Closed)], &captured).await,
+                crate::replay_guard::ObservedSenderRegime::LegacyOrUnproven,
+                "{label}: an abandoned row must stop counting whatever base it was written in"
+            );
+        }
+    }
+
+    /// DUPLICATE PHYSICAL CONNECTIONS FOR ONE SPELLING.
+    ///
+    /// `handle_hello` writes `peer_connections[from]` unconditionally and only then calls
+    /// `install_incoming_connection`, which *declines* — without closing — a duplicate when a
+    /// live entry already owns the key (#2504). So the capability row can be written by one
+    /// physical connection while the session entry proving liveness is another.
+    ///
+    /// That mismatch is deliberately not treated as a defect, and this is the reasoning it
+    /// rests on. Writing a row for a spelling requires passing the three #2520 DID-TLS checks
+    /// for it, so both connections are the same key holder; `insert` is last-write-wins, so
+    /// the row is that holder's *most recent* claim; and the session entry proves it is still
+    /// here. "The latest claim this peer made, while this peer is still connected" is exactly
+    /// what current evidence should mean. Binding the row to one physical connection would be
+    /// stricter and *worse*: a declined duplicate would strand the peer with no usable row.
+    ///
+    /// What must never happen is the cross-principal version, so that is asserted here: a live
+    /// session belonging to a different key cannot supply anyone else's capability.
+    #[tokio::test]
+    async fn a_second_connection_for_one_spelling_is_still_that_principals_own_claim() {
+        let sender = KeyPair::generate().unwrap();
+        let captured = create_signed_envelope(&sender, 4);
+        let (ctx, forwarded) = create_test_context(None);
+        let quic = QuicPair::new().await;
+
+        // First connection authenticates and is installed as the session.
+        let _installed = install_row(&ctx, &quic, 0, sender.did(), NOT_DURABLE, Row::Live)
+            .await
+            .expect("a live session");
+
+        // A second physical connection for the same spelling: its Hello overwrites the row,
+        // but the installer keeps the first connection as the session.
+        let duplicate = quic.connect(1).await;
+        ctx.peer_connections.write().await.insert(
+            sender.did().clone(),
+            authenticated_row(sender.did(), DURABLE),
+        );
+        let arc = ctx.session_manager.read().await.connections_arc();
+        crate::session::install_incoming_connection(
+            &arc,
+            Some(ctx.own_did.as_str()),
+            sender.did().to_string(),
+            duplicate.ours.clone(),
+        )
+        .await;
+        {
+            let sessions = arc.read().await;
+            let held = sessions
+                .get(sender.did().as_str())
+                .expect("the spelling still has a session");
+            assert_ne!(
+                held.stable_id(),
+                duplicate.ours.stable_id(),
+                "CONTROL: the installer must have declined the duplicate, or this case is not \
+                 the mismatch it claims to be"
+            );
+            assert!(
+                held.close_reason().is_none(),
+                "CONTROL: and it is still live"
+            );
+        }
+
+        ctx.handle_signed(create_network_message(&captured), &captured)
+            .await;
+        assert_eq!(
+            forwarded.load(Ordering::SeqCst),
+            0,
+            "the row is this principal's own most recent authenticated claim and this \
+             principal is still connected under this spelling, so it counts: an empty window \
+             owes it the retirement hold"
         );
     }
 }

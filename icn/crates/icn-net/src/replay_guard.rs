@@ -1367,7 +1367,7 @@ impl ReplayGuard {
     /// Test-only. The production clock is not swappable at runtime: a security hold
     /// whose clock an operator could substitute is not a hold.
     #[cfg(test)]
-    fn with_clock(mut self, clock: Arc<dyn MonotonicClock>) -> Self {
+    pub(crate) fn with_clock(mut self, clock: Arc<dyn MonotonicClock>) -> Self {
         self.clock = clock;
         self
     }
