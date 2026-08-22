@@ -1,32 +1,121 @@
 ---
 name: merge-prs
-description: Merge one or more PRs. No polling loops. Uses gh --json. Prefer --auto, use --admin when told.
-argument-hint: "[PR numbers...] [--admin]"
+description: Merge one or more PRs with full stack-integration pipeline. Resolves branches, rebases, gates, pulls main.
+argument-hint: "[PR numbers...] [--admin] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # merge strategy, required checks, admin bypass rules
+    - ops/state/truth/sources.json      # truth ownership map
+  live_load_required:
+    - "gh pr view <N> --json number,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - PR numbers or branch names
+    - required check lists (query live or read policy.json)
+    - sprint state
 ---
 
-Merge PRs. No polling. No tabular parsing. One line per PR.
+Stack-integration merge pipeline. Not a thin `gh pr merge` wrapper. Owns branch resolution,
+merge ordering, post-merge rebases, local verification, and main sync.
+
+For single quick merges when you already know the state is clean, this still works. For sprint
+batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output).
+
+## Merge authorization boundary (non-negotiable)
+
+**Never merge without explicit, per-PR maintainer authorization.** Green required checks are a
+precondition for merging, not permission to merge. Authorization for one PR never carries to
+another, and never survives a change of scope. If you have not been told to merge *this* PR,
+stop after reporting readiness.
+
+`ops/state/truth/policy.json` owns the merge strategy, the required-check set, and the admin-bypass
+rules; live branch protection is the second authority. This skill owns neither — read both at run
+time and never restate their contents or their count here.
+
+## Step 0 — Preflight (run first, always)
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
+```
+
+If `what-matters-now.sh` reports drift errors → **stop and fix drift before merging**.
+Drift in agent files (stale paths, missing truth_contracts, hardcoded check sets) means
+the tooling you're running may itself be unreliable.
 
 ## Steps
 
-1. List target PRs:
-   - If `$ARGUMENTS` specifies PR numbers, use those.
-   - Otherwise: `gh pr list --json number,title,headRefName,statusCheckRollup --limit 20`
-   - If zero open PRs, print "0 open PRs" and stop.
+1. **Resolve PRs to merge**:
+   - If `$ARGUMENTS` specifies numbers, use those.
+   - Otherwise list open PRs: `gh pr list --json number,title,headRefName,mergeable,mergeStateStatus`
+   - If zero open PRs, stop.
 
-2. For each PR, in order:
-   a. Get status: `gh pr view <N> --json number,title,mergeable,statusCheckRollup`
-   b. If checks are green → `gh pr merge <N> --merge`
-   c. If checks are pending/running → `gh pr merge <N> --auto --merge` (let GitHub merge when green)
-   d. If `$ARGUMENTS` includes `--admin` → use `gh pr merge <N> --merge --admin`
-   e. If merge fails, print one-line error and continue to next PR.
+2. **For each PR, resolve head branch from GitHub** (never trust plan names):
+   ```bash
+   gh pr view <N> --json number,title,headRefName,baseRefName,mergeable,mergeStateStatus \
+     --jq '{pr:.number, head:.headRefName, base:.baseRefName, mergeable:.mergeable, state:.mergeStateStatus}'
+   ```
 
-3. After all PRs: `git checkout main && git pull`
+3. **Classify check state** (required gates only — load from policy.json, never hardcode):
+   ```bash
+   REPO_ROOT="$(git rev-parse --show-toplevel)"
+   REQUIRED=$(python3 -c "import json; p=json.load(open('${REPO_ROOT}/ops/state/truth/policy.json')); print(','.join('\"'+c+'\"' for c in p['merge']['required_checks']))")
+   gh pr view <N> --json statusCheckRollup \
+     --jq ".statusCheckRollup[] | select(.name | IN(${REQUIRED})) | {name:.name, result:.conclusion}" 2>/dev/null
+   ```
+
+   - `UNSTABLE` mergeStateStatus + all required conclusions `SUCCESS` → treat as GREEN, safe to merge
+   - Any required conclusion empty/pending → use `--auto` or wait
+   - A failure whose check name is in `merge.non_blocking_checks` (read from `policy.json`,
+     never from memory) → **never blocks**; ignore it
+
+4. **Merge** (in order provided; smallest/safest first for batch). This repo uses **squash merge**:
+   ```bash
+   gh pr merge <N> --squash             # green required checks (default)
+   gh pr merge <N> --squash --admin     # if $ARGUMENTS includes --admin (queue-stalled)
+   gh pr merge <N> --auto --squash      # pending required checks
+   ```
+   Exception: subtree merge commits require `--merge` — note the reason explicitly.
+
+5. **After each merge**:
+   ```bash
+   git checkout main && git pull
+   ```
+
+6. **Rebase remaining PR branches** after each merge to keep them current:
+   ```bash
+   gh pr view <remaining-N> --json headRefName --jq '.headRefName'   # resolve branch
+   git checkout <branch> && git rebase origin/main
+   # Run scoped clippy before force-pushing — from the Cargo workspace root, never the monorepo root
+   (cd "$(git rev-parse --show-toplevel)/icn" && cargo clippy -p <affected-packages> --all-targets -- -D warnings)
+   git push --force-with-lease
+   ```
+
+7. **Final**: confirm main state, print one-line summary per PR.
+
+## Output format
+
+```
+#<first>  merged · rebased [<branch-b>, <branch-c>]
+#<second> merged · rebased [<branch-c>]
+#<third>  merged · rebased []
+```
 
 ## Rules
 
-- **No polling loops.** Never `while true; sleep; done`. Use `--auto` for pending checks.
-- **No tabular parsing.** Always `--json` flag, parse with `jq` or python3.
-- **One line per PR**: `#123 merged` or `#123 failed: <reason>` or `#123 --auto set`.
-- Max 20 lines total output.
+- **No polling loops.** Use `--auto` for pending checks; use `--admin` for queue-stalled (not failing).
+- **No tabular parsing.** Always `--json` with `jq` or `python3`.
+- **UNSTABLE ≠ blocked.** Required checks green + `mergeable=MERGEABLE` → merge.
+- **Always resolve head branch from GitHub.** Never use plan-doc branch names directly.
+- **After each merge, rebase remaining branches.** Verify locally before force-push.
+
+## Resolving the required-check set
+
+This skill deliberately contains no required-check list and no check count. Resolve both at run time.
+
+Verify live: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
+
+Or read canonical: `python3 -c "import json; print(json.load(open('$(git rev-parse --show-toplevel)/ops/state/truth/policy.json'))['merge']['required_checks'])"`

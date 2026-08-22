@@ -88,17 +88,19 @@ icn-ledger, icn-ccl, icn-compute, icn-gateway, icn-governance, icn-federation, i
 
 ## Reference Files
 
-**In-repo sources (authoritative):**
-- Sprint state: `icn/ops/state/sprint/current.json`
-- ADRs: `icn/docs/adr/` (canonical; `ops/state/decisions/` is a redirect)
-- Architecture: `icn/docs/ARCHITECTURE.md`
-- Current state: `icn/docs/STATE.md`
-- Planning: `icn/docs/planning/` and `icn/docs/strategy/`
+**In-repo sources.** Resolve the owner for the question you are actually asking; do not treat
+this list as a truth root. `ops/state/truth/sources.json` is the arbiter — if it disagrees with
+anything below, it wins. Paths are relative to `$(git rev-parse --show-toplevel)`:
 
-**Launchpad docs** (on Zentith / Launchpad HQ — not on this dev VM):
-- `~/.claude_launchpad/projects/icn/icn-crate-reference.md`
-- `~/.claude_launchpad/projects/icn/icn-forward-plan.md`
-- Only accessible if SSH'd to Zentith (operator-supplied host) or running locally there.
+- Truth-owner map: `ops/state/truth/sources.json`
+- Sprint cadence: `ops/state/sprint/current.json` (cadence only — not "what is being worked on now")
+- ADRs: `docs/adr/` (canonical; `ops/state/decisions/` is a redirect)
+- Architecture: `docs/ARCHITECTURE.md`
+- Planning: `docs/planning/` and `docs/strategy/`
+
+Do not load `docs/STATE.md` or `docs/PHASE_PROGRESS.md` to answer "where is the project" — they
+are history/evidence, consulted only when the question needs them. Current work is a live query
+(`gh issue list`, `gh pr list`); see `.agents/skills/icn-preflight/SKILL.md`.
 
 ## Commands
 

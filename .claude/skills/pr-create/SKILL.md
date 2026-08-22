@@ -90,5 +90,6 @@ Title: `<type>(<scope>): <description>` (under 70 chars)
 
 - Base branch defaults to `main` unless `$ARGUMENTS` specifies otherwise
 - Push the branch with `-u` flag before creating PR
-- Include `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>` in commits
+- Include a `Co-Authored-By:` trailer naming the assisting model actually used for the change.
+  Do not copy a model name from this file — it is not the owner of that fact.
 - Never create PRs without running verification first

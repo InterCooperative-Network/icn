@@ -45,11 +45,14 @@ The generator reads or queries:
 - `ops/state/truth/policy.json` for merge-policy data;
 - `ops/state/truth/agents.json` for agent routing metadata;
 - `ops/state/truth/skills.json` for skill ownership;
-- `ops/state/config/repo-map.json` for repository/worktree topology metadata;
 - `git` for branch, HEAD, working-tree status, and `origin/main` when present;
 - `gh` for open PR/issue state when available and not disabled;
 - the generated Agent Context Spine metadata when present;
 - the newest handoff **path only** as an optional memory pointer.
+
+It does **not** read `ops/state/config/repo-map.json`. Repository/worktree topology is owned by
+that file and resolved directly; the overlay carries no topology section, so wiring it in would
+add a dependency with no consumer (icn#2633).
 
 It does **not** treat the body of a handoff as current state.
 

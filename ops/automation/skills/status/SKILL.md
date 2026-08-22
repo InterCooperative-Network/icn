@@ -29,7 +29,7 @@ If empty, skip this section. Otherwise show each session as:
 ```bash
 cat "$(git rev-parse --show-toplevel)/ops/state/sprint/current.json"
 ```
-(Canonical copy is `icn/ops/` — the standalone `icn-ops/` repo is stale.)
+(Canonical location is `ops/` inside this monorepo — the standalone `icn-ops/` repo is retired.)
 Show: sprint number + name, goals, task counts by status (pending/in-progress/in-review/done).
 
 **3. Repository status** — call MCP tool `repo_status`
