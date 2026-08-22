@@ -452,6 +452,40 @@ pub struct ReplayStateNotDurable {
     pub sequence: u64,
 }
 
+/// This node's persisted replay state could not be loaded, so the guard is not initialized
+/// and refuses every peer until the store becomes usable again (#2644).
+///
+/// # Why this needs a type of its own
+///
+/// It is the same class as [`ReplayStateNotDurable`] — a **local** storage fault, never peer
+/// misbehaviour — but it arises one layer earlier and used to have no type at all. Since #2640
+/// the load path performs real storage mutation (`put`, `flush`, `delete`) while collapsing
+/// spelling-distinct rows onto one canonical key, so it can now fail on an ordinary disk
+/// problem rather than only on unreadable bytes. When it did, `check_replay_only` propagated
+/// the raw `anyhow` error, `handlers::signed` found no local-fault type on it, and every
+/// honest peer whose message happened to trigger the retry was scored
+/// `Violation::ReplayAttack` — our disk, their ban.
+///
+/// The guard deliberately stays uninitialized on failure, so the condition repeats for every
+/// message until an operator repairs the store; that is what makes typing it load-bearing
+/// rather than cosmetic. It is also why the underlying cause is attached with `.context`
+/// rather than replaced: the operator needs the storage error, and the classifier needs a
+/// type it can downcast to.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "this node's persisted replay state could not be initialized, so no sequence from {peer} \
+     can be proven new; sequence {sequence} was rejected rather than accepted against \
+     unknown state"
+)]
+pub struct ReplayStateInitializationFailed {
+    /// The peer whose message met the uninitialized guard. Incidental — the fault is local
+    /// and affects every peer — and carried only so the log names the traffic that was
+    /// dropped.
+    pub peer: String,
+    /// The sequence number that was rejected.
+    pub sequence: u64,
+}
+
 /// This receiver's durable replay state for the peer could not be read, so the
 /// peer is quarantined until nothing it sent before the restart could still be
 /// fresh.
@@ -1919,9 +1953,26 @@ impl ReplayGuard {
             .context(e)
         })?;
 
-        // Ensure initialized for persistent mode
+        // Ensure initialized for persistent mode.
+        //
+        // Typed at this boundary rather than propagated raw (#2644). A failure here is a
+        // local storage fault: the guard fails closed, stays uninitialized, and retries on
+        // the next message, so an untyped error meant `handlers::signed` classified our own
+        // disk problem as a replay attack by whichever peer happened to be talking — for
+        // every peer, on every message, until the store was repaired.
+        //
+        // Added as *context on* the storage error rather than the other way round, so the
+        // whole cause chain — down to the failing verb — survives for the operator while the
+        // type stays downcastable for the classifier. Wrapping the other way
+        // (`Error::new(typed).context(e)`) keeps the downcast but flattens `e` to its top
+        // line, discarding the storage detail that says which store to repair.
         if !self.initialized.load(Ordering::Acquire) {
-            self.load_persisted_state()?;
+            self.load_persisted_state().map_err(|e| {
+                e.context(ReplayStateInitializationFailed {
+                    peer: envelope.from.as_str().to_string(),
+                    sequence: envelope.sequence,
+                })
+            })?;
         }
 
         // Note: Signature verification is SKIPPED - caller must have already verified
@@ -12469,5 +12520,219 @@ mod respelled_identity_tests {
             Some(until),
             "a competing hold with an earlier deadline must not shorten the obligation"
         );
+    }
+
+    /// A store whose `put`, `flush` or `delete` can be made to fail on demand, and repaired.
+    ///
+    /// Since #2640 the load path performs real storage mutation while collapsing
+    /// spelling-distinct rows onto one canonical key, so all three verbs are on the
+    /// initialization path and each of them can fail on an ordinary disk problem.
+    struct FailableStore {
+        inner: Arc<icn_store::SledStore>,
+        failing: std::sync::Mutex<Option<&'static str>>,
+    }
+
+    impl FailableStore {
+        fn failing(inner: Arc<icn_store::SledStore>, verb: &'static str) -> Arc<Self> {
+            Arc::new(FailableStore {
+                inner,
+                failing: std::sync::Mutex::new(Some(verb)),
+            })
+        }
+
+        fn repair(&self) {
+            *self.failing.lock().unwrap() = None;
+        }
+
+        fn check(&self, verb: &str) -> Result<()> {
+            if *self.failing.lock().unwrap() == Some(verb) {
+                anyhow::bail!("simulated storage failure during {verb}");
+            }
+            Ok(())
+        }
+    }
+
+    impl Store for FailableStore {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            self.inner.get(key)
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            self.check("put")?;
+            self.inner.put(key, value)
+        }
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            self.check("delete")?;
+            self.inner.delete(key)
+        }
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan(prefix)
+        }
+        fn flush(&self) -> Result<()> {
+            self.check("flush")?;
+            self.inner.flush().map(|_| ())
+        }
+        fn get_replica_metadata(
+            &self,
+            hash: &icn_store::ContentHash,
+        ) -> Result<Option<icn_store::ReplicaMetadata>> {
+            self.inner.get_replica_metadata(hash)
+        }
+        fn put_replica_metadata(&self, meta: &icn_store::ReplicaMetadata) -> Result<()> {
+            self.inner.put_replica_metadata(meta)
+        }
+        fn list_replica_hashes(&self) -> Result<Vec<icn_store::ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+    }
+
+    /// Seed two spellings of one principal plus an unrelated second principal, so
+    /// canonicalization must `put`, `flush` and `delete`, and so a partially applied load
+    /// would leave an observable window behind.
+    fn seed_two_spellings(store: &dyn Store, sender: &KeyPair, other: &KeyPair) {
+        let canonical = sender.did().clone();
+        seed_max_seq(
+            store,
+            &canonical,
+            10,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_max_seq(
+            store,
+            &alias_of(&canonical),
+            11,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+        seed_max_seq(
+            store,
+            other.did(),
+            42,
+            REPLAY_STATE_SEMANTIC_VERSION,
+            SENDER_REGIME_DURABLE_V1,
+        );
+    }
+
+    /// Matrix 16–20: a storage failure during replay-state initialization is a **local**
+    /// fault, typed as one, fail-closed, all-or-nothing, and retryable.
+    ///
+    /// The #2644 F2 defect. `check_replay_only` propagated the raw `anyhow` error from the
+    /// load, so `handlers::signed` — which classifies local faults by downcasting to the
+    /// replay-state error types — found nothing it recognised and fell through to
+    /// `Violation::ReplayAttack`. The guard deliberately stays uninitialized after a failed
+    /// load, so *every* message retried the load and *every* honest peer was scored for this
+    /// node's disk problem.
+    #[test]
+    fn a_storage_failure_during_initialization_is_a_typed_local_fault() {
+        for verb in ["put", "flush", "delete"] {
+            let sled = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let sender = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            seed_two_spellings(sled.as_ref(), &sender, &other);
+
+            let broken = FailableStore::failing(sled.clone(), verb);
+            let mut guard = ReplayGuard::new_persistent(300, 3600, broken.clone());
+
+            // Matrix 20: repeated, because the latch stays clear and every message retries.
+            for round in 0..3 {
+                let err = guard
+                    .check_replay_only(
+                        &envelope(&sender, &canonical, 99),
+                        ObservedSenderRegime::DurableV1,
+                    )
+                    .expect_err("the load must fail closed rather than run against no state");
+
+                // Matrix 16: typed, and downcastable through the `.context` that keeps the
+                // storage cause attached for the operator.
+                assert!(
+                    err.downcast_ref::<ReplayStateInitializationFailed>()
+                        .is_some(),
+                    "{verb} round {round}: an initialization failure must carry the typed \
+                     local-fault error; got: {err:#}"
+                );
+                assert!(
+                    format!("{err:#}").contains(verb),
+                    "{verb} round {round}: and must retain the underlying storage cause; \
+                     got: {err:#}"
+                );
+
+                // CONTROL: it must not be mistakable for a replay. `handlers::signed` reaches
+                // `Violation::ReplayAttack` only when *no* local-fault type is present, so
+                // this is the assertion that keeps an honest peer off the ban path.
+                assert!(
+                    !format!("{err}").contains("Replay detected"),
+                    "{verb} round {round}: a local storage fault must never present as a \
+                     replay detection"
+                );
+
+                // Matrix 17 + 19: fail-closed and all-or-nothing. Nothing was adopted, so the
+                // second principal's perfectly readable row is not half-installed either.
+                assert!(
+                    !guard.is_initialized(),
+                    "{verb} round {round}: the latch must stay clear so the load retries"
+                );
+                assert_eq!(
+                    guard.peer_count(),
+                    0,
+                    "{verb} round {round}: no window may survive a failed load"
+                );
+            }
+
+            // Matrix 18: repair the store and the very next message initializes normally.
+            broken.repair();
+            guard
+                .check_replay_only(
+                    &envelope(&sender, &canonical, 99),
+                    ObservedSenderRegime::DurableV1,
+                )
+                .unwrap_or_else(|e| panic!("{verb}: a repaired store must initialize: {e}"));
+            assert!(
+                guard.is_initialized(),
+                "{verb}: the retry must latch initialization once it succeeds"
+            );
+            assert_eq!(
+                guard.peer_count(),
+                2,
+                "{verb}: and must rebuild every window from the repaired store"
+            );
+
+            // CONTROL: the state it rebuilt is the real state, not an empty one that would
+            // have accepted anything. The merged floor is 11, so 11 is a replay.
+            assert!(
+                guard
+                    .check_replay_only(
+                        &envelope(&sender, &canonical, 11),
+                        ObservedSenderRegime::DurableV1
+                    )
+                    .is_err(),
+                "{verb}: the recovered floor must be the persisted one"
+            );
+        }
+    }
+
+    /// Matrix 22: the healthy-store control for the failure test above.
+    ///
+    /// Same rows, same store type, nothing failing. Without this, every assertion above is
+    /// satisfiable by a build that simply refuses all traffic.
+    #[test]
+    fn the_same_rows_on_a_healthy_store_initialize_and_accept_normally() {
+        let sled = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        let other = KeyPair::generate().unwrap();
+        let canonical = sender.did().clone();
+        seed_two_spellings(sled.as_ref(), &sender, &other);
+
+        let healthy = FailableStore::failing(sled.clone(), "nothing-fails");
+        let mut guard = ReplayGuard::new_persistent(300, 3600, healthy);
+
+        guard
+            .check_replay_only(
+                &envelope(&sender, &canonical, 99),
+                ObservedSenderRegime::DurableV1,
+            )
+            .expect("honest traffic above the floor must be accepted on a healthy store");
+        assert!(guard.is_initialized());
+        assert_eq!(guard.peer_count(), 2);
     }
 }

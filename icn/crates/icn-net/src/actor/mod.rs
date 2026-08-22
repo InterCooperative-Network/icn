@@ -16,7 +16,7 @@ use icn_identity::{Did, IdentityBundle, PersonhoodStoreTrait};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 use crate::{
     protocol::NetworkMessage,
@@ -1229,7 +1229,18 @@ impl NetworkActor {
             // is exactly the highest sequence ever accepted because it is
             // flushed before acceptance returns (#2514).
             if let Err(e) = guard.load_persisted_state() {
-                warn!("Failed to load replay guard state: {}. Starting fresh.", e);
+                // Deliberately NOT "starting fresh" (#2644). The guard fails closed: it
+                // installs no interpretation of the store, leaves itself uninitialized, and
+                // refuses every signed message — retrying the load on each one — until the
+                // store is usable. Saying it started fresh described the pre-#2640 behaviour,
+                // where a failed load silently disarmed replay protection, and would now send
+                // an operator looking for the wrong problem while the node accepts nothing.
+                error!(
+                    error = %e,
+                    "Replay state could not be loaded. Replay protection is NOT armed and \
+                     this node will REFUSE all signed traffic, retrying the load on each \
+                     message, until the replay store is usable. Repair or replace it"
+                );
             }
             info!("Replay protection enabled with persistence (300s clock skew, 3600s peer age limit)");
             Arc::new(RwLock::new(guard))

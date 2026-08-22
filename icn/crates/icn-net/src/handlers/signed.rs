@@ -204,6 +204,18 @@ impl ConnectionContext {
                         // this does not clear on its own.
                         e.downcast_ref::<crate::replay_guard::UnsupportedSenderRegime>()
                             .map(|e| e.to_string())
+                    })
+                    .or_else(|| {
+                        // Our own persisted replay state could not be loaded at all
+                        // (#2644). The most local fault of the lot: the guard is
+                        // uninitialized, so it refuses *every* peer, and the peer whose
+                        // message happened to trigger the retry did nothing whatsoever.
+                        // Since #2640 the load performs storage writes while canonicalizing
+                        // spelling-distinct rows, so an ordinary disk problem reaches here —
+                        // and before this arm existed it arrived untyped and was scored as a
+                        // replay attack against every honest sender in turn.
+                        e.downcast_ref::<crate::replay_guard::ReplayStateInitializationFailed>()
+                            .map(|e| e.to_string())
                     });
                 if let Some(reason) = local_fault {
                     // Three of these local faults do not resolve themselves, so they
@@ -217,7 +229,23 @@ impl ConnectionContext {
                             .is_some()
                         || e.downcast_ref::<crate::replay_guard::SenderRegimeDowngrade>()
                             .is_some();
-                    if needs_operator {
+                    // Separate from `needs_operator` because the remedy is different and the
+                    // blast radius is larger: this one is not a per-peer incompatibility but a
+                    // node that is refusing *all* signed traffic, and the fix is repairing
+                    // storage rather than moving a binary version (#2644). It does clear by
+                    // itself once the store works, so it is not folded into the message above.
+                    if e.downcast_ref::<crate::replay_guard::ReplayStateInitializationFailed>()
+                        .is_some()
+                    {
+                        error!(
+                            peer = %envelope.from,
+                            seq = envelope.sequence,
+                            "Dropping message: this node's persisted replay state cannot be \
+                             loaded, so it is refusing ALL signed traffic until the store is \
+                             usable. Not peer misbehaviour — repair or replace the replay \
+                             store: {reason}"
+                        );
+                    } else if needs_operator {
                         error!(
                             peer = %envelope.from,
                             seq = envelope.sequence,
@@ -417,6 +445,19 @@ mod tests {
         misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
     ) -> (ConnectionContext, Arc<AtomicUsize>) {
         let (ctx, _keypair, count) = create_test_context_with_own_keypair(misbehavior_detector);
+        (ctx, count)
+    }
+
+    /// Same as [`create_test_context`], but with a caller-supplied replay guard.
+    ///
+    /// The only way to reach the handler's local-fault classifier with a *persistent* guard,
+    /// which is what #2644 is about: an in-memory guard has no store to fail.
+    fn create_test_context_with_guard(
+        misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
+        guard: ReplayGuard,
+    ) -> (ConnectionContext, Arc<AtomicUsize>) {
+        let (mut ctx, _keypair, count) = create_test_context_with_own_keypair(misbehavior_detector);
+        ctx.replay_guard = Arc::new(RwLock::new(guard));
         (ctx, count)
     }
 
@@ -1240,6 +1281,194 @@ mod tests {
                 .is_empty(),
             "control: a real replay must still be scored, or the assertions above prove \
              nothing about how the migration hold is classified"
+        );
+    }
+
+    /// A store whose `flush` fails, so replay-state initialization fails with it.
+    struct FlushFailsStore {
+        inner: Arc<icn_store::SledStore>,
+        failing: std::sync::atomic::AtomicBool,
+    }
+
+    impl icn_store::Store for FlushFailsStore {
+        fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            self.inner.get(key)
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+            self.inner.put(key, value)
+        }
+        fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+            self.inner.delete(key)
+        }
+        fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan(prefix)
+        }
+        fn flush(&self) -> anyhow::Result<()> {
+            if self.failing.load(Ordering::SeqCst) {
+                anyhow::bail!("simulated disk failure during flush");
+            }
+            self.inner.flush().map(|_| ())
+        }
+        fn get_replica_metadata(
+            &self,
+            hash: &icn_store::ContentHash,
+        ) -> anyhow::Result<Option<icn_store::ReplicaMetadata>> {
+            self.inner.get_replica_metadata(hash)
+        }
+        fn put_replica_metadata(&self, meta: &icn_store::ReplicaMetadata) -> anyhow::Result<()> {
+            self.inner.put_replica_metadata(meta)
+        }
+        fn list_replica_hashes(&self) -> anyhow::Result<Vec<icn_store::ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+    }
+
+    /// Seed two spellings of one sender, so replay-state initialization must write, flush and
+    /// delete while collapsing them onto one canonical key (#2640).
+    fn seed_two_spellings(store: &dyn icn_store::Store, sender: &KeyPair) {
+        let canonical = sender.did().clone();
+        let hex: String = canonical
+            .to_verifying_key()
+            .unwrap()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let alias = icn_identity::Did::from_str(&format!("did:icn:f{hex}")).unwrap();
+        assert_ne!(
+            alias.as_str(),
+            canonical.as_str(),
+            "CONTROL: the alias must be a different spelling of the same key"
+        );
+        for (did, seq) in [(&canonical, 10u64), (&alias, 11u64)] {
+            let mut key = b"replay_max_seq:".to_vec();
+            key.extend_from_slice(did.as_str().as_bytes());
+            let value = serde_json::json!({
+                "max_seq": seq,
+                "updated_at_ms": 0u64,
+                "semantic_version": 1u32,
+                // The unproven namespace, which is what a context with no `peer_connections`
+                // entry resolves the live sender to. Tagging these rows durable instead would
+                // make the repaired-store control a `SenderRegimeDowngrade` — a different
+                // local fault, and not the one under test.
+                "sender_regime": 0u32,
+            });
+            store
+                .put(&key, &serde_json::to_vec(&value).unwrap())
+                .unwrap();
+        }
+    }
+
+    /// #2644 — a local replay-state initialization failure must never reach the peer-ban path.
+    ///
+    /// The handler boundary, not the guard's unit boundary, because the defect lived in the
+    /// join between them: `ReplayGuard::check_replay_only` propagated an untyped storage
+    /// error, and this function classifies local faults by downcasting to the replay-state
+    /// error types. Nothing matched, so the fall-through ran — `warn!("Replay attack
+    /// detected")` and `Violation::ReplayAttack` against a peer that had done nothing.
+    ///
+    /// The guard deliberately stays uninitialized after a failed load and retries on every
+    /// message, so this is not a single stray score: every honest peer is scored on every
+    /// message until the store is repaired, which is exactly the automatic-ban input
+    /// `MisbehaviorDetector` consumes. The message is looped for that reason.
+    #[tokio::test]
+    async fn a_local_replay_state_initialization_failure_is_never_scored_as_a_replay_attack() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let sled = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+        seed_two_spellings(sled.as_ref(), &sender);
+
+        let broken = Arc::new(FlushFailsStore {
+            inner: sled.clone(),
+            failing: std::sync::atomic::AtomicBool::new(true),
+        });
+        let guard = ReplayGuard::new_persistent(300, 3600, broken.clone());
+        let (ctx, forward_count) = create_test_context_with_guard(Some(detector.clone()), guard);
+
+        for round in 0..5 {
+            let envelope = create_signed_envelope(&sender, 100 + round);
+            ctx.handle_signed(create_network_message(&envelope), &envelope)
+                .await;
+        }
+
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "the guard must still fail closed: nothing may be delivered while replay state \
+             cannot be loaded"
+        );
+        {
+            let detector_guard = detector.read().await;
+            let violations = detector_guard.get_violations(sender.did());
+            assert!(
+                violations.is_empty(),
+                "our own storage failure must not be scored against the peer; got \
+                 {violations:?}"
+            );
+        }
+
+        // CONTROL: the guard really was uninitialized on every one of those messages, so the
+        // assertion above is about the classifier and not about a guard that quietly
+        // succeeded.
+        assert!(
+            !ctx.replay_guard.read().await.is_initialized(),
+            "CONTROL: the load must have failed on every message"
+        );
+
+        // CONTROL: repairing the store proves the same peer, the same handler and the same
+        // detector do deliver traffic — so "no violations" above is not "nothing works".
+        broken.failing.store(false, Ordering::SeqCst);
+        let fresh = create_signed_envelope(&sender, 200);
+        ctx.handle_signed(create_network_message(&fresh), &fresh)
+            .await;
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            1,
+            "CONTROL: once the store is repaired the retry must initialize and deliver"
+        );
+    }
+
+    /// The other half of the control: a genuine replay is still scored as one.
+    ///
+    /// Without it, every assertion in the test above is satisfiable by a handler that stopped
+    /// recording `ReplayAttack` altogether.
+    #[tokio::test]
+    async fn a_genuine_replay_is_still_scored_after_the_local_fault_exemption() {
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let sled = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let sender = KeyPair::generate().unwrap();
+
+        let healthy = Arc::new(FlushFailsStore {
+            inner: sled.clone(),
+            failing: std::sync::atomic::AtomicBool::new(false),
+        });
+        let guard = ReplayGuard::new_persistent(300, 3600, healthy);
+        let (ctx, forward_count) = create_test_context_with_guard(Some(detector.clone()), guard);
+
+        let envelope = create_signed_envelope(&sender, 1);
+        let message = create_network_message(&envelope);
+        ctx.handle_signed(message.clone(), &envelope).await;
+        assert_eq!(forward_count.load(Ordering::SeqCst), 1);
+
+        ctx.handle_signed(message, &envelope).await;
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            1,
+            "the replay must not be delivered"
+        );
+
+        let detector_guard = detector.read().await;
+        let violations = detector_guard.get_violations(sender.did());
+        assert!(
+            violations.iter().any(|v| matches!(
+                v.violation,
+                icn_security::Violation::ReplayAttack { sequence: 1, .. }
+            )),
+            "a real replay must still reach the ReplayAttack path; got {violations:?}"
         );
     }
 }
