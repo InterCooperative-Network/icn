@@ -551,9 +551,10 @@ key (`SenderPrincipal`), not the wire spelling. In memory, map #37 is keyed by i
 **#1 (`make_sender_regime_key`)**, **#2 (`make_max_seq_key`)** and **#3 (`make_finalized_key`)**
 are written under the principal's canonical base58btc spelling, and a migration pass at
 `load_persisted_state` collapses pre-existing spelling-distinct rows onto that one key **wherever
-one key can carry their combined meaning**: within a single semantic version the high-water merges
-to the **maximum** with its sender-regime tag kept coupled to the number, provenance rows join to
-the **strongest established** regime, and finalized sequences take the **union**. The canonical row
+one key can carry their combined meaning**: high-water rows merge to the **maximum** only inside a
+single `(semantic_version, sender_regime)` group — the unit within which two numbers are
+comparable at all — provenance rows join to the **strongest established** regime, and finalized
+sequences take the **union**. The canonical row
 is flushed before any alias row is retired. A re-spelled captured envelope is therefore rejected by
 the replay guard, and the self-DID drop in `handlers/signed.rs` (§10.2's "related sub-instance")
 now compares keys rather than strings.
@@ -582,9 +583,21 @@ and deletes nothing in these cases:
   `semantic_version` selects *how* a persisted number is to be read, not how large it is, so "most
   restrictive version" is not a safe tie-break here: the legacy version wins that comparison, and
   collapsing onto it would replace a current-version durable floor with a legacy row whose number
-  the load pass discards — leaving a floor of 0 once the bounded migration hold expires. The load
-  pass groups by `(principal, semantic_version)` on the same rule and **joins the groups' effects**
-  onto one window instead: floors by maximum, holds by `PeerHold::stronger_of`.
+  the load pass discards — leaving a floor of 0 once the bounded migration hold expires.
+- **Readable rows spanning several sender regimes, within one version** (#2644). The same argument
+  one axis over, and the sharper case: `sender_regime` names the namespace that produced the
+  number, and numbers from two namespaces are not comparable at all. An earlier pass resolved such
+  a pair to a single `TransitionToDurableV1` row carrying `max(durable, legacy)` — a state that
+  never existed, in which a *durable* high-water of 10 wore the legacy label, so the promotion
+  ending that migration discarded it and every durable sequence at or below 10 became replayable.
+  There is no correct scalar to collapse them into, so they are not collapsed.
+
+  The load pass groups by `(principal, semantic_version, sender_regime)` on the same rule and
+  **composes the groups' effects** onto one window instead, through `HighWaterEvidence`: each floor
+  stays under the namespace that produced it (`NumericNamespace`), legacy-namespace numbers beside
+  a durable floor contribute a bounded `MigratingSenderRegime` obligation rather than a number, and
+  holds join by `PeerHold::stronger_of`. The composition is order-independent, which matters
+  because the order `sled` hands the rows over is a property of the spellings an attacker picked.
 - **A group whose canonical row is itself unreadable** (`install_canonical_row`). Writing the merge
   over it would erase the evidence that quarantines the sender and replace it with a floor derived
   only from the spellings that could be read. Every readable alias in that group is left standing
@@ -593,12 +606,15 @@ and deletes nothing in these cases:
   migration hold whose promotion retires the retained number, and a fossil row must not impose
   that on a principal a durable sibling already proved (#2644).
 
-**Consequence, and it is a real cost.** Alias rows left by either case are never retired, and
+**Consequence, and it is a real cost.** Alias rows left by any of these cases are never retired, and
 `cleanup()` deletes only the canonical key, so normal cleanup cannot reach them. A principal with a
 surviving legacy-version alias row therefore pays a bounded `MigratingFromLegacy` hold **again on
-every restart**, for as long as that row exists. The store converges — and the recurring hold stops
-— only once the principal's rows are back to a single semantic version, at which point the next
-start canonicalizes them normally. That is the deliberate trade: a bounded, self-clearing hold that
+every restart**, and one with a surviving legacy-regime alias row pays a bounded
+`MigratingSenderRegime` hold on every restart, for as long as that row exists. The mixed-regime case
+does not converge on its own: a completed promotion writes the canonical key and never touches an
+alias, so the pair re-forms on the next start. The store converges — and the recurring hold stops —
+only once the principal's rows are back to a single `(semantic_version, sender_regime)` group, at
+which point the next start canonicalizes them normally. That is the deliberate trade: a bounded, self-clearing hold that
 can recur, against a permanent loss of replay protection.
 
 **Unreadable rows quarantine in two of the three keyspaces, not all three.** For row #1
