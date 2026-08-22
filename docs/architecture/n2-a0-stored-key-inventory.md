@@ -695,9 +695,15 @@ by adding one.
 Two consequences worth recording for N2-A. First, this removes a per-envelope scan of an
 unbounded structure: the interim fix walked row #57 once per signed message, and since nothing
 prunes that map, a peer reconnecting under one-off DIDs could grow it permanently and make every
-other peer's traffic pay for the scan. The registry is one hash lookup and its cardinality is
-bounded by live claiming connections, which pre-authentication admission already bounds (#2547).
-Second, row #57's *remaining* consumers are unchanged — cached version, X25519 and PQ material,
+other peer's traffic pay for the scan. The registry is one hash lookup, and its cardinality is
+the number of connections currently *claiming* — each of which is a live QUIC connection the
+peer has to keep standing up, where the cache kept its entry after the connection was gone.
+**This is deliberately not a #2547 bound**, and should not be recorded as one:
+`record_authenticated_peer` drops the admission guard the moment a connection authenticates,
+while the capability claim is taken afterwards, so pre-authentication admission limits how many
+connections a source may hold *while anonymous* and says nothing about authenticated ones. A
+post-authentication connection bound, if one is wanted, is a separate piece of work this does
+not supply. Second, row #57's *remaining* consumers are unchanged — cached version, X25519 and PQ material,
 and #2504-era reconnection — so the migration this row still owes is unaffected. What changed is
 that replay-regime attribution is no longer one of them.
 
