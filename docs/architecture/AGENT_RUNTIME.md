@@ -401,8 +401,13 @@ branch/HEAD/PR hanging off the lane as live or advisory metadata, never as ident
 ## 9. Safe waiting
 
 `ops/scripts/icn-wait` is the supported way to wait for something. It exists because the
-alternative agents invent is defective in two reproducible ways — a self-matching
-`pgrep -f` predicate, and a sentinel wait whose file cannot appear. Both are documented in
+alternative agents invent is defective in two reproducible — and materially different — ways.
+A self-matching `pgrep -f` predicate is **logically non-terminating**: the observer matches
+itself, so no future event can satisfy it. An unbounded sentinel wait is **not** impossible —
+the file may legitimately arrive later — but with stderr swallowed and no bound or producer
+identity it cannot distinguish a working producer from a dead one, a deleted scratch directory,
+or a sentinel that will never come, so it can spin indefinitely while appearing active. Both are
+documented in
 `ops/scripts/README-icn-wait.md`, **blocked** at the Bash tool seam by
 `.claude/hooks/pre-bash-guard.py` (which explicitly does not flag the safe `[m]utate.py`
 bracket idiom), and pinned by regression tests in `scripts/test-icn-wait.sh` and

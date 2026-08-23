@@ -24,15 +24,9 @@ import {
   recordProgress,
   registerSession,
   releaseSession,
-  sessionsByWorktreeName,
   type SessionRow,
 } from "../runtime/session-runtime.js";
-import {
-  branchChanged,
-  discoverWorktree,
-  readBranchState,
-  type WorktreeIdentity,
-} from "../runtime/worktree-identity.js";
+import { type WorktreeIdentity } from "../runtime/worktree-identity.js";
 
 let db: Database.Database;
 

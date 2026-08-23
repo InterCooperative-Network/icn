@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""test_pre_bash_guard.py — the Bash guard must block exactly the loops that cannot terminate.
+"""test_pre_bash_guard.py — the Bash guard must block exactly the two unsafe wait shapes.
+
+The two shapes have DIFFERENT properties, and the guard must state each correctly:
+
+  A. self-matching `pgrep -f`  — LOGICALLY NON-TERMINATING. The observer matches itself, so no
+     future event from any process can satisfy the predicate.
+
+  B. unbounded sentinel wait   — NOT logically impossible. Another process may legitimately
+     create the file later. The defect is that, with stderr swallowed and no bound and no
+     producer identity, it cannot distinguish a working producer from a dead one, a deleted
+     scratch directory, or a sentinel that will never arrive — so it can spin indefinitely
+     while appearing active. Blocked in that unbounded form only; bounded forms are fine.
+
+Overstating B as "impossible" would be a false claim in an error message an agent is expected
+to trust, so the wording of each block is asserted, not just the exit code.
 
 Two failure modes matter equally and are tested equally:
 
@@ -91,7 +105,57 @@ CASES: list[tuple[str, int, str]] = [
     (
         'until [ -f /tmp/ready ]; do sleep 5; done',
         ALLOW,
-        "bare file poll without swallowed stderr is not provably broken",
+        "bare file poll without swallowed stderr is not the refused shape",
+    ),
+    # ── shape B is about BOUNDEDNESS + EVIDENCE, not about waiting on files ──
+    (
+        'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; timeout 60 true; done',
+        ALLOW,
+        "SAFE: sentinel wait that is bounded is allowed",
+    ),
+    (
+        'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; [ $SECONDS -gt 600 ] && break; done',
+        ALLOW,
+        "SAFE: sentinel wait with its own bound is allowed",
+    ),
+    (
+        "icn-wait file /tmp/run.log --pattern '^EXIT=' --source-pid 4242 --timeout 600",
+        ALLOW,
+        "SAFE: the supported form supplies both a bound and producer evidence",
+    ),
+    # ── ordinary legitimate loops must not be caught ──
+    ("for f in *.rs; do echo $f; done", ALLOW, "ordinary for-loop"),
+    (
+        'while read -r line; do echo "$line"; done < input.txt',
+        ALLOW,
+        "ordinary while-read loop",
+    ),
+    (
+        'while [ $i -lt 5 ]; do i=$((i+1)); sleep 1; done',
+        ALLOW,
+        "bounded counting loop with a sleep",
+    ),
+    (
+        "cargo test 2>/dev/null || echo failed",
+        ALLOW,
+        "swallowed stderr outside any loop",
+    ),
+]
+
+# The block message must describe the ACTUAL property of each shape. An error message an agent
+# is told to trust must not overstate its case.
+MESSAGE_CONTRACT = [
+    (
+        'until ! pgrep -f "scratchpad/mutate.py"; do sleep 20; done',
+        ["can never terminate", "matches full command lines", "icn-wait"],
+        ["may legitimately create"],
+        "self-match message claims impossibility (correctly)",
+    ),
+    (
+        'until grep -q "^EXIT=" /tmp/x.log 2>/dev/null; do sleep 20; done',
+        ["not impossible in principle", "producer died", "--source-pid", "unbounded"],
+        ["can never terminate", "no future event"],
+        "sentinel message describes indistinguishability, NOT impossibility",
     ),
 ]
 
@@ -119,16 +183,29 @@ def main() -> int:
         else:
             print(f"  ok    {'BLOCK' if want == BLOCK else 'allow'}  {label}")
 
-    # A block must explain itself: an unexplained refusal is indistinguishable from a bug.
-    _, err = run('until ! pgrep -f "scratchpad/mutate.py"; do sleep 20; done')
-    for needle in ("icn-wait", "matches full command lines"):
-        if needle not in err:
-            failures += 1
-            print(f"  FAIL  block message does not mention {needle!r}", file=sys.stderr)
-        else:
-            print(f"  ok    block message mentions {needle!r}")
+    # A block must explain itself accurately: an unexplained refusal is indistinguishable from
+    # a bug, and an OVERSTATED one teaches the agent something false.
+    checks = 0
+    for cmd, must_have, must_not_have, label in MESSAGE_CONTRACT:
+        _, err = run(cmd)
+        low = err.lower()
+        ok_msg = True
+        for needle in must_have:
+            checks += 1
+            if needle.lower() not in low:
+                failures += 1
+                ok_msg = False
+                print(f"  FAIL  message missing {needle!r} ({label})", file=sys.stderr)
+        for needle in must_not_have:
+            checks += 1
+            if needle.lower() in low:
+                failures += 1
+                ok_msg = False
+                print(f"  FAIL  message OVERSTATES: contains {needle!r} ({label})", file=sys.stderr)
+        if ok_msg:
+            print(f"  ok    {label}")
 
-    print(f"\npassed: {len(CASES) + 2 - failures}  failed: {failures}")
+    print(f"\npassed: {len(CASES) + checks - failures}  failed: {failures}")
     return 1 if failures else 0
 
 

@@ -11,11 +11,10 @@
 //
 // Refs docs/architecture/AGENT_RUNTIME.md §3.
 
-import { execFileSync } from "child_process";
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { hostname } from "os";
-import { basename, dirname } from "path";
+import { dirname } from "path";
 import { initDb } from "../state/db.js";
 import {
   classifyWorktree,

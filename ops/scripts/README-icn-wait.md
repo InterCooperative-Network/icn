@@ -19,22 +19,39 @@ the pattern*. It matches itself. The predicate can never become false.
 Verified on the live process: `pgrep -f "scratchpad/mutate.py"` returned exactly one PID — the
 waiter.
 
-### 2. The vanished sentinel
+### 2. The unbounded sentinel wait
 
 ```bash
 until grep -q "^EXIT=" /tmp/.../full-test-3.log 2>/dev/null; do sleep 20; done
 ```
 
-The `2>/dev/null` turns *"this file does not exist"* into *"not ready yet"*. A sentinel whose
-producer died, or whose scratchpad was cleaned up, becomes indistinguishable from one still
-coming.
+**This one is not logically impossible**, and it matters not to overstate it: another process
+may legitimately create or update that file later, in which case the loop finishes normally.
+
+Its defect is **indistinguishability**. With stderr swallowed, no bound, and no producer
+identity, the loop cannot tell apart four situations:
+
+| Situation | Waiting is |
+|---|---|
+| the producer is still working | correct |
+| the producer died | futile |
+| the scratch directory was deleted | futile |
+| the sentinel will never arrive | futile |
+
+Three of the four are terminal, and the loop treats all four identically — `2>/dev/null`
+collapses *"cannot read this file"* into *"not ready yet"*. So it can spin indefinitely while
+appearing active, and can never report why. On `icn-dev` it was the third case: the scratchpad
+had been cleaned up and `full-test-3.log` no longer existed.
+
+The fix is not to stop waiting on files — it is to supply a **bound** and **producer evidence**,
+which is exactly what `icn-wait file --source-pid --timeout` does.
 
 ### Why they were hard to spot
 
 Both spawn a fresh child every few seconds. By every naive metric — recent process start, live
-parent, constant activity — they look maximally **alive**. They are maximally **dead**: no
-future event can end either one. This is the distinction the agent runtime draws as
-*activity ≠ progress*.
+parent, constant activity — they look maximally **alive**. Neither was making progress: the
+first could never finish, and the second was waiting on something that was never coming. This
+is the distinction the agent runtime draws as *activity ≠ progress*.
 
 Neither pattern appears anywhere in this repository. They are ad-hoc inventions, which is why
 the fix is a supported primitive rather than a documentation change.

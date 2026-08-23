@@ -85,19 +85,22 @@ wait "$foreign" 2>/dev/null
 
 echo
 
-# ── 2. The vanished-sentinel defect (PID 220945 on icn-dev) ──────────────────
+# ── 2. The unbounded-sentinel defect (PID 220945 on icn-dev) ─────────────────
 echo "2. sentinel-file waits"
 
-# NEGATIVE CONTROL: the original loop against a path whose directory does not exist. The
-# 2>/dev/null makes ENOENT look like "not ready", so it spins forever.
+# NOTE ON THE PROPERTY UNDER TEST. Unlike the self-matching pgrep above, a sentinel wait is not
+# logically impossible — a file can legitimately arrive later. The defect is that the unbounded,
+# error-swallowing form cannot distinguish a working producer from a dead one, a deleted
+# directory, or a sentinel that will never come. This control pins the WORST case (a directory
+# nothing will ever create), where the wait is in fact unsatisfiable AND cannot say so.
 timeout 6 bash -c '
   until grep -q "^EXIT=" /nonexistent-dir-xyz/full-test-3.log 2>/dev/null; do sleep 1; done
 ' >/dev/null 2>&1
 rc=$?
 if [ "$rc" -eq 124 ]; then
-  ok "naive 'until grep -q PATTERN missing-file' never terminates (defect reproduced)"
+  ok "naive 'until grep -q PATTERN missing-file' spins with no way to report failure (defect reproduced)"
 else
-  bad "naive sentinel loop should hang" "exited $rc instead of timing out"
+  bad "naive sentinel loop should spin" "exited $rc instead of timing out"
 fi
 
 # POSITIVE: unreachable sentinel is a distinct, immediate failure — not a wait.
