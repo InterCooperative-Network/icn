@@ -64,6 +64,14 @@ export function registerSessionTools(
         .string()
         .optional()
         .describe("Agent provider/harness, e.g. claude-code, codex, cursor"),
+      agent_pid: z
+        .number()
+        .optional()
+        .describe(
+          "Your process id, if you know it. Recorded as correlation metadata and used by " +
+            "lifecycle classification to corroborate liveness without any caller cooperation. " +
+            "Omitting it removes that safety net for this session."
+        ),
       provider_session_id: z
         .string()
         .optional()

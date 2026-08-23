@@ -98,13 +98,54 @@ BOUNDED_RE = re.compile(
     r"|\$SECONDS\b|\bSECONDS\s*[-=]"       # $SECONDS / SECONDS=
     r"|(^|[;&|\n]\s*)break\b"              # break as a statement
     r"|(^|[;&|(]\s*)icn-wait\b"             # the supported helper
-    r"|\bdeadline\b|\bmax_?(?:tries|attempts|wait)\b",
-    re.M,
+    # These two were left as bare words while the others were anchored, so ANY occurrence
+    # disarmed the guard — including inside the pgrep pattern itself
+    # (`pgrep -f "deadline-runner.py"`) or in a trailing comment. Anchor them the same way:
+    # a shell variable or an assignment, not an arbitrary substring.
+    r"|\$(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b"
+    r"|\b(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\s*=",
+    re.M | re.I,
 )
 
 
 def strip_comments(cmd: str) -> str:
     return COMMENT_RE.sub("", cmd)
+
+
+def quoted_spans(cmd: str) -> list[tuple[int, int]]:
+    """Character ranges inside single/double quotes or a heredoc body.
+
+    Without this the guard blocks writing ABOUT the defect: `git commit -m "... until !
+    pgrep -f x; do sleep 5; done ..."` and a heredoc appending the example to the README were
+    both refused. A loop that exists only as text inside an argument is not a loop the shell
+    will run.
+    """
+    spans: list[tuple[int, int]] = []
+    i, n = 0, len(cmd)
+    while i < n:
+        ch = cmd[i]
+        if ch in "\"'":
+            j = i + 1
+            while j < n and cmd[j] != ch:
+                if cmd[j] == "\\":
+                    j += 1
+                j += 1
+            spans.append((i, min(j, n)))
+            i = j + 1
+            continue
+        if cmd.startswith("<<", i):
+            m = re.match(r"<<-?\s*['\"]?(\w+)['\"]?", cmd[i:])
+            if m:
+                end = cmd.find("\n" + m.group(1), i)
+                spans.append((i, end if end != -1 else n))
+                i = end if end != -1 else n
+                continue
+        i += 1
+    return spans
+
+
+def inside_span(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(a <= pos <= b for a, b in spans)
 
 
 def _pattern_of(m: re.Match) -> str | None:
@@ -125,8 +166,12 @@ def blocked_reason(cmd: str) -> str | None:
     loop's own termination condition.
     """
     clean = strip_comments(cmd)
+    spans = quoted_spans(clean)
 
     for loop in LOOP_RE.finditer(clean):
+        # A loop keyword inside a quoted argument or heredoc is text, not a command.
+        if inside_span(loop.start("kw"), spans):
+            continue
         cond, body = loop.group("cond"), loop.group("body")
 
         # A polling loop sleeps somewhere in its body. Position within the body is irrelevant.

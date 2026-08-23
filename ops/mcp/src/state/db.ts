@@ -1,13 +1,45 @@
 import Database from "better-sqlite3";
-import { existsSync, mkdirSync } from "fs";
+import { execFileSync } from "child_process";
+import { existsSync, mkdirSync, realpathSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_DB_PATH = join(__dirname, "../../data/icn-ops.db");
+/** Pre-existing location: beside whichever copy of this JS is executing. */
+const LEGACY_DB_PATH = join(__dirname, "../../data/icn-ops.db");
+
+/**
+ * The session registry must be ONE database per repository, not one per worktree.
+ *
+ * The old default resolved beside the executing JS. That was harmless while only the MCP server
+ * used it, but this runtime added a second writer — the hook CLI, which runs out of the agent's
+ * OWN worktree — while the MCP server is pinned by ~/.claude.json to an absolute path in the
+ * mcp-host worktree. The result observed on this VM: two live databases with different schemas,
+ * a hook-registered session invisible to every mcp__icn-ops__* tool, and file_claims failing a
+ * foreign-key check because the session id existed only in the other file.
+ *
+ * Git already names the thing shared by every worktree of a repo: --git-common-dir. Deriving
+ * from it is consistent with how this runtime identifies lanes (worktree-identity.ts), needs no
+ * machine-specific path, and works for bare stores and plain clones alike.
+ */
+export function resolveDefaultDbPath(from: string = __dirname): string {
+  try {
+    const common = execFileSync("git", ["-C", from, "rev-parse", "--git-common-dir"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (common) {
+      const abs = common.startsWith("/") ? common : join(from, common);
+      return join(realpathSync(abs), "icn-ops.db");
+    }
+  } catch {
+    // Not inside a repo, or git unavailable — fall through.
+  }
+  return LEGACY_DB_PATH;
+}
 
 export function initDb(dbPath?: string): Database.Database {
-  const path = dbPath ?? process.env["ICN_OPS_DB"] ?? DEFAULT_DB_PATH;
+  const path = dbPath ?? process.env["ICN_OPS_DB"] ?? resolveDefaultDbPath();
 
   // Ensure data directory exists
   const dir = dirname(path);
@@ -194,5 +226,39 @@ function migrate(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
     `);
     db.prepare("INSERT INTO schema_version (version) VALUES (3)").run();
+  }
+
+  // Schema v4: supervisions are scoped to a LANE, not to whichever session declared them.
+  //
+  // This is a NEW migration rather than an edit to v3 because a v3-stamped database now
+  // demonstrably exists on this machine — and a stamped version is skipped wholesale, so an
+  // in-place edit would silently leave it on the old shape. That rule is pinned by
+  // schema-upgrade.test.ts ("migration-number discipline"); this is it being obeyed.
+  //
+  // WHY IT MATTERS: watchers_process had no lane of its own, so supervisions were found via the
+  // owning session row. When a resumed conversation re-registered from a different worktree the
+  // row moved, and the supervision moved with it — leaving the lane where the build was ACTUALLY
+  // RUNNING with no protection. Observed: a live `cargo test --workspace` in lane A while lane A
+  // classified retireable:true.
+  //
+  // The column doubles as a discriminator. `watch_process` (a pre-existing, unrelated feature)
+  // inserts into this same table with worktree_id NULL, so lane-scoped supervision queries no
+  // longer reap those rows out from under the background poller that owns them.
+  const v4 = db
+    .prepare("SELECT COUNT(*) as count FROM schema_version WHERE version = 4")
+    .get() as { count: number };
+  if (v4.count === 0) {
+    const cols = new Set(
+      (db.prepare("PRAGMA table_info(watchers_process)").all() as Array<{ name: string }>).map(
+        (c) => c.name
+      )
+    );
+    if (!cols.has("worktree_id")) {
+      db.exec("ALTER TABLE watchers_process ADD COLUMN worktree_id TEXT");
+    }
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_watchers_worktree ON watchers_process(worktree_id, status)"
+    );
+    db.prepare("INSERT INTO schema_version (version) VALUES (4)").run();
   }
 }

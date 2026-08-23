@@ -599,7 +599,7 @@ describe("4. a supervised long-running operation is not abandonment", () => {
 
   it("an unregistered lane gains nothing from supervision (still fail-safe)", () => {
     const c = classify([], { observed_pids: [1], live_supervisions: [
-      { id: 1, pid: process.pid, label: "x", created_at: Date.now() },
+      { id: 1, pid: process.pid, label: "x", created_at: Date.now(), worktree_id: null },
     ] }, { heartbeat_age_min: null, progress_age_min: null }, LIMITS);
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
     expect(c.retireable).toBe(false);
@@ -729,5 +729,118 @@ describe("a resumed conversation that reappears in another lane", () => {
       repo: "icn", identity: ident("same"), provider_session_id: "conv",
     });
     expect(again.lane_changed).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Round-2 independent review: protection is a property of the LANE.
+//
+// The defect these pin: classifyWorktree selected one "primary" session by freshest heartbeat
+// — the very signal this module argues is not liveness — and judged the whole lane from it.
+// A crashed co-occupant that heartbeated more recently became primary, its dead pid was the
+// only one checked, and a live agent's recorded pid was never looked at.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("a lane is protected by ANY live occupant", () => {
+  it("a live agent protects the lane even when a crashed peer has a fresher heartbeat", () => {
+    const live = registerSession(db, {
+      repo: "icn", identity: ident("shared"), provider_session_id: "live", agent_pid: process.pid,
+    });
+    const dead = registerSession(db, {
+      repo: "icn", identity: ident("shared"), provider_session_id: "dead", agent_pid: 999_999_999,
+    });
+    backdate(live.session_id, "last_heartbeat", 40);
+    backdate(live.session_id, "last_progress", 40);
+    backdate(dead.session_id, "last_heartbeat", 35); // fresher -> becomes "primary"
+    backdate(dead.session_id, "last_progress", 35);
+
+    const c = classifyWorktree(db, wtid("shared"), { observed_pids: [] });
+
+    expect(c.retireable).toBe(false);
+    expect(c.contention.count).toBe(2);
+    // ...and the reason must name the pid that is actually alive, not primary's dead one.
+    expect(c.reason).toContain(String(process.pid));
+    expect(c.reason).not.toContain("999999999");
+  });
+
+  it("only retires when EVERY recorded pid on the lane is gone", () => {
+    const a = registerSession(db, {
+      repo: "icn", identity: ident("gone"), provider_session_id: "a", agent_pid: 999_999_998,
+    });
+    const b = registerSession(db, {
+      repo: "icn", identity: ident("gone"), provider_session_id: "b", agent_pid: 999_999_999,
+    });
+    for (const s of [a.session_id, b.session_id]) {
+      backdate(s, "last_heartbeat", 120);
+      backdate(s, "last_progress", 120);
+    }
+    const c = classifyWorktree(db, wtid("gone"), { observed_pids: [] });
+    expect(c.state).toBe("REGISTERED-EXPIRED");
+    expect(c.retireable).toBe(true);
+  });
+});
+
+describe("a supervision belongs to the lane, not to the session that declared it", () => {
+  it("protects the lane where the build runs after the session moves away", () => {
+    // A build runs in a DIRECTORY. When a resumed conversation re-registered from another
+    // worktree the row moved and took the supervision with it, leaving the lane with the
+    // running build reading retireable:true.
+    const a = registerSession(db, {
+      repo: "icn", identity: ident("laneA"), provider_session_id: "conv",
+    });
+    superviseOperation(db, a.session_id, process.pid, "cargo test --workspace");
+    const peer = registerSession(db, {
+      repo: "icn", identity: ident("laneA"), provider_session_id: "peer", agent_pid: 999_999_999,
+    });
+    backdate(a.session_id, "last_heartbeat", 90);
+    backdate(peer.session_id, "last_heartbeat", 90);
+    backdate(peer.session_id, "last_progress", 90);
+
+    registerSession(db, { repo: "icn", identity: ident("laneB"), provider_session_id: "conv" });
+
+    const c = classifyWorktree(db, wtid("laneA"), { observed_pids: [] });
+    expect(c.state).toBe("SUPERVISED-BUSY");
+    expect(c.retireable).toBe(false);
+    expect(c.reason).toContain("cargo test --workspace");
+  });
+
+  it("does not reap plain watch_process rows, which belong to the background poller", () => {
+    // watch_process writes to the same table with a NULL lane. Reaping those here stole the
+    // poller's completion events and mailbox alerts from a pre-existing feature.
+    const s = registerSession(db, { repo: "icn", identity: ident("w"), provider_session_id: "k" });
+    db.prepare(
+      "INSERT INTO watchers_process (session_id, pid, label, created_at, status) VALUES (?, ?, ?, ?, 'running')"
+    ).run(s.session_id, 999_999_999, "docker build", Date.now());
+
+    liveSupervisions(db, s.session_id);
+    classifyWorktree(db, wtid("w"), { observed_pids: [] });
+
+    expect(
+      db.prepare("SELECT status FROM watchers_process WHERE label = 'docker build'").get()
+    ).toEqual({ status: "running" });
+  });
+});
+
+describe("supervision explains staleness; it never makes a healthy lane less protected", () => {
+  it("a healthy lane stays REGISTERED-ACTIVE while a build is declared", () => {
+    const s = registerSession(db, { repo: "icn", identity: ident("busy"), provider_session_id: "k" });
+    recordProgress(db, s.session_id, { kind: "command" });
+    superviseOperation(db, s.session_id, process.pid, "cargo build");
+
+    const c = classifyWorktree(db, wtid("busy"), { observed_pids: [] });
+    expect(c.state).toBe("REGISTERED-ACTIVE");
+    expect(c.retireable_with_approval).toBe(false);
+  });
+});
+
+describe("the TTL cannot be driven low enough to make everything retireable", () => {
+  it("clamps an absurd ICN_SESSION_TTL_MINUTES to the floor", () => {
+    const s = registerSession(db, { repo: "icn", identity: ident("ttl"), provider_session_id: "k" });
+    backdate(s.session_id, "last_heartbeat", 2);
+    backdate(s.session_id, "last_progress", 2);
+    const c = classifyWorktree(db, wtid("ttl"), { observed_pids: [] },
+      { ICN_SESSION_TTL_MINUTES: "1" } as NodeJS.ProcessEnv);
+    expect(c.state).toBe("REGISTERED-ACTIVE");
+    expect(c.retireable).toBe(false);
   });
 });

@@ -177,6 +177,23 @@ Releasing one session leaves every other occupant's authority untouched.
 Branch/PR/issue *state* is a live query (`live_branch_state`, `live_pr_state`,
 `live_issue_state` in `sources.json`). The registry stores the **reference**, never the state.
 
+## 2.6 One registry per repository
+
+The registry is a single SQLite database resolved from `git rev-parse --git-common-dir`, so
+every worktree of a repo shares it: `<repo>.git/icn-ops.db`. `ICN_OPS_DB` still overrides.
+
+This is load-bearing, not cosmetic. The previous default resolved *beside the executing JS*,
+which was harmless while the MCP server was the only writer. This runtime adds a second writer —
+the hook CLI, which runs out of the agent's **own** worktree — while `~/.claude.json` pins the
+MCP server to an absolute path in the `mcp-host` worktree. The observed result was two live
+databases with different schemas, hook-registered sessions invisible to every `mcp__icn-ops__*`
+tool, and `claim_files` failing a foreign-key check because the session id existed only in the
+other file.
+
+**Operational note:** after this lands, the `mcp-host` MCP server must be rebuilt and restarted
+for running sessions to pick up the shared registry. Rows in the old per-worktree databases are
+not migrated; they are stale session state and expire by TTL anyway.
+
 ## 3. Registration seam and failure policy
 
 **Seam:** the `SessionStart` hook, via `ops/scripts/icn-agent-session register`.
@@ -266,13 +283,17 @@ The registry also **corroborates itself**: it records the session's own `agent_p
 agent process protects the lane regardless of what any caller did or did not observe. Retirement
 requires *both* an affirmative empty observation *and* a dead (or absent) recorded pid.
 
-Classification is keyed on `worktree_id` (§2.2). When several sessions occupy a lane the verdict
-follows the **most live** one — a busy reviewer must not let a dead editor look retireable, and
-a dead editor must not make a busy reviewer's lane look abandoned — while `contention` reports
-every occupant.
+Classification is keyed on `worktree_id` (§2.2), and **protection is a property of the lane, not
+of any one row**. Heartbeat ages are reported from the freshest session, but liveness is
+aggregated across *every* occupant: the lane is protected if any recorded `agent_pid` is alive
+or any supervision is running in it. Selecting a single "primary" by heartbeat freshness and
+judging from that row produced `retireable: true` on a lane with a running agent, because a
+crashed peer with a fresher heartbeat won the selection and only its dead pid was checked.
+`contention` reports every occupant.
 
 TTL is `ICN_SESSION_TTL_MINUTES` (default 30, matching the pre-existing `list_sessions`
-window). Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-lane-audit`'s
+window), clamped to a 5-minute floor — it is read from the ambient environment of whoever runs
+classify, and a value of 1 turned a two-minute-old heartbeat into a retirement candidate. Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-lane-audit`'s
 `QUIESCENT_AFTER_MIN`).
 
 ### 5.1 Long-running legitimate operations
@@ -295,6 +316,14 @@ is deliberately hard to abuse:
 - **Bounded** — a supervision older than `ICN_SUPERVISION_MAX_MINUTES` (default 480) expires
   even if its PID is still alive, so a wedged process cannot protect a lane indefinitely.
 - **Reaped when the process dies** — a crashed build cannot pin a lane.
+- **Scoped to the lane, not the session** — a supervision records the `worktree_id` it was
+  declared in, so a session that later resumes from a different worktree cannot take the
+  protection of a build still running here away with it. The lane column also distinguishes
+  supervisions from `watch_process` rows in the same table, so lane queries no longer reap
+  another feature's watchers out from under its poller.
+- **Explains staleness only** — it applies when the heartbeat has expired. Applied
+  unconditionally it re-labelled a healthy lane and made it *approval-retireable*, i.e.
+  declaring a long build made the lane less protected.
 - **Not a trump card** — it protects against *automatic* retirement, never against an
   operator's decision, and it never touches progress evidence.
 

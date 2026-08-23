@@ -445,7 +445,7 @@
     },
     {
       "event": "SessionStart",
-      "matcher": "startup|resume",
+      "matcher": "startup|resume|clear|fork",
       "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
     },
     {

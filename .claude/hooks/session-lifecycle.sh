@@ -45,7 +45,12 @@ for k in sys.argv[1].split('.'):
     if not isinstance(v, dict):
         sys.exit(0)
     v = v.get(k)
-print(v if isinstance(v, str) else '')
+# Booleans must survive: Claude Code sends {"interrupted": false} as a JSON bool, and returning
+# '' for it made the interrupted-tool check unreachable dead code.
+if isinstance(v, bool):
+    print('true' if v else 'false')
+else:
+    print(v if isinstance(v, str) else '')
 " "$1" 2>/dev/null
 }
 
@@ -73,8 +78,11 @@ SESSION_BIN="$ROOT/ops/scripts/icn-agent-session"
 # output, so a missing exec bit, a payload-shape change, or an absent python3 turned the whole
 # feature off and — on SessionStart — suppressed the startup context block entirely, leaving
 # the agent with no idea the runtime existed and no indication anything was wrong.
+# $2 = "force" for callers that cannot know the event (an unparseable payload has no event, and
+# early-returning on that made the "could not be parsed" banner unreachable dead code — the
+# silent degradation this function exists to prevent).
 degraded_banner() {
-  [ "$EVENT" = "SessionStart" ] || return 0
+  if [ "${2:-}" != "force" ] && [ "$EVENT" != "SessionStart" ]; then return 0; fi
   cat <<BANNER
 ## ICN agent runtime — DEGRADED
 Lifecycle tracking is NOT active for this session: $1
@@ -90,7 +98,9 @@ if [ ! -x "$SESSION_BIN" ]; then
   exit 0
 fi
 if [ -z "$EVENT" ]; then
-  degraded_banner "the hook payload could not be parsed (is python3 available?)"
+  # No event means the payload could not be read at all, so we cannot know this is SessionStart.
+  # Announce anyway: a silent no-op here disables the runtime with zero signal.
+  degraded_banner "the hook payload could not be parsed (is python3 available?)" force
   exit 0
 fi
 if [ -z "$KEY" ]; then

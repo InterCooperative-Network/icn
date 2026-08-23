@@ -46,7 +46,11 @@ import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.
  * file whose lifetime is the harness's. `pid@host` is never synthesised — PIDs are recycled,
  * so it is correlation metadata at best and dangerous as identity.
  */
-function resolveHarnessKey(explicit?: string, identityFile?: string): string | null {
+function resolveHarnessKey(
+  explicit?: string,
+  identityFile?: string,
+  opts: { mint?: boolean } = {}
+): string | null {
   if (explicit) return explicit;
   if (!identityFile) return null;
   try {
@@ -54,6 +58,10 @@ function resolveHarnessKey(explicit?: string, identityFile?: string): string | n
       const existing = readFileSync(identityFile, "utf-8").trim();
       if (existing) return existing;
     }
+    // Only `register` may create an identity. Minting on read paths meant a second
+    // `release --identity-file F` wrote a BRAND NEW uuid, missed the lookup, and returned
+    // before the cleanup — a cleanup path that resurrected the artifact it exists to remove.
+    if (!opts.mint) return null;
     mkdirSync(dirname(identityFile), { recursive: true });
     const minted = randomUUID();
     writeFileSync(identityFile, minted + "\n", { mode: 0o600 });
@@ -153,7 +161,9 @@ function main(): number {
 
   switch (cmd) {
     case "register": {
-      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"), {
+        mint: true,
+      });
       const cwd = str(args, "cwd") ?? process.cwd();
       // ICN_ROOT (or --root) is a CANDIDATE, validated by Git — never authoritative on its own,
       // and hook cwd may be a subdirectory or scratch path, so Git resolves the real owner.
@@ -248,8 +258,14 @@ function main(): number {
       }
       if (!row) return 0;
 
-      const id = superviseOperation(db, row.id, pid, str(args, "label") ?? "supervised operation");
-      process.stdout.write(String(id) + "\n");
+      try {
+        const id = superviseOperation(db, row.id, pid, str(args, "label") ?? "supervised operation");
+        process.stdout.write(String(id) + "\n");
+      } catch (e) {
+        // The wrapper's contract is "exits non-zero ONLY for classify". A rejected supervision
+        // is an expected outcome, not a crash.
+        process.stderr.write(`icn-agent-session: supervision rejected: ${(e as Error).message}\n`);
+      }
       return 0;
     }
 
@@ -312,8 +328,20 @@ function main(): number {
       if (!worktreeId) {
         const name = str(args, "worktree");
         if (!name) {
+          // Exit 2 is the RETIREMENT-CANDIDATE verdict. Using it for a usage error told a
+          // consumer gating on `$? -eq 2` that an unresolvable path was permission to retire.
+          process.stdout.write(
+            JSON.stringify({
+              state: "REGISTRY-UNAVAILABLE",
+              retireable: false,
+              retireable_with_approval: false,
+              reason:
+                "no lane could be resolved from the arguments given " +
+                "(need --worktree-id, --path, or --worktree)",
+            }) + "\n"
+          );
           process.stderr.write("classify requires --worktree-id, --path, or --worktree\n");
-          return 2;
+          return 3;
         }
         const matches = sessionsByWorktreeName(db, name);
         const ids = [...new Set(matches.map((m) => m.worktree_id).filter(Boolean))];
@@ -337,13 +365,44 @@ function main(): number {
       // classify as retireable.
       const pidsRaw = str(args, "pids");
       const observedNone = args["observed-none"] === true;
-      const pids =
-        pidsRaw !== undefined
-          ? pidsRaw.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
-          : observedNone
-            ? []
-            : null;
-      const c = classifyWorktree(db, worktree, { observed_pids: pids });
+      let pids: number[] | null;
+      if (pidsRaw !== undefined) {
+        const tokens = pidsRaw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+        const parsed = tokens
+          .map((s) => Number(s))
+          .filter((n) => Number.isInteger(n) && n > 0);
+        // Garbage in must not become the strongest possible claim. `--pids "$(lsof -t … )"`
+        // where lsof errored used to collapse to [] — an affirmative "I looked and found
+        // nothing" — reintroducing the very bug the three-state observation closed.
+        if (tokens.length > 0 && parsed.length === 0) {
+          process.stderr.write(
+            `icn-agent-session: --pids ${JSON.stringify(pidsRaw)} contained no valid pids; ` +
+              "treating as NO observation performed (lane stays protected)\n"
+          );
+          pids = null;
+        } else {
+          pids = parsed;
+        }
+      } else {
+        pids = observedNone ? [] : null;
+      }
+      let c;
+      try {
+        c = classifyWorktree(db, worktree, { observed_pids: pids });
+      } catch (e) {
+        // Any unexpected failure must still produce a parseable, fail-safe verdict. Letting the
+        // exception escape produced EMPTY stdout — the precise failure the wrapper's degrade
+        // path exists to prevent.
+        process.stdout.write(
+          JSON.stringify({
+            state: "REGISTRY-UNAVAILABLE",
+            retireable: false,
+            retireable_with_approval: false,
+            reason: `classification failed: ${(e as Error).message}`,
+          }) + "\n"
+        );
+        return 3;
+      }
       process.stdout.write(JSON.stringify(c) + "\n");
       // Exit code is the verdict: 0 protected-and-healthy, 1 protected, 2 candidate.
       if (c.state === "REGISTERED-ACTIVE") return 0;

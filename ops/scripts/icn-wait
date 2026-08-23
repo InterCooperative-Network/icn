@@ -140,6 +140,19 @@ is_our_descendant() {
 }
 
 # Matches for PATTERN excluding the observer. Prints surviving PIDs, one per line.
+# Validate the pattern ONCE, up front. `pgrep` exits 2 on a bad regex while printing nothing,
+# which is indistinguishable from "no matches" — so an invalid pattern reported the wait as
+# SATISFIED (exit 0, "your build finished"). That is the same swallowed-error defect the file
+# branch fixes and the Bash guard blocks agents for writing.
+assert_pattern_usable() {
+  local pat="$1" out rc
+  out="$(pgrep -f -- "$pat" 2>&1)"; rc=$?
+  # 0 = matched, 1 = no match. Anything else is pgrep failing, not an answer.
+  if [ "$rc" -ge 2 ]; then
+    fatal "pattern /$pat/ cannot be evaluated by pgrep (exit $rc): ${out:-no detail}"
+  fi
+}
+
 foreign_matches() {
   local pat="$1" pid
   pgrep -f -- "$pat" 2>/dev/null | while read -r pid; do
@@ -300,6 +313,7 @@ case "$CMD" in
     pat="${POSITIONAL[0]:-}"
     [ -n "$pat" ] || die "match requires a pattern"
     LABEL="${LABEL:-processes matching /$pat/}"
+    assert_pattern_usable "$pat"
     build_exclusions
 
     # ASSERTION, not an assumption. The observer's own command line contains the pattern (it

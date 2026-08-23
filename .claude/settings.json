@@ -157,7 +157,7 @@
     ],
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|clear|fork",
         "hooks": [
           {
             "type": "command",

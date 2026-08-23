@@ -21,8 +21,22 @@ set -uo pipefail
 
 cmd="${1:-help}"
 
-# Resolve the repo root without trusting cwd: hooks may run from anywhere under the worktree.
-ROOT="${CLAUDE_PROJECT_DIR:-}"
+# Resolve the repo root. THIS SCRIPT'S OWN LOCATION WINS.
+#
+# Preferring $CLAUDE_PROJECT_DIR meant a wrapper in worktree A would exec worktree B's compiled
+# CLI — observed resolving to mcp-host from this lane — so a stale sibling build could silently
+# classify with old logic. The script and the CLI it calls must be the same checkout. Symlinks
+# are resolved so an entry in ~/bin still finds its own repo.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+ROOT="$(cd "$(dirname "$self")/../.." 2>/dev/null && pwd || true)"
+
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="${CLAUDE_PROJECT_DIR:-}"
+fi
 if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 fi

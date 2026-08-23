@@ -226,6 +226,47 @@ CASES: list[tuple[str, int, str]] = [
         ALLOW,
         "deliberate: a bare test with no swallowed stderr is not the refused shape",
     ),
+
+    # ── ROUND 2 of independent review: bounding words that were left unanchored ──
+    # `timeout`, `SECONDS`, `break` and `icn-wait` were anchored to command positions but
+    # `deadline` and `max_?wait` were not, so ANY occurrence disarmed the guard — including
+    # inside the pgrep pattern itself, which is the evasion class the docstring claims to fix.
+    (
+        'until ! pgrep -f "deadline-runner.py"; do sleep 20; done',
+        BLOCK,
+        "FN: 'deadline' inside the pgrep pattern must not read as a bound",
+    ),
+    (
+        'until ! pgrep -f "max_wait.sh"; do sleep 20; done',
+        BLOCK,
+        "FN: 'max_wait' inside the pgrep pattern must not read as a bound",
+    ),
+    (
+        'until ! pgrep -f "mutate.py"; do sleep 20; echo "past deadline"; done',
+        BLOCK,
+        "FN: 'deadline' in loop-body output must not read as a bound",
+    ),
+    (
+        'DEADLINE=$((SECONDS+600)); until ! pgrep -f foo; do sleep 5; [ $SECONDS -gt $DEADLINE ] && break; done',
+        ALLOW,
+        "a REAL deadline variable still bounds the loop",
+    ),
+    # ── the guard must not block writing ABOUT the defect ──
+    (
+        'git commit -m "block until ! pgrep -f x; do sleep 5; done loops"',
+        ALLOW,
+        "FP: a loop inside a quoted commit message is text, not a command",
+    ),
+    (
+        "cat >> README.md <<'EOF'\nuntil ! pgrep -f \"mutate.py\"; do sleep 20; done\nEOF",
+        ALLOW,
+        "FP: a loop inside a heredoc body is documentation, not a command",
+    ),
+    (
+        'echo \'until ! pgrep -f x; do sleep 5; done\' > example.txt',
+        ALLOW,
+        "FP: a single-quoted loop being written to a file",
+    ),
 ]
 
 # The block message must describe the ACTUAL property of each shape. An error message an agent

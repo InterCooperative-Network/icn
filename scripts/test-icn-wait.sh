@@ -76,6 +76,12 @@ else
   bad "foreign match should be waited for" "exit $rc after ${waited}s"
 fi
 
+# An unusable pattern must FAIL, not report the wait as satisfied. pgrep exits 2 on a bad regex
+# while printing nothing, which is indistinguishable from "no matches" — so this used to exit 0,
+# telling the caller the thing it was waiting for had finished.
+timeout 20 "$WAIT" match 'foo(' --timeout 5 >/dev/null 2>&1
+check "invalid match pattern fails fast (exit 3), never reports success" 3 $?
+
 # A real foreign process, waited for exactly by PID.
 sleep 9 & foreign=$!
 ( sleep 2; kill "$foreign" 2>/dev/null ) &

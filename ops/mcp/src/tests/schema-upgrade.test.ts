@@ -77,7 +77,7 @@ describe("upgrade from the shipped v2 shape", () => {
         version: number;
       }>
     ).map((r) => r.version);
-    expect(versions).toEqual([1, 2, 3]);
+    expect(versions).toEqual([1, 2, 3, 4]);
 
     const cols = columns(db, "sessions");
     for (const c of [
@@ -88,6 +88,10 @@ describe("upgrade from the shipped v2 shape", () => {
       expect(cols).toContain(c);
     }
     expect(cols).not.toContain("state"); // the discarded experimental column
+
+    // v4 lane-scopes supervisions so they cannot follow a session out of the worktree.
+    const wcols = columns(db, "watchers_process");
+    expect(wcols).toContain("worktree_id");
 
     // Pre-existing data survives, with safe defaults for the new columns.
     const row = db.prepare("SELECT * FROM sessions WHERE id = 'legacy-session-1'").get() as
@@ -126,6 +130,9 @@ describe("upgrade from the shipped v2 shape", () => {
     expect(columns(db, "sessions")).toEqual(before);
     expect(
       db.prepare("SELECT COUNT(*) c FROM schema_version WHERE version = 3").get()
+    ).toEqual({ c: 1 });
+    expect(
+      db.prepare("SELECT COUNT(*) c FROM schema_version WHERE version = 4").get()
     ).toEqual({ c: 1 });
     db.close();
   });
@@ -168,6 +175,12 @@ describe("migration-number discipline", () => {
     // The stamp wins: the experimental column is still there, the new ones never arrived.
     expect(cols).toContain("state");
     expect(cols).not.toContain("worktree_id");
+    // ...and this is exactly why the lane-scoping change was shipped as v4 rather than as an
+    // edit to v3: a v3-stamped database already existed on the development VM.
+    expect(
+      db.prepare("SELECT COUNT(*) c FROM schema_version WHERE version = 4").get()
+    ).toEqual({ c: 1 });
+    expect(columns(db, "watchers_process")).toContain("worktree_id");
     db.close();
   });
 });
