@@ -12,18 +12,56 @@
 // Refs docs/architecture/AGENT_RUNTIME.md §3.
 
 import { execFileSync } from "child_process";
+import { randomUUID } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { hostname } from "os";
 import { basename, dirname } from "path";
 import { initDb } from "../state/db.js";
 import {
   classifyWorktree,
+  endSupervision,
+  InvalidProviderSessionIdError,
+  liveSupervisions,
+  sessionsByWorktreeName,
   recordHeartbeat,
+  recordInteraction,
   recordProgress,
   registerSession,
   releaseSession,
+  superviseOperation,
   type ProgressKind,
   type SessionRow,
 } from "../runtime/session-runtime.js";
+import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.js";
+
+/**
+ * Resolve a DURABLE harness key.
+ *
+ * Preferred: the provider's own stable session id. For Claude Code that is `session_id` in the
+ * hook payload — verified present on SessionStart/UserPromptSubmit/PostToolUse/Stop/SessionEnd
+ * and verified unchanged across `--resume`. (There is no CLAUDE_SESSION_ID environment
+ * variable; that was an assumption and it is false on this installation.)
+ *
+ * Fallback for launchers with no provider id: mint a UUID once and persist it in an identity
+ * file whose lifetime is the harness's. `pid@host` is never synthesised — PIDs are recycled,
+ * so it is correlation metadata at best and dangerous as identity.
+ */
+function resolveHarnessKey(explicit?: string, identityFile?: string): string | null {
+  if (explicit) return explicit;
+  if (!identityFile) return null;
+  try {
+    if (existsSync(identityFile)) {
+      const existing = readFileSync(identityFile, "utf-8").trim();
+      if (existing) return existing;
+    }
+    mkdirSync(dirname(identityFile), { recursive: true });
+    const minted = randomUUID();
+    writeFileSync(identityFile, minted + "\n", { mode: 0o600 });
+    return minted;
+  } catch {
+    return null;
+  }
+}
 
 type Args = Record<string, string | boolean>;
 
@@ -50,45 +88,12 @@ function str(args: Args, key: string): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-/** Resolve repo/worktree/branch from a working directory, without trusting the caller. */
-function resolveLocation(cwd: string): {
-  repo: string;
-  worktree: string | null;
-  branch: string | null;
-} {
-  let top: string | null = null;
-  let branch: string | null = null;
-  try {
-    top = execFileSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    top = null;
-  }
-  if (top) {
-    try {
-      branch =
-        execFileSync("git", ["-C", top, "branch", "--show-current"], {
-          encoding: "utf-8",
-          stdio: ["ignore", "pipe", "ignore"],
-        }).trim() || null;
-    } catch {
-      branch = null;
-    }
-  }
-  // Canonical layout is <root>/worktrees/<repo>/<worktree>; derive both from the path rather
-  // than hardcoding a repo name, so other repos on this VM work unchanged.
-  const path = top ?? cwd;
-  const worktree = basename(path);
-  const parent = basename(dirname(path));
-  const repo = parent && parent !== "worktrees" ? parent : "icn";
-  return { repo, worktree: worktree || null, branch };
-}
-
-function findByHarnessKey(db: ReturnType<typeof initDb>, key: string): SessionRow | undefined {
+function findByProviderSession(
+  db: ReturnType<typeof initDb>,
+  key: string
+): SessionRow | undefined {
   return db
-    .prepare("SELECT * FROM sessions WHERE harness_key = ? AND state = 'active' LIMIT 1")
+    .prepare("SELECT * FROM sessions WHERE provider_session_id = ? LIMIT 1")
     .get(key) as SessionRow | undefined;
 }
 
@@ -104,11 +109,14 @@ function main(): number {
       [
         "icn-agent-session <command> [--flags]",
         "",
-        "  register  --harness-key K --cwd DIR [--task-ref R] [--pr-ref P]",
+        "  register    --harness-key K|--identity-file F --cwd DIR [--task-ref R] [--pr-ref P]",
         "            [--parent-session ID] [--provider NAME] [--pid N] [--task-description T]",
-        "  progress  --harness-key K --kind file_edit|command|turn|test|task_state|explicit",
-        "            [--activity TEXT]",
-        "  heartbeat --harness-key K",
+        "  progress    --harness-key K --kind file_edit|command|test|task_state|explicit",
+        "              [--activity TEXT]",
+        "  interaction --harness-key K   (turn boundary: liveness only, NOT progress)",
+        "  heartbeat   --harness-key K",
+        "  supervise   --harness-key K --pid N [--label L]   -> prints supervision id",
+        "  unsupervise --id N [--exit-code C]",
         "  release   --harness-key K [--reason completed|cancelled|error|shutdown]",
         "  status    --harness-key K",
         "  classify  --worktree W [--pids 1,2,3]",
@@ -142,53 +150,93 @@ function main(): number {
 
   switch (cmd) {
     case "register": {
-      const key = str(args, "harness-key");
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
       const cwd = str(args, "cwd") ?? process.cwd();
-      const loc = resolveLocation(cwd);
+      // ICN_ROOT (or --root) is a CANDIDATE, validated by Git — never authoritative on its own,
+      // and hook cwd may be a subdirectory or scratch path, so Git resolves the real owner.
+      const identity = discoverWorktree(cwd, str(args, "root") ?? process.env["ICN_ROOT"] ?? null);
+      if (!identity) {
+        process.stderr.write(
+          `icn-agent-session: ${cwd} does not resolve to a Git worktree; not registering\n`
+        );
+        return 0;
+      }
+      const branchState = readBranchState(identity.worktree_path);
       const pidRaw = str(args, "pid");
-      const result = registerSession(db, {
-        repo: str(args, "repo") ?? loc.repo,
-        worktree: str(args, "worktree") ?? loc.worktree,
-        branch: str(args, "branch") ?? loc.branch,
-        task_description: str(args, "task-description") ?? null,
-        task_ref: str(args, "task-ref") ?? null,
-        pr_ref: str(args, "pr-ref") ?? null,
-        parent_session_id: str(args, "parent-session") ?? null,
-        provider: str(args, "provider") ?? "claude-code",
-        agent_pid: pidRaw ? Number(pidRaw) : null,
-        host: hostname(),
-        harness_key: key ?? null,
-      });
+      let result;
+      try {
+        result = registerSession(db, {
+          repo: str(args, "repo") ?? identity.repo_name,
+          identity,
+          branch_state: branchState,
+          task_description: str(args, "task-description") ?? null,
+          task_ref: str(args, "task-ref") ?? null,
+          pr_ref: str(args, "pr-ref") ?? null,
+          parent_session_id: str(args, "parent-session") ?? null,
+          provider: str(args, "provider") ?? "claude-code",
+          agent_pid: pidRaw ? Number(pidRaw) : null,
+          host: hostname(),
+          provider_session_id: key ?? null,
+          transcript_path: str(args, "transcript-path") ?? null,
+        });
+      } catch (e) {
+        if (e instanceof InvalidProviderSessionIdError) {
+          process.stderr.write(`icn-agent-session: ${(e as Error).message}\n`);
+          return 2;
+        }
+        throw e;
+      }
       emit(
         JSON.stringify({
           ...result,
-          repo: str(args, "repo") ?? loc.repo,
-          worktree: loc.worktree,
-          branch: loc.branch,
+          repo: identity.repo_name,
+          worktree_name: identity.worktree_name,
+          worktree_path: identity.worktree_path,
+          branch: branchState.branch,
+          detached: branchState.detached,
         })
       );
       return 0;
     }
 
     case "progress":
+    case "interaction":
     case "heartbeat": {
-      const key = str(args, "harness-key");
-      if (!key) return 0; // nothing to attribute progress to; never block a hook
-      const row = findByHarnessKey(db, key);
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      if (!key) return 0; // nothing to attribute the signal to; never block a hook
+      const row = findByProviderSession(db, key);
       if (!row) return 0; // unregistered session: silently a no-op, not an error
-      if (cmd === "heartbeat") {
-        recordHeartbeat(db, row.id);
-      } else {
+      if (cmd === "heartbeat") recordHeartbeat(db, row.id);
+      else if (cmd === "interaction") recordInteraction(db, row.id);
+      else {
         const kind = (str(args, "kind") ?? "explicit") as ProgressKind;
         recordProgress(db, row.id, { kind, activity: str(args, "activity") ?? null });
       }
       return 0;
     }
 
+    case "supervise": {
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      const row = key ? findByProviderSession(db, key) : undefined;
+      const pid = Number(str(args, "pid"));
+      if (!row || !Number.isInteger(pid) || pid <= 0) return 0;
+      const id = superviseOperation(db, row.id, pid, str(args, "label") ?? "supervised operation");
+      process.stdout.write(String(id) + "\n");
+      return 0;
+    }
+
+    case "unsupervise": {
+      const id = Number(str(args, "id"));
+      if (!Number.isInteger(id)) return 0;
+      const code = str(args, "exit-code");
+      endSupervision(db, id, code === undefined ? undefined : Number(code));
+      return 0;
+    }
+
     case "release": {
-      const key = str(args, "harness-key");
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
       if (!key) return 0;
-      const row = findByHarnessKey(db, key);
+      const row = findByProviderSession(db, key);
       if (!row) return 0;
       const res = releaseSession(db, row.id, {
         reason: str(args, "reason") ?? "completed",
@@ -198,20 +246,48 @@ function main(): number {
     }
 
     case "status": {
-      const key = str(args, "harness-key");
-      const row = key ? findByHarnessKey(db, key) : undefined;
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      const row = key ? findByProviderSession(db, key) : undefined;
       process.stdout.write(
-        JSON.stringify(row ? { registered: true, ...row } : { registered: false }) + "\n"
+        JSON.stringify(
+          row
+            ? { registered: true, ...row, live_supervisions: liveSupervisions(db, row.id) }
+            : { registered: false }
+        ) + "\n"
       );
       return 0;
     }
 
     case "classify": {
-      const worktree = str(args, "worktree");
-      if (!worktree) {
-        process.stderr.write("classify requires --worktree\n");
-        return 2;
+      // Prefer the Git-derived id. --worktree (a display name) is accepted for humans and
+      // resolved through Git when a path is available, because a bare basename is ambiguous.
+      let worktreeId = str(args, "worktree-id") ?? null;
+      const path = str(args, "path");
+      if (!worktreeId && path) {
+        worktreeId = discoverWorktree(path, null)?.worktree_id ?? null;
       }
+      if (!worktreeId) {
+        const name = str(args, "worktree");
+        if (!name) {
+          process.stderr.write("classify requires --worktree-id, --path, or --worktree\n");
+          return 2;
+        }
+        const matches = sessionsByWorktreeName(db, name);
+        const ids = [...new Set(matches.map((m) => m.worktree_id).filter(Boolean))];
+        if (ids.length > 1) {
+          process.stdout.write(
+            JSON.stringify({
+              state: "REGISTRY-UNAVAILABLE",
+              retireable: false,
+              retireable_with_approval: false,
+              reason: `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`,
+            }) + "\n"
+          );
+          return 1;
+        }
+        worktreeId = ids[0] ?? name;
+      }
+      const worktree = worktreeId;
       const pids = (str(args, "pids") ?? "")
         .split(",")
         .map((s) => Number(s.trim()))

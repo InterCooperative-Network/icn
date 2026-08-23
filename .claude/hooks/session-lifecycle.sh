@@ -5,13 +5,22 @@
 # where the ICN session registry is wired in. One script handles every lifecycle event; it
 # dispatches on hook_event_name so there is a single place to reason about the contract.
 #
+# IDENTITY
+#   The harness key is `session_id` from the hook payload. Verified on this installation:
+#   it is present on every event, identical across SessionStart/UserPromptSubmit/PostToolUse/
+#   Stop/SessionEnd, and unchanged across `--resume`. There is NO CLAUDE_SESSION_ID env var.
+#
 # EVENT -> SIGNAL MAPPING (Refs docs/architecture/AGENT_RUNTIME.md §4)
 #   SessionStart      register + emit the standard startup context
 #   PostToolUse Edit  progress:file_edit   — a file actually changed
 #   PostToolUse Bash  progress:command     — a command actually completed
-#   Stop              progress:turn        — an agent turn actually finished
-#   UserPromptSubmit  heartbeat            — liveness only; a human interacting is not progress
+#   Stop              INTERACTION          — a turn finished; that is liveness, NOT progress
+#   UserPromptSubmit  INTERACTION          — a human is driving; also not progress
 #   SessionEnd        release
+#
+# Stop is deliberately NOT progress. A turn boundary proves the harness produced a response.
+# An agent stuck in a retry cycle completes turns indefinitely while task state never moves,
+# and counting those would defeat PROGRESS-STALLED — the one signal that catches it.
 #
 # DELIBERATELY ABSENT: a periodic heartbeat timer. A timer is exactly the mechanism that makes
 # a deadlocked session look healthy forever. Because every signal here is edge-triggered by a
@@ -44,6 +53,7 @@ EVENT="$(field hook_event_name)"
 KEY="$(field session_id)"
 CWD="$(field cwd)"
 TOOL="$(field tool_name)"
+TRANSCRIPT="$(field transcript_path)"
 
 ROOT="${CLAUDE_PROJECT_DIR:-${CWD:-$PWD}}"
 SESSION_BIN="$ROOT/ops/scripts/icn-agent-session"
@@ -55,7 +65,10 @@ run() { "$SESSION_BIN" "$@" >/dev/null 2>>"${TMPDIR:-/tmp}/icn-agent-session.log
 case "$EVENT" in
   SessionStart)
     # Registration output is discarded; the startup context below is what the agent sees.
-    run register --harness-key "$KEY" --cwd "${CWD:-$ROOT}" --pid "$PPID" --provider claude-code
+    # cwd is a STARTING POINT only: the CLI resolves the owning worktree through Git, so a
+    # subdirectory or scratch path cannot misattribute this session to the wrong lane.
+    run register --harness-key "$KEY" --cwd "${CWD:-$ROOT}" --pid "$PPID" \
+        --provider claude-code --transcript-path "$TRANSCRIPT"
 
     STATUS="$("$SESSION_BIN" status --harness-key "$KEY" 2>/dev/null || echo '{}')"
     if printf '%s' "$STATUS" | grep -q '"registered": *true'; then
@@ -64,7 +77,10 @@ case "$EVENT" in
       LIFECYCLE="DEGRADED — NOT registered. Lifecycle tracking is NOT active for this session."
     fi
 
-    BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || echo detached)"
+    # Display values only. The lane's identity is the Git worktree id held in the registry;
+    # branch is live state and is re-read on every read, never trusted from here.
+    BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null)"
+    [ -n "$BRANCH" ] || BRANCH="detached"
     WT="$(basename "$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || echo "$ROOT")")"
 
     # Standard startup context. It is a ROUTER, not a briefing: it names where authoritative
@@ -101,10 +117,10 @@ CTX
     ;;
 
   Stop|SubagentStop)
-    run progress --harness-key "$KEY" --kind turn --activity "turn complete" ;;
+    run interaction --harness-key "$KEY" ;;
 
   UserPromptSubmit)
-    run heartbeat --harness-key "$KEY" ;;
+    run interaction --harness-key "$KEY" ;;
 
   SessionEnd)
     REASON="$(field reason)"

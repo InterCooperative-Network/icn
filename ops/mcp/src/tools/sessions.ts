@@ -3,13 +3,18 @@ import { z } from "zod";
 import type Database from "better-sqlite3";
 import { readFileSync } from "fs";
 import { resolveOpsStatePath } from "../paths.js";
+import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.js";
 import {
   activeSessionsForWorktree,
   ageMinutes,
   classifyWorktree,
   getSession,
+  endSupervision,
+  liveSupervisions,
   recordHeartbeat,
+  recordInteraction,
   recordProgress,
+  superviseOperation,
   registerSession,
   releaseSession,
   stallMinutes,
@@ -42,7 +47,13 @@ export function registerSessionTools(
         .string()
         .optional()
         .describe("Brief description of what this session is working on"),
-      branch: z.string().optional().describe("Branch at registration time"),
+      branch: z
+        .string()
+        .optional()
+        .describe(
+          "DEPRECATED and ignored: branch is live state read from Git, not a launch input. " +
+            "The branch at registration is recorded automatically as history."
+        ),
       task_ref: z.string().optional().describe("Issue reference, e.g. icn#2653"),
       pr_ref: z.string().optional().describe("PR reference, e.g. icn#2660"),
       parent_session_id: z
@@ -53,15 +64,41 @@ export function registerSessionTools(
         .string()
         .optional()
         .describe("Agent provider/harness, e.g. claude-code, codex, cursor"),
-      harness_key: z
+      provider_session_id: z
         .string()
         .optional()
         .describe(
-          "Stable per-harness session key. Registration is idempotent on this value: " +
-            "re-registering returns the existing session instead of creating a duplicate."
+          "The harness conversation id (Claude Code's hook session_id). Registration is " +
+            "idempotent on this within a live activation. It is stable across --resume, so " +
+            "one conversation may have several activations over time — never two at once."
+        ),
+      cwd: z
+        .string()
+        .optional()
+        .describe(
+          "Directory to resolve the owning Git worktree from. Resolved through Git, so a " +
+            "subdirectory works and a wrong path cannot misattribute the lane."
         ),
     },
-    async (input) => json(registerSession(db, input)),
+    async (input) => {
+      const identity = discoverWorktree(
+        input.cwd ?? process.cwd(),
+        process.env["ICN_ROOT"] ?? null
+      );
+      if (!identity) {
+        return json({
+          error: "no_worktree",
+          reason: `${input.cwd ?? process.cwd()} does not resolve to a Git worktree`,
+        });
+      }
+      return json(
+        registerSession(db, {
+          ...input,
+          identity,
+          branch_state: readBranchState(identity.worktree_path),
+        })
+      );
+    }
   );
 
   server.tool(
@@ -81,7 +118,6 @@ export function registerSessionTools(
           `SELECT s.*, GROUP_CONCAT(fc.file_path) as claimed_files
              FROM sessions s
              LEFT JOIN file_claims fc ON fc.session_id = s.id
-            WHERE s.state = 'active'
             GROUP BY s.id
             ORDER BY s.started_at DESC`
         )
@@ -91,14 +127,16 @@ export function registerSessionTools(
         .map((r) => {
           const hb = ageMinutes(db, r["last_heartbeat"] as string);
           const pa = ageMinutes(db, r["last_progress"] as string | null);
+          const supervised = liveSupervisions(db, r["id"] as string);
           return {
             ...r,
             heartbeat_age_min: hb == null ? null : Number(hb.toFixed(1)),
             progress_age_min: pa == null ? null : Number(pa.toFixed(1)),
             expired: hb != null && hb > ttl,
+            live_supervisions: supervised,
           };
         })
-        .filter((r) => include_expired || !r.expired);
+        .filter((r) => include_expired || !r.expired || r.live_supervisions.length > 0);
 
       return json({
         ttl_minutes: ttl,
@@ -165,8 +203,11 @@ export function registerSessionTools(
     {
       session_id: z.string(),
       kind: z
-        .enum(["file_edit", "command", "turn", "test", "task_state", "explicit"])
-        .describe("What kind of runtime event this progress represents"),
+        .enum(["file_edit", "command", "test", "task_state", "explicit"])
+        .describe(
+          "What kind of runtime event this progress represents. Note there is no 'turn': a " +
+            "completed agent turn is interaction, not progress — use session_interaction."
+        ),
       activity: z
         .string()
         .optional()
@@ -174,6 +215,43 @@ export function registerSessionTools(
     },
     async ({ session_id, kind, activity }) =>
       json({ ok: recordProgress(db, session_id, { kind, activity }), signal: "progress" })
+  );
+
+  server.tool(
+    "session_interaction",
+    "Report INTERACTION — a turn completed, a prompt arrived. Advances liveness only. A turn " +
+      "boundary proves the harness responded, not that the work moved, so this must never " +
+      "advance progress or a stalled agent could hide behind repeated empty turns.",
+    { session_id: z.string() },
+    async ({ session_id }) =>
+      json({ ok: recordInteraction(db, session_id), signal: "interaction" })
+  );
+
+  server.tool(
+    "supervise_operation",
+    "Declare a long-running operation (build, test suite) so its lane is not judged abandoned " +
+      "when no hook fires for longer than the heartbeat TTL. Requires a live PID: supervision " +
+      "cannot outlive the process it names.",
+    {
+      session_id: z.string(),
+      pid: z.number().describe("PID of the long-running process"),
+      label: z.string().describe("Human-readable label, e.g. 'cargo test --workspace'"),
+    },
+    async ({ session_id, pid, label }) => {
+      const id = superviseOperation(db, session_id, pid, label);
+      return json({ supervision_id: id, pid, label });
+    }
+  );
+
+  server.tool(
+    "end_supervision",
+    "Mark a supervised operation finished.",
+    {
+      supervision_id: z.number(),
+      exit_code: z.number().optional(),
+    },
+    async ({ supervision_id, exit_code }) =>
+      json({ ok: endSupervision(db, supervision_id, exit_code) })
   );
 
   server.tool(
@@ -194,15 +272,32 @@ export function registerSessionTools(
     "Authoritative lifecycle classification for a worktree, combining the session registry " +
       "with process observation. Absence of a registry row NEVER means 'safe to terminate'.",
     {
-      worktree: z.string().describe("Worktree directory name"),
+      worktree_id: z
+        .string()
+        .optional()
+        .describe("Canonical lane id: realpath of `git rev-parse --absolute-git-dir`."),
+      path: z
+        .string()
+        .optional()
+        .describe("Any path inside the worktree; the lane id is resolved from it via Git."),
       observed_pids: z
         .array(z.number())
         .optional()
         .default([])
         .describe("PIDs observed holding the worktree (corroborating evidence)"),
     },
-    async ({ worktree, observed_pids }) =>
-      json(classifyWorktree(db, worktree, { observed_pids }))
+    async ({ worktree_id, path, observed_pids }) => {
+      const id = worktree_id ?? (path ? discoverWorktree(path, null)?.worktree_id : undefined);
+      if (!id) {
+        return json({
+          state: "REGISTRY-UNAVAILABLE",
+          retireable: false,
+          retireable_with_approval: false,
+          reason: "no canonical worktree id could be resolved; the lane stays protected",
+        });
+      }
+      return json(classifyWorktree(db, id, { observed_pids }));
+    }
   );
 
   server.tool(

@@ -70,36 +70,112 @@ seam (§3), a richer identity (§2), a progress signal (§4), and a declared own
 
 ---
 
-## 2. The agent session contract
+## 2. The identity model: repository → lane → activation
 
-A session's **authoritative** identity lives in one row of the `sessions` table. Fields are
-classified so consumers know how much to trust each one.
+The single most important thing this runtime gets right is *what is stable*. Everything else
+follows from it.
 
-### Authoritative — written by the runtime, owned here
-| Field | Meaning |
+```
+repository                    repo_id        Git: realpath(--git-common-dir)
+  └── worktree / lane         worktree_id    Git: realpath(--absolute-git-dir)
+        ├── runtime activation(s)   id       one per live activation (0..N per lane)
+        └── branch / HEAD / PR / task        live or advisory, never identity
+```
+
+### 2.1 The worktree is the lane; the branch is not its identity
+
+A development session belongs to a concrete Git worktree. During that session the branch moves
+constantly and legitimately: HEAD advances, the branch is rebased, it is renamed, the worktree
+is deliberately detached, occasionally a different branch is checked out. **None of those events
+creates a different lane.** A model that keys on branch would fork a lane's history every time
+someone rebased.
+
+Branch and HEAD are therefore *live state about* a lane, re-read on every query. The branch
+captured at registration is kept only as `branch_at_registration`, a historical launch fact. It
+is never used as current branch state. When the live branch differs from it, the runtime reports
+`branch_changed: true` — a warning about state, not evidence that the session moved.
+
+### 2.2 The lane key is Git-derived, never a basename
+
+`worktree = "task-review"` is not an identity: two repositories on this VM can each contain a
+worktree by that name, and the disk/lifecycle tooling has already been bitten by basename
+collisions once. Rather than invent an identifier, the runtime uses what Git already
+guarantees:
+
+| Field | Source | Property |
+|---|---|---|
+| `repo_id` | `realpath(git rev-parse --git-common-dir)` | one per repository |
+| `worktree_id` | `realpath(git rev-parse --absolute-git-dir)` | **one per worktree, unique within *and across* repositories** |
+| `worktree_path` | `realpath(git rev-parse --show-toplevel)` | working directory |
+| `worktree_name` | basename of the path | **display only — never a join key** |
+
+For a linked worktree the admin dir is `<repo>.git/worktrees/<name>`; for a main worktree it is
+the repo dir. Either way `task-review` under `icn.git` and under `nycn.git` resolve to different
+ids, so the collision is impossible rather than unlikely.
+
+Resolution goes through `discoverWorktree()`, which asks Git — it never parses a path. Two
+consequences that are enforced, not assumed:
+
+- **Hook `cwd` is a starting point, not truth.** Tool execution happens from subdirectories and
+  scratch paths; Git resolves the owner from anywhere inside the worktree.
+- **`ICN_ROOT` is a hint that loses to `cwd`.** Validating that an env root is a real worktree
+  is not sufficient — a valid answer to the wrong question is still wrong. On icn-dev `ICN_ROOT`
+  is pinned to the `mcp-host` worktree by the shell profile, so an env-root-first resolution
+  filed *every* session under `mcp-host`. It is consulted only when `cwd` resolves to nothing.
+
+### 2.3 Provider conversation vs runtime activation
+
+Captured from this installation's real hook payloads:
+
+- `session_id` is present on every hook event and identical across all of them;
+- it is **unchanged across `claude --resume`** (`SessionStart` fires again with `source: resume`);
+- there is **no `CLAUDE_SESSION_ID` environment variable**.
+
+So the provider id identifies a **conversation**, which may outlive several runtime activations:
+
+```
+conversation X ──▶ activation A ──▶ SessionEnd (all authority surrendered)
+               └─▶ (later --resume) ──▶ activation B     A ≠ B, same provider id
+```
+
+| Concept | Field | Lifetime |
+|---|---|---|
+| Runtime activation | `id` (UUID) | one live activation |
+| Provider conversation | `provider_session_id` | may span resume cycles |
+| Process | `agent_pid`, `host` | correlation only |
+
+Registration idempotency is scoped to the *live* activation: a duplicate hook within one
+activation returns the existing row; a resume after release creates a new activation that
+inherits **no** claims, watchers or mailbox authority. The runtime therefore does **not** assert
+"a provider session id is never reused after release" — the live probe disproved that.
+
+`pid@host` is rejected outright as identity. PIDs are recycled, so a future process could
+inherit a dead session's claims. It is correlation metadata at best.
+
+### 2.4 Several sessions may occupy one lane
+
+`one worktree == one session` is **not** a database invariant. Real situations include an
+interactive agent plus a review session, an old activation briefly overlapping a resumed one,
+operator inspection, and accidental concurrent sessions — the last of which is precisely what
+we want the runtime to *detect*. Each session keeps its own activation id while pointing at the
+same `worktree_id`; `classify()` reports `contention: {count, session_ids}` and registration
+returns `co_occupants`.
+
+File claims, watchers and every other authority stay **session-scoped**, never worktree-scoped.
+Releasing one session leaves every other occupant's authority untouched.
+
+### 2.5 Field classification
+
+| Class | Fields |
 |---|---|
-| `id` | Session UUID. Stable for the session's life. |
-| `repo` | Repo key (`icn`, …). |
-| `worktree` | Worktree directory name, not a path. |
-| `branch` | Branch at registration. Advisory after that — branches move. |
-| `state` | `active` \| `released`. Lifecycle state. |
-| `started_at` / `last_heartbeat` / `last_progress` | Timestamps; see §4. |
-| `progress_count` | Monotonic counter. Only advances on evidence of *work*. |
-| `agent_pid` / `host` | The OS process to correlate against `/proc`. |
-| `parent_session_id` | Set for child sessions; NULL for roots. |
+| **Authoritative stable identity** | `id`, `repo_id`, `worktree_id`, `worktree_path` |
+| **Authoritative live state** | live branch/HEAD (read from Git), `last_heartbeat`, `last_progress`, `progress_count`, live supervisions, contention |
+| **Advisory launch metadata** | `provider_session_id`, `branch_at_registration`, `head_at_registration`, `task_ref`, `pr_ref`, `task_description`, `provider`, `transcript_path`, `worktree_name`, `worktree` |
+| **Correlation only** | `agent_pid`, `host` |
+| **Derived, never stored** | lifecycle state, expiry, stall, retireability, `branch_changed` |
 
-### Advisory — supplied at launch, may be stale or absent
-`task_description`, `task_ref` (e.g. `icn#2653`), `pr_ref`, `provider`, `current_activity`.
-
-### Derived — never stored, always recomputed
-Everything the auditor computes: expiry, stall, pin state, and the lane classification in §5.
-Storing a derived verdict would let it go stale silently.
-
-### Not duplicated here
 Branch/PR/issue *state* is a live query (`live_branch_state`, `live_pr_state`,
 `live_issue_state` in `sources.json`). The registry stores the **reference**, never the state.
-
----
 
 ## 3. Registration seam and failure policy
 
@@ -110,9 +186,11 @@ exposes the same core through a CLI (`ops/mcp/dist/cli/session.js`). MCP tools a
 **one shared module** (`ops/mcp/src/runtime/session-runtime.ts`); there is no second
 implementation to drift.
 
-Idempotency: registration is keyed on the harness session identifier
-(`CLAUDE_SESSION_ID`, else `pid@host`). Re-running `register` for the same key returns the
-existing row instead of creating a second one, so a hook that fires twice cannot double-register.
+Idempotency: registration is keyed on the provider conversation id taken from the hook
+payload's `session_id` field (§2.3). Re-running `register` for the same live activation returns
+the existing row, so a hook that fires twice cannot double-register. Launchers with no provider
+id pass `--identity-file`, which mints a UUID once and persists it for the harness's lifetime;
+`pid@host` is never synthesised.
 
 **Failure policy: degrade loudly, never block, never overclaim.**
 
@@ -139,10 +217,16 @@ process alive   !=   session healthy   !=   meaningful progress occurring
 - **`last_heartbeat`** — "the harness is still running". Advanced by any hook firing.
   Cheap, and deliberately weak evidence.
 - **`last_progress` + `progress_count`** — "work happened". Advanced **only** by hook events
-  that correspond to real runtime effects: a file edit (`PostToolUse` on `Edit|Write`), a
-  completed non-trivial command (`PostToolUse` on `Bash`), or an agent turn boundary (`Stop`).
-  `progress_count` is monotonic, so a consumer can sample it twice and prove motion without
-  trusting a clock.
+  that correspond to real runtime effects: a file edit (`PostToolUse` on `Edit|Write`) or a
+  completed command (`PostToolUse` on `Bash`). `progress_count` is monotonic, so a consumer can
+  sample it twice and prove motion without trusting a clock.
+
+  **A completed turn is deliberately NOT progress.** `Stop` and `UserPromptSubmit` are
+  *interaction*: they prove the harness produced a response or a human is driving, not that
+  task state moved. An agent stuck in a retry cycle completes turns indefinitely while nothing
+  advances; counting those would let it defeat `PROGRESS-STALLED`, the one signal that catches
+  it. There is no `turn` progress kind, and a test asserts 200 consecutive turn boundaries
+  leave `progress_count` at 1.
 - **`current_activity`** — advisory free text for humans reading `list_sessions`.
 
 A polling wait loop advances `last_heartbeat` and never `progress_count`; that is exactly the
@@ -159,6 +243,7 @@ timer is precisely the mechanism that makes a deadlocked session look healthy.
 | State | Means | Retireable? |
 |---|---|---|
 | `REGISTERED-ACTIVE` | Row present, heartbeat inside TTL, progress recent. | No |
+| `SUPERVISED-BUSY` | A declared long-running operation is still alive (§5.1). | No |
 | `PROGRESS-STALLED` | Row present, heartbeat fresh, `progress_count` unchanged past the stall window. | Only with operator approval |
 | `REGISTERED-EXPIRED` | Row present, heartbeat older than TTL, no live pid. | Candidate |
 | `UNREGISTERED-OBSERVED` | No row, but processes hold the worktree. | **No** — pre-integration or unsupported launcher |
@@ -168,9 +253,39 @@ timer is precisely the mechanism that makes a deadlocked session look healthy.
 pre-integration session, an unsupported launcher, or a registry failure, so it resolves to
 protected. This is asserted by tests, not by convention.
 
+Classification is keyed on `worktree_id` (§2.2). When several sessions occupy a lane the verdict
+follows the **most live** one — a busy reviewer must not let a dead editor look retireable, and
+a dead editor must not make a busy reviewer's lane look abandoned — while `contention` reports
+every occupant.
+
 TTL is `ICN_SESSION_TTL_MINUTES` (default 30, matching the pre-existing `list_sessions`
 window). Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-lane-audit`'s
 `QUIESCENT_AFTER_MIN`).
+
+### 5.1 Long-running legitimate operations
+
+A 45-minute `cargo test` emits **no** hook events while it runs, so its heartbeat ages past a
+30-minute TTL and the lane would look abandoned. The fix is not a periodic fake heartbeat —
+that is the exact mechanism this runtime bans — but *declaring* the operation:
+
+```
+icn-wait cmd --supervise --harness-key <id> --timeout 3600 -- cargo test --workspace
+```
+
+Supervision reuses the pre-existing `watchers_process` table (session, pid, label, status). It
+is only credible while its **PID is actually alive**: `liveSupervisions()` reaps rows whose
+process has died, so a crashed build cannot pin a lane forever. A supervised lane is protected
+but its progress evidence is untouched, so supervision cannot be used as a back door to fake
+progress.
+
+The four claims this keeps separate:
+
+| Claim | Evidence |
+|---|---|
+| harness heartbeat age | `last_heartbeat` |
+| known live process | `agent_pid` / observed PIDs in `/proc` |
+| supervised long-running activity | live `watchers_process` row |
+| actual progress | `last_progress`, `progress_count` |
 
 ---
 
@@ -186,6 +301,27 @@ window). Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-
 
 The runtime does not pretend otherwise. A row that stops heartbeating becomes
 `REGISTERED-EXPIRED` after TTL; that is the only mechanism for abrupt death, by design.
+
+### What release surrenders
+
+Release keeps the **pre-existing DELETE semantics** — the session row is removed and
+`file_claims` cascade — so there is no "released but still holding claims" state to get wrong.
+History was already owned by `ops/state/session-log.jsonl` and stays there. The complete
+inventory of session-scoped resources, kept beside the code that clears it:
+
+| Resource | Class | On release |
+|---|---|---|
+| `file_claims.session_id` | authority | deleted (FK cascade) |
+| `watchers_process.session_id` | authority | invalidated → `status='released'` (no FK; would otherwise stay `running` and keep supervising for a dead session) |
+| `mailbox.to_session` (unread) | authority | invalidated → marked read |
+| `mailbox.from_session` | history | kept |
+| `events.scope = session:<id>` | history | kept |
+
+The rule: **a released session retains history and surrenders every authority.** Because rows
+are deleted rather than soft-marked, this is true by construction rather than by discipline.
+
+Deliberately **not** introduced: a `state='released'` column. It would create rows that read as
+inactive while still owning claims — the precise failure this table avoids.
 
 ### Subagents and child sessions
 Claude Code subagents (`Agent` tool) run **in-process**. They receive no `SessionStart` event,
