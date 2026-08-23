@@ -246,8 +246,8 @@ class regresses, at the cost of holding delivery until the batch commits. Correc
 negotiable in that trade: the invariant remains <em>durable replay fact before semantic acceptance</em>.</p>
 <h2 id="7-forgetting-replay-state">7. Forgetting replay state</h2>
 <p><code>ReplayGuard::cleanup()</code> runs periodically and, for any peer with no <strong>accepted</strong> traffic in
-<code>max_peer_age_secs</code>, removes the in-memory window <strong>and deletes the persisted
-<code>replay_max_seq:&lt;did&gt;</code> key</strong>.</p>
+<code>max_peer_age_secs</code> <em>and no deadline-free hold</em>, removes the in-memory window <strong>and deletes the
+persisted <code>replay_max_seq:&lt;did&gt;</code> key</strong>. The exemption is §7.3.</p>
 <p>Two properties matter:</p>
 <ol>
 <li><strong>A window that rejects everything never refreshes its own liveness.</strong> <code>last_update</code> is written
@@ -289,6 +289,46 @@ below <code>A</code>, so the exposure is confined to the corrupt-state case (§8
 <p>This is a property of ICN&#39;s time contract, not something <code>ReplayGuard</code> can solve. Recorded here so
 it is not mistaken for a replay-guard defect: <strong>bounded monotonic wall-clock progress on each node
 is a prerequisite for signed-envelope freshness</strong>, and therefore for replay-state expiry.</p>
+<h3 id="73-liveness-gc-is-not-a-release-valve-for-structural-safety-state-2645">7.3 Liveness GC is not a release valve for structural safety state (#2645)</h3>
+<p>Property 1 above is the whole reason this exemption is needed, and it took a while to see: a peer
+under a hold is <em>refused</em>, and a refusal never refreshes <code>last_update</code>. So a peer under a hold with
+<strong>no deadline</strong> is not merely eligible for eviction — it is <em>guaranteed</em> to reach it. Being refused
+is what drove the window past <code>max_peer_age_secs</code>, and eviction then discharged the refusal and
+deleted the durable evidence that produced it. The refusal starved the timestamp that decided
+whether the refusal survived.</p>
+<p>Freshness (property 2) does not license that deletion. Freshness bounds how long an envelope
+produced under a regime we <em>understand</em> stays dangerous. <code>PeerHold::UnsupportedVersion</code> and
+<code>PeerHold::UnsupportedSenderRegime</code> exist precisely because the regime is <strong>not</strong> understood: the
+state might have changed sequence interpretation, window semantics, or freshness assumptions
+themselves. There is no interval after which an unknown meaning becomes known, which is why those
+two holds carry no deadline and the operator-facing error says <em>this will not clear on its own</em>.</p>
+<blockquote>
+<p><strong>Invariant.</strong> Liveness GC may discard ordinary and bounded replay state according to policy, but
+it must not retire persistent evidence whose interpretation requires an indefinite fail-closed
+hold. Refusing a peer must not itself cause the evidence responsible for that refusal to age out.</p>
+</blockquote>
+<p>Scope, stated narrowly on purpose:</p>
+<ul>
+<li><strong>Exempt:</strong> a window whose hold satisfies <code>PeerHold::is_indefinite()</code> — <code>UnsupportedVersion</code> and
+<code>UnsupportedSenderRegime</code>. The window and its <code>replay_max_seq:&lt;did&gt;</code> row are both retained, so a
+restart reconstructs the same typed refusal.</li>
+<li><strong>Not exempt:</strong> everything else. A window with no hold still ages out and still has its row
+deleted. So does one under any of the three <strong>bounded</strong> holds (<code>Unreadable</code>,
+<code>MigratingFromLegacy</code>, <code>MigratingSenderRegime</code>), and one carrying an undischarged
+<code>pending_legacy_migration</code> obligation. Those are quarantines and migrations in flight; they are
+supposed to end, and retaining them would make an ordinary upgrade permanent.</li>
+</ul>
+<p>This is not a claim that ReplayGuard now retains every replay floor forever. It does not, and §9.3
+of <code>protocol-state-migration-invariants.md</code> still describes the ordinary aged-out-high-water case
+that provenance exists to serve.</p>
+<p><strong>The retained set stays bounded.</strong> No deadline-free hold is installable from the message path —
+<code>check_replay_only</code>&#39;s only hold is the bounded <code>MigratingSenderRegime</code> of a live namespace
+transition — so every one of them originates in a row read during the single
+<code>load_persisted_state</code> pass. The exempt set is a subset of one load&#39;s output: bounded by the store,
+never by traffic. Same argument §9.3 already rests on for provenance.</p>
+<p>Pinned by <code>replay_guard::cleanup_hold_tests</code> (both directions: the deadline-free holds survive
+cleanup and restart; the bounded holds and the unheld control still age out) and, at the handler
+boundary, <code>a_deadline_free_hold_survives_cleanup_and_is_still_never_scored_against_the_peer</code>.</p>
 <h2 id="8-storage-rollback-corruption-and-other-degenerate-states">8. Storage rollback, corruption, and other degenerate states</h2>
 <ul>
 <li><strong>Corrupt / undeserialisable entry.</strong> The key&#39;s existence proves state existed, but its high-water
