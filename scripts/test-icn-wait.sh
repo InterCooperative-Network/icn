@@ -171,47 +171,24 @@ check "non-numeric timeout is rejected (exit 2)" 2 $?
 
 echo
 
-# ── 5. supervision of long operations ────────────────────────────────────────
-echo "5. supervised long operations (the sanctioned alternative to a fake heartbeat)"
+# ── 5. the anti-hang tool must never hang in its own argument parser ─────────
+echo "5. the anti-hang tool must not hang"
 
-SESSION_BIN="$ROOT/ops/scripts/icn-agent-session"
-if [ -x "$SESSION_BIN" ] && [ -f "$ROOT/ops/mcp/dist/cli/session.js" ]; then
-  export ICN_OPS_DB="$TMP/sup.db"
+# `shift 2` with one argument left FAILS and shifts nothing, so the parser spun at 100% CPU
+# forever. Realistic trigger: `--timeout $T` where $T is unset.
+timeout 8 "$WAIT" pid 2 --timeout >/dev/null 2>&1
+check "a dangling option value is a usage error, not an infinite loop" 2 $?
 
-  "$SESSION_BIN" register --harness-key wait-selftest-conv --cwd "$ROOT" >/dev/null 2>&1
-  # No --harness-key: a Bash command cannot know the provider session id (there is no
-  # CLAUDE_SESSION_ID env var), so this must resolve the lane's sole session by itself.
-  timeout 30 "$WAIT" cmd --supervise --timeout 20 -- sleep 2 >/dev/null 2>&1
-  check "supervised wait completes without a session id" 0 $?
+timeout 8 "$WAIT" file /tmp/x --pattern >/dev/null 2>&1
+check "same for a dangling --pattern" 2 $?
 
-  LEFT="$("$SESSION_BIN" status --harness-key wait-selftest-conv 2>/dev/null \
-          | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("live_supervisions",[])))' 2>/dev/null)"
-  if [ "${LEFT:-x}" = "0" ]; then
-    ok "supervision is closed out when the operation finishes (none left running)"
-  else
-    bad "supervision leaked" "${LEFT} still running"
-  fi
+# An oversized value made the `-gt 0` test error out (no set -e), leaving DEADLINE=0 so
+# expired() was never true — a silently UNBOUNDED wait from a flag that looks like a bound.
+timeout 8 "$WAIT" pid 2 --timeout 99999999999999999999 >/dev/null 2>&1
+check "an oversized --timeout is rejected, not silently unbounded" 2 $?
 
-  # A contended lane must decline rather than attach the build to an arbitrary session.
-  "$SESSION_BIN" register --harness-key wait-selftest-conv2 --cwd "$ROOT" >/dev/null 2>&1
-  ERR="$("$SESSION_BIN" supervise --pid $$ --label probe --cwd "$ROOT" 2>&1 >/dev/null)"
-  case "$ERR" in
-    *"pass --harness-key"*) ok "contended lane declines to guess which session owns the operation" ;;
-    *) bad "contended lane should decline" "got: ${ERR:-<silence>}" ;;
-  esac
-
-  # Supervision must never be usable as a fake heartbeat: it cannot invent progress.
-  PC="$("$SESSION_BIN" status --harness-key wait-selftest-conv 2>/dev/null \
-        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("progress_count"))' 2>/dev/null)"
-  if [ "${PC:-x}" = "0" ]; then
-    ok "supervising an operation does NOT advance progress evidence"
-  else
-    bad "supervision advanced progress" "progress_count=${PC}"
-  fi
-  unset ICN_OPS_DB
-else
-  echo "  skip  session CLI not built (npm --prefix ops/mcp run build)"
-fi
+timeout 8 "$WAIT" pid 2 --timeout 9223372036854775807 >/dev/null 2>&1
+check "an int64-overflowing --timeout is rejected" 2 $?
 
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"

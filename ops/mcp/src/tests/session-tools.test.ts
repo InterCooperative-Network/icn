@@ -67,8 +67,8 @@ describe("every registered session tool is actually callable", () => {
     const names = tools.map((t) => t.name).sort();
     for (const expected of [
       "register_session", "list_sessions", "claim_files", "heartbeat",
-      "session_progress", "session_interaction", "supervise_operation",
-      "end_supervision", "release_session", "session_lifecycle", "session_info",
+      "session_progress", "session_interaction",
+      "release_session", "session_lifecycle", "session_info",
       "recent_sessions",
     ]) {
       expect(names).toContain(expected);
@@ -91,7 +91,6 @@ describe("every registered session tool is actually callable", () => {
       ["heartbeat", { session_id: sid }],
       ["session_progress", { session_id: sid, kind: "file_edit" }],
       ["session_interaction", { session_id: sid }],
-      ["supervise_operation", { session_id: sid, pid: process.pid, label: "probe" }],
       ["session_info", { session_id: sid }],
       ["session_lifecycle", { ...LANE }],
       ["recent_sessions", { count: 1 }],
@@ -199,17 +198,17 @@ describe("lifecycle tools behave through the protocol", () => {
 
   it("session_lifecycle protects a lane with no registry row", async () => {
     const r = (await call("session_lifecycle", { worktree_id: "/no/such/lane" })) as {
-      state: string; retireable: boolean;
+      state: string;
     };
     expect(r.state).toBe("UNREGISTERED-OBSERVED");
-    expect(r.retireable).toBe(false);
   });
 
   it("session_lifecycle refuses to guess when no lane id can be resolved", async () => {
     const r = (await call("session_lifecycle", { path: "/definitely/not/a/repo" })) as {
-      state: string; retireable: boolean;
+      state: string;
     };
-    expect(r.retireable).toBe(false);
+    // No lane resolves, so no facts can be reported — and it must say so rather than guess.
+    expect(r.state).toBe("REGISTRY-UNAVAILABLE");
   });
 
   it("progress advances the counter but interaction does not", async () => {
@@ -222,15 +221,6 @@ describe("lifecycle tools behave through the protocol", () => {
     expect(info.progress_count).toBe(1);
   });
 
-  it("supervise_operation then end_supervision round-trips", async () => {
-    const a = (await call("register_session", { repo: "icn", ...LANE })) as { session_id: string };
-    const s = (await call("supervise_operation", {
-      session_id: a.session_id, pid: process.pid, label: "cargo test",
-    })) as { supervision_id: number };
-    expect(s.supervision_id).toBeGreaterThan(0);
-    const e = (await call("end_supervision", { supervision_id: s.supervision_id, exit_code: 0 })) as { ok: boolean };
-    expect(e.ok).toBe(true);
-  });
 
   it("list_sessions returns the registered session with its age fields", async () => {
     await call("register_session", { repo: "icn", ...LANE });
@@ -240,6 +230,5 @@ describe("lifecycle tools behave through the protocol", () => {
     expect(r.ttl_minutes).toBeGreaterThan(0);
     expect(r.sessions).toHaveLength(1);
     expect(r.sessions[0]).toHaveProperty("heartbeat_age_min");
-    expect(r.sessions[0]).toHaveProperty("live_supervisions");
   });
 });

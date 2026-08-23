@@ -94,7 +94,9 @@ BANNER
 }
 
 if [ ! -x "$SESSION_BIN" ]; then
-  degraded_banner "ops/scripts/icn-agent-session is missing or not executable"
+  # `force`: when the payload was also unparseable, EVENT is empty and the banner would
+  # otherwise return silently — the two failure modes combined into a total silent disable.
+  degraded_banner "ops/scripts/icn-agent-session is missing or not executable" force
   exit 0
 fi
 if [ -z "$EVENT" ]; then
@@ -115,11 +117,14 @@ case "$EVENT" in
     # Registration output is discarded; the startup context below is what the agent sees.
     # cwd is a STARTING POINT only: the CLI resolves the owning worktree through Git, so a
     # subdirectory or scratch path cannot misattribute this session to the wrong lane.
-    run register --harness-key "$KEY" --cwd "${CWD:-$ROOT}" --pid "$PPID" \
-        --provider claude-code --transcript-path "$TRANSCRIPT"
+    # ONE invocation, not two. `register` already reports what happened, so re-querying with
+    # `status` doubled the work: each call opens the shared registry, and under an exclusive
+    # lock (busy_timeout 5s each) the pair took 10.4s against this hook's 10s budget. The
+    # harness then killed it, and the agent got neither the startup context nor the banner.
+    REG="$("$SESSION_BIN" register --harness-key "$KEY" --cwd "${CWD:-$ROOT}" --pid "$PPID" \
+        --provider claude-code --transcript-path "$TRANSCRIPT" 2>/dev/null || echo '')"
 
-    STATUS="$("$SESSION_BIN" status --harness-key "$KEY" 2>/dev/null || echo '{}')"
-    if printf '%s' "$STATUS" | grep -q '"registered": *true'; then
+    if printf '%s' "$REG" | grep -q '"session_id"'; then
       LIFECYCLE="registered (heartbeat+progress tracked; release on SessionEnd)"
     else
       LIFECYCLE="DEGRADED — NOT registered. Lifecycle tracking is NOT active for this session."

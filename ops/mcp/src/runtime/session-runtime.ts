@@ -54,7 +54,6 @@ function positiveIntOr(raw: string | undefined, fallback: number): number {
  */
 export type LifecycleState =
   | "REGISTERED-ACTIVE"
-  | "SUPERVISED-BUSY"
   | "PROGRESS-STALLED"
   | "REGISTERED-EXPIRED"
   | "UNREGISTERED-OBSERVED"
@@ -371,7 +370,7 @@ export type ReleaseResult = {
   /** Child sessions still active at release time; they are NOT cascaded (see AGENT_RUNTIME §6). */
   orphaned_children: string[];
   /** Ephemeral authority surrendered, by resource kind. */
-  dropped: { file_claims: number; watchers: number; undelivered_messages: number };
+  dropped: { file_claims: number; undelivered_messages: number };
 };
 
 /**
@@ -404,7 +403,7 @@ export function releaseSession(
     return {
       released: false,
       orphaned_children: [],
-      dropped: { file_claims: 0, watchers: 0, undelivered_messages: 0 },
+      dropped: { file_claims: 0, undelivered_messages: 0 },
     };
 
   const children = (
@@ -444,29 +443,6 @@ export function releaseSession(
     .prepare("DELETE FROM file_claims WHERE session_id = ?")
     .run(sessionId).changes;
 
-  // Watchers have no foreign key: without this they stay status='running' forever and the
-  // background poller keeps supervising on behalf of a session that no longer exists.
-  //
-  // But a session ending does NOT stop its build. Releasing every row unconditionally meant
-  // `/clear` silently revoked protection from a `cargo test --workspace` that was still
-  // running, and the lane immediately became approval-retireable. A supervision whose PROCESS
-  // IS STILL ALIVE outlives the session that declared it: the work is in the lane, not in the
-  // conversation. Only dead rows are released here; live ones are reaped later by pid.
-  const releasable = db
-    .prepare(
-      "SELECT id, pid FROM watchers_process WHERE session_id = ? AND status = 'running'"
-    )
-    .all(sessionId) as Array<{ id: number; pid: number }>;
-  let watchers = 0;
-  for (const w of releasable) {
-    if (!pidAlive(w.pid)) {
-      db.prepare(
-        "UPDATE watchers_process SET status = 'released', completed_at = ? WHERE id = ?"
-      ).run(Date.now(), w.id);
-      watchers += 1;
-    }
-  }
-
   // Undelivered inbox messages: keep the row (history) but stop them being pending for a
   // session that can never read them.
   const undelivered = db
@@ -481,7 +457,6 @@ export function releaseSession(
     orphaned_children: children,
     dropped: {
       file_claims: claims,
-      watchers,
       undelivered_messages: undelivered,
     },
   };
@@ -538,94 +513,21 @@ export function ageMinutes(
   return row.m == null ? null : row.m;
 }
 
-// ── supervised long-running operations ───────────────────────────────────────
+// ── process liveness ─────────────────────────────────────────────────────────
 //
-// A legitimate 45-minute build emits NO hook events while it runs, so its heartbeat ages past
-// the 30-minute TTL and the lane would look abandoned. That must not make it retireable.
+// SUPERVISION OF LONG-RUNNING OPERATIONS IS NOT PART OF THIS MODULE.
 //
-// The fix is not a fake heartbeat — it is declaring the operation. `watchers_process` already
-// models exactly this (session, pid, label, status), so supervision reuses it rather than
-// adding a table. A supervision is only credible while its PID is actually alive, so a
-// supervised operation cannot outlive the process it names.
-
-export type Supervision = {
-  id: number;
-  pid: number;
-  label: string;
-  created_at: number;
-  worktree_id: string | null;
-};
-
-export class SupervisionRejected extends Error {}
-
-/** Upper bound on how long one supervision may protect a lane. */
-export const DEFAULT_MAX_SUPERVISION_MINUTES = 480; // 8h — longer than any real ICN build
-
-export function maxSupervisionMinutes(env: NodeJS.ProcessEnv = process.env): number {
-  return positiveIntOr(
-    env["ICN_SUPERVISION_MAX_MINUTES"],
-    DEFAULT_MAX_SUPERVISION_MINUTES
-  );
-}
-
-/**
- * Declare a long-running operation.
- *
- * The PID must be ALIVE at declaration. Without that check, `supervise --pid 1` (or any
- * long-lived pid: init, sshd, a tmux server, the agent's own process) permanently exempted a
- * lane from every verdict this runtime exists to produce — the reap in liveSupervisions() only
- * fires when the process dies, and those never do.
- */
-export function superviseOperation(
-  db: Database.Database,
-  sessionId: string,
-  pid: number,
-  label: string,
-  isAlive: (pid: number) => boolean = pidAlive
-): number {
-  // A build runs in a DIRECTORY, not in a conversation. Stamp the lane at declaration so the
-  // supervision stays with the worktree even if the owning session later moves.
-  if (!Number.isInteger(pid) || pid <= 1) {
-    throw new SupervisionRejected(
-      `pid ${pid} is not a supervisable process (pid <= 1 is never a build)`
-    );
-  }
-  if (!isAlive(pid)) {
-    throw new SupervisionRejected(
-      `pid ${pid} is not running; supervision must name a live process`
-    );
-  }
-  const exists = db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(sessionId);
-  if (!exists) {
-    throw new SupervisionRejected(`no active session ${sessionId} to own this supervision`);
-  }
-  const owner = db
-    .prepare("SELECT worktree_id FROM sessions WHERE id = ?")
-    .get(sessionId) as { worktree_id: string | null } | undefined;
-  const r = db
-    .prepare(
-      "INSERT INTO watchers_process (session_id, pid, label, created_at, status, worktree_id) VALUES (?, ?, ?, ?, 'running', ?)"
-    )
-    .run(sessionId, pid, label, Date.now(), owner?.worktree_id ?? null);
-  return Number(r.lastInsertRowid);
-}
-
-export function endSupervision(
-  db: Database.Database,
-  id: number,
-  exitCode?: number,
-  ownerSessionId?: string
-): boolean {
-  // With no owner filter, any caller could complete any row by id — including another lane's
-  // supervision, or a `watch_process` row, stealing that feature's completion event.
-  const sql =
-    "UPDATE watchers_process SET status = 'completed', completed_at = ?, exit_code = ? " +
-    "WHERE id = ? AND status = 'running'" +
-    (ownerSessionId ? " AND session_id = ?" : "");
-  const params: unknown[] = [Date.now(), exitCode ?? null, id];
-  if (ownerSessionId) params.push(ownerSessionId);
-  return db.prepare(sql).run(...params).changes > 0;
-}
+// It lived here and was removed deliberately: five of the six P0 defects found across three
+// independent review rounds were in that surface, and each repair satisfied its own test and
+// comment while breaking the invariant one layer out. The root cause is that a lane's
+// protection had three competing sources of truth — the supervision row's lane, the owning
+// session's lane, and the live pid — and every fix re-derived the wrong one.
+//
+// It is preserved on branch ops/agent-supervision-lifecycle for a separate PR, where it can be
+// redesigned around a single source of truth and reviewed on its own.
+//
+// What remains here reports OBSERVATIONS. Nothing in this module decides that a lane may be
+// retired; see the Classification type.
 
 /** Whether a PID is alive. Signal 0 performs the permission/existence check only. */
 export function pidAlive(pid: number): boolean {
@@ -636,92 +538,6 @@ export function pidAlive(pid: number): boolean {
     // EPERM means the process exists but belongs to another user — still alive.
     return (e as NodeJS.ErrnoException).code === "EPERM";
   }
-}
-
-/**
- * Supervisions whose process is STILL RUNNING and which have not outlived their bound.
- *
- * Two reap conditions, both necessary:
- *   - the PID died           — a crashed build must not keep a lane protected;
- *   - the supervision aged out — a PID that never dies (a daemon, a wedged process, a
- *     mistakenly-supervised long-lived process) must not protect a lane indefinitely.
- */
-export function liveSupervisions(
-  db: Database.Database,
-  sessionId: string,
-  isAlive: (pid: number) => boolean = pidAlive,
-  env: NodeJS.ProcessEnv = process.env
-): Supervision[] {
-  // `worktree_id IS NOT NULL` restricts this to SUPERVISIONS. `watch_process` — a separate,
-  // pre-existing feature — writes to this same table with a NULL lane, and reaping those rows
-  // here silently stole the background poller's completion events and mailbox alerts.
-  const rows = db
-    .prepare(
-      "SELECT id, pid, label, created_at, worktree_id FROM watchers_process " +
-        "WHERE session_id = ? AND status = 'running' AND worktree_id IS NOT NULL"
-    )
-    .all(sessionId) as Supervision[];
-  const maxAgeMs = maxSupervisionMinutes(env) * 60_000;
-  const now = Date.now();
-  const live: Supervision[] = [];
-  for (const r of rows) {
-    if (!isAlive(r.pid)) {
-      endSupervision(db, r.id);
-    } else if (now - r.created_at > maxAgeMs) {
-      db.prepare(
-        "UPDATE watchers_process SET status = 'expired', completed_at = ? WHERE id = ?"
-      ).run(now, r.id);
-    } else {
-      live.push(r);
-    }
-  }
-  return live;
-}
-
-/**
- * Supervisions still running IN A LANE, regardless of which session declared them or where that
- * session has since moved. This is the query classification must use: a lane is protected by the
- * work actually running in it.
- */
-export function liveSupervisionsForLane(
-  db: Database.Database,
-  worktreeId: string,
-  isAlive: (pid: number) => boolean = pidAlive,
-  env: NodeJS.ProcessEnv = process.env
-): Supervision[] {
-  // Pre-v4 rows carry worktree_id NULL because ALTER TABLE cannot backfill, and a pre-v4
-  // supervision is byte-identical to a pre-v4 `watch_process` row, so they cannot be told
-  // apart. Excluding them dropped protection from a lane with a live build — the unsafe
-  // direction, and verbatim the P0 v4 exists to prevent. Include legacy rows whose owning
-  // session is on THIS lane: over-protecting a lane is the safe failure, and the pid-liveness
-  // check below still stops a dead row protecting anything.
-  const rows = db
-    .prepare(
-      "SELECT id, pid, label, created_at, worktree_id FROM watchers_process " +
-        "WHERE status = 'running' AND (" +
-        "  worktree_id = ?" +
-        "  OR (worktree_id IS NULL AND session_id IN (SELECT id FROM sessions WHERE worktree_id = ?))" +
-        ")"
-    )
-    .all(worktreeId, worktreeId) as Supervision[];
-  const maxAgeMs = maxSupervisionMinutes(env) * 60_000;
-  const now = Date.now();
-  const live: Supervision[] = [];
-  for (const r of rows) {
-    // Only rows this runtime STAMPED are reaped. A legacy NULL-lane row may belong to
-    // `watch_process`, whose background poller owns its lifecycle and its completion event.
-    const ours = r.worktree_id != null;
-    if (!isAlive(r.pid)) {
-      if (ours) endSupervision(db, r.id);
-    } else if (ours && now - r.created_at > maxAgeMs) {
-      db.prepare(
-        "UPDATE watchers_process SET status = 'expired', completed_at = ? WHERE id = ?"
-      ).run(now, r.id);
-    } else if (isAlive(r.pid)) {
-      live.push(r);
-    }
-  }
-  return live;
 }
 
 // ── classification ───────────────────────────────────────────────────────────
@@ -741,12 +557,6 @@ export type ClassifyObservation = {
   observed_pids?: number[] | null;
   /** True when the registry could not be opened/read at all. */
   registry_unavailable?: boolean;
-  /**
-   * Declared long-running operations whose process is still alive. These are the difference
-   * between "no hook fired because the session is dead" and "no hook fired because a known,
-   * supervised 45-minute build is still running".
-   */
-  live_supervisions?: Supervision[];
   /** Current branch/HEAD, re-read at classification time. Never the registration value. */
   live_branch?: BranchState | null;
   /**
@@ -763,19 +573,23 @@ export type ClassifyObservation = {
   live_agent_pids?: number[];
 };
 
+/**
+ * A read-only description of what the runtime OBSERVES about a lane.
+ *
+ * There is deliberately no `retireable` field. Deciding that a lane may be reclaimed is a
+ * policy question with real consequences — it can mean killing a live agent or destroying an
+ * in-flight build — and every attempt to answer it inside this module produced a defect that
+ * passed its own tests. Consumers (icn-lane-audit) apply their own policy to these facts, and
+ * retirement stays read-only and operator-approved.
+ */
 export type Classification = {
+  /** What the registry and process observation say. NOT a retirement verdict. */
   state: LifecycleState;
-  /** Whether a consumer may consider retiring this lane WITHOUT operator approval. */
-  retireable: boolean;
-  /** Whether retirement is defensible but must be operator-approved. */
-  retireable_with_approval: boolean;
   reason: string;
   session_id: string | null;
   heartbeat_age_min: number | null;
   progress_age_min: number | null;
   progress_count: number | null;
-  /** Declared long-running operations still alive at classification time. */
-  supervised: Supervision[];
   /**
    * Concurrent occupancy. Surfaced, never prevented: several sessions on one lane is a real
    * situation the runtime must be able to REPORT (an agent plus a reviewer, an overlapping
@@ -810,13 +624,10 @@ export function classify(
   limits: { ttl_min: number; stall_min: number }
 ): Classification {
   const base = {
-    retireable: false,
-    retireable_with_approval: false,
     session_id: null as string | null,
     heartbeat_age_min: null as number | null,
     progress_age_min: null as number | null,
     progress_count: null as number | null,
-    supervised: [] as Supervision[],
     contention: { count: 0, session_ids: [] as string[] },
     branch_changed: false,
     live_branch: null as BranchState | null,
@@ -852,7 +663,6 @@ export function classify(
   }
 
   const s = sessions[0]!;
-  const supervised = obs.live_supervisions ?? [];
   const live = obs.live_branch ?? null;
   const shared = {
     session_id: s.id,
@@ -865,31 +675,10 @@ export function classify(
     heartbeat_age_min: ages.heartbeat_age_min,
     progress_age_min: ages.progress_age_min,
     progress_count: s.progress_count,
-    supervised,
   };
 
   const hb = ages.heartbeat_age_min;
   const heartbeatExpired = hb != null && hb > limits.ttl_min;
-
-  // A declared, still-running operation explains a STALE heartbeat — that is its entire job.
-  // It is deliberately gated on expiry: applied unconditionally it re-labelled a perfectly
-  // healthy lane (fresh heartbeat, recent progress) as SUPERVISED-BUSY and thereby made it
-  // approval-retireable, i.e. declaring a long build made the lane LESS protected. That
-  // inverted the incentive to declare one.
-  if (supervised.length > 0 && heartbeatExpired) {
-    return {
-      ...shared,
-      state: "SUPERVISED-BUSY",
-      retireable: false,
-      // An operator may still decide to retire a lane holding a runaway build. Reporting this
-      // as untouchable put supervision above every verdict the runtime produces — one call
-      // with any long-lived pid exempted a lane permanently.
-      retireable_with_approval: true,
-      reason:
-        `heartbeat is ${fmt(hb)} min old, but ${supervised.length} supervised operation(s) ` +
-        `are still running: ${supervised.map((x) => `${x.label} (pid ${x.pid})`).join(", ")}`,
-    };
-  }
 
   if (heartbeatExpired) {
     // Expired heartbeat + a live process is still a *process-pinned* lane. The process is the
@@ -898,8 +687,6 @@ export function classify(
       return {
         ...shared,
         state: "PROGRESS-STALLED",
-        retireable: false,
-        retireable_with_approval: true,
         reason:
           `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}) but ` +
           `${observedPids.length} process(es) still hold the worktree`,
@@ -912,8 +699,6 @@ export function classify(
       return {
         ...shared,
         state: "PROGRESS-STALLED",
-        retireable: false,
-        retireable_with_approval: true,
         reason:
           `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}) but a registered agent ` +
           `process on this lane is still alive` +
@@ -929,8 +714,6 @@ export function classify(
       return {
         ...shared,
         state: "REGISTERED-EXPIRED",
-        retireable: false,
-        retireable_with_approval: true,
         reason:
           `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}), but no process observation ` +
           "was supplied — absence of observation is not evidence of absence, so the lane is protected",
@@ -940,8 +723,6 @@ export function classify(
     return {
       ...shared,
       state: "REGISTERED-EXPIRED",
-      retireable: true,
-      retireable_with_approval: true,
       reason:
         `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}); an observation was performed ` +
         `and found no process holding the worktree` +
@@ -970,8 +751,6 @@ export function classify(
     return {
       ...shared,
       state: "PROGRESS-STALLED",
-      retireable: false,
-      retireable_with_approval: true,
       reason:
         (s.progress_count === 0
           ? `heartbeat is fresh (${fmt(hb)} min) but NO progress has ever been recorded, ` +
@@ -984,8 +763,6 @@ export function classify(
   return {
     ...shared,
     state: "REGISTERED-ACTIVE",
-    retireable: false,
-    retireable_with_approval: false,
     reason:
       s.progress_count === 0
         ? `heartbeat ${fmt(hb)} min; no progress recorded yet (registered ${fmt(ages.session_age_min ?? null)} min ago)`
@@ -1038,10 +815,6 @@ export function classifyWorktree(
   const agentPidAlive =
     obs.agent_pid_alive ?? (recordedPids.length > 0 ? liveAgentPids.length > 0 : null);
 
-  // Supervisions are found BY LANE, so a session that has moved away cannot take the protection
-  // of a build still running here with it.
-  const supervised = obs.live_supervisions ?? liveSupervisionsForLane(db, worktreeId, pidAlive, env);
-
   const liveBranch =
     obs.live_branch ??
     (primary?.worktree_path ? readBranchState(primary.worktree_path) : null);
@@ -1050,7 +823,6 @@ export function classifyWorktree(
     primary ? [primary, ...sessions.filter((x) => x.id !== primary.id)] : [],
     {
       ...obs,
-      live_supervisions: supervised,
       live_branch: liveBranch,
       agent_pid_alive: agentPidAlive,
       live_agent_pids: liveAgentPids,

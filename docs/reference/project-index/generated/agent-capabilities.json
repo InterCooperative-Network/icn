@@ -55,10 +55,6 @@
       "summary": "Emit an event to the event log."
     },
     {
-      "name": "end_supervision",
-      "summary": "Mark a supervised operation finished."
-    },
-    {
       "name": "get_decision",
       "summary": "Read the full content of an ADR by number or title search."
     },
@@ -173,10 +169,6 @@
     {
       "name": "session_progress",
       "summary": "Report that meaningful work happened (file edit, completed command, test run, turn boundary)."
-    },
-    {
-      "name": "supervise_operation",
-      "summary": "Declare a long-running operation (build, test suite) so its lane is not judged abandoned when no hook fires for longer than the heartbeat TTL."
     },
     {
       "name": "update_task",

@@ -18,10 +18,8 @@ import { initDb } from "../state/db.js";
 import {
   activeSessionsForWorktree,
   classifyWorktree,
-  liveSupervisions,
   registerSession,
   releaseSession,
-  superviseOperation,
 } from "../runtime/session-runtime.js";
 
 let root: string;
@@ -229,13 +227,7 @@ describe("several sessions may occupy one lane", () => {
       for (const s of [a.session_id, b.session_id]) {
         db.prepare("INSERT INTO file_claims (file_path, session_id) VALUES (?, ?)")
           .run(`claim-${s}.rs`, s);
-        superviseOperation(db, s, process.pid, `build-${s}`);
       }
-      // Kill a's supervision so release has something to surrender. A LIVE supervision now
-      // deliberately outlives its session (the build is still running); that is covered
-      // separately in session-runtime.test.ts.
-      db.prepare("UPDATE watchers_process SET pid = 999999999 WHERE session_id = ?")
-        .run(a.session_id);
 
       releaseSession(db, a.session_id, { reason: "completed" });
 
@@ -246,12 +238,10 @@ describe("several sessions may occupy one lane", () => {
       expect(
         db.prepare("SELECT COUNT(*) c FROM file_claims WHERE session_id = ?").get(b.session_id)
       ).toEqual({ c: 1 });
-      expect(liveSupervisions(db, b.session_id)).toHaveLength(1);
       // a surrendered everything.
       expect(
         db.prepare("SELECT COUNT(*) c FROM file_claims WHERE session_id = ?").get(a.session_id)
       ).toEqual({ c: 0 });
-      expect(liveSupervisions(db, a.session_id)).toHaveLength(0);
     } finally {
       db.close();
     }
@@ -297,17 +287,13 @@ describe("provider conversation vs runtime activation", () => {
       // A accrues ephemeral authority.
       db.prepare("INSERT INTO file_claims (file_path, session_id) VALUES ('a.rs', ?)")
         .run(a1.session_id);
-      superviseOperation(db, a1.session_id, process.pid, "cargo build");
-      // Dead process: this is leaked bookkeeping the release must clear.
-      db.prepare("UPDATE watchers_process SET pid = 999999999 WHERE session_id = ?")
-        .run(a1.session_id);
       db.prepare(
         "INSERT INTO mailbox (to_session, from_session, kind, payload, created_at) VALUES (?, 'x', 'text', '{}', ?)"
       ).run(a1.session_id, Date.now());
 
       // SessionEnd: all authority surrendered.
       const rel = releaseSession(db, a1.session_id, { reason: "other" });
-      expect(rel.dropped).toEqual({ file_claims: 1, watchers: 1, undelivered_messages: 1 });
+      expect(rel.dropped).toEqual({ file_claims: 1, undelivered_messages: 1 });
 
       // Later --resume: SAME provider conversation, NEW runtime activation.
       const b = registerSession(db, { repo: "repoA", identity, provider_session_id: CONV });
@@ -319,7 +305,6 @@ describe("provider conversation vs runtime activation", () => {
       expect(
         db.prepare("SELECT COUNT(*) c FROM file_claims WHERE session_id = ?").get(b.session_id)
       ).toEqual({ c: 0 });
-      expect(liveSupervisions(db, b.session_id)).toHaveLength(0);
       expect(
         db.prepare("SELECT COUNT(*) c FROM mailbox WHERE to_session = ? AND read_at IS NULL")
           .get(b.session_id)

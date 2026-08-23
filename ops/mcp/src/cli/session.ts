@@ -18,17 +18,14 @@ import { dirname } from "path";
 import { initDb } from "../state/db.js";
 import {
   classifyWorktree,
-  endSupervision,
   InvalidProviderSessionIdError,
   activeSessionsForWorktree,
-  liveSupervisions,
   sessionsByWorktreeName,
   recordHeartbeat,
   recordInteraction,
   recordProgress,
   registerSession,
   releaseSession,
-  superviseOperation,
   type ProgressKind,
   type SessionRow,
 } from "../runtime/session-runtime.js";
@@ -123,10 +120,7 @@ function main(): number {
         "              [--activity TEXT]",
         "  interaction --harness-key K   (turn boundary: liveness only, NOT progress)",
         "  heartbeat   --harness-key K",
-        "  supervise   --pid N [--harness-key K] [--label L]  -> prints supervision id",
-        "              (without --harness-key: resolves the lane's sole session)",
-        "  unsupervise --id N [--exit-code C]",
-        "  release   --harness-key K [--reason completed|cancelled|error|shutdown]",
+              "  release   --harness-key K [--reason completed|cancelled|error|shutdown]",
         "  status    --harness-key K",
         "  classify    --worktree-id ID | --path DIR | --worktree NAME",
         "              [--pids 1,2,3 | --observed-none]",
@@ -228,69 +222,7 @@ function main(): number {
       return 0;
     }
 
-    case "supervise": {
-      const pid = Number(str(args, "pid"));
-      if (!Number.isInteger(pid) || pid <= 0) return 0;
 
-      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
-      let row = key ? findByProviderSession(db, key) : undefined;
-
-      // No key supplied: resolve by lane. A Bash command has no access to the provider session
-      // id (there is no CLAUDE_SESSION_ID env var — verified), so requiring one would make
-      // `icn-wait --supervise` unusable from the place it is actually needed.
-      //
-      // Only unambiguous when ONE session occupies the lane. With several, guessing would
-      // attach a build to the wrong session, so it declines and says why.
-      if (!row) {
-        const identity = discoverWorktree(str(args, "cwd") ?? process.cwd(), null);
-        if (identity) {
-          const rows = activeSessionsForWorktree(db, identity.worktree_id);
-          if (rows.length === 1) {
-            row = rows[0];
-          } else if (rows.length > 1) {
-            process.stderr.write(
-              `icn-agent-session: ${rows.length} sessions occupy this lane; ` +
-                "pass --harness-key to say which one owns this operation\n"
-            );
-            return 0;
-          }
-        }
-      }
-      if (!row) return 0;
-
-      try {
-        const id = superviseOperation(db, row.id, pid, str(args, "label") ?? "supervised operation");
-        process.stdout.write(String(id) + "\n");
-      } catch (e) {
-        // The wrapper's contract is "exits non-zero ONLY for classify". A rejected supervision
-        // is an expected outcome, not a crash.
-        process.stderr.write(`icn-agent-session: supervision rejected: ${(e as Error).message}\n`);
-      }
-      return 0;
-    }
-
-    case "unsupervise": {
-      const id = Number(str(args, "id"));
-      if (!Number.isInteger(id)) return 0;
-      const code = str(args, "exit-code");
-      // Scope to the owning session when we can identify it. Without an owner filter any
-      // caller could complete any row by id — another lane's supervision, or a watch_process
-      // row, stealing that feature's completion event.
-      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
-      const owner = key ? findByProviderSession(db, key) : undefined;
-      const ok = endSupervision(
-        db,
-        id,
-        code === undefined ? undefined : Number(code),
-        owner?.id
-      );
-      if (!ok && owner) {
-        process.stderr.write(
-          `icn-agent-session: supervision ${id} is not owned by this session (or already ended)\n`
-        );
-      }
-      return 0;
-    }
 
     case "release": {
       const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
@@ -323,11 +255,7 @@ function main(): number {
       const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
       const row = key ? findByProviderSession(db, key) : undefined;
       process.stdout.write(
-        JSON.stringify(
-          row
-            ? { registered: true, ...row, live_supervisions: liveSupervisions(db, row.id) }
-            : { registered: false }
-        ) + "\n"
+        JSON.stringify(row ? { registered: true, ...row } : { registered: false }) + "\n"
       );
       return 0;
     }
@@ -419,9 +347,10 @@ function main(): number {
         return 3;
       }
       process.stdout.write(JSON.stringify(c) + "\n");
-      // Exit code is the verdict: 0 protected-and-healthy, 1 protected, 2 candidate.
-      if (c.state === "REGISTERED-ACTIVE") return 0;
-      return c.retireable ? 2 : 1;
+      // The exit code reports whether FACTS COULD BE PRODUCED, not whether a lane may be
+      // retired. There is no "retirement candidate" code: this command observes, and the
+      // consumer applies policy. 0 = facts returned, 3 = nothing authoritative available.
+      return c.state === "REGISTRY-UNAVAILABLE" ? 3 : 0;
     }
 
     default:

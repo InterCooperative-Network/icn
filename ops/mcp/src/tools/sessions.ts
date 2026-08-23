@@ -9,12 +9,9 @@ import {
   ageMinutes,
   classifyWorktree,
   getSession,
-  endSupervision,
-  liveSupervisions,
   recordHeartbeat,
   recordInteraction,
   recordProgress,
-  superviseOperation,
   registerSession,
   releaseSession,
   stallMinutes,
@@ -143,16 +140,14 @@ export function registerSessionTools(
         .map((r) => {
           const hb = ageMinutes(db, r["last_heartbeat"] as string);
           const pa = ageMinutes(db, r["last_progress"] as string | null);
-          const supervised = liveSupervisions(db, r["id"] as string);
           return {
             ...r,
             heartbeat_age_min: hb == null ? null : Number(hb.toFixed(1)),
             progress_age_min: pa == null ? null : Number(pa.toFixed(1)),
             expired: hb != null && hb > ttl,
-            live_supervisions: supervised,
           };
         })
-        .filter((r) => include_expired || !r.expired || r.live_supervisions.length > 0);
+        .filter((r) => include_expired || !r.expired);
 
       return json({
         ttl_minutes: ttl,
@@ -262,37 +257,7 @@ export function registerSessionTools(
       json({ ok: recordInteraction(db, session_id), signal: "interaction" })
   );
 
-  server.tool(
-    "supervise_operation",
-    "Declare a long-running operation (build, test suite) so its lane is not judged abandoned " +
-      "when no hook fires for longer than the heartbeat TTL. The PID must be alive NOW and the " +
-      "supervision expires with it; supervision protects a lane from expiry but never from a " +
-      "progress-stall verdict.",
-    {
-      session_id: z.string(),
-      pid: z.number().describe("PID of the long-running process"),
-      label: z.string().describe("Human-readable label, e.g. 'cargo test --workspace'"),
-    },
-    async ({ session_id, pid, label }) => {
-      try {
-        const id = superviseOperation(db, session_id, pid, label);
-        return json({ supervision_id: id, pid, label });
-      } catch (e) {
-        return json({ error: "supervision_rejected", reason: (e as Error).message });
-      }
-    }
-  );
 
-  server.tool(
-    "end_supervision",
-    "Mark a supervised operation finished.",
-    {
-      supervision_id: z.number(),
-      exit_code: z.number().optional(),
-    },
-    async ({ supervision_id, exit_code }) =>
-      json({ ok: endSupervision(db, supervision_id, exit_code) })
-  );
 
   server.tool(
     "release_session",
@@ -334,9 +299,8 @@ export function registerSessionTools(
       if (!id) {
         return json({
           state: "REGISTRY-UNAVAILABLE",
-          retireable: false,
-          retireable_with_approval: false,
-          reason: "no canonical worktree id could be resolved; the lane stays protected",
+          reason:
+            "no canonical worktree id could be resolved, so no facts can be reported for this lane",
         });
       }
       return json(classifyWorktree(db, id, { observed_pids: observed_pids ?? null }));

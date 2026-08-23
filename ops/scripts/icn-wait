@@ -30,8 +30,7 @@
 #   * Timeouts are observable — they print what was being waited for and how long.
 #
 # USAGE
-#   icn-wait cmd  [--timeout SEC] [--label L] [--supervise [--harness-key K]] -- <command...>
-#                                                               # PREFERRED: launch and wait $!
+#   icn-wait cmd  [--timeout SEC] [--label L] -- <command...>   # PREFERRED: launch and wait $!
 #   icn-wait pid  <PID> [--timeout SEC] [--label L]
 #   icn-wait file <PATH> [--pattern REGEX] [--source-pid PID] [--timeout SEC]
 #   icn-wait match <PATTERN> [--timeout SEC]                    # last resort; see NOTES
@@ -44,11 +43,6 @@
 #   `match` is a last resort. If you started the process, you have its PID — use `cmd` or `pid`,
 #   which are exact. Pattern matching is inherently ambiguous and is offered only because some
 #   waits are genuinely for processes this shell did not create.
-#
-#   --supervise declares the launched process to the session registry for its lifetime, so a
-#   legitimately long operation (a 45-minute test run that emits no hook events) is not judged
-#   abandoned when its heartbeat ages past the TTL. This is the sanctioned alternative to a
-#   periodic fake heartbeat: it is backed by a live PID and expires with the process.
 
 set -uo pipefail
 
@@ -63,7 +57,6 @@ while [ -L "$self" ]; do
   case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
 done
 readonly SCRIPT_DIR="$(cd "$(dirname "$self")" && pwd)"
-readonly SESSION_BIN="$SCRIPT_DIR/icn-agent-session"
 
 die()   { printf 'icn-wait: %s\n' "$*" >&2; exit 2; }
 fatal() { printf 'icn-wait: UNREACHABLE — %s\n' "$*" >&2; exit 3; }
@@ -77,16 +70,20 @@ case "$CMD" in -h|--help|help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 
 shift
 
 TIMEOUT="$DEFAULT_TIMEOUT"; LABEL=""; PATTERN=""; SOURCE_PID=""; ALLOW_UNBOUNDED=0
-QUIET=0; SUPERVISE=0; HARNESS_KEY=""; POSITIONAL=(); PAYLOAD=()
+QUIET=0; POSITIONAL=(); PAYLOAD=()
+# `shift 2` with only one argument left FAILS and shifts NOTHING, so the loop spun at 100% CPU
+# forever — the anti-hang tool hanging on a typo like `--timeout $UNSET`. Every option value is
+# now required explicitly.
+need_value() {
+  [ $# -ge 2 ] || die "$1 requires a value"
+}
 while [ $# -gt 0 ]; do
   case "$1" in
-    --timeout)          TIMEOUT="${2:-}"; shift 2 ;;
-    --label)            LABEL="${2:-}"; shift 2 ;;
-    --pattern)          PATTERN="${2:-}"; shift 2 ;;
-    --source-pid)       SOURCE_PID="${2:-}"; shift 2 ;;
+    --timeout)          need_value "$@"; TIMEOUT="$2"; shift 2 ;;
+    --label)            need_value "$@"; LABEL="$2"; shift 2 ;;
+    --pattern)          need_value "$@"; PATTERN="$2"; shift 2 ;;
+    --source-pid)       need_value "$@"; SOURCE_PID="$2"; shift 2 ;;
     --allow-unbounded)  ALLOW_UNBOUNDED=1; shift ;;
-    --supervise)        SUPERVISE=1; shift ;;
-    --harness-key)      HARNESS_KEY="${2:-}"; shift 2 ;;
     --quiet)            QUIET=1; shift ;;
     --)                 shift; PAYLOAD=("$@"); break ;;
     -*)                 die "unknown option: $1" ;;
@@ -97,6 +94,13 @@ done
 case "$TIMEOUT" in
   ''|*[!0-9]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
 esac
+# An oversized value is not a bound. `[ "$TIMEOUT" -gt 0 ]` errored on a 20-digit number
+# (no set -e), leaving DEADLINE=0 so expired() was never true — a silently UNBOUNDED wait from
+# a flag that looks like a bound. One year is far beyond any legitimate use.
+readonly MAX_TIMEOUT=31536000
+if [ "${#TIMEOUT}" -gt 9 ] || [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ] 2>/dev/null; then
+  die "--timeout $TIMEOUT exceeds the maximum of ${MAX_TIMEOUT}s (1 year)"
+fi
 if [ "$TIMEOUT" -eq 0 ] && [ "$ALLOW_UNBOUNDED" -ne 1 ]; then
   die "--timeout 0 means wait forever; that needs --allow-unbounded stated explicitly"
 fi
@@ -180,8 +184,8 @@ case "$CMD" in
     # No pattern, no ambiguity, no self-match possible.
     [ "${#PAYLOAD[@]}" -gt 0 ] || die "cmd requires: icn-wait cmd [--timeout N] -- <command...>"
     # Own process group, so a timeout can reap the whole job tree rather than just the direct
-    # child. Without this a wrapper's backgrounded grandchildren survived the "bounded" wait and
-    # kept holding the worktree after --supervise had already retired the supervision.
+    # child. Without this a wrapper's backgrounded grandchildren survived the "bounded" wait
+    # and kept holding the worktree.
     if command -v setsid >/dev/null 2>&1; then
       setsid "${PAYLOAD[@]}" &
     else
@@ -213,58 +217,20 @@ case "$CMD" in
       wait "$child" 2>/dev/null
     }
 
-    # Declare the operation so a long legitimate run is protected without faking progress.
-    SUP_ID=""
-    if [ "$SUPERVISE" = 1 ]; then
-      # --harness-key is optional: a Bash command has no access to the provider session id
-      # (there is no CLAUDE_SESSION_ID env var), so supervise resolves the lane's sole session
-      # when none is given, and declines rather than guessing when the lane is contended.
-      if [ -x "$SESSION_BIN" ]; then
-        if [ -n "$HARNESS_KEY" ]; then
-          SUP_ID="$("$SESSION_BIN" supervise --harness-key "$HARNESS_KEY" \
-                      --pid "$child" --label "$LABEL" 2>/dev/null || true)"
-        else
-          SUP_ID="$("$SESSION_BIN" supervise --pid "$child" --label "$LABEL" \
-                      --cwd "$PWD" 2>/dev/null || true)"
-        fi
-      fi
-      # Supervision is best-effort observability; its absence must never change the wait.
-      [ -n "$SUP_ID" ] || note "supervision unavailable; waiting anyway"
-    fi
-    # A signal must not orphan the job. `setsid` detaches the child into its own group, so a
-    # harness tool-call timeout that kills OUR group leaves the build running AND leaves the
-    # supervision row 'running' with end_supervision never called. Cover every exit path.
-    on_signal() {
-      note "received signal; terminating supervised child and releasing supervision"
-      terminate_child
-      end_supervision 143
-      exit 143
-    }
     trap on_signal INT TERM HUP
 
-    end_supervision() {
-      [ -n "$SUP_ID" ] || return 0
-      [ -x "$SESSION_BIN" ] || return 0
-      if [ -n "$HARNESS_KEY" ]; then
-        "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" \
-          --harness-key "$HARNESS_KEY" >/dev/null 2>&1 || true
-      else
-        "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" >/dev/null 2>&1 || true
-      fi
-    }
-
     if [ "$DEADLINE" -eq 0 ]; then
-      wait "$child"; rc=$?; end_supervision "$rc"; exit "$rc"
+      wait "$child"; exit $?
     fi
     # Bounded wait on our own child: poll cheaply, then reap for the true exit status.
     while alive "$child"; do
       if expired; then
         terminate_child
-        end_supervision 124; timed_out "$LABEL"
+        timed_out "$LABEL"
       fi
       sleep "$POLL_INTERVAL"
     done
-    wait "$child"; rc=$?; end_supervision "$rc"; exit "$rc"
+    wait "$child"; exit $?
     ;;
 
   pid)

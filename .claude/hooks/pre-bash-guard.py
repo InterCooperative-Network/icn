@@ -45,7 +45,6 @@ Refs icn#2653.
 import json
 import re
 import sys
-from re import error
 
 # ── detection ─────────────────────────────────────────────────────────────────
 #
@@ -109,11 +108,17 @@ BOUNDED_RE = re.compile(
 )
 
 # Wrappers whose quoted argument is executed, not quoted text.
+# `-c` may be bundled with other short flags (`-lc`, `-ec`, `-cx`), and the code may be in
+# ANSI-C quoting (`$'...'`). Requiring a bare `-c` followed by a plain quote let every
+# combined form through.
 EXEC_WRAPPER_RE = re.compile(
-    r"\b(?:ba|z|k|da)?sh\b[^|;&\n]*?-c\s+(?P<q>['\"])(?P<code>.*?)(?<!\\)(?P=q)"
-    r"|\beval\s+(?P<q2>['\"])(?P<code2>.*?)(?<!\\)(?P=q2)",
+    r"\b(?:ba|z|k|da)?sh\b[^|;&\n]*?\s-[a-zA-Z]*c[a-zA-Z]*\s+\$?(?P<q>['\"])(?P<code>.*?)(?<!\\)(?P=q)"
+    r"|\beval\s+\$?(?P<q2>['\"])(?P<code2>.*?)(?<!\\)(?P=q2)",
     re.S,
 )
+
+# ── F2: command substitution is EXECUTED, not quoted text ────────────────
+CMD_SUBST_RE = re.compile(r"\$\((?P<code>[^()]*(?:\([^()]*\)[^()]*)*)\)|`(?P<code2>[^`]*)`", re.S)
 # Only a heredoc fed to a SHELL is executed. `cat >> README.md <<EOF` is documentation, and
 # recursing into it refused an agent's attempt to document this very defect.
 HEREDOC_RE = re.compile(
@@ -123,6 +128,24 @@ HEREDOC_RE = re.compile(
 
 
 ANY_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<code>.*?)\n\s*(?P=tag)\b", re.S)
+
+
+_SPAN_CACHE: dict[str, list[tuple[int, int]]] = {}
+
+
+def quoted_spans_cached(text: str) -> list[tuple[int, int]]:
+    """Memoised span computation.
+
+    This runs once per loop per fragment and is O(len) each time; on a large many-quoted
+    command that pushed the hook past its 5s budget (40KB measured at 23s), and a hook that
+    times out fails OPEN. Commands are small and repeated, so a dict keyed on the text is
+    both correct and enough.
+    """
+    hit = _SPAN_CACHE.get(text)
+    if hit is None:
+        hit = quoted_spans(text)
+        _SPAN_CACHE[text] = hit
+    return hit
 
 
 def quoted_spans(text: str) -> list[tuple[int, int]]:
@@ -185,6 +208,12 @@ def fragments(cmd: str, depth: int = 0, ancestor_bounded: bool = False) -> list[
             found.extend(fragments(code, depth + 1, mine))
     for m in HEREDOC_RE.finditer(cmd):
         found.extend(fragments(m.group("code"), depth + 1, mine))
+    for m in CMD_SUBST_RE.finditer(cmd):
+        code = m.group("code") or m.group("code2")
+        # A substitution inherits nothing: `echo "$(<loop>)"` runs the loop regardless of what
+        # bounds the echo.
+        if code and re.search(r"\b(until|while)\b", code):
+            found.extend(fragments(code, depth + 1, False))
     return found
 
 
@@ -192,7 +221,9 @@ def _pattern_of(m: re.Match) -> str | None:
     for g in ("qpat", "pat", "qpat2", "pat2"):
         try:
             v = m.group(g)
-        except (IndexError, error):
+        except IndexError:
+            # `.group()` on a missing group raises only IndexError; re.error comes from
+            # compile/match and was never reachable here.
             continue
         if v:
             return v
@@ -201,7 +232,7 @@ def _pattern_of(m: re.Match) -> str | None:
 
 def _bounded(fragment: str) -> bool:
     """A bounding construct that is really executed — not one sitting inside a string."""
-    spans = quoted_spans(fragment)
+    spans = quoted_spans_cached(fragment)
     return any(not inside_span(m.start(), spans) for m in BOUNDED_RE.finditer(fragment))
 
 
@@ -211,7 +242,7 @@ def blocked_reason(cmd: str) -> str | None:
         if ancestor_bounded:
             continue
         clean = strip_comments_outside_quotes(fragment)
-        spans = quoted_spans(clean)
+        spans = quoted_spans_cached(clean)
 
         for loop in LOOP_RE.finditer(clean):
             # A loop keyword inside quotes is text UNLESS this fragment is itself an executed
@@ -221,7 +252,12 @@ def blocked_reason(cmd: str) -> str | None:
             cond, body = loop.group("cond"), loop.group("body")
             if not re.search(r"\bsleep\b", body, re.I):
                 continue
-            if _bounded(loop.group(0)) or _bounded(clean):
+            # LOOP-SCOPED, not fragment-scoped. `_bounded(clean)` meant a bounding token
+            # ANYWHERE in the fragment — before the loop, after `done`, in an unrelated
+            # command — disarmed it: `timeout 5 true; <loop>` and even `<loop>\nexit 0`
+            # were allowed while hanging. A parent wrapper's bound still applies, which is
+            # what `ancestor_bounded` carries.
+            if _bounded(loop.group(0)):
                 continue
 
             # ── Defect A: the condition matches the observer itself ──

@@ -257,18 +257,21 @@ timer is precisely the mechanism that makes a deadlocked session look healthy.
 `icn-agent-session classify --worktree <name>` returns one state. The registry is the
 **first** source of evidence; process observation is corroborating, never overriding.
 
-| State | Means | Retireable? |
-|---|---|---|
-| `REGISTERED-ACTIVE` | Row present, heartbeat inside TTL, progress recent. | No |
-| `SUPERVISED-BUSY` | A declared long-running operation is still alive (§5.1). | Only with operator approval |
-| `PROGRESS-STALLED` | Row present, heartbeat fresh, `progress_count` unchanged past the stall window. | Only with operator approval |
-| `REGISTERED-EXPIRED` | Row present, heartbeat older than TTL, no live pid. | Candidate |
-| `UNREGISTERED-OBSERVED` | No row, but processes hold the worktree. | **No** — pre-integration or unsupported launcher |
-| `REGISTRY-UNAVAILABLE` | Registry unreadable. | **No** |
+| State | Means |
+|---|---|
+| `REGISTERED-ACTIVE` | Row present, heartbeat inside TTL, progress recent. |
+| `PROGRESS-STALLED` | Row present, heartbeat fresh, `progress_count` unchanged past the stall window. |
+| `REGISTERED-EXPIRED` | Row present, heartbeat older than TTL. |
+| `UNREGISTERED-OBSERVED` | No row for this lane. |
+| `REGISTRY-UNAVAILABLE` | Registry unreadable, or no lane could be resolved. |
 
-**Absence of a row never means "safe to terminate."** A missing row is indistinguishable from a
-pre-integration session, an unsupported launcher, or a registry failure, so it resolves to
-protected. This is asserted by tests, not by convention.
+**These are observations, not verdicts.** `classify` returns no `retireable` field: deciding a
+lane may be reclaimed can mean killing a live agent or destroying an in-flight build, and every
+attempt to answer it inside this module produced a defect that passed its own tests. Consumers
+apply their own policy to the facts, and retirement stays read-only and operator-approved.
+
+**Absence of a row is not evidence of absence of a session.** A missing row is indistinguishable
+from a pre-integration session, an unsupported launcher, or a registry failure.
 
 **Absence of an observation is not evidence of absence either.** `observed_pids` distinguishes
 three states, and only the third can support retirement:
@@ -296,47 +299,22 @@ window), clamped to a 5-minute floor — it is read from the ambient environment
 classify, and a value of 1 turned a two-minute-old heartbeat into a retirement candidate. Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-lane-audit`'s
 `QUIESCENT_AFTER_MIN`).
 
-### 5.1 Long-running legitimate operations
+### 5.1 Supervision of long-running operations — NOT IN THIS LAYER
 
-A 45-minute `cargo test` emits **no** hook events while it runs, so its heartbeat ages past a
-30-minute TTL and the lane would look abandoned. The fix is not a periodic fake heartbeat —
-that is the exact mechanism this runtime bans — but *declaring* the operation:
+A legitimately long build emits no hook events, so its heartbeat ages past the TTL and the lane
+looks idle. Declaring the operation is the right answer, and it was implemented here — then
+removed.
 
-```
-icn-wait cmd --supervise --harness-key <id> --timeout 3600 -- cargo test --workspace
-```
+Five of the six P0 defects found across three independent review rounds were in that surface.
+Each repair satisfied its own test and its own comment while breaking the invariant one layer
+out, because a lane's protection had three competing sources of truth: the supervision row's
+lane, the owning session's lane, and the live pid. That is a design problem, not a diligence
+one, so it is being redesigned rather than patched again.
 
-Supervision reuses the pre-existing `watchers_process` table (session, pid, label, status), and
-is deliberately hard to abuse:
-
-- **Authenticated at declaration** — the PID must be alive and greater than 1, and the owning
-  session must exist. Without this, `supervise --pid 1` (or any long-lived pid: a daemon, a
-  tmux server, the agent's own process) exempted a lane permanently, because the reap only
-  fires when the process dies and those never do.
-- **Bounded** — a supervision older than `ICN_SUPERVISION_MAX_MINUTES` (default 480) expires
-  even if its PID is still alive, so a wedged process cannot protect a lane indefinitely.
-- **Reaped when the process dies** — a crashed build cannot pin a lane.
-- **Scoped to the lane, not the session** — a supervision records the `worktree_id` it was
-  declared in, so a session that later resumes from a different worktree cannot take the
-  protection of a build still running here away with it. The lane column also distinguishes
-  supervisions from `watch_process` rows in the same table, so lane queries no longer reap
-  another feature's watchers out from under its poller.
-- **Explains staleness only** — it applies when the heartbeat has expired. Applied
-  unconditionally it re-labelled a healthy lane and made it *approval-retireable*, i.e.
-  declaring a long build made the lane less protected.
-- **Not a trump card** — it protects against *automatic* retirement, never against an
-  operator's decision, and it never touches progress evidence.
-
-The four claims this keeps separate:
-
-| Claim | Evidence |
-|---|---|
-| harness heartbeat age | `last_heartbeat` |
-| known live process | `agent_pid` / observed PIDs in `/proc` |
-| supervised long-running activity | live `watchers_process` row |
-| actual progress | `last_progress`, `progress_count` |
-
----
+The work is preserved on `ops/agent-supervision-lifecycle` for a separate PR. Until it lands,
+a long build shows as `PROGRESS-STALLED` or `REGISTERED-EXPIRED` — which is honest, because
+this layer genuinely does not know the difference between a long build and an abandoned lane.
+No consumer may act on that without operator approval.
 
 ## 6. Release guarantees — stated exactly
 
@@ -427,15 +405,17 @@ first and corroborate with observation second:
 icn-agent-session classify --path <worktree>     # or --worktree-id <id>
 ```
 
-It returns JSON — `state`, `retireable`, `retireable_with_approval`, `reason`, `contention`,
-`branch_changed`, `live_branch`, `supervised` — and an exit code that is itself the verdict:
-`0` healthy, `1` protected, `2` candidate, `3` registry unavailable.
+It returns JSON facts — `state`, `reason`, `contention`, `branch_changed`, `live_branch`,
+`live_agent_pids`, heartbeat/progress ages and `progress_count`. The exit code reports whether
+facts could be produced (`0`) or not (`3`); there is deliberately **no** "retirement candidate"
+code.
 
 Binding rules for every consumer:
 
-- **A missing row is not permission.** `UNREGISTERED-OBSERVED` and `REGISTRY-UNAVAILABLE` are
-  protected states. A lane with no row may be a pre-integration session, an unsupported
-  launcher, or a registry failure.
+- **A missing row is not permission.** A lane with no row may be a pre-integration session, an
+  unsupported launcher, or a registry failure.
+- **This layer issues no retirement verdict at all.** A consumer that wants one owns that
+  policy, and owns the consequences.
 - **A merged PR is not permission either.** Merge state is one input; it says nothing about who
   is currently working in the lane.
 - **Process observation may only make a verdict safer**, never more permissive: an expired
