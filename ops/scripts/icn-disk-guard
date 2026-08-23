@@ -1,0 +1,441 @@
+#!/usr/bin/env bash
+#
+# icn-disk-guard — bound Cargo build-artifact growth across ICN agent worktrees.
+#
+# WHY THIS EXISTS
+#   Every agent worktree under ~/icn-dev/worktrees/<repo>/<name> builds into its own
+#   icn/target/. Each is 3-26 GB, and a full workspace build across feature sets can exceed
+#   100 GB. Nothing removed them, so the root filesystem reached 96% with 372 GB of build
+#   output across 19 worktrees.
+#
+# POLICY: TWO LAYERS, BECAUSE FILESYSTEM PERCENT IS A LAGGING SIGNAL
+#   v1 only reclaimed once the filesystem was already at 80%. That is too late for this
+#   workload: one worktree reached 119 GB on its own, so the disk can go from comfortable to
+#   critical inside a single agent session. Percent-of-disk is the symptom, not the resource.
+#
+#   Layer 1 - ROUTINE housekeeping. Runs whatever the filesystem looks like. Reclaims Cargo
+#             output that is provably safe (MERGED-INACTIVE, idle, unpinned, clean) and both
+#             stale and substantial. This is what actually bounds growth.
+#   Layer 2 - PRESSURE housekeeping. Above FS_WARN_PCT the guard becomes more eager about
+#             already-safe output: it lowers the age and size floors. It NEVER relaxes the
+#             identity, liveness or git-safety checks - only how stale/large output must be.
+#
+#   Layer 3 - BUDGETS. Independently of both, the guard reports on the resource itself:
+#             total ICN target footprint and the largest individual target, each with a
+#             warning and a critical threshold. These raise the exit code so a scheduled run
+#             is loud before the filesystem is endangered.
+#
+# WHAT IT WILL AND WILL NOT TOUCH
+#   Cargo build output is disposable: reproducible from source by definition. Source trees,
+#   git metadata, branches and worktree registration are not, and this script never touches
+#   them. It only removes directories literally named `target/` carrying a Cargo
+#   CACHEDIR.TAG, and only from worktrees positively classified MERGED-INACTIVE.
+#
+#   It fails SAFE in every unknown: if `gh` is missing, unauthenticated or rate-limited, PR
+#   state is unknown, the worktree classifies STALE-UNKNOWN, and nothing is removed.
+#
+#   It never terminates a process to make a target eligible. A merged worktree still pinned
+#   by a live process is reported as MERGED-BUT-PROCESS-PINNED - agent-lifecycle debt for an
+#   operator, not something a disk guard should resolve by killing things.
+#
+# USAGE
+#   icn-disk-guard                 audit only; never deletes (default, safe)
+#   icn-disk-guard --auto          reclaim eligible output (routine + pressure layers)
+#   icn-disk-guard --apply         same as --auto; explicit operator intent
+#   icn-disk-guard --self-test     run the policy unit tests
+#   icn-disk-guard --quiet         suppress output while everything is healthy (for timers)
+#
+# EXIT CODES
+#   0  healthy
+#   1  WARNING  (filesystem >= FS_WARN_PCT, or a budget warning threshold crossed)
+#   2  CRITICAL (filesystem >= FS_CRIT_PCT, or a budget critical threshold crossed)
+#   3  invocation or environment error
+#
+set -uo pipefail
+
+# ══════════════════════ POLICY CONFIGURATION - SINGLE SOURCE OF TRUTH ══════════════════════
+# Every threshold the guard applies is declared here exactly once. Each is overridable from
+# the environment so the self-tests can scale them without duplicating literals; production
+# runs supply nothing and get the defaults below.
+readonly ICN_ROOT="${ICN_DEV_ROOT:-$HOME/icn-dev}"
+readonly WORKTREE_ROOT="$ICN_ROOT/worktrees"
+readonly FILESYSTEM="${ICN_GUARD_FS:-/}"
+
+# -- Layer 2: filesystem pressure --------------------------------------------------------
+readonly FS_WARN_PCT="${ICN_GUARD_FS_WARN_PCT:-78}"    # lowered from v1's 80: 484 GB disk, so
+                                                        # 78% still leaves ~106 GB of headroom,
+                                                        # which is under one pathological target.
+readonly FS_CRIT_PCT="${ICN_GUARD_FS_CRIT_PCT:-90}"
+
+# -- Layer 1: routine housekeeping (applies with no disk pressure at all) ----------------
+readonly ROUTINE_MIN_AGE_DAYS="${ICN_GUARD_ROUTINE_MIN_AGE_DAYS:-7}"
+readonly ROUTINE_MIN_GB="${ICN_GUARD_ROUTINE_MIN_GB:-5}"
+# Rationale for 5 GB rather than 10: across 19 observed targets the median is 7.2 GB. A 10 GB
+# floor sits above the median and would have covered 6/19 targets (308 GB); a 5 GB floor
+# covers 13/19 (355 GB). The incident was caused as much by many mid-sized targets as by the
+# two >100 GB outliers, and the safety of a routine clean rests on the MERGED-INACTIVE
+# classification, not on the size floor. The floor exists only to avoid churning on trivia.
+
+# -- Layer 2 eligibility relaxation under pressure ---------------------------------------
+# Same identity/liveness/git checks; only staleness and size floors move.
+readonly PRESSURE_MIN_AGE_DAYS="${ICN_GUARD_PRESSURE_MIN_AGE_DAYS:-2}"
+readonly PRESSURE_MIN_GB="${ICN_GUARD_PRESSURE_MIN_GB:-1}"
+
+# -- Layer 3: Cargo build-output budgets -------------------------------------------------
+readonly BUDGET_TOTAL_WARN_GB="${ICN_GUARD_BUDGET_TOTAL_WARN_GB:-150}"
+readonly BUDGET_TOTAL_CRIT_GB="${ICN_GUARD_BUDGET_TOTAL_CRIT_GB:-200}"
+readonly BUDGET_ONE_WARN_GB="${ICN_GUARD_BUDGET_ONE_WARN_GB:-50}"
+readonly BUDGET_ONE_CRIT_GB="${ICN_GUARD_BUDGET_ONE_CRIT_GB:-100}"
+
+readonly LOG_FILE="${ICN_DISK_GUARD_LOG:-$ICN_ROOT/state/disk-guard.log}"
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+
+PRINT_VERDICT=0
+if [ "${1:-}" = "--print-verdict" ]; then PRINT_VERDICT=1; shift; fi
+
+MODE=audit
+QUIET=0
+[ "$PRINT_VERDICT" = 1 ] || for a in "$@"; do
+  case "$a" in
+    --auto|--apply) MODE=apply ;;
+    --self-test)    MODE=selftest ;;
+    --quiet)        QUIET=1 ;;
+    -h|--help)      sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $a (try --help)" >&2; exit 3 ;;
+  esac
+done
+
+# Output is buffered rather than printed as it goes, so that --quiet can be *revoked
+# retroactively*. A scheduled run must stay silent while everything is healthy, but the
+# decision "is this healthy" is not final until the budgets have been evaluated at the very
+# end. Printing eagerly meant a --quiet timer run stayed silent even at CRITICAL: the exit
+# code was right and the journal said nothing, which is exactly the invisibility this guard
+# exists to remove. The EXIT trap flushes on every path, including early exits.
+OUT_BUF=""
+say() { OUT_BUF+="$*"$'\n'; }
+flush_output() { if [ "$QUIET" = 0 ] || [ "${rc:-0}" -ne 0 ]; then printf '%s' "$OUT_BUF"; fi; }
+trap flush_output EXIT
+log() { mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null; printf '%s %s\n' "$(date -Is)" "$*" >> "$LOG_FILE"; }
+
+usage_pct() { df --output=pcent "$FILESYSTEM" | tail -1 | tr -dc '0-9'; }
+free_gb()   { echo $(( $(df --output=avail -k "$FILESYSTEM" | tail -1) / 1024 / 1024 )); }
+used_gb()   { echo $(( $(df --output=used  -k "$FILESYSTEM" | tail -1) / 1024 / 1024 )); }
+
+# ══════════════════ PURE POLICY FUNCTIONS - no I/O, so --self-test drives them ══════════════
+
+# final_class <git_class> <pinned:0|1>
+# Overlays liveness onto git state. Splitting these is what lets a merged-but-pinned worktree
+# be reported as lifecycle debt instead of disappearing into a generic "active".
+final_class() {
+  local git_class="$1" pinned="$2"
+  if [ "$pinned" -gt 0 ]; then
+    case "$git_class" in
+      MERGED) echo "MERGED-BUT-PROCESS-PINNED" ;;
+      *)      echo "ACTIVE" ;;
+    esac
+    return
+  fi
+  case "$git_class" in
+    MERGED)   echo "MERGED-INACTIVE" ;;
+    OPEN)     echo "OPEN-PR" ;;
+    UNMERGED) echo "UNMERGED" ;;
+    *)        echo "STALE-UNKNOWN" ;;
+  esac
+}
+
+# eligibility_verdict <class> <age_days> <size_gb> <dirty> <procs> <fds> <layer:routine|pressure>
+eligibility_verdict() {
+  local class="$1" age="$2" gb="$3" dirty="$4" procs="$5" fds="$6" layer="${7:-routine}"
+  local min_age min_gb
+  if [ "$layer" = pressure ]; then min_age="$PRESSURE_MIN_AGE_DAYS"; min_gb="$PRESSURE_MIN_GB"
+  else                             min_age="$ROUTINE_MIN_AGE_DAYS";  min_gb="$ROUTINE_MIN_GB"; fi
+
+  # Liveness and git safety are absolute. Pressure never relaxes these.
+  [ "$procs" -gt 0 ] && { echo "KEEP:process-pinned(${procs})"; return; }
+  [ "$fds"   -gt 0 ] && { echo "KEEP:fd-pinned(${fds})";        return; }
+  [ "$dirty" -gt 0 ] && { echo "KEEP:uncommitted-source";       return; }
+  case "$class" in
+    ACTIVE)                    echo "KEEP:active";           return ;;
+    MERGED-BUT-PROCESS-PINNED) echo "KEEP:process-pinned";   return ;;
+    OPEN-PR)                   echo "KEEP:open-pr";          return ;;
+    UNMERGED)                  echo "KEEP:unmerged-branch";  return ;;
+    STALE-UNKNOWN)             echo "KEEP:unknown-state";    return ;;
+    MERGED-INACTIVE)           ;;
+    *)                         echo "KEEP:unclassified";     return ;;
+  esac
+  [ "$gb"  -lt "$min_gb" ]  && { echo "KEEP:below-size-floor(${gb}GB<${min_gb}GB)"; return; }
+  [ "$age" -lt "$min_age" ] && { echo "KEEP:too-recent(${age}d<${min_age}d)";       return; }
+  echo "ELIGIBLE:$layer"
+}
+
+# budget_level <value_gb> <warn_gb> <crit_gb> -> OK|WARN|CRIT
+budget_level() {
+  local v="$1" w="$2" c="$3"
+  [ "$v" -ge "$c" ] && { echo CRIT; return; }
+  [ "$v" -ge "$w" ] && { echo WARN; return; }
+  echo OK
+}
+
+# escalate <current_rc> <level> -> highest severity so far
+escalate() {
+  local rc="$1" lvl="$2"
+  case "$lvl" in CRIT) echo 2 ;; WARN) [ "$rc" -ge 2 ] && echo "$rc" || echo 1 ;; *) echo "$rc" ;; esac
+}
+
+# ══════════════════════════════════ PROBES (I/O) ═══════════════════════════════════════════
+procs_using() {
+  local name="$1" n=0 c
+  for p in /proc/[0-9]*; do
+    c=$(readlink "$p/cwd" 2>/dev/null) || continue
+    case "$c" in *"/$name/"*|*"/$name") n=$((n+1)) ;; esac
+  done
+  echo "$n"
+}
+fds_using() {
+  # `find -lname` matches the symlink *target*, which is what a /proc/PID/fd entry carries.
+  # `-print -quit` stops at the first hit, so a process with thousands of fds costs one match.
+  local name="$1" n=0 hit
+  for p in /proc/[0-9]*; do
+    hit=$(find "$p/fd" -maxdepth 1 -lname "*/$name/*" -print -quit 2>/dev/null)
+    [ -n "$hit" ] && n=$((n+1))
+  done
+  echo "$n"
+}
+# Who is pinning it: "pid cmd age" lines. Reported, never acted on.
+pinning_procs() {
+  local name="$1" c cmd age
+  for p in /proc/[0-9]*; do
+    c=$(readlink "$p/cwd" 2>/dev/null) || continue
+    case "$c" in *"/$name/"*|*"/$name")
+      cmd=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-48)
+      age=$(ps -o etime= -p "${p##*/}" 2>/dev/null | tr -d ' ')
+      say "$(printf '      pid %-8s age %-14s %s' "${p##*/}" "${age:-?}" "${cmd:-?}")" ;;
+    esac
+  done
+}
+
+git_class() { # git_class <worktree>  -> MERGED|OPEN|UNMERGED|UNKNOWN  (fails safe to UNKNOWN)
+  local wt="$1" br pr
+  br=$(git -C "$wt" branch --show-current 2>/dev/null)
+  [ -z "$br" ] && { echo UNKNOWN; return; }               # detached: PR state unknowable
+  command -v gh >/dev/null 2>&1 || { echo UNKNOWN; return; }
+  pr=$(cd "$wt" && gh pr list --state all --head "$br" --json state --jq '.[0].state' 2>/dev/null)
+  case "$pr" in
+    MERGED) echo MERGED ;;
+    OPEN)   echo OPEN ;;
+    CLOSED) echo UNMERGED ;;
+    ""|*)   echo UNKNOWN ;;                                # no PR, or gh failed -> fail safe
+  esac
+}
+
+# ══════════════════════════════════════ SELF-TEST ══════════════════════════════════════════
+run_self_test() {
+  local fails=0 n=0
+  check() {
+    n=$((n+1))
+    case "$2" in "$1"*) printf '  PASS  %s\n' "$3" ;;
+                 *) printf '  FAIL  %s -> got "%s", wanted "%s"*\n' "$3" "$2" "$1"; fails=$((fails+1)) ;; esac
+  }
+  echo "icn-disk-guard self-test"
+
+  echo "-- policy configuration is coherent --"
+  check ok "$([ "$FS_WARN_PCT" -lt "$FS_CRIT_PCT" ] && echo ok)"                       "FS_WARN_PCT < FS_CRIT_PCT"
+  check ok "$([ "$BUDGET_TOTAL_WARN_GB" -lt "$BUDGET_TOTAL_CRIT_GB" ] && echo ok)"     "total budget warn < crit"
+  check ok "$([ "$BUDGET_ONE_WARN_GB" -lt "$BUDGET_ONE_CRIT_GB" ] && echo ok)"         "per-target warn < crit"
+  check ok "$([ "$PRESSURE_MIN_AGE_DAYS" -le "$ROUTINE_MIN_AGE_DAYS" ] && echo ok)"    "pressure age floor <= routine"
+  check ok "$([ "$PRESSURE_MIN_GB" -le "$ROUTINE_MIN_GB" ] && echo ok)"                "pressure size floor <= routine"
+  # Thresholds must come from the config block, not be re-hardcoded in the logic. Overriding
+  # the variable must change the verdict; if a literal were duplicated below, this fails.
+  check KEEP:below-size-floor \
+    "$(ICN_GUARD_ROUTINE_MIN_GB=999 bash "$0" --print-verdict MERGED-INACTIVE 99 50 0 0 0 routine)" \
+    "routine size floor is read from config (override changes verdict)"
+  check ELIGIBLE \
+    "$(ICN_GUARD_ROUTINE_MIN_AGE_DAYS=1 bash "$0" --print-verdict MERGED-INACTIVE 2 50 0 0 0 routine)" \
+    "routine age floor is read from config (override changes verdict)"
+
+  echo "-- LAYER 1: routine cleanup needs no filesystem pressure --"
+  check ELIGIBLE:routine  "$(eligibility_verdict MERGED-INACTIVE 30 50 0 0 0 routine)" "merged+old+big -> eligible with a healthy disk"
+  check KEEP:too-recent   "$(eligibility_verdict MERGED-INACTIVE  3 50 0 0 0 routine)" "merged but only 3d old -> kept"
+  check KEEP:below-size-floor "$(eligibility_verdict MERGED-INACTIVE 30 2 0 0 0 routine)" "merged+old but 2GB -> kept"
+
+  echo "-- LAYER 2: pressure relaxes staleness/size ONLY --"
+  check ELIGIBLE:pressure "$(eligibility_verdict MERGED-INACTIVE 3 2 0 0 0 pressure)"  "3d/2GB becomes eligible under pressure"
+  check KEEP:too-recent   "$(eligibility_verdict MERGED-INACTIVE 1 50 0 0 0 pressure)" "1d still too recent even under pressure"
+  check KEEP:open-pr      "$(eligibility_verdict OPEN-PR        99 99 0 0 0 pressure)" "pressure does NOT relax open-PR"
+  check KEEP:unmerged     "$(eligibility_verdict UNMERGED       99 99 0 0 0 pressure)" "pressure does NOT relax unmerged"
+  check KEEP:unknown      "$(eligibility_verdict STALE-UNKNOWN  99 99 0 0 0 pressure)" "pressure does NOT relax unknown state"
+  check KEEP:process-pinned "$(eligibility_verdict MERGED-INACTIVE 99 99 0 1 0 pressure)" "pressure does NOT relax liveness"
+  check KEEP:uncommitted  "$(eligibility_verdict MERGED-INACTIVE 99 99 1 0 0 pressure)" "pressure does NOT relax dirty tree"
+
+  echo "-- LAYER 3: budgets --"
+  check OK   "$(budget_level 100 "$BUDGET_TOTAL_WARN_GB" "$BUDGET_TOTAL_CRIT_GB")" "total 100GB under warn"
+  check WARN "$(budget_level 169 "$BUDGET_TOTAL_WARN_GB" "$BUDGET_TOTAL_CRIT_GB")" "total 169GB warns"
+  check CRIT "$(budget_level 250 "$BUDGET_TOTAL_WARN_GB" "$BUDGET_TOTAL_CRIT_GB")" "total 250GB critical"
+  check OK   "$(budget_level  16 "$BUDGET_ONE_WARN_GB"   "$BUDGET_ONE_CRIT_GB")"   "single 16GB under warn"
+  check WARN "$(budget_level  60 "$BUDGET_ONE_WARN_GB"   "$BUDGET_ONE_CRIT_GB")"   "single 60GB warns"
+  check CRIT "$(budget_level 114 "$BUDGET_ONE_WARN_GB" "$BUDGET_ONE_CRIT_GB")"     "single 114GB (the real one) is critical"
+  check 1 "$(escalate 0 WARN)" "a budget warning raises exit code to 1"
+  check 2 "$(escalate 1 CRIT)" "a budget critical raises exit code to 2"
+  check 2 "$(escalate 2 WARN)" "a later warning cannot lower an earlier critical"
+
+  echo "-- classification: liveness overlaid on git state --"
+  check MERGED-BUT-PROCESS-PINNED "$(final_class MERGED   1)" "merged + pinned -> lifecycle debt, not 'active'"
+  check MERGED-INACTIVE           "$(final_class MERGED   0)" "merged + free -> reclaimable"
+  check ACTIVE                    "$(final_class OPEN     1)" "open PR + pinned -> active"
+  check OPEN-PR                   "$(final_class OPEN     0)" "open PR + free -> still protected"
+  check ACTIVE                    "$(final_class UNKNOWN  1)" "unknown + pinned -> active"
+  check STALE-UNKNOWN             "$(final_class UNKNOWN  0)" "unknown git state fails safe"
+  check UNMERGED                  "$(final_class UNMERGED 0)" "closed-unmerged PR is protected"
+
+  echo "-- reporting vs alerting --"
+  # A pinned target is reported, but pinned-ness alone must not raise the exit code; the
+  # budgets decide whether it is worth waking someone. Guards against re-introducing the
+  # every-4-hours-forever warning.
+  check 0 "$(escalate 0 OK)"   "an OK budget leaves the exit code alone"
+  check 2 "$(escalate 0 "$(budget_level 114 "$BUDGET_ONE_WARN_GB" "$BUDGET_ONE_CRIT_GB")")" \
+        "a 114GB pinned target still escalates to CRITICAL via the budget layer"
+  check 0 "$(escalate 0 "$(budget_level 20 "$BUDGET_ONE_WARN_GB" "$BUDGET_ONE_CRIT_GB")")" \
+        "a 20GB pinned target is reported but does not wake anyone"
+
+  echo "-- protections that must hold at ANY size --"
+  check KEEP:active        "$(eligibility_verdict ACTIVE                    99 200 0 0 0 pressure)" "200GB active target still kept"
+  check KEEP:open-pr       "$(eligibility_verdict OPEN-PR                   99 200 0 0 0 pressure)" "200GB open-PR target still kept"
+  check KEEP:process-pinned "$(eligibility_verdict MERGED-BUT-PROCESS-PINNED 99 200 0 0 0 pressure)" "200GB merged-but-pinned still kept"
+  check KEEP:unclassified  "$(eligibility_verdict ''                        99 200 0 0 0 pressure)" "empty class never eligible"
+
+  echo
+  [ "$fails" -eq 0 ] && { echo "self-test: $n/$n passed"; return 0; }
+  echo "self-test: $fails of $n FAILED"; return 1
+}
+
+# Hidden hook: lets the self-test re-enter with overridden config and prove the thresholds are
+# read from the config block rather than duplicated inside the logic.
+[ "$PRINT_VERDICT" = 1 ] && { eligibility_verdict "$@"; exit 0; }
+
+[ "$MODE" = selftest ] && { run_self_test; exit $?; }
+
+# ═══════════════════════════════════════ AUDIT ═════════════════════════════════════════════
+pct=$(usage_pct); free=$(free_gb); used=$(used_gb)
+rc=0; fs_level=OK
+[ "$pct" -ge "$FS_WARN_PCT" ] && { fs_level=WARNING; rc=1; }
+[ "$pct" -ge "$FS_CRIT_PCT" ] && { fs_level=CRITICAL; rc=2; }
+
+LAYER=routine
+[ "$pct" -ge "$FS_WARN_PCT" ] && LAYER=pressure
+
+say "icn-disk-guard  $(date -Is)"
+say "filesystem $FILESYSTEM: ${pct}% used, ${used} GB used, ${free} GB free  [$fs_level]"
+say "cleanup layer: $LAYER (routine floors ${ROUTINE_MIN_AGE_DAYS}d/${ROUTINE_MIN_GB}GB; pressure floors ${PRESSURE_MIN_AGE_DAYS}d/${PRESSURE_MIN_GB}GB above ${FS_WARN_PCT}%)"
+say ""
+
+[ -d "$WORKTREE_ROOT" ] || { say "no worktree root at $WORKTREE_ROOT"; exit "$rc"; }
+
+total_gb=0; elig_gb=0; max_gb=0; max_name=""
+declare -a elig_list=() pinned_report=()
+row() { say "$(printf '  %-42s %7s %5s  %-26s %s' "$1" "$2" "$3" "$4" "$5")"; }
+say "ICN worktree Cargo build output:"
+row WORKTREE SIZE AGE CLASS VERDICT
+
+while IFS= read -r t; do
+  [ -f "$t/CACHEDIR.TAG" ] || continue
+  wt="${t%/icn/target}"; [ "$wt" = "$t" ] && wt="${t%/target}"
+  name=$(basename "$wt")
+  mb=$(du -sm "$t" 2>/dev/null | cut -f1); mb=${mb:-0}; gb=$((mb/1024))
+  age=$(( ( $(date +%s) - $(stat -c %Y "$t" 2>/dev/null || echo 0) ) / 86400 ))
+  dirty=$(git -C "$wt" status --porcelain 2>/dev/null | grep -cv '^?? icn/target')
+  np=$(procs_using "$name"); nf=$(fds_using "$name")
+  class=$(final_class "$(git_class "$wt")" "$(( np + nf > 0 ? 1 : 0 ))")
+  verdict=$(eligibility_verdict "$class" "$age" "$gb" "${dirty:-0}" "$np" "$nf" "$LAYER")
+
+  total_gb=$((total_gb+gb))
+  [ "$gb" -gt "$max_gb" ] && { max_gb=$gb; max_name=$name; }
+  hr=$(numfmt --to=iec --suffix=B $((mb*1024*1024)) 2>/dev/null || echo "${mb}M")
+  row "$name" "$hr" "${age}d" "$class" "$verdict"
+  case "$verdict" in ELIGIBLE*) elig_gb=$((elig_gb+gb)); elig_list+=("$t") ;; esac
+  if [ "$class" = MERGED-BUT-PROCESS-PINNED ] && [ "$gb" -ge "$ROUTINE_MIN_GB" ]; then
+    pinned_report+=("$name|$hr|$age")
+  fi
+done < <(find "$WORKTREE_ROOT" -maxdepth 6 -type d -name target -prune 2>/dev/null | sort)
+
+# -- Layer 3: budgets --
+say ""
+say "Cargo build-output budgets:"
+tl=$(budget_level "$total_gb" "$BUDGET_TOTAL_WARN_GB" "$BUDGET_TOTAL_CRIT_GB")
+ol=$(budget_level "$max_gb"   "$BUDGET_ONE_WARN_GB"   "$BUDGET_ONE_CRIT_GB")
+say "  total footprint : ${total_gb} GB  (warn ${BUDGET_TOTAL_WARN_GB} / crit ${BUDGET_TOTAL_CRIT_GB})  [$tl]"
+say "  largest target  : ${max_gb} GB  ${max_name:+($max_name)}  (warn ${BUDGET_ONE_WARN_GB} / crit ${BUDGET_ONE_CRIT_GB})  [$ol]"
+say "  reclaimable now : ${elig_gb} GB in ${#elig_list[@]} worktree(s)  [layer: $LAYER]"
+rc=$(escalate "$rc" "$tl"); rc=$(escalate "$rc" "$ol")
+[ "$tl" = WARN ] && say "  !! total ICN build output above budget; stale targets should be reclaimed."
+[ "$tl" = CRIT ] && say "  !! CRITICAL: total ICN build output far above budget."
+[ "$ol" = WARN ] && say "  !! one target above ${BUDGET_ONE_WARN_GB} GB."
+[ "$ol" = CRIT ] && say "  !! CRITICAL: one target above ${BUDGET_ONE_CRIT_GB} GB - a single worktree can fill this disk."
+
+# -- Layer 4: agent-lifecycle debt (report only; never acted on) --
+if [ "${#pinned_report[@]}" -gt 0 ]; then
+  say ""
+  say "MERGED-BUT-PROCESS-PINNED - merged work whose build output cannot be reclaimed because"
+  say "processes still hold it. This is agent-lifecycle debt, not a disk-guard action:"
+  for e in "${pinned_report[@]}"; do
+    IFS='|' read -r n s a <<< "$e"
+    say "  $n  ($s, ${a}d idle) - blocked only by live processes:"
+    pinning_procs "$n"
+  done
+  say "  -> resolve by ending those sessions; the guard will never terminate them."
+  # Deliberately does NOT raise the exit code on its own. Long-lived agent shells sitting in
+  # merged worktrees are the steady state on this host, so escalating here would make every
+  # scheduled run warn forever and train an operator to ignore it. The case that actually
+  # matters is already covered: a pinned target still counts toward the total footprint and
+  # the per-target budget, so a *large* one trips those thresholds anyway — and this block is
+  # then the explanation of why it cannot be reclaimed.
+fi
+
+[ "$fs_level" = WARNING ]  && say "" && say "!! WARNING: filesystem >= ${FS_WARN_PCT}%."
+[ "$fs_level" = CRITICAL ] && say "" && say "!! CRITICAL: filesystem >= ${FS_CRIT_PCT}%. Builds and agent sessions will start failing."
+# rc != 0 makes flush_output print the whole buffer even under --quiet (see say()).
+
+log "audit pct=$pct free=${free}GB total=${total_gb}GB max=${max_gb}GB($max_name) eligible=${elig_gb}GB n=${#elig_list[@]} layer=$LAYER pinned=${#pinned_report[@]} rc=$rc"
+
+# ══════════════════════════════════════ RECLAIM ════════════════════════════════════════════
+if [ "${#elig_list[@]}" -eq 0 ]; then
+  [ "$MODE" = apply ] && say "" && say "nothing eligible to reclaim."
+  exit "$rc"
+fi
+
+if [ "$MODE" != apply ]; then
+  say ""
+  say "DRY RUN - would remove (build output only; no source, no git state, no worktrees):"
+  for t in "${elig_list[@]}"; do say "    rm -rf $t"; done
+  say ""
+  say "Re-run with --apply to reclaim."
+  exit "$rc"
+fi
+
+say ""
+say "RECLAIMING ${#elig_list[@]} target directories [layer: $LAYER]:"
+for t in "${elig_list[@]}"; do
+  name=$(basename "${t%/icn/target}")
+  # Re-verify at the moment of deletion: the audit above takes time and an agent may have
+  # woken since. Cheap insurance against racing a starting build.
+  np=$(procs_using "$name"); nf=$(fds_using "$name")
+  if [ "$np" -gt 0 ] || [ "$nf" -gt 0 ]; then
+    say "    SKIP (became active) $t"; log "skip-active $t"; continue
+  fi
+  [ -f "$t/CACHEDIR.TAG" ] || { say "    SKIP (not a cargo target) $t"; log "skip-nontarget $t"; continue; }
+  case "$t" in */target) ;; *) say "    SKIP (not a target path) $t"; log "skip-badpath $t"; continue ;; esac
+  sz=$(du -sh "$t" 2>/dev/null | cut -f1)
+  if rm -rf "$t"; then
+    say "    removed $sz  $t  [MERGED-INACTIVE, layer=$LAYER]"
+    log "removed size=$sz path=$t class=MERGED-INACTIVE layer=$LAYER reason=stale-merged-build-output"
+  else
+    say "    FAILED  $t"; log "failed $t"
+  fi
+done
+
+pct2=$(usage_pct); free2=$(free_gb)
+say ""
+say "after reclaim: ${pct2}% used, ${free2} GB free (was ${pct}%, ${free} GB)"
+log "post-reclaim pct=$pct2 free=${free2}GB"
+[ "$pct2" -ge "$FS_CRIT_PCT" ] && exit 2
+[ "$pct2" -ge "$FS_WARN_PCT" ] && exit 1
+exit "$rc"
