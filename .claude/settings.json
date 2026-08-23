@@ -142,9 +142,31 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh",
+            "timeout": 5,
+            "statusMessage": "Recording session progress..."
+          }
+        ]
       }
     ],
     "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh",
+            "timeout": 10,
+            "statusMessage": "Registering agent session..."
+          }
+        ]
+      },
       {
         "matcher": "startup",
         "hooks": [
@@ -168,6 +190,45 @@
           {
             "type": "command",
             "command": "echo 'Context compacted. Remember: workspace is icn/, run cargo from there. 5 invariants: adversarial-by-default, determinism, canonical-encodings, no-panics, kernel/app-boundaries.'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh",
+            "timeout": 5,
+            "statusMessage": "Recording turn progress..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh",
+            "timeout": 5,
+            "statusMessage": "Session heartbeat..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh",
+            "timeout": 10,
+            "statusMessage": "Releasing agent session..."
           }
         ]
       }

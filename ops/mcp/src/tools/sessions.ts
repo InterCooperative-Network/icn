@@ -1,11 +1,26 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
-import { randomUUID } from "crypto";
-import { appendFileSync, readFileSync } from "fs";
+import { readFileSync } from "fs";
 import { resolveOpsStatePath } from "../paths.js";
+import {
+  activeSessionsForWorktree,
+  ageMinutes,
+  classifyWorktree,
+  getSession,
+  recordHeartbeat,
+  recordProgress,
+  registerSession,
+  releaseSession,
+  stallMinutes,
+  ttlMinutes,
+} from "../runtime/session-runtime.js";
 
 const SESSION_LOG = resolveOpsStatePath("session-log.jsonl");
+
+function json(value: unknown) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+}
 
 export function registerSessionTools(
   server: McpServer,
@@ -13,56 +28,83 @@ export function registerSessionTools(
 ): void {
   server.tool(
     "register_session",
-    "Register an agent session to track what it's working on. Call at session start.",
+    "Register an agent session. Normally called automatically by the SessionStart hook " +
+      "(ops/scripts/icn-agent-session); call it manually only from a launcher that has no hooks.",
     {
-      repo: z
-        .string()
-        .describe(
-          "Repo name: icn, homelab-inventory"
-        ),
+      repo: z.string().describe("Repo name: icn, homelab-inventory"),
       worktree: z
         .string()
         .optional()
-        .describe("Worktree name under the configured worktree root (repo-map.json#worktrees.root; e.g. task-preflight-hardening)"),
+        .describe(
+          "Worktree name under the configured worktree root (repo-map.json#worktrees.root; e.g. task-preflight-hardening)"
+        ),
       task_description: z
         .string()
         .optional()
         .describe("Brief description of what this session is working on"),
+      branch: z.string().optional().describe("Branch at registration time"),
+      task_ref: z.string().optional().describe("Issue reference, e.g. icn#2653"),
+      pr_ref: z.string().optional().describe("PR reference, e.g. icn#2660"),
+      parent_session_id: z
+        .string()
+        .optional()
+        .describe("Parent session ID when this is a child/review session"),
+      provider: z
+        .string()
+        .optional()
+        .describe("Agent provider/harness, e.g. claude-code, codex, cursor"),
+      harness_key: z
+        .string()
+        .optional()
+        .describe(
+          "Stable per-harness session key. Registration is idempotent on this value: " +
+            "re-registering returns the existing session instead of creating a duplicate."
+        ),
     },
-    async ({ repo, worktree, task_description }) => {
-      const id = randomUUID();
-      db.prepare(
-        "INSERT INTO sessions (id, repo, worktree, task_description) VALUES (?, ?, ?, ?)"
-      ).run(id, repo, worktree ?? null, task_description ?? null);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ session_id: id, repo, worktree }),
-          },
-        ],
-      };
-    }
+    async (input) => json(registerSession(db, input)),
   );
 
   server.tool(
     "list_sessions",
-    "List all active agent sessions and their file claims.",
-    {},
-    async () => {
-      const sessions = db
+    "List agent sessions with lifecycle classification and file claims.",
+    {
+      include_expired: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Include sessions whose heartbeat is older than the TTL"),
+    },
+    async ({ include_expired }) => {
+      const ttl = ttlMinutes();
+      const rows = db
         .prepare(
           `SELECT s.*, GROUP_CONCAT(fc.file_path) as claimed_files
-           FROM sessions s
-           LEFT JOIN file_claims fc ON fc.session_id = s.id
-           WHERE datetime(s.last_heartbeat) > datetime('now', '-30 minutes')
-           GROUP BY s.id
-           ORDER BY s.started_at DESC`
+             FROM sessions s
+             LEFT JOIN file_claims fc ON fc.session_id = s.id
+            WHERE s.state = 'active'
+            GROUP BY s.id
+            ORDER BY s.started_at DESC`
         )
-        .all();
-      return {
-        content: [{ type: "text", text: JSON.stringify(sessions, null, 2) }],
-      };
+        .all() as Array<Record<string, unknown>>;
+
+      const enriched = rows
+        .map((r) => {
+          const hb = ageMinutes(db, r["last_heartbeat"] as string);
+          const pa = ageMinutes(db, r["last_progress"] as string | null);
+          return {
+            ...r,
+            heartbeat_age_min: hb == null ? null : Number(hb.toFixed(1)),
+            progress_age_min: pa == null ? null : Number(pa.toFixed(1)),
+            expired: hb != null && hb > ttl,
+          };
+        })
+        .filter((r) => include_expired || !r.expired);
+
+      return json({
+        ttl_minutes: ttl,
+        stall_minutes: stallMinutes(),
+        sessions: enriched,
+      });
     }
   );
 
@@ -78,13 +120,15 @@ export function registerSessionTools(
     async ({ session_id, files }) => {
       const conflicts: string[] = [];
       const claimed: string[] = [];
+      const ttl = ttlMinutes();
 
       const checkStmt = db.prepare(
         `SELECT session_id FROM file_claims
          WHERE file_path = ? AND session_id != ?
          AND session_id IN (
            SELECT id FROM sessions
-           WHERE datetime(last_heartbeat) > datetime('now', '-30 minutes')
+           WHERE state = 'active'
+             AND julianday('now') - julianday(last_heartbeat) < ? / 1440.0
          )`
       );
       const insertStmt = db.prepare(
@@ -92,8 +136,7 @@ export function registerSessionTools(
       );
 
       for (const file of files) {
-        const existing = checkStmt.get(file, session_id);
-        if (existing) {
+        if (checkStmt.get(file, session_id, ttl)) {
           conflicts.push(file);
         } else {
           insertStmt.run(file, session_id);
@@ -101,69 +144,83 @@ export function registerSessionTools(
         }
       }
 
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ claimed, conflicts }) },
-        ],
-      };
+      return json({ claimed, conflicts });
     }
   );
 
   server.tool(
     "heartbeat",
-    "Update session last_heartbeat to keep it active. Call periodically during long operations.",
+    "Report LIVENESS only — 'the harness is still running'. This is deliberately weak " +
+      "evidence and never implies progress. To report that work happened, call session_progress.",
+    { session_id: z.string() },
+    async ({ session_id }) =>
+      json({ ok: recordHeartbeat(db, session_id), signal: "liveness" })
+  );
+
+  server.tool(
+    "session_progress",
+    "Report that meaningful work happened (file edit, completed command, test run, turn " +
+      "boundary). Advances last_progress and the monotonic progress_count, which is what " +
+      "distinguishes a working session from a spinning one.",
     {
       session_id: z.string(),
+      kind: z
+        .enum(["file_edit", "command", "turn", "test", "task_state", "explicit"])
+        .describe("What kind of runtime event this progress represents"),
+      activity: z
+        .string()
+        .optional()
+        .describe("Short human-readable current activity, e.g. 'cargo test -p icn-gateway'"),
     },
-    async ({ session_id }) => {
-      db.prepare(
-        "UPDATE sessions SET last_heartbeat = datetime('now') WHERE id = ?"
-      ).run(session_id);
-      return {
-        content: [{ type: "text", text: "ok" }],
-      };
-    }
+    async ({ session_id, kind, activity }) =>
+      json({ ok: recordProgress(db, session_id, { kind, activity }), signal: "progress" })
   );
 
   server.tool(
     "release_session",
-    "Sign off and release all file claims. Call at session end.",
+    "Sign off and release all file claims. Normally called automatically by the SessionEnd hook.",
     {
       session_id: z.string(),
+      reason: z
+        .string()
+        .optional()
+        .describe("Why the session ended: completed, cancelled, error, shutdown"),
     },
+    async ({ session_id, reason }) => json(releaseSession(db, session_id, { reason }))
+  );
+
+  server.tool(
+    "session_lifecycle",
+    "Authoritative lifecycle classification for a worktree, combining the session registry " +
+      "with process observation. Absence of a registry row NEVER means 'safe to terminate'.",
+    {
+      worktree: z.string().describe("Worktree directory name"),
+      observed_pids: z
+        .array(z.number())
+        .optional()
+        .default([])
+        .describe("PIDs observed holding the worktree (corroborating evidence)"),
+    },
+    async ({ worktree, observed_pids }) =>
+      json(classifyWorktree(db, worktree, { observed_pids }))
+  );
+
+  server.tool(
+    "session_info",
+    "Full record for one session, including its children.",
+    { session_id: z.string() },
     async ({ session_id }) => {
-      // Capture before deletion — file_claims cascade-delete with the session row
-      const session = db
-        .prepare("SELECT * FROM sessions WHERE id = ?")
-        .get(session_id) as Record<string, unknown> | undefined;
-
-      if (session) {
-        const files = (
-          db
-            .prepare("SELECT file_path FROM file_claims WHERE session_id = ?")
-            .all(session_id) as Array<{ file_path: string }>
-        ).map((r) => r.file_path);
-
-        const entry = {
-          ...session,
-          released_at: new Date().toISOString(),
-          files_touched: files,
-          duration_minutes: Math.round(
-            (Date.now() - new Date(session["started_at"] as string).getTime()) / 60000
-          ),
-        };
-        try {
-          appendFileSync(SESSION_LOG, JSON.stringify(entry) + "\n");
-        } catch {
-          // Non-fatal — log failure shouldn't block session release
-        }
-      }
-
-      db.prepare("DELETE FROM file_claims WHERE session_id = ?").run(session_id);
-      db.prepare("DELETE FROM sessions WHERE id = ?").run(session_id);
-      return {
-        content: [{ type: "text", text: "session released" }],
-      };
+      const session = getSession(db, session_id);
+      if (!session) return json({ error: "not_found", session_id });
+      const children = db
+        .prepare("SELECT id, worktree, state FROM sessions WHERE parent_session_id = ?")
+        .all(session_id);
+      return json({
+        ...session,
+        heartbeat_age_min: ageMinutes(db, session.last_heartbeat),
+        progress_age_min: ageMinutes(db, session.last_progress),
+        children,
+      });
     }
   );
 
@@ -179,20 +236,16 @@ export function registerSessionTools(
     },
     async ({ count }) => {
       try {
-        const content = readFileSync(SESSION_LOG, "utf-8");
-        const lines = content.trim().split("\n").filter(Boolean);
-        const recent = lines
-          .slice(-count)
-          .reverse()
-          .map((l) => JSON.parse(l) as unknown);
-        return {
-          content: [{ type: "text", text: JSON.stringify(recent, null, 2) }],
-        };
+        const lines = readFileSync(SESSION_LOG, "utf-8")
+          .trim()
+          .split("\n")
+          .filter(Boolean);
+        return json(lines.slice(-count).reverse().map((l) => JSON.parse(l) as unknown));
       } catch {
-        return {
-          content: [{ type: "text", text: "No session history yet." }],
-        };
+        return { content: [{ type: "text" as const, text: "No session history yet." }] };
       }
     }
   );
 }
+
+export { activeSessionsForWorktree };

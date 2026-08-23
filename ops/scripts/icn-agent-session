@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#: capability: agent-session-lifecycle
+#: summary: Register, progress, release and classify ICN agent sessions.
+#: safety: modifies_local
+#
+# icn-agent-session — the launch-seam entrypoint for the ICN agent session runtime.
+#
+# Claude Code hooks are ordinary subprocesses with no MCP client, so they cannot call
+# register_session. This wrapper resolves the repo, finds the built CLI, and forwards argv to
+# ops/mcp/dist/cli/session.js — the same runtime core the MCP tools use.
+#
+# DEGRADATION POLICY (Refs docs/architecture/AGENT_RUNTIME.md §3)
+#   The registry is observability, not a safety gate, so an unavailable registry must never
+#   block development. But it must never be silently absent either: when this script cannot do
+#   its job it says so on stderr with a specific reason, and exits 0 so the hook survives.
+#   The one exception is `classify`, whose exit code is a verdict and is passed through.
+#
+# Usage: icn-agent-session <register|progress|heartbeat|release|status|classify> [--flags]
+
+set -uo pipefail
+
+cmd="${1:-help}"
+
+# Resolve the repo root without trusting cwd: hooks may run from anywhere under the worktree.
+ROOT="${CLAUDE_PROJECT_DIR:-}"
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="${ICN_ROOT:-}"
+fi
+
+degrade() {
+  # Visible, specific, non-blocking. Never claims lifecycle tracking is active.
+  printf 'agent-runtime: DEGRADED (unregistered) — %s\n' "$1" >&2
+  [ "$cmd" = "classify" ] && exit 3
+  exit 0
+}
+
+[ -n "$ROOT" ] && [ -d "$ROOT/ops/mcp" ] || degrade "could not resolve an ICN repo root"
+
+CLI="$ROOT/ops/mcp/dist/cli/session.js"
+if [ ! -f "$CLI" ]; then
+  degrade "session CLI not built ($CLI missing) — run: npm --prefix '$ROOT/ops/mcp' run build"
+fi
+
+command -v node >/dev/null 2>&1 || degrade "node not found on PATH"
+
+exec node "$CLI" "$@"
