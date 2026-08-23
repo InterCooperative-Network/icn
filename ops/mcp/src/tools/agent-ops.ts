@@ -1,6 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type Database from "better-sqlite3";
+import { readFileSync } from "fs";
+import { join } from "node:path";
 import { resolveMonorepoRoot } from "../paths.js";
+import { activeSessionsForWorktree } from "../runtime/session-runtime.js";
+import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.js";
 import { buildEnvironmentReport } from "../diagnostics/environment-report.js";
 import { buildDoctorReport } from "../diagnostics/doctor.js";
 import { AGENT_BRIEF } from "../diagnostics/agent-brief.js";
@@ -14,8 +19,88 @@ import {
   buildPathBrief,
 } from "../diagnostics/agent-context-spine.js";
 
-export function registerAgentOpsTools(server: McpServer): void {
+export function registerAgentOpsTools(
+  server: McpServer,
+  db?: Database.Database
+): void {
   const repoRoot = resolveMonorepoRoot();
+
+  server.tool(
+    "icn_ops_agent_runtime",
+    "START HERE. What this agent runtime can do and who this session is. Returns the " +
+      "GENERATED capability manifest (MCP tools verified against the live server, canonical " +
+      "skills, hooks, helper scripts, truth-domain owners) plus this session's lifecycle " +
+      "identity. Nothing here is hand-maintained: adding a capability in its canonical " +
+      "location and regenerating makes it appear, and CI fails if the manifest drifts.",
+    {
+      cwd: z
+        .string()
+        .optional()
+        .describe("Any path inside your worktree; used to report your lane and session."),
+      section: z
+        .enum(["all", "mcp_tools", "skills", "hooks", "helpers", "truth_domains", "session"])
+        .optional()
+        .default("all")
+        .describe("Narrow the response when you only need one part."),
+    },
+    async ({ cwd, section }) => {
+      const manifestPath = join(
+        repoRoot,
+        "docs/reference/project-index/generated/agent-capabilities.json"
+      );
+      let manifest: Record<string, unknown> = {};
+      let manifestError: string | null = null;
+      try {
+        manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+      } catch (e) {
+        manifestError =
+          `capability manifest unreadable (${e instanceof Error ? e.message : String(e)}). ` +
+          "Regenerate: python3 scripts/generate-agent-capabilities.py --write";
+      }
+
+      // Session identity is reported honestly: an unregistered session is told so rather than
+      // being given a plausible-looking blank record.
+      let session: Record<string, unknown> = { registered: false };
+      const identity = discoverWorktree(cwd ?? process.cwd(), process.env["ICN_ROOT"] ?? null);
+      if (identity) {
+        session["lane"] = {
+          repo_id: identity.repo_id,
+          worktree_id: identity.worktree_id,
+          worktree_path: identity.worktree_path,
+          worktree_name: identity.worktree_name,
+          live_branch: readBranchState(identity.worktree_path),
+        };
+        if (db) {
+          const rows = activeSessionsForWorktree(db, identity.worktree_id);
+          session["registered"] = rows.length > 0;
+          session["sessions"] = rows.map((r) => ({
+            session_id: r.id,
+            provider_session_id: r.provider_session_id,
+            progress_count: r.progress_count,
+            current_activity: r.current_activity,
+          }));
+          session["contention"] = rows.length > 1;
+          if (rows.length === 0) {
+            session["note"] =
+              "No session is registered for this lane. Lifecycle tracking is NOT active; " +
+              "the SessionStart hook may not be installed for this launcher.";
+          }
+        }
+      } else {
+        session["note"] = "not inside a Git worktree";
+      }
+
+      const payload: Record<string, unknown> =
+        section === "session"
+          ? { session }
+          : section === "all"
+            ? { ...manifest, session }
+            : { [section]: manifest[section] ?? [], session };
+      if (manifestError) payload["manifest_error"] = manifestError;
+
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+    }
+  );
 
   server.tool(
     "icn_ops_environment_report",

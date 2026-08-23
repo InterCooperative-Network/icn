@@ -1,0 +1,576 @@
+{
+  "schema": "icn.agent-capabilities.v1",
+  "description": "Generated index of agent-facing capabilities. Do not edit by hand: run scripts/generate-agent-capabilities.py --write. MCP tools are read from the live server via tools/list, so this reflects what the runtime can really expose.",
+  "generated_by": "scripts/generate-agent-capabilities.py",
+  "verified_against": {
+    "mcp_tools": "live tools/list from ops/mcp/dist/index.js",
+    "skills": "ops/state/truth/skills.json",
+    "hooks": ".claude/settings.json",
+    "helpers": "ops/scripts/* with #: capability: headers",
+    "truth_domains": "ops/state/truth/sources.json"
+  },
+  "mcp_tools": [
+    {
+      "name": "ack_messages",
+      "summary": "Mark specific messages as read."
+    },
+    {
+      "name": "build_cache_status",
+      "summary": "Get sccache hit rates and disk usage (cached 120s)."
+    },
+    {
+      "name": "check_events",
+      "summary": "Check for recent events."
+    },
+    {
+      "name": "ci_status",
+      "summary": "Get latest CI run results for active branches (uses gh CLI)."
+    },
+    {
+      "name": "claim_files",
+      "summary": "Advisory lock on files to signal intent to edit."
+    },
+    {
+      "name": "claim_task",
+      "summary": "Atomically assign a task to this session's agent."
+    },
+    {
+      "name": "close_sprint",
+      "summary": "Archive current sprint to history/ and start a new sprint, carrying over unfinished tasks."
+    },
+    {
+      "name": "cluster_health",
+      "summary": "Get K3s cluster pod status and service endpoint reachability (cached 90s)."
+    },
+    {
+      "name": "create_task",
+      "summary": "Add a new task to the current sprint."
+    },
+    {
+      "name": "delete_task",
+      "summary": "Remove a task from the current sprint."
+    },
+    {
+      "name": "emit_event",
+      "summary": "Emit an event to the event log."
+    },
+    {
+      "name": "end_supervision",
+      "summary": "Mark a supervised operation finished."
+    },
+    {
+      "name": "get_decision",
+      "summary": "Read the full content of an ADR by number or title search."
+    },
+    {
+      "name": "get_messages",
+      "summary": "Read messages from your mailbox."
+    },
+    {
+      "name": "get_tasks",
+      "summary": "List all sprint tasks with their current status, assignees, and blockers."
+    },
+    {
+      "name": "heartbeat",
+      "summary": "Report LIVENESS only \u2014 'the harness is still running'."
+    },
+    {
+      "name": "icn_ops_agent_brief",
+      "summary": "Compact structured briefing: safe vocabulary, forbidden terms, verification commands, PR hygiene, MCP troubleshooting."
+    },
+    {
+      "name": "icn_ops_agent_context_spine",
+      "summary": "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates,"
+    },
+    {
+      "name": "icn_ops_agent_runtime",
+      "summary": "START HERE."
+    },
+    {
+      "name": "icn_ops_command_catalog",
+      "summary": "Catalog of common verification commands (not executed)."
+    },
+    {
+      "name": "icn_ops_doctor",
+      "summary": "Read-only diagnosis: MCP wiring, native sqlite module, portability script, dirty tree, optional CLIs."
+    },
+    {
+      "name": "icn_ops_environment_report",
+      "summary": "Structured environment snapshot (git, Node/npm, optional gh/kubectl, MCP config parity hints)."
+    },
+    {
+      "name": "icn_ops_next_steps",
+      "summary": "Read-only workflow guidance: severity, short summary, and recommended next verification or setup steps (commands are strings only; never executed by MCP)."
+    },
+    {
+      "name": "icn_ops_repo_map",
+      "summary": "Compact repo layout map for agents: key directories with present flag, one-line description, agent_use, and optional caution."
+    },
+    {
+      "name": "icn_ops_state_index",
+      "summary": "Canonical state and architecture doc paths with presence flags (does not invent missing files)."
+    },
+    {
+      "name": "icn_ops_verification_plan",
+      "summary": "Ordered verification checklist for an area (commands are recommendations only; not executed)."
+    },
+    {
+      "name": "list_sessions",
+      "summary": "List agent sessions with lifecycle classification and file claims."
+    },
+    {
+      "name": "list_watchers",
+      "summary": "List process watchers, optionally filtered by session."
+    },
+    {
+      "name": "log_decision",
+      "summary": "Write a new Architecture Decision Record (ADR) to docs/adr/ and index it."
+    },
+    {
+      "name": "pr_status",
+      "summary": "List open PRs with review status (uses gh CLI)."
+    },
+    {
+      "name": "recent_sessions",
+      "summary": "Show recently completed sessions with what they worked on."
+    },
+    {
+      "name": "register_session",
+      "summary": "Register an agent session."
+    },
+    {
+      "name": "release_session",
+      "summary": "Sign off and release all file claims."
+    },
+    {
+      "name": "repo_status",
+      "summary": "Get current branch, dirty files, and sync status for all ICN repos."
+    },
+    {
+      "name": "search_decisions",
+      "summary": "Full-text search over ADR titles and tags."
+    },
+    {
+      "name": "send_message",
+      "summary": "Send a message to another agent's mailbox, or broadcast to all active sessions."
+    },
+    {
+      "name": "service_endpoints",
+      "summary": "List all known service endpoints and whether they're reachable."
+    },
+    {
+      "name": "session_info",
+      "summary": "Full record for one session, including its children."
+    },
+    {
+      "name": "session_interaction",
+      "summary": "Report INTERACTION \u2014 a turn completed, a prompt arrived."
+    },
+    {
+      "name": "session_lifecycle",
+      "summary": "Authoritative lifecycle classification for a worktree, combining the session registry with process observation."
+    },
+    {
+      "name": "session_progress",
+      "summary": "Report that meaningful work happened (file edit, completed command, test run, turn boundary)."
+    },
+    {
+      "name": "supervise_operation",
+      "summary": "Declare a long-running operation (build, test suite) so its lane is not judged abandoned when no hook fires for longer than the heartbeat TTL."
+    },
+    {
+      "name": "update_task",
+      "summary": "Update task status, notes, or PR number."
+    },
+    {
+      "name": "watch_process",
+      "summary": "Register a process watcher."
+    },
+    {
+      "name": "worktree_status",
+      "summary": "List all git worktrees with branch, last commit, staleness vs main."
+    }
+  ],
+  "skills": [
+    {
+      "name": "bench",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/bench/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "changelog",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/changelog/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "ci-status",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/ci-status/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "demo-validate",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/demo-validate/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "devnet",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/devnet/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "diag-infra",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/diag-infra/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "firewall-check",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/firewall-check/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "fix-ci",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/fix-ci/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "fix-rust-lints",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/fix-rust-lints/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "handoff",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/handoff/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "icn-commons-design",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/icn-commons-design/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "icn-dev",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/icn-dev/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "icn-preflight",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/icn-preflight/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "integrate-pr-stack",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/integrate-pr-stack/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "merge-pr",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/merge-pr/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "merge-prs",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/merge-prs/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "pr-create",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/pr-create/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "preflight",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/preflight/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "push",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/push/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "repair-gh-workflow",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/repair-gh-workflow/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "resolve-pr-branch",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/resolve-pr-branch/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "resolve-rust-targets",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/resolve-rust-targets/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "review-apply",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/review-apply/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "sync-docs",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/sync-docs/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "verify",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/verify/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "watch-ci-and-advance",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/watch-ci-and-advance/SKILL.md",
+      "summary": ""
+    },
+    {
+      "name": "status",
+      "group": "ops_automation_canonical",
+      "canonical_path": "ops/automation/skills/status/SKILL.md",
+      "summary": "Full development status dashboard \u2014 MCP-powered"
+    },
+    {
+      "name": "sync-and-build",
+      "group": "ops_automation_canonical",
+      "canonical_path": "ops/automation/skills/sync-and-build/SKILL.md",
+      "summary": "Website build pipeline \u2014 no sync script needed"
+    },
+    {
+      "name": "worktree",
+      "group": "ops_automation_canonical",
+      "canonical_path": "ops/automation/skills/worktree/SKILL.md",
+      "summary": "Git worktree management"
+    }
+  ],
+  "hooks": [
+    {
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/openapi-sync-guard.sh"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-tool-guard.py"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-bash-guard.py"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/dep-guard.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/firewall-guard.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/panic-guard.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scope-guard.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/todo-guard.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "echo \"branch: $(git branch --show-current 2>/dev/null || echo detached)\""
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-tool-guard.py"
+    },
+    {
+      "event": "SessionEnd",
+      "matcher": "",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "compact",
+      "command": "echo 'Context compacted. Remember: workspace is icn/, run cargo from there. 5 invariants: adversarial-by-default, determinism, canonical-encodings, no-panics, kernel/app-boundaries.'"
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "startup",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/hook-health.sh"
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "startup",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-orient.sh"
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "startup|resume",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
+    },
+    {
+      "event": "Stop",
+      "matcher": "",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
+    },
+    {
+      "event": "UserPromptSubmit",
+      "matcher": "",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-lifecycle.sh"
+    }
+  ],
+  "helpers": [
+    {
+      "name": "icn-agent-session",
+      "path": "ops/scripts/icn-agent-session",
+      "capability": "agent-session-lifecycle",
+      "summary": "Register, progress, release and classify ICN agent sessions.",
+      "safety": "modifies_local"
+    },
+    {
+      "name": "icn-wait",
+      "path": "ops/scripts/icn-wait",
+      "capability": "safe-waiting",
+      "summary": "Bounded, self-match-proof waiting for processes, commands and sentinel files.",
+      "safety": "read_only"
+    }
+  ],
+  "truth_domains": [
+    {
+      "domain": "adr_decisions",
+      "owner": "docs/adr/"
+    },
+    {
+      "domain": "agent_capability_index",
+      "owner": "docs/reference/project-index/generated/agent-capabilities.json"
+    },
+    {
+      "domain": "agent_operating_contract",
+      "owner": "AGENTS.md"
+    },
+    {
+      "domain": "agent_reasoning_constitution",
+      "owner": "docs/ai/ICN_CONSTITUTIONAL_CORE.md"
+    },
+    {
+      "domain": "agent_registry",
+      "owner": "ops/state/truth/agents.json"
+    },
+    {
+      "domain": "agent_runtime_state",
+      "owner": "ops/mcp (sessions table; ICN_OPS_DB)"
+    },
+    {
+      "domain": "agent_workflow",
+      "owner": "docs/ai/WORKFLOW_ARCHITECTURE.md"
+    },
+    {
+      "domain": "ci_exceptions",
+      "owner": "ops/state/ci-exceptions.md"
+    },
+    {
+      "domain": "cluster_topology",
+      "owner": "ops/state/config/repo-map.json#infrastructure"
+    },
+    {
+      "domain": "cross_repo_pr_stacks",
+      "owner": "ops/coordination/stacks/"
+    },
+    {
+      "domain": "deployment_runtime_state",
+      "owner": "private-network-ops"
+    },
+    {
+      "domain": "documentation_classification",
+      "owner": "docs/registry.toml"
+    },
+    {
+      "domain": "downstream_dependency_locks",
+      "owner": "downstream-repos"
+    },
+    {
+      "domain": "ecosystem_index",
+      "owner": "docs/ATLAS.md"
+    },
+    {
+      "domain": "identity_semantics",
+      "owner": "docs/architecture/IDENTITY_SEMANTICS.md"
+    },
+    {
+      "domain": "invariants",
+      "owner": "AGENTS.md"
+    },
+    {
+      "domain": "live_branch_state",
+      "owner": "git"
+    },
+    {
+      "domain": "live_ci_state",
+      "owner": "github-api"
+    },
+    {
+      "domain": "live_issue_state",
+      "owner": "github-api"
+    },
+    {
+      "domain": "live_pr_state",
+      "owner": "github-api"
+    },
+    {
+      "domain": "merge_policy",
+      "owner": "ops/state/truth/policy.json"
+    },
+    {
+      "domain": "repo_topology",
+      "owner": "ops/state/config/repo-map.json"
+    },
+    {
+      "domain": "skill_registry",
+      "owner": "ops/state/truth/skills.json"
+    },
+    {
+      "domain": "sprint_state",
+      "owner": "ops/state/sprint/current.json"
+    }
+  ]
+}

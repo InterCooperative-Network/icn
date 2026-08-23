@@ -10,14 +10,19 @@
     },
     "repo_topology": {
       "owner": "ops/state/config/repo-map.json",
-      "sections": ["repos", "org_repos", "worktrees", "relationships"],
+      "sections": [
+        "repos",
+        "org_repos",
+        "worktrees",
+        "relationships"
+      ],
       "stability": "slow-changing",
-      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), and worktree root. The .infrastructure section is owned by cluster_topology, not here. org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), and worktree root. The .infrastructure section is owned by cluster_topology, not here. org_repos is repo discovery / coordination metadata, not architectural truth \u2014 role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
     },
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
       "stability": "volatile",
-      "description": "NARROW DOMAIN: sprint-cadence state only — whether a sprint is running (cadence/active_sprint), the board's own lineage, and the pointer to the closed-sprint archive. It does NOT own \"what is being worked on now\": current work selection is a live query owned by live_issue_state + live_pr_state, per docs/ai/WORKFLOW_ARCHITECTURE.md (\"Current work selection\"). The cadence may be dormant; when it is, \"no active sprint\" is the truthful current answer, not a stale one, and must never be \"refreshed\" by opening a sprint that does not exist. Read the owner for the current value — this map routes the question, it does not answer it."
+      "description": "NARROW DOMAIN: sprint-cadence state only \u2014 whether a sprint is running (cadence/active_sprint), the board's own lineage, and the pointer to the closed-sprint archive. It does NOT own \"what is being worked on now\": current work selection is a live query owned by live_issue_state + live_pr_state, per docs/ai/WORKFLOW_ARCHITECTURE.md (\"Current work selection\"). The cadence may be dormant; when it is, \"no active sprint\" is the truthful current answer, not a stale one, and must never be \"refreshed\" by opening a sprint that does not exist. Read the owner for the current value \u2014 this map routes the question, it does not answer it."
     },
     "merge_policy": {
       "owner": "ops/state/truth/policy.json",
@@ -59,16 +64,35 @@
       "stability": "slow-changing",
       "description": "All available skills, their canonical paths, and ownership"
     },
+    "agent_runtime_state": {
+      "owner": "ops/mcp (sessions table; ICN_OPS_DB)",
+      "description": "Live agent session lifecycle: which sessions occupy which worktree/lane, their heartbeat/progress evidence and supervised long-running operations. Authoritative for lifecycle; ABSENCE OF A ROW IS NOT EVIDENCE OF ABSENCE OF A SESSION and never means a lane is safe to retire.",
+      "query": "ops/scripts/icn-agent-session classify --path <worktree>",
+      "mcp_tools": [
+        "session_lifecycle",
+        "list_sessions",
+        "session_info"
+      ],
+      "contract": "docs/architecture/AGENT_RUNTIME.md",
+      "identity": "Lanes are keyed on the Git-derived worktree_id (realpath of `git rev-parse --absolute-git-dir`), never a basename and never a branch name.",
+      "volatile": true
+    },
+    "agent_capability_index": {
+      "owner": "docs/reference/project-index/generated/agent-capabilities.json",
+      "description": "Generated index of agent-facing capabilities (MCP tools introspected from the live server, canonical skills, hooks, helper scripts, truth-domain owners). A projection, never hand-edited.",
+      "generator": "scripts/generate-agent-capabilities.py",
+      "checker": "scripts/check-agent-capabilities.py"
+    },
     "downstream_dependency_locks": {
       "owner": "downstream-repos",
       "query": "each downstream repo's ops/upstream/icn.lock.yaml, registered in ops/state/config/repo-map.json#org_repos",
       "stability": "slow-changing",
-      "description": "Review attestations pinning the ICN ref each downstream repo (nycn, icn-learn, icn-community-bridge) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). A lock is human-signed once a person fills `reviewer`; a first machine-prepared lock carries `reviewer: pending` with no `reviewed_at` and is registered in org_repos with `lock.review_status: pending-human-signoff` so tooling does NOT treat it as a completed human attestation — icn-learn and icn-community-bridge are in that state today, while nycn carries a human-signed prior review (previous_review). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint."
+      "description": "Review attestations pinning the ICN ref each downstream repo (nycn, icn-learn, icn-community-bridge) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). A lock is human-signed once a person fills `reviewer`; a first machine-prepared lock carries `reviewer: pending` with no `reviewed_at` and is registered in org_repos with `lock.review_status: pending-human-signoff` so tooling does NOT treat it as a completed human attestation \u2014 icn-learn and icn-community-bridge are in that state today, while nycn carries a human-signed prior review (previous_review). The lock files live in the downstream repos, never in this repo \u2014 a lock is a review attestation, not an automated dependency constraint."
     },
     "cross_repo_pr_stacks": {
       "owner": "ops/coordination/stacks/",
       "stability": "slow-changing",
-      "description": "Cross-repo PR merge order and per-stack state: machine-readable stack manifests (<slug>.stack.yaml, format icn-pr-stack/v1, validated by scripts/check-pr-stack.sh). ops/coordination/PR_STACK_PROTOCOL.md documents the discipline; the manifests own stack state. Coordination metadata only — plan/order facts, never runtime or readiness truth."
+      "description": "Cross-repo PR merge order and per-stack state: machine-readable stack manifests (<slug>.stack.yaml, format icn-pr-stack/v1, validated by scripts/check-pr-stack.sh). ops/coordination/PR_STACK_PROTOCOL.md documents the discipline; the manifests own stack state. Coordination metadata only \u2014 plan/order facts, never runtime or readiness truth."
     },
     "adr_decisions": {
       "owner": "docs/adr/",
@@ -78,7 +102,7 @@
     "documentation_classification": {
       "owner": "docs/registry.toml",
       "stability": "slow-changing",
-      "description": "Per-document category, status, truth_class, owner, audience, and last_updated for docs/**. Enforced by docs/scripts/doc_control_check.py. Classification only: it records what kind of document a file is and who owns it, and never establishes the domain facts inside that document — those belong to the domain owners registered here. When a document's front matter and this registry disagree, reconcile them; do not treat either as the domain's semantic owner."
+      "description": "Per-document category, status, truth_class, owner, audience, and last_updated for docs/**. Enforced by docs/scripts/doc_control_check.py. Classification only: it records what kind of document a file is and who owns it, and never establishes the domain facts inside that document \u2014 those belong to the domain owners registered here. When a document's front matter and this registry disagree, reconcile them; do not treat either as the domain's semantic owner."
     },
     "deployment_runtime_state": {
       "owner": "private-network-ops",
@@ -89,18 +113,20 @@
     "cluster_topology": {
       "owner": "ops/state/config/repo-map.json#infrastructure",
       "stability": "slow-changing",
-      "description": "K3s node/service ROLES only (role:<name> tokens). Concrete node IPs / service ports are private operational values (docs/ATLAS.md §5) held in the private network-ops repo, never in this public map; repo-map.json .infrastructure.k3s lists roles, resolve to addresses only from the private source."
+      "description": "K3s node/service ROLES only (role:<name> tokens). Concrete node IPs / service ports are private operational values (docs/ATLAS.md \u00a75) held in the private network-ops repo, never in this public map; repo-map.json .infrastructure.k3s lists roles, resolve to addresses only from the private source."
     },
     "invariants": {
       "owner": "AGENTS.md",
-      "sections": ["3. ICN invariants"],
+      "sections": [
+        "3. ICN invariants"
+      ],
       "stability": "constant",
       "description": "The five non-negotiable agent/protocol invariants: adversarial-by-default, determinism, canonical encodings, no panics in protocol paths, and Meaning Firewall/kernel-app boundary. Never override."
     },
     "identity_semantics": {
       "owner": "docs/architecture/IDENTITY_SEMANTICS.md",
       "stability": "slow-changing",
-      "description": "NARROW SEMANTIC DOMAIN. Owns only: the seven normative class contracts - six identity-bearing (Principal, human Subject, Institution/governed entity, Node, ContinuityRoot, Device Principal) plus ContextNonce, which is public protocol data and names nothing; which identifier domain names each class; the exhaustive allowed/forbidden substitution matrix (an unlisted substitution is a category error); context-scope and correlation constraints for human subjects; genesis-AUTHORITY semantics per class; the legacy did:icn:<key> bridge invariants and migration terminus; and the type-level invariants (I1-I12) implementation must enforce. Does NOT own the broader human-identity architecture, threat model, requirements or derivation — that is docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md (status living, NOT canonical, so it does not compete for these facts). Does NOT own session-authority attenuation (docs/architecture/AUTHORITY_SPINE.md) or the historical evidence map (docs/architecture/PRINCIPAL_MODEL.md §1-§3). Does NOT own any downstream protocol: genesis/context-establishment is GEN (#2602), device authorization is N4 (#2599), reconciliation is N3 (#2598), recovery is N7 (#2603), member-origin envelopes are N5 (#2605). Semantic contract only — it asserts no implementation, migration, deployment or production-integration status."
+      "description": "NARROW SEMANTIC DOMAIN. Owns only: the seven normative class contracts - six identity-bearing (Principal, human Subject, Institution/governed entity, Node, ContinuityRoot, Device Principal) plus ContextNonce, which is public protocol data and names nothing; which identifier domain names each class; the exhaustive allowed/forbidden substitution matrix (an unlisted substitution is a category error); context-scope and correlation constraints for human subjects; genesis-AUTHORITY semantics per class; the legacy did:icn:<key> bridge invariants and migration terminus; and the type-level invariants (I1-I12) implementation must enforce. Does NOT own the broader human-identity architecture, threat model, requirements or derivation \u2014 that is docs/architecture/HUMAN_IDENTITY_ARCHITECTURE.md (status living, NOT canonical, so it does not compete for these facts). Does NOT own session-authority attenuation (docs/architecture/AUTHORITY_SPINE.md) or the historical evidence map (docs/architecture/PRINCIPAL_MODEL.md \u00a71-\u00a73). Does NOT own any downstream protocol: genesis/context-establishment is GEN (#2602), device authorization is N4 (#2599), reconciliation is N3 (#2598), recovery is N7 (#2603), member-origin envelopes are N5 (#2605). Semantic contract only \u2014 it asserts no implementation, migration, deployment or production-integration status."
     },
     "ci_exceptions": {
       "owner": "ops/state/ci-exceptions.md",
@@ -133,15 +159,15 @@
     }
   },
   "forbidden": [
-    "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
-    "Do NOT answer \"what is being worked on now\" from ops/state/sprint/current.json — that file owns the sprint cadence only; resolve live_issue_state / live_pr_state instead",
-    "Do NOT open a sprint, or assume the next sprint number, to make a dormant sprint_state record look fresh — when no sprint is running, saying so IS the current answer",
-    "Do NOT hardcode PR numbers or branch lists — query via gh",
-    "Do NOT hardcode cluster IPs — repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
-    "Do NOT treat a handoff, chat summary, model memory, or generated overlay as current project authority — reverify volatile claims and load registered owners",
-    "Do NOT duplicate registered domain semantics inside specialist/provider prompts — load the owner at runtime",
-    "Do NOT use icn-ops/state paths — canonical is ops/state/ (inside monorepo)",
-    "Do NOT use icn-website/ paths — canonical is website/ (inside monorepo)",
-    "Do NOT reference sync-from-icn.sh — the website reads docs directly"
+    "Do NOT hardcode sprint numbers in skills or agents \u2014 read ops/state/sprint/current.json",
+    "Do NOT answer \"what is being worked on now\" from ops/state/sprint/current.json \u2014 that file owns the sprint cadence only; resolve live_issue_state / live_pr_state instead",
+    "Do NOT open a sprint, or assume the next sprint number, to make a dormant sprint_state record look fresh \u2014 when no sprint is running, saying so IS the current answer",
+    "Do NOT hardcode PR numbers or branch lists \u2014 query via gh",
+    "Do NOT hardcode cluster IPs \u2014 repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
+    "Do NOT treat a handoff, chat summary, model memory, or generated overlay as current project authority \u2014 reverify volatile claims and load registered owners",
+    "Do NOT duplicate registered domain semantics inside specialist/provider prompts \u2014 load the owner at runtime",
+    "Do NOT use icn-ops/state paths \u2014 canonical is ops/state/ (inside monorepo)",
+    "Do NOT use icn-website/ paths \u2014 canonical is website/ (inside monorepo)",
+    "Do NOT reference sync-from-icn.sh \u2014 the website reads docs directly"
   ]
 }

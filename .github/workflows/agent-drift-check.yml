@@ -10,6 +10,10 @@ on:
       - '.claude/**'
       - 'ops/automation/skills/**'
       - 'scripts/check-skill-registry.py'
+      - 'scripts/check-agent-capabilities.py'
+      - 'scripts/generate-agent-capabilities.py'
+      - 'ops/mcp/src/**'
+      - 'ops/scripts/**'
       - 'scripts/tests/test_skill_registry_invariants.py'
       - 'ops/scripts/setup-skill-symlinks.sh'
       - 'ops/state/truth/**'
@@ -58,6 +62,21 @@ jobs:
 
       - name: Truth-spine validation (warning-mode, Refs icn#2141)
         run: python3 scripts/check-truth-spine.py
+
+      # The capability manifest introspects the LIVE MCP server, so it needs the server built.
+      # This is what makes "add a capability in its canonical place and agents discover it" an
+      # enforced property: forgetting to regenerate fails here (Refs icn#2653).
+      - name: Build ops MCP (required for capability introspection)
+        run: npm --prefix ops/mcp ci && npm --prefix ops/mcp run build
+
+      - name: Agent capability manifest matches the real runtime surface (Refs icn#2653)
+        run: python3 scripts/check-agent-capabilities.py
+
+      - name: Capability discovery behaves as advertised (Refs icn#2653)
+        run: bash scripts/test-agent-capability-discovery.sh
+
+      - name: Safe wait primitives reject the known non-terminating patterns (Refs icn#2653)
+        run: bash scripts/test-icn-wait.sh
 
       - name: Public docs address-boundary guard tests (Refs icn#2393)
         run: python3 scripts/tests/test_public_docs_boundary.py
