@@ -82,6 +82,9 @@ jobs:
       - name: Safe wait primitives reject the known non-terminating patterns (Refs icn#2653)
         run: bash scripts/test-icn-wait.sh
 
+      - name: Bash guard blocks non-terminating waits without false positives (Refs icn#2653)
+        run: python3 scripts/tests/test_pre_bash_guard.py
+
       - name: Public docs address-boundary guard tests (Refs icn#2393)
         run: python3 scripts/tests/test_public_docs_boundary.py
 

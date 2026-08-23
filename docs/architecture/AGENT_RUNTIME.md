@@ -403,7 +403,9 @@ branch/HEAD/PR hanging off the lane as live or advisory metadata, never as ident
 `ops/scripts/icn-wait` is the supported way to wait for something. It exists because the
 alternative agents invent is defective in two reproducible ways — a self-matching
 `pgrep -f` predicate, and a sentinel wait whose file cannot appear. Both are documented in
-`ops/scripts/README-icn-wait.md`, rejected by `.claude/hooks/pre-bash-guard.py`, and pinned by
-regression tests.
+`ops/scripts/README-icn-wait.md`, **blocked** at the Bash tool seam by
+`.claude/hooks/pre-bash-guard.py` (which explicitly does not flag the safe `[m]utate.py`
+bracket idiom), and pinned by regression tests in `scripts/test-icn-wait.sh` and
+`scripts/tests/test_pre_bash_guard.py`.
 
 Every wait is bounded. Indefinite blocking is available only behind an explicit flag.
