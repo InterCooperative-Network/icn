@@ -183,30 +183,36 @@ escalate() {
 }
 
 # ══════════════════════════════════ PROBES (I/O) ═══════════════════════════════════════════
+# Matched on the worktree's FULL path, not its basename. One registered worktree is literally
+# named `icn`, and `*/icn/*` matches the path of every other worktree in the tree — so a
+# basename match attributed every lane's processes to it. The direction was fail-safe (phantom
+# pins mean KEEP, never a false delete), but a liveness probe that can be fooled by a substring
+# is not one to build a deletion decision on.
 procs_using() {
-  local name="$1" n=0 c
+  local wtpath="${1%/}" n=0 c
   for p in /proc/[0-9]*; do
     c=$(readlink "$p/cwd" 2>/dev/null) || continue
-    case "$c" in *"/$name/"*|*"/$name") n=$((n+1)) ;; esac
+    case "$c" in "$wtpath"|"$wtpath"/*) n=$((n+1)) ;; esac
   done
   echo "$n"
 }
 fds_using() {
   # `find -lname` matches the symlink *target*, which is what a /proc/PID/fd entry carries.
   # `-print -quit` stops at the first hit, so a process with thousands of fds costs one match.
-  local name="$1" n=0 hit
+  # Full path, for the same reason as procs_using.
+  local wtpath="${1%/}" n=0 hit
   for p in /proc/[0-9]*; do
-    hit=$(find "$p/fd" -maxdepth 1 -lname "*/$name/*" -print -quit 2>/dev/null)
+    hit=$(find "$p/fd" -maxdepth 1 -lname "$wtpath/*" -print -quit 2>/dev/null)
     [ -n "$hit" ] && n=$((n+1))
   done
   echo "$n"
 }
 # Who is pinning it: "pid cmd age" lines. Reported, never acted on.
 pinning_procs() {
-  local name="$1" c cmd age
+  local wtpath="${1%/}" c cmd age
   for p in /proc/[0-9]*; do
     c=$(readlink "$p/cwd" 2>/dev/null) || continue
-    case "$c" in *"/$name/"*|*"/$name")
+    case "$c" in "$wtpath"|"$wtpath"/*)
       cmd=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-48)
       age=$(ps -o etime= -p "${p##*/}" 2>/dev/null | tr -d ' ')
       say "$(printf '      pid %-8s age %-14s %s' "${p##*/}" "${age:-?}" "${cmd:-?}")" ;;
@@ -343,7 +349,7 @@ while IFS= read -r t; do
   mb=$(du -sm "$t" 2>/dev/null | cut -f1); mb=${mb:-0}; gb=$((mb/1024))
   age=$(( ( $(date +%s) - $(stat -c %Y "$t" 2>/dev/null || echo 0) ) / 86400 ))
   dirty=$(git -C "$wt" status --porcelain 2>/dev/null | grep -cv '^?? icn/target')
-  np=$(procs_using "$name"); nf=$(fds_using "$name")
+  np=$(procs_using "$wt"); nf=$(fds_using "$wt")
   class=$(final_class "$(git_class "$wt")" "$(( np + nf > 0 ? 1 : 0 ))")
   verdict=$(eligibility_verdict "$class" "$age" "$gb" "${dirty:-0}" "$np" "$nf" "$LAYER")
 
@@ -353,7 +359,7 @@ while IFS= read -r t; do
   row "$name" "$hr" "${age}d" "$class" "$verdict"
   case "$verdict" in ELIGIBLE*) elig_gb=$((elig_gb+gb)); elig_list+=("$t") ;; esac
   if [ "$class" = MERGED-BUT-PROCESS-PINNED ] && [ "$gb" -ge "$ROUTINE_MIN_GB" ]; then
-    pinned_report+=("$name|$hr|$age")
+    pinned_report+=("$name|$hr|$age|$wt")
   fi
 done < <(find "$WORKTREE_ROOT" -maxdepth 6 -type d -name target -prune 2>/dev/null | sort)
 
@@ -377,9 +383,9 @@ if [ "${#pinned_report[@]}" -gt 0 ]; then
   say "MERGED-BUT-PROCESS-PINNED - merged work whose build output cannot be reclaimed because"
   say "processes still hold it. This is agent-lifecycle debt, not a disk-guard action:"
   for e in "${pinned_report[@]}"; do
-    IFS='|' read -r n s a <<< "$e"
+    IFS='|' read -r n s a wp <<< "$e"
     say "  $n  ($s, ${a}d idle) - blocked only by live processes:"
-    pinning_procs "$n"
+    pinning_procs "$wp"
   done
   say "  -> resolve by ending those sessions; the guard will never terminate them."
   # Deliberately does NOT raise the exit code on its own. Long-lived agent shells sitting in
@@ -414,10 +420,10 @@ fi
 say ""
 say "RECLAIMING ${#elig_list[@]} target directories [layer: $LAYER]:"
 for t in "${elig_list[@]}"; do
-  name=$(basename "${t%/icn/target}")
+  wtp="${t%/icn/target}"
   # Re-verify at the moment of deletion: the audit above takes time and an agent may have
   # woken since. Cheap insurance against racing a starting build.
-  np=$(procs_using "$name"); nf=$(fds_using "$name")
+  np=$(procs_using "$wtp"); nf=$(fds_using "$wtp")
   if [ "$np" -gt 0 ] || [ "$nf" -gt 0 ]; then
     say "    SKIP (became active) $t"; log "skip-active $t"; continue
   fi
