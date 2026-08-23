@@ -243,7 +243,7 @@ timer is precisely the mechanism that makes a deadlocked session look healthy.
 | State | Means | Retireable? |
 |---|---|---|
 | `REGISTERED-ACTIVE` | Row present, heartbeat inside TTL, progress recent. | No |
-| `SUPERVISED-BUSY` | A declared long-running operation is still alive (§5.1). | No |
+| `SUPERVISED-BUSY` | A declared long-running operation is still alive (§5.1). | Only with operator approval |
 | `PROGRESS-STALLED` | Row present, heartbeat fresh, `progress_count` unchanged past the stall window. | Only with operator approval |
 | `REGISTERED-EXPIRED` | Row present, heartbeat older than TTL, no live pid. | Candidate |
 | `UNREGISTERED-OBSERVED` | No row, but processes hold the worktree. | **No** — pre-integration or unsupported launcher |
@@ -252,6 +252,19 @@ timer is precisely the mechanism that makes a deadlocked session look healthy.
 **Absence of a row never means "safe to terminate."** A missing row is indistinguishable from a
 pre-integration session, an unsupported launcher, or a registry failure, so it resolves to
 protected. This is asserted by tests, not by convention.
+
+**Absence of an observation is not evidence of absence either.** `observed_pids` distinguishes
+three states, and only the third can support retirement:
+
+| Value | Means |
+|---|---|
+| omitted / `null` | **nobody looked** — protected |
+| `[]` | an observation was performed and found nothing |
+| `[…]` | processes are holding the lane — protected |
+
+The registry also **corroborates itself**: it records the session's own `agent_pid`, so a live
+agent process protects the lane regardless of what any caller did or did not observe. Retirement
+requires *both* an affirmative empty observation *and* a dead (or absent) recorded pid.
 
 Classification is keyed on `worktree_id` (§2.2). When several sessions occupy a lane the verdict
 follows the **most live** one — a busy reviewer must not let a dead editor look retireable, and
@@ -272,11 +285,18 @@ that is the exact mechanism this runtime bans — but *declaring* the operation:
 icn-wait cmd --supervise --harness-key <id> --timeout 3600 -- cargo test --workspace
 ```
 
-Supervision reuses the pre-existing `watchers_process` table (session, pid, label, status). It
-is only credible while its **PID is actually alive**: `liveSupervisions()` reaps rows whose
-process has died, so a crashed build cannot pin a lane forever. A supervised lane is protected
-but its progress evidence is untouched, so supervision cannot be used as a back door to fake
-progress.
+Supervision reuses the pre-existing `watchers_process` table (session, pid, label, status), and
+is deliberately hard to abuse:
+
+- **Authenticated at declaration** — the PID must be alive and greater than 1, and the owning
+  session must exist. Without this, `supervise --pid 1` (or any long-lived pid: a daemon, a
+  tmux server, the agent's own process) exempted a lane permanently, because the reap only
+  fires when the process dies and those never do.
+- **Bounded** — a supervision older than `ICN_SUPERVISION_MAX_MINUTES` (default 480) expires
+  even if its PID is still alive, so a wedged process cannot protect a lane indefinitely.
+- **Reaped when the process dies** — a crashed build cannot pin a lane.
+- **Not a trump card** — it protects against *automatic* retirement, never against an
+  operator's decision, and it never touches progress evidence.
 
 The four claims this keeps separate:
 

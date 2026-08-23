@@ -150,7 +150,14 @@ foreign_matches() {
   done
 }
 
-alive() { kill -0 "$1" 2>/dev/null; }
+# `kill -0` returns 1 for BOTH "no such process" and "permission denied", so a process owned by
+# another uid read as dead: `icn-wait pid 2` reported "already gone" (exit 0 = condition met)
+# for a live kernel thread, and --source-pid called a live producer exited. On Linux /proc is
+# the authoritative existence check and is not permission-sensitive.
+alive() {
+  [ -d "/proc/$1" ] && return 0
+  kill -0 "$1" 2>/dev/null
+}
 
 # ── subcommands ──────────────────────────────────────────────────────────────
 case "$CMD" in
@@ -159,9 +166,39 @@ case "$CMD" in
     # PREFERRED FORM. We create the process, so we own its PID and can `wait` on it exactly.
     # No pattern, no ambiguity, no self-match possible.
     [ "${#PAYLOAD[@]}" -gt 0 ] || die "cmd requires: icn-wait cmd [--timeout N] -- <command...>"
-    "${PAYLOAD[@]}" &
+    # Own process group, so a timeout can reap the whole job tree rather than just the direct
+    # child. Without this a wrapper's backgrounded grandchildren survived the "bounded" wait and
+    # kept holding the worktree after --supervise had already retired the supervision.
+    if command -v setsid >/dev/null 2>&1; then
+      setsid "${PAYLOAD[@]}" &
+    else
+      "${PAYLOAD[@]}" &
+    fi
     child=$!
     LABEL="${LABEL:-${PAYLOAD[0]}}"
+
+    # TERM, grace, then KILL. TERM alone is a request: a child that traps it (for cleanup) or is
+    # wedged in uninterruptible I/O made the timeout unbounded, defeating this tool's one
+    # headline guarantee. Measured before the fix: --timeout 3 returned after 12s.
+    readonly KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
+    terminate_child() {
+      local pgid
+      pgid="$(ps -o pgid= -p "$child" 2>/dev/null | tr -d " ")"
+      if [ -n "$pgid" ] && [ "$pgid" != "$(ps -o pgid= -p $$ 2>/dev/null | tr -d " ")" ]; then
+        kill -TERM "-$pgid" 2>/dev/null
+      else
+        kill -TERM "$child" 2>/dev/null
+      fi
+      local waited=0
+      while alive "$child" && [ "$waited" -lt "$KILL_GRACE" ]; do
+        sleep 1; waited=$((waited + 1))
+      done
+      if alive "$child"; then
+        note "child did not exit ${KILL_GRACE}s after SIGTERM; escalating to SIGKILL"
+        if [ -n "$pgid" ]; then kill -KILL "-$pgid" 2>/dev/null; else kill -KILL "$child" 2>/dev/null; fi
+      fi
+      wait "$child" 2>/dev/null
+    }
 
     # Declare the operation so a long legitimate run is protected without faking progress.
     SUP_ID=""
@@ -193,7 +230,7 @@ case "$CMD" in
     # Bounded wait on our own child: poll cheaply, then reap for the true exit status.
     while alive "$child"; do
       if expired; then
-        kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null
+        terminate_child
         end_supervision 124; timed_out "$LABEL"
       fi
       sleep "$POLL_INTERVAL"
@@ -238,7 +275,15 @@ case "$CMD" in
     while :; do
       if [ -e "$path" ]; then
         if [ -z "$PATTERN" ]; then exit 0; fi
-        if grep -qE -- "$PATTERN" "$path" 2>/dev/null; then exit 0; fi
+        # Branch on grep's EXIT STATUS, not on "did it print". 0 = matched, 1 = not yet,
+        # >=2 = grep itself failed (unreadable file, invalid regex) — which can never become a
+        # match and must fail fast. Swallowing this with 2>/dev/null is precisely the defect
+        # pre-bash-guard.py blocks agents for writing; the replacement must not commit it too.
+        grep_err="$(grep -qE -- "$PATTERN" "$path" 2>&1)"; grc=$?
+        if [ "$grc" -eq 0 ]; then exit 0; fi
+        if [ "$grc" -ge 2 ]; then
+          fatal "cannot evaluate the sentinel condition on $path: ${grep_err:-grep exited $grc}"
+        fi
       fi
       # The producer died without satisfying the condition: it can never be satisfied.
       if [ -n "$SOURCE_PID" ] && ! alive "$SOURCE_PID"; then

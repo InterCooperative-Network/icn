@@ -46,42 +46,139 @@ import json
 import re
 import sys
 
-# A polling loop: `until <cond>; do ... done` or `while <cond>; do ... done`.
-LOOP_RE = re.compile(r"\b(until|while)\b", re.I)
-SLEEP_IN_LOOP_RE = re.compile(r"\bdo\b[^;]*\bsleep\b|\bsleep\b[^;]*;\s*done", re.I | re.S)
-
-# `pgrep -f PATTERN` / `pgrep -af PATTERN`, capturing the pattern.
+# ── detection ─────────────────────────────────────────────────────────────────
 #
-# Quoted and unquoted forms are matched separately on purpose: a single alternation that tries
-# to span both cannot allow spaces inside quotes without also swallowing the rest of an
-# unquoted command line. Getting this wrong is not academic — the real loop found in a second
-# lane used `pgrep -f "/cargo build -p icn-net"`, whose pattern contains spaces, and an
-# earlier single-branch regex let it straight through.
+# The earlier version pattern-matched over the whole command string. That was wrong in both
+# directions and an independent review found 11 evasions and 5 misfires. Two structural
+# mistakes caused nearly all of them:
+#
+#   * it looked for `sleep` adjacent to `do`/`done`, so ANY extra statement after the sleep
+#     (`do sleep 30; date; done`) disarmed the guard — a one-token rewrite of the real incident
+#     loop walked straight through;
+#   * it looked for the defect anywhere in the command, so a legitimate loop whose BODY happened
+#     to contain `grep ... 2>/dev/null` or the word `test` was blocked.
+#
+# So: parse the loop, split condition from body, and require the defect in the CONDITION (that
+# is what decides termination) and the sleep in the BODY (that is what makes it a poll).
+
+COMMENT_RE = re.compile(r"(?<!\\)#[^\n]*")
+
+# `until|while <condition> ; do <body> done`  — condition and body captured separately.
+LOOP_RE = re.compile(
+    r"\b(?P<kw>until|while)\b(?P<cond>.*?)(?:;|\n)\s*do\b(?P<body>.*?)\bdone\b",
+    re.S | re.I,
+)
+
+# `pgrep -f PATTERN` (any flag order), quoted or bare.
 PGREP_RE = re.compile(
     r"\bpgrep\b[^|;&\n]*?-[a-zA-Z]*f[a-zA-Z]*\s+(?:--\s+)?"
-    r"(?:"
-    r"(?P<q>['\"])(?P<qpat>[^'\"]*)(?P=q)"   # quoted: spaces allowed
-    r"|(?P<pat>[^'\"\s|;&)]+)"               # bare: stops at whitespace
-    r")"
+    r"(?:(?P<q>['\"])(?P<qpat>[^'\"]*)(?P=q)|(?P<pat>[^'\"\s|;&)]+))"
 )
 
-# The bracket trick — `[m]utate.py` — is the documented way to write a pattern that cannot
-# match the shell whose command line contains it, because the literal text `[m]utate.py` is
-# not matched by the regex `[m]utate.py`. Patterns using it are SAFE and must not be flagged.
+# `ps ... | grep PATTERN` — the other canonical self-matching idiom. grep's own argv appears in
+# ps output, so it is non-terminating for exactly the same reason as pgrep -f.
+PS_GREP_RE = re.compile(
+    r"\bps\b[^|;\n]*\|[^|;\n]*\bgrep\b[^|;\n]*?"
+    r"(?:(?P<q2>['\"])(?P<qpat2>[^'\"]*)(?P=q2)|(?P<pat2>[^'\"\s|;&)]+))\s*$"
+)
+
+# The bracket trick — `[m]utate.py` — cannot match the shell that names it. Always safe.
 BRACKET_TRICK_RE = re.compile(r"\[[^\]]\]")
 
-# A sentinel wait whose failure is swallowed: `grep -q ... FILE 2>/dev/null` inside a loop.
-# The 2>/dev/null is the load-bearing part: it is what collapses "cannot read this file" into
-# "not ready yet", erasing the difference between a live producer and a dead one.
-SENTINEL_RE = re.compile(r"\b(grep|test|\[)\b[^;]*2>\s*/dev/null", re.I)
+# stderr swallowed: `2>/dev/null` or bash's `&>/dev/null`.
+SWALLOW_RE = re.compile(r"(2>\s*/dev/null|&>\s*/dev/null|>&\s*/dev/null)")
+# a file/content predicate
+FILE_PRED_RE = re.compile(r"\b(grep|test)\b|\[\s")
 
-# Anything that bounds the loop or gives it evidence, so it can end or report failure.
-# Presence of ANY of these means the loop is not the unbounded form this guard refuses.
+# Bounding constructs, as real tokens. `timeout` must be a command with a duration, SECONDS a
+# shell variable, break a statement — previously the bare WORDS matched, so `--timeout 60`
+# inside a pgrep pattern, the English word "seconds", or `break` in a comment all disarmed it.
 BOUNDED_RE = re.compile(
-    r"\btimeout\b|\bSECONDS\b|\bicn-wait\b|\bbreak\b|\bdeadline\b"
-    r"|\bmax_?(?:tries|attempts|wait)\b|--source-pid\b",
-    re.I,
+    r"(^|[;&|(]\s*)timeout\s+[\d.]+"      # timeout 600 ...
+    r"|\$SECONDS\b|\bSECONDS\s*[-=]"       # $SECONDS / SECONDS=
+    r"|(^|[;&|\n]\s*)break\b"              # break as a statement
+    r"|(^|[;&|(]\s*)icn-wait\b"             # the supported helper
+    r"|\bdeadline\b|\bmax_?(?:tries|attempts|wait)\b",
+    re.M,
 )
+
+
+def strip_comments(cmd: str) -> str:
+    return COMMENT_RE.sub("", cmd)
+
+
+def _pattern_of(m: re.Match) -> str | None:
+    for g in ("qpat", "pat", "qpat2", "pat2"):
+        try:
+            v = m.group(g)
+        except IndexError:
+            continue
+        if v:
+            return v
+    return None
+
+
+def blocked_reason(cmd: str) -> str | None:
+    """Return a refusal reason, or None to allow.
+
+    Refuses only the two unbounded shapes documented above, and only when the defect is in the
+    loop's own termination condition.
+    """
+    clean = strip_comments(cmd)
+
+    for loop in LOOP_RE.finditer(clean):
+        cond, body = loop.group("cond"), loop.group("body")
+
+        # A polling loop sleeps somewhere in its body. Position within the body is irrelevant.
+        if not re.search(r"\bsleep\b", body, re.I):
+            continue
+
+        # An escape hatch anywhere in the COMMAND means the loop can end or report failure —
+        # including a wrapper outside it, e.g. `timeout 600 bash -c "until ...; done"`. Scoping
+        # this to the loop text alone wrongly blocked exactly that form. Safe to widen now that
+        # comments are stripped and the bounding tokens are anchored to command positions.
+        if BOUNDED_RE.search(clean):
+            continue
+
+        # ── Defect A: the condition matches the observer itself ──
+        for m in list(PGREP_RE.finditer(cond)) + list(PS_GREP_RE.finditer(cond)):
+            pat = _pattern_of(m)
+            if not pat or BRACKET_TRICK_RE.search(pat):
+                continue
+            safe_hint = f"[{pat[:1]}]{pat[1:]}" if pat else "[p]attern"
+            return (
+                f"This wait can never terminate.\n\n"
+                f"  pattern: {pat}\n\n"
+                f"`pgrep -f` (and `ps | grep`) matches full command lines, and THIS shell's own "
+                f"command line contains that pattern — so the shell matches itself and the loop "
+                f"condition stays true forever. No future event from any process can end it. "
+                f"Two loops of exactly this shape were found on icn-dev pinning a merged lane's "
+                f"build output for up to 2.8 days.\n\n"
+                f"If you must match by pattern, the bracket idiom `{safe_hint}` does not match "
+                f"the shell that names it — but an exact PID is better still."
+            )
+
+        # ── Defect B: unbounded sentinel wait whose failure is swallowed ──
+        if SWALLOW_RE.search(cond) and FILE_PRED_RE.search(cond):
+            return (
+                "This wait is unbounded and cannot detect its own failure.\n\n"
+                "A sentinel wait is not impossible in principle — another process may "
+                "legitimately create or update the file later, and this loop would then finish "
+                "normally. The defect is that it cannot tell the difference between:\n"
+                "    - the producer is still working      (waiting is correct)\n"
+                "    - the producer died                   (waiting is futile)\n"
+                "    - the scratch directory was deleted   (waiting is futile)\n"
+                "    - the sentinel will never arrive      (waiting is futile)\n\n"
+                "Discarding stderr collapses \"cannot read this file\" into \"not ready yet\", so "
+                "three terminal cases look exactly like the healthy one. With no bound, the loop "
+                "can spin indefinitely while appearing active and never report why. A loop of "
+                "this shape was found on icn-dev waiting on a file whose scratch directory had "
+                "been cleaned up.\n\n"
+                "Supply a bound and producer evidence and this is fine — that is exactly what "
+                "the icn-wait form below does."
+            )
+    return None
+
 
 ADVICE = """
 Use ops/scripts/icn-wait instead — every form is bounded, and the file form takes producer
@@ -98,53 +195,6 @@ For a long build, add --supervise so the lane is not judged abandoned while it r
 
 It resolves your session from the worktree; no session id needed.
 """
-
-
-def blocked_reason(cmd: str) -> str | None:
-    if not LOOP_RE.search(cmd) or not SLEEP_IN_LOOP_RE.search(cmd):
-        return None  # not a polling loop; nothing here applies
-    if BOUNDED_RE.search(cmd):
-        return None  # bounded, or has evidence: it can end and can report failure
-
-    for m in PGREP_RE.finditer(cmd):
-        pat = m.group("qpat") if m.group("qpat") is not None else m.group("pat")
-        if not pat:
-            continue
-        if BRACKET_TRICK_RE.search(pat):
-            continue  # the safe idiom — explicitly supported
-        # The pattern is a literal substring of the very command line that runs pgrep, so
-        # `pgrep -f` matches this shell. The predicate can never become false. (Defect A.)
-        return (
-            f"This wait can never terminate.\n\n"
-            f"  pattern: {pat}\n\n"
-            f"`pgrep -f` matches full command lines, and THIS shell's command line contains "
-            f"that pattern, so the shell matches itself and the loop condition stays true "
-            f"forever. No future event from any process can end it. Two loops of exactly this "
-            f"shape were found on icn-dev pinning a merged lane's build output for up to "
-            f"2.8 days.\n\n"
-            f"If you must match by pattern, the bracket idiom `[{pat[:1]}]{pat[1:]}` does not "
-            f"match the shell that names it — but an exact PID is better still."
-        )
-
-    if SENTINEL_RE.search(cmd):
-        return (
-            "This wait is unbounded and cannot detect its own failure.\n\n"
-            "A sentinel wait is not impossible in principle — another process may legitimately "
-            "create or update the file later, and this loop would then finish normally. The "
-            "defect is that it cannot tell the difference between:\n"
-            "    - the producer is still working      (waiting is correct)\n"
-            "    - the producer died                   (waiting is futile)\n"
-            "    - the scratch directory was deleted   (waiting is futile)\n"
-            "    - the sentinel will never arrive      (waiting is futile)\n\n"
-            "Redirecting stderr to /dev/null collapses \"cannot read this file\" into \"not "
-            "ready yet\", so three terminal cases look exactly like the healthy one. With no "
-            "bound, the loop can spin indefinitely while appearing active and never report why. "
-            "A loop of this shape was found on icn-dev waiting on a file whose scratch "
-            "directory had been cleaned up.\n\n"
-            "Supply a bound and producer evidence and this is fine — that is exactly what the "
-            "icn-wait form below does."
-        )
-    return None
 
 
 def main() -> int:

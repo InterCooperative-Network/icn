@@ -139,13 +139,36 @@ export type RegisterResult = {
   created: boolean;
   /** True when an existing live activation was returned instead of a new one. */
   deduplicated: boolean;
+  /**
+   * Set when a deduplicated activation was found occupying a DIFFERENT lane than the caller.
+   * The lane columns are updated to where the session actually is, and this reports the move
+   * so a caller is never silently told it registered somewhere it did not.
+   */
+  lane_changed?: { from: string | null; to: string | null };
   /** Other live activations already occupying this lane. Reported, never prevented. */
   co_occupants: string[];
 };
 
 // ── writes ───────────────────────────────────────────────────────────────────
 
+/**
+ * Register (or re-attach to) an activation.
+ *
+ * The whole body runs in ONE transaction: the SELECT-then-INSERT was racing its own unique
+ * index on provider_session_id. Two hook subprocesses firing concurrently for the same
+ * conversation both saw no row, both inserted, and the loser died with
+ * SQLITE_CONSTRAINT_UNIQUE — leaving that session unregistered, which is precisely the
+ * outcome idempotency exists to prevent. Several MCP server processes share one database file
+ * on this VM, so this is not theoretical.
+ */
 export function registerSession(
+  db: Database.Database,
+  input: RegisterInput
+): RegisterResult {
+  return db.transaction(() => registerSessionInner(db, input))();
+}
+
+function registerSessionInner(
   db: Database.Database,
   input: RegisterInput
 ): RegisterResult {
@@ -172,6 +195,32 @@ export function registerSession(
       .prepare("SELECT id FROM sessions WHERE provider_session_id = ? LIMIT 1")
       .get(key) as { id: string } | undefined;
     if (existing) {
+      // A resumed conversation can legitimately reappear in a DIFFERENT worktree (`--resume`
+      // run from another lane, or a `resume` SessionStart after the previous process died
+      // without SessionEnd). Previously the lane columns were left pointing at the old lane
+      // while the RESULT reported the new one — so lane A looked permanently occupied by a
+      // session that had left, lane B reported UNREGISTERED-OBSERVED, and the returned
+      // worktree_id contradicted the stored row. Move the row to where the session actually is
+      // and say so.
+      const prior = db
+        .prepare("SELECT worktree_id FROM sessions WHERE id = ?")
+        .get(existing.id) as { worktree_id: string | null };
+      const moved = worktreeId !== null && prior.worktree_id !== worktreeId;
+      if (moved) {
+        db.prepare(
+          `UPDATE sessions
+              SET repo_id = ?, worktree_id = ?, worktree_path = ?, worktree_name = ?,
+                  worktree = COALESCE(?, worktree)
+            WHERE id = ?`
+        ).run(
+          idt?.repo_id ?? null,
+          worktreeId,
+          idt?.worktree_path ?? null,
+          idt?.worktree_name ?? null,
+          idt?.worktree_name ?? null,
+          existing.id
+        );
+      }
       // Refresh mutable launch facts; never touch identity or progress history.
       db.prepare(
         `UPDATE sessions
@@ -190,13 +239,18 @@ export function registerSession(
         input.transcript_path ?? null,
         existing.id
       );
+      // Report the lane actually stored on the row, never the caller's guess.
+      const stored = db
+        .prepare("SELECT worktree_id FROM sessions WHERE id = ?")
+        .get(existing.id) as { worktree_id: string | null };
       return {
         session_id: existing.id,
         provider_session_id: key,
-        worktree_id: worktreeId,
+        worktree_id: stored.worktree_id,
         created: false,
         deduplicated: true,
         co_occupants: coOccupants().filter((id) => id !== existing.id),
+        ...(moved ? { lane_changed: { from: prior.worktree_id, to: stored.worktree_id } } : {}),
       };
     }
   }
@@ -468,12 +522,47 @@ export function ageMinutes(
 
 export type Supervision = { id: number; pid: number; label: string; created_at: number };
 
+export class SupervisionRejected extends Error {}
+
+/** Upper bound on how long one supervision may protect a lane. */
+export const DEFAULT_MAX_SUPERVISION_MINUTES = 480; // 8h — longer than any real ICN build
+
+export function maxSupervisionMinutes(env: NodeJS.ProcessEnv = process.env): number {
+  return positiveIntOr(
+    env["ICN_SUPERVISION_MAX_MINUTES"],
+    DEFAULT_MAX_SUPERVISION_MINUTES
+  );
+}
+
+/**
+ * Declare a long-running operation.
+ *
+ * The PID must be ALIVE at declaration. Without that check, `supervise --pid 1` (or any
+ * long-lived pid: init, sshd, a tmux server, the agent's own process) permanently exempted a
+ * lane from every verdict this runtime exists to produce — the reap in liveSupervisions() only
+ * fires when the process dies, and those never do.
+ */
 export function superviseOperation(
   db: Database.Database,
   sessionId: string,
   pid: number,
-  label: string
+  label: string,
+  isAlive: (pid: number) => boolean = pidAlive
 ): number {
+  if (!Number.isInteger(pid) || pid <= 1) {
+    throw new SupervisionRejected(
+      `pid ${pid} is not a supervisable process (pid <= 1 is never a build)`
+    );
+  }
+  if (!isAlive(pid)) {
+    throw new SupervisionRejected(
+      `pid ${pid} is not running; supervision must name a live process`
+    );
+  }
+  const exists = db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(sessionId);
+  if (!exists) {
+    throw new SupervisionRejected(`no active session ${sessionId} to own this supervision`);
+  }
   const r = db
     .prepare(
       "INSERT INTO watchers_process (session_id, pid, label, created_at, status) VALUES (?, ?, ?, ?, 'running')"
@@ -504,23 +593,37 @@ export function pidAlive(pid: number): boolean {
 }
 
 /**
- * Supervisions whose process is STILL RUNNING. A row whose PID has died is reaped here rather
- * than trusted, so a crashed build cannot keep a lane protected forever.
+ * Supervisions whose process is STILL RUNNING and which have not outlived their bound.
+ *
+ * Two reap conditions, both necessary:
+ *   - the PID died           — a crashed build must not keep a lane protected;
+ *   - the supervision aged out — a PID that never dies (a daemon, a wedged process, a
+ *     mistakenly-supervised long-lived process) must not protect a lane indefinitely.
  */
 export function liveSupervisions(
   db: Database.Database,
   sessionId: string,
-  isAlive: (pid: number) => boolean = pidAlive
+  isAlive: (pid: number) => boolean = pidAlive,
+  env: NodeJS.ProcessEnv = process.env
 ): Supervision[] {
   const rows = db
     .prepare(
       "SELECT id, pid, label, created_at FROM watchers_process WHERE session_id = ? AND status = 'running'"
     )
     .all(sessionId) as Supervision[];
+  const maxAgeMs = maxSupervisionMinutes(env) * 60_000;
+  const now = Date.now();
   const live: Supervision[] = [];
   for (const r of rows) {
-    if (isAlive(r.pid)) live.push(r);
-    else endSupervision(db, r.id);
+    if (!isAlive(r.pid)) {
+      endSupervision(db, r.id);
+    } else if (now - r.created_at > maxAgeMs) {
+      db.prepare(
+        "UPDATE watchers_process SET status = 'expired', completed_at = ? WHERE id = ?"
+      ).run(now, r.id);
+    } else {
+      live.push(r);
+    }
   }
   return live;
 }
@@ -528,8 +631,18 @@ export function liveSupervisions(
 // ── classification ───────────────────────────────────────────────────────────
 
 export type ClassifyObservation = {
-  /** PIDs observed holding the worktree. Corroborating evidence only. */
-  observed_pids: number[];
+  /**
+   * PIDs observed holding the worktree.
+   *
+   * `null` or absent means NOBODY LOOKED — which is NOT the same as "nothing is there", and
+   * must never be consumed as evidence of absence. An empty ARRAY is an affirmative claim that
+   * an observation was performed and found nothing; only that can support retirement.
+   *
+   * This distinction is the whole finding: every caller defaulted this to `[]`, so a lane whose
+   * agent process was demonstrably alive classified as REGISTERED-EXPIRED / retireable, with a
+   * reason string asserting "no process holds the worktree" that nothing had checked.
+   */
+  observed_pids?: number[] | null;
   /** True when the registry could not be opened/read at all. */
   registry_unavailable?: boolean;
   /**
@@ -540,6 +653,11 @@ export type ClassifyObservation = {
   live_supervisions?: Supervision[];
   /** Current branch/HEAD, re-read at classification time. Never the registration value. */
   live_branch?: BranchState | null;
+  /**
+   * Result of checking the session's own recorded `agent_pid`. The registry can corroborate
+   * itself without any caller cooperation, so a missing external observation is not fatal.
+   */
+  agent_pid_alive?: boolean | null;
 };
 
 export type Classification = {
@@ -580,7 +698,12 @@ export type Classification = {
 export function classify(
   sessions: SessionRow[],
   obs: ClassifyObservation,
-  ages: { heartbeat_age_min: number | null; progress_age_min: number | null },
+  ages: {
+    heartbeat_age_min: number | null;
+    progress_age_min: number | null;
+    /** Age since started_at. Used when a session has NEVER progressed — see below. */
+    session_age_min?: number | null;
+  },
   limits: { ttl_min: number; stall_min: number }
 ): Classification {
   const base = {
@@ -596,6 +719,10 @@ export function classify(
     live_branch: null as BranchState | null,
   };
 
+  // "Nobody looked" vs "looked and found nothing" — see ClassifyObservation.observed_pids.
+  const observationPerformed = Array.isArray(obs.observed_pids);
+  const observedPids = obs.observed_pids ?? [];
+
   if (obs.registry_unavailable) {
     return {
       ...base,
@@ -610,8 +737,8 @@ export function classify(
       ...base,
       state: "UNREGISTERED-OBSERVED",
       reason:
-        obs.observed_pids.length > 0
-          ? `no registry row, but ${obs.observed_pids.length} process(es) hold the worktree; ` +
+        observedPids.length > 0
+          ? `no registry row, but ${observedPids.length} process(es) hold the worktree; ` +
             "may be a pre-integration session or an unsupported launcher — protected"
           : "no registry row and no observed process; nothing authoritative to act on — protected",
     };
@@ -644,7 +771,10 @@ export function classify(
       ...shared,
       state: "SUPERVISED-BUSY",
       retireable: false,
-      retireable_with_approval: false,
+      // An operator may still decide to retire a lane holding a runaway build. Reporting this
+      // as untouchable put supervision above every verdict the runtime produces — one call
+      // with any long-lived pid exempted a lane permanently.
+      retireable_with_approval: true,
       reason:
         `heartbeat is ${fmt(hb)} min old, but ${supervised.length} supervised operation(s) ` +
         `are still running: ${supervised.map((x) => `${x.label} (pid ${x.pid})`).join(", ")}`,
@@ -654,7 +784,7 @@ export function classify(
   if (heartbeatExpired) {
     // Expired heartbeat + a live process is still a *process-pinned* lane. The process is the
     // stronger fact here, so it downgrades the verdict rather than being ignored.
-    if (obs.observed_pids.length > 0) {
+    if (observedPids.length > 0) {
       return {
         ...shared,
         state: "PROGRESS-STALLED",
@@ -662,21 +792,59 @@ export function classify(
         retireable_with_approval: true,
         reason:
           `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}) but ` +
-          `${obs.observed_pids.length} process(es) still hold the worktree`,
+          `${observedPids.length} process(es) still hold the worktree`,
       };
     }
+
+    // The registry corroborates itself: the session recorded its own pid, so a live agent
+    // process is decisive regardless of what any caller did or did not observe.
+    if (obs.agent_pid_alive) {
+      return {
+        ...shared,
+        state: "PROGRESS-STALLED",
+        retireable: false,
+        retireable_with_approval: true,
+        reason:
+          `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}) but the session's own ` +
+          `agent process (pid ${s.agent_pid}) is still alive`,
+      };
+    }
+
+    // Retirement requires an AFFIRMATIVE observation. Without one the only honest verdict is
+    // "the heartbeat expired and nobody checked whether anything is running".
+    if (!observationPerformed) {
+      return {
+        ...shared,
+        state: "REGISTERED-EXPIRED",
+        retireable: false,
+        retireable_with_approval: true,
+        reason:
+          `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}), but no process observation ` +
+          "was supplied — absence of observation is not evidence of absence, so the lane is protected",
+      };
+    }
+
     return {
       ...shared,
       state: "REGISTERED-EXPIRED",
       retireable: true,
       retireable_with_approval: true,
-      reason: `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}) and no process holds the worktree`,
+      reason:
+        `heartbeat is ${fmt(hb)} min old (TTL ${limits.ttl_min}); an observation was performed ` +
+        `and found no process holding the worktree` +
+        (s.agent_pid ? `, and its recorded agent pid ${s.agent_pid} is gone` : ""),
     };
   }
 
   const pa = ages.progress_age_min;
-  // Never progressed at all: fall back to how long the session has been heartbeating.
-  const effectiveProgressAge = pa ?? hb;
+  // A session that has NEVER progressed must still be able to stall. Falling back to the
+  // HEARTBEAT AGE was wrong twice over: it is staleness, not elapsed work time, and the branch
+  // was unreachable — control only reaches here when hb <= ttl (30), which can never exceed
+  // the stall window (90). So a lane that registered and then only ever emitted interactions
+  // — a review or analysis session using Read/Grep, or one blocked waiting on a human —
+  // reported REGISTERED-ACTIVE forever. Fall back to age since registration, which is the
+  // quantity the comment always meant.
+  const effectiveProgressAge = pa ?? ages.session_age_min ?? null;
   if (
     effectiveProgressAge != null &&
     effectiveProgressAge > limits.stall_min
@@ -687,7 +855,10 @@ export function classify(
       retireable: false,
       retireable_with_approval: true,
       reason:
-        `heartbeat is fresh (${fmt(hb)} min) but no progress for ${fmt(effectiveProgressAge)} min ` +
+        (s.progress_count === 0
+          ? `heartbeat is fresh (${fmt(hb)} min) but NO progress has ever been recorded, ` +
+            `${fmt(effectiveProgressAge)} min after registration `
+          : `heartbeat is fresh (${fmt(hb)} min) but no progress for ${fmt(effectiveProgressAge)} min `) +
         `(stall window ${limits.stall_min}); activity without progress`,
     };
   }
@@ -697,7 +868,10 @@ export function classify(
     state: "REGISTERED-ACTIVE",
     retireable: false,
     retireable_with_approval: false,
-    reason: `heartbeat ${fmt(hb)} min, progress ${fmt(effectiveProgressAge)} min, count ${s.progress_count}`,
+    reason:
+      s.progress_count === 0
+        ? `heartbeat ${fmt(hb)} min; no progress recorded yet (registered ${fmt(ages.session_age_min ?? null)} min ago)`
+        : `heartbeat ${fmt(hb)} min, progress ${fmt(effectiveProgressAge)} min, count ${s.progress_count}`,
   };
 }
 
@@ -737,12 +911,24 @@ export function classifyWorktree(
     obs.live_branch ??
     (primary?.worktree_path ? readBranchState(primary.worktree_path) : null);
 
+  // Self-corroboration: check the session's own recorded pid. This needs no caller cooperation
+  // and is what makes a missing external observation non-fatal rather than dangerous.
+  const agentPidAlive =
+    obs.agent_pid_alive ??
+    (primary?.agent_pid != null ? pidAlive(primary.agent_pid) : null);
+
   return classify(
     primary ? [primary, ...sessions.filter((x) => x.id !== primary.id)] : [],
-    { ...obs, live_supervisions: supervised, live_branch: liveBranch },
+    {
+      ...obs,
+      live_supervisions: supervised,
+      live_branch: liveBranch,
+      agent_pid_alive: agentPidAlive,
+    },
     {
       heartbeat_age_min: primary ? ageMinutes(db, primary.last_heartbeat) : null,
       progress_age_min: primary ? ageMinutes(db, primary.last_progress) : null,
+      session_age_min: primary ? ageMinutes(db, primary.started_at) : null,
     },
     { ttl_min: ttlMinutes(env), stall_min: stallMinutes(env) }
   );

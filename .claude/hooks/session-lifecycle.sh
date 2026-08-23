@@ -54,11 +54,49 @@ KEY="$(field session_id)"
 CWD="$(field cwd)"
 TOOL="$(field tool_name)"
 TRANSCRIPT="$(field transcript_path)"
+INTERRUPTED="$(field tool_response.interrupted)"
+
+# Would a FAILED tool call wrongly count as progress? Measured on this installation
+# (Claude Code 2.1.237): a Bash call that provably ran and exited non-zero fired PostToolUse
+# ZERO times, so the hook never sees a failure and cannot record one as progress. We do not
+# rely on that: an interrupted/failed response is skipped explicitly, so if a future release
+# starts delivering failures here, a retry loop still cannot manufacture progress.
+tool_failed() {
+  case "$INTERRUPTED" in True|true) return 0 ;; esac
+  return 1
+}
 
 ROOT="${CLAUDE_PROJECT_DIR:-${CWD:-$PWD}}"
 SESSION_BIN="$ROOT/ops/scripts/icn-agent-session"
-[ -x "$SESSION_BIN" ] || exit 0
-[ -n "$KEY" ] || exit 0
+
+# The runtime must never be disabled SILENTLY. Previously these two guards exited 0 with no
+# output, so a missing exec bit, a payload-shape change, or an absent python3 turned the whole
+# feature off and — on SessionStart — suppressed the startup context block entirely, leaving
+# the agent with no idea the runtime existed and no indication anything was wrong.
+degraded_banner() {
+  [ "$EVENT" = "SessionStart" ] || return 0
+  cat <<BANNER
+## ICN agent runtime — DEGRADED
+Lifecycle tracking is NOT active for this session: $1
+Capabilities are still discoverable: MCP tool 'icn_ops_agent_runtime', or
+docs/reference/project-index/generated/agent-capabilities.json
+Standing rules still apply: work only in your own worktree; never merge without explicit
+per-PR authorization; wait with 'ops/scripts/icn-wait', never an ad-hoc 'until ! pgrep -f' loop.
+BANNER
+}
+
+if [ ! -x "$SESSION_BIN" ]; then
+  degraded_banner "ops/scripts/icn-agent-session is missing or not executable"
+  exit 0
+fi
+if [ -z "$EVENT" ]; then
+  degraded_banner "the hook payload could not be parsed (is python3 available?)"
+  exit 0
+fi
+if [ -z "$KEY" ]; then
+  degraded_banner "the hook payload carried no session_id"
+  exit 0
+fi
 
 run() { "$SESSION_BIN" "$@" >/dev/null 2>>"${TMPDIR:-/tmp}/icn-agent-session.log"; }
 
@@ -107,13 +145,18 @@ CTX
     ;;
 
   PostToolUse)
-    case "$TOOL" in
-      Edit|Write|MultiEdit|NotebookEdit)
-        run progress --harness-key "$KEY" --kind file_edit --activity "edit: $TOOL" ;;
-      Bash)
-        run progress --harness-key "$KEY" --kind command --activity "bash" ;;
-      *) : ;;
-    esac
+    if tool_failed; then
+      # Interrupted/failed work is liveness, not progress.
+      run interaction --harness-key "$KEY"
+    else
+      case "$TOOL" in
+        Edit|Write|MultiEdit|NotebookEdit)
+          run progress --harness-key "$KEY" --kind file_edit --activity "edit: $TOOL" ;;
+        Bash)
+          run progress --harness-key "$KEY" --kind command --activity "bash" ;;
+        *) : ;;
+      esac
+    fi
     ;;
 
   Stop|SubagentStop)

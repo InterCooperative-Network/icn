@@ -37,13 +37,20 @@ export function registerAgentOpsTools(
         .string()
         .optional()
         .describe("Any path inside your worktree; used to report your lane and session."),
+      provider_session_id: z
+        .string()
+        .optional()
+        .describe(
+          "Your own harness conversation id, if you know it. Without it this tool can report " +
+            "who occupies the lane but CANNOT tell you whether YOU are registered."
+        ),
       section: z
         .enum(["all", "mcp_tools", "skills", "hooks", "helpers", "truth_domains", "session"])
         .optional()
         .default("all")
         .describe("Narrow the response when you only need one part."),
     },
-    async ({ cwd, section }) => {
+    async ({ cwd, section, provider_session_id }) => {
       // Resolve the CALLER's lane first. repoRoot honours ICN_ROOT, which on icn-dev is pinned
       // to the mcp-host worktree — so using it would hand an agent working in lane X the
       // capability manifest of lane Y (or, as observed, a confusing ENOENT for a manifest that
@@ -68,7 +75,11 @@ export function registerAgentOpsTools(
 
       // Session identity is reported honestly: an unregistered session is told so rather than
       // being given a plausible-looking blank record.
-      let session: Record<string, unknown> = { registered: false };
+      // `registered` is a claim about the CALLER. Deriving it from lane occupancy told a
+      // review subagent, a second agent in the worktree, or a session whose own registration
+      // failed that it was registered because SOMEONE ELSE had a row — undoing the one thing
+      // the SessionStart hook reports honestly. Unknown is reported as unknown.
+      let session: Record<string, unknown> = { registered: null };
       if (identity) {
         session["lane"] = {
           repo_id: identity.repo_id,
@@ -79,19 +90,36 @@ export function registerAgentOpsTools(
         };
         if (db) {
           const rows = activeSessionsForWorktree(db, identity.worktree_id);
-          session["registered"] = rows.length > 0;
-          session["sessions"] = rows.map((r) => ({
+          session["lane_sessions"] = rows.map((r) => ({
             session_id: r.id,
             provider_session_id: r.provider_session_id,
             progress_count: r.progress_count,
             current_activity: r.current_activity,
           }));
           session["contention"] = rows.length > 1;
-          if (rows.length === 0) {
+
+          if (provider_session_id) {
+            const mine = rows.find((r) => r.provider_session_id === provider_session_id);
+            session["registered"] = Boolean(mine);
+            if (mine) {
+              session["my_session_id"] = mine.id;
+              session["my_progress_count"] = mine.progress_count;
+            } else {
+              session["note"] =
+                `No session is registered for provider_session_id ${provider_session_id}. ` +
+                "Lifecycle tracking is NOT active for YOU, regardless of other occupants.";
+            }
+          } else {
             session["note"] =
-              "No session is registered for this lane. Lifecycle tracking is NOT active; " +
-              "the SessionStart hook may not be installed for this launcher.";
+              rows.length === 0
+                ? "No session is registered for this lane at all, so lifecycle tracking is not " +
+                  "active here. The SessionStart hook may not be installed for this launcher."
+                : "Pass provider_session_id to learn whether YOU are registered; " +
+                  `${rows.length} session(s) occupy this lane, which says nothing about you.`;
           }
+        } else {
+          session["note"] =
+            "No session registry is wired into this server, so registration cannot be checked.";
         }
       } else {
         session["note"] = "not inside a Git worktree";

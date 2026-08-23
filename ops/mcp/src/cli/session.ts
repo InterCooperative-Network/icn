@@ -12,7 +12,7 @@
 // Refs docs/architecture/AGENT_RUNTIME.md §3.
 
 import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { hostname } from "os";
 import { dirname } from "path";
 import { initDb } from "../state/db.js";
@@ -120,7 +120,9 @@ function main(): number {
         "  unsupervise --id N [--exit-code C]",
         "  release   --harness-key K [--reason completed|cancelled|error|shutdown]",
         "  status    --harness-key K",
-        "  classify  --worktree W [--pids 1,2,3]",
+        "  classify    --worktree-id ID | --path DIR | --worktree NAME",
+        "              [--pids 1,2,3 | --observed-none]",
+        "              (omitting both means 'no observation performed' -> stays protected)",
         "",
       ].join("\n")
     );
@@ -267,6 +269,21 @@ function main(): number {
       const res = releaseSession(db, row.id, {
         reason: str(args, "reason") ?? "completed",
       });
+      // The identity file is a session-scoped resource too. Left behind, a SIGKILLed session's
+      // key was re-read by the next launch, which then DEDUPED INTO THE DEAD SESSION'S ROW and
+      // inherited its progress history and file claims — exactly the identity inheritance that
+      // rejecting pid@host exists to prevent, reached through the sanctioned fallback.
+      const identityFile = str(args, "identity-file");
+      if (identityFile) {
+        try {
+          rmSync(identityFile, { force: true });
+        } catch {
+          process.stderr.write(
+            `icn-agent-session: could not remove identity file ${identityFile}; ` +
+              "a later launch could inherit this session's identity\n"
+          );
+        }
+      }
       emit(JSON.stringify(res));
       return 0;
     }
@@ -314,10 +331,18 @@ function main(): number {
         worktreeId = ids[0] ?? name;
       }
       const worktree = worktreeId;
-      const pids = (str(args, "pids") ?? "")
-        .split(",")
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isInteger(n) && n > 0);
+      // Absent --pids means NOBODY LOOKED and must stay protected. --observed-none is the
+      // affirmative "I looked and found nothing", which is the only form that can support
+      // retirement. Passing [] for both was the bug: it let a lane with a live agent process
+      // classify as retireable.
+      const pidsRaw = str(args, "pids");
+      const observedNone = args["observed-none"] === true;
+      const pids =
+        pidsRaw !== undefined
+          ? pidsRaw.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
+          : observedNone
+            ? []
+            : null;
       const c = classifyWorktree(db, worktree, { observed_pids: pids });
       process.stdout.write(JSON.stringify(c) + "\n");
       // Exit code is the verdict: 0 protected-and-healthy, 1 protected, 2 candidate.

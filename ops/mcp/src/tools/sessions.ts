@@ -160,13 +160,16 @@ export function registerSessionTools(
       const claimed: string[] = [];
       const ttl = ttlMinutes();
 
+      // NOTE: no `state` predicate. v3 deliberately has no `state` column — release DELETEs
+      // the row, so a row's EXISTENCE is liveness. An earlier draft of this query carried a
+      // `state = 'active'` clause left over from a discarded design; it made every call throw
+      // `no such column: state`, silently disabling advisory locking altogether.
       const checkStmt = db.prepare(
         `SELECT session_id FROM file_claims
          WHERE file_path = ? AND session_id != ?
          AND session_id IN (
            SELECT id FROM sessions
-           WHERE state = 'active'
-             AND julianday('now') - julianday(last_heartbeat) < ? / 1440.0
+           WHERE julianday('now') - julianday(last_heartbeat) < ? / 1440.0
          )`
       );
       const insertStmt = db.prepare(
@@ -230,16 +233,21 @@ export function registerSessionTools(
   server.tool(
     "supervise_operation",
     "Declare a long-running operation (build, test suite) so its lane is not judged abandoned " +
-      "when no hook fires for longer than the heartbeat TTL. Requires a live PID: supervision " +
-      "cannot outlive the process it names.",
+      "when no hook fires for longer than the heartbeat TTL. The PID must be alive NOW and the " +
+      "supervision expires with it; supervision protects a lane from expiry but never from a " +
+      "progress-stall verdict.",
     {
       session_id: z.string(),
       pid: z.number().describe("PID of the long-running process"),
       label: z.string().describe("Human-readable label, e.g. 'cargo test --workspace'"),
     },
     async ({ session_id, pid, label }) => {
-      const id = superviseOperation(db, session_id, pid, label);
-      return json({ supervision_id: id, pid, label });
+      try {
+        const id = superviseOperation(db, session_id, pid, label);
+        return json({ supervision_id: id, pid, label });
+      } catch (e) {
+        return json({ error: "supervision_rejected", reason: (e as Error).message });
+      }
     }
   );
 
@@ -283,8 +291,11 @@ export function registerSessionTools(
       observed_pids: z
         .array(z.number())
         .optional()
-        .default([])
-        .describe("PIDs observed holding the worktree (corroborating evidence)"),
+        .describe(
+          "PIDs you observed holding the worktree. OMIT this if you did not actually look — " +
+            "an omitted value means 'no observation performed' and keeps the lane protected. " +
+            "Pass [] only as an affirmative 'I looked and found nothing'."
+        ),
     },
     async ({ worktree_id, path, observed_pids }) => {
       const id = worktree_id ?? (path ? discoverWorktree(path, null)?.worktree_id : undefined);
@@ -296,7 +307,7 @@ export function registerSessionTools(
           reason: "no canonical worktree id could be resolved; the lane stays protected",
         });
       }
-      return json(classifyWorktree(db, id, { observed_pids }));
+      return json(classifyWorktree(db, id, { observed_pids: observed_pids ?? null }));
     }
   );
 
@@ -308,7 +319,9 @@ export function registerSessionTools(
       const session = getSession(db, session_id);
       if (!session) return json({ error: "not_found", session_id });
       const children = db
-        .prepare("SELECT id, worktree, state FROM sessions WHERE parent_session_id = ?")
+        .prepare(
+          "SELECT id, worktree, worktree_id FROM sessions WHERE parent_session_id = ?"
+        )
         .all(session_id);
       return json({
         ...session,

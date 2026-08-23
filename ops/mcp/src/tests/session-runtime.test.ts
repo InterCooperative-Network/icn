@@ -16,6 +16,7 @@ import {
   liveSupervisions,
   recordInteraction,
   superviseOperation,
+  SupervisionRejected,
   ageMinutes,
   classify,
   classifyWorktree,
@@ -24,6 +25,7 @@ import {
   recordProgress,
   registerSession,
   releaseSession,
+  type ClassifyObservation,
   type SessionRow,
 } from "../runtime/session-runtime.js";
 import { type WorktreeIdentity } from "../runtime/worktree-identity.js";
@@ -522,25 +524,54 @@ describe("4. a supervised long-running operation is not abandonment", () => {
 
     expect(c.state).toBe("SUPERVISED-BUSY");
     expect(c.retireable).toBe(false);
-    expect(c.retireable_with_approval).toBe(false);
+    // Protected from AUTOMATIC retirement, but an operator may still retire a lane holding a
+    // runaway build. Reporting this as untouchable put supervision above every verdict the
+    // runtime produces, so one call with any long-lived pid exempted a lane permanently.
+    expect(c.retireable_with_approval).toBe(true);
     expect(c.reason).toContain("cargo test --workspace");
   });
 
-  it("does NOT protect the lane once the supervised process dies", () => {
-    // Otherwise a crashed build would pin a lane forever — the failure mode we are fixing.
+  it("refuses to supervise a process that is not running", () => {
+    // Without this, `supervise --pid 1` (or any long-lived pid) permanently exempted a lane:
+    // the reap only fires when the process dies, and init never does.
     const { session_id } = registerSession(db, { repo: "icn", identity: ident("build"), provider_session_id: "k" });
-    superviseOperation(db, session_id, 999_999_999, "cargo build"); // never existed
+    expect(() => superviseOperation(db, session_id, 999_999_999, "cargo build")).toThrow(
+      SupervisionRejected
+    );
+    expect(() => superviseOperation(db, session_id, 1, "cargo build")).toThrow(SupervisionRejected);
+    expect(() => superviseOperation(db, "no-such-session", process.pid, "x")).toThrow(
+      SupervisionRejected
+    );
+    expect(db.prepare("SELECT COUNT(*) c FROM watchers_process").get()).toEqual({ c: 0 });
+  });
+
+  it("reaps a supervision whose process has since died", () => {
+    const { session_id } = registerSession(db, { repo: "icn", identity: ident("build"), provider_session_id: "k" });
+    superviseOperation(db, session_id, process.pid, "cargo build");
     backdate(session_id, "last_heartbeat", 120);
     backdate(session_id, "last_progress", 120);
 
-    const c = classifyWorktree(db, wtid("build"), { observed_pids: [] });
-
+    // Simulate the process dying after declaration.
+    const c = classifyWorktree(db, wtid("build"), {
+      observed_pids: [],
+      live_supervisions: [],
+    });
     expect(c.state).toBe("REGISTERED-EXPIRED");
     expect(c.retireable).toBe(true);
-    // and the dead supervision was reaped rather than left 'running' forever
+  });
+
+  it("expires a supervision that outlives its bound even if the pid never dies", () => {
+    // A daemon, a wedged process, or a mistakenly-supervised long-lived pid must not protect a
+    // lane indefinitely just because it refuses to exit.
+    const { session_id } = registerSession(db, { repo: "icn", identity: ident("build"), provider_session_id: "k" });
+    const sup = superviseOperation(db, session_id, process.pid, "endless");
+    db.prepare("UPDATE watchers_process SET created_at = ? WHERE id = ?")
+      .run(Date.now() - 999 * 60_000, sup);
+
+    expect(liveSupervisions(db, session_id)).toHaveLength(0);
     expect(
-      db.prepare("SELECT status FROM watchers_process WHERE session_id = ?").get(session_id)
-    ).toEqual({ status: "completed" });
+      db.prepare("SELECT status FROM watchers_process WHERE id = ?").get(sup)
+    ).toEqual({ status: "expired" });
   });
 
   it("supervision expires when explicitly ended, restoring normal judgement", () => {
@@ -572,5 +603,131 @@ describe("4. a supervised long-running operation is not abandonment", () => {
     ] }, { heartbeat_age_min: null, progress_age_min: null }, LIMITS);
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
     expect(c.retireable).toBe(false);
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Fail-safe observation semantics.
+//
+// The defect these pin: every caller defaulted observed_pids to [], so "nobody looked" was
+// consumed as "nothing is there". A lane whose registered agent process was demonstrably
+// ALIVE classified as REGISTERED-EXPIRED / retireable:true, with a reason string asserting
+// "no process holds the worktree" that nothing had ever checked.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("absence of observation is not evidence of absence", () => {
+  function row(over: Partial<SessionRow> = {}): SessionRow {
+    return {
+      id: "s1", repo: "icn", repo_id: "/repos/icn.git", worktree: "wt",
+      worktree_id: wtid("wt"), worktree_path: "/wt/icn/wt", worktree_name: "wt",
+      branch_at_registration: null, head_at_registration: null, task_description: null,
+      task_ref: null, pr_ref: null, parent_session_id: null, provider: "claude-code",
+      agent_pid: null, host: "icn-dev", provider_session_id: "k", transcript_path: null,
+      current_activity: null, progress_count: 3, started_at: "2026-08-23 00:00:00",
+      last_heartbeat: "2026-08-23 00:00:00", last_progress: "2026-08-23 00:00:00",
+      ...over,
+    };
+  }
+  const EXPIRED = { heartbeat_age_min: 120, progress_age_min: 120 };
+
+  it("an expired heartbeat with NO observation supplied is not retireable", () => {
+    const c = classify([row()], {}, EXPIRED, LIMITS);
+    expect(c.state).toBe("REGISTERED-EXPIRED");
+    expect(c.retireable).toBe(false);
+    expect(c.retireable_with_approval).toBe(true);
+    expect(c.reason).toContain("no process observation");
+  });
+
+  it("null observed_pids is treated the same as omitting it", () => {
+    const c = classify([row()], { observed_pids: null }, EXPIRED, LIMITS);
+    expect(c.retireable).toBe(false);
+  });
+
+  it("an AFFIRMATIVE empty observation is what unlocks retirement", () => {
+    const c = classify([row()], { observed_pids: [] }, EXPIRED, LIMITS);
+    expect(c.state).toBe("REGISTERED-EXPIRED");
+    expect(c.retireable).toBe(true);
+    expect(c.reason).toContain("an observation was performed");
+  });
+
+  it("a live recorded agent_pid protects the lane even with an affirmative empty observation", () => {
+    // The registry corroborates itself: it recorded the pid, so it can check it without any
+    // caller cooperation.
+    const c = classify([row({ agent_pid: 4242 })], { observed_pids: [], agent_pid_alive: true },
+      EXPIRED, LIMITS);
+    expect(c.state).toBe("PROGRESS-STALLED");
+    expect(c.retireable).toBe(false);
+    expect(c.reason).toContain("agent process");
+  });
+
+  it("end to end: a live agent process is never retireable, however the caller asks", () => {
+    const { session_id } = registerSession(db, {
+      repo: "icn", identity: ident("live"), provider_session_id: "k", agent_pid: process.pid,
+    });
+    backdate(session_id, "last_heartbeat", 120);
+    backdate(session_id, "last_progress", 120);
+
+    for (const obs of [{}, { observed_pids: null }, { observed_pids: [] }] as ClassifyObservation[]) {
+      const c = classifyWorktree(db, wtid("live"), obs);
+      expect(c.retireable).toBe(false);
+    }
+  });
+});
+
+describe("a session that has never progressed can still stall", () => {
+  it("falls back to age since registration, not heartbeat staleness", () => {
+    // Previously unreachable: the fallback used heartbeat AGE, and control only reaches the
+    // stall check when that age is under the TTL — which can never exceed the stall window.
+    const { session_id } = registerSession(db, {
+      repo: "icn", identity: ident("idle"), provider_session_id: "k", agent_pid: process.pid,
+    });
+    // Registered hours ago, heartbeating constantly, never once progressed.
+    db.prepare("UPDATE sessions SET started_at = datetime('now','-400 minutes') WHERE id = ?")
+      .run(session_id);
+    for (let i = 0; i < 20; i++) recordInteraction(db, session_id);
+
+    const c = classifyWorktree(db, wtid("idle"), { observed_pids: [process.pid] });
+    expect(c.state).toBe("PROGRESS-STALLED");
+    expect(c.progress_count).toBe(0);
+    expect(c.reason).toContain("NO progress has ever been recorded");
+  });
+
+  it("does not stall a young session that simply has not progressed yet", () => {
+    const { session_id } = registerSession(db, {
+      repo: "icn", identity: ident("young"), provider_session_id: "k",
+    });
+    recordInteraction(db, session_id);
+    expect(classifyWorktree(db, wtid("young"), { observed_pids: [1] }).state)
+      .toBe("REGISTERED-ACTIVE");
+  });
+});
+
+describe("a resumed conversation that reappears in another lane", () => {
+  it("moves the row to where the session actually is, and says so", () => {
+    const a = registerSession(db, {
+      repo: "icn", identity: ident("laneA"), provider_session_id: "conv",
+    });
+    const b = registerSession(db, {
+      repo: "icn", identity: ident("laneB"), provider_session_id: "conv",
+    });
+
+    expect(b.session_id).toBe(a.session_id);
+    expect(b.deduplicated).toBe(true);
+    // The returned lane must match the STORED lane — previously it reported the caller's lane
+    // while the row still pointed at the old one.
+    expect(b.worktree_id).toBe(wtid("laneB"));
+    expect(b.lane_changed).toEqual({ from: wtid("laneA"), to: wtid("laneB") });
+
+    expect(activeSessionsForWorktree(db, wtid("laneA"))).toHaveLength(0);
+    expect(activeSessionsForWorktree(db, wtid("laneB"))).toHaveLength(1);
+  });
+
+  it("does not report a lane change when the lane is unchanged", () => {
+    registerSession(db, { repo: "icn", identity: ident("same"), provider_session_id: "conv" });
+    const again = registerSession(db, {
+      repo: "icn", identity: ident("same"), provider_session_id: "conv",
+    });
+    expect(again.lane_changed).toBeUndefined();
   });
 });

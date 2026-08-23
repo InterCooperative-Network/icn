@@ -133,8 +133,23 @@ for needle in "agent-capabilities.json" "icn_ops_agent_runtime" "ops/state/truth
   grep -q "$needle" "$HOOK" && ok "startup context points at $needle" || bad "startup context missing $needle"
 done
 # It must stay a router: a startup banner that dumps documentation is the failure mode.
-LINES=$(sed -n '/^## ICN agent runtime/,/^CTX$/p' "$HOOK" | wc -l)
+# Anchor on the exact heading so the DEGRADED banner (which shares the prefix) is measured
+# separately rather than being folded into the same range.
+LINES=$(sed -n '/^## ICN agent runtime$/,/^CTX$/p' "$HOOK" | wc -l)
 if [ "$LINES" -lt 30 ]; then ok "startup context stays small (${LINES} lines)"; else bad "startup context too large" "${LINES} lines"; fi
+
+# The degraded banner must ALSO stay small, and must say plainly that tracking is off.
+DLINES=$(sed -n '/^## ICN agent runtime — DEGRADED$/,/^BANNER$/p' "$HOOK" | wc -l)
+if [ "$DLINES" -gt 0 ] && [ "$DLINES" -lt 20 ]; then
+  ok "degraded banner stays small (${DLINES} lines)"
+else
+  bad "degraded banner missing or too large" "${DLINES} lines"
+fi
+if sed -n '/^## ICN agent runtime — DEGRADED$/,/^BANNER$/p' "$HOOK" | grep -q "NOT active"; then
+  ok "degraded banner states plainly that lifecycle tracking is NOT active"
+else
+  bad "degraded banner must not imply tracking is working"
+fi
 
 $CHECK >/dev/null 2>&1 && ok "manifest restored and true at end of run" || bad "manifest left dirty"
 

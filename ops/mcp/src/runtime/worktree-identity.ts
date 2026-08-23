@@ -25,7 +25,7 @@
 
 import { execFileSync } from "child_process";
 import { existsSync, realpathSync } from "fs";
-import { basename } from "path";
+import { basename, dirname, resolve } from "path";
 
 /** Stable identity of a lane. Nothing here changes when the branch does. */
 export type WorktreeIdentity = {
@@ -57,6 +57,13 @@ function git(dir: string, args: string[]): string | null {
   } catch {
     return null;
   }
+}
+
+/** Human-readable repo name from a common-dir path, for both bare stores and plain clones. */
+function repoNameFrom(commonDir: string): string {
+  const base = basename(commonDir);
+  if (base === ".git") return basename(dirname(commonDir));
+  return base.replace(/\.git$/, "");
 }
 
 function canonical(p: string | null): string | null {
@@ -98,11 +105,14 @@ export function discoverWorktree(
     const gitDir = canonical(git(dir, ["rev-parse", "--absolute-git-dir"]));
     if (!gitDir) continue;
 
-    // --git-common-dir may be relative to the worktree; resolve it from there.
+    // `--git-common-dir` may be relative — and it is relative to the directory git ran in
+    // (our `-C dir`), NOT to the worktree toplevel. Resolving it against the toplevel produced
+    // a different repo_id for every subdirectory depth (`<top>/../../.git` from two levels
+    // down), which escapes the repo, fails realpath, and silently returns un-normalised. On
+    // linked worktrees git prints an absolute path so this was invisible here; it breaks on
+    // any plain clone. resolve() handles both the absolute and relative cases.
     const commonRaw = git(dir, ["rev-parse", "--git-common-dir"]);
-    const common = canonical(
-      commonRaw && !commonRaw.startsWith("/") ? `${git(dir, ["rev-parse", "--show-toplevel"])}/${commonRaw}` : commonRaw
-    );
+    const common = canonical(commonRaw ? resolve(dir, commonRaw) : null);
     const top = canonical(git(dir, ["rev-parse", "--show-toplevel"]));
     if (!common || !top) continue;
 
@@ -111,7 +121,9 @@ export function discoverWorktree(
 
     return {
       repo_id: common,
-      repo_name: basename(common).replace(/\.git$/, ""),
+      // A bare store is `<name>.git`; a plain clone's common dir is `<repo>/.git`, whose
+      // basename is literally ".git" and would strip to the empty string. Step up in that case.
+      repo_name: repoNameFrom(common),
       worktree_id: gitDir,
       worktree_path: top,
       worktree_name: basename(top),

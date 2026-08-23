@@ -140,6 +140,92 @@ CASES: list[tuple[str, int, str]] = [
         ALLOW,
         "swallowed stderr outside any loop",
     ),
+
+    # ── EVASIONS AND MISFIRES FOUND BY INDEPENDENT REVIEW ──
+    # An earlier detection pass matched over the whole command string. It had 11 evasions and
+    # 5 misfires, nearly all from two structural mistakes: requiring `sleep` to sit adjacent to
+    # `do`/`done`, and looking for the defect anywhere rather than in the loop's own condition.
+    # Every case below is verbatim from that review and is now pinned.
+    (
+        'while pgrep -f "cargo build -p icn-net" >/dev/null; do date; sleep 30; date; done',
+        BLOCK,
+        "FN: a statement after sleep must not disarm the guard (one-token rewrite of the real loop)",
+    ),
+    (
+        'while ! pgrep -f "cargo build" >/dev/null; do\n  echo waiting;\n  sleep 30\ndone',
+        BLOCK,
+        "FN: multi-line loop body",
+    ),
+    (
+        'while pgrep -f "cargo build" >/dev/null; do echo "checking every 5 seconds"; sleep 5; done',
+        BLOCK,
+        "FN: the English word 'seconds' must not read as a bound",
+    ),
+    (
+        'while pgrep -f "cargo test --timeout 60" >/dev/null; do sleep 5; done',
+        BLOCK,
+        "FN: 'timeout' inside the pgrep pattern must not read as a bound",
+    ),
+    (
+        'while pgrep -f "cargo build" >/dev/null; do sleep 60; done  # will break when the build ends',
+        BLOCK,
+        "FN: 'break' in a comment must not read as an escape hatch",
+    ),
+    (
+        'while ps aux | grep -q "cargo build -p icn-net"; do sleep 30; done',
+        BLOCK,
+        "FN: ps|grep is the same self-matching defect as pgrep -f",
+    ),
+    (
+        'until grep -q "^EXIT=" /tmp/s/out.log &>/dev/null; do sleep 10; done',
+        BLOCK,
+        "FN: bash's &>/dev/null swallows stderr identically to 2>/dev/null",
+    ),
+    (
+        'while ! [ -f /tmp/scratch/EXIT ] 2>/dev/null; do sleep 10; done',
+        BLOCK,
+        "FN: the [ ... ] test form, not just `test`",
+    ),
+    (
+        'while [ -n "$(pgrep -f \'cargo build\')" ]; do echo poll; sleep 20; echo again; done',
+        BLOCK,
+        "FN: $() command-substitution form",
+    ),
+    (
+        'until grep -q READY /tmp/s/out 2>/dev/null; do echo .; sleep 5; echo .; done',
+        BLOCK,
+        "FN: statements around the sleep, sentinel shape",
+    ),
+    (
+        'while IFS= read -r f; do grep -H TODO "$f" 2>/dev/null; sleep 0.1; done < files.txt',
+        ALLOW,
+        "FP: grep 2>/dev/null in the BODY of a read-loop is output, not a predicate",
+    ),
+    (
+        'while read -r pkg; do cargo test -p "$pkg" 2>/dev/null; sleep 1; done < pkgs.txt',
+        ALLOW,
+        "FP: the word 'test' in `cargo test` is not a file predicate",
+    ),
+    (
+        'while ! nc -z localhost 5432; do sleep 1; done\nnpm test 2>/dev/null',
+        ALLOW,
+        "FP: a statement on the next line is outside the loop entirely",
+    ),
+    (
+        'while ! curl -sf localhost:3000/health >/dev/null; do sleep 2; done && cargo test --workspace 2>/dev/null',
+        ALLOW,
+        "FP: chained statement after the loop must not leak into its condition",
+    ),
+    (
+        'n=0\nwhile [ $n -lt 10 ]; do n=$((n+1)); grep -c ERROR app.log 2>/dev/null; sleep 1; done',
+        ALLOW,
+        "FP: an explicitly bounded counting loop",
+    ),
+    (
+        'until [ -f /tmp/scratch/DONE ]; do sleep 10; done',
+        ALLOW,
+        "deliberate: a bare test with no swallowed stderr is not the refused shape",
+    ),
 ]
 
 # The block message must describe the ACTUAL property of each shape. An error message an agent
