@@ -166,9 +166,17 @@ case "$CMD" in
     # Declare the operation so a long legitimate run is protected without faking progress.
     SUP_ID=""
     if [ "$SUPERVISE" = 1 ]; then
-      if [ -x "$SESSION_BIN" ] && [ -n "$HARNESS_KEY" ]; then
-        SUP_ID="$("$SESSION_BIN" supervise --harness-key "$HARNESS_KEY" \
-                    --pid "$child" --label "$LABEL" 2>/dev/null || true)"
+      # --harness-key is optional: a Bash command has no access to the provider session id
+      # (there is no CLAUDE_SESSION_ID env var), so supervise resolves the lane's sole session
+      # when none is given, and declines rather than guessing when the lane is contended.
+      if [ -x "$SESSION_BIN" ]; then
+        if [ -n "$HARNESS_KEY" ]; then
+          SUP_ID="$("$SESSION_BIN" supervise --harness-key "$HARNESS_KEY" \
+                      --pid "$child" --label "$LABEL" 2>/dev/null || true)"
+        else
+          SUP_ID="$("$SESSION_BIN" supervise --pid "$child" --label "$LABEL" \
+                      --cwd "$PWD" 2>/dev/null || true)"
+        fi
       fi
       # Supervision is best-effort observability; its absence must never change the wait.
       [ -n "$SUP_ID" ] || note "supervision unavailable; waiting anyway"

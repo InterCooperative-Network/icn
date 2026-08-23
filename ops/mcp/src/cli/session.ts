@@ -21,6 +21,7 @@ import {
   classifyWorktree,
   endSupervision,
   InvalidProviderSessionIdError,
+  activeSessionsForWorktree,
   liveSupervisions,
   sessionsByWorktreeName,
   recordHeartbeat,
@@ -115,7 +116,8 @@ function main(): number {
         "              [--activity TEXT]",
         "  interaction --harness-key K   (turn boundary: liveness only, NOT progress)",
         "  heartbeat   --harness-key K",
-        "  supervise   --harness-key K --pid N [--label L]   -> prints supervision id",
+        "  supervise   --pid N [--harness-key K] [--label L]  -> prints supervision id",
+        "              (without --harness-key: resolves the lane's sole session)",
         "  unsupervise --id N [--exit-code C]",
         "  release   --harness-key K [--reason completed|cancelled|error|shutdown]",
         "  status    --harness-key K",
@@ -216,10 +218,35 @@ function main(): number {
     }
 
     case "supervise": {
-      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
-      const row = key ? findByProviderSession(db, key) : undefined;
       const pid = Number(str(args, "pid"));
-      if (!row || !Number.isInteger(pid) || pid <= 0) return 0;
+      if (!Number.isInteger(pid) || pid <= 0) return 0;
+
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      let row = key ? findByProviderSession(db, key) : undefined;
+
+      // No key supplied: resolve by lane. A Bash command has no access to the provider session
+      // id (there is no CLAUDE_SESSION_ID env var — verified), so requiring one would make
+      // `icn-wait --supervise` unusable from the place it is actually needed.
+      //
+      // Only unambiguous when ONE session occupies the lane. With several, guessing would
+      // attach a build to the wrong session, so it declines and says why.
+      if (!row) {
+        const identity = discoverWorktree(str(args, "cwd") ?? process.cwd(), null);
+        if (identity) {
+          const rows = activeSessionsForWorktree(db, identity.worktree_id);
+          if (rows.length === 1) {
+            row = rows[0];
+          } else if (rows.length > 1) {
+            process.stderr.write(
+              `icn-agent-session: ${rows.length} sessions occupy this lane; ` +
+                "pass --harness-key to say which one owns this operation\n"
+            );
+            return 0;
+          }
+        }
+      }
+      if (!row) return 0;
+
       const id = superviseOperation(db, row.id, pid, str(args, "label") ?? "supervised operation");
       process.stdout.write(String(id) + "\n");
       return 0;

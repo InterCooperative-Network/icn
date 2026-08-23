@@ -161,5 +161,49 @@ timeout 10 "$WAIT" file "$TMP/x" --timeout abc >/dev/null 2>&1
 check "non-numeric timeout is rejected (exit 2)" 2 $?
 
 echo
+
+# ── 5. supervision of long operations ────────────────────────────────────────
+echo "5. supervised long operations (the sanctioned alternative to a fake heartbeat)"
+
+SESSION_BIN="$ROOT/ops/scripts/icn-agent-session"
+if [ -x "$SESSION_BIN" ] && [ -f "$ROOT/ops/mcp/dist/cli/session.js" ]; then
+  export ICN_OPS_DB="$TMP/sup.db"
+
+  "$SESSION_BIN" register --harness-key wait-selftest-conv --cwd "$ROOT" >/dev/null 2>&1
+  # No --harness-key: a Bash command cannot know the provider session id (there is no
+  # CLAUDE_SESSION_ID env var), so this must resolve the lane's sole session by itself.
+  timeout 30 "$WAIT" cmd --supervise --timeout 20 -- sleep 2 >/dev/null 2>&1
+  check "supervised wait completes without a session id" 0 $?
+
+  LEFT="$("$SESSION_BIN" status --harness-key wait-selftest-conv 2>/dev/null \
+          | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("live_supervisions",[])))' 2>/dev/null)"
+  if [ "${LEFT:-x}" = "0" ]; then
+    ok "supervision is closed out when the operation finishes (none left running)"
+  else
+    bad "supervision leaked" "${LEFT} still running"
+  fi
+
+  # A contended lane must decline rather than attach the build to an arbitrary session.
+  "$SESSION_BIN" register --harness-key wait-selftest-conv2 --cwd "$ROOT" >/dev/null 2>&1
+  ERR="$("$SESSION_BIN" supervise --pid $$ --label probe --cwd "$ROOT" 2>&1 >/dev/null)"
+  case "$ERR" in
+    *"pass --harness-key"*) ok "contended lane declines to guess which session owns the operation" ;;
+    *) bad "contended lane should decline" "got: ${ERR:-<silence>}" ;;
+  esac
+
+  # Supervision must never be usable as a fake heartbeat: it cannot invent progress.
+  PC="$("$SESSION_BIN" status --harness-key wait-selftest-conv 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("progress_count"))' 2>/dev/null)"
+  if [ "${PC:-x}" = "0" ]; then
+    ok "supervising an operation does NOT advance progress evidence"
+  else
+    bad "supervision advanced progress" "progress_count=${PC}"
+  fi
+  unset ICN_OPS_DB
+else
+  echo "  skip  session CLI not built (npm --prefix ops/mcp run build)"
+fi
+
+echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

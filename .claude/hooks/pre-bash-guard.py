@@ -64,8 +64,11 @@ Use ops/scripts/icn-wait instead — it is bounded and cannot wait on itself:
   icn-wait file <PATH> --pattern '^EXIT=' --timeout 600 --source-pid <PID>
   icn-wait match '<pattern>' --timeout 600      # last resort; excludes the observer
 
-Add --supervise --harness-key "$CLAUDE_SESSION_ID" for long builds so the lane is not
-judged abandoned while it runs.
+For a long build, add --supervise so the lane is not judged abandoned while it runs:
+
+  icn-wait cmd --supervise --timeout 3600 -- cargo test --workspace
+
+It resolves your session from the worktree; no session id needed.
 """
 
 
