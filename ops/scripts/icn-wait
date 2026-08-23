@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+#: capability: safe-waiting
+#: summary: Bounded, self-match-proof waiting for processes, commands and sentinel files.
+#: safety: read_only
+#
+# icn-wait — wait for something, correctly.
+#
+# WHY THIS EXISTS
+#   Agents invent waiting loops, and the loops they invent are reproducibly wrong. Two real
+#   non-terminating examples were recovered from this VM's process table:
+#
+#     until ! pgrep -f "scratchpad/mutate.py"; do sleep 20; done
+#         `pgrep -f` matches full command lines, and the waiting shell's OWN command line
+#         contains the pattern. The shell matches itself, so the predicate is permanently
+#         false. This is a logical deadlock, not a slow process: no future event can end it.
+#
+#     until grep -q "^EXIT=" /tmp/.../full-test-3.log 2>/dev/null; do sleep 20; done
+#         The `2>/dev/null` turns "this file does not exist" into "not ready yet", so a
+#         sentinel whose producer died — or whose scratchpad was cleaned up — is
+#         indistinguishable from one that is still coming. It spins forever.
+#
+#   Both looked maximally alive (a fresh child every few seconds) and were maximally dead.
+#
+# WHAT THIS GUARANTEES
+#   * Every wait is BOUNDED. Unbounded blocking requires --allow-unbounded, explicitly.
+#   * Pattern waits CANNOT match the observer: this process, its ancestors and its own
+#     descendants are excluded from every match set, and the exclusion is asserted, not assumed.
+#   * Impossible conditions FAIL FAST with a distinct exit code instead of spinning: a sentinel
+#     whose directory does not exist, or whose producer has already exited without writing it.
+#   * Timeouts are observable — they print what was being waited for and how long.
+#
+# USAGE
+#   icn-wait cmd  [--timeout SEC] [--label L] [--supervise [--harness-key K]] -- <command...>
+#                                                               # PREFERRED: launch and wait $!
+#   icn-wait pid  <PID> [--timeout SEC] [--label L]
+#   icn-wait file <PATH> [--pattern REGEX] [--source-pid PID] [--timeout SEC]
+#   icn-wait match <PATTERN> [--timeout SEC]                    # last resort; see NOTES
+#
+# EXIT CODES
+#   0 condition met      1 timed out
+#   2 usage error        3 condition unreachable (can never become true)
+#
+# NOTES
+#   `match` is a last resort. If you started the process, you have its PID — use `cmd` or `pid`,
+#   which are exact. Pattern matching is inherently ambiguous and is offered only because some
+#   waits are genuinely for processes this shell did not create.
+#
+#   --supervise declares the launched process to the session registry for its lifetime, so a
+#   legitimately long operation (a 45-minute test run that emits no hook events) is not judged
+#   abandoned when its heartbeat ages past the TTL. This is the sanctioned alternative to a
+#   periodic fake heartbeat: it is backed by a live PID and expires with the process.
+
+set -uo pipefail
+
+readonly DEFAULT_TIMEOUT="${ICN_WAIT_DEFAULT_TIMEOUT:-1800}"   # 30 min
+readonly POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
+
+die()   { printf 'icn-wait: %s\n' "$*" >&2; exit 2; }
+fatal() { printf 'icn-wait: UNREACHABLE — %s\n' "$*" >&2; exit 3; }
+note()  { [ "${QUIET:-0}" = 1 ] || printf 'icn-wait: %s\n' "$*" >&2; }
+
+now() { date +%s; }
+
+# ── argument parsing ─────────────────────────────────────────────────────────
+CMD="${1:-}"; [ -n "$CMD" ] || die "no subcommand (try --help)"
+case "$CMD" in -h|--help|help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+shift
+
+TIMEOUT="$DEFAULT_TIMEOUT"; LABEL=""; PATTERN=""; SOURCE_PID=""; ALLOW_UNBOUNDED=0
+QUIET=0; SUPERVISE=0; HARNESS_KEY=""; POSITIONAL=(); PAYLOAD=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --timeout)          TIMEOUT="${2:-}"; shift 2 ;;
+    --label)            LABEL="${2:-}"; shift 2 ;;
+    --pattern)          PATTERN="${2:-}"; shift 2 ;;
+    --source-pid)       SOURCE_PID="${2:-}"; shift 2 ;;
+    --allow-unbounded)  ALLOW_UNBOUNDED=1; shift ;;
+    --supervise)        SUPERVISE=1; shift ;;
+    --harness-key)      HARNESS_KEY="${2:-}"; shift 2 ;;
+    --quiet)            QUIET=1; shift ;;
+    --)                 shift; PAYLOAD=("$@"); break ;;
+    -*)                 die "unknown option: $1" ;;
+    *)                  POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+case "$TIMEOUT" in
+  ''|*[!0-9]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
+esac
+if [ "$TIMEOUT" -eq 0 ] && [ "$ALLOW_UNBOUNDED" -ne 1 ]; then
+  die "--timeout 0 means wait forever; that needs --allow-unbounded stated explicitly"
+fi
+
+DEADLINE=0
+[ "$TIMEOUT" -gt 0 ] && DEADLINE=$(( $(now) + TIMEOUT ))
+
+expired() { [ "$DEADLINE" -gt 0 ] && [ "$(now)" -ge "$DEADLINE" ]; }
+
+timed_out() {
+  printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL:-$1}" >&2
+  exit 1
+}
+
+# ── observer exclusion set ───────────────────────────────────────────────────
+# Every PID that is "us": this shell, its whole ancestor chain, and anything we spawn. A
+# pattern wait that counted any of these would be waiting on itself — the exact #2644 defect.
+build_exclusions() {
+  local p=$$ guard=0
+  EXCLUDE=" $$ "
+  while [ "$p" -gt 1 ] && [ "$guard" -lt 64 ]; do
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+    [ -n "$p" ] || break
+    EXCLUDE="$EXCLUDE$p "
+    guard=$((guard + 1))
+  done
+}
+
+is_excluded() { case "$EXCLUDE" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
+# Descendants of this script (the pgrep we spawn, any subshell) are ours too.
+is_our_descendant() {
+  local p="$1" guard=0
+  while [ "$p" -gt 1 ] && [ "$guard" -lt 64 ]; do
+    [ "$p" = "$$" ] && return 0
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+    [ -n "$p" ] || return 1
+    guard=$((guard + 1))
+  done
+  return 1
+}
+
+# Matches for PATTERN excluding the observer. Prints surviving PIDs, one per line.
+foreign_matches() {
+  local pat="$1" pid
+  pgrep -f -- "$pat" 2>/dev/null | while read -r pid; do
+    [ -n "$pid" ] || continue
+    is_excluded "$pid" && continue
+    is_our_descendant "$pid" && continue
+    printf '%s\n' "$pid"
+  done
+}
+
+alive() { kill -0 "$1" 2>/dev/null; }
+
+# ── subcommands ──────────────────────────────────────────────────────────────
+case "$CMD" in
+
+  cmd)
+    # PREFERRED FORM. We create the process, so we own its PID and can `wait` on it exactly.
+    # No pattern, no ambiguity, no self-match possible.
+    [ "${#PAYLOAD[@]}" -gt 0 ] || die "cmd requires: icn-wait cmd [--timeout N] -- <command...>"
+    "${PAYLOAD[@]}" &
+    child=$!
+    LABEL="${LABEL:-${PAYLOAD[0]}}"
+
+    # Declare the operation so a long legitimate run is protected without faking progress.
+    SUP_ID=""
+    if [ "$SUPERVISE" = 1 ]; then
+      SESSION_BIN="$(dirname "$0")/icn-agent-session"
+      if [ -x "$SESSION_BIN" ] && [ -n "$HARNESS_KEY" ]; then
+        SUP_ID="$("$SESSION_BIN" supervise --harness-key "$HARNESS_KEY" \
+                    --pid "$child" --label "$LABEL" 2>/dev/null || true)"
+      fi
+      # Supervision is best-effort observability; its absence must never change the wait.
+      [ -n "$SUP_ID" ] || note "supervision unavailable; waiting anyway"
+    fi
+    end_supervision() {
+      [ -n "$SUP_ID" ] || return 0
+      "$(dirname "$0")/icn-agent-session" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" \
+        >/dev/null 2>&1 || true
+    }
+
+    if [ "$DEADLINE" -eq 0 ]; then
+      wait "$child"; rc=$?; end_supervision "$rc"; exit "$rc"
+    fi
+    # Bounded wait on our own child: poll cheaply, then reap for the true exit status.
+    while alive "$child"; do
+      if expired; then
+        kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null
+        end_supervision 124; timed_out "$LABEL"
+      fi
+      sleep "$POLL_INTERVAL"
+    done
+    wait "$child"; rc=$?; end_supervision "$rc"; exit "$rc"
+    ;;
+
+  pid)
+    target="${POSITIONAL[0]:-}"
+    case "$target" in ''|*[!0-9]*) die "pid requires a numeric PID" ;; esac
+    [ "$target" = "$$" ] && fatal "asked to wait for this very process ($$)"
+    build_exclusions
+    is_excluded "$target" && fatal "PID $target is this process or one of its ancestors; waiting on it can never complete"
+
+    if ! alive "$target"; then
+      note "PID $target is already gone"
+      exit 0
+    fi
+    LABEL="${LABEL:-PID $target}"
+    # Not our child, so `wait` is unavailable; kill -0 polling is exact and cannot self-match.
+    while alive "$target"; do
+      expired && timed_out "$LABEL"
+      sleep "$POLL_INTERVAL"
+    done
+    exit 0
+    ;;
+
+  file)
+    path="${POSITIONAL[0]:-}"
+    [ -n "$path" ] || die "file requires a path"
+    LABEL="${LABEL:-$path}"
+
+    # FAIL FAST on an unreachable sentinel. A missing directory is not "not yet" — nothing is
+    # going to create it, and treating it as pending is how a wait becomes immortal.
+    dir="$(dirname -- "$path")"
+    [ -d "$dir" ] || fatal "sentinel directory does not exist: $dir (nothing can create $path)"
+
+    if [ -n "$SOURCE_PID" ]; then
+      case "$SOURCE_PID" in *[!0-9]*) die "--source-pid must be numeric" ;; esac
+    fi
+
+    while :; do
+      if [ -e "$path" ]; then
+        if [ -z "$PATTERN" ]; then exit 0; fi
+        if grep -qE -- "$PATTERN" "$path" 2>/dev/null; then exit 0; fi
+      fi
+      # The producer died without satisfying the condition: it can never be satisfied.
+      if [ -n "$SOURCE_PID" ] && ! alive "$SOURCE_PID"; then
+        fatal "producer PID $SOURCE_PID exited and $path still does not satisfy the condition"
+      fi
+      # The directory was cleaned up mid-wait (the other half of the #2644 defect).
+      [ -d "$dir" ] || fatal "sentinel directory disappeared during the wait: $dir"
+      expired && timed_out "$LABEL"
+      sleep "$POLL_INTERVAL"
+    done
+    ;;
+
+  match)
+    pat="${POSITIONAL[0]:-}"
+    [ -n "$pat" ] || die "match requires a pattern"
+    LABEL="${LABEL:-processes matching /$pat/}"
+    build_exclusions
+
+    # ASSERTION, not an assumption. The observer's own command line contains the pattern (it
+    # is right there in argv), so a naive matcher WOULD count it and the wait could never end.
+    # Prove the exclusion actually removes us before entering the loop.
+    if pgrep -f -- "$pat" 2>/dev/null | grep -qx "$$"; then
+      note "observer PID $$ matches /$pat/ and is excluded (this is the #2644 self-match trap)"
+    fi
+    if foreign_matches "$pat" | grep -qx "$$"; then
+      fatal "observer exclusion failed for /$pat/ — refusing to enter a self-matching wait"
+    fi
+
+    while :; do
+      remaining="$(foreign_matches "$pat")"
+      [ -z "$remaining" ] && exit 0
+      expired && timed_out "$LABEL"
+      sleep "$POLL_INTERVAL"
+    done
+    ;;
+
+  *) die "unknown subcommand: $CMD (try --help)" ;;
+esac
