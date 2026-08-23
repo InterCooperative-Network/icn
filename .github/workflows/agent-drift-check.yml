@@ -11,6 +11,7 @@ on:
       - 'ops/automation/skills/**'
       - 'scripts/check-skill-registry.py'
       - 'scripts/check-agent-capabilities.py'
+      - 'scripts/check-agent-runtime-adoption.py'
       - 'scripts/generate-agent-capabilities.py'
       - 'ops/mcp/src/**'
       - 'ops/scripts/**'
@@ -71,6 +72,9 @@ jobs:
 
       - name: Agent capability manifest matches the real runtime surface (Refs icn#2653)
         run: python3 scripts/check-agent-capabilities.py
+
+      - name: Lifecycle hooks and provider MCP routes are still wired (Refs icn#2653)
+        run: python3 scripts/check-agent-runtime-adoption.py --verbose
 
       - name: Capability discovery behaves as advertised (Refs icn#2653)
         run: bash scripts/test-agent-capability-discovery.sh

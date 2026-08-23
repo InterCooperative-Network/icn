@@ -369,7 +369,36 @@ tool and the file, but not the startup line or automatic registration. See §1.1
 
 ---
 
-## 8. Safe waiting
+## 8. Lifecycle consumers
+
+`icn-lane-audit` (icn#2653) and any future consumer should join on **canonical lane identity**
+first and corroborate with observation second:
+
+```
+icn-agent-session classify --path <worktree>     # or --worktree-id <id>
+```
+
+It returns JSON — `state`, `retireable`, `retireable_with_approval`, `reason`, `contention`,
+`branch_changed`, `live_branch`, `supervised` — and an exit code that is itself the verdict:
+`0` healthy, `1` protected, `2` candidate, `3` registry unavailable.
+
+Binding rules for every consumer:
+
+- **A missing row is not permission.** `UNREGISTERED-OBSERVED` and `REGISTRY-UNAVAILABLE` are
+  protected states. A lane with no row may be a pre-integration session, an unsupported
+  launcher, or a registry failure.
+- **A merged PR is not permission either.** Merge state is one input; it says nothing about who
+  is currently working in the lane.
+- **Process observation may only make a verdict safer**, never more permissive: an expired
+  heartbeat plus a live process downgrades to protected, not the reverse.
+- **The disk guard gets no process-control authority.** `icn-disk-guard` classifies and
+  reclaims build output under its own policy; it does not signal processes, and retirement
+  stays a separate, operator-approved step.
+
+The hierarchy consumers should model is the one in §2: repository → lane → activation(s), with
+branch/HEAD/PR hanging off the lane as live or advisory metadata, never as identity.
+
+## 9. Safe waiting
 
 `ops/scripts/icn-wait` is the supported way to wait for something. It exists because the
 alternative agents invent is defective in two reproducible ways — a self-matching
