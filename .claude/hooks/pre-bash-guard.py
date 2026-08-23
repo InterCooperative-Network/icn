@@ -45,101 +45,110 @@ Refs icn#2653.
 import json
 import re
 import sys
+from re import error
 
 # ── detection ─────────────────────────────────────────────────────────────────
 #
-# The earlier version pattern-matched over the whole command string. That was wrong in both
-# directions and an independent review found 11 evasions and 5 misfires. Two structural
-# mistakes caused nearly all of them:
+# Structure, learned from two rounds of adversarial review:
 #
-#   * it looked for `sleep` adjacent to `do`/`done`, so ANY extra statement after the sleep
-#     (`do sleep 30; date; done`) disarmed the guard — a one-token rewrite of the real incident
-#     loop walked straight through;
-#   * it looked for the defect anywhere in the command, so a legitimate loop whose BODY happened
-#     to contain `grep ... 2>/dev/null` or the word `test` was blocked.
-#
-# So: parse the loop, split condition from body, and require the defect in the CONDITION (that
-# is what decides termination) and the sleep in the BODY (that is what makes it a poll).
+#   * Quoted spans are computed on the RAW text, BEFORE comment stripping. Doing it the other
+#     way let a `#` inside a string eat the rest of the line — including the loop's `done`.
+#   * A quoted span is not automatically inert. `bash -c "<loop>"`, `sh -c`, `eval` and heredoc
+#     bodies are EXECUTED, so they are recursively re-parsed as fragments. Treating them as
+#     text allowed 19/19 non-terminating waits through, `bash -c "..."` being a one-token
+#     rewrite of the real incident loop.
+#   * Bounding tokens only count OUTSIDE quotes, so `echo "x; break"` cannot disarm the guard.
 
-COMMENT_RE = re.compile(r"(?<!\\)#[^\n]*")
+MAX_FRAGMENT_DEPTH = 4
 
-# `until|while <condition> ; do <body> done`  — condition and body captured separately.
+# Bash starts a comment only where `#` BEGINS A WORD. Treating any `#` as a comment ate the
+# rest of the line for an ordinary URL fragment (`curl http://h/p#f`), taking the loop's `done`
+# with it and disarming the guard.
+COMMENT_RE = re.compile(r"(?:(?<=\s)|^)#[^\n]*")
+
 LOOP_RE = re.compile(
     r"\b(?P<kw>until|while)\b(?P<cond>.*?)(?:;|\n)\s*do\b(?P<body>.*?)\bdone\b",
     re.S | re.I,
 )
 
-# `pgrep -f PATTERN` (any flag order), quoted or bare.
 PGREP_RE = re.compile(
     r"\bpgrep\b[^|;&\n]*?-[a-zA-Z]*f[a-zA-Z]*\s+(?:--\s+)?"
     r"(?:(?P<q>['\"])(?P<qpat>[^'\"]*)(?P=q)|(?P<pat>[^'\"\s|;&)]+))"
 )
 
-# `ps ... | grep PATTERN` — the other canonical self-matching idiom. grep's own argv appears in
-# ps output, so it is non-terminating for exactly the same reason as pgrep -f.
+# `ps … | grep PATTERN` — the same self-matching defect. `grep -c` is excluded: counting is the
+# documented way to compensate for the self-match, and flagging it produced a refusal that
+# named `]` as the pattern.
 PS_GREP_RE = re.compile(
-    r"\bps\b[^|;\n]*\|[^|;\n]*\bgrep\b[^|;\n]*?"
-    r"(?:(?P<q2>['\"])(?P<qpat2>[^'\"]*)(?P=q2)|(?P<pat2>[^'\"\s|;&)]+))\s*$"
+    r"\bps\b[^|;\n]*\|(?P<grep>[^|;\n]*?\bgrep\b[^|;\n]*?)\s+"
+    # Skip leading flags so the PATTERN is captured, not `-c`. Without this the count form was
+    # read as pattern="-c" and the exclusion below never fired.
+    r"(?:-\S+\s+)*"
+    r"(?:(?P<q2>['\"])(?P<qpat2>[^'\"]*)(?P=q2)|(?P<pat2>[A-Za-z0-9_./][A-Za-z0-9_./-]+))"
 )
 
-# The bracket trick — `[m]utate.py` — cannot match the shell that names it. Always safe.
 BRACKET_TRICK_RE = re.compile(r"\[[^\]]\]")
-
-# stderr swallowed: `2>/dev/null` or bash's `&>/dev/null`.
 SWALLOW_RE = re.compile(r"(2>\s*/dev/null|&>\s*/dev/null|>&\s*/dev/null)")
-# a file/content predicate
-FILE_PRED_RE = re.compile(r"\b(grep|test)\b|\[\s")
+# A FILE sentinel: an explicit file test, or a grep whose target looks like a path. Requiring
+# this stops a pipeline predicate (`kubectl get … | grep -q Running 2>/dev/null`) — which is
+# not a sentinel wait at all — from being refused.
+FILE_TEST_RE = re.compile(r"(\btest\b|\[)\s+-[efsrd]\b")
+GREP_FILE_RE = re.compile(r"\bgrep\b[^|;\n]*\s(?P<target>[~./][^\s|;&]*|\$\{?\w+\}?)\s*(?:2>|&>|>&|$)")
 
-# Bounding constructs, as real tokens. `timeout` must be a command with a duration, SECONDS a
-# shell variable, break a statement — previously the bare WORDS matched, so `--timeout 60`
-# inside a pgrep pattern, the English word "seconds", or `break` in a comment all disarmed it.
 BOUNDED_RE = re.compile(
-    r"(^|[;&|(]\s*)timeout\s+[\d.]+"      # timeout 600 ...
-    r"|\$SECONDS\b|\bSECONDS\s*[-=]"       # $SECONDS / SECONDS=
-    r"|(^|[;&|\n]\s*)break\b"              # break as a statement
-    r"|(^|[;&|(]\s*)icn-wait\b"             # the supported helper
-    # These two were left as bare words while the others were anchored, so ANY occurrence
-    # disarmed the guard — including inside the pgrep pattern itself
-    # (`pgrep -f "deadline-runner.py"`) or in a trailing comment. Anchor them the same way:
-    # a shell variable or an assignment, not an arbitrary substring.
+    r"(^|[;&|(]\s*)timeout\s+[\d.]+"
+    r"|\$SECONDS\b|\bSECONDS\s*[-=<>]|\(\(\s*SECONDS\b"
+    r"|(^|[;&|\n]\s*)break\b"
+    # `exit` must be at a command position. As a bare word under re.I it matched the path
+    # /tmp/scratch/EXIT and silently disarmed the guard on the very sentinel shape it refuses.
+    r"|(^|[;&|\n]\s*)exit\b"
+    r"|(^|[;&|(]\s*)icn-wait\b"
     r"|\$(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b"
     r"|\b(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\s*=",
     re.M | re.I,
 )
 
+# Wrappers whose quoted argument is executed, not quoted text.
+EXEC_WRAPPER_RE = re.compile(
+    r"\b(?:ba|z|k|da)?sh\b[^|;&\n]*?-c\s+(?P<q>['\"])(?P<code>.*?)(?<!\\)(?P=q)"
+    r"|\beval\s+(?P<q2>['\"])(?P<code2>.*?)(?<!\\)(?P=q2)",
+    re.S,
+)
+# Only a heredoc fed to a SHELL is executed. `cat >> README.md <<EOF` is documentation, and
+# recursing into it refused an agent's attempt to document this very defect.
+HEREDOC_RE = re.compile(
+    r"\b(?:ba|z|k|da)?sh\b[^\n]*?<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<code>.*?)\n\s*(?P=tag)\b",
+    re.S,
+)
 
-def strip_comments(cmd: str) -> str:
-    return COMMENT_RE.sub("", cmd)
+
+ANY_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<code>.*?)\n\s*(?P=tag)\b", re.S)
 
 
-def quoted_spans(cmd: str) -> list[tuple[int, int]]:
-    """Character ranges inside single/double quotes or a heredoc body.
+def quoted_spans(text: str) -> list[tuple[int, int]]:
+    """Character ranges the shell will NOT execute as commands of this fragment.
 
-    Without this the guard blocks writing ABOUT the defect: `git commit -m "... until !
-    pgrep -f x; do sleep 5; done ..."` and a heredoc appending the example to the README were
-    both refused. A loop that exists only as text inside an argument is not a loop the shell
-    will run.
+    Covers single/double quotes and EVERY heredoc body. A heredoc fed to a shell is executed —
+    but that is handled by recursing into it as its own fragment, not by parsing it here; a
+    heredoc fed to `cat` is documentation, and parsing it in place refused an agent's attempt to
+    write about this very defect.
     """
-    spans: list[tuple[int, int]] = []
-    i, n = 0, len(cmd)
+    spans: list[tuple[int, int]] = [(m.start("code"), m.end("code")) for m in ANY_HEREDOC_RE.finditer(text)]
+    i, n = 0, len(text)
     while i < n:
-        ch = cmd[i]
+        ch = text[i]
+        if inside_span(i, spans):
+            i += 1
+            continue
         if ch in "\"'":
             j = i + 1
-            while j < n and cmd[j] != ch:
-                if cmd[j] == "\\":
+            while j < n and text[j] != ch:
+                if text[j] == "\\":
                     j += 1
                 j += 1
             spans.append((i, min(j, n)))
             i = j + 1
             continue
-        if cmd.startswith("<<", i):
-            m = re.match(r"<<-?\s*['\"]?(\w+)['\"]?", cmd[i:])
-            if m:
-                end = cmd.find("\n" + m.group(1), i)
-                spans.append((i, end if end != -1 else n))
-                i = end if end != -1 else n
-                continue
         i += 1
     return spans
 
@@ -148,80 +157,120 @@ def inside_span(pos: int, spans: list[tuple[int, int]]) -> bool:
     return any(a <= pos <= b for a, b in spans)
 
 
+def strip_comments_outside_quotes(text: str) -> str:
+    spans = quoted_spans(text)
+    out, last = [], 0
+    for m in COMMENT_RE.finditer(text):
+        if inside_span(m.start(), spans):
+            continue
+        out.append(text[last:m.start()])
+        last = m.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
+def fragments(cmd: str, depth: int = 0, ancestor_bounded: bool = False) -> list[tuple[str, bool]]:
+    """(fragment, bounded_by_ancestor) for the command and every body the shell executes.
+
+    The ancestor flag matters: in `timeout 600 bash -c "<loop>"` the bound lives in the PARENT,
+    so a nested fragment judged in isolation would be refused despite being perfectly bounded.
+    """
+    mine = ancestor_bounded or _bounded(cmd)
+    found = [(cmd, ancestor_bounded)]
+    if depth >= MAX_FRAGMENT_DEPTH:
+        return found
+    for m in EXEC_WRAPPER_RE.finditer(cmd):
+        code = m.group("code") or m.group("code2")
+        if code:
+            found.extend(fragments(code, depth + 1, mine))
+    for m in HEREDOC_RE.finditer(cmd):
+        found.extend(fragments(m.group("code"), depth + 1, mine))
+    return found
+
+
 def _pattern_of(m: re.Match) -> str | None:
     for g in ("qpat", "pat", "qpat2", "pat2"):
         try:
             v = m.group(g)
-        except IndexError:
+        except (IndexError, error):
             continue
         if v:
             return v
     return None
 
 
+def _bounded(fragment: str) -> bool:
+    """A bounding construct that is really executed — not one sitting inside a string."""
+    spans = quoted_spans(fragment)
+    return any(not inside_span(m.start(), spans) for m in BOUNDED_RE.finditer(fragment))
+
+
 def blocked_reason(cmd: str) -> str | None:
-    """Return a refusal reason, or None to allow.
-
-    Refuses only the two unbounded shapes documented above, and only when the defect is in the
-    loop's own termination condition.
-    """
-    clean = strip_comments(cmd)
-    spans = quoted_spans(clean)
-
-    for loop in LOOP_RE.finditer(clean):
-        # A loop keyword inside a quoted argument or heredoc is text, not a command.
-        if inside_span(loop.start("kw"), spans):
+    """Return a refusal reason, or None to allow."""
+    for fragment, ancestor_bounded in fragments(cmd):
+        if ancestor_bounded:
             continue
-        cond, body = loop.group("cond"), loop.group("body")
+        clean = strip_comments_outside_quotes(fragment)
+        spans = quoted_spans(clean)
 
-        # A polling loop sleeps somewhere in its body. Position within the body is irrelevant.
-        if not re.search(r"\bsleep\b", body, re.I):
-            continue
-
-        # An escape hatch anywhere in the COMMAND means the loop can end or report failure —
-        # including a wrapper outside it, e.g. `timeout 600 bash -c "until ...; done"`. Scoping
-        # this to the loop text alone wrongly blocked exactly that form. Safe to widen now that
-        # comments are stripped and the bounding tokens are anchored to command positions.
-        if BOUNDED_RE.search(clean):
-            continue
-
-        # ── Defect A: the condition matches the observer itself ──
-        for m in list(PGREP_RE.finditer(cond)) + list(PS_GREP_RE.finditer(cond)):
-            pat = _pattern_of(m)
-            if not pat or BRACKET_TRICK_RE.search(pat):
+        for loop in LOOP_RE.finditer(clean):
+            # A loop keyword inside quotes is text UNLESS this fragment is itself an executed
+            # body — and in that case we are already recursing into it as its own fragment.
+            if inside_span(loop.start("kw"), spans):
                 continue
-            safe_hint = f"[{pat[:1]}]{pat[1:]}" if pat else "[p]attern"
-            return (
-                f"This wait can never terminate.\n\n"
-                f"  pattern: {pat}\n\n"
-                f"`pgrep -f` (and `ps | grep`) matches full command lines, and THIS shell's own "
-                f"command line contains that pattern — so the shell matches itself and the loop "
-                f"condition stays true forever. No future event from any process can end it. "
-                f"Two loops of exactly this shape were found on icn-dev pinning a merged lane's "
-                f"build output for up to 2.8 days.\n\n"
-                f"If you must match by pattern, the bracket idiom `{safe_hint}` does not match "
-                f"the shell that names it — but an exact PID is better still."
-            )
+            cond, body = loop.group("cond"), loop.group("body")
+            if not re.search(r"\bsleep\b", body, re.I):
+                continue
+            if _bounded(loop.group(0)) or _bounded(clean):
+                continue
 
-        # ── Defect B: unbounded sentinel wait whose failure is swallowed ──
-        if SWALLOW_RE.search(cond) and FILE_PRED_RE.search(cond):
-            return (
-                "This wait is unbounded and cannot detect its own failure.\n\n"
-                "A sentinel wait is not impossible in principle — another process may "
-                "legitimately create or update the file later, and this loop would then finish "
-                "normally. The defect is that it cannot tell the difference between:\n"
-                "    - the producer is still working      (waiting is correct)\n"
-                "    - the producer died                   (waiting is futile)\n"
-                "    - the scratch directory was deleted   (waiting is futile)\n"
-                "    - the sentinel will never arrive      (waiting is futile)\n\n"
-                "Discarding stderr collapses \"cannot read this file\" into \"not ready yet\", so "
-                "three terminal cases look exactly like the healthy one. With no bound, the loop "
-                "can spin indefinitely while appearing active and never report why. A loop of "
-                "this shape was found on icn-dev waiting on a file whose scratch directory had "
-                "been cleaned up.\n\n"
-                "Supply a bound and producer evidence and this is fine — that is exactly what "
-                "the icn-wait form below does."
-            )
+            # ── Defect A: the condition matches the observer itself ──
+            for m in list(PGREP_RE.finditer(cond)) + list(PS_GREP_RE.finditer(cond)):
+                # Check the WHOLE match: the grep group is non-greedy, so `-c` can fall outside
+                # it and the exclusion silently never fired.
+                if re.search(r"\bgrep\b[^|;\n]*?(-\w*c\b|--count)", m.group(0)):
+                    continue  # `grep -c` counts: the documented self-match compensation
+                pat = _pattern_of(m)
+                if not pat or BRACKET_TRICK_RE.search(pat):
+                    continue
+                if not re.search(r"[A-Za-z0-9]", pat):
+                    continue  # punctuation is not a process pattern
+                safe_hint = f"[{pat[:1]}]{pat[1:]}"
+                return (
+                    f"This wait can never terminate.\n\n"
+                    f"  pattern: {pat}\n\n"
+                    f"`pgrep -f` (and `ps | grep`) matches full command lines, and THIS shell's own "
+                    f"command line contains that pattern — so the shell matches itself and the loop "
+                    f"condition stays true forever. No future event from any process can end it. "
+                    f"Two loops of exactly this shape were found on icn-dev pinning a merged lane's "
+                    f"build output for up to 2.8 days.\n\n"
+                    f"If you must match by pattern, the bracket idiom `{safe_hint}` does not match "
+                    f"the shell that names it — but an exact PID is better still."
+                )
+
+            # ── Defect B: unbounded FILE sentinel whose failure is swallowed ──
+            if (
+                SWALLOW_RE.search(cond)
+                and "|" not in cond
+                and (FILE_TEST_RE.search(cond) or GREP_FILE_RE.search(cond))
+            ):
+                return (
+                    "This wait is unbounded and cannot detect its own failure.\n\n"
+                    "A sentinel wait is not impossible in principle — another process may "
+                    "legitimately create or update the file later, and this loop would then finish "
+                    "normally. The defect is that it cannot tell the difference between:\n"
+                    "    - the producer is still working      (waiting is correct)\n"
+                    "    - the producer died                   (waiting is futile)\n"
+                    "    - the scratch directory was deleted   (waiting is futile)\n"
+                    "    - the sentinel will never arrive      (waiting is futile)\n\n"
+                    "Discarding stderr collapses \"cannot read this file\" into \"not ready yet\", so "
+                    "three terminal cases look exactly like the healthy one. With no bound, the loop "
+                    "can spin indefinitely while appearing active and never report why. A loop of "
+                    "this shape was found on icn-dev waiting on a file whose scratch directory had "
+                    "been cleaned up.\n\n"
+                    "Supply a bound and producer evidence and this is fine — that is exactly what "
+                    "the icn-wait form below does."
+                )
     return None
 
 
@@ -248,9 +297,19 @@ def main() -> int:
     except Exception:
         return 0
 
-    cmd = data.get("tool_input", {}).get("command", "") or ""
+    # Defensive: the payload shape is the harness's, not ours. Previously a non-dict
+    # tool_input or a non-string command raised AttributeError/TypeError and the hook exited 1
+    # with a traceback — a guard that CRASHES fails open, which is the worst of both worlds.
+    tool_input = data.get("tool_input") if isinstance(data, dict) else None
+    cmd = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if not isinstance(cmd, str) or not cmd:
+        return 0
 
-    reason = blocked_reason(cmd)
+    try:
+        reason = blocked_reason(cmd)
+    except Exception as exc:  # noqa: BLE001 - never fail a session on a guard bug
+        print(f"[icn-dev GUARD] internal error, command allowed: {exc}", file=sys.stderr)
+        return 0
     if reason:
         print(f"[icn-dev GUARD] {reason}\n{ADVICE}", file=sys.stderr)
         return 2

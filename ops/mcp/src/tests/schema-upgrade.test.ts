@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { initDb } from "../state/db.js";
-import { registerSession } from "../runtime/session-runtime.js";
+import { classifyWorktree, registerSession } from "../runtime/session-runtime.js";
 
 let dir: string;
 beforeEach(() => {
@@ -152,6 +152,73 @@ describe("upgrade from the shipped v2 shape", () => {
     expect(r.created).toBe(true);
     // Legacy row and new row coexist.
     expect(db.prepare("SELECT COUNT(*) c FROM sessions").get()).toEqual({ c: 2 });
+    db.close();
+  });
+});
+
+describe("upgrade from a v3-shaped database (the shape this branch already published)", () => {
+  /** v3: sessions has the full identity set; watchers_process has NO worktree_id. */
+  function buildV3(path: string, pid: number): void {
+    const db = new Database(path);
+    db.exec(`
+      CREATE TABLE sessions (
+        id TEXT PRIMARY KEY, repo TEXT NOT NULL, worktree TEXT, task_description TEXT,
+        started_at TEXT DEFAULT (datetime('now')), last_heartbeat TEXT DEFAULT (datetime('now')),
+        repo_id TEXT, worktree_id TEXT, worktree_path TEXT, worktree_name TEXT,
+        provider_session_id TEXT, branch_at_registration TEXT, head_at_registration TEXT,
+        task_ref TEXT, pr_ref TEXT, parent_session_id TEXT, provider TEXT, transcript_path TEXT,
+        agent_pid INTEGER, host TEXT, current_activity TEXT, last_progress TEXT,
+        progress_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE file_claims (file_path TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, claimed_at TEXT, PRIMARY KEY (file_path, session_id));
+      CREATE TABLE health_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, polled_at TEXT);
+      CREATE TABLE decision_index (id TEXT PRIMARY KEY, title TEXT NOT NULL, tags TEXT, file_path TEXT NOT NULL, created_at TEXT);
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT DEFAULT (datetime('now')));
+      CREATE TABLE events (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL);
+      CREATE TABLE mailbox (id INTEGER PRIMARY KEY, to_session TEXT NOT NULL, from_session TEXT, kind TEXT NOT NULL DEFAULT 'text', payload TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL, read_at INTEGER);
+      CREATE TABLE watchers_process (id INTEGER PRIMARY KEY, session_id TEXT NOT NULL, pid INTEGER NOT NULL, label TEXT NOT NULL, created_at INTEGER NOT NULL, completed_at INTEGER, exit_code INTEGER, status TEXT NOT NULL DEFAULT 'running');
+      INSERT INTO schema_version (version) VALUES (1), (2), (3);
+    `);
+    db.prepare(
+      "INSERT INTO sessions (id, repo, worktree_id, worktree_path, worktree_name, provider_session_id, last_heartbeat, last_progress) " +
+      "VALUES ('v3s','icn','/r/icn.git/worktrees/laneA','/wt/laneA','laneA','conv', datetime('now','-120 minutes'), datetime('now','-120 minutes'))"
+    ).run();
+    // A supervision written by the PREVIOUS release: no lane column existed to record.
+    db.prepare(
+      "INSERT INTO watchers_process (session_id,pid,label,created_at,status) VALUES ('v3s',?,'cargo test --workspace',?, 'running')"
+    ).run(pid, Date.now());
+    db.close();
+  }
+
+  it("a supervision written before v4 still protects its lane after upgrading", () => {
+    // THE DEFECT THIS PINS: `ALTER TABLE ADD COLUMN` cannot backfill, so every pre-v4
+    // supervision came back worktree_id NULL and both consumers excluded it — the lane with a
+    // live build classified retireable:true. That is verbatim the P0 v4 exists to prevent,
+    // reintroduced on the upgrade path. The earlier test asserted only that the COLUMN
+    // arrives, which is why it passed over this.
+    const path = join(dir, "v3.db");
+    buildV3(path, process.pid); // a real, live pid
+    const db = initDb(path);
+
+    expect(columns(db, "watchers_process")).toContain("worktree_id");
+    expect(
+      db.prepare("SELECT worktree_id FROM watchers_process").get()
+    ).toEqual({ worktree_id: null }); // still NULL — nothing can backfill it
+
+    const c = classifyWorktree(db, "/r/icn.git/worktrees/laneA", { observed_pids: [] });
+    expect(c.state).toBe("SUPERVISED-BUSY");
+    expect(c.retireable).toBe(false);
+    expect(c.supervised).toHaveLength(1);
+    db.close();
+  });
+
+  it("a dead pre-v4 supervision does not protect the lane", () => {
+    const path = join(dir, "v3dead.db");
+    buildV3(path, 999_999_999);
+    const db = initDb(path);
+    const c = classifyWorktree(db, "/r/icn.git/worktrees/laneA", { observed_pids: [] });
+    expect(c.state).toBe("REGISTERED-EXPIRED");
+    expect(c.retireable).toBe(true);
     db.close();
   });
 });

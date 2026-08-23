@@ -231,6 +231,11 @@ describe("several sessions may occupy one lane", () => {
           .run(`claim-${s}.rs`, s);
         superviseOperation(db, s, process.pid, `build-${s}`);
       }
+      // Kill a's supervision so release has something to surrender. A LIVE supervision now
+      // deliberately outlives its session (the build is still running); that is covered
+      // separately in session-runtime.test.ts.
+      db.prepare("UPDATE watchers_process SET pid = 999999999 WHERE session_id = ?")
+        .run(a.session_id);
 
       releaseSession(db, a.session_id, { reason: "completed" });
 
@@ -293,6 +298,9 @@ describe("provider conversation vs runtime activation", () => {
       db.prepare("INSERT INTO file_claims (file_path, session_id) VALUES ('a.rs', ?)")
         .run(a1.session_id);
       superviseOperation(db, a1.session_id, process.pid, "cargo build");
+      // Dead process: this is leaked bookkeeping the release must clear.
+      db.prepare("UPDATE watchers_process SET pid = 999999999 WHERE session_id = ?")
+        .run(a1.session_id);
       db.prepare(
         "INSERT INTO mailbox (to_session, from_session, kind, payload, created_at) VALUES (?, 'x', 'text', '{}', ?)"
       ).run(a1.session_id, Date.now());

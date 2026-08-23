@@ -267,6 +267,44 @@ CASES: list[tuple[str, int, str]] = [
         ALLOW,
         "FP: a single-quoted loop being written to a file",
     ),
+
+    # ── ROUND 3: execution wrappers. A quoted span is not automatically inert — the shell RUNS
+    # `bash -c "..."`. Treating it as text let 19/19 non-terminating waits through, and
+    # `bash -c` is a one-token rewrite of the real incident loop.
+    ('bash -c "until ! pgrep -f qq_marker; do sleep 1; done"', BLOCK, "FN: bash -c wrapper"),
+    ('sh -c "until ! pgrep -f zz_marker; do sleep 2; done"', BLOCK, "FN: sh -c wrapper"),
+    ('eval "until ! pgrep -f ev_marker; do sleep 2; done"', BLOCK, "FN: eval wrapper"),
+    ('bash <<EOF\nuntil ! pgrep -f hd_marker; do sleep 2; done\nEOF', BLOCK,
+     "FN: heredoc fed to a shell IS executed"),
+    # ── comment/quote parsing order ──
+    ('until ! pgrep -f b.sh; do sleep 5; echo "#"; done', BLOCK,
+     "FN: a '#' inside a string must not eat the loop's done"),
+    ('until ! pgrep -f z.sh; do sleep 5; curl http://h/p#f; done', BLOCK,
+     "FN: a URL fragment is not a comment (bash needs # at a word start)"),
+    # ── bounding tokens only count outside quotes ──
+    ('until ! pgrep -f x.sh; do sleep 5; echo "x; break"; done', BLOCK,
+     "FN: 'break' inside a string is not an escape hatch"),
+    ('until ! pgrep -f y.sh; do sleep 5; echo "; timeout 5"; done', BLOCK,
+     "FN: 'timeout' inside a string is not a bound"),
+    ('until ! pgrep -f "deadline=runner.py"; do sleep 5; done', BLOCK,
+     "FN: 'deadline=' inside the pattern is not a bound"),
+    ('until ! pgrep -f "max_wait=30s-runner"; do sleep 5; done', BLOCK,
+     "FN: 'max_wait=' inside the pattern is not a bound"),
+    ('while ps aux | grep -q "cargo build -p icn-net"; do sleep 30; done', BLOCK,
+     "FN: ps|grep -q is the same self-match defect"),
+    # ── correct waits that must NOT be refused ──
+    ('end=$((SECONDS+600)); while (( SECONDS < end )) && ! test -f /tmp/f 2>/dev/null; do sleep 5; done',
+     ALLOW, "FP: SECONDS in arithmetic context is a real bound"),
+    ('dl=$(($(date +%s)+600)); until grep -q OK /tmp/f 2>/dev/null; do [ $(date +%s) -ge $dl ] && exit 1; sleep 5; done',
+     ALLOW, "FP: 'exit' is an escape hatch just like 'break'"),
+    ('i=0; until grep -q OK /tmp/f 2>/dev/null; do i=$((i+1)); [ $i -gt 60 ] && exit 1; sleep 5; done',
+     ALLOW, "FP: a bounded counter"),
+    ('until kubectl get pod x -o json | grep -q Running 2>/dev/null; do sleep 5; done',
+     ALLOW, "FP: a pipeline predicate is not a file sentinel"),
+    ('while [ "$(ps aux | grep -c foo)" -gt 1 ]; do sleep 5; done',
+     ALLOW, "FP: grep -c is the documented self-match compensation"),
+    ('while ! [ -f /tmp/scratch/EXIT ] 2>/dev/null; do sleep 10; done', BLOCK,
+     "FN: a path containing 'EXIT' must not read as an exit statement"),
 ]
 
 # The block message must describe the ACTUAL property of each shape. An error message an agent

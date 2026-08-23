@@ -66,6 +66,8 @@ export function registerSessionTools(
         .describe("Agent provider/harness, e.g. claude-code, codex, cursor"),
       agent_pid: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe(
           "Your process id, if you know it. Recorded as correlation metadata and used by " +
@@ -99,13 +101,19 @@ export function registerSessionTools(
           reason: `${input.cwd ?? process.cwd()} does not resolve to a Git worktree`,
         });
       }
-      return json(
-        registerSession(db, {
-          ...input,
-          identity,
-          branch_state: readBranchState(identity.worktree_path),
-        })
-      );
+      try {
+        return json(
+          registerSession(db, {
+            ...input,
+            identity,
+            branch_state: readBranchState(identity.worktree_path),
+          })
+        );
+      } catch (e) {
+        // supervise_operation already answers structurally; this one threw, so a durable-id
+        // violation surfaced as a protocol error instead of a usable message.
+        return json({ error: "registration_rejected", reason: (e as Error).message });
+      }
     }
   );
 
@@ -188,8 +196,24 @@ export function registerSessionTools(
         if (checkStmt.get(file, session_id, ttl)) {
           conflicts.push(file);
         } else {
-          insertStmt.run(file, session_id);
-          claimed.push(file);
+          try {
+            insertStmt.run(file, session_id);
+            claimed.push(file);
+          } catch (e) {
+            // A released/unknown session_id trips the foreign key. Every sibling tool answers
+            // with structured JSON; leaking a raw SqliteError here made an ordinary
+            // "your session is gone" indistinguishable from a server fault.
+            return json({
+              error: "unknown_session",
+              session_id,
+              reason:
+                `cannot claim files for session ${session_id}: it is not registered ` +
+                "(it may have been released). Re-register before claiming. " +
+                `[${(e as Error).message}]`,
+              claimed,
+              conflicts,
+            });
+          }
         }
       }
 

@@ -450,7 +450,11 @@ describe("3. release surrenders every session-scoped authority", () => {
   function seedAuthority(sessionId: string) {
     db.prepare("INSERT INTO file_claims (file_path, session_id) VALUES (?, ?)")
       .run("icn/crates/a/src/lib.rs", sessionId);
+    // A supervision whose process has since DIED is pure leaked bookkeeping and must be
+    // released. (A supervision whose process is still ALIVE is a different case — see the
+    // dedicated test below.)
     superviseOperation(db, sessionId, process.pid, "cargo test");
+    db.prepare("UPDATE watchers_process SET pid = 999999999 WHERE session_id = ?").run(sessionId);
     db.prepare(
       "INSERT INTO mailbox (to_session, from_session, kind, payload, created_at) VALUES (?, ?, 'text', '{}', ?)"
     ).run(sessionId, "someone-else", Date.now());
@@ -473,6 +477,27 @@ describe("3. release surrenders every session-scoped authority", () => {
       .prepare("SELECT COUNT(*) c FROM mailbox WHERE to_session = ? AND read_at IS NULL")
       .get(session_id);
     expect(pending).toEqual({ c: 0 });
+  });
+
+  it("a supervision whose process is still ALIVE outlives the session that declared it", () => {
+    // Ending a session does not stop its build. Releasing every watcher unconditionally meant
+    // `/clear` silently revoked protection from a `cargo test --workspace` still running in the
+    // lane, which immediately became approval-retireable. The work lives in the worktree, not
+    // in the conversation; the row is reaped by pid as soon as the process actually exits.
+    const { session_id } = registerSession(db, {
+      repo: "icn", identity: ident("livebuild"), provider_session_id: "k",
+    });
+    superviseOperation(db, session_id, process.pid, "cargo test --workspace");
+
+    const res = releaseSession(db, session_id, { reason: "clear" });
+
+    expect(res.dropped.watchers).toBe(0); // nothing to surrender: the build is still running
+    expect(
+      db.prepare("SELECT status FROM watchers_process WHERE label = 'cargo test --workspace'").get()
+    ).toEqual({ status: "running" });
+    // ...and the LANE is still protected by it, even with no session row left.
+    const c = classifyWorktree(db, wtid("livebuild"), { observed_pids: [] });
+    expect(c.retireable).toBe(false);
   });
 
   it("a released session cannot be resurrected into holding authority again", () => {

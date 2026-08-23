@@ -273,7 +273,22 @@ function main(): number {
       const id = Number(str(args, "id"));
       if (!Number.isInteger(id)) return 0;
       const code = str(args, "exit-code");
-      endSupervision(db, id, code === undefined ? undefined : Number(code));
+      // Scope to the owning session when we can identify it. Without an owner filter any
+      // caller could complete any row by id — another lane's supervision, or a watch_process
+      // row, stealing that feature's completion event.
+      const key = resolveHarnessKey(str(args, "harness-key"), str(args, "identity-file"));
+      const owner = key ? findByProviderSession(db, key) : undefined;
+      const ok = endSupervision(
+        db,
+        id,
+        code === undefined ? undefined : Number(code),
+        owner?.id
+      );
+      if (!ok && owner) {
+        process.stderr.write(
+          `icn-agent-session: supervision ${id} is not owned by this session (or already ended)\n`
+        );
+      }
       return 0;
     }
 

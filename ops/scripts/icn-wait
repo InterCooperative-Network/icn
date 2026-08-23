@@ -231,10 +231,26 @@ case "$CMD" in
       # Supervision is best-effort observability; its absence must never change the wait.
       [ -n "$SUP_ID" ] || note "supervision unavailable; waiting anyway"
     fi
+    # A signal must not orphan the job. `setsid` detaches the child into its own group, so a
+    # harness tool-call timeout that kills OUR group leaves the build running AND leaves the
+    # supervision row 'running' with end_supervision never called. Cover every exit path.
+    on_signal() {
+      note "received signal; terminating supervised child and releasing supervision"
+      terminate_child
+      end_supervision 143
+      exit 143
+    }
+    trap on_signal INT TERM HUP
+
     end_supervision() {
       [ -n "$SUP_ID" ] || return 0
       [ -x "$SESSION_BIN" ] || return 0
-      "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" >/dev/null 2>&1 || true
+      if [ -n "$HARNESS_KEY" ]; then
+        "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" \
+          --harness-key "$HARNESS_KEY" >/dev/null 2>&1 || true
+      else
+        "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" >/dev/null 2>&1 || true
+      fi
     }
 
     if [ "$DEADLINE" -eq 0 ]; then

@@ -1,5 +1,30 @@
 import Database from "better-sqlite3";
 import { execFileSync } from "child_process";
+
+/**
+ * Environment for child `git` calls with the repo-selecting variables REMOVED.
+ *
+ * `GIT_DIR` overrides `-C`, and git EXPORTS it into hooks when running in a linked worktree —
+ * which is the only kind ICN uses. Inherited, it made two different lanes resolve to the SAME
+ * worktree_id and pointed the registry at an unrelated repository. This is the same lesson as
+ * ICN_ROOT, one layer down: an unchecked environment variable must never be able to
+ * misattribute a session to the wrong lane.
+ */
+const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
+  const e = { ...process.env };
+  for (const k of [
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES",
+  ]) {
+    delete e[k];
+  }
+  return e;
+})();
 import { existsSync, mkdirSync, realpathSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -27,6 +52,7 @@ export function resolveDefaultDbPath(from: string = __dirname): string {
     const common = execFileSync("git", ["-C", from, "rev-parse", "--git-common-dir"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
+      env: GIT_SANITISED_ENV,
     }).trim();
     if (common) {
       const abs = common.startsWith("/") ? common : join(from, common);
@@ -35,11 +61,22 @@ export function resolveDefaultDbPath(from: string = __dirname): string {
   } catch {
     // Not inside a repo, or git unavailable — fall through.
   }
+  // Falling back means going BACK to a per-worktree database, which is exactly the split this
+  // function exists to close. It must never happen quietly.
+  process.stderr.write(
+    "icn-ops: could not derive the shared registry from git; falling back to the per-worktree " +
+      `path ${LEGACY_DB_PATH}. Sessions registered here will NOT be visible to other worktrees ` +
+      "or to the MCP server. Set ICN_OPS_DB to pin the registry explicitly.\n"
+  );
   return LEGACY_DB_PATH;
 }
 
 export function initDb(dbPath?: string): Database.Database {
-  const path = dbPath ?? process.env["ICN_OPS_DB"] ?? resolveDefaultDbPath();
+  // An EMPTY ICN_OPS_DB is not a path: better-sqlite3 opens "" as an anonymous temporary
+  // database, so `register` reported a session id into storage that vanished, and the very
+  // next `status` said not-registered. Treat empty as unset.
+  const envPath = process.env["ICN_OPS_DB"];
+  const path = dbPath ?? (envPath && envPath.trim() !== "" ? envPath : resolveDefaultDbPath());
 
   // Ensure data directory exists
   const dir = dirname(path);
@@ -55,7 +92,13 @@ export function initDb(dbPath?: string): Database.Database {
   // Wait up to 5 s when another writer holds the lock (multi-agent safety)
   db.pragma("busy_timeout = 5000");
 
-  migrate(db);
+  // The whole ladder runs in ONE immediate transaction. Previously each step was a bare
+  // PRAGMA -> ALTER -> INSERT with no lock, so concurrent opens raced: 9 of 40 parallel initDb
+  // calls on a fresh database threw `duplicate column name`, and the MCP server's
+  // main().catch(exit 1) turns that into "the server does not start". registerSession was
+  // hardened against this exact hazard with .immediate(); the migration was not — and v4 plus
+  // a brand-new default path means the next fleet start runs the whole ladder from scratch.
+  db.transaction(() => migrate(db)).immediate();
   return db;
 }
 
@@ -230,10 +273,12 @@ function migrate(db: Database.Database): void {
 
   // Schema v4: supervisions are scoped to a LANE, not to whichever session declared them.
   //
-  // This is a NEW migration rather than an edit to v3 because a v3-stamped database now
-  // demonstrably exists on this machine — and a stamped version is skipped wholesale, so an
-  // in-place edit would silently leave it on the old shape. That rule is pinned by
-  // schema-upgrade.test.ts ("migration-number discipline"); this is it being obeyed.
+  // A NEW migration rather than an edit to v3. The only v3-stamped databases found on this
+  // machine were throwaway test artifacts, not production state — an earlier version of this
+  // comment overstated that as "demonstrably exists", which review correctly challenged. The
+  // reason stands on its own without it: v3 has been published on this branch, a stamped
+  // version is skipped wholesale, and nothing can prove no clone has run it. Adding a number
+  // is free; an in-place edit is unrecoverable. Pinned by schema-upgrade.test.ts.
   //
   // WHY IT MATTERS: watchers_process had no lane of its own, so supervisions were found via the
   // owning session row. When a resumed conversation re-registered from a different worktree the

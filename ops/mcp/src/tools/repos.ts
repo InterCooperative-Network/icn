@@ -1,4 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ttlMinutes } from "../runtime/session-runtime.js";
+import { discoverWorktree } from "../runtime/worktree-identity.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { join } from "path";
@@ -158,17 +160,34 @@ export function registerRepoTools(
         })
       );
 
+      // Occupancy is keyed on the Git-derived worktree_id, resolved per listed directory.
+      // Keying on the display name attributed one lane's agent to another lane, hid real
+      // occupants by overwriting, and reported an occupied lane as free. The name is only a
+      // last-resort fallback for pre-v3 rows that have no lane id.
       const activeSessions = db
         .prepare(
-          `SELECT worktree, task_description FROM sessions
-           WHERE worktree IS NOT NULL
-           AND datetime(last_heartbeat) > datetime('now', '-30 minutes')`
+          `SELECT id, worktree, worktree_name, worktree_id, task_description FROM sessions
+           WHERE datetime(last_heartbeat) > datetime('now', '-' || ? || ' minutes')`
         )
-        .all() as Array<{ worktree: string; task_description: string }>;
+        .all(ttlMinutes()) as Array<{
+        id: string;
+        worktree: string | null;
+        worktree_name: string | null;
+        worktree_id: string | null;
+        task_description: string | null;
+      }>;
 
-      const sessionMap: Record<string, string> = {};
+      // A lane may hold several sessions; collapsing them into one string hid contention.
+      const byLane = new Map<string, string[]>();
+      const byName = new Map<string, string[]>();
       for (const s of activeSessions) {
-        sessionMap[s.worktree] = s.task_description;
+        const label = s.task_description ?? s.id;
+        if (s.worktree_id) {
+          byLane.set(s.worktree_id, [...(byLane.get(s.worktree_id) ?? []), label]);
+        } else {
+          const n = s.worktree_name ?? s.worktree;
+          if (n) byName.set(n, [...(byName.get(n) ?? []), label]);
+        }
       }
 
       return {
@@ -179,10 +198,21 @@ export function registerRepoTools(
               {
                 worktreeRoot: wtRoot,
                 error: wtRootError,
-                worktrees: results.map((r) => ({
-                  ...r,
-                  claimedBy: sessionMap[r.name] ?? null,
-                })),
+                worktrees: results.map((r) => {
+                  const id = discoverWorktree(join(wtRoot, r.name), null)?.worktree_id;
+                  const occupants = [
+                    ...(id ? byLane.get(id) ?? [] : []),
+                    ...(byName.get(r.name) ?? []),
+                  ];
+                  return {
+                    ...r,
+                    worktree_id: id ?? null,
+                    // Retained for compatibility; null when unoccupied.
+                    claimedBy: occupants[0] ?? null,
+                    occupants,
+                    contention: occupants.length > 1,
+                  };
+                }),
               },
               null,
               2

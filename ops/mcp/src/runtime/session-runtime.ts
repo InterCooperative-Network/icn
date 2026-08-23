@@ -446,11 +446,26 @@ export function releaseSession(
 
   // Watchers have no foreign key: without this they stay status='running' forever and the
   // background poller keeps supervising on behalf of a session that no longer exists.
-  const watchers = db
+  //
+  // But a session ending does NOT stop its build. Releasing every row unconditionally meant
+  // `/clear` silently revoked protection from a `cargo test --workspace` that was still
+  // running, and the lane immediately became approval-retireable. A supervision whose PROCESS
+  // IS STILL ALIVE outlives the session that declared it: the work is in the lane, not in the
+  // conversation. Only dead rows are released here; live ones are reaped later by pid.
+  const releasable = db
     .prepare(
-      "UPDATE watchers_process SET status = 'released', completed_at = ? WHERE session_id = ? AND status = 'running'"
+      "SELECT id, pid FROM watchers_process WHERE session_id = ? AND status = 'running'"
     )
-    .run(Date.now(), sessionId).changes;
+    .all(sessionId) as Array<{ id: number; pid: number }>;
+  let watchers = 0;
+  for (const w of releasable) {
+    if (!pidAlive(w.pid)) {
+      db.prepare(
+        "UPDATE watchers_process SET status = 'released', completed_at = ? WHERE id = ?"
+      ).run(Date.now(), w.id);
+      watchers += 1;
+    }
+  }
 
   // Undelivered inbox messages: keep the row (history) but stop them being pending for a
   // session that can never read them.
@@ -595,14 +610,21 @@ export function superviseOperation(
   return Number(r.lastInsertRowid);
 }
 
-export function endSupervision(db: Database.Database, id: number, exitCode?: number): boolean {
-  return (
-    db
-      .prepare(
-        "UPDATE watchers_process SET status = 'completed', completed_at = ?, exit_code = ? WHERE id = ? AND status = 'running'"
-      )
-      .run(Date.now(), exitCode ?? null, id).changes > 0
-  );
+export function endSupervision(
+  db: Database.Database,
+  id: number,
+  exitCode?: number,
+  ownerSessionId?: string
+): boolean {
+  // With no owner filter, any caller could complete any row by id — including another lane's
+  // supervision, or a `watch_process` row, stealing that feature's completion event.
+  const sql =
+    "UPDATE watchers_process SET status = 'completed', completed_at = ?, exit_code = ? " +
+    "WHERE id = ? AND status = 'running'" +
+    (ownerSessionId ? " AND session_id = ?" : "");
+  const params: unknown[] = [Date.now(), exitCode ?? null, id];
+  if (ownerSessionId) params.push(ownerSessionId);
+  return db.prepare(sql).run(...params).changes > 0;
 }
 
 /** Whether a PID is alive. Signal 0 performs the permission/existence check only. */
@@ -667,23 +689,35 @@ export function liveSupervisionsForLane(
   isAlive: (pid: number) => boolean = pidAlive,
   env: NodeJS.ProcessEnv = process.env
 ): Supervision[] {
+  // Pre-v4 rows carry worktree_id NULL because ALTER TABLE cannot backfill, and a pre-v4
+  // supervision is byte-identical to a pre-v4 `watch_process` row, so they cannot be told
+  // apart. Excluding them dropped protection from a lane with a live build — the unsafe
+  // direction, and verbatim the P0 v4 exists to prevent. Include legacy rows whose owning
+  // session is on THIS lane: over-protecting a lane is the safe failure, and the pid-liveness
+  // check below still stops a dead row protecting anything.
   const rows = db
     .prepare(
       "SELECT id, pid, label, created_at, worktree_id FROM watchers_process " +
-        "WHERE worktree_id = ? AND status = 'running'"
+        "WHERE status = 'running' AND (" +
+        "  worktree_id = ?" +
+        "  OR (worktree_id IS NULL AND session_id IN (SELECT id FROM sessions WHERE worktree_id = ?))" +
+        ")"
     )
-    .all(worktreeId) as Supervision[];
+    .all(worktreeId, worktreeId) as Supervision[];
   const maxAgeMs = maxSupervisionMinutes(env) * 60_000;
   const now = Date.now();
   const live: Supervision[] = [];
   for (const r of rows) {
+    // Only rows this runtime STAMPED are reaped. A legacy NULL-lane row may belong to
+    // `watch_process`, whose background poller owns its lifecycle and its completion event.
+    const ours = r.worktree_id != null;
     if (!isAlive(r.pid)) {
-      endSupervision(db, r.id);
-    } else if (now - r.created_at > maxAgeMs) {
+      if (ours) endSupervision(db, r.id);
+    } else if (ours && now - r.created_at > maxAgeMs) {
       db.prepare(
         "UPDATE watchers_process SET status = 'expired', completed_at = ? WHERE id = ?"
       ).run(now, r.id);
-    } else {
+    } else if (isAlive(r.pid)) {
       live.push(r);
     }
   }
@@ -980,6 +1014,9 @@ export function classifyWorktree(
 ): Classification {
   const sessions = activeSessionsForWorktree(db, worktreeId);
 
+  // Report supervisions even when no session row remains on the lane: a build stamped to this
+  // worktree is still running here, and saying "nothing authoritative to act on" while the
+  // runtime holds a live supervision for it is untrue (the verdict was already protected).
   // Rank by heartbeat freshness for AGE REPORTING only.
   const ranked = sessions
     .map((x) => ({ row: x, hb: ageMinutes(db, x.last_heartbeat) }))

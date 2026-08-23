@@ -24,6 +24,31 @@
 // Refs docs/architecture/AGENT_RUNTIME.md §2.
 
 import { execFileSync } from "child_process";
+
+/**
+ * Environment for child `git` calls with the repo-selecting variables REMOVED.
+ *
+ * `GIT_DIR` overrides `-C`, and git EXPORTS it into hooks when running in a linked worktree —
+ * which is the only kind ICN uses. Inherited, it made two different lanes resolve to the SAME
+ * worktree_id and pointed the registry at an unrelated repository. This is the same lesson as
+ * ICN_ROOT, one layer down: an unchecked environment variable must never be able to
+ * misattribute a session to the wrong lane.
+ */
+const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
+  const e = { ...process.env };
+  for (const k of [
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES",
+  ]) {
+    delete e[k];
+  }
+  return e;
+})();
 import { existsSync, realpathSync } from "fs";
 import { basename, dirname, resolve } from "path";
 
@@ -53,6 +78,7 @@ function git(dir: string, args: string[]): string | null {
     return execFileSync("git", ["-C", dir, ...args], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
+      env: GIT_SANITISED_ENV,
     }).trim();
   } catch {
     return null;
