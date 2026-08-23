@@ -44,8 +44,15 @@ export function registerAgentOpsTools(
         .describe("Narrow the response when you only need one part."),
     },
     async ({ cwd, section }) => {
+      // Resolve the CALLER's lane first. repoRoot honours ICN_ROOT, which on icn-dev is pinned
+      // to the mcp-host worktree — so using it would hand an agent working in lane X the
+      // capability manifest of lane Y (or, as observed, a confusing ENOENT for a manifest that
+      // exists perfectly well in the caller's own worktree). The lane wins; repoRoot is the
+      // fallback for callers that supply no cwd.
+      const identity = discoverWorktree(cwd ?? process.cwd(), null);
+      const manifestRoot = identity?.worktree_path ?? repoRoot;
       const manifestPath = join(
-        repoRoot,
+        manifestRoot,
         "docs/reference/project-index/generated/agent-capabilities.json"
       );
       let manifest: Record<string, unknown> = {};
@@ -54,14 +61,14 @@ export function registerAgentOpsTools(
         manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
       } catch (e) {
         manifestError =
-          `capability manifest unreadable (${e instanceof Error ? e.message : String(e)}). ` +
+          `capability manifest unreadable at ${manifestPath} ` +
+          `(${e instanceof Error ? e.message : String(e)}). ` +
           "Regenerate: python3 scripts/generate-agent-capabilities.py --write";
       }
 
       // Session identity is reported honestly: an unregistered session is told so rather than
       // being given a plausible-looking blank record.
       let session: Record<string, unknown> = { registered: false };
-      const identity = discoverWorktree(cwd ?? process.cwd(), process.env["ICN_ROOT"] ?? null);
       if (identity) {
         session["lane"] = {
           repo_id: identity.repo_id,
