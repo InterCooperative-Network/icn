@@ -55,6 +55,16 @@ set -uo pipefail
 readonly DEFAULT_TIMEOUT="${ICN_WAIT_DEFAULT_TIMEOUT:-1800}"   # 30 min
 readonly POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
 
+# Resolve our own directory THROUGH symlinks: helpers here are commonly symlinked into ~/bin,
+# and a bare `dirname $0` would then look for its siblings in ~/bin and silently not find them.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+readonly SCRIPT_DIR="$(cd "$(dirname "$self")" && pwd)"
+readonly SESSION_BIN="$SCRIPT_DIR/icn-agent-session"
+
 die()   { printf 'icn-wait: %s\n' "$*" >&2; exit 2; }
 fatal() { printf 'icn-wait: UNREACHABLE — %s\n' "$*" >&2; exit 3; }
 note()  { [ "${QUIET:-0}" = 1 ] || printf 'icn-wait: %s\n' "$*" >&2; }
@@ -156,7 +166,6 @@ case "$CMD" in
     # Declare the operation so a long legitimate run is protected without faking progress.
     SUP_ID=""
     if [ "$SUPERVISE" = 1 ]; then
-      SESSION_BIN="$(dirname "$0")/icn-agent-session"
       if [ -x "$SESSION_BIN" ] && [ -n "$HARNESS_KEY" ]; then
         SUP_ID="$("$SESSION_BIN" supervise --harness-key "$HARNESS_KEY" \
                     --pid "$child" --label "$LABEL" 2>/dev/null || true)"
@@ -166,8 +175,8 @@ case "$CMD" in
     fi
     end_supervision() {
       [ -n "$SUP_ID" ] || return 0
-      "$(dirname "$0")/icn-agent-session" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" \
-        >/dev/null 2>&1 || true
+      [ -x "$SESSION_BIN" ] || return 0
+      "$SESSION_BIN" unsupervise --id "$SUP_ID" --exit-code "${1:-0}" >/dev/null 2>&1 || true
     }
 
     if [ "$DEADLINE" -eq 0 ]; then
