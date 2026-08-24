@@ -182,6 +182,80 @@ fi
 
 $CHECK >/dev/null 2>&1 && ok "manifest restored and true at end of run" || bad "manifest left dirty"
 
+# ── live MCP introspection must fail LOUDLY, never hang or guess ────────────
+#
+# The generator runs inside the drift gate on EVERY pull request, and its `timeout` parameter
+# was declared and never used: read_reply() blocked in a bare readline() with no deadline, so a
+# wedged server hung the gate indefinitely. Measured before the fix: a stub that reads stdin and
+# never answers held it until an external timeout(1) killed it at 100s.
+#
+# Each case below is a stub MCP server standing in for a real failure mode. The generator must
+# terminate with a clear message in all of them — and must never fall back to guessing the tool
+# surface from source, because "what the source appears to say" is not "what the runtime can
+# actually expose".
+echo
+echo "live MCP introspection failure modes"
+
+STUB_ROOT="$(mktemp -d)"
+trap 'rm -rf "$STUB_ROOT"' EXIT
+mkdir -p "$STUB_ROOT/ops/mcp/dist"
+for p in .claude ops/scripts ops/state scripts docs; do
+  [ -e "$ROOT/$p" ] && { mkdir -p "$STUB_ROOT/$(dirname "$p")"; cp -a "$ROOT/$p" "$STUB_ROOT/$(dirname "$p")/"; }
+done
+
+stub_case() {
+  local label="$1" body="$2" want_rc="$3" want_msg="$4" budget="$5"
+  printf '%s\n' "$body" > "$STUB_ROOT/ops/mcp/dist/index.js"
+  local start rc elapsed
+  start=$(date +%s)
+  # A SHORT declared timeout, exercising the same watchdog the 90s default uses. The external
+  # `timeout` is the backstop that proves the generator terminated ITSELF: if it ever fires,
+  # the case is reported as a hang, never as a pass.
+  ICN_CAPABILITY_MCP_TIMEOUT=5 timeout "$budget" \
+    python3 "$ROOT/scripts/generate-agent-capabilities.py" \
+    --repo-root "$STUB_ROOT" >"$STUB_ROOT/out.log" 2>&1
+  rc=$?; elapsed=$(( $(date +%s) - start ))
+  if [ "$rc" -eq 124 ]; then
+    bad "$label" "the generator HUNG (killed by an external timeout after ${elapsed}s)"
+  elif [ "$rc" -ne "$want_rc" ]; then
+    bad "$label" "rc=$rc (wanted $want_rc): $(tail -1 "$STUB_ROOT/out.log")"
+  elif ! grep -qiE "$want_msg" "$STUB_ROOT/out.log"; then
+    bad "$label" "message did not match /$want_msg/: $(tail -1 "$STUB_ROOT/out.log")"
+  else
+    ok "$label (${elapsed}s)"
+  fi
+}
+
+# 1. never responds — the case that hung the gate.
+stub_case "a wedged server is abandoned at the declared timeout, not waited on forever" \
+  'process.stdin.resume(); setInterval(() => {}, 1 << 30);' \
+  1 "did not answer within" 40
+
+# 2. closes stdout immediately.
+stub_case "a server that closes stdout fails with a specific message" \
+  'process.stdout.end(); process.stdin.resume(); setInterval(() => {}, 1 << 30);' \
+  1 "closed stdout|did not answer within" 40
+
+# 3. answers with something that is not JSON-RPC at all.
+stub_case "a server emitting malformed output does not become a capability list" \
+  'process.stdin.on("data", () => process.stdout.write("this is not json\n")); process.stdin.resume(); setInterval(() => {}, 1 << 30);' \
+  1 "did not answer within|closed stdout" 40
+
+# 4. exits immediately — the "not built / crashes on start" shape.
+stub_case "a server that exits immediately is reported, not treated as zero tools" \
+  'process.exit(3);' \
+  1 "closed stdout|did not answer within" 40
+
+# ...and the manifest must never be written from any of those runs.
+if grep -q "generated" "$STUB_ROOT/ops/state/truth/generated/agent-capabilities.json" 2>/dev/null; then
+  if diff -q "$STUB_ROOT/ops/state/truth/generated/agent-capabilities.json" \
+             "$ROOT/ops/state/truth/generated/agent-capabilities.json" >/dev/null 2>&1; then
+    ok "no failed introspection rewrote the manifest"
+  else
+    bad "a failed introspection MODIFIED the manifest" "it must never publish a guess"
+  fi
+fi
+
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

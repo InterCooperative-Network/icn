@@ -25,7 +25,7 @@ not by reading prior design docs.
 | `icn-claude` | Same, from a remote host over SSH; always lands in the `mcp-host` worktree. | Yes — same hooks |
 | Claude Code interactive / remote (`ccd-cli`) | The actual agent process. One OS process per session. | Yes — same hooks |
 | Claude Code subagents (`Agent` tool) | In-process children of a session. They do **not** get their own OS process, hook events, or MCP client. | **No** — see §6 |
-| Provider adapters (`.codex/`, `.cursor/`, `.opencode/`) | Configuration overlays that point a different provider at the same MCP server and skills. | Partially — MCP tools yes, hooks no |
+| Provider adapters (`.codex/`, `.cursor/`, `.opencode/`) | Configuration overlays for other providers. Only `.cursor/mcp.json` actually declares the ops MCP; `.codex/mcp/servers.example.json` is an example that omits it, and `.opencode/opencode.json` has no MCP block at all. | `.cursor` partially — MCP tools yes, hooks no. `.codex`/`.opencode`: manifest file only |
 | CI agents (`.github/workflows/`) | Non-interactive, ephemeral, no worktree, no registry. | No — out of scope by design |
 
 **The real front door is not a script.** `icn-start` only chooses a directory and execs
@@ -390,9 +390,15 @@ committed copy. It runs in `agent-drift-check.yml` on **every** PR.
 discoverable to every launcher that reads the manifest, and *forgetting* to regenerate fails
 CI. No launcher, provider adapter, or prompt is edited to add a capability.
 
-Limits, stated plainly: the manifest describes capabilities to a session that reads it. Provider
-adapters that do not run Claude Code hooks (`.codex/`, `.cursor/`, `.opencode/`) get the MCP
-tool and the file, but not the startup line or automatic registration. See §1.1.
+Limits, stated plainly: the manifest describes capabilities to a session that reads it. No
+provider outside Claude Code gets the startup line or automatic registration, because none of
+them run Claude Code hooks — and the MCP route is narrower than it looks. Only `.cursor/mcp.json`
+declares the ops MCP server today, so only Cursor can call `icn_ops_agent_runtime` and the
+session tools (explicitly — it still cannot auto-register). `.codex/mcp/servers.example.json` is
+an *example* file that does not declare the ops MCP at all, and its entries point at the retired
+`~/projects/icn` path; `.opencode/opencode.json` has no MCP block. Those two get the generated
+manifest as a file on disk and nothing else. `check-agent-runtime-adoption.py` prints this same
+breakdown, so the claim is verified on every run rather than asserted here. See §1.1.
 
 ---
 

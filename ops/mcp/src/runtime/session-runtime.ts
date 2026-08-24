@@ -15,6 +15,8 @@ import { appendFileSync } from "fs";
 import { resolveOpsStatePath } from "../paths.js";
 import {
   branchChanged,
+  currentWorktreePathFor,
+  laneGeneration,
   readBranchState,
   type BranchState,
   type WorktreeIdentity,
@@ -30,6 +32,9 @@ export const DEFAULT_STALL_MINUTES = 90;
 /** Floor on the TTL. Below this, ordinary gaps between hook events read as abandonment. */
 export const MIN_TTL_MINUTES = 5;
 
+/** Floor on the stall window. Below this, ordinary thinking time reads as failure to progress. */
+export const MIN_STALL_MINUTES = 5;
+
 export function ttlMinutes(env: NodeJS.ProcessEnv = process.env): number {
   // Clamped because this is read from the ambient environment of whoever runs classify:
   // ICN_SESSION_TTL_MINUTES=1 turned a two-minute-old heartbeat into a retirement candidate.
@@ -39,7 +44,14 @@ export function ttlMinutes(env: NodeJS.ProcessEnv = process.env): number {
   );
 }
 export function stallMinutes(env: NodeJS.ProcessEnv = process.env): number {
-  return positiveIntOr(env["ICN_SESSION_STALL_MINUTES"], DEFAULT_STALL_MINUTES);
+  // Floored for exactly the reason the TTL is, and it was missing here: this is read from the
+  // ambient environment of whoever runs classify, so ICN_SESSION_STALL_MINUTES=1 made every
+  // session older than a minute report PROGRESS-STALLED, and "1e-3" floored to 0 made every
+  // session report it unconditionally.
+  return Math.max(
+    MIN_STALL_MINUTES,
+    positiveIntOr(env["ICN_SESSION_STALL_MINUTES"], DEFAULT_STALL_MINUTES)
+  );
 }
 function positiveIntOr(raw: string | undefined, fallback: number): number {
   const n = Number(raw);
@@ -97,6 +109,8 @@ export type SessionRow = {
   worktree_id: string | null;
   worktree_path: string | null;
   worktree_name: string | null;
+  /** Which GENERATION of the lane this row belongs to. Null = unknown (pre-upgrade row). */
+  worktree_generation: string | null;
   branch_at_registration: string | null;
   head_at_registration: string | null;
   task_description: string | null;
@@ -184,7 +198,14 @@ function registerSessionInner(
   db: Database.Database,
   input: RegisterInput
 ): RegisterResult {
-  const key = input.provider_session_id ?? null;
+  // `|| null`, not `?? null`. An EMPTY STRING is not nullish, so `??` preserved it: the row
+  // stored a NON-NULL "" (covered by the partial unique index) while every `if (key)` guard
+  // treated it as absent, so the dedupe SELECT was skipped. The first such register stored a
+  // key that could never be looked up, and every later register carrying "" — the same
+  // conversation OR an unrelated session — died on SQLITE_CONSTRAINT_UNIQUE, unregistered.
+  // The CLI's `str()` already drops zero-length values; the MCP surface (z.string().optional(),
+  // which accepts "") did not, so the guard has to live here, in the shared core.
+  const key = input.provider_session_id || null;
   if (key) assertDurableProviderSessionId(key);
 
   const idt = input.identity ?? null;
@@ -223,6 +244,7 @@ function registerSessionInner(
           `UPDATE sessions
               SET repo_id = ?, worktree_id = ?, worktree_path = ?, worktree_name = ?,
                   worktree = COALESCE(?, worktree),
+                  worktree_generation = ?,
                   branch_at_registration = ?, head_at_registration = ?
             WHERE id = ?`
         ).run(
@@ -231,6 +253,9 @@ function registerSessionInner(
           idt?.worktree_path ?? null,
           idt?.worktree_name ?? null,
           idt?.worktree_name ?? null,
+          // The generation moves with the lane for the same reason the branch does: this row
+          // now belongs to the destination lane's CURRENT generation, not the origin's.
+          idt?.worktree_generation ?? null,
           // Move these WITH the lane. Left behind, `branch_changed` was permanently and
           // wrongly true after a supported lane move — it compared lane B's live branch
           // against a branch recorded for lane A.
@@ -277,9 +302,10 @@ function registerSessionInner(
   db.prepare(
     `INSERT INTO sessions
        (id, repo, repo_id, worktree, worktree_id, worktree_path, worktree_name,
+        worktree_generation,
         branch_at_registration, head_at_registration, task_description, task_ref, pr_ref,
         parent_session_id, provider, agent_pid, host, provider_session_id, transcript_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.repo,
@@ -288,6 +314,7 @@ function registerSessionInner(
     worktreeId,
     idt?.worktree_path ?? null,
     idt?.worktree_name ?? null,
+    idt?.worktree_generation ?? null,
     bs?.branch ?? null,
     bs?.head ?? null,
     input.task_description ?? null,
@@ -337,13 +364,43 @@ export function recordInteraction(db: Database.Database, sessionId: string): boo
   return recordHeartbeat(db, sessionId);
 }
 
-/** Runtime events that count as evidence that work actually happened. */
-export type ProgressKind =
-  | "file_edit"
-  | "command"
-  | "test"
-  | "task_state"
-  | "explicit";
+/**
+ * Runtime events that count as evidence that work actually happened.
+ *
+ * ONE list, exported, because this vocabulary was written out three times — this union, the
+ * zod enum in tools/sessions.ts, and an unchecked cast in cli/session.ts. Three copies is
+ * three chances to disagree, and they already did: the CLI accepted `--kind turn` silently
+ * while the MCP tool rejected it, and adding "turn" back to BOTH the union and the enum left
+ * the entire suite green. The MCP schema and the CLI now derive from this array.
+ *
+ * THERE IS NO "turn". A completed agent turn proves the harness answered, not that work moved;
+ * an agent looping on a failing edit completes turns forever. Counting turns as progress would
+ * defeat PROGRESS-STALLED, which is the one signal this runtime exists to provide.
+ */
+export const PROGRESS_KINDS = [
+  "file_edit",
+  "command",
+  "test",
+  "task_state",
+  "explicit",
+] as const;
+
+export type ProgressKind = (typeof PROGRESS_KINDS)[number];
+
+export class InvalidProgressKindError extends Error {}
+
+/**
+ * Enforced in the SHARED CORE, not per surface. TypeScript cannot help here: the CLI receives
+ * `--kind` as an arbitrary string from a hook payload, and a cast is not a check.
+ */
+export function assertProgressKind(kind: string): asserts kind is ProgressKind {
+  if (!(PROGRESS_KINDS as readonly string[]).includes(kind)) {
+    throw new InvalidProgressKindError(
+      `${JSON.stringify(kind)} is not a progress kind (allowed: ${PROGRESS_KINDS.join(", ")}). ` +
+        "A completed agent turn is INTERACTION, not progress — record it as an interaction."
+    );
+  }
+}
 
 /**
  * Progress. Advances `last_progress` AND the monotonic `progress_count`, so a consumer can
@@ -352,8 +409,10 @@ export type ProgressKind =
 export function recordProgress(
   db: Database.Database,
   sessionId: string,
-  opts: { kind: ProgressKind; activity?: string | null } 
+  opts: { kind: ProgressKind; activity?: string | null }
 ): boolean {
+  // Validated here so EVERY caller is covered, including the ones TypeScript cannot see.
+  assertProgressKind(opts.kind);
   const r = db
     .prepare(
       `UPDATE sessions
@@ -399,6 +458,26 @@ export type ReleaseResult = {
  */
 
 export function releaseSession(
+  db: Database.Database,
+  sessionId: string,
+  opts: { reason?: string } = {}
+): ReleaseResult {
+  // ATOMIC, for the same reason registerSession is. Release ran a SELECT, four dependent
+  // statements and the row DELETE as SEVEN separate implicit transactions. A registration that
+  // deduped into this row between the SELECT and the DELETE was silently voided: the arriving
+  // session was told `created:false, deduplicated:true` about a row release then deleted,
+  // leaving an agent that believes it is registered with no row at all — the precise outcome
+  // idempotency exists to prevent. `.immediate()` takes the write lock at BEGIN because a
+  // deferred transaction raises SQLITE_BUSY_SNAPSHOT on a concurrent commit, which
+  // busy_timeout does not cover.
+  //
+  // The session-log append inside remains best-effort: a rolled-back release can leave a
+  // history line for a release that did not happen. That is a log, not authority, and the
+  // alternative — writing it after commit — loses the line entirely if the process dies.
+  return db.transaction(() => releaseSessionInner(db, sessionId, opts)).immediate();
+}
+
+function releaseSessionInner(
   db: Database.Database,
   sessionId: string,
   opts: { reason?: string } = {}
@@ -492,9 +571,40 @@ export function activeSessionsForWorktree(
   db: Database.Database,
   worktreeId: string
 ): SessionRow[] {
-  return db
+  const rows = db
     .prepare("SELECT * FROM sessions WHERE worktree_id = ? ORDER BY started_at DESC")
     .all(worktreeId) as SessionRow[];
+
+  // Drop rows left behind by a REMOVED worktree that happened to share this admin directory.
+  // git recycles `<repo>/.git/worktrees/<basename>`, so a new lane at a DIFFERENT path can
+  // inherit a deleted lane's id and adopt its unreleased rows — see currentWorktreePathFor().
+  //
+  // Fail-safe by construction: when the live path cannot be determined (a main worktree, an
+  // unreadable admin dir) every row is kept, and a row that never recorded a path is kept too.
+  // Filtering can therefore only ever make a lane look LESS occupied when git itself says the
+  // recorded path is not this lane — and an emptied lane classifies UNREGISTERED-OBSERVED,
+  // which is protected, not actionable.
+  // GENERATION FIRST. `worktree_id` identifies a lane in SPACE; the generation identifies it in
+  // TIME. Recreating a worktree at the EXACT SAME pathname leaves repo, admin dir and recorded
+  // path all matching while the lane is genuinely a different one — verified: a fresh `gen2`
+  // worktree classified REGISTERED-ACTIVE holding `gen1`'s row. A path comparison cannot see
+  // that; only a token minted per generation can.
+  //
+  // Both comparisons drop a row ONLY when the two sides are KNOWN AND DIFFERENT. Unknown on
+  // either side keeps it, so an unmintable token, an unreadable admin dir or a pre-upgrade NULL
+  // can only ever make a lane look MORE occupied. A lane emptied by this filter classifies
+  // UNREGISTERED-OBSERVED, which is protected rather than actionable.
+  const liveGeneration = laneGeneration(worktreeId);
+  const livePath = currentWorktreePathFor(worktreeId);
+  return rows.filter((r) => {
+    if (liveGeneration != null && r.worktree_generation != null) {
+      return r.worktree_generation === liveGeneration;
+    }
+    // Nothing to compare temporally (a row written before v5, or an admin dir we cannot mint
+    // into). Fall back to the path, which still catches recreation at a DIFFERENT path.
+    if (livePath != null && r.worktree_path != null) return r.worktree_path === livePath;
+    return true;
+  });
 }
 
 /** Compatibility lookup by display name. Ambiguous by construction — reports every match. */
@@ -537,8 +647,80 @@ export function ageMinutes(
 // What remains here reports OBSERVATIONS. Nothing in this module decides that a lane may be
 // retired; see the Classification type.
 
+/**
+ * Turn a `--pids` string and an `--observed-none` flag into the THREE-STATE observation the
+ * classifier requires: `null` = nobody looked, `[]` = looked and found nothing, `[…]` = found
+ * these. Lives in the shared core, not in the CLI, so the invariant is testable in-process —
+ * the CLI module runs `main()` on import and cannot be imported by a test.
+ *
+ * THE RULE IS ABOUT THE RESULT, NOT THE SPELLING OF THE INPUT. Any `--pids` value that yields
+ * no usable pid means the observation FAILED, and a failed observation is `null`. The
+ * affirmative "I looked and found nothing" has exactly one spelling: `--observed-none`.
+ *
+ * The previous guard was `tokens.length > 0 && parsed.length === 0`, which left a hole exactly
+ * where the shell puts one: `tokens` is already filtered to non-empty strings, so a value made
+ * only of whitespace and separators produced `tokens.length === 0`, skipped the guard, and
+ * landed on the affirmative `[]`. Measured — `' , '`, `','`, `'  '` and `', ,,'` each produced
+ * a byte-identical envelope to `--observed-none` on a lane a live process was holding. Those
+ * values are not exotic: `"$(a | paste -sd, -),$(b | paste -sd, -)"` yields `","` when both
+ * commands find nothing, and so does `printf '%s,' "${EMPTY[@]}"`.
+ */
+export function parseObservedPids(
+  raw: string | undefined,
+  observedNone: boolean
+): { observed_pids: number[] | null; warning?: string } {
+  if (raw === undefined) {
+    return { observed_pids: observedNone ? [] : null };
+  }
+  const tokens = raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  const parsed: number[] = [];
+  const rejected: string[] = [];
+  for (const t of tokens) {
+    // PLAIN DECIMAL DIGITS ONLY. `Number()` silently reinterprets "0x10" as 16 and "1e3" as
+    // 1000, so a token that is not a pid at all would be accepted as some OTHER pid — an
+    // observation about a process nobody looked at.
+    const n = /^[0-9]+$/.test(t) ? Number(t) : NaN;
+    // Non-positive is not a pid either: POSIX gives `kill(0)` and `kill(-1)` process-GROUP
+    // meanings, so they always "succeed" and would report a lane alive forever.
+    if (Number.isInteger(n) && n > 0) parsed.push(n);
+    else rejected.push(t);
+  }
+
+  // A PARTIAL observation is not a safe observation. Silently dropping an unparseable token
+  // would report FEWER holders than the caller actually saw — the less-protective direction —
+  // so anything unreadable invalidates the whole thing rather than shrinking it.
+  if (rejected.length > 0) {
+    return {
+      observed_pids: null,
+      warning:
+        `--pids ${JSON.stringify(raw)} contained unusable entries (${rejected
+          .map((t) => JSON.stringify(t))
+          .join(", ")}); treating as NO observation performed (lane stays protected)`,
+    };
+  }
+  if (parsed.length === 0) {
+    return {
+      observed_pids: null,
+      warning:
+        `--pids ${JSON.stringify(raw)} contained no pids; treating as NO observation performed ` +
+        "(lane stays protected). The affirmative 'I looked and found nothing' is --observed-none",
+    };
+  }
+  return { observed_pids: parsed };
+}
+
 /** Whether a PID is alive. Signal 0 performs the permission/existence check only. */
 export function pidAlive(pid: number): boolean {
+  // NON-POSITIVE PIDS ARE NOT PROCESSES. POSIX gives them a completely different meaning:
+  // `kill(0, sig)` signals the CALLER'S OWN PROCESS GROUP and `kill(-1, sig)` signals every
+  // process the uid may signal, so both SUCCEED and reported "alive" forever. The CLI already
+  // rejected 0/negative on its own `--pid`/`--pids` inputs, but the shared primitive did not —
+  // and `watchers_process.pid` reaches it unvalidated, so a watcher on pid 0 never completed.
+  // A liveness primitive must answer "no" to a question that is not about a process at all.
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -634,6 +816,14 @@ export function classify(
     progress_age_min: number | null;
     /** Age since started_at. Used when a session has NEVER progressed — see below. */
     session_age_min?: number | null;
+    /**
+     * LANE-level progress count, when the caller has one.
+     *
+     * `classifyWorktree` aggregates progress across every occupant for the same reason it
+     * aggregates liveness, so it must be able to override the primary row's own counter —
+     * otherwise the lane reports the primary's `0` while a co-occupant is working.
+     */
+    progress_count?: number | null;
   },
   limits: { ttl_min: number; stall_min: number }
 ): Classification {
@@ -679,6 +869,9 @@ export function classify(
 
   const s = sessions[0]!;
   const live = obs.live_branch ?? null;
+  // Lane-level when the caller supplied it, else this row's own. See `ages.progress_count`.
+  const effectiveProgressCount = ages.progress_count ?? s.progress_count;
+
   const shared = {
     session_id: s.id,
     contention: {
@@ -690,7 +883,7 @@ export function classify(
     live_agent_pids: obs.live_agent_pids ?? [],
     heartbeat_age_min: ages.heartbeat_age_min,
     progress_age_min: ages.progress_age_min,
-    progress_count: s.progress_count,
+    progress_count: effectiveProgressCount,
   };
 
   const hb = ages.heartbeat_age_min;
@@ -768,7 +961,7 @@ export function classify(
       ...shared,
       state: "PROGRESS-STALLED",
       reason:
-        (s.progress_count === 0
+        (effectiveProgressCount === 0
           ? `heartbeat is fresh (${fmt(hb)} min) but NO progress has ever been recorded, ` +
             `${fmt(effectiveProgressAge)} min after registration `
           : `heartbeat is fresh (${fmt(hb)} min) but no progress for ${fmt(effectiveProgressAge)} min `) +
@@ -780,9 +973,9 @@ export function classify(
     ...shared,
     state: "REGISTERED-ACTIVE",
     reason:
-      s.progress_count === 0
+      effectiveProgressCount === 0
         ? `heartbeat ${fmt(hb)} min; no progress recorded yet (registered ${fmt(ages.session_age_min ?? null)} min ago)`
-        : `heartbeat ${fmt(hb)} min, progress ${fmt(effectiveProgressAge)} min, count ${s.progress_count}`,
+        : `heartbeat ${fmt(hb)} min, progress ${fmt(effectiveProgressAge)} min, count ${effectiveProgressCount}`,
   };
 }
 
@@ -828,6 +1021,26 @@ export function classifyWorktree(
   const agentPidAlive =
     obs.agent_pid_alive ?? (recordedPids.length > 0 ? liveAgentPids.length > 0 : null);
 
+  // PROGRESS IS A PROPERTY OF THE LANE TOO — the same lesson as liveness, one field over.
+  //
+  // Progress was read from `primary` alone, and `primary` is whichever row has the freshest
+  // HEARTBEAT. So a co-occupant that only heartbeats (a reviewer completing turns, which is
+  // interaction, not progress) outranked one that was actually working, and the lane reported
+  // "NO progress has ever been recorded" one second after a co-occupant recorded progress —
+  // with progress_count 0 and progress_age_min null emitted as LANE facts. Aggregate instead.
+  const progressAges = sessions
+    .map((x) => ageMinutes(db, x.last_progress))
+    .filter((x): x is number => x != null);
+  const laneProgressAge = progressAges.length > 0 ? Math.min(...progressAges) : null;
+  const laneProgressCount = sessions.reduce((n, x) => n + (x.progress_count ?? 0), 0);
+  // When NOBODY has progressed, "how long has this lane failed to progress" is measured from
+  // the OLDEST registration on it. A lane occupied for 200 minutes is not made fresh by a
+  // session that joined a minute ago.
+  const sessionAges = sessions
+    .map((x) => ageMinutes(db, x.started_at))
+    .filter((x): x is number => x != null);
+  const laneSessionAge = sessionAges.length > 0 ? Math.max(...sessionAges) : null;
+
   const liveBranch =
     obs.live_branch ??
     (primary?.worktree_path ? readBranchState(primary.worktree_path) : null);
@@ -842,8 +1055,9 @@ export function classifyWorktree(
     },
     {
       heartbeat_age_min: primary ? ageMinutes(db, primary.last_heartbeat) : null,
-      progress_age_min: primary ? ageMinutes(db, primary.last_progress) : null,
-      session_age_min: primary ? ageMinutes(db, primary.started_at) : null,
+      progress_age_min: laneProgressAge,
+      session_age_min: laneSessionAge,
+      progress_count: laneProgressCount,
     },
     { ttl_min: ttlMinutes(env), stall_min: stallMinutes(env) }
   );

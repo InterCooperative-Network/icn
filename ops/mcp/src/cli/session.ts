@@ -17,7 +17,9 @@ import { hostname } from "os";
 import { dirname } from "path";
 import { initDb } from "../state/db.js";
 import {
+  assertProgressKind,
   classifyWorktree,
+  parseObservedPids,
   InvalidProviderSessionIdError,
   sessionsByWorktreeName,
   recordHeartbeat,
@@ -25,7 +27,7 @@ import {
   recordProgress,
   registerSession,
   releaseSession,
-  type ProgressKind,
+  type Classification,
   type SessionRow,
 } from "../runtime/session-runtime.js";
 import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.js";
@@ -101,6 +103,36 @@ function findByProviderSession(
     .get(key) as SessionRow | undefined;
 }
 
+/**
+ * The ONLY way this CLI emits a degraded classification.
+ *
+ * A degraded envelope has to be structurally identical to a healthy one, because a consumer
+ * typed against `Classification` reads `.live_agent_pids.length` and throws outright on a
+ * partial object. Four sites built these as bare object literals and TypeScript did not
+ * enforce anything: a literal handed straight to `JSON.stringify` is checked against no type
+ * at all, so deleting `live_agent_pids` and `contention` from every one of them left
+ * `tsc --noEmit` clean and the whole suite green. One of the four — the `initDb` failure, i.e.
+ * the registry missing, locked, or corrupt — shipped without them, and that is the MOST likely
+ * degraded condition in production, not the rarest.
+ *
+ * The annotated return type is what makes the contract checkable; routing every site through
+ * one constructor is what stops a fifth site from being added without it.
+ */
+function degradedClassification(reason: string): Classification {
+  return {
+    state: "REGISTRY-UNAVAILABLE",
+    reason,
+    session_id: null,
+    heartbeat_age_min: null,
+    progress_age_min: null,
+    progress_count: null,
+    contention: { count: 0, session_ids: [] },
+    branch_changed: false,
+    live_branch: null,
+    live_agent_pids: [],
+  };
+}
+
 function main(): number {
   const { cmd, args } = parseArgs(process.argv.slice(2));
   const quiet = args["quiet"] === true;
@@ -139,10 +171,8 @@ function main(): number {
     const msg = e instanceof Error ? e.message : String(e);
     if (cmd === "classify") {
       process.stdout.write(
-        JSON.stringify({
-          state: "REGISTRY-UNAVAILABLE",
-          reason: `session registry could not be opened: ${msg}`,
-        }) + "\n"
+        JSON.stringify(degradedClassification(`session registry could not be opened: ${msg}`)) +
+          "\n"
       );
       return 3;
     }
@@ -156,9 +186,14 @@ function main(): number {
         mint: true,
       });
       const cwd = str(args, "cwd") ?? process.cwd();
-      // ICN_ROOT (or --root) is a CANDIDATE, validated by Git — never authoritative on its own,
-      // and hook cwd may be a subdirectory or scratch path, so Git resolves the real owner.
-      const identity = discoverWorktree(cwd, str(args, "root") ?? process.env["ICN_ROOT"] ?? null);
+      // An EXPLICIT `--root` is an operator stating intent, so it may still act as a fallback
+      // when cwd resolves to nothing. ICN_ROOT MUST NOT, and no longer does. It is ambient, and
+      // on icn-dev the shell profile pins it to the mcp-host worktree — so every session whose
+      // cwd was not a worktree (a scratch path, a deleted directory, $HOME) was registered
+      // under mcp-host's REAL lane: phantom occupancy on a lane nobody was in, while the lane
+      // the agent was actually in reported UNREGISTERED. Whether a session was misfiled or
+      // correctly refused came down to whether an environment variable happened to be set.
+      const identity = discoverWorktree(cwd, str(args, "root") ?? null);
       if (!identity) {
         process.stderr.write(
           `icn-agent-session: ${cwd} does not resolve to a Git worktree; not registering\n`
@@ -218,7 +253,17 @@ function main(): number {
       if (cmd === "heartbeat") recordHeartbeat(db, row.id);
       else if (cmd === "interaction") recordInteraction(db, row.id);
       else {
-        const kind = (str(args, "kind") ?? "explicit") as ProgressKind;
+        // A CAST IS NOT A CHECK. `--kind` arrives as an arbitrary string from a hook payload,
+        // and `as ProgressKind` asserted a fact TypeScript had no way to verify — so the CLI
+        // accepted `--kind turn` and advanced progress_count, while the MCP tool rejected the
+        // same word. Validate against the shared vocabulary so both surfaces agree.
+        const kind = str(args, "kind") ?? "explicit";
+        try {
+          assertProgressKind(kind);
+        } catch (e) {
+          process.stderr.write(`icn-agent-session: ${(e as Error).message}\n`);
+          return 2;
+        }
         recordProgress(db, row.id, { kind, activity: str(args, "activity") ?? null });
       }
       return 0;
@@ -277,16 +322,12 @@ function main(): number {
           // that verdict no longer exists, and reusing the code for a usage error told a
           // consumer an unresolvable path was permission to retire.
           process.stdout.write(
-            JSON.stringify({
-              state: "REGISTRY-UNAVAILABLE",
-              // Present on every envelope: the type declares it required, and a consumer
-              // typed against the interface throws on `.live_agent_pids.length`.
-              live_agent_pids: [],
-              contention: { count: 0, session_ids: [] },
-              reason:
+            JSON.stringify(
+              degradedClassification(
                 "no lane could be resolved from the arguments given " +
-                "(need --worktree-id, --path, or --worktree)",
-            }) + "\n"
+                  "(need --worktree-id, --path, or --worktree)"
+              )
+            ) + "\n"
           );
           process.stderr.write("classify requires --worktree-id, --path, or --worktree\n");
           return 3;
@@ -295,14 +336,11 @@ function main(): number {
         const ids = [...new Set(matches.map((m) => m.worktree_id).filter(Boolean))];
         if (ids.length > 1) {
           process.stdout.write(
-            JSON.stringify({
-              state: "REGISTRY-UNAVAILABLE",
-              // Present on every envelope: the type declares it required, and a consumer
-              // typed against the interface throws on `.live_agent_pids.length`.
-              live_agent_pids: [],
-              contention: { count: 0, session_ids: [] },
-              reason: `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`,
-            }) + "\n"
+            JSON.stringify(
+              degradedClassification(
+                `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`
+              )
+            ) + "\n"
           );
           // 3, not 1: the documented contract is 0 (facts produced) or 3 (none available).
           return 3;
@@ -310,33 +348,9 @@ function main(): number {
         worktreeId = ids[0] ?? name;
       }
       const worktree = worktreeId;
-      // Absent --pids means NOBODY LOOKED and must stay protected. --observed-none is the
-      // affirmative "I looked and found nothing", which is the only form that can support
-      // retirement. Passing [] for both was the bug: it let a lane with a live agent process
-      // classify as retireable.
-      const pidsRaw = str(args, "pids");
-      const observedNone = args["observed-none"] === true;
-      let pids: number[] | null;
-      if (pidsRaw !== undefined) {
-        const tokens = pidsRaw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
-        const parsed = tokens
-          .map((s) => Number(s))
-          .filter((n) => Number.isInteger(n) && n > 0);
-        // Garbage in must not become the strongest possible claim. `--pids "$(lsof -t … )"`
-        // where lsof errored used to collapse to [] — an affirmative "I looked and found
-        // nothing" — reintroducing the very bug the three-state observation closed.
-        if (tokens.length > 0 && parsed.length === 0) {
-          process.stderr.write(
-            `icn-agent-session: --pids ${JSON.stringify(pidsRaw)} contained no valid pids; ` +
-              "treating as NO observation performed (lane stays protected)\n"
-          );
-          pids = null;
-        } else {
-          pids = parsed;
-        }
-      } else {
-        pids = observedNone ? [] : null;
-      }
+      const parsed = parseObservedPids(str(args, "pids"), args["observed-none"] === true);
+      if (parsed.warning) process.stderr.write(`icn-agent-session: ${parsed.warning}\n`);
+      const pids = parsed.observed_pids;
       let c;
       try {
         c = classifyWorktree(db, worktree, { observed_pids: pids });
@@ -345,12 +359,9 @@ function main(): number {
         // exception escape produced EMPTY stdout — the precise failure the wrapper's degrade
         // path exists to prevent.
         process.stdout.write(
-          JSON.stringify({
-            state: "REGISTRY-UNAVAILABLE",
-            live_agent_pids: [],
-            contention: { count: 0, session_ids: [] },
-            reason: `classification failed: ${(e as Error).message}`,
-          }) + "\n"
+          JSON.stringify(
+            degradedClassification(`classification failed: ${(e as Error).message}`)
+          ) + "\n"
         );
         return 3;
       }
@@ -367,4 +378,8 @@ function main(): number {
   }
 }
 
-process.exit(main());
+// `process.exitCode`, NOT `process.exit()`. When stdout is a PIPE, Node's writes are
+// asynchronous, and process.exit() discards whatever is still queued — so a large envelope
+// was TRUNCATED at the 64 KB pipe buffer while classify still exited 0, i.e. "facts produced"
+// with unparseable JSON on the wire. Setting exitCode lets the event loop drain first.
+process.exitCode = main();

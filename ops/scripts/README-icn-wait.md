@@ -115,7 +115,5 @@ Reporting a timeout as 1 made that indistinguishable from a failing test suite, 
   it, and this document.
 - `scripts/test-icn-wait.sh` pins every recovered pattern, each with a **negative control**
   that reproduces the original loop and asserts it still hangs.
-- `scripts/tests/test_pre_bash_guard.py` tests the guard in both directions — false negatives
-  and false positives — using the real recovered command lines.
 
 See `docs/architecture/AGENT_RUNTIME.md` for the lane lifecycle this feeds.

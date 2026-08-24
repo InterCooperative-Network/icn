@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 import sys
@@ -46,9 +47,33 @@ REQUIRED_MATCHER_TOKENS = {
 
 
 def _invokes_hook(command: str) -> bool:
-    """The hook must be the command, not merely mentioned in it (e.g. in a comment)."""
-    stripped = command.split("#", 1)[0].strip().strip('"').strip("'")
-    return stripped.endswith(HOOK) or stripped.endswith(HOOK.split("/")[-1])
+    """
+    The hook must be THE COMMAND — the program actually executed — not merely the last word
+    on the line.
+
+    This used to be `stripped.endswith(HOOK)`, which any string ENDING in the path satisfies.
+    Rewriting all five hooks as `true "$CLAUDE_PROJECT_DIR"/.claude/hooks/session-lifecycle.sh`
+    — lifecycle tracking completely off, nothing registered, nothing released — left this gate
+    reporting "25 check(s) passed, 0 failure(s)". A gate whose entire purpose is to prove the
+    runtime is wired must not accept a command that provably never runs it.
+    """
+    stripped = command.split("#", 1)[0].strip()
+    try:
+        tokens = shlex.split(stripped)
+    except ValueError:
+        return False
+    # Leading VAR=value environment assignments are legitimate and are not the program.
+    idx = 0
+    while idx < len(tokens) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[idx]):
+        idx += 1
+    if idx >= len(tokens):
+        return False
+    argv0 = tokens[idx]
+    # An explicit interpreter is legitimate (`bash <hook>`), but then the hook must be its
+    # FIRST argument — not something appended after an unrelated program.
+    if os.path.basename(argv0) in {"bash", "sh", "zsh"} and idx + 1 < len(tokens):
+        argv0 = tokens[idx + 1]
+    return argv0.endswith(HOOK) or argv0.endswith(HOOK.split("/")[-1])
 
 
 REQUIRED_EXECUTABLES = [
@@ -59,6 +84,9 @@ REQUIRED_EXECUTABLES = [
 
 # Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
 # COVERAGE below), so the MCP surface is the only capability route they have.
+# How many checks a COMPLETE run performs. Asserted, not decorative — see the floor in main().
+EXPECTED_CHECKS = 25
+
 PROVIDER_MCP_CONFIGS = [
     (".mcp.json", ["mcpServers", "icn-ops"]),
     (".cursor/mcp.json", ["mcpServers", "icn-ops"]),
@@ -164,7 +192,16 @@ def main() -> int:
     for rel, keypath in PROVIDER_MCP_CONFIGS:
         path = root / rel
         if not path.is_file():
-            continue  # optional adapter
+            # NOT "continue # optional adapter". A missing file is the MOST likely way to lose
+            # a provider's only capability route, and skipping it silently dropped the check
+            # while COVERAGE below went on printing that the adapter "declares the ops MCP in
+            # .cursor/mcp.json" — a claim about a file that did not exist. Deleting
+            # .cursor/mcp.json passed 24/0; deleting .mcp.json passed 24/0. Both now fail.
+            failures.append(
+                f"missing: {rel} — the gate claims this adapter reaches the ops MCP, so its "
+                "absence is a coverage failure, not an optional extra"
+            )
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except ValueError as exc:
@@ -330,6 +367,20 @@ def main() -> int:
             else:
                 ok(f"{HOOK} writes registration and progress to the registry")
 
+
+    # A CHECK THAT VANISHES MUST NOT READ AS A CHECK THAT PASSED.
+    #
+    # Several blocks below skip themselves when their input is absent, so the total silently
+    # dropped to 24 without ops/mcp/dist (which is gitignored), 24 without .mcp.json, and 23
+    # without both — every one of them exiting 0. The strongest check in the file, the registry
+    # write-through, was one of the ones that disappeared. CI happens to build first today, so
+    # this was latent rather than live; a floor makes it neither.
+    if checked < EXPECTED_CHECKS:
+        failures.append(
+            f"only {checked} of {EXPECTED_CHECKS} checks ran — a check that skipped itself is "
+            "not a check that passed. Something the gate depends on is missing (an unbuilt "
+            "ops/mcp/dist, a deleted adapter); fix that rather than lowering EXPECTED_CHECKS"
+        )
 
     print(f"agent-runtime adoption: {checked} check(s) passed, {len(failures)} failure(s)")
     if args.verbose or failures:

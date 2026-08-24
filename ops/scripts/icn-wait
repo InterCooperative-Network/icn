@@ -73,6 +73,12 @@ case "$POLL_INTERVAL" in
     ;;
   *) POLL_INTERVAL=2 ;;
 esac
+# ...and not absurdly LARGE. The lower bound existed; the upper bound did not, so an env var
+# silently overrode an explicit one: `ICN_WAIT_POLL_INTERVAL=45 icn-wait file X --timeout 2`
+# ran for 45 seconds, and 999999 ran until it was killed. That is the same class of defect
+# ICN_WAIT_KILL_GRACE was capped for. The cap bounds the interval; poll_sleep() additionally
+# clamps every individual sleep to the remaining budget, so --timeout is honoured exactly.
+awk -v p="$POLL_INTERVAL" 'BEGIN{exit !(p>60)}' && POLL_INTERVAL=60
 readonly POLL_INTERVAL
 
 # Resolve our own directory THROUGH symlinks: helpers here are commonly symlinked into ~/bin,
@@ -136,6 +142,15 @@ DEADLINE=0
 
 expired() { [ "$DEADLINE" -gt 0 ] && [ "$(now)" -ge "$DEADLINE" ]; }
 
+# Sleep one poll interval, but NEVER past the deadline. A long interval must not be able to
+# overshoot --timeout; without this, the timeout was only checked BETWEEN sleeps.
+poll_sleep() {
+  if [ "$DEADLINE" -eq 0 ]; then sleep "$POLL_INTERVAL"; return; fi
+  remaining=$(( DEADLINE - $(now) ))
+  [ "$remaining" -le 0 ] && return
+  sleep "$(awk -v p="$POLL_INTERVAL" -v r="$remaining" 'BEGIN{print (p<r)?p:r}')"
+}
+
 timed_out() {
   printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL:-$1}" >&2
   exit 1
@@ -173,7 +188,7 @@ is_our_descendant() {
 # Validate the pattern ONCE, up front. `pgrep` exits 2 on a bad regex while printing nothing,
 # which is indistinguishable from "no matches" — so an invalid pattern reported the wait as
 # SATISFIED (exit 0, "your build finished"). That is the same swallowed-error defect the file
-# branch fixes and the Bash guard blocks agents for writing.
+# branch fixes, and this tool exists so agents do not write them.
 assert_pattern_usable() {
   local pat="$1" out rc
   out="$(pgrep -f -- "$pat" 2>&1)"; rc=$?
@@ -279,7 +294,7 @@ case "$CMD" in
         printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL}" >&2
         exit 124
       fi
-      sleep "$POLL_INTERVAL"
+      poll_sleep
     done
     wait "$child"; exit $?
     ;;
@@ -287,6 +302,11 @@ case "$CMD" in
   pid)
     target="${POSITIONAL[0]:-}"
     case "$target" in ''|*[!0-9]*) die "pid requires a numeric PID" ;; esac
+    # PID 0 is not a process. POSIX gives `kill -0 0` a different meaning entirely — it signals
+    # the CALLER'S OWN process group — so it always succeeds and `icn-wait pid 0` reported the
+    # target alive forever: a logical deadlock, not a wait. Measured: exit 1 only when the
+    # timeout fired, and never at all under --allow-unbounded.
+    [ "$target" -eq 0 ] && die "PID 0 is not a process (kill -0 0 signals the caller's process group)"
     [ "$target" = "$$" ] && fatal "asked to wait for this very process ($$)"
     build_exclusions
     is_excluded "$target" && fatal "PID $target is this process or one of its ancestors; waiting on it can never complete"
@@ -299,7 +319,7 @@ case "$CMD" in
     # Not our child, so `wait` is unavailable; kill -0 polling is exact and cannot self-match.
     while alive "$target"; do
       expired && timed_out "$LABEL"
-      sleep "$POLL_INTERVAL"
+      poll_sleep
     done
     exit 0
     ;;
@@ -316,6 +336,9 @@ case "$CMD" in
 
     if [ -n "$SOURCE_PID" ]; then
       case "$SOURCE_PID" in *[!0-9]*) die "--source-pid must be numeric" ;; esac
+      # Same reason as `pid 0` above: a source-pid of 0 always reads alive, so the dead-producer
+      # fail-fast below could never fire and the wait silently lost its only early exit.
+      [ "$SOURCE_PID" -eq 0 ] && die "--source-pid 0 is not a process"
     fi
 
     while :; do
@@ -324,7 +347,7 @@ case "$CMD" in
         # Branch on grep's EXIT STATUS, not on "did it print". 0 = matched, 1 = not yet,
         # >=2 = grep itself failed (unreadable file, invalid regex) — which can never become a
         # match and must fail fast. Swallowing this with 2>/dev/null is precisely the defect
-        # pre-bash-guard.py blocks agents for writing; the replacement must not commit it too.
+        # This is the defect the tool replaces; the replacement must not commit it too.
         grep_err="$(grep -qE -- "$PATTERN" "$path" 2>&1)"; grc=$?
         if [ "$grc" -eq 0 ]; then exit 0; fi
         if [ "$grc" -ge 2 ]; then
@@ -338,7 +361,7 @@ case "$CMD" in
       # The directory was cleaned up mid-wait (the other half of the #2644 defect).
       [ -d "$dir" ] || fatal "sentinel directory disappeared during the wait: $dir"
       expired && timed_out "$LABEL"
-      sleep "$POLL_INTERVAL"
+      poll_sleep
     done
     ;;
 
@@ -363,7 +386,7 @@ case "$CMD" in
       remaining="$(foreign_matches "$pat")"
       [ -z "$remaining" ] && exit 0
       expired && timed_out "$LABEL"
-      sleep "$POLL_INTERVAL"
+      poll_sleep
     done
     ;;
 

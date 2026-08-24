@@ -49,8 +49,9 @@ const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
   }
   return e;
 })();
-import { existsSync, realpathSync } from "fs";
-import { basename, dirname, resolve } from "path";
+import { randomUUID } from "crypto";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "fs";
+import { basename, dirname, join, resolve } from "path";
 
 /** Stable identity of a lane. Nothing here changes when the branch does. */
 export type WorktreeIdentity = {
@@ -64,6 +65,11 @@ export type WorktreeIdentity = {
   worktree_path: string;
   /** Display only — may collide across repos, never used as a key. */
   worktree_name: string;
+  /**
+   * AUTHORITATIVE TEMPORAL: which GENERATION of this lane this is. Null when it cannot be
+   * determined, which callers must treat as "unknown", never as "different". See laneGeneration().
+   */
+  worktree_generation: string | null;
 };
 
 /** AUTHORITATIVE LIVE: what the lane currently points at. Re-read, never cached. */
@@ -90,6 +96,87 @@ function repoNameFrom(commonDir: string): string {
   const base = basename(commonDir);
   if (base === ".git") return basename(dirname(commonDir));
   return base.replace(/\.git$/, "");
+}
+
+/**
+ * Name of the runtime-owned generation token, stored INSIDE the Git admin directory.
+ *
+ * WHY A TOKEN AND NOT A PATH
+ *   `repo + admin dir + worktree path` identifies a lane in SPACE but not in TIME. Git recycles
+ *   `<repo>/.git/worktrees/<basename>` after `git worktree remove`, and a worktree can be
+ *   recreated at the EXACT SAME pathname — at which point recorded path, admin dir and repo all
+ *   match, and a brand-new generation silently inherits the previous one's unreleased rows and
+ *   the authority attached to them. Verified: a fresh `gen2` worktree classified
+ *   REGISTERED-ACTIVE holding `gen1`'s session row.
+ *
+ * WHY IT CANNOT OUTLIVE ITS GENERATION
+ *   The token lives in the one container GIT ITSELF DELETES. `git worktree remove` and
+ *   `git worktree prune` remove the whole admin directory, so the token goes with it and a
+ *   recreated worktree necessarily mints a new one. It is deliberately NOT stored in the
+ *   working tree (which a user may keep), nor in the repo root, nor in any global cache — every
+ *   one of those would survive the removal and reintroduce exactly the aliasing it prevents.
+ *
+ * WHAT IT SURVIVES
+ *   Commits, branch switches, branch renames, history-rewriting rebases and detached HEAD all
+ *   leave the admin directory in place, so the generation is stable across every one of them —
+ *   which is the whole point: none of those make it a different worktree.
+ *
+ * FAILURE IS "UNKNOWN", NOT "DIFFERENT"
+ *   A read-only or unreadable admin directory yields null. Callers keep every row when either
+ *   side is unknown, so an unmintable token can only ever make a lane look MORE occupied.
+ */
+const GENERATION_FILE = "icn-lane-generation";
+
+export function laneGeneration(adminDir: string): string | null {
+  const file = join(adminDir, GENERATION_FILE);
+  const read = (): string | null => {
+    try {
+      const v = readFileSync(file, "utf8").trim();
+      return v || null;
+    } catch {
+      return null;
+    }
+  };
+  const existing = read();
+  if (existing) return existing;
+  try {
+    // `wx` fails if the file appeared meanwhile, so two concurrent minters cannot both win —
+    // the loser falls through and reads whatever the winner wrote.
+    writeFileSync(file, `${randomUUID()}\n`, { flag: "wx" });
+  } catch {
+    // EEXIST (someone else minted first) or an unwritable admin dir. Both fall through to the
+    // read below, which returns null for the unwritable case.
+  }
+  return read();
+}
+
+/**
+ * The path a LINKED worktree's admin directory currently points at, or null when the id is not
+ * a linked worktree (a main worktree's `.git` has no `gitdir` file) or cannot be read.
+ *
+ * `worktree_id` is stable for the life of a worktree but NOT unique over time, because git
+ * RECYCLES the admin directory name: after `git worktree remove old/mylane`, a later
+ * `git worktree add new/mylane` — a different path, a different branch — is handed the SAME
+ * `<repo>/.git/worktrees/mylane`, and therefore the same id. Verified directly.
+ *
+ * Left unhandled, the new lane silently adopts the removed lane's unreleased rows, and that
+ * flips the verdict in the DANGEROUS direction: a fresh lane that should read
+ * UNREGISTERED-OBSERVED (protected, because absence of a row is never evidence of absence)
+ * instead reads REGISTERED-EXPIRED, with a reason string asserting facts about a directory
+ * that no longer exists.
+ *
+ * Returning null on any doubt is deliberate — the caller keeps every row when it cannot tell,
+ * so an unreadable admin dir can only ever make a lane look MORE occupied, never less.
+ */
+export function currentWorktreePathFor(worktreeId: string): string | null {
+  try {
+    const raw = readFileSync(join(worktreeId, "gitdir"), "utf8").trim();
+    if (!raw) return null;
+    // `gitdir` holds the path of the worktree's own `.git` FILE; the lane is its parent.
+    return canonical(dirname(raw));
+  } catch {
+    return null;
+  }
 }
 
 function canonical(p: string | null): string | null {
@@ -123,6 +210,13 @@ export function discoverWorktree(
   //
   // Validating that envRoot is a real worktree is therefore NOT enough — a valid answer to the
   // wrong question is still wrong. envRoot is consulted only when cwd resolves to nothing.
+  //
+  // AND IT MUST NEVER BE AMBIENT. Callers now pass only an EXPLICIT `--root` here; the
+  // `ICN_ROOT` reads were removed from every call site. The fallback below is reachable
+  // whenever cwd yields no gitDir — which includes the ordinary case of a cwd that simply is
+  // not in a repository — so while it was fed from the environment, a session started in a
+  // scratch path or a deleted directory was filed under mcp-host's real lane instead of being
+  // refused. An operator typing `--root` is stating intent; a shell profile is not.
   const candidates: string[] = [];
   if (startDir && existsSync(startDir)) candidates.push(startDir);
   if (envRoot && existsSync(envRoot)) candidates.push(envRoot);
@@ -153,6 +247,7 @@ export function discoverWorktree(
       worktree_id: gitDir,
       worktree_path: top,
       worktree_name: basename(top),
+      worktree_generation: laneGeneration(gitDir),
     };
   }
   return null;

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -136,12 +136,28 @@ describe("branch movement never changes lane identity", () => {
     expect(discoverWorktree(wtA)!.worktree_id).toBe(before);
   });
 
-  it("survives a rebase (history rewritten)", () => {
+  it("survives a rebase that ACTUALLY rewrites history", () => {
     const before = discoverWorktree(wtA)!.worktree_id;
+
+    // This test used to run `git rebase --onto main main`, which rewrites NOTHING: it captured
+    // `head0` and then discarded it with `void head0;`, so it asserted identity survived an
+    // operation that never happened. Build genuinely divergent history instead, and prove the
+    // rewrite occurred before claiming identity survived it.
+    writeFileSync(join(repoA, "trunk.txt"), "trunk\n");
+    git(repoA, "add", "trunk.txt");
+    git(repoA, "commit", "-qm", "trunk advances");
+
+    writeFileSync(join(wtA, "lane.txt"), "lane\n");
+    git(wtA, "add", "lane.txt");
+    git(wtA, "commit", "-qm", "lane work");
+
     const head0 = readBranchState(wtA).head;
-    git(wtA, "rebase", "-q", "--onto", "main", "main");
-    // Even if the rebase is a no-op for content, identity must be untouched.
-    void head0;
+    git(wtA, "rebase", "-q", "main");
+    const head1 = readBranchState(wtA).head;
+
+    expect(head0).toBeTruthy();
+    expect(head1).toBeTruthy();
+    expect(head1).not.toBe(head0); // the rewrite is real, so the claim below means something
     expect(discoverWorktree(wtA)!.worktree_id).toBe(before);
   });
 
@@ -331,5 +347,193 @@ describe("provider conversation vs runtime activation", () => {
     } finally {
       db.close();
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LANE IDENTITY IN TIME (A3)
+//
+// worktree_id answers "which lane, in space". It does NOT answer "which lane, WHEN".
+// Git recycles `<repo>/.git/worktrees/<basename>` after `git worktree remove`, and a worktree
+// can be recreated at the EXACT SAME pathname — at which point repo, admin dir AND recorded
+// path all match, and a brand-new generation inherits the previous one's unreleased rows.
+// Verified before the fix: a fresh `gen2` worktree classified REGISTERED-ACTIVE holding
+// `gen1`'s session row. A path comparison is structurally incapable of catching that, which is
+// why the discriminator is a token minted per generation inside the directory git deletes.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("worktree generation — identity in time", () => {
+  let gRoot: string;
+  let gRepo: string;
+
+  beforeAll(() => {
+    gRoot = mkdtempSync(join(tmpdir(), "icn-lane-generation-"));
+    gRepo = join(gRoot, "repo");
+    makeRepo(gRepo);
+  });
+  afterAll(() => rmSync(gRoot, { recursive: true, force: true }));
+
+  const genOf = (path: string): string | null => {
+    const id = discoverWorktree(path);
+    expect(id).not.toBeNull();
+    return id!.worktree_generation;
+  };
+
+  it("is minted, non-empty, and stable when re-read", () => {
+    const wt = join(gRoot, "stable");
+    git(gRepo, "worktree", "add", "-q", "-b", "stable-lane", wt);
+    const first = genOf(wt);
+    expect(first).toBeTruthy();
+    // Re-reading must NOT mint a second token — that would make every call a new generation.
+    expect(genOf(wt)).toBe(first);
+  });
+
+  it("survives commits, branch switch, branch rename, detached HEAD", () => {
+    const wt = join(gRoot, "churn");
+    git(gRepo, "worktree", "add", "-q", "-b", "churn-lane", wt);
+    const before = genOf(wt);
+
+    writeFileSync(join(wt, "a.txt"), "a\n");
+    git(wt, "add", "a.txt");
+    git(wt, "commit", "-qm", "c1");
+    expect(genOf(wt)).toBe(before);
+
+    git(wt, "checkout", "-q", "-b", "churn-other");
+    expect(genOf(wt)).toBe(before);
+
+    git(wt, "branch", "-m", "churn-renamed");
+    expect(genOf(wt)).toBe(before);
+
+    git(wt, "checkout", "-q", "--detach");
+    expect(genOf(wt)).toBe(before);
+  });
+
+  it("survives a GENUINE history rewrite (HEAD actually changes)", () => {
+    const wt = join(gRoot, "rebased");
+    git(gRepo, "worktree", "add", "-q", "-b", "rebase-lane", wt);
+    const before = genOf(wt);
+
+    // Divergent history: main moves on, the lane commits on top of the OLD base.
+    writeFileSync(join(gRepo, "trunk.txt"), "trunk\n");
+    git(gRepo, "add", "trunk.txt");
+    git(gRepo, "commit", "-qm", "trunk moves");
+
+    writeFileSync(join(wt, "mine.txt"), "mine\n");
+    git(wt, "add", "mine.txt");
+    git(wt, "commit", "-qm", "mine");
+    const headBefore = git(wt, "rev-parse", "HEAD");
+
+    git(wt, "rebase", "-q", "main");
+    const headAfter = git(wt, "rev-parse", "HEAD");
+
+    // The point of the test: if HEAD did not move, the rebase was a no-op and the identity
+    // claim below is worthless. An earlier version of this fixture rebased `--onto main main`,
+    // which rewrites nothing at all.
+    expect(headAfter).not.toBe(headBefore);
+    expect(genOf(wt)).toBe(before);
+  });
+
+  it("is identical when the same worktree is reached through a symlink", () => {
+    const wt = join(gRoot, "symlinked");
+    git(gRepo, "worktree", "add", "-q", "-b", "symlink-lane", wt);
+    const direct = genOf(wt);
+    const link = join(gRoot, "symlink-alias");
+    symlinkSync(wt, link);
+    expect(genOf(link)).toBe(direct);
+    // and the lane itself is still one lane
+    expect(discoverWorktree(link)!.worktree_id).toBe(discoverWorktree(wt)!.worktree_id);
+  });
+
+  it("DIFFERS after remove/recreate at the EXACT SAME path", () => {
+    const wt = join(gRoot, "recreated-same");
+    git(gRepo, "worktree", "add", "-q", "-b", "same-gen1", wt);
+    const idBefore = discoverWorktree(wt)!;
+    const genBefore = idBefore.worktree_generation;
+
+    git(gRepo, "worktree", "remove", "--force", wt);
+    git(gRepo, "worktree", "add", "-q", "-b", "same-gen2", wt);
+    const idAfter = discoverWorktree(wt)!;
+
+    // Everything git-derived is IDENTICAL — this is exactly why a path check cannot help.
+    expect(idAfter.worktree_id).toBe(idBefore.worktree_id);
+    expect(idAfter.worktree_path).toBe(idBefore.worktree_path);
+    expect(idAfter.repo_id).toBe(idBefore.repo_id);
+    // Only the generation separates them.
+    expect(idAfter.worktree_generation).toBeTruthy();
+    expect(idAfter.worktree_generation).not.toBe(genBefore);
+  });
+
+  it("DIFFERS after remove/recreate at a DIFFERENT path with the same basename", () => {
+    const older = join(gRoot, "old", "shared-name");
+    const newer = join(gRoot, "new", "shared-name");
+    mkdirSync(join(gRoot, "old"), { recursive: true });
+    mkdirSync(join(gRoot, "new"), { recursive: true });
+    git(gRepo, "worktree", "add", "-q", "-b", "diff-gen1", older);
+    const genBefore = genOf(older);
+    git(gRepo, "worktree", "remove", "--force", older);
+    git(gRepo, "worktree", "add", "-q", "-b", "diff-gen2", newer);
+    expect(genOf(newer)).not.toBe(genBefore);
+  });
+
+  it("differs between same-basename lanes in one repo and across repos", () => {
+    const one = join(gRoot, "p1", "task-review");
+    const two = join(gRoot, "p2", "task-review");
+    mkdirSync(join(gRoot, "p1"), { recursive: true });
+    mkdirSync(join(gRoot, "p2"), { recursive: true });
+    git(gRepo, "worktree", "add", "-q", "-b", "coexist-1", one);
+    git(gRepo, "worktree", "add", "-q", "-b", "coexist-2", two);
+    expect(genOf(one)).not.toBe(genOf(two));
+    // and against the OTHER repository's identically-named lane from the shared fixture
+    expect(genOf(one)).not.toBe(discoverWorktree(wtB)!.worktree_generation);
+  });
+
+  it("a recreated lane does not adopt the previous generation's session rows", () => {
+    const wt = join(gRoot, "adoption");
+    git(gRepo, "worktree", "add", "-q", "-b", "adopt-gen1", wt);
+    const db = initDb(":memory:");
+    const first = discoverWorktree(wt)!;
+    registerSession(db, {
+      repo: "gen",
+      identity: first,
+      branch_state: readBranchState(first.worktree_path),
+      provider_session_id: "gen1-session",
+      agent_pid: 999999,
+    });
+    expect(activeSessionsForWorktree(db, first.worktree_id)).toHaveLength(1);
+
+    git(gRepo, "worktree", "remove", "--force", wt);
+    git(gRepo, "worktree", "add", "-q", "-b", "adopt-gen2", wt);
+    const second = discoverWorktree(wt)!;
+    expect(second.worktree_id).toBe(first.worktree_id); // git really did recycle it
+
+    // The row still EXISTS — nothing is destroyed — it is simply no longer this lane's.
+    expect(
+      (db.prepare("SELECT COUNT(*) AS c FROM sessions").get() as { c: number }).c
+    ).toBe(1);
+    expect(activeSessionsForWorktree(db, second.worktree_id)).toHaveLength(0);
+
+    // ...and the lane therefore reads PROTECTED, not actionable.
+    const c = classifyWorktree(db, second.worktree_id, { observed_pids: [] });
+    expect(c.state).toBe("UNREGISTERED-OBSERVED");
+    expect(c.session_id).toBeNull();
+    expect(c.contention.count).toBe(0);
+  });
+
+  it("keeps rows when the generation is UNKNOWN on either side (fail safe)", () => {
+    const wt = join(gRoot, "unknown-gen");
+    git(gRepo, "worktree", "add", "-q", "-b", "unknown-lane", wt);
+    const db = initDb(":memory:");
+    const id = discoverWorktree(wt)!;
+    registerSession(db, {
+      repo: "gen",
+      identity: id,
+      branch_state: readBranchState(id.worktree_path),
+      provider_session_id: "unknown-gen-session",
+      agent_pid: 999999,
+    });
+    // Simulate a pre-v5 row: generation not recorded. It must still be attributed, because
+    // "unknown" may never be read as "different" — that direction loses protection.
+    db.prepare("UPDATE sessions SET worktree_generation = NULL").run();
+    expect(activeSessionsForWorktree(db, id.worktree_id)).toHaveLength(1);
   });
 });

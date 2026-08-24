@@ -76,28 +76,48 @@ describe("every registered session tool is actually callable", () => {
   });
 
   it("invokes EVERY advertised tool without a protocol-level error", async () => {
-    // The blunt instrument that would have caught the shipped defect: if tools/list vouches
-    // for it, it must at minimum not throw when called with valid arguments.
+    // DERIVED FROM tools/list, never from a literal list.
+    //
+    // The previous version iterated a hardcoded nine-entry array, so advertising a TENTH tool
+    // with a broken handler — precisely the defect this file exists to prevent — changed
+    // nothing here. The hole was closed only for the tools that happened to exist the day it
+    // was written. Now an advertised tool with no entry below fails the coverage assertion
+    // before anything is invoked.
     const reg = (await call("register_session", { repo: "icn", ...LANE })) as {
       session_id: string;
     };
     expect(reg.session_id).toBeTruthy();
     const sid = reg.session_id;
 
-    const failures: string[] = [];
-    const invocations: Array<[string, Record<string, unknown>]> = [
-      ["list_sessions", {}],
-      ["claim_files", { session_id: sid, files: ["icn/crates/a/src/lib.rs"] }],
-      ["heartbeat", { session_id: sid }],
-      ["session_progress", { session_id: sid, kind: "file_edit" }],
-      ["session_interaction", { session_id: sid }],
-      ["session_info", { session_id: sid }],
-      ["session_lifecycle", { ...LANE }],
-      ["recent_sessions", { count: 1 }],
-      ["release_session", { session_id: sid, reason: "completed" }],
+    const ARGS: Record<string, Record<string, unknown>> = {
+      register_session: { repo: "icn", ...LANE },
+      list_sessions: {},
+      claim_files: { session_id: sid, files: ["icn/crates/a/src/lib.rs"] },
+      heartbeat: { session_id: sid },
+      session_progress: { session_id: sid, kind: "file_edit" },
+      session_interaction: { session_id: sid },
+      session_info: { session_id: sid },
+      session_lifecycle: { ...LANE },
+      recent_sessions: { count: 1 },
+      release_session: { session_id: sid, reason: "completed" },
+    };
+
+    const { tools } = await client.listTools();
+    const advertised = tools.map((t) => t.name);
+
+    // A tool the server VOUCHES FOR but this suite never calls is an untested tool.
+    expect(advertised.filter((n) => !(n in ARGS)).sort()).toEqual([]);
+    // ...and an entry here for a tool no longer advertised is stale scaffolding.
+    expect(Object.keys(ARGS).filter((n) => !advertised.includes(n)).sort()).toEqual([]);
+
+    // release_session goes last: it deletes the row every other call depends on.
+    const ordered = [
+      ...advertised.filter((n) => n !== "register_session" && n !== "release_session"),
+      ...advertised.filter((n) => n === "release_session"),
     ];
-    for (const [name, args] of invocations) {
-      const res = await callRaw(name, args);
+    const failures: string[] = [];
+    for (const name of ordered) {
+      const res = await callRaw(name, ARGS[name]!);
       if (res.isError) failures.push(`${name}: ${res.content?.[0]?.text}`);
     }
     expect(failures).toEqual([]);

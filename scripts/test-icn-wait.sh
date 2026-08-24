@@ -206,6 +206,23 @@ check "an oversized --timeout is rejected, not silently unbounded" 2 $?
 timeout 8 "$WAIT" pid 2 --timeout 9223372036854775807 >/dev/null 2>&1
 check "an int64-overflowing --timeout is rejected" 2 $?
 
+# THE NUMERIC CAP, ON ITS OWN. Both assertions above are satisfied by the LENGTH guard
+# (`${#TIMEOUT} -gt 9`) without the numeric comparison ever running, so deleting
+# `[ "$TIMEOUT" -gt "$MAX_TIMEOUT" ]` left them green while `--timeout 999999999` became an
+# effectively unbounded wait. These two values live in the band only the numeric cap can
+# reject: 8 and 9 digits, so the length guard passes them, and both exceed 31536000.
+timeout 8 "$WAIT" pid 2 --timeout 31536001 >/dev/null 2>&1
+check "--timeout just over the 1-year cap is rejected by the NUMERIC cap (8 digits)" 2 $?
+
+timeout 8 "$WAIT" pid 2 --timeout 999999999 >/dev/null 2>&1
+check "--timeout 999999999 is rejected by the NUMERIC cap (9 digits, length guard passes it)" 2 $?
+
+# ...and the boundary itself must still be ACCEPTED, or the cap is just an arbitrary refusal.
+# Waited against a pid that does not exist, so the condition is met immediately: rc 0 means the
+# value was accepted and the wait ran, rc 2 would mean the cap rejected its own boundary.
+timeout 8 "$WAIT" pid 4194303 --timeout 31536000 >/dev/null 2>&1
+check "--timeout exactly at the cap is ACCEPTED (rc 0 = ran, not 2 = rejected)" 0 $?
+
 echo
 
 # ── 6. signals must stop the wait AND reap the child ─────────────────────────
@@ -311,6 +328,53 @@ if [ "$rc" -eq 0 ] && [ -f "$TMP/jc.mark" ] && [ "$elapsed" -ge 3 ]; then
   ok "cmd waits for the real command even under job control (${elapsed}s)"
 else
   bad "cmd returned before the command finished" "rc=$rc elapsed=${elapsed}s marker=$([ -f "$TMP/jc.mark" ] && echo present || echo absent)"
+fi
+
+echo
+
+# ── 8. a PID that is not a process, and a bound that another knob can override ──
+echo "8. non-process pids and interacting bounds"
+
+# POSIX gives `kill -0 0` a completely different meaning — it signals the CALLER'S OWN process
+# group — so it always succeeds. `icn-wait pid 0` therefore reported the target alive forever:
+# a logical deadlock, not a wait. Measured before the fix: exit 1 only when the timeout fired,
+# and under --allow-unbounded it never returned at all.
+timeout 8 "$WAIT" pid 0 --timeout 3 >/dev/null 2>&1
+check "pid 0 is rejected as not-a-process (exit 2), never waited on" 2 $?
+
+timeout 8 "$WAIT" pid -5 --timeout 3 >/dev/null 2>&1
+check "a negative pid is rejected (exit 2)" 2 $?
+
+timeout 8 "$WAIT" file "$TMP/never-appears" --source-pid 0 --timeout 3 >/dev/null 2>&1
+check "--source-pid 0 is rejected (exit 2), so the dead-producer exit can still fire" 2 $?
+
+# A live, real pid must still be waited on, or the guards above would be indistinguishable from
+# a tool that refuses everything.
+sleep 5 &
+live_pid=$!
+timeout 8 "$WAIT" pid "$live_pid" --timeout 2 >/dev/null 2>&1
+check "a real live pid is still waited on (exit 1 = timed out, not 2 = rejected)" 1 $?
+kill "$live_pid" 2>/dev/null; wait "$live_pid" 2>/dev/null
+
+# ICN_WAIT_POLL_INTERVAL had a lower bound and NO upper bound, so an env var silently overrode
+# an explicit one: --timeout 2 with POLL=45 ran for 45 seconds. Each sleep is now clamped to the
+# remaining budget, so the deadline holds regardless of the interval.
+start=$(date +%s)
+ICN_WAIT_POLL_INTERVAL=45 timeout 30 "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 1 ] && [ "$elapsed" -le 6 ]; then
+  ok "a huge ICN_WAIT_POLL_INTERVAL cannot overrun --timeout (${elapsed}s for a 3s bound)"
+else
+  bad "poll interval overrode the timeout" "rc=$rc elapsed=${elapsed}s (expected rc=1 within ~3s)"
+fi
+
+start=$(date +%s)
+ICN_WAIT_POLL_INTERVAL=999999 timeout 30 "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 1 ] && [ "$elapsed" -le 6 ]; then
+  ok "an absurd ICN_WAIT_POLL_INTERVAL is capped and still honours --timeout (${elapsed}s)"
+else
+  bad "absurd poll interval overrode the timeout" "rc=$rc elapsed=${elapsed}s"
 fi
 
 echo

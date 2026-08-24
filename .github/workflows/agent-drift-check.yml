@@ -12,6 +12,7 @@ on:
       - 'scripts/check-skill-registry.py'
       - 'scripts/check-agent-capabilities.py'
       - 'scripts/check-agent-runtime-adoption.py'
+      - 'scripts/test-agent-runtime-adoption-gate.sh'
       - 'scripts/generate-agent-capabilities.py'
       - 'ops/mcp/src/**'
       - 'ops/scripts/**'
@@ -81,6 +82,9 @@ jobs:
 
       - name: Safe wait primitives reject the known non-terminating patterns (Refs icn#2653)
         run: bash scripts/test-icn-wait.sh
+
+      - name: The adoption gate itself can still fail (Refs icn#2653)
+        run: bash scripts/test-agent-runtime-adoption-gate.sh
 
 
       - name: Public docs address-boundary guard tests (Refs icn#2393)

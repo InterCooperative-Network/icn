@@ -11,7 +11,10 @@ import { initDb, migrate } from "../state/db.js";
 import {
   activeSessionsForWorktree,
   assertDurableProviderSessionId,
+  assertProgressKind,
+  InvalidProgressKindError,
   InvalidProviderSessionIdError,
+  PROGRESS_KINDS,
   recordInteraction,
   ageMinutes,
   classify,
@@ -50,6 +53,7 @@ function ident(name: string, repo = "icn"): WorktreeIdentity {
   return {
     repo_id: `/repos/${repo}.git`,
     repo_name: repo,
+    worktree_generation: `gen-${repo}-${name}`,
     worktree_id: `/repos/${repo}.git/worktrees/${name}`,
     worktree_path: `/wt/${repo}/${name}`,
     worktree_name: name,
@@ -262,6 +266,7 @@ describe("classification — registered lanes", () => {
     return {
       id: "s1", repo: "icn", repo_id: "/repos/icn.git", worktree: "wt",
       worktree_id: wtid("wt"), worktree_path: "/wt/icn/wt", worktree_name: "wt",
+      worktree_generation: null,
       branch_at_registration: null, head_at_registration: null, task_description: null,
       task_ref: null, pr_ref: null, parent_session_id: null, provider: "claude-code",
       agent_pid: 1234, host: "icn-dev", provider_session_id: "k", transcript_path: null,
@@ -451,20 +456,16 @@ describe("2. a completed turn is interaction, not progress", () => {
     expect(row.last_progress).toBeNull();
   });
 
-  it("'turn' is not a spellable progress kind", () => {
-    // Asserted against the RUNTIME's own behaviour, not against a list defined in this test.
-    // The old version compared a local literal to itself: adding `turn` back to both the union
-    // and the zod enum left the suite green.
+  it("a turn boundary does not advance the progress counter", () => {
+    // The vocabulary half of this invariant — that "turn" cannot even be SPELLED as a progress
+    // kind — is enforced in the shared core and pinned in "the progress vocabulary is closed"
+    // below, against the real PROGRESS_KINDS list rather than a literal copied into this test.
+    // What is left here is the semantic half: interaction never becomes progress.
     const { session_id } = registerSession(db, { repo: "icn", identity: ident("w"), provider_session_id: "k" });
-    // A bogus kind must not be silently accepted as progress by the core.
-    recordProgress(db, session_id, { kind: "turn" as unknown as ProgressKind });
-    // The core does not validate kinds — the SCHEMA does. Assert the schema, which is the
-    // thing that can actually regress, via the tool registration in session-tools.test.ts.
-    // Here we pin the semantic instead: a turn boundary goes through recordInteraction and
-    // must never advance the counter.
     const before = getSession(db, session_id)!.progress_count;
     recordInteraction(db, session_id);
     expect(getSession(db, session_id)!.progress_count).toBe(before);
+    expect(getSession(db, session_id)!.last_progress).toBeNull();
   });
 
   it("real work still advances progress, so the signal is not simply dead", () => {
@@ -553,6 +554,7 @@ describe("absence of observation is not evidence of absence", () => {
     return {
       id: "s1", repo: "icn", repo_id: "/repos/icn.git", worktree: "wt",
       worktree_id: wtid("wt"), worktree_path: "/wt/icn/wt", worktree_name: "wt",
+      worktree_generation: null,
       branch_at_registration: null, head_at_registration: null, task_description: null,
       task_ref: null, pr_ref: null, parent_session_id: null, provider: "claude-code",
       agent_pid: null, host: "icn-dev", provider_session_id: "k", transcript_path: null,
@@ -722,5 +724,63 @@ describe("the TTL cannot be driven low enough to make everything retireable", ()
     const c = classifyWorktree(db, wtid("ttl"), { observed_pids: [] },
       { ICN_SESSION_TTL_MINUTES: "1" } as NodeJS.ProcessEnv);
     expect(c.state).toBe("REGISTERED-ACTIVE");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// "turn" IS NOT A PROGRESS KIND (D3)
+//
+// The previous test for this was VACUOUS: adding "turn" back to BOTH the TypeScript union and
+// the zod enum left all 184 tests green. It sampled `before` AFTER the call it was meant to
+// prove had no effect, asserted nothing about the rejection, and delegated the schema half to
+// a test that did not exist.
+//
+// The invariant is real and load-bearing: a completed turn proves the harness answered, not
+// that work moved. An agent looping on a failing edit completes turns forever, so counting
+// them as progress defeats PROGRESS-STALLED — the one signal this runtime exists to provide.
+// It is now enforced in the shared core, and the MCP schema derives from the same list.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("the progress vocabulary is closed, and 'turn' is not in it", () => {
+  it("PROGRESS_KINDS does not contain 'turn'", () => {
+    expect(PROGRESS_KINDS).not.toContain("turn");
+    expect([...PROGRESS_KINDS].sort()).toEqual(
+      ["command", "explicit", "file_edit", "task_state", "test"].sort()
+    );
+  });
+
+  it("assertProgressKind accepts every listed kind and rejects 'turn' BY NAME", () => {
+    for (const k of PROGRESS_KINDS) {
+      expect(() => assertProgressKind(k)).not.toThrow();
+    }
+    // Not merely "some error": the error must be the vocabulary error, or this test would pass
+    // on a typo, a missing import, or a database failure.
+    expect(() => assertProgressKind("turn")).toThrow(InvalidProgressKindError);
+    expect(() => assertProgressKind("turn")).toThrow(/is not a progress kind/);
+    for (const bogus of ["", "TURN", "Turn", "interaction", "heartbeat", "file_edit "]) {
+      expect(() => assertProgressKind(bogus)).toThrow(InvalidProgressKindError);
+    }
+  });
+
+  it("recordProgress REFUSES a bogus kind and does not advance the counter", () => {
+    const db = initDb(":memory:");
+    const r = registerSession(db, { repo: "icn", provider_session_id: "kind-guard" });
+    const count = () =>
+      (db.prepare("SELECT progress_count AS c FROM sessions WHERE id = ?").get(r.session_id) as {
+        c: number;
+      }).c;
+
+    expect(count()).toBe(0);
+    // The core is the last line of defence: the CLI hands it an arbitrary string from a hook
+    // payload, so a cast upstream proves nothing.
+    expect(() =>
+      recordProgress(db, r.session_id, { kind: "turn" as unknown as ProgressKind })
+    ).toThrow(InvalidProgressKindError);
+    expect(count()).toBe(0);
+
+    // ...and a legitimate kind still works, or the guard would be indistinguishable from a
+    // recordProgress that is simply broken.
+    expect(recordProgress(db, r.session_id, { kind: "file_edit" })).toBe(true);
+    expect(count()).toBe(1);
   });
 });

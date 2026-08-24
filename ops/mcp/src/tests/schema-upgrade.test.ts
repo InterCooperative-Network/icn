@@ -10,7 +10,7 @@ import Database from "better-sqlite3";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { initDb } from "../state/db.js";
+import { initDb, LATEST_SCHEMA_VERSION } from "../state/db.js";
 import { registerSession } from "../runtime/session-runtime.js";
 
 let dir: string;
@@ -77,7 +77,11 @@ describe("upgrade from the shipped v2 shape", () => {
         version: number;
       }>
     ).map((r) => r.version);
-    expect(versions).toEqual([1, 2, 3, 4]);
+    expect(versions).toEqual([1, 2, 3, 4, 5]);
+    // initDb() skips the migration transaction when LATEST_SCHEMA_VERSION is already stamped,
+    // so a constant left behind after a new migration is added means that migration NEVER RUNS
+    // — silently, on every existing database. Pin them to each other.
+    expect(Math.max(...versions)).toBe(LATEST_SCHEMA_VERSION);
 
     const cols = columns(db, "sessions");
     for (const c of [
@@ -146,6 +150,7 @@ describe("upgrade from the shipped v2 shape", () => {
       identity: {
         repo_id: "/repos/icn.git", repo_name: "icn",
         worktree_id: "/repos/icn.git/worktrees/wt", worktree_path: "/wt", worktree_name: "wt",
+        worktree_generation: null,
       },
       provider_session_id: "conv-after-upgrade",
     });
@@ -183,5 +188,84 @@ describe("migration-number discipline", () => {
     ).toEqual({ c: 1 });
     expect(columns(db, "watchers_process")).toContain("worktree_id");
     db.close();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE LADDER IS ATOMIC (A5-1)
+//
+// Each step used to be a bare PRAGMA -> ALTER -> INSERT with no lock, so concurrent opens
+// raced and 9 of 40 parallel initDb calls on a fresh database threw `duplicate column name` —
+// which the MCP server's main().catch(exit 1) turns into "the server does not start".
+// `db.transaction(() => migrate(db)).immediate()` fixed it, and NOTHING TESTED IT: removing
+// the wrapper left all 184 tests green.
+//
+// This proves the property deterministically instead of racing for it. A table occupying the
+// name of an index v3 creates makes the ladder fail AFTER v3 has already added its columns —
+// the exact window where a non-transactional ladder leaves a half-migrated database behind.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("the migration ladder is atomic", () => {
+  function columnsOf(path: string, table: string): string[] {
+    const db = new Database(path);
+    try {
+      return (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+        (c) => c.name
+      );
+    } finally {
+      db.close();
+    }
+  }
+  function stamps(path: string): number[] {
+    const db = new Database(path);
+    try {
+      return (
+        db.prepare("SELECT version FROM schema_version ORDER BY version").all() as Array<{
+          version: number;
+        }>
+      ).map((r) => r.version);
+    } finally {
+      db.close();
+    }
+  }
+
+  it("rolls the WHOLE step back when a later statement in it fails", () => {
+    const path = join(dir, "atomic.db");
+    buildShippedV2(path);
+
+    // Occupy the name v3's index wants. SQLite refuses ("there is already a table named ..."),
+    // and IF NOT EXISTS does not suppress it — so v3 fails after its ALTERs have run.
+    const seed = new Database(path);
+    seed.exec("CREATE TABLE idx_sessions_worktree_id (x)");
+    seed.close();
+
+    const before = columnsOf(path, "sessions");
+    expect(before).not.toContain("worktree_id");
+    expect(stamps(path)).toEqual([1, 2]);
+
+    expect(() => initDb(path)).toThrow(/already a table named idx_sessions_worktree_id/);
+
+    // THE POINT: not one column, and not one stamp, may survive a failed step.
+    expect(columnsOf(path, "sessions")).toEqual(before);
+    expect(stamps(path)).toEqual([1, 2]);
+  });
+
+  it("leaves a database that still migrates cleanly once the obstruction is gone", () => {
+    const path = join(dir, "atomic-recover.db");
+    buildShippedV2(path);
+    const seed = new Database(path);
+    seed.exec("CREATE TABLE idx_sessions_worktree_id (x)");
+    seed.close();
+
+    expect(() => initDb(path)).toThrow();
+
+    const fix = new Database(path);
+    fix.exec("DROP TABLE idx_sessions_worktree_id");
+    fix.close();
+
+    const db = initDb(path);
+    db.close();
+    expect(columnsOf(path, "sessions")).toContain("worktree_id");
+    expect(stamps(path)).toEqual([1, 2, 3, 4, 5]);
   });
 });

@@ -37,6 +37,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import sys
 import tempfile
 from pathlib import Path
@@ -47,7 +48,13 @@ SCHEMA = "icn.agent-capabilities.v1"
 
 # ── MCP introspection ─────────────────────────────────────────────────────────
 
-def introspect_mcp_tools(root: Path, timeout: float = 90.0) -> list[dict]:
+# Overridable so the failure-mode tests can exercise the SAME watchdog path in seconds rather
+# than sitting through the production budget three times. Not a behaviour switch: the default
+# is what runs in CI, and the code path is identical either way.
+MCP_INTROSPECT_TIMEOUT = float(os.environ.get("ICN_CAPABILITY_MCP_TIMEOUT") or 90.0)
+
+
+def introspect_mcp_tools(root: Path, timeout: float = MCP_INTROSPECT_TIMEOUT) -> list[dict]:
     """Ask the built MCP server what tools it actually exposes.
 
     Speaks newline-delimited JSON-RPC over stdio, which is what the MCP stdio transport uses.
@@ -74,6 +81,24 @@ def introspect_mcp_tools(root: Path, timeout: float = 90.0) -> list[dict]:
             text=True,
             bufsize=1,
         )
+        # ENFORCE the declared timeout. It was a parameter and nothing else: read_reply()
+        # blocked in a bare readline() with no deadline, so a wedged MCP server hung this
+        # generator forever — and this generator runs inside the drift gate on EVERY pull
+        # request. Measured: a stub server that reads stdin and never answers held the gate
+        # until an external timeout(1) killed it at 100s.
+        #
+        # A watchdog that kills the child, rather than select() on proc.stdout, because the
+        # stream is buffered text: select() can report "not ready" while a complete line
+        # already sits in Python's buffer, which would produce false timeouts.
+        timed_out = threading.Event()
+
+        def _kill_on_timeout() -> None:
+            timed_out.set()
+            proc.kill()
+
+        watchdog = threading.Timer(timeout, _kill_on_timeout)
+        watchdog.daemon = True
+        watchdog.start()
         try:
             def send(msg: dict) -> None:
                 assert proc.stdin
@@ -85,6 +110,12 @@ def introspect_mcp_tools(root: Path, timeout: float = 90.0) -> list[dict]:
                 while True:
                     line = proc.stdout.readline()
                     if not line:
+                        if timed_out.is_set():
+                            raise SystemExit(
+                                f"MCP server did not answer within {timeout:.0f}s during "
+                                "introspection; refusing to hang the drift gate. Is the server "
+                                "wedged, or waiting on something it cannot get?"
+                            )
                         raise SystemExit("MCP server closed stdout during introspection")
                     line = line.strip()
                     if not line:
@@ -109,6 +140,7 @@ def introspect_mcp_tools(root: Path, timeout: float = 90.0) -> list[dict]:
             send({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
             reply = read_reply(2)
         finally:
+            watchdog.cancel()
             proc.terminate()
             try:
                 proc.wait(timeout=10)

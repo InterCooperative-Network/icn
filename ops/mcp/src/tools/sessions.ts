@@ -7,6 +7,7 @@ import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.
 import {
   activeSessionsForWorktree,
   ageMinutes,
+  PROGRESS_KINDS,
   classifyWorktree,
   getSession,
   recordHeartbeat,
@@ -88,10 +89,9 @@ export function registerSessionTools(
         ),
     },
     async (input) => {
-      const identity = discoverWorktree(
-        input.cwd ?? process.cwd(),
-        process.env["ICN_ROOT"] ?? null
-      );
+      // No ICN_ROOT fallback: an ambient variable pinned to another worktree must never decide
+      // which lane a session is filed under. See the note in cli/session.ts.
+      const identity = discoverWorktree(input.cwd ?? process.cwd(), null);
       if (!identity) {
         return json({
           error: "no_worktree",
@@ -233,7 +233,7 @@ export function registerSessionTools(
     {
       session_id: z.string(),
       kind: z
-        .enum(["file_edit", "command", "test", "task_state", "explicit"])
+        .enum(PROGRESS_KINDS)
         .describe(
           "What kind of runtime event this progress represents. Note there is no 'turn': a " +
             "completed agent turn is interaction, not progress — use session_interaction."
@@ -298,11 +298,20 @@ export function registerSessionTools(
       const id = worktree_id ?? (path ? discoverWorktree(path, null)?.worktree_id : undefined);
       if (!id) {
         return json({
+          // The FULL field set, structurally identical to a healthy envelope: a consumer typed
+          // against `Classification` reads `.live_agent_pids.length` and throws on a partial
+          // object, so a degraded answer missing fields is unparseable, not safer.
           state: "REGISTRY-UNAVAILABLE",
-          live_agent_pids: [],
-          contention: { count: 0, session_ids: [] },
           reason:
             "no canonical worktree id could be resolved, so no facts can be reported for this lane",
+          session_id: null,
+          heartbeat_age_min: null,
+          progress_age_min: null,
+          progress_count: null,
+          contention: { count: 0, session_ids: [] },
+          branch_changed: false,
+          live_branch: null,
+          live_agent_pids: [],
         });
       }
       return json(classifyWorktree(db, id, { observed_pids: observed_pids ?? null }));

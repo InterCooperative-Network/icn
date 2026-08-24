@@ -50,7 +50,11 @@ degrade() {
   if [ "$cmd" = "classify" ]; then
     # classify's stdout is FACTS that consumers parse. Emitting nothing here made a degraded
     # wrapper indistinguishable from an empty answer. Emit the same envelope the CLI does.
-    printf '{"state":"REGISTRY-UNAVAILABLE","live_agent_pids":[],"contention":{"count":0,"session_ids":[]},"reason":"%s"}\n' \
+    # The FULL field set, structurally identical to a healthy envelope and to the CLI's
+    # degradedClassification(). A consumer typed against the interface reads
+    # `.live_agent_pids.length` and throws on a partial object, so a degraded answer that is
+    # missing fields is not a safer answer — it is an unparseable one.
+    printf '{"state":"REGISTRY-UNAVAILABLE","reason":"%s","session_id":null,"heartbeat_age_min":null,"progress_age_min":null,"progress_count":null,"contention":{"count":0,"session_ids":[]},"branch_changed":false,"live_branch":null,"live_agent_pids":[]}\n' \
       "agent runtime unavailable: $1"
     exit 3
   fi
