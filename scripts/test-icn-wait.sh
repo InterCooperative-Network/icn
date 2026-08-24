@@ -259,10 +259,16 @@ if [ -n "$child" ] && kill -0 "$child" 2>/dev/null; then
 else
   ok "SIGTERM reaps the setsid-detached child"
 fi
-if grep -q "on_signal" "$WAIT" && ! grep -q "on_signal()" "$WAIT"; then
-  bad "trap references an undefined handler" "on_signal is trapped but never defined"
+# BOTH halves must be present. The old form was `grep -q on_signal && ! grep -q "on_signal()"`,
+# which is satisfied when everything is there AND when everything is gone — deleting the `trap`
+# line entirely left it green, so it could not detect the very regression it names.
+trap_line=$(grep -c '^[[:space:]]*trap on_signal' "$WAIT")
+handler_def=$(grep -c '^[[:space:]]*on_signal()' "$WAIT")
+if [ "$trap_line" -ge 1 ] && [ "$handler_def" -ge 1 ]; then
+  ok "the signal handler is both DEFINED and TRAPPED (${trap_line} trap, ${handler_def} def)"
 else
-  ok "the trapped handler is actually defined"
+  bad "signal handling is not wired" \
+      "trap lines=$trap_line handler definitions=$handler_def (both must be >= 1)"
 fi
 
 # An unvalidated poll interval busy-loops. DETECTING IT NEEDS A FORK-RATE MEASUREMENT, not a
@@ -275,25 +281,37 @@ fi
 # counts every fork on the box, and measured idle noise of 261-273 per 4s made this assertion
 # report three different outcomes across three runs of the UNMODIFIED script. A test that
 # measures the machine instead of the tool is worse than no test.
-cpu_ticks_of() {  # $1 = pid -> utime+stime in clock ticks
-  awk '{print $14 + $15}' "/proc/$1/stat" 2>/dev/null || echo 0
+BUSY_TICK_LIMIT=10   # a 2s-interval poll burns ~0 ticks; anything above this is spinning
+cpu_ticks_of() {  # $1 = pid -> utime+stime in clock ticks, or DEAD if it is not running
+  # DEAD, not 0. A corpse has no /proc entry, so `|| echo 0` reported the same "0 ticks" as a
+  # politely-sleeping waiter — and every assertion below reads low ticks as success. A mutant
+  # that made icn-wait EXIT IMMEDIATELY, performing no wait at all, therefore passed all eight
+  # busy-loop assertions. The measurement must be able to say "there was nothing to measure".
+  awk '{print $14 + $15}' "/proc/$1/stat" 2>/dev/null || echo DEAD
 }
-busy_ticks() {    # $1 = poll interval -> cpu ticks burned by icn-wait over ~3s
+busy_ticks() {    # $1 = poll interval -> cpu ticks burned by icn-wait over ~3s, or DEAD
   ICN_WAIT_POLL_INTERVAL="$1" "$WAIT" file "$TMP/never-poll-$1.log" --timeout 6 >/dev/null 2>&1 &
   local w=$! ticks
   sleep 3
+  # PRECONDITION: it must still be waiting. Without this the whole measurement is unfalsifiable.
   ticks=$(cpu_ticks_of "$w")
   kill -TERM "$w" 2>/dev/null; wait "$w" 2>/dev/null
-  echo "${ticks:-0}"
+  echo "${ticks:-DEAD}"
 }
-BUSY_TICK_LIMIT=10   # a 2s-interval poll burns ~0 ticks; anything above this is spinning
-for badval in 0 00 0.0 .0 0.001 0.0001 .05 abc; do
-  n=$(busy_ticks "$badval")
-  if [ "$n" -lt "$BUSY_TICK_LIMIT" ]; then
-    ok "ICN_WAIT_POLL_INTERVAL=$badval does not busy-loop (${n} cpu ticks in 3s)"
+
+# One place decides whether a busy-tick sample means "polled politely" or "never waited".
+assert_polite() {  # $1 = label suffix, $2 = sample
+  if [ "$2" = "DEAD" ]; then
+    bad "ICN_WAIT_POLL_INTERVAL=$1 does not busy-loop" \
+        "the waiter was NOT RUNNING when sampled — it never waited, so 'low cpu' proves nothing"
+  elif [ "$2" -lt "$BUSY_TICK_LIMIT" ]; then
+    ok "ICN_WAIT_POLL_INTERVAL=$1 does not busy-loop (${2} cpu ticks in 3s, still waiting)"
   else
-    bad "ICN_WAIT_POLL_INTERVAL=$badval busy-loops" "${n} cpu ticks in 3s"
+    bad "ICN_WAIT_POLL_INTERVAL=$1 busy-loops" "${2} cpu ticks in 3s"
   fi
+}
+for badval in 0 00 0.0 .0 0.001 0.0001 .05 abc; do
+  assert_polite "$badval" "$(busy_ticks "$badval")"
 done
 
 # KILL_GRACE is validated and capped like the timeout, or a `--timeout 2` wait can last days.
@@ -376,6 +394,47 @@ if [ "$rc" -eq 1 ] && [ "$elapsed" -le 6 ]; then
 else
   bad "absurd poll interval overrode the timeout" "rc=$rc elapsed=${elapsed}s"
 fi
+
+
+# ── 9. bounds that only matter where the deadline clamp cannot reach ────────
+echo "9. poll-interval bounds, independently of the deadline"
+
+# THE CAP ITSELF. Both earlier cap tests pass `--timeout 3`, so poll_sleep()'s deadline clamp
+# alone satisfies them — deleting the 60s cap left the whole suite green. The cap is the only
+# thing that matters when there IS no deadline: unbounded, `ICN_WAIT_POLL_INTERVAL=999999`
+# slept for 11.5 days, so a condition that was met would be noticed 11.5 days late.
+ICN_WAIT_POLL_INTERVAL=999999 "$WAIT" file "$TMP/never-appears" --timeout 0 --allow-unbounded \
+  >/dev/null 2>&1 &
+wp=$!
+# Poll for the sleeper rather than sampling once after a fixed delay: under heavy machine load
+# the child may not exist yet at 1.5s, and "no sleep child found" would be reported as a cap
+# failure when the cap is fine. The ASSERTION is about the sleep DURATION, so waiting longer to
+# observe it costs nothing; a genuinely absent sleeper still fails after the bound.
+sleeper=""
+for _ in $(seq 1 20); do
+  sleep 0.5
+  sleeper=$(pgrep -P "$wp" -x sleep 2>/dev/null | head -1)
+  [ -n "$sleeper" ] && break
+done
+slept=""
+[ -n "$sleeper" ] && slept=$(tr '\0' ' ' < "/proc/$sleeper/cmdline" 2>/dev/null | awk '{print $2}')
+kill -TERM "$wp" 2>/dev/null; wait "$wp" 2>/dev/null
+if [ -n "$slept" ] && awk -v s="$slept" 'BEGIN{exit !(s<=60)}'; then
+  ok "an unbounded wait still caps the poll interval (slept ${slept}s, not 999999s)"
+else
+  bad "the poll interval is uncapped without a deadline" "child slept for '${slept:-<no sleep child found>}'"
+fi
+
+# THE LOWER BOUND, AS A PROPERTY. It used to be a list of spellings anchored at the first
+# character (`0.0*|.0*`), so one extra leading zero walked past it and busy-spun.
+for spelling in 00.001 000.0001 0000.00001 00.0; do
+  ICN_WAIT_POLL_INTERVAL="$spelling" "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1 &
+  wp=$!
+  sleep 2.5
+  ticks=$(cpu_ticks_of "$wp")
+  kill -TERM "$wp" 2>/dev/null; wait "$wp" 2>/dev/null
+  assert_polite "$spelling" "$ticks"
+done
 
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"

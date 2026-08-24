@@ -88,7 +88,7 @@ describe("schema v3 migration", () => {
       (db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>).map((c) => c.name);
     const before = cols();
 
-    db.prepare("DELETE FROM schema_version WHERE version IN (3, 4)").run();
+    db.prepare("DELETE FROM schema_version WHERE version IN (3, 4, 5)").run();
     expect(() => migrate(db)).not.toThrow();
 
     expect(cols()).toEqual(before);

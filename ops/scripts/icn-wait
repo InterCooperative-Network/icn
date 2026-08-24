@@ -66,10 +66,11 @@ POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
 case "$POLL_INTERVAL" in
   *[!0-9.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
   *[1-9]*)
-    # Reject anything smaller than 0.1: "0." followed by one or more zeros before any digit.
-    case "$POLL_INTERVAL" in
-      0.0*|.0*) POLL_INTERVAL=2 ;;
-    esac
+    # Bound checked NUMERICALLY, below. The previous guard enumerated spellings — `0.0*|.0*` —
+    # which is anchored at the first character, so one extra leading zero walked straight past
+    # it: `00.001`, `000.0001` and `0000.00001` all validated and then busy-spun (17, 27 and 37
+    # CPU ticks in 3s against a limit of 10). Enumerating spellings is the exact failure this
+    # file's own comments complain about; assert the property instead.
     ;;
   *) POLL_INTERVAL=2 ;;
 esac
@@ -78,6 +79,7 @@ esac
 # ran for 45 seconds, and 999999 ran until it was killed. That is the same class of defect
 # ICN_WAIT_KILL_GRACE was capped for. The cap bounds the interval; poll_sleep() additionally
 # clamps every individual sleep to the remaining budget, so --timeout is honoured exactly.
+awk -v p="$POLL_INTERVAL" 'BEGIN{exit !(p<0.1)}' && POLL_INTERVAL=2
 awk -v p="$POLL_INTERVAL" 'BEGIN{exit !(p>60)}' && POLL_INTERVAL=60
 readonly POLL_INTERVAL
 

@@ -7,6 +7,7 @@ import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.
 import {
   activeSessionsForWorktree,
   ageMinutes,
+  degradedClassification,
   PROGRESS_KINDS,
   classifyWorktree,
   getSession,
@@ -297,24 +298,22 @@ export function registerSessionTools(
     async ({ worktree_id, path, observed_pids }) => {
       const id = worktree_id ?? (path ? discoverWorktree(path, null)?.worktree_id : undefined);
       if (!id) {
-        return json({
-          // The FULL field set, structurally identical to a healthy envelope: a consumer typed
-          // against `Classification` reads `.live_agent_pids.length` and throws on a partial
-          // object, so a degraded answer missing fields is unparseable, not safer.
-          state: "REGISTRY-UNAVAILABLE",
-          reason:
-            "no canonical worktree id could be resolved, so no facts can be reported for this lane",
-          session_id: null,
-          heartbeat_age_min: null,
-          progress_age_min: null,
-          progress_count: null,
-          contention: { count: 0, session_ids: [] },
-          branch_changed: false,
-          live_branch: null,
-          live_agent_pids: [],
-        });
+        return json(
+          degradedClassification(
+            "no canonical worktree id could be resolved, so no facts can be reported for this lane"
+          )
+        );
       }
-      return json(classifyWorktree(db, id, { observed_pids: observed_pids ?? null }));
+      try {
+        return json(classifyWorktree(db, id, { observed_pids: observed_pids ?? null }));
+      } catch (e) {
+        // Same contract the CLI already honoured: any unexpected failure must still produce a
+        // parseable, fail-safe verdict. This surface called the identical core BARE, so a
+        // SqliteError out of the read path (BUSY/IOERR/CORRUPT on a file several MCP processes
+        // share) surfaced as a protocol error with no envelope at all — the caller got
+        // `isError: true` and a bare message instead of the fields it is told to act on.
+        return json(degradedClassification(`classification failed: ${(e as Error).message}`));
+      }
     }
   );
 

@@ -44,6 +44,12 @@ BACKUP="$(mktemp)"; cp "$MANIFEST" "$BACKUP"
 HEALTH_BACKUP="$(mktemp)"; cp "$ROOT/ops/mcp/src/tools/health.ts" "$HEALTH_BACKUP"
 PROBE_HELPER="$ROOT/ops/scripts/icn-capability-probe"
 cleanup() {
+  # STUB_ROOT is cleaned HERE, not by a second `trap ... EXIT`. A second trap on the same
+  # signal REPLACES the first: adding one for the stub fixture silently disabled this whole
+  # function, so the manifest and health.ts were never restored, two mktemp files leaked on
+  # every run, and the rebuild below — which exists to stop a fixture tool being left compiled
+  # into the live server — never ran.
+  [ -n "${STUB_ROOT:-}" ] && rm -rf "$STUB_ROOT"
   cp "$BACKUP" "$MANIFEST"
   cp "$HEALTH_BACKUP" "$ROOT/ops/mcp/src/tools/health.ts"
   rm -f "$BACKUP" "$HEALTH_BACKUP" "$PROBE_HELPER"
@@ -149,7 +155,10 @@ HOOK="$ROOT/.claude/hooks/session-lifecycle.sh"
 # Scope the search to the CTX block. Grepping the WHOLE FILE passed even when a needle was
 # deleted from the startup context, because the same strings appear in the DEGRADED banner.
 CTX_BLOCK="$(sed -n '/^## ICN agent runtime$/,/^CTX$/p' "$HOOK")"
-for needle in "agent-capabilities.json" "icn_ops_agent_runtime" "ops/state/truth/sources.json" "AGENTS.md"; do
+# "AGENTS.md" alone also matched the unrelated line "Report completion per AGENTS.md §9." in
+# the same block, so the startup context could stop pointing at the operating contract and this
+# assertion would not notice. Match the POINTER, not the filename.
+for needle in "agent-capabilities.json" "icn_ops_agent_runtime" "ops/state/truth/sources.json" "operating contract: AGENTS.md"; do
   if printf '%s' "$CTX_BLOCK" | grep -q "$needle"; then
     ok "startup context points at $needle"
   else
@@ -196,12 +205,18 @@ $CHECK >/dev/null 2>&1 && ok "manifest restored and true at end of run" || bad "
 echo
 echo "live MCP introspection failure modes"
 
-STUB_ROOT="$(mktemp -d)"
-trap 'rm -rf "$STUB_ROOT"' EXIT
+STUB_ROOT="$(mktemp -d)"   # cleaned by cleanup(); do NOT add a second EXIT trap
 mkdir -p "$STUB_ROOT/ops/mcp/dist"
 for p in .claude ops/scripts ops/state scripts docs; do
   [ -e "$ROOT/$p" ] && { mkdir -p "$STUB_ROOT/$(dirname "$p")"; cp -a "$ROOT/$p" "$STUB_ROOT/$(dirname "$p")/"; }
 done
+
+# Snapshot the manifest the fixture starts with. The check below asserts it is UNCHANGED — the
+# fixture copies docs/, so its mere presence proves nothing; only its content does.
+STUB_MANIFEST_BEFORE=""
+if [ -f "$STUB_ROOT/docs/reference/project-index/generated/agent-capabilities.json" ]; then
+  STUB_MANIFEST_BEFORE=$(sha256sum "$STUB_ROOT/docs/reference/project-index/generated/agent-capabilities.json" | cut -d" " -f1)
+fi
 
 stub_case() {
   local label="$1" body="$2" want_rc="$3" want_msg="$4" budget="$5"
@@ -232,28 +247,37 @@ stub_case "a wedged server is abandoned at the declared timeout, not waited on f
   1 "did not answer within" 40
 
 # 2. closes stdout immediately.
-stub_case "a server that closes stdout fails with a specific message" \
+stub_case "a server that closes stdout but keeps running is bounded by the TIMEOUT" \
   'process.stdout.end(); process.stdin.resume(); setInterval(() => {}, 1 << 30);' \
-  1 "closed stdout|did not answer within" 40
+  1 "did not answer within" 40
 
 # 3. answers with something that is not JSON-RPC at all.
 stub_case "a server emitting malformed output does not become a capability list" \
   'process.stdin.on("data", () => process.stdout.write("this is not json\n")); process.stdin.resume(); setInterval(() => {}, 1 << 30);' \
-  1 "did not answer within|closed stdout" 40
+  1 "did not answer within" 40
 
 # 4. exits immediately — the "not built / crashes on start" shape.
-stub_case "a server that exits immediately is reported, not treated as zero tools" \
+stub_case "a server that EXITS is reported as closed stdout, not as zero tools" \
   'process.exit(3);' \
-  1 "closed stdout|did not answer within" 40
+  1 "closed stdout" 40
 
 # ...and the manifest must never be written from any of those runs.
-if grep -q "generated" "$STUB_ROOT/ops/state/truth/generated/agent-capabilities.json" 2>/dev/null; then
-  if diff -q "$STUB_ROOT/ops/state/truth/generated/agent-capabilities.json" \
-             "$ROOT/ops/state/truth/generated/agent-capabilities.json" >/dev/null 2>&1; then
-    ok "no failed introspection rewrote the manifest"
+# The manifest lives at docs/reference/project-index/generated/, NOT ops/state/truth/generated/.
+# This block previously guarded on the latter — a path that exists nowhere in the repository —
+# so it could emit neither ok nor bad, and a mutant that published `{"schema":"GUESSED"}` from a
+# FAILED introspection sailed through the suite untouched. Assert against the real path, and
+# assert unconditionally: "the file is absent" is itself the passing state here, because the
+# fixture never had one.
+REL_MANIFEST="docs/reference/project-index/generated/agent-capabilities.json"
+if [ -n "${STUB_MANIFEST_BEFORE:-}" ] && [ -f "$STUB_ROOT/$REL_MANIFEST" ]; then
+  after=$(sha256sum "$STUB_ROOT/$REL_MANIFEST" | cut -d" " -f1)
+  if [ "$after" = "$STUB_MANIFEST_BEFORE" ]; then
+    ok "no failed introspection rewrote the manifest (sha unchanged)"
   else
-    bad "a failed introspection MODIFIED the manifest" "it must never publish a guess"
+    bad "a failed introspection REWROTE the manifest" "sha $STUB_MANIFEST_BEFORE -> $after"
   fi
+else
+  bad "manifest snapshot missing" "expected $REL_MANIFEST in the stub fixture"
 fi
 
 echo

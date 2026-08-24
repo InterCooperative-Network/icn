@@ -204,6 +204,22 @@ describe("lane progress aggregates across every occupant", () => {
     db.prepare("UPDATE sessions SET started_at = datetime('now','-200 minutes')").run();
     return { db, a: a.session_id, b: b.session_id };
   }
+
+  /**
+   * Age ONE occupant's column. The aggregation tests below need occupants at DIFFERENT
+   * timestamps: an earlier version of this fixture ran a single UPDATE with no WHERE clause, so
+   * every occupant got the same value — which meant min and max were indistinguishable and
+   * mutants swapping them survived the whole suite.
+   */
+  const ageOne = (
+    db: ReturnType<typeof initDb>,
+    id: string,
+    col: "started_at" | "last_progress" | "last_heartbeat",
+    minutes: number
+  ) =>
+    db
+      .prepare(`UPDATE sessions SET ${col} = datetime('now', ?) WHERE id = ?`)
+      .run(`-${minutes} minutes`, id);
   const progress = (db: ReturnType<typeof initDb>, id: string) =>
     db.prepare(
       "UPDATE sessions SET last_progress = datetime('now'), progress_count = progress_count + 1, last_heartbeat = datetime('now') WHERE id = ?"
@@ -260,13 +276,42 @@ describe("lane progress aggregates across every occupant", () => {
     expect(c.progress_count).toBe(1);
   });
 
-  it("with nobody progressing, the stall is measured from the OLDEST registration", () => {
-    const { db } = setup();
+  it("the FRESHEST progress on the lane wins (min, not max)", () => {
+    const { db, a, b } = setup();
+    progress(db, a);
+    progress(db, b);
+    ageOne(db, a, "last_progress", 300); // one occupant went quiet long ago...
+    // ...the other progressed just now, so the LANE progressed just now.
+    const c = classifyWorktree(db, WT, { observed_pids: [] });
+    expect(c.progress_age_min).not.toBeNull();
+    expect(c.progress_age_min!).toBeLessThan(5);
+    expect(c.state).toBe("REGISTERED-ACTIVE");
+  });
+
+  it("the stall window is measured from the OLDEST registration (max, not min)", () => {
+    const { db, b } = setup();
+    // A newcomer joined a minute ago; the lane has still been occupied for 200 minutes.
+    ageOne(db, b, "started_at", 1);
     const c = classifyWorktree(db, WT, { observed_pids: [] });
     expect(c.state).toBe("PROGRESS-STALLED");
-    // A newcomer must not make a long-occupied lane look fresh.
     expect(c.reason).toMatch(/200\.\d min after registration/);
   });
+
+  it("the lane heartbeat follows the MOST LIVE occupant, not the deadest", () => {
+    // classifyWorktree's own contract: "a busy reviewer must not let a dead editor look
+    // retireable". Liveness and progress were both aggregated; the heartbeat dimension was
+    // pinned by nothing, so reporting the OLDEST heartbeat instead of the freshest left the
+    // whole suite green while turning an actively-working lane into REGISTERED-EXPIRED.
+    const { db, a, b } = setup();
+    progress(db, b); // b is working right now
+    ageOne(db, a, "last_heartbeat", 400); // a is long dead
+    const c = classifyWorktree(db, WT, { observed_pids: [] });
+    expect(c.heartbeat_age_min).not.toBeNull();
+    expect(c.heartbeat_age_min!).toBeLessThan(5);
+    expect(c.state).toBe("REGISTERED-ACTIVE");
+    expect(c.reason).not.toMatch(/an observation was performed and found no process/);
+  });
+
 });
 
 // ── kept P2s, each with a compact regression ────────────────────────────────

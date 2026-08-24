@@ -54,8 +54,18 @@ degrade() {
     # degradedClassification(). A consumer typed against the interface reads
     # `.live_agent_pids.length` and throws on a partial object, so a degraded answer that is
     # missing fields is not a safer answer — it is an unparseable one.
+    # JSON-ESCAPE THE REASON. It interpolates $CLI/$ROOT — a filesystem path, which may
+    # legitimately contain a double quote, a backslash, a tab or a newline. Any of those
+    # produced an UNPARSEABLE envelope alongside exit 3: a consumer got the fail-safe status
+    # and garbage on stdout, which is precisely the failure this block exists to prevent.
+    # Verified: quote -> "Expecting ',' delimiter", backslash -> "Invalid \escape",
+    # tab -> "Invalid control character".
+    esc=$(printf '%s' "agent runtime unavailable: $1" \
+      | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' \
+      | tr '\n\r' '  ' \
+      | tr -d '\000-\010\013\014\016-\037')
     printf '{"state":"REGISTRY-UNAVAILABLE","reason":"%s","session_id":null,"heartbeat_age_min":null,"progress_age_min":null,"progress_count":null,"contention":{"count":0,"session_ids":[]},"branch_changed":false,"live_branch":null,"live_agent_pids":[]}\n' \
-      "agent runtime unavailable: $1"
+      "$esc"
     exit 3
   fi
   exit 0

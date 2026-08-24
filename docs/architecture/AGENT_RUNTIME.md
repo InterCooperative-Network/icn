@@ -105,9 +105,45 @@ guarantees:
 | Field | Source | Property |
 |---|---|---|
 | `repo_id` | `realpath(git rev-parse --git-common-dir)` | one per repository |
-| `worktree_id` | `realpath(git rev-parse --absolute-git-dir)` | **one per worktree, unique within *and across* repositories** |
+| `worktree_id` | `realpath(git rev-parse --absolute-git-dir)` | **one per worktree, unique within *and across* repositories — in SPACE. Not unique over TIME: see `worktree_generation`.** |
+| `worktree_generation` | UUID minted into `<admin-dir>/icn-lane-generation` | **which generation of the lane this is** |
 | `worktree_path` | `realpath(git rev-parse --show-toplevel)` | working directory |
 | `worktree_name` | basename of the path | **display only — never a join key** |
+
+### 2.2.1 The lane in TIME — `worktree_generation`
+
+`worktree_id` names a *slot*, and git reclaims slots. `git worktree remove` deletes
+`<repo>/.git/worktrees/<basename>`, and the next `git worktree add` with the same basename is
+handed **the same admin directory** — so a new worktree, on a new branch, at a different path
+*or the same one*, inherits the previous lane's `worktree_id`.
+
+That matters because unreleased rows are joined to the lane by that id. Observed directly: a
+freshly created worktree classified `REGISTERED-ACTIVE` holding the *previous* lane's session
+row. Comparing `worktree_path` does not help — recreate at the same pathname and repo, admin
+dir and path all match while the lane is genuinely a different one.
+
+So identity carries a **generation**: a UUID minted into `<admin-dir>/icn-lane-generation`.
+
+- **Where it lives is the whole design.** It sits inside the one container git itself deletes,
+  so it cannot outlive its generation. Not the working tree (a user may keep that), not the
+  repo root, not a global cache — each of those survives removal and reintroduces the aliasing.
+- **Minted atomically**, by writing a complete temp file and `link(2)`-ing it into place: a
+  single winner, and the target is complete the instant it is visible. (`O_CREAT|O_EXCL`
+  followed by a separate write let a loser read a zero-length file: 6 of 240 concurrent minters
+  got nothing.)
+- **Minted only on the identity path.** `discoverWorktree()` mints; the classification path
+  reads and never writes, because it receives a caller-supplied `worktree_id` and a read path
+  must not create files at an arbitrary location.
+- **What it survives:** commits, branch switches, branch renames, history-rewriting rebases,
+  detached HEAD, `git worktree move`, and symlinked access. None of those make it a different
+  worktree, and the admin directory is untouched by all of them.
+- **NULL means UNKNOWN, never "different".** A row written before schema v5, or a lane whose
+  token could not be minted, is *kept* by the filter. Rows are dropped only when both sides are
+  known and differ, so this can only ever make a lane look **more** occupied.
+
+A re-registering session always refreshes its row's generation, including when the lane id is
+unchanged — otherwise a conversation resuming into a recreated lane would keep the dead
+generation and be filtered out of the lane it is actually working in.
 
 For a linked worktree the admin dir is `<repo>.git/worktrees/<name>`; for a main worktree it is
 the repo dir. Either way `task-review` under `icn.git` and under `nycn.git` resolve to different
@@ -168,7 +204,7 @@ Releasing one session leaves every other occupant's authority untouched.
 
 | Class | Fields |
 |---|---|
-| **Authoritative stable identity** | `id`, `repo_id`, `worktree_id`, `worktree_path` |
+| **Authoritative stable identity** | `id`, `repo_id`, `worktree_id`, `worktree_generation`, `worktree_path` |
 | **Authoritative live state** | live branch/HEAD (read from Git), `last_heartbeat`, `last_progress`, `progress_count`, contention |
 | **Advisory launch metadata** | `provider_session_id`, `branch_at_registration`, `head_at_registration`, `task_ref`, `pr_ref`, `task_description`, `provider`, `transcript_path`, `worktree_name`, `worktree` |
 | **Correlation only** | `agent_pid`, `host` |
@@ -286,7 +322,8 @@ The registry also **corroborates itself**: it records the session's own `agent_p
 agent process protects the lane regardless of what any caller did or did not observe. Retirement
 requires *both* an affirmative empty observation *and* a dead (or absent) recorded pid.
 
-Classification is keyed on `worktree_id` (§2.2), and **protection is a property of the lane, not
+Classification is keyed on `worktree_id` **and `worktree_generation`** (§2.2, §2.2.1), and
+**protection is a property of the lane, not
 of any one row**. Heartbeat ages are reported from the freshest session, but liveness is
 aggregated across *every* occupant: a live recorded `agent_pid` anywhere on the lane is
 reported, and named in `reason`. Selecting a single "primary" by heartbeat freshness and

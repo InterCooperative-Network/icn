@@ -236,8 +236,8 @@ function registerSessionInner(
       // worktree_id contradicted the stored row. Move the row to where the session actually is
       // and say so.
       const prior = db
-        .prepare("SELECT worktree_id FROM sessions WHERE id = ?")
-        .get(existing.id) as { worktree_id: string | null };
+        .prepare("SELECT worktree_id, worktree_generation FROM sessions WHERE id = ?")
+        .get(existing.id) as { worktree_id: string | null; worktree_generation: string | null };
       const moved = worktreeId !== null && prior.worktree_id !== worktreeId;
       if (moved) {
         db.prepare(
@@ -261,6 +261,29 @@ function registerSessionInner(
           // against a branch recorded for lane A.
           bs?.branch ?? null,
           bs?.head ?? null,
+          existing.id
+        );
+      } else if (idt !== null && prior.worktree_generation !== (idt.worktree_generation ?? null)) {
+        // SAME worktree_id, DIFFERENT GENERATION — and this is not an exotic case.
+        //
+        // Git recycles `<repo>/.git/worktrees/<basename>`, so a lane removed and recreated at
+        // the SAME pathname keeps its worktree_id. `moved` is therefore false, and a resumed
+        // conversation that deduped into its old row kept the DEAD generation. The lane filter
+        // drops rows whose generation is known-different, so it then discarded the row of a
+        // LIVE, just-registered, heartbeating session — emptying that session's own lane.
+        //
+        // Measured before this fix: register reported success (deduplicated), the row still
+        // held gen1 while the lane held gen2, and classify answered UNREGISTERED-OBSERVED with
+        // contention 0. Worse, a DEAD co-occupant carrying the fresh generation survived the
+        // filter, so the lane reported REGISTERED-EXPIRED naming the dead pid while the live
+        // occupant had been filtered away — an inversion of the exact invariant the lane-level
+        // aggregation exists to guarantee.
+        //
+        // Overwrite unconditionally, including with NULL when the token could not be minted:
+        // NULL means "unknown", which the filter KEEPS. Preserving a stale generation would
+        // keep the row filtered, which is the unsafe direction.
+        db.prepare("UPDATE sessions SET worktree_generation = ? WHERE id = ?").run(
+          idt.worktree_generation ?? null,
           existing.id
         );
       }
@@ -471,16 +494,37 @@ export function releaseSession(
   // deferred transaction raises SQLITE_BUSY_SNAPSHOT on a concurrent commit, which
   // busy_timeout does not cover.
   //
-  // The session-log append inside remains best-effort: a rolled-back release can leave a
-  // history line for a release that did not happen. That is a log, not authority, and the
-  // alternative — writing it after commit — loses the line entirely if the process dies.
-  return db.transaction(() => releaseSessionInner(db, sessionId, opts)).immediate();
+  // The session-log append is best-effort and now happens AFTER the commit, so a rolled-back
+  // release can no longer leave a history line for a release that did not happen. The cost is
+  // that a process dying between commit and append loses the line — a log is not authority,
+  // and that is the cheaper failure.
+  // The history line is written AFTER the transaction commits.
+  //
+  // Wrapping release in a transaction put an `appendFileSync` inside the exclusive registry
+  // write lock, so any stalled write to ops/state/session-log.jsonl held that lock for as long
+  // as the filesystem took. Measured with a FIFO standing in for a stalled disk: a concurrent
+  // `register` waited out its full 5 s busy_timeout and then died SQLITE_BUSY, exit 1,
+  // unregistered — the exact outcome registerSession's own transaction exists to prevent.
+  // Blocking I/O has no business inside a lock that other processes are queuing on.
+  let historyLine: string | null = null;
+  const result = db
+    .transaction(() => releaseSessionInner(db, sessionId, opts, (line) => (historyLine = line)))
+    .immediate();
+  if (historyLine !== null) {
+    try {
+      appendFileSync(SESSION_LOG, historyLine);
+    } catch {
+      // Best-effort: a log is not authority, and release has already committed.
+    }
+  }
+  return result;
 }
 
 function releaseSessionInner(
   db: Database.Database,
   sessionId: string,
-  opts: { reason?: string } = {}
+  opts: { reason?: string } = {},
+  emitHistory: (line: string) => void = () => {}
 ): ReleaseResult {
   const session = db
     .prepare("SELECT * FROM sessions WHERE id = ?")
@@ -507,23 +551,19 @@ function releaseSessionInner(
       .all(sessionId) as Array<{ file_path: string }>
   ).map((r) => r.file_path);
 
-  try {
-    appendFileSync(
-      SESSION_LOG,
-      JSON.stringify({
-        ...session,
-        released_at: new Date().toISOString(),
-        release_reason: opts.reason ?? "unspecified",
-        files_touched: files,
-        orphaned_children: children,
-        duration_minutes: Math.round(
-          (Date.now() - new Date(session.started_at + "Z").getTime()) / 60000
-        ),
-      }) + "\n"
-    );
-  } catch {
-    // Non-fatal: an unwritable log must not block releasing the session.
-  }
+  // Handed OUT of the transaction, written after it commits. See releaseSession().
+  emitHistory(
+    JSON.stringify({
+      ...session,
+      released_at: new Date().toISOString(),
+      release_reason: opts.reason ?? "unspecified",
+      files_touched: files,
+      orphaned_children: children,
+      duration_minutes: Math.round(
+        (Date.now() - new Date(session.started_at + "Z").getTime()) / 60000
+      ),
+    }) + "\n"
+  );
 
   // Drop ephemeral authority BEFORE deleting the row, so nothing is orphaned by the cascade.
   const claims = db
@@ -710,6 +750,35 @@ export function parseObservedPids(
     };
   }
   return { observed_pids: parsed };
+}
+
+/**
+ * The ONLY way any surface emits a degraded classification.
+ *
+ * A degraded envelope must be structurally identical to a healthy one, because a consumer
+ * typed against `Classification` reads `.live_agent_pids.length` and throws outright on a
+ * partial object.
+ *
+ * It lives in the shared core rather than in one surface because the repair that introduced it
+ * covered ONLY the CLI. The MCP tool and the shell wrapper kept hand-written literals, and a
+ * literal handed to `JSON.stringify` (or to a helper typed `unknown`) is checked against no
+ * type at all — deleting `contention` and `live_agent_pids` from the MCP tool's copy left
+ * `tsc --noEmit` clean and all 250 tests green, while the same deletion inside this annotated
+ * constructor is a compile error. One emitter was enforced; the others were decoration.
+ */
+export function degradedClassification(reason: string): Classification {
+  return {
+    state: "REGISTRY-UNAVAILABLE",
+    reason,
+    session_id: null,
+    heartbeat_age_min: null,
+    progress_age_min: null,
+    progress_count: null,
+    contention: { count: 0, session_ids: [] },
+    branch_changed: false,
+    live_branch: null,
+    live_agent_pids: [],
+  };
 }
 
 /** Whether a PID is alive. Signal 0 performs the permission/existence check only. */

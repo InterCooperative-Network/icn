@@ -19,6 +19,7 @@ import { initDb } from "../state/db.js";
 import {
   assertProgressKind,
   classifyWorktree,
+  degradedClassification,
   parseObservedPids,
   InvalidProviderSessionIdError,
   sessionsByWorktreeName,
@@ -27,7 +28,6 @@ import {
   recordProgress,
   registerSession,
   releaseSession,
-  type Classification,
   type SessionRow,
 } from "../runtime/session-runtime.js";
 import { discoverWorktree, readBranchState } from "../runtime/worktree-identity.js";
@@ -103,35 +103,6 @@ function findByProviderSession(
     .get(key) as SessionRow | undefined;
 }
 
-/**
- * The ONLY way this CLI emits a degraded classification.
- *
- * A degraded envelope has to be structurally identical to a healthy one, because a consumer
- * typed against `Classification` reads `.live_agent_pids.length` and throws outright on a
- * partial object. Four sites built these as bare object literals and TypeScript did not
- * enforce anything: a literal handed straight to `JSON.stringify` is checked against no type
- * at all, so deleting `live_agent_pids` and `contention` from every one of them left
- * `tsc --noEmit` clean and the whole suite green. One of the four — the `initDb` failure, i.e.
- * the registry missing, locked, or corrupt — shipped without them, and that is the MOST likely
- * degraded condition in production, not the rarest.
- *
- * The annotated return type is what makes the contract checkable; routing every site through
- * one constructor is what stops a fifth site from being added without it.
- */
-function degradedClassification(reason: string): Classification {
-  return {
-    state: "REGISTRY-UNAVAILABLE",
-    reason,
-    session_id: null,
-    heartbeat_age_min: null,
-    progress_age_min: null,
-    progress_count: null,
-    contention: { count: 0, session_ids: [] },
-    branch_changed: false,
-    live_branch: null,
-    live_agent_pids: [],
-  };
-}
 
 function main(): number {
   const { cmd, args } = parseArgs(process.argv.slice(2));
@@ -213,11 +184,16 @@ function main(): number {
           pr_ref: str(args, "pr-ref") ?? null,
           parent_session_id: str(args, "parent-session") ?? null,
           provider: str(args, "provider") ?? "claude-code",
-          // Validated like --pids is. `process.kill(0,0)` and `kill(-1,0)` SUCCEED (they
-        // signal a process group), so --pid 0 made the lane report live forever.
+          // Validated exactly like --pids is — it previously said so without doing it.
+        // `Number()` silently reinterprets "0x10" as 16 and "1e3" as 1000, so a token that is
+        // not a pid became some OTHER pid and was published in `live_agent_pids`, the field a
+        // retirement consumer is told to act on. (`/proc/16/comm` is a kernel thread.) Plain
+        // decimal digits only. `kill(0)` and `kill(-1)` signal process GROUPS and always
+        // succeed, so non-positive is rejected too, and pid 1 can never be this agent.
         agent_pid: (() => {
-          const n = pidRaw ? Number(pidRaw) : NaN;
-          return Number.isInteger(n) && n > 1 ? n : null;
+          if (!pidRaw || !/^[0-9]+$/.test(pidRaw)) return null;
+          const n = Number(pidRaw);
+          return Number.isSafeInteger(n) && n > 1 ? n : null;
         })(),
           host: hostname(),
           provider_session_id: key ?? null,

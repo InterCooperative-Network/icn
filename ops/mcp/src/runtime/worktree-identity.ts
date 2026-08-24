@@ -50,7 +50,7 @@ const GIT_SANITISED_ENV: NodeJS.ProcessEnv = (() => {
   return e;
 })();
 import { randomUUID } from "crypto";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "fs";
+import { existsSync, linkSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 
 /** Stable identity of a lane. Nothing here changes when the branch does. */
@@ -127,7 +127,19 @@ function repoNameFrom(commonDir: string): string {
  */
 const GENERATION_FILE = "icn-lane-generation";
 
-export function laneGeneration(adminDir: string): string | null {
+export function laneGeneration(
+  adminDir: string,
+  opts: { mint?: boolean } = {}
+): string | null {
+  // MINTING IS OPT-IN, and only the identity path opts in.
+  //
+  // This is called from two places with very different trust: discoverWorktree(), which has
+  // just had the directory confirmed by `git rev-parse --absolute-git-dir`, and the lane filter
+  // in activeSessionsForWorktree(), which receives a worktree_id straight from a caller —
+  // `session_lifecycle`'s unvalidated `worktree_id`, or a CLI `--worktree <name>` that falls
+  // back to a path relative to the process cwd. Minting there meant the documented READ-ONLY
+  // classification path created a file at an attacker-chosen location. Verified: an unrelated
+  // temp directory gained an `icn-lane-generation` file just by being named in a classify call.
   const file = join(adminDir, GENERATION_FILE);
   const read = (): string | null => {
     try {
@@ -139,13 +151,42 @@ export function laneGeneration(adminDir: string): string | null {
   };
   const existing = read();
   if (existing) return existing;
+  if (!opts.mint) return null;
+
+  // ...and even then, only into something that actually IS a Git admin directory. Both a
+  // linked worktree's admin dir and a main `.git` contain HEAD; nothing else we would ever be
+  // handed does.
+  if (!existsSync(join(adminDir, "HEAD"))) return null;
+
+  // ATOMIC CREATE-WITH-CONTENT.
+  //
+  // `writeFileSync(file, uuid, { flag: "wx" })` is open(O_CREAT|O_EXCL) followed by a SEPARATE
+  // write, so a loser that hit EEXIST in the window between them read a ZERO-LENGTH file and
+  // returned null. Measured across 240 genuinely parallel minters: 6 (2.5%) came back null.
+  // That is not cosmetic — a NULL-generation row is kept by the filter and therefore ADOPTED by
+  // a later generation of the lane, which is precisely the aliasing this token exists to stop.
+  //
+  // Writing the content to a temp file first and then link(2)-ing it into place preserves the
+  // single-winner guarantee (link fails EEXIST if the target exists) while guaranteeing the
+  // target is COMPLETE the instant it becomes visible. rename(2) would be wrong here: it
+  // replaces, so concurrent minters would each install their own token and disagree.
+  const tmp = `${file}.tmp.${process.pid}.${randomUUID()}`;
   try {
-    // `wx` fails if the file appeared meanwhile, so two concurrent minters cannot both win —
-    // the loser falls through and reads whatever the winner wrote.
-    writeFileSync(file, `${randomUUID()}\n`, { flag: "wx" });
+    writeFileSync(tmp, `${randomUUID()}\n`, { mode: 0o644 });
+    try {
+      linkSync(tmp, file);
+    } catch {
+      // EEXIST — another minter won. Their token is complete; we read it below.
+    }
   } catch {
-    // EEXIST (someone else minted first) or an unwritable admin dir. Both fall through to the
-    // read below, which returns null for the unwritable case.
+    // Unwritable admin directory. Falls through to a final read, which returns null, and null
+    // means UNKNOWN: the filter keeps every row it cannot judge.
+  } finally {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // Nothing to clean up.
+    }
   }
   return read();
 }
@@ -247,7 +288,7 @@ export function discoverWorktree(
       worktree_id: gitDir,
       worktree_path: top,
       worktree_name: basename(top),
-      worktree_generation: laneGeneration(gitDir),
+      worktree_generation: laneGeneration(gitDir, { mint: true }),
     };
   }
   return null;

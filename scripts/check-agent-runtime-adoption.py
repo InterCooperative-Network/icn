@@ -46,7 +46,7 @@ REQUIRED_MATCHER_TOKENS = {
 }
 
 
-def _invokes_hook(command: str) -> bool:
+def _invokes_hook(command: str, root: Path) -> bool:
     """
     The hook must be THE COMMAND — the program actually executed — not merely the last word
     on the line.
@@ -58,6 +58,15 @@ def _invokes_hook(command: str) -> bool:
     runtime is wired must not accept a command that provably never runs it.
     """
     stripped = command.split("#", 1)[0].strip()
+
+    # NO SHELL OPERATORS. Everything after argv0 used to be ignored, so appending ` </dev/null`
+    # to each hook left the gate at 25/0 while the hook received no payload at all and answered
+    # "DEGRADED — hook payload unparseable" on every single event: no register, no progress, no
+    # release. A redirection, a pipe or a second command can change what runs or what it reads,
+    # and none of them belong in a hook invocation.
+    if re.search(r"[<>;&|`$(){}]", stripped.replace("$CLAUDE_PROJECT_DIR", "")):
+        return False
+
     try:
         tokens = shlex.split(stripped)
     except ValueError:
@@ -73,7 +82,22 @@ def _invokes_hook(command: str) -> bool:
     # FIRST argument — not something appended after an unrelated program.
     if os.path.basename(argv0) in {"bash", "sh", "zsh"} and idx + 1 < len(tokens):
         argv0 = tokens[idx + 1]
-    return argv0.endswith(HOOK) or argv0.endswith(HOOK.split("/")[-1])
+
+    # IT MUST BE THE HOOK FILE, not a string that merely ends like it. Pointing every command
+    # at `.claude/hooks/DISABLED/session-lifecycle.sh` — a path that does not exist, so the hook
+    # exits 127 and lifecycle tracking is entirely off — satisfied `endswith()` and left the
+    # gate reporting 25 checks passed. Resolve the path and compare it to the file the gate
+    # separately execs.
+    resolved = argv0.replace("$CLAUDE_PROJECT_DIR", str(root)).replace(
+        "${CLAUDE_PROJECT_DIR}", str(root)
+    )
+    candidate = Path(resolved)
+    if not candidate.is_absolute():
+        candidate = root / resolved
+    try:
+        return candidate.resolve() == (root / HOOK).resolve() and candidate.is_file()
+    except OSError:
+        return False
 
 
 REQUIRED_EXECUTABLES = [
@@ -156,7 +180,7 @@ def main() -> int:
             for entry in (hooks.get(event) or [])
             for h in (entry.get("hooks") or [])
         ]
-        invoking = [m for m, c in entries if _invokes_hook(c)]
+        invoking = [m for m, c in entries if _invokes_hook(c, root)]
         if not invoking:
             failures.append(f"{event} does not invoke {HOOK} — {consequence}")
             continue
@@ -375,9 +399,12 @@ def main() -> int:
     # without both — every one of them exiting 0. The strongest check in the file, the registry
     # write-through, was one of the ones that disappeared. CI happens to build first today, so
     # this was latent rather than live; a floor makes it neither.
-    if checked < EXPECTED_CHECKS:
+    # EXACT, not a floor. `checked < EXPECTED_CHECKS` let a spurious extra ok() report
+    # "26 check(s) passed" and exit 0 — which is how a duplicated check masks a lost one.
+    if checked != EXPECTED_CHECKS:
         failures.append(
-            f"only {checked} of {EXPECTED_CHECKS} checks ran — a check that skipped itself is "
+            f"{checked} checks ran, expected exactly {EXPECTED_CHECKS} — a check that skipped "
+            "itself is "
             "not a check that passed. Something the gate depends on is missing (an unbuilt "
             "ops/mcp/dist, a deleted adapter); fix that rather than lowering EXPECTED_CHECKS"
         )

@@ -124,6 +124,51 @@ describe("every registered session tool is actually callable", () => {
   });
 });
 
+describe("session_lifecycle preserves the three-state observation", () => {
+  it("OMITTING observed_pids means NOBODY LOOKED, even with a registry row present", async () => {
+    // The Round-8 P0, restorable at the tool boundary: `observed_pids ?? null` -> `?? []` turns
+    // an absent observation into the affirmative "I looked and found nothing". No test caught
+    // it, because the only lifecycle tests used a lane with NO rows — where both values agree.
+    const reg = (await call("register_session", { repo: "icn", ...LANE })) as {
+      session_id: string;
+      worktree_id: string;
+    };
+    expect(reg.worktree_id).toBeTruthy();
+
+    // The observation distinction only SURFACES once the heartbeat has expired: while a session
+    // is fresh both answers take the REGISTERED-ACTIVE branch, whose reason mentions no
+    // observation at all. Asserting there would compare two identical strings and prove
+    // nothing — the control below exists to make that impossible to miss.
+    db.prepare("UPDATE sessions SET last_heartbeat = datetime('now','-120 minutes')").run();
+
+    const omitted = (await call("session_lifecycle", { worktree_id: reg.worktree_id })) as {
+      reason: string;
+      live_agent_pids: number[];
+    };
+    const affirmative = (await call("session_lifecycle", {
+      worktree_id: reg.worktree_id,
+      observed_pids: [],
+    })) as { reason: string };
+
+    // Absent must NOT read as an affirmative empty observation...
+    expect(omitted.reason).not.toMatch(/an observation was performed/i);
+    // ...and the two must be distinguishable at all, or the contract has collapsed.
+    expect(omitted.reason).not.toBe(affirmative.reason);
+    expect(affirmative.reason).toMatch(/an observation was performed/i);
+    expect(Array.isArray(omitted.live_agent_pids)).toBe(true);
+  });
+
+  it("still produces a full, parseable envelope when the lane cannot be resolved", async () => {
+    const r = (await call("session_lifecycle", { worktree_id: "/no/such/lane/at/all" })) as Record<
+      string,
+      unknown
+    >;
+    for (const k of ["state", "reason", "contention", "live_agent_pids", "session_id"]) {
+      expect(Object.keys(r)).toContain(k);
+    }
+  });
+});
+
 describe("claim_files actually grants and detects conflicts", () => {
   it("grants a claim and reports it back", async () => {
     const a = (await call("register_session", { repo: "icn", ...LANE })) as { session_id: string };

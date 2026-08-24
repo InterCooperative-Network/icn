@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawn, spawnSync } from "child_process";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
+import { mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -93,7 +93,15 @@ catch (e) { console.error("FAIL " + (e && e.code) + " " + (e && e.message)); pro
 
   it("leaves exactly one stamp per schema version, and a coherent schema", async () => {
     const db = join(work, "cold2.db");
-    await stampede(12, PRELUDE(out, db) + `const d = initDb(DB); d.close(); console.log("OK");`);
+    // ASSERT ON THE STAMPEDE. This discarded its return value, so the concurrent opens could
+    // all be dying and the test still passed — the probe below calls initDb() itself, which
+    // re-establishes every property it then checks.
+    const opens = await stampede(
+      12,
+      PRELUDE(out, db) + `const d = initDb(DB); d.close(); console.log("OK");`
+    );
+    expect(opens.filter((r) => r.code !== 0).map((f) => f.stderr.trim())).toEqual([]);
+    expect(opens.filter((r) => r.stdout.includes("OK"))).toHaveLength(12);
     const probe = join(work, "probe.mjs");
     writeFileSync(
       probe,
@@ -199,11 +207,12 @@ console.log(String(d.prepare("SELECT COUNT(*) c FROM sessions WHERE provider_ses
 // EXCLUSIVE write lock on a database several MCP processes share. The CLI turned that into
 // "registry unavailable", exit 1, session never registered.
 //
-// NOTE ON MUTANT SELECTION: removing the migration transaction does NOT fail these tests, and
-// that is correct rather than a weakness here — with the pragma order fixed and every ALTER
-// already guarded by a column check, the ladder is idempotent enough that concurrency alone no
-// longer exposes it. Its necessity is proven where it belongs, by the deterministic rollback
-// test in schema-upgrade.test.ts.
+// NOTE ON MUTANT SELECTION: the migration transaction's ATOMICITY is proven deterministically
+// by the rollback test in schema-upgrade.test.ts, not by racing for it. These tests cover the
+// other half — that concurrent cold opens neither crash nor corrupt — and they do detect a
+// missing transaction now that the stampede's results are actually asserted (`duplicate column
+// name` from the losers). One test is not made responsible for two properties merely because
+// both involve SQLite.
 describe("registry availability under genuine contention", () => {
   /** Hold a real write lock in a SEPARATE process; resolves once the lock is actually held. */
   function holdWriteLock(db: string, holdMs: number): { ready: Promise<void>; done: Promise<void> } {
@@ -273,7 +282,10 @@ catch (e) { console.log(JSON.stringify({ ok: false, ms: Date.now() - t0,
   it("a COLD start waits out transient contention instead of failing instantly", async () => {
     const db = join(work, "cold-under-lock.db");
     // Seed the file so a competing writer can hold a lock on it before any migration exists.
-    const holder = holdWriteLock(db, 2500); // releases well inside the 5s busy_timeout
+    // 1200 ms against a 5 s busy_timeout leaves ~3.8 s of headroom. At 2500 ms the margin was
+    // thin enough that heavy parallel load on the machine could eat it, which would make this
+    // test flaky in the one direction that matters least — a false failure.
+    const holder = holdWriteLock(db, 1200);
     await holder.ready;
     const r = await openOnce(db);
     expect(r.err).toBe("");
@@ -292,6 +304,138 @@ catch (e) { console.log(JSON.stringify({ ok: false, ms: Date.now() - t0,
 // produced" — having emitted a truncated, unparseable envelope. Session rows are only ever
 // removed by release, so co-occupants accumulate on a lane indefinitely and the 64 KB pipe
 // buffer is reachable in the ordinary course of things.
+// ── the generation token must be minted atomically ──────────────────────────
+//
+// `writeFileSync(file, uuid, { flag: "wx" })` is open(O_CREAT|O_EXCL) followed by a SEPARATE
+// write, so a loser that hit EEXIST in the window between them read a ZERO-LENGTH file and got
+// null. Measured across 240 genuinely parallel minters: 6 came back null — and a
+// NULL-generation row is kept by the lane filter and therefore ADOPTED by a later generation,
+// which is the aliasing the token exists to prevent.
+describe("lane generation minting under real concurrency", () => {
+  it("every concurrent minter gets the SAME non-null token", async () => {
+    const repo = join(work, "mintrepo");
+    execFileSync("git", ["init", "-q", "-b", "main", repo], { stdio: "pipe" });
+    execFileSync("git", ["-C", repo, "-c", "user.email=t@e", "-c", "user.name=t",
+                         "commit", "-q", "--allow-empty", "-m", "base"], { stdio: "pipe" });
+    const lane = join(work, "mintlane");
+    execFileSync("git", ["-C", repo, "worktree", "add", "-q", "-b", "mint", lane], { stdio: "pipe" });
+
+    const results = await stampede(
+      24,
+      `
+import { discoverWorktree } from ${JSON.stringify(join(out, "runtime/worktree-identity.js"))};
+const startAt = Number(process.argv[2]);
+while (Date.now() < startAt) { /* spin to a common start */ }
+const id = discoverWorktree(${JSON.stringify(lane)});
+console.log(JSON.stringify({ gen: id ? id.worktree_generation : null }));
+`
+    );
+    expect(results.filter((r) => r.code !== 0).map((f) => f.stderr.trim())).toEqual([]);
+    const gens = results.map((r) => JSON.parse(r.stdout.trim()).gen);
+
+    // NOT ONE may be null: a null generation is exactly the row a recreated lane adopts.
+    expect(gens.filter((g) => g === null)).toEqual([]);
+    // ...and they must all agree, or the "generation" would change per reader and orphan rows.
+    expect(new Set(gens).size).toBe(1);
+    // No torn or partial token.
+    expect(gens[0]).toMatch(/^[0-9a-f-]{36}$/);
+    // No temp files left behind in the admin directory.
+    const admin = execFileSync("git", ["-C", lane, "rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8",
+    }).trim();
+    expect(readdirSync(admin).filter((f) => f.includes("icn-lane-generation.tmp"))).toEqual([]);
+  }, 120_000);
+});
+
+// ── the CLI's --pid must be validated exactly like --pids ──────────────────
+//
+// It claimed to be, and was not: `Number()` silently reinterprets "0x10" as 16 and "1e3" as
+// 1000, so a token that is not a pid at all became some OTHER pid and was published in
+// `live_agent_pids` — the field a retirement consumer is told to act on. (pid 16 on this
+// machine is a kernel thread.) Only a spawned process can exercise the CLI's own parsing.
+describe("CLI --pid validation", () => {
+  it("stores only plain decimal pids greater than 1, and NULL for anything else", () => {
+    const lane = join(work, "pidlane");
+    execFileSync("git", ["init", "-q", "-b", "main", lane], { stdio: "pipe" });
+    const cli = join(out, "cli/session.js");
+
+    const check = (raw: string): number | null => {
+      const db = join(work, `pid-${Buffer.from(raw).toString("hex")}.db`);
+      execFileSync(process.execPath, [cli, "register", "--harness-key", `k-${raw}`,
+                                      "--cwd", lane, "--pid", raw, "--quiet"],
+                   { env: { ...process.env, ICN_OPS_DB: db }, stdio: "pipe" });
+      const probe = join(work, "readpid.mjs");
+      writeFileSync(
+        probe,
+        `import Database from "better-sqlite3";
+const d = new Database(process.argv[2]);
+const r = d.prepare("SELECT agent_pid AS p FROM sessions").get();
+console.log(JSON.stringify(r ? r.p : "NOROW"));`
+      );
+      return JSON.parse(
+        execFileSync(process.execPath, [probe, db], { encoding: "utf-8" }).trim()
+      );
+    };
+
+    // Silently reinterpreted before the fix: "1e3" -> 1000, "0x10" -> 16.
+    expect(check("1e3")).toBeNull();
+    expect(check("0x10")).toBeNull();
+    expect(check("0")).toBeNull();      // kill(0) signals the caller's process group
+    expect(check("-1")).toBeNull();     // kill(-1) signals everything the uid may signal
+    expect(check("1")).toBeNull();      // pid 1 is init; it can never be this agent
+    expect(check("1.5")).toBeNull();
+    expect(check("99999999999999999999")).toBeNull(); // Number() yields a float, not a pid
+    // ...and a real pid still survives, or the guard would be indistinguishable from a
+    // register that simply never records anything.
+    expect(check("12345")).toBe(12345);
+  }, 120_000);
+});
+
+// ── the CLI classify exit-code contract ────────────────────────────────────
+//
+// The contract is 0 (facts produced) or 3 (none available), and NOTHING tested it: the CLI is
+// executed by exactly one other test, inside a shell pipeline whose status is `cat`'s, so
+// classify's own exit code was never observed. Three separate mutants survived — including
+// turning an unresolvable lane into exit 0, which the source itself calls "telling a consumer
+// an unresolvable path was permission to retire".
+describe("CLI classify exit codes", () => {
+  const runClassify = (args: string[], db: string): { code: number; out: string } => {
+    const cli = join(out, "cli/session.js");
+    const r = spawnSync(process.execPath, [cli, "classify", ...args], {
+      encoding: "utf-8",
+      env: { ...process.env, ICN_OPS_DB: db },
+      timeout: 30_000,
+    });
+    return { code: r.status ?? -1, out: r.stdout ?? "" };
+  };
+
+  it("exits 3 with a full envelope when no lane can be resolved", () => {
+    const db = join(work, "exit3.db");
+    const r = runClassify([], db);
+    expect(r.code).toBe(3);
+    const parsed = JSON.parse(r.out);
+    expect(parsed.state).toBe("REGISTRY-UNAVAILABLE");
+    expect(Array.isArray(parsed.live_agent_pids)).toBe(true);
+  });
+
+  it("exits 3, never 0, when the registry itself cannot be opened", () => {
+    const corrupt = join(work, "corrupt-exit.db");
+    writeFileSync(corrupt, Buffer.from([0xde, 0xad, 0xbe, 0xef, 0x00, 0x01, 0x02, 0x03]));
+    const r = runClassify(["--worktree-id", "/some/lane"], corrupt);
+    expect(r.code).toBe(3);
+    const parsed = JSON.parse(r.out); // must still be parseable, not empty stdout
+    expect(parsed.state).toBe("REGISTRY-UNAVAILABLE");
+    expect(Object.keys(parsed)).toContain("contention");
+  });
+
+  it("exits 0 when facts ARE produced, so 3 is not simply always returned", () => {
+    const db = join(work, "exit0.db");
+    const r = runClassify(["--worktree-id", "/a/lane/that/has/no/rows", "--observed-none"], db);
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.out).state).toBe("UNREGISTERED-OBSERVED");
+  });
+});
+
 describe("classify output survives a pipe", () => {
   it("emits a COMPLETE, parseable envelope larger than the pipe buffer", async () => {
     const db = join(work, "bigenvelope.db");

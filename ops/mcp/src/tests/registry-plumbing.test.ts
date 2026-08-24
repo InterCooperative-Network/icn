@@ -61,6 +61,24 @@ describe("default registry path is derived from the repository, not from the exe
     expect(resolveDefaultDbPath(repo)).toBe(expected);
   });
 
+  it("normalises symlinks, so one repository cannot get two registries", () => {
+    // `realpathSync` here is load-bearing and was untested: dropping it left `tsc` clean and
+    // all 250 tests green, while a repo reached through a symlinked parent resolved to a
+    // DIFFERENT database file than the same repo reached directly. That is the exact
+    // per-worktree split this function exists to close, reintroduced one path component up.
+    const linkedParent = join(root, "link-to-root");
+    symlinkSync(root, linkedParent);
+    const viaLink = join(linkedParent, "repo");
+    expect(resolveDefaultDbPath(viaLink)).toBe(resolveDefaultDbPath(repo));
+
+    // ...and through a symlinked worktree as well.
+    const wtLink = join(root, "link-to-lane");
+    symlinkSync(wt, wtLink);
+    expect(resolveDefaultDbPath(wtLink)).toBe(resolveDefaultDbPath(wt));
+    // The resolved path must contain no symlink component at all.
+    expect(resolveDefaultDbPath(viaLink)).not.toContain("link-to-root");
+  });
+
   it("gives DIFFERENT repositories different registries", () => {
     expect(resolveDefaultDbPath(repo)).not.toBe(resolveDefaultDbPath(otherRepo));
   });

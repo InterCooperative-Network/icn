@@ -6,12 +6,13 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
   branchChanged,
   discoverWorktree,
+  laneGeneration,
   readBranchState,
 } from "../runtime/worktree-identity.js";
 import { initDb } from "../state/db.js";
@@ -517,6 +518,128 @@ describe("worktree generation — identity in time", () => {
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
     expect(c.session_id).toBeNull();
     expect(c.contention.count).toBe(0);
+  });
+
+  it("a RESUMED conversation in a recreated lane keeps its attribution", () => {
+    // THE FAIL-SAFE INVERSION THIS FILTER ONCE CAUSED.
+    //
+    // `moved` is `prior.worktree_id !== worktreeId`, and git RECYCLES the admin dir — so a lane
+    // removed and recreated at the same pathname keeps its worktree_id, `moved` is false, and a
+    // resumed conversation that deduped into its old row kept the DEAD generation. The filter
+    // then discarded the row of a LIVE, just-registered, heartbeating session. Measured:
+    // register reported success, and classify answered UNREGISTERED-OBSERVED with contention 0.
+    const wt = join(gRoot, "resumed");
+    git(gRepo, "worktree", "add", "-q", "-b", "resume-gen1", wt);
+    const db = initDb(":memory:");
+    const first = discoverWorktree(wt)!;
+    registerSession(db, {
+      repo: "gen",
+      identity: first,
+      branch_state: readBranchState(first.worktree_path),
+      provider_session_id: "resumed-conversation",
+      agent_pid: process.pid,
+    });
+
+    git(gRepo, "worktree", "remove", "--force", wt);
+    git(gRepo, "worktree", "add", "-q", "-b", "resume-gen2", wt);
+    const second = discoverWorktree(wt)!;
+    expect(second.worktree_id).toBe(first.worktree_id); // git recycled it
+    expect(second.worktree_generation).not.toBe(first.worktree_generation);
+
+    const again = registerSession(db, {
+      repo: "gen",
+      identity: second,
+      branch_state: readBranchState(second.worktree_path),
+      provider_session_id: "resumed-conversation",
+      agent_pid: process.pid,
+    });
+    expect(again.deduplicated).toBe(true);
+
+    expect(activeSessionsForWorktree(db, second.worktree_id)).toHaveLength(1);
+    const c = classifyWorktree(db, second.worktree_id, { observed_pids: [] });
+    expect(c.state).not.toBe("UNREGISTERED-OBSERVED");
+    expect(c.contention.count).toBe(1);
+    expect(c.session_id).toBe(again.session_id);
+  });
+
+  it("the generation MOVES with the lane on a genuine lane change", () => {
+    // The lane-move UPDATE carries worktree_generation, and nothing covered it: the only prior
+    // lane-move test used synthetic, non-existent lane directories, so the column was never
+    // compared against a real second lane.
+    const laneA = join(gRoot, "move-a");
+    const laneB = join(gRoot, "move-b");
+    git(gRepo, "worktree", "add", "-q", "-b", "move-a", laneA);
+    git(gRepo, "worktree", "add", "-q", "-b", "move-b", laneB);
+    const db = initDb(":memory:");
+    const a = discoverWorktree(laneA)!;
+    const b = discoverWorktree(laneB)!;
+    expect(a.worktree_generation).not.toBe(b.worktree_generation);
+
+    registerSession(db, {
+      repo: "gen", identity: a, branch_state: readBranchState(a.worktree_path),
+      provider_session_id: "moving-conversation", agent_pid: process.pid,
+    });
+    const moved = registerSession(db, {
+      repo: "gen", identity: b, branch_state: readBranchState(b.worktree_path),
+      provider_session_id: "moving-conversation", agent_pid: process.pid,
+    });
+    expect(moved.deduplicated).toBe(true);
+
+    const row = db
+      .prepare("SELECT worktree_generation AS g FROM sessions WHERE id = ?")
+      .get(moved.session_id) as { g: string | null };
+    expect(row.g).toBe(b.worktree_generation);
+    expect(activeSessionsForWorktree(db, b.worktree_id)).toHaveLength(1);
+    expect(activeSessionsForWorktree(db, a.worktree_id)).toHaveLength(0);
+  });
+
+  it("the READ path never mints, and never writes outside a Git admin directory", () => {
+    // classify() takes a caller-supplied worktree_id — `session_lifecycle`'s unvalidated input,
+    // or a CLI `--worktree <name>` that falls back to a path relative to the process cwd. A
+    // read path that mints created a file at an attacker-chosen location.
+    const victim = join(gRoot, "not-an-admin-dir");
+    mkdirSync(victim, { recursive: true });
+    expect(laneGeneration(victim)).toBeNull();
+    expect(readdirSync(victim)).toEqual([]);
+
+    expect(laneGeneration(victim, { mint: true })).toBeNull();
+    expect(readdirSync(victim)).toEqual([]);
+
+    const fresh = join(gRoot, "unminted");
+    git(gRepo, "worktree", "add", "-q", "-b", "unminted-lane", fresh);
+    const admin = git(fresh, "rev-parse", "--absolute-git-dir");
+    expect(laneGeneration(admin)).toBeNull();
+    expect(existsSync(join(admin, "icn-lane-generation"))).toBe(false);
+    expect(discoverWorktree(fresh)!.worktree_generation).toBeTruthy();
+    expect(existsSync(join(admin, "icn-lane-generation"))).toBe(true);
+  });
+
+  it("falls back to the PATH for pre-v5 rows, in both directions", () => {
+    // The only protection a NULL-generation row has. Deleting the path comparison left the
+    // whole suite green, because the one test covering unknown generations exercises only the
+    // KEEP direction — which a missing filter also produces. Both directions are needed.
+    const wt = join(gRoot, "pathfallback");
+    git(gRepo, "worktree", "add", "-q", "-b", "pathfallback", wt);
+    const db = initDb(":memory:");
+    const id = discoverWorktree(wt)!;
+    registerSession(db, {
+      repo: "gen", identity: id, branch_state: readBranchState(id.worktree_path),
+      provider_session_id: "pre-v5-row", agent_pid: process.pid,
+    });
+    // Simulate a row written before v5: no generation recorded.
+    db.prepare("UPDATE sessions SET worktree_generation = NULL").run();
+
+    // KEEP: the recorded path still matches the live one.
+    expect(activeSessionsForWorktree(db, id.worktree_id)).toHaveLength(1);
+
+    // DROP: the recorded path is a lane that no longer lives here — the recycled-admin-dir
+    // case, which is the whole reason the fallback exists.
+    db.prepare("UPDATE sessions SET worktree_path = ?").run(join(gRoot, "some-removed-lane"));
+    expect(activeSessionsForWorktree(db, id.worktree_id)).toHaveLength(0);
+
+    // ...and a row that never recorded a path at all stays KEPT: unknown is never "different".
+    db.prepare("UPDATE sessions SET worktree_path = NULL").run();
+    expect(activeSessionsForWorktree(db, id.worktree_id)).toHaveLength(1);
   });
 
   it("keeps rows when the generation is UNKNOWN on either side (fail safe)", () => {
