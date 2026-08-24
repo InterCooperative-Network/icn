@@ -66,7 +66,7 @@
     },
     "agent_runtime_state": {
       "owner": "ops/mcp (sessions table; ICN_OPS_DB)",
-      "description": "Live agent session lifecycle: which sessions occupy which worktree/lane, their heartbeat/progress evidence and supervised long-running operations. Authoritative for lifecycle; ABSENCE OF A ROW IS NOT EVIDENCE OF ABSENCE OF A SESSION and never means a lane is safe to retire.",
+      "description": "Live agent session lifecycle: which sessions occupy which worktree/lane, and their heartbeat/progress evidence. Reports OBSERVATIONS ONLY \u2014 it issues no retirement verdict, and absence of a row is not evidence of absence of a session.",
       "query": "ops/scripts/icn-agent-session classify --path <worktree>",
       "mcp_tools": [
         "session_lifecycle",
@@ -75,7 +75,8 @@
       ],
       "contract": "docs/architecture/AGENT_RUNTIME.md",
       "identity": "Lanes are keyed on the Git-derived worktree_id (realpath of `git rev-parse --absolute-git-dir`), never a basename and never a branch name.",
-      "volatile": true
+      "volatile": true,
+      "not_owned_here": "Supervision of long-running operations, and any retireable/reclaimable verdict. See branch ops/agent-supervision-lifecycle."
     },
     "agent_capability_index": {
       "owner": "docs/reference/project-index/generated/agent-capabilities.json",

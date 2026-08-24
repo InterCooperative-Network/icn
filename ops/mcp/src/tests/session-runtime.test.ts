@@ -197,13 +197,13 @@ describe("release", () => {
 });
 
 describe("classification — fail-safe invariants", () => {
-  it("a registry outage is never retireable", () => {
+  it("a registry outage never reports a free lane", () => {
     const c = classify([], { observed_pids: [1, 2], registry_unavailable: true }, 
       { heartbeat_age_min: null, progress_age_min: null }, LIMITS);
     expect(c.state).toBe("REGISTRY-UNAVAILABLE");
   });
 
-  it("an unregistered but process-held worktree is never retireable", () => {
+  it("an unregistered but process-held worktree never reports a free lane", () => {
     // Pre-integration sessions and unsupported launchers land here. Absence of a row is
     // NOT evidence of absence of a session.
     const c = classify([], { observed_pids: [4242] },
@@ -211,7 +211,7 @@ describe("classification — fail-safe invariants", () => {
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
   });
 
-  it("an unregistered worktree with no processes is still not auto-retireable", () => {
+  it("an unregistered worktree with no processes still reports UNREGISTERED-OBSERVED", () => {
     const c = classify([], { observed_pids: [] },
       { heartbeat_age_min: null, progress_age_min: null }, LIMITS);
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
@@ -273,7 +273,7 @@ describe("classification — registered lanes", () => {
     expect(c.state).toBe("PROGRESS-STALLED");
   });
 
-  it("expired heartbeat with no live process is the only auto-retireable state", () => {
+  it("expired heartbeat with no live process reports REGISTERED-EXPIRED", () => {
     const c = classify([row()], { observed_pids: [] },
       { heartbeat_age_min: 120, progress_age_min: 120 }, LIMITS);
     expect(c.state).toBe("REGISTERED-EXPIRED");
@@ -526,7 +526,7 @@ describe("absence of observation is not evidence of absence", () => {
   }
   const EXPIRED = { heartbeat_age_min: 120, progress_age_min: 120 };
 
-  it("an expired heartbeat with NO observation supplied is not retireable", () => {
+  it("an expired heartbeat with NO observation supplied says so in the reason", () => {
     const c = classify([row()], {}, EXPIRED, LIMITS);
     expect(c.state).toBe("REGISTERED-EXPIRED");
     expect(c.reason).toContain("no process observation");
@@ -540,7 +540,7 @@ describe("absence of observation is not evidence of absence", () => {
     expect(explicitNull.reason).toContain("no process observation");
   });
 
-  it("an AFFIRMATIVE empty observation is what unlocks retirement", () => {
+  it("an AFFIRMATIVE empty observation is reported as such", () => {
     const c = classify([row()], { observed_pids: [] }, EXPIRED, LIMITS);
     expect(c.state).toBe("REGISTERED-EXPIRED");
     expect(c.reason).toContain("an observation was performed");
@@ -555,7 +555,7 @@ describe("absence of observation is not evidence of absence", () => {
     expect(c.reason).toContain("agent process");
   });
 
-  it("end to end: a live agent process is never retireable, however the caller asks", () => {
+  it("end to end: a live agent process is always reported, however the caller asks", () => {
     const { session_id } = registerSession(db, {
       repo: "icn", identity: ident("live"), provider_session_id: "k", agent_pid: process.pid,
     });
@@ -640,7 +640,7 @@ describe("a resumed conversation that reappears in another lane", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("a lane is protected by ANY live occupant", () => {
-  it("a live agent protects the lane even when a crashed peer has a fresher heartbeat", () => {
+  it("a live agent is reported even when a crashed peer has a fresher heartbeat", () => {
     const live = registerSession(db, {
       repo: "icn", identity: ident("shared"), provider_session_id: "live", agent_pid: process.pid,
     });

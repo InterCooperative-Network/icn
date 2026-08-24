@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -144,12 +145,41 @@ def main() -> int:
         else:
             ok(f"{rel} declares {'.'.join(keypath)}")
 
-    # 4. the hook must be resilient: it may never hard-fail a session
-    hook_src = (root / HOOK).read_text(encoding="utf-8") if (root / HOOK).is_file() else ""
-    if hook_src and "exit 0" not in hook_src:
-        failures.append(f"{HOOK} must exit 0 on every path; a lifecycle hook must never fail a session")
-    elif hook_src:
-        ok(f"{HOOK} exits 0 on every path")
+    # 4. the hook must be resilient: it may never hard-fail a session.
+    #
+    # This used to grep for the literal string "exit 0" and then PRINT "exits 0 on every path".
+    # A hook whose only `exit 0` was unreachable passed while hard-failing every session. Run
+    # it instead, with the payload shapes that actually reach it, and check the exit status.
+    hook_path = root / HOOK
+    if hook_path.is_file() and os.access(hook_path, os.X_OK):
+        probes = [
+            ("SessionStart", '{"hook_event_name":"SessionStart","session_id":"probe","cwd":"%s"}' % root),
+            ("PostToolUse", '{"hook_event_name":"PostToolUse","session_id":"probe","cwd":"%s","tool_name":"Bash"}' % root),
+            ("SessionEnd", '{"hook_event_name":"SessionEnd","session_id":"probe","cwd":"%s","reason":"clear"}' % root),
+            ("malformed", "not json at all"),
+            ("empty", ""),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ)
+            env["ICN_OPS_DB"] = str(Path(tmp) / "probe.db")
+            env["ICN_ROOT"] = tmp
+            env["CLAUDE_PROJECT_DIR"] = str(root)
+            for label, payload in probes:
+                try:
+                    r = subprocess.run(
+                        ["bash", str(hook_path)], input=payload, capture_output=True,
+                        text=True, env=env, timeout=30,
+                    )
+                except subprocess.TimeoutExpired:
+                    failures.append(f"{HOOK} timed out on a {label} payload; it must never block a session")
+                    continue
+                if r.returncode != 0:
+                    failures.append(
+                        f"{HOOK} exited {r.returncode} on a {label} payload; a lifecycle hook "
+                        "must never fail a session"
+                    )
+                else:
+                    ok(f"{HOOK} exits 0 on a {label} payload")
 
     print(f"agent-runtime adoption: {checked} check(s) passed, {len(failures)} failure(s)")
     if args.verbose or failures:

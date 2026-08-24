@@ -296,8 +296,8 @@ crashed peer with a fresher heartbeat won the selection and only its dead pid wa
 
 TTL is `ICN_SESSION_TTL_MINUTES` (default 30, matching the pre-existing `list_sessions`
 window), clamped to a 5-minute floor — it is read from the ambient environment of whoever runs
-classify, and a value of 1 turned a two-minute-old heartbeat into a retirement candidate. Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, matching `icn-lane-audit`'s
-`QUIESCENT_AFTER_MIN`).
+classify, and a value of 1 turned a two-minute-old heartbeat into a retirement candidate. Stall window is `ICN_SESSION_STALL_MINUTES` (default 90, chosen to match the
+`QUIESCENT_AFTER_MIN` proposed by icn#2653, which is not merged).
 
 ### 5.1 Supervision of long-running operations — NOT IN THIS LAYER
 
@@ -398,7 +398,7 @@ tool and the file, but not the startup line or automatic registration. See §1.1
 
 ## 8. Lifecycle consumers
 
-`icn-lane-audit` (icn#2653) and any future consumer should join on **canonical lane identity**
+`icn-lane-audit` (icn#2653 — not merged, so it does not exist in this tree yet) and any future consumer should join on **canonical lane identity**
 first and corroborate with observation second:
 
 ```

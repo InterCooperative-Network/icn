@@ -268,8 +268,9 @@ function main(): number {
       if (!worktreeId) {
         const name = str(args, "worktree");
         if (!name) {
-          // Exit 2 is the RETIREMENT-CANDIDATE verdict. Using it for a usage error told a
-          // consumer gating on `$? -eq 2` that an unresolvable path was permission to retire.
+          // Only 0 and 3 are defined. An earlier contract used 2 for "retirement candidate";
+          // that verdict no longer exists, and reusing the code for a usage error told a
+          // consumer an unresolvable path was permission to retire.
           process.stdout.write(
             JSON.stringify({
               state: "REGISTRY-UNAVAILABLE",
@@ -290,7 +291,8 @@ function main(): number {
               reason: `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`,
             }) + "\n"
           );
-          return 1;
+          // 3, not 1: the documented contract is 0 (facts produced) or 3 (none available).
+          return 3;
         }
         worktreeId = ids[0] ?? name;
       }

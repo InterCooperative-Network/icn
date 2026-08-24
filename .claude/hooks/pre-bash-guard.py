@@ -94,19 +94,38 @@ SWALLOW_RE = re.compile(r"(2>\s*/dev/null|&>\s*/dev/null|>&\s*/dev/null)")
 FILE_TEST_RE = re.compile(r"(\btest\b|\[)\s+-[efsrd]\b")
 GREP_FILE_RE = re.compile(r"\bgrep\b[^|;\n]*\s(?P<target>[~./][^\s|;&]*|\$\{?\w+\}?)\s*(?:2>|&>|>&|$)")
 
-BOUNDED_RE = re.compile(
-    r"(^|[;&|(]\s*)timeout\s+[\d.]+"
-    r"|\$SECONDS\b|\bSECONDS\s*[-=<>]|\(\(\s*SECONDS\b"
-    r"|(^|[;&|\n]\s*)break\b"
-    # `exit` must be at a command position. As a bare word under re.I it matched the path
-    # /tmp/scratch/EXIT and silently disarmed the guard on the very sentinel shape it refuses.
-    r"|(^|[;&|\n]\s*)exit\b"
-    r"|(^|[;&|(]\s*)icn-wait\b"
-    # A READ (`$deadline`) can bound a loop. An ASSIGNMENT cannot: `max_tries=3` inside the
-    # body is a dead store, and it is exactly what an agent writes while *trying* to add a
-    # bound — so accepting it disarmed the guard on a provably non-terminating loop.
-    r"|\$\{?(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b",
-    re.M | re.I,
+# WHAT ACTUALLY BOUNDS A LOOP
+#
+# Three rounds of review each found the same defect in a new disguise: the guard tested for the
+# PRESENCE of a bounding token rather than for a construct that can actually end the loop.
+#   round 4: a token anywhere in the fragment  -> `<loop>; exit 0`
+#   round 5: an assignment inside the body     -> `do max_tries=3; sleep 2; done`
+#   round 6: a READ inside the body            -> `do echo $SECONDS; sleep 5; done`
+# Each is what an agent writes while *trying* to add a bound, and each left a provably
+# non-terminating loop allowed.
+#
+# So stop matching tokens. A polling loop can end in exactly two ways:
+#   1. the BODY executes break / exit / return, or
+#   2. the CONDITION contains a term that can go false on its own (a clock or a counter),
+#      independently of the defective predicate.
+# Anything else — a timeout on an unrelated body command, a variable merely printed, a dead
+# store — bounds nothing.
+
+# break / exit / return at a command position, in the loop body.
+ESCAPE_STMT_RE = re.compile(r"(^|[;&|\n]\s*|&&\s*|\|\|\s*)(break|exit|return)\b", re.M)
+
+# A self-terminating term in the loop CONDITION: a clock or a counter comparison.
+COND_BOUND_RE = re.compile(
+    r"\$SECONDS\b|\(\(\s*SECONDS\b"
+    r"|\$\{?(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b"
+    r"|\bdate\s+\+%s\b"
+    r"|-(?:lt|le|gt|ge)\s+\$?\{?\w+",
+    re.I,
+)
+
+# A bound supplied by an ANCESTOR wrapper, e.g. `timeout 600 bash -c "<loop>"`.
+ANCESTOR_BOUND_RE = re.compile(
+    r"(^|[;&|(]\s*)timeout\s+[\d.]+|(^|[;&|(]\s*)icn-wait\b", re.M
 )
 
 # Wrappers whose quoted argument is executed, not quoted text.
@@ -124,12 +143,17 @@ CMD_SUBST_RE = re.compile(r"\$\((?P<code>[^()]*(?:\([^()]*\)[^()]*)*)\)|`(?P<cod
 # Only a heredoc fed to a SHELL is executed. `cat >> README.md <<EOF` is documentation, and
 # recursing into it refused an agent's attempt to document this very defect.
 HEREDOC_RE = re.compile(
-    r"\b(?:ba|z|k|da)?sh\b[^\n]*?<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<code>.*?)\n\s*(?P=tag)\b",
+    r"\b(?:ba|z|k|da)?sh\b[^\n]*?<<-?\s*['\"]?(?P<tag>\w+)['\"]?[^\n]*\n(?P<code>.*?)\n\s*(?P=tag)\b",
     re.S,
 )
 
 
-ANY_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(?P<tag>\w+)['\"]?\n(?P<code>.*?)\n\s*(?P=tag)\b", re.S)
+# The redirect can come AFTER the tag: `cat <<'EOF' > file` and `cat <<'EOF' | tee f` are both
+# ordinary. Requiring a newline immediately after the tag meant those bodies were parsed as
+# live commands, and the guard refused an agent documenting this very defect.
+ANY_HEREDOC_RE = re.compile(
+    r"<<-?\s*['\"]?(?P<tag>\w+)['\"]?[^\n]*\n(?P<code>.*?)\n\s*(?P=tag)\b", re.S
+)
 
 
 _SPAN_CACHE: dict[str, list[tuple[int, int]]] = {}
@@ -164,6 +188,11 @@ def quoted_spans(text: str) -> list[tuple[int, int]]:
         ch = text[i]
         if inside_span(i, spans):
             i += 1
+            continue
+        if ch == "\\":
+            # A backslash escape outside a quote escapes the NEXT character, so `don\'t` does
+            # not open a span. Treating it as an opener made everything after it inert text.
+            i += 2
             continue
         if ch in "\"'":
             j = i + 1
@@ -232,10 +261,20 @@ def _pattern_of(m: re.Match) -> str | None:
     return None
 
 
+def _outside_quotes(pattern: re.Pattern[str], text: str) -> bool:
+    """True when `pattern` matches at a position the shell will actually execute."""
+    spans = quoted_spans_cached(text)
+    return any(not inside_span(m.start(), spans) for m in pattern.finditer(text))
+
+
 def _bounded(fragment: str) -> bool:
-    """A bounding construct that is really executed — not one sitting inside a string."""
-    spans = quoted_spans_cached(fragment)
-    return any(not inside_span(m.start(), spans) for m in BOUNDED_RE.finditer(fragment))
+    """A bound supplied by a wrapper AROUND a loop (ancestor scope only)."""
+    return _outside_quotes(ANCESTOR_BOUND_RE, fragment)
+
+
+def _loop_can_end(cond: str, body: str) -> bool:
+    """Can this loop terminate other than by its (defective) predicate going false?"""
+    return _outside_quotes(ESCAPE_STMT_RE, body) or _outside_quotes(COND_BOUND_RE, cond)
 
 
 def blocked_reason(cmd: str) -> str | None:
@@ -252,14 +291,19 @@ def blocked_reason(cmd: str) -> str | None:
             if inside_span(loop.start("kw"), spans):
                 continue
             cond, body = loop.group("cond"), loop.group("body")
-            if not re.search(r"\bsleep\b", body, re.I):
+
+            # A POLLING loop: it sleeps, or it spins on a trivial body. A sleepless spin
+            # (`do :; done`) was ignored entirely and is strictly worse than what we refuse.
+            if not (
+                re.search(r"\bsleep\b", body, re.I)
+                or re.fullmatch(r"[\s;]*(?::|true)?[\s;]*", body)
+            ):
                 continue
-            # LOOP-SCOPED, not fragment-scoped. `_bounded(clean)` meant a bounding token
-            # ANYWHERE in the fragment — before the loop, after `done`, in an unrelated
-            # command — disarmed it: `timeout 5 true; <loop>` and even `<loop>\nexit 0`
-            # were allowed while hanging. A parent wrapper's bound still applies, which is
-            # what `ancestor_bounded` carries.
-            if _bounded(loop.group(0)):
+
+            # Can it end other than by its own (defective) predicate going false? Only a
+            # break/exit/return in the BODY, or a self-terminating term in the CONDITION,
+            # counts. A wrapper's bound is carried separately by `ancestor_bounded`.
+            if _loop_can_end(cond, body):
                 continue
 
             # ── Defect A: the condition matches the observer itself ──

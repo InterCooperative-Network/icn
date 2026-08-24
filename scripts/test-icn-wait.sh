@@ -224,19 +224,54 @@ else
   ok "the trapped handler is actually defined"
 fi
 
-# An unvalidated poll interval busy-looped at ~100% CPU firing sleep errors.
+# An unvalidated poll interval busy-loops. DETECTING IT NEEDS A FORK-RATE MEASUREMENT, not a
+# stderr scan: the round-5 version of this test counted `sleep`-related stderr lines, but
+# `sleep 0` is a VALID command that exits 0 and prints nothing — so the test passed against a
+# deliberately broken script (measured: 1076 forks in 3s vs 10, and the test said ok). That is
+# the second time a test written to close a vacuity finding was itself vacuous, which is why
+# this one asserts on the observable pathology instead of a side effect of it.
+forks_during() {
+  local before after
+  before=$(awk '/^processes/{print $2}' /proc/stat)
+  ICN_WAIT_POLL_INTERVAL="$1" timeout 4 "$WAIT" file "$TMP/never-poll-$1.log" --timeout 3 >/dev/null 2>&1
+  after=$(awk '/^processes/{print $2}' /proc/stat)
+  echo $(( after - before ))
+}
+for badval in 0 00 0.0 .0 abc; do
+  n=$(forks_during "$badval")
+  if [ "$n" -lt 100 ]; then
+    ok "ICN_WAIT_POLL_INTERVAL=$badval falls back instead of busy-looping (${n} forks)"
+  else
+    bad "ICN_WAIT_POLL_INTERVAL=$badval busy-loops" "${n} forks in 4s"
+  fi
+done
+
+# KILL_GRACE is validated and capped like the timeout, or a `--timeout 2` wait can last days.
+cat > "$TMP/stubborn.sh" <<'EOS'
+#!/usr/bin/env bash
+trap '' TERM
+sleep 300
+EOS
+chmod +x "$TMP/stubborn.sh"
 start=$(date +%s)
-ICN_WAIT_POLL_INTERVAL=0 timeout 8 "$WAIT" file "$TMP/never-poll.log" --timeout 3 >/dev/null 2>"$TMP/poll.err"
+ICN_WAIT_KILL_GRACE=999999 timeout 90 "$WAIT" cmd --timeout 2 -- "$TMP/stubborn.sh" >/dev/null 2>&1
 elapsed=$(( $(date +%s) - start ))
-# The TIMEOUT line on stderr is expected; a busy-loop shows up as hundreds of `sleep` errors.
-# `grep -c` prints 0 AND exits 1 when there are no matches, so `|| echo 0` appended a second
-# zero and the numeric test then errored on "0\n0".
-sleep_errs=$(grep -c "sleep" "$TMP/poll.err" 2>/dev/null | head -1)
-sleep_errs=${sleep_errs:-0}
-if [ "$elapsed" -ge 2 ] && [ "$sleep_errs" -eq 0 ]; then
-  ok "an invalid ICN_WAIT_POLL_INTERVAL falls back instead of busy-looping"
+if [ "$elapsed" -lt 60 ]; then
+  ok "an absurd ICN_WAIT_KILL_GRACE is capped (${elapsed}s)"
 else
-  bad "invalid poll interval" "elapsed=${elapsed}s sleep-errors=${sleep_errs}"
+  bad "ICN_WAIT_KILL_GRACE is uncapped" "${elapsed}s"
+fi
+
+# Under job control, setsid FORKS instead of exec'ing, so `$!` was the setsid parent and the
+# wait returned success while the real command was still running in a detached session.
+rm -f "$TMP/jc.mark"
+start=$(date +%s)
+env SHELLOPTS=monitor "$WAIT" cmd --timeout 30 -- bash -c "sleep 4; echo alive > $TMP/jc.mark" >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 0 ] && [ -f "$TMP/jc.mark" ] && [ "$elapsed" -ge 3 ]; then
+  ok "cmd waits for the real command even under job control (${elapsed}s)"
+else
+  bad "cmd returned before the command finished" "rc=$rc elapsed=${elapsed}s marker=$([ -f "$TMP/jc.mark" ] && echo present || echo absent)"
 fi
 
 echo

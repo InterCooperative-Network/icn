@@ -51,8 +51,12 @@ POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
 # Validated like the timeout is. `ICN_WAIT_POLL_INTERVAL=0` (or a non-number) spun at ~100% CPU
 # firing `sleep` errors hundreds of times a second — the "maximally alive, maximally dead"
 # signature this tool exists to eliminate.
+# Accept only a well-formed, strictly positive decimal. The previous list enumerated a few
+# spellings of zero and missed `00`, `.0`, `0.`, `0.00` and malformed values like `1.2.3` —
+# each of which produced ~130 forks/second.
 case "$POLL_INTERVAL" in
-  ''|*[!0-9.]*|.|0|0.0) POLL_INTERVAL=2 ;;
+  *[!0-9.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
+  *) case "$POLL_INTERVAL" in *[1-9]*) : ;; *) POLL_INTERVAL=2 ;; esac ;;
 esac
 readonly POLL_INTERVAL
 
@@ -193,6 +197,13 @@ case "$CMD" in
     # Own process group, so a timeout can reap the whole job tree rather than just the direct
     # child. Without this a wrapper's backgrounded grandchildren survived the "bounded" wait
     # and kept holding the worktree.
+    # `setsid(2)` FAILS for a process-group leader, and util-linux setsid then FORKS and the
+    # parent exits immediately. With job control on, a background child IS its own group
+    # leader — so `$!` was the short-lived setsid parent, not the payload, and icn-wait
+    # reported "condition met, exit 0" while the real command was still running in a detached
+    # session, outside both the timeout and terminate_child's reach. Disabling job control
+    # makes setsid exec instead of fork, so `$!` is always the payload.
+    set +m
     if command -v setsid >/dev/null 2>&1; then
       setsid "${PAYLOAD[@]}" &
     else
@@ -204,7 +215,13 @@ case "$CMD" in
     # TERM, grace, then KILL. TERM alone is a request: a child that traps it (for cleanup) or is
     # wedged in uninterruptible I/O made the timeout unbounded, defeating this tool's one
     # headline guarantee. Measured before the fix: --timeout 3 returned after 12s.
-    readonly KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
+    # Validated and capped like the timeout is. Unbounded, ICN_WAIT_KILL_GRACE=999999 turned a
+    # `--timeout 2` wait into an ~11-day one, defeating this tool's one headline guarantee.
+    KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
+    case "$KILL_GRACE" in ''|*[!0-9]*) KILL_GRACE=10 ;; esac
+    [ "${#KILL_GRACE}" -gt 4 ] && KILL_GRACE=10
+    [ "$KILL_GRACE" -gt 300 ] 2>/dev/null && KILL_GRACE=300
+    readonly KILL_GRACE
     terminate_child() {
       local pgid
       pgid="$(ps -o pgid= -p "$child" 2>/dev/null | tr -d " ")"

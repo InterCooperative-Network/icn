@@ -28,11 +28,25 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf '  ok    %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf '  FAIL  %s\n     -> %s\n' "$1" "${2:-}" >&2; }
 
+# This suite perturbs TRACKED files to prove drift is detected. Restoring them with
+# `git checkout --` would DISCARD a developer's uncommitted work in those files, so we refuse
+# to start if they are already dirty and restore from byte-exact copies instead.
+FIXTURE_FILES=("docs/reference/project-index/generated/agent-capabilities.json" "ops/mcp/src/tools/health.ts")
+for f in "${FIXTURE_FILES[@]}"; do
+  if [ -n "$(git -C "$ROOT" status --porcelain -- "$f")" ]; then
+    echo "REFUSING TO RUN: $f has uncommitted changes." >&2
+    echo "This suite perturbs it and would restore over your work. Commit or stash first." >&2
+    exit 2
+  fi
+done
+
 BACKUP="$(mktemp)"; cp "$MANIFEST" "$BACKUP"
+HEALTH_BACKUP="$(mktemp)"; cp "$ROOT/ops/mcp/src/tools/health.ts" "$HEALTH_BACKUP"
 PROBE_HELPER="$ROOT/ops/scripts/icn-capability-probe"
 cleanup() {
-  cp "$BACKUP" "$MANIFEST"; rm -f "$BACKUP" "$PROBE_HELPER"
-  git -C "$ROOT" checkout -- ops/mcp/src/tools/health.ts 2>/dev/null || true
+  cp "$BACKUP" "$MANIFEST"
+  cp "$HEALTH_BACKUP" "$ROOT/ops/mcp/src/tools/health.ts"
+  rm -f "$BACKUP" "$HEALTH_BACKUP" "$PROBE_HELPER"
 }
 trap cleanup EXIT
 
@@ -122,7 +136,7 @@ if npm --prefix "$ROOT/ops/mcp" run build >/dev/null 2>&1; then
 else
   bad "fixture build failed" "could not compile the probe tool"
 fi
-git -C "$ROOT" checkout -- ops/mcp/src/tools/health.ts
+cp "$HEALTH_BACKUP" "$ROOT/ops/mcp/src/tools/health.ts"
 npm --prefix "$ROOT/ops/mcp" run build >/dev/null 2>&1
 
 # ── 3. startup context points at the canonical sources ────────────────────────

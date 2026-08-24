@@ -109,10 +109,39 @@ CASES: list[tuple[str, int, str]] = [
     ),
     # ── shape B is about BOUNDEDNESS + EVIDENCE, not about waiting on files ──
     (
+        # NOT bounded, and this case was mislabelled as safe for two rounds: `timeout 60`
+        # bounds `true`, not the loop. Pinning a false negative as correct is how the
+        # dead-bound class survived — the test taught the guard to be wrong.
         'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; timeout 60 true; done',
-        ALLOW,
-        "SAFE: sentinel wait that is bounded is allowed",
+        BLOCK,
+        "a timeout on an unrelated BODY command bounds nothing",
     ),
+    (
+        'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; [ $SECONDS -gt 600 ] && break; done',
+        ALLOW,
+        "SAFE: a sentinel wait with a real in-loop bound",
+    ),
+    (
+        'timeout 600 bash -c \'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; done\'',
+        ALLOW,
+        "SAFE: a sentinel wait bounded by a wrapper around the whole loop",
+    ),
+
+    # ── ROUND 6: a dead READ is not a bound either (round 5 fixed only dead stores) ──
+    ('while pgrep -f ZQmk >/dev/null; do echo $SECONDS; sleep 5; done', BLOCK,
+     "FN: printing $SECONDS bounds nothing"),
+    ('while pgrep -f ZQmk >/dev/null; do sleep 5; echo waited $SECONDS sec; done', BLOCK,
+     "FN: same, after the sleep"),
+    ('until ! pgrep -f ZQmk; do sleep 5; printf "max %s" $max_tries; done', BLOCK,
+     "FN: printing a counter bounds nothing"),
+    ("echo don\\'t; until ! pgrep -f ZQmk; do sleep 20; done", BLOCK,
+     "FN: an escaped quote outside quotes must not open a span to EOF"),
+    ('until ! pgrep -f ZQmk; do :; done', BLOCK,
+     "FN: a sleepless spin is worse than the shape we refuse, not exempt from it"),
+    ("cat <<'EOF' > README.md\nuntil ! pgrep -f \"m.py\"; do sleep 20; done\nEOF", ALLOW,
+     "FP: heredoc whose redirect follows the tag is still documentation"),
+    ("cat <<'EOF' | tee README.md\nuntil ! pgrep -f \"m.py\"; do sleep 20; done\nEOF", ALLOW,
+     "FP: same, piped"),
     (
         'until grep -q "^EXIT=" /tmp/run.log 2>/dev/null; do sleep 5; [ $SECONDS -gt 600 ] && break; done',
         ALLOW,

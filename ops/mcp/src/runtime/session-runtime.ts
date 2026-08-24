@@ -616,7 +616,7 @@ export type Classification = {
  * Classify a worktree from registry state plus process observation.
  *
  * FAIL-SAFE INVARIANT (asserted by tests, not by convention):
- *   absence of a registry row NEVER yields retireable=true.
+ *   absence of a registry row NEVER yields a state implying the lane is free.
  * A missing row is indistinguishable from a pre-integration session, an unsupported
  * launcher, or a registry failure — all of which must stay protected.
  */
