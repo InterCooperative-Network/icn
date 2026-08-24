@@ -39,6 +39,12 @@
 #   0 condition met      1 timed out
 #   2 usage error        3 condition unreachable (can never become true)
 #
+#   `cmd` is the exception, and deliberately so: it PROPAGATES the command's own exit status,
+#   because "did cargo test pass" is the thing a caller needs. To keep that unambiguous it
+#   reports a timeout as 124 (the convention `timeout(1)` uses), not 1 — otherwise "the test
+#   suite failed" and "the wait expired" were indistinguishable for the form both this file
+#   and the README call PREFERRED. A signal-terminated wait reports 143.
+#
 # NOTES
 #   `match` is a last resort. If you started the process, you have its PID — use `cmd` or `pid`,
 #   which are exact. Pattern matching is inherently ambiguous and is offered only because some
@@ -54,9 +60,18 @@ POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
 # Accept only a well-formed, strictly positive decimal. The previous list enumerated a few
 # spellings of zero and missed `00`, `.0`, `0.`, `0.00` and malformed values like `1.2.3` —
 # each of which produced ~130 forks/second.
+# Well-formed AND not absurdly small. Requiring only "contains a non-zero digit" accepted
+# 0.001, which polls ~1000x/second and burns real CPU — it merely scored just under the test's
+# threshold rather than being correct. A poll interval below 0.1s serves no purpose here.
 case "$POLL_INTERVAL" in
   *[!0-9.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
-  *) case "$POLL_INTERVAL" in *[1-9]*) : ;; *) POLL_INTERVAL=2 ;; esac ;;
+  *[1-9]*)
+    # Reject anything smaller than 0.1: "0." followed by one or more zeros before any digit.
+    case "$POLL_INTERVAL" in
+      0.0*|.0*) POLL_INTERVAL=2 ;;
+    esac
+    ;;
+  *) POLL_INTERVAL=2 ;;
 esac
 readonly POLL_INTERVAL
 
@@ -220,7 +235,9 @@ case "$CMD" in
     KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
     case "$KILL_GRACE" in ''|*[!0-9]*) KILL_GRACE=10 ;; esac
     [ "${#KILL_GRACE}" -gt 4 ] && KILL_GRACE=10
-    [ "$KILL_GRACE" -gt 300 ] 2>/dev/null && KILL_GRACE=300
+    # 60s, not 300s. A `--timeout 2` wait that can still take five minutes to return is not
+    # meaningfully bounded, which is the whole claim this tool makes.
+    [ "$KILL_GRACE" -gt 60 ] 2>/dev/null && KILL_GRACE=60
     readonly KILL_GRACE
     terminate_child() {
       local pgid
@@ -259,7 +276,8 @@ case "$CMD" in
     while alive "$child"; do
       if expired; then
         terminate_child
-        timed_out "$LABEL"
+        printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL}" >&2
+        exit 124
       fi
       sleep "$POLL_INTERVAL"
     done

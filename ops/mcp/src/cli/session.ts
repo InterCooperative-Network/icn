@@ -178,7 +178,12 @@ function main(): number {
           pr_ref: str(args, "pr-ref") ?? null,
           parent_session_id: str(args, "parent-session") ?? null,
           provider: str(args, "provider") ?? "claude-code",
-          agent_pid: pidRaw ? Number(pidRaw) : null,
+          // Validated like --pids is. `process.kill(0,0)` and `kill(-1,0)` SUCCEED (they
+        // signal a process group), so --pid 0 made the lane report live forever.
+        agent_pid: (() => {
+          const n = pidRaw ? Number(pidRaw) : NaN;
+          return Number.isInteger(n) && n > 1 ? n : null;
+        })(),
           host: hostname(),
           provider_session_id: key ?? null,
           transcript_path: str(args, "transcript-path") ?? null,
@@ -274,6 +279,10 @@ function main(): number {
           process.stdout.write(
             JSON.stringify({
               state: "REGISTRY-UNAVAILABLE",
+              // Present on every envelope: the type declares it required, and a consumer
+              // typed against the interface throws on `.live_agent_pids.length`.
+              live_agent_pids: [],
+              contention: { count: 0, session_ids: [] },
               reason:
                 "no lane could be resolved from the arguments given " +
                 "(need --worktree-id, --path, or --worktree)",
@@ -288,6 +297,10 @@ function main(): number {
           process.stdout.write(
             JSON.stringify({
               state: "REGISTRY-UNAVAILABLE",
+              // Present on every envelope: the type declares it required, and a consumer
+              // typed against the interface throws on `.live_agent_pids.length`.
+              live_agent_pids: [],
+              contention: { count: 0, session_ids: [] },
               reason: `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`,
             }) + "\n"
           );
@@ -334,6 +347,8 @@ function main(): number {
         process.stdout.write(
           JSON.stringify({
             state: "REGISTRY-UNAVAILABLE",
+            live_agent_pids: [],
+            contention: { count: 0, session_ids: [] },
             reason: `classification failed: ${(e as Error).message}`,
           }) + "\n"
         );

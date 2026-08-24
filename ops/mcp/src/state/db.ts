@@ -103,7 +103,7 @@ export function initDb(dbPath?: string): Database.Database {
 }
 
 /** SQL DDL batches on the SQLite connection (better-sqlite3 API). */
-function migrate(db: Database.Database): void {
+export function migrate(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,

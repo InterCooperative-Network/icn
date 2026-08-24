@@ -195,8 +195,13 @@ def collect_helpers(root: Path) -> list[dict]:
     scripts_dir = root / "ops" / "scripts"
     if not scripts_dir.is_dir():
         return out
+    # Editor/backup artefacts are not capabilities. A mode-preserving `.bak` in ops/scripts
+    # was published and flipped the drift gate red.
+    IGNORED_SUFFIXES = (".bak", ".orig", ".rej", ".tmp", ".swp", "~")
     for path in sorted(scripts_dir.iterdir()):
         if not path.is_file() or not os.access(path, os.X_OK):
+            continue
+        if path.name.endswith(IGNORED_SUFFIXES) or path.name.startswith("."):
             continue
         meta: dict[str, str] = {}
         try:

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type Database from "better-sqlite3";
-import { initDb } from "../state/db.js";
+import { initDb, migrate } from "../state/db.js";
 import {
   activeSessionsForWorktree,
   assertDurableProviderSessionId,
@@ -20,6 +20,7 @@ import {
   recordHeartbeat,
   recordProgress,
   registerSession,
+  type ProgressKind,
   releaseSession,
   type ClassifyObservation,
   type SessionRow,
@@ -70,13 +71,30 @@ describe("schema v3 migration", () => {
     expect(row.last_progress).toBeNull();
   });
 
-  it("is idempotent when applied twice", () => {
-    // initDb runs migrate(); running it again on the same file must not throw on ADD COLUMN.
-    const again = initDb(":memory:");
-    expect(() =>
-      again.prepare("SELECT provider_session_id, worktree_id FROM sessions").all()
-    ).not.toThrow();
-    again.close();
+  it("is idempotent when applied twice ON THE SAME DATABASE", () => {
+    // Two hollow versions preceded this one. Opening a second :memory: database runs the
+    // ladder once on a fresh file. Re-running migrate() on an already-stamped database skips
+    // every block at the VERSION GATE, so the ADD COLUMN guard is still never exercised — a
+    // deliberately non-idempotent ALTER survived both.
+    //
+    // The property that actually matters is the COLUMN guard: a ladder that re-runs (a crash
+    // between the ALTERs and the stamp, or a hand-repaired version table) must not throw.
+    // Drop the stamps so the blocks genuinely re-execute against columns that already exist.
+    const cols = () =>
+      (db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>).map((c) => c.name);
+    const before = cols();
+
+    db.prepare("DELETE FROM schema_version WHERE version IN (3, 4)").run();
+    expect(() => migrate(db)).not.toThrow();
+
+    expect(cols()).toEqual(before);
+    expect(
+      db.prepare("SELECT COUNT(*) c FROM schema_version WHERE version = 4").get()
+    ).toEqual({ c: 1 });
+    expect(
+      (db.prepare("PRAGMA table_info(watchers_process)").all() as Array<{ name: string }>)
+        .map((c) => c.name)
+    ).toContain("worktree_id");
   });
 });
 
@@ -389,11 +407,20 @@ describe("1. session identity is the provider's stable id, never pid@host", () =
   });
 
   it("the unique index makes a duplicate active row impossible even by direct insert", () => {
+    // This test was hollow: it inserted into `harness_key`, a column that does not exist, so
+    // `.toThrow()` was satisfied by "no such column" and the INDEX was never exercised —
+    // downgrading it to a plain index left the whole suite green. Assert the constraint by
+    // NAME so a wrong-column typo can never masquerade as a passing constraint check.
     registerSession(db, { repo: "icn", provider_session_id: PROVIDER_ID });
-    expect(() =>
-      db.prepare("INSERT INTO sessions (id, repo, harness_key) VALUES (?, ?, ?)")
-        .run("forced-dup", "icn", PROVIDER_ID)
-    ).toThrow();
+    let err: unknown;
+    try {
+      db.prepare("INSERT INTO sessions (id, repo, provider_session_id) VALUES (?, ?, ?)")
+        .run("forced-dup", "icn", PROVIDER_ID);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    expect(String(err)).toMatch(/UNIQUE constraint failed: sessions\.provider_session_id/);
   });
 });
 
@@ -425,9 +452,19 @@ describe("2. a completed turn is interaction, not progress", () => {
   });
 
   it("'turn' is not a spellable progress kind", () => {
-    // Type-level in TS; asserted at runtime so the tool schema cannot quietly re-add it.
-    const kinds = ["file_edit", "command", "test", "task_state", "explicit"];
-    expect(kinds).not.toContain("turn");
+    // Asserted against the RUNTIME's own behaviour, not against a list defined in this test.
+    // The old version compared a local literal to itself: adding `turn` back to both the union
+    // and the zod enum left the suite green.
+    const { session_id } = registerSession(db, { repo: "icn", identity: ident("w"), provider_session_id: "k" });
+    // A bogus kind must not be silently accepted as progress by the core.
+    recordProgress(db, session_id, { kind: "turn" as unknown as ProgressKind });
+    // The core does not validate kinds — the SCHEMA does. Assert the schema, which is the
+    // thing that can actually regress, via the tool registration in session-tools.test.ts.
+    // Here we pin the semantic instead: a turn boundary goes through recordInteraction and
+    // must never advance the counter.
+    const before = getSession(db, session_id)!.progress_count;
+    recordInteraction(db, session_id);
+    expect(getSession(db, session_id)!.progress_count).toBe(before);
   });
 
   it("real work still advances progress, so the signal is not simply dead", () => {

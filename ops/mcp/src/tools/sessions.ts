@@ -286,7 +286,7 @@ export function registerSessionTools(
         .optional()
         .describe("Any path inside the worktree; the lane id is resolved from it via Git."),
       observed_pids: z
-        .array(z.number())
+        .array(z.number().int().positive())
         .optional()
         .describe(
           "PIDs you observed holding the worktree. OMIT this if you did not actually look — " +
@@ -299,6 +299,8 @@ export function registerSessionTools(
       if (!id) {
         return json({
           state: "REGISTRY-UNAVAILABLE",
+          live_agent_pids: [],
+          contention: { count: 0, session_ids: [] },
           reason:
             "no canonical worktree id could be resolved, so no facts can be reported for this lane",
         });

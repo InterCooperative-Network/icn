@@ -106,7 +106,9 @@ fi
 if [ -z "$EVENT" ]; then
   # No event means the payload could not be read at all, so we cannot know this is SessionStart.
   # Announce anyway: a silent no-op here disables the runtime with zero signal.
-  degraded_banner "the hook payload could not be parsed (is python3 available?)" force
+  # We cannot know the event, so we cannot know this is SessionStart. Announce once per
+  # invocation in ONE line rather than repeating a six-line banner after every tool call.
+  echo "ICN agent runtime: DEGRADED — hook payload unparseable (is python3 available?); lifecycle tracking is NOT active."
   exit 0
 fi
 if [ -z "$KEY" ]; then

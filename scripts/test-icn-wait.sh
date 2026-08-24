@@ -140,13 +140,29 @@ timeout 20 "$WAIT" cmd --timeout 15 -- true >/dev/null 2>&1
 check "cmd wait completes and propagates success" 0 $?
 
 timeout 20 "$WAIT" cmd --timeout 15 -- false >/dev/null 2>&1
-check "cmd wait propagates the child's failure exit code" 1 $?
+check "cmd propagates the child's failure status (1)" 1 $?
+
+timeout 20 "$WAIT" cmd --timeout 15 -- bash -c 'exit 77' >/dev/null 2>&1
+check "cmd propagates an arbitrary child status (77)" 77 $?
+
+# Distinct from ANY child status: "the suite failed" and "the wait expired" were
+# indistinguishable while both reported 1, for the form the docs call PREFERRED.
+timeout 20 "$WAIT" cmd --timeout 15 -- bash -c 'exit 124' >/dev/null 2>&1
+check "cmd propagates 124 from the child too" 124 $?
 
 timeout 20 "$WAIT" cmd --timeout 2 -- sleep 30 >/dev/null 2>&1
-check "cmd wait enforces its own timeout on a slow child" 1 $?
+check "cmd reports its own timeout as 124, not as a child status" 124 $?
 
+# `$$` here is the TEST's pid, which is icn-wait's ancestor — so this exercised the ancestor
+# guard, not the self guard, and deleting the self check left the suite green. Make icn-wait
+# report its own pid and wait on that.
 timeout 10 "$WAIT" pid "$$" --timeout 5 >/dev/null 2>&1
-check "refuses to wait on itself (exit 3)" 3 $?
+check "refuses to wait on an ancestor via \$\$ (exit 3)" 3 $?
+SELF_ERR="$(timeout 10 bash -c "exec \"$WAIT\" pid \$\$ --timeout 5" 2>&1 >/dev/null)"; SELF_RC=$?
+case "$SELF_ERR" in
+  *"this very process"*|*"ancestors"*) ok "refuses to wait on itself, and says which case" ;;
+  *) bad "self-wait must be refused with a reason" "rc=$SELF_RC err=${SELF_ERR:-<silence>}" ;;
+esac
 
 parent="$(ps -o ppid= -p $$ | tr -d ' ')"
 timeout 10 "$WAIT" pid "$parent" --timeout 5 >/dev/null 2>&1
@@ -204,6 +220,14 @@ echo "6. signal handling"
 waiter=$!
 sleep 1.5
 child="$(ps -eo pid,ppid --no-headers | awk -v p="$waiter" '$2==p {print $1}' | head -1)"
+# PRECONDITION. Without this the whole block passed against a `cmd` that never launched
+# anything: an empty $child short-circuits every later check to its ok branch.
+if [ -z "$child" ]; then
+  bad "precondition: cmd must launch a child before signalling" "no child of pid $waiter"
+  kill -9 "$waiter" 2>/dev/null
+else
+  ok "precondition: cmd launched child $child"
+fi
 kill -TERM "$waiter" 2>/dev/null
 sleep 3
 if kill -0 "$waiter" 2>/dev/null; then
@@ -230,19 +254,28 @@ fi
 # deliberately broken script (measured: 1076 forks in 3s vs 10, and the test said ok). That is
 # the second time a test written to close a vacuity finding was itself vacuous, which is why
 # this one asserts on the observable pathology instead of a side effect of it.
-forks_during() {
-  local before after
-  before=$(awk '/^processes/{print $2}' /proc/stat)
-  ICN_WAIT_POLL_INTERVAL="$1" timeout 4 "$WAIT" file "$TMP/never-poll-$1.log" --timeout 3 >/dev/null 2>&1
-  after=$(awk '/^processes/{print $2}' /proc/stat)
-  echo $(( after - before ))
+# Measure the WAITER'S OWN cpu time, not the system-wide fork counter: /proc/stat `processes`
+# counts every fork on the box, and measured idle noise of 261-273 per 4s made this assertion
+# report three different outcomes across three runs of the UNMODIFIED script. A test that
+# measures the machine instead of the tool is worse than no test.
+cpu_ticks_of() {  # $1 = pid -> utime+stime in clock ticks
+  awk '{print $14 + $15}' "/proc/$1/stat" 2>/dev/null || echo 0
 }
-for badval in 0 00 0.0 .0 abc; do
-  n=$(forks_during "$badval")
-  if [ "$n" -lt 100 ]; then
-    ok "ICN_WAIT_POLL_INTERVAL=$badval falls back instead of busy-looping (${n} forks)"
+busy_ticks() {    # $1 = poll interval -> cpu ticks burned by icn-wait over ~3s
+  ICN_WAIT_POLL_INTERVAL="$1" "$WAIT" file "$TMP/never-poll-$1.log" --timeout 6 >/dev/null 2>&1 &
+  local w=$! ticks
+  sleep 3
+  ticks=$(cpu_ticks_of "$w")
+  kill -TERM "$w" 2>/dev/null; wait "$w" 2>/dev/null
+  echo "${ticks:-0}"
+}
+BUSY_TICK_LIMIT=10   # a 2s-interval poll burns ~0 ticks; anything above this is spinning
+for badval in 0 00 0.0 .0 0.001 0.0001 .05 abc; do
+  n=$(busy_ticks "$badval")
+  if [ "$n" -lt "$BUSY_TICK_LIMIT" ]; then
+    ok "ICN_WAIT_POLL_INTERVAL=$badval does not busy-loop (${n} cpu ticks in 3s)"
   else
-    bad "ICN_WAIT_POLL_INTERVAL=$badval busy-loops" "${n} forks in 4s"
+    bad "ICN_WAIT_POLL_INTERVAL=$badval busy-loops" "${n} cpu ticks in 3s"
   fi
 done
 
@@ -253,14 +286,20 @@ trap '' TERM
 sleep 300
 EOS
 chmod +x "$TMP/stubborn.sh"
-start=$(date +%s)
-ICN_WAIT_KILL_GRACE=999999 timeout 90 "$WAIT" cmd --timeout 2 -- "$TMP/stubborn.sh" >/dev/null 2>&1
-elapsed=$(( $(date +%s) - start ))
-if [ "$elapsed" -lt 60 ]; then
-  ok "an absurd ICN_WAIT_KILL_GRACE is capped (${elapsed}s)"
-else
-  bad "ICN_WAIT_KILL_GRACE is uncapped" "${elapsed}s"
-fi
+# 999999 is six digits and is caught by the LENGTH check alone, so the numeric cap was never
+# exercised — deleting it left the suite green. 9999 passes the length check and can only be
+# stopped by the cap itself.
+for grace in 999999 9999; do
+  start=$(date +%s)
+  ICN_WAIT_KILL_GRACE=$grace timeout 120 "$WAIT" cmd --timeout 2 -- "$TMP/stubborn.sh" >/dev/null 2>&1
+  elapsed=$(( $(date +%s) - start ))
+  # timeout(2) + poll + capped grace(60) + slack. An uncapped value blows straight past this.
+  if [ "$elapsed" -lt 90 ]; then
+    ok "ICN_WAIT_KILL_GRACE=$grace is capped (${elapsed}s)"
+  else
+    bad "ICN_WAIT_KILL_GRACE=$grace is uncapped" "${elapsed}s"
+  fi
+done
 
 # Under job control, setsid FORKS instead of exec'ing, so `$!` was the setsid parent and the
 # wait returned success while the real command was still running in a detached session.

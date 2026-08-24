@@ -374,14 +374,14 @@ locations:
 
 | Capability kind | Derived from |
 |---|---|
-| MCP tools | `server.tool("…")` registrations in `ops/mcp/src/tools/*.ts` |
+| MCP tools | a live `tools/list` from the built server — introspected, never grepped from source |
 | Skills | `ops/state/truth/skills.json` (the registry that already owns them) |
 | Hooks | `.claude/settings.json` hook declarations |
 | Repo helper scripts | `ops/scripts/` executables with a `#:capability` header |
 | Truth domains | `ops/state/truth/sources.json` |
 
-It is surfaced three ways: the `icn_ops_agent_runtime` MCP tool, the `session-orient.sh`
-startup line (a pointer, not a dump), and the file itself.
+It is surfaced three ways: the `icn_ops_agent_runtime` MCP tool, the startup context emitted
+by `session-lifecycle.sh` (a pointer, not a dump), and the file itself.
 
 `scripts/check-agent-capabilities.py` regenerates the manifest and fails if it differs from the
 committed copy. It runs in `agent-drift-check.yml` on **every** PR.
@@ -437,9 +437,13 @@ the file may legitimately arrive later — but with stderr swallowed and no boun
 identity it cannot distinguish a working producer from a dead one, a deleted scratch directory,
 or a sentinel that will never come, so it can spin indefinitely while appearing active. Both are
 documented in
-`ops/scripts/README-icn-wait.md`, **blocked** at the Bash tool seam by
-`.claude/hooks/pre-bash-guard.py` (which explicitly does not flag the safe `[m]utate.py`
-bracket idiom), and pinned by regression tests in `scripts/test-icn-wait.sh` and
-`scripts/tests/test_pre_bash_guard.py`.
+`ops/scripts/README-icn-wait.md` and pinned by regression tests in `scripts/test-icn-wait.sh`.
+
+A blocking Bash-seam guard was implemented and then removed. It failed four rewrites in four
+review rounds; its last false negative was the most natural phrasing of the loop, it refused
+the canonical `ps aux | grep -v grep` idiom, and it exceeded its own hook timeout on large
+inputs — failing open. Static analysis of arbitrary shell is not a solvable problem at this
+seam, so this layer relies on the positive path instead: a supported primitive, named in the
+startup context. The attempt is preserved on `ops/agent-wait-guard`.
 
 Every wait is bounded. Indefinite blocking is available only behind an explicit flag.

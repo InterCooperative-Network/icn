@@ -47,6 +47,9 @@ cleanup() {
   cp "$BACKUP" "$MANIFEST"
   cp "$HEALTH_BACKUP" "$ROOT/ops/mcp/src/tools/health.ts"
   rm -f "$BACKUP" "$HEALTH_BACKUP" "$PROBE_HELPER"
+  # Rebuild INSIDE the trap: an interrupted run otherwise left the fixture tool
+  # (icn_ops_probe_tool_fixture) compiled into the live server.
+  npm --prefix "$ROOT/ops/mcp" run build >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -143,14 +146,26 @@ npm --prefix "$ROOT/ops/mcp" run build >/dev/null 2>&1
 echo
 echo "3. startup context routes rather than duplicates"
 HOOK="$ROOT/.claude/hooks/session-lifecycle.sh"
+# Scope the search to the CTX block. Grepping the WHOLE FILE passed even when a needle was
+# deleted from the startup context, because the same strings appear in the DEGRADED banner.
+CTX_BLOCK="$(sed -n '/^## ICN agent runtime$/,/^CTX$/p' "$HOOK")"
 for needle in "agent-capabilities.json" "icn_ops_agent_runtime" "ops/state/truth/sources.json" "AGENTS.md"; do
-  grep -q "$needle" "$HOOK" && ok "startup context points at $needle" || bad "startup context missing $needle"
+  if printf '%s' "$CTX_BLOCK" | grep -q "$needle"; then
+    ok "startup context points at $needle"
+  else
+    bad "startup context missing $needle"
+  fi
 done
 # It must stay a router: a startup banner that dumps documentation is the failure mode.
 # Anchor on the exact heading so the DEGRADED banner (which shares the prefix) is measured
 # separately rather than being folded into the same range.
-LINES=$(sed -n '/^## ICN agent runtime$/,/^CTX$/p' "$HOOK" | wc -l)
-if [ "$LINES" -lt 30 ]; then ok "startup context stays small (${LINES} lines)"; else bad "startup context too large" "${LINES} lines"; fi
+# A LOWER bound too: deleting or renaming the heading made this 0 lines and still reported ok.
+LINES=$(printf '%s' "$CTX_BLOCK" | wc -l)
+if [ "$LINES" -gt 5 ] && [ "$LINES" -lt 30 ]; then
+  ok "startup context stays small but present (${LINES} lines)"
+else
+  bad "startup context size out of range" "${LINES} lines (want 6..29)"
+fi
 
 # The degraded banner must ALSO stay small, and must say plainly that tracking is off.
 DLINES=$(sed -n '/^## ICN agent runtime — DEGRADED$/,/^BANNER$/p' "$HOOK" | wc -l)

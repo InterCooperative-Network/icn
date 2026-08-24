@@ -89,15 +89,30 @@ icn-wait match 'some-unique-marker' --timeout 600
 
 ```
 0  condition met
-1  timed out              (bounded wait expired)
+1  timed out              (bounded wait expired)          — pid / file / match
 2  usage error            (bad flags; unbounded without --allow-unbounded)
 3  condition unreachable  (can never become true — fail fast, do not spin)
+
+cmd is different, on purpose:
+  <n>  the command's own exit status   (0 means the command succeeded)
+  124  the wait timed out              (the convention timeout(1) uses)
+  143  terminated by a signal
 ```
+
+`cmd` propagates the command's status because "did `cargo test` pass" is what a caller needs.
+Reporting a timeout as 1 made that indistinguishable from a failing test suite, so timeouts use
+124 instead.
 
 ## Enforcement
 
-- `.claude/hooks/pre-bash-guard.py` **blocks** both defect shapes at the Bash tool seam and
-  points here. The safe bracket idiom (`pgrep -f "[m]utate.py"`) is explicitly *not* flagged.
+- There is deliberately **no** static Bash guard blocking these shapes. One was written and
+  removed: it was rewritten four times across four review rounds and broken every time, and its
+  final failure was the *natural* phrasing — `while [ "$(pgrep -f X | wc -l)" -gt 0 ]` — while
+  simultaneously refusing the canonical `ps aux | grep -v grep` idiom and failing open (taking
+  51s against a 5s hook budget) on large inputs. Statically analysing arbitrary shell with
+  regexes does not converge. The work is preserved on `ops/agent-wait-guard`.
+  What prevents the defect here is the positive path: this tool, the startup context that names
+  it, and this document.
 - `scripts/test-icn-wait.sh` pins every recovered pattern, each with a **negative control**
   that reproduces the original loop and asserts it still hangs.
 - `scripts/tests/test_pre_bash_guard.py` tests the guard in both directions — false negatives

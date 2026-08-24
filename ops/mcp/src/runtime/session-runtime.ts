@@ -222,7 +222,8 @@ function registerSessionInner(
         db.prepare(
           `UPDATE sessions
               SET repo_id = ?, worktree_id = ?, worktree_path = ?, worktree_name = ?,
-                  worktree = COALESCE(?, worktree)
+                  worktree = COALESCE(?, worktree),
+                  branch_at_registration = ?, head_at_registration = ?
             WHERE id = ?`
         ).run(
           idt?.repo_id ?? null,
@@ -230,6 +231,11 @@ function registerSessionInner(
           idt?.worktree_path ?? null,
           idt?.worktree_name ?? null,
           idt?.worktree_name ?? null,
+          // Move these WITH the lane. Left behind, `branch_changed` was permanently and
+          // wrongly true after a supported lane move — it compared lane B's live branch
+          // against a branch recorded for lane A.
+          bs?.branch ?? null,
+          bs?.head ?? null,
           existing.id
         );
       }

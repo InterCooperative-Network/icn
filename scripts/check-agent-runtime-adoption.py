@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import tempfile
 import sys
@@ -36,6 +37,19 @@ REQUIRED_EVENTS = {
     "Stop": "interaction/liveness would never be reported between tool calls",
     "SessionEnd": "sessions would never release; every lane would leak until TTL expiry",
 }
+
+# Matchers that must be covered, not merely present. Keyed by event.
+REQUIRED_MATCHER_TOKENS = {
+    "SessionStart": ["startup", "resume"],
+    "PostToolUse": ["Bash"],
+}
+
+
+def _invokes_hook(command: str) -> bool:
+    """The hook must be the command, not merely mentioned in it (e.g. in a comment)."""
+    stripped = command.split("#", 1)[0].strip().strip('"').strip("'")
+    return stripped.endswith(HOOK) or stripped.endswith(HOOK.split("/")[-1])
+
 
 REQUIRED_EXECUTABLES = [
     "ops/scripts/icn-agent-session",
@@ -58,9 +72,14 @@ COVERAGE = {
         "any Claude Code session opened in the repo": "project settings are inherited",
     },
     "partial": {
-        ".codex / .cursor / .opencode adapters":
-            "reach the ops MCP (so icn_ops_agent_runtime and the session tools work), but do "
-            "not execute Claude Code hooks — they must call register_session explicitly",
+        ".cursor adapter":
+            "declares the ops MCP in .cursor/mcp.json, so icn_ops_agent_runtime and the "
+            "session tools work — but it does not execute Claude Code hooks, so it must call "
+            "register_session explicitly",
+        ".codex / .opencode adapters":
+            "do NOT declare the ops MCP at all (.codex/mcp/servers.example.json is an example "
+            "that omits it and points at the retired ~/projects/icn path; .opencode/opencode.json "
+            "has no MCP block). They get the capability manifest as a file and nothing else.",
     },
     "unsupported": {
         "Claude Code subagents (Agent tool)":
@@ -102,17 +121,34 @@ def main() -> int:
 
     hooks = settings.get("hooks") or {}
     for event, consequence in REQUIRED_EVENTS.items():
-        commands = [
-            h.get("command", "")
+        # A SUBSTRING test passed for `true  # .claude/hooks/session-lifecycle.sh`, i.e. the
+        # runtime fully off while the gate printed ok. Require the hook to be the command.
+        entries = [
+            (entry.get("matcher", ""), h.get("command", ""))
             for entry in (hooks.get(event) or [])
             for h in (entry.get("hooks") or [])
         ]
-        if any(HOOK in c for c in commands):
-            ok(f"{event} -> {HOOK}")
-        else:
-            failures.append(
-                f"{event} does not invoke {HOOK} — {consequence}"
+        invoking = [m for m, c in entries if _invokes_hook(c)]
+        if not invoking:
+            failures.append(f"{event} does not invoke {HOOK} — {consequence}")
+            continue
+
+        # MATCHERS WERE NEVER INSPECTED. Narrowing PostToolUse to `NotebookEdit`, or
+        # SessionStart to `fork`, left the gate green while producing exactly the consequence
+        # the gate itself prints.
+        required = REQUIRED_MATCHER_TOKENS.get(event)
+        if required:
+            covered = any(
+                all(re.search(rf"(^|\|){re.escape(tok)}($|\|)", m) for tok in required)
+                for m in invoking
             )
+            if not covered:
+                failures.append(
+                    f"{event} invokes {HOOK} but its matcher {invoking!r} does not cover "
+                    f"{required} — {consequence}"
+                )
+                continue
+        ok(f"{event} -> {HOOK} (matcher {invoking[0]!r})")
 
     # 2. the things the hooks call actually exist and can be executed
     for rel in REQUIRED_EXECUTABLES:
@@ -155,6 +191,8 @@ def main() -> int:
         probes = [
             ("SessionStart", '{"hook_event_name":"SessionStart","session_id":"probe","cwd":"%s"}' % root),
             ("PostToolUse", '{"hook_event_name":"PostToolUse","session_id":"probe","cwd":"%s","tool_name":"Bash"}' % root),
+            ("Stop", '{"hook_event_name":"Stop","session_id":"probe","cwd":"%s"}' % root),
+            ("UserPromptSubmit", '{"hook_event_name":"UserPromptSubmit","session_id":"probe","cwd":"%s"}' % root),
             ("SessionEnd", '{"hook_event_name":"SessionEnd","session_id":"probe","cwd":"%s","reason":"clear"}' % root),
             ("malformed", "not json at all"),
             ("empty", ""),
@@ -168,7 +206,9 @@ def main() -> int:
                 try:
                     r = subprocess.run(
                         ["bash", str(hook_path)], input=payload, capture_output=True,
-                        text=True, env=env, timeout=30,
+                        # The declared budget in settings.json, not an arbitrary 30s: a 12s
+                        # hook passed this gate and was then killed live by the harness.
+                        text=True, env=env, timeout=(10 if label == "SessionStart" else 5),
                     )
                 except subprocess.TimeoutExpired:
                     failures.append(f"{HOOK} timed out on a {label} payload; it must never block a session")
@@ -178,8 +218,118 @@ def main() -> int:
                         f"{HOOK} exited {r.returncode} on a {label} payload; a lifecycle hook "
                         "must never fail a session"
                     )
+                    continue
+                ok(f"{HOOK} exits 0 on a {label} payload")
+
+                # Exit status alone proved nothing: the hook exits 0 on every path BY DESIGN,
+                # so eight behavioural mutations (SessionStart printing nothing, the banner
+                # suppressed, the registry call removed) all passed. Assert the OUTPUT.
+                if label == "SessionStart":
+                    out = r.stdout
+                    if "ICN agent runtime" not in out:
+                        failures.append(
+                            f"{HOOK} produced no startup context on SessionStart; an agent "
+                            "would never learn the runtime exists"
+                        )
+                    elif "DEGRADED" not in out and "session:" not in out:
+                        failures.append(
+                            f"{HOOK} startup context does not state the session's lifecycle "
+                            "status; it must never leave that ambiguous"
+                        )
+                    else:
+                        ok(f"{HOOK} emits startup context naming its lifecycle status")
+                elif label in ("PostToolUse", "Stop", "UserPromptSubmit", "SessionEnd"):
+                    # These must stay SILENT with a well-formed payload — a banner after every
+                    # tool call was a real regression.
+                    if r.stdout.strip():
+                        failures.append(
+                            f"{HOOK} printed to stdout on {label}; only SessionStart and an "
+                            "unknown-event degrade may emit context"
+                        )
+                    else:
+                        ok(f"{HOOK} stays silent on {label}")
+
+    # 2b. THE DEGRADED PATH, probed in a degraded fixture.
+    #
+    # The healthy probes above cannot see the banner at all: with a working helper the hook
+    # emits the normal context and the banner never fires. So suppressing the banner entirely,
+    # or printing it after every tool call, both passed. Recreate the hook in a scratch tree
+    # with NO helper and assert both halves of the contract.
+    if hook_path.is_file():
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "fakeroot"
+            (fake / ".claude" / "hooks").mkdir(parents=True)
+            (fake / ".claude" / "hooks" / "session-lifecycle.sh").write_text(
+                hook_path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            env = dict(os.environ)
+            env["CLAUDE_PROJECT_DIR"] = str(fake)   # no ops/scripts/icn-agent-session here
+            env["ICN_OPS_DB"] = str(fake / "x.db")
+            env["ICN_ROOT"] = str(fake)
+            probes = {
+                "SessionStart": ('{"hook_event_name":"SessionStart","session_id":"p","cwd":"%s"}' % fake, True),
+                "PostToolUse": ('{"hook_event_name":"PostToolUse","session_id":"p","cwd":"%s","tool_name":"Bash"}' % fake, False),
+                "Stop": ('{"hook_event_name":"Stop","session_id":"p","cwd":"%s"}' % fake, False),
+            }
+            for label, (payload, expect_banner) in probes.items():
+                r = subprocess.run(
+                    ["bash", str(fake / ".claude" / "hooks" / "session-lifecycle.sh")],
+                    input=payload, capture_output=True, text=True, env=env, timeout=15,
+                )
+                got_banner = "DEGRADED" in r.stdout
+                if expect_banner and not got_banner:
+                    failures.append(
+                        f"{HOOK} did not announce DEGRADED on {label} with the helper missing; "
+                        "the runtime must never be disabled silently"
+                    )
+                elif not expect_banner and got_banner:
+                    failures.append(
+                        f"{HOOK} printed the DEGRADED banner on {label}; only SessionStart and "
+                        "an unknown event may emit it, or it repeats after every tool call"
+                    )
                 else:
-                    ok(f"{HOOK} exits 0 on a {label} payload")
+                    ok(f"{HOOK} degraded-path behaviour correct on {label}")
+
+    # 4b. THE HOOK MUST ACTUALLY WRITE TO THE REGISTRY.
+    #
+    # stdout probes cannot see this: neutering the helper-invoking wrapper leaves the startup
+    # context intact while progress, interaction and release silently never happen. Drive a
+    # real SessionStart + PostToolUse against a scratch registry and assert the row moved.
+    if hook_path.is_file() and (root / "ops" / "mcp" / "dist" / "cli" / "session.js").is_file():
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ)
+            env["ICN_OPS_DB"] = str(Path(tmp) / "probe.db")
+            env["ICN_ROOT"] = tmp
+            env["CLAUDE_PROJECT_DIR"] = str(root)
+            sid = "adoption-probe-session"
+            for payload in (
+                '{"hook_event_name":"SessionStart","session_id":"%s","cwd":"%s"}' % (sid, root),
+                '{"hook_event_name":"PostToolUse","session_id":"%s","cwd":"%s","tool_name":"Bash"}' % (sid, root),
+            ):
+                subprocess.run(["bash", str(hook_path)], input=payload, capture_output=True,
+                               text=True, env=env, timeout=20)
+            status = subprocess.run(
+                [str(root / "ops" / "scripts" / "icn-agent-session"), "status",
+                 "--harness-key", sid],
+                capture_output=True, text=True, env=env, timeout=20,
+            )
+            try:
+                row = json.loads(status.stdout or "{}")
+            except ValueError:
+                row = {}
+            if not row.get("registered"):
+                failures.append(
+                    f"{HOOK} did not register a session in the registry; the startup context "
+                    "would claim tracking is active while nothing is recorded"
+                )
+            elif not row.get("progress_count"):
+                failures.append(
+                    f"{HOOK} registered a session but PostToolUse recorded no progress; "
+                    "every lane would look stalled"
+                )
+            else:
+                ok(f"{HOOK} writes registration and progress to the registry")
+
 
     print(f"agent-runtime adoption: {checked} check(s) passed, {len(failures)} failure(s)")
     if args.verbose or failures:
