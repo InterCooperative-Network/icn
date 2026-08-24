@@ -19,7 +19,6 @@ import { initDb } from "../state/db.js";
 import {
   classifyWorktree,
   InvalidProviderSessionIdError,
-  activeSessionsForWorktree,
   sessionsByWorktreeName,
   recordHeartbeat,
   recordInteraction,
@@ -142,8 +141,6 @@ function main(): number {
       process.stdout.write(
         JSON.stringify({
           state: "REGISTRY-UNAVAILABLE",
-          retireable: false,
-          retireable_with_approval: false,
           reason: `session registry could not be opened: ${msg}`,
         }) + "\n"
       );
@@ -276,8 +273,6 @@ function main(): number {
           process.stdout.write(
             JSON.stringify({
               state: "REGISTRY-UNAVAILABLE",
-              retireable: false,
-              retireable_with_approval: false,
               reason:
                 "no lane could be resolved from the arguments given " +
                 "(need --worktree-id, --path, or --worktree)",
@@ -292,8 +287,6 @@ function main(): number {
           process.stdout.write(
             JSON.stringify({
               state: "REGISTRY-UNAVAILABLE",
-              retireable: false,
-              retireable_with_approval: false,
               reason: `worktree name ${JSON.stringify(name)} is ambiguous across ${ids.length} lanes: ${ids.join(", ")}`,
             }) + "\n"
           );
@@ -339,8 +332,6 @@ function main(): number {
         process.stdout.write(
           JSON.stringify({
             state: "REGISTRY-UNAVAILABLE",
-            retireable: false,
-            retireable_with_approval: false,
             reason: `classification failed: ${(e as Error).message}`,
           }) + "\n"
         );

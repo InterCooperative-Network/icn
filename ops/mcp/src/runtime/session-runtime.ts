@@ -377,10 +377,12 @@ export type ReleaseResult = {
  * Session-scoped resources — the complete inventory, kept next to the code that must clear it.
  *
  *   file_claims.session_id       AUTHORITY  advisory edit lock  -> deleted (FK ON DELETE CASCADE)
- *   watchers_process.session_id  AUTHORITY  live process monitor-> invalidated (no FK; would
- *                                                                  otherwise stay 'running'
- *                                                                  and keep emitting events to
- *                                                                  a dead session)
+ *   watchers_process.session_id  NOT TOUCHED. That table belongs to the pre-existing
+ *                                watch_process feature and its background poller. Supervision
+ *                                (which also used it) left with ops/agent-supervision-lifecycle,
+ *                                and cleaning up watcher rows goes with it. A row whose session
+ *                                is deleted therefore survives as 'running' until its pid exits
+ *                                — a pre-existing leak on main, not one this branch introduces.
  *   mailbox.to_session           AUTHORITY  undelivered inbox   -> invalidated (no FK)
  *   mailbox.from_session         HISTORY    sender attribution  -> kept
  *   events.scope = session:<id>  HISTORY    event log           -> kept
@@ -602,6 +604,12 @@ export type Classification = {
    */
   branch_changed: boolean;
   live_branch: BranchState | null;
+  /**
+   * Recorded agent pids found ALIVE. Emitted because it is the decisive fact for any consumer
+   * applying a retirement policy — the reduction's whole rationale is that consumers own that
+   * policy, so the evidence has to be on the wire, not just interpolated into `reason`.
+   */
+  live_agent_pids: number[];
 };
 
 /**
@@ -631,6 +639,7 @@ export function classify(
     contention: { count: 0, session_ids: [] as string[] },
     branch_changed: false,
     live_branch: null as BranchState | null,
+    live_agent_pids: [] as number[],
   };
 
   // "Nobody looked" vs "looked and found nothing" — see ClassifyObservation.observed_pids.
@@ -672,6 +681,7 @@ export function classify(
     },
     branch_changed: live ? branchChanged(s.branch_at_registration, live) : false,
     live_branch: live,
+    live_agent_pids: obs.live_agent_pids ?? [],
     heartbeat_age_min: ages.heartbeat_age_min,
     progress_age_min: ages.progress_age_min,
     progress_count: s.progress_count,
@@ -791,9 +801,6 @@ export function classifyWorktree(
 ): Classification {
   const sessions = activeSessionsForWorktree(db, worktreeId);
 
-  // Report supervisions even when no session row remains on the lane: a build stamped to this
-  // worktree is still running here, and saying "nothing authoritative to act on" while the
-  // runtime holds a live supervision for it is untrue (the verdict was already protected).
   // Rank by heartbeat freshness for AGE REPORTING only.
   const ranked = sessions
     .map((x) => ({ row: x, hb: ageMinutes(db, x.last_heartbeat) }))

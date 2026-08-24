@@ -217,13 +217,22 @@ describe("classification — fail-safe invariants", () => {
     expect(c.state).toBe("UNREGISTERED-OBSERVED");
   });
 
-  it("NO input combination makes an empty registry retireable", () => {
-    // Exhaustive guard against a future edit reintroducing "no row == safe to kill".
-    for (const pids of [[], [1], [1, 2, 3]]) {
+  it("NO input combination makes an empty registry look like a free lane", () => {
+    // Exhaustive guard against a future edit reintroducing "no row == nothing here".
+    //
+    // This test was briefly VACUOUS: removing the `retireable` field stripped its assertions
+    // with a regex and left it computing a value and checking nothing. It passed, and CI
+    // passed, while the single most dangerous behaviour in this change went unguarded. A test
+    // that asserts nothing is worse than a deleted one — it reports success forever.
+    for (const pids of [[], [1], [1, 2, 3]] as number[][]) {
       for (const unavailable of [true, false]) {
         for (const hb of [null, 0, 10, 10_000]) {
           const c = classify([], { observed_pids: pids, registry_unavailable: unavailable },
             { heartbeat_age_min: hb, progress_age_min: hb }, LIMITS);
+          expect(["UNREGISTERED-OBSERVED", "REGISTRY-UNAVAILABLE"]).toContain(c.state);
+          expect(c.session_id).toBeNull();
+          expect(c.reason).toMatch(/protected/);
+          expect(c).not.toHaveProperty("retireable");
         }
       }
     }
@@ -524,7 +533,11 @@ describe("absence of observation is not evidence of absence", () => {
   });
 
   it("null observed_pids is treated the same as omitting it", () => {
-    const c = classify([row()], { observed_pids: null }, EXPIRED, LIMITS);
+    const omitted = classify([row()], {}, EXPIRED, LIMITS);
+    const explicitNull = classify([row()], { observed_pids: null }, EXPIRED, LIMITS);
+    expect(explicitNull.state).toBe(omitted.state);
+    expect(explicitNull.reason).toBe(omitted.reason);
+    expect(explicitNull.reason).toContain("no process observation");
   });
 
   it("an AFFIRMATIVE empty observation is what unlocks retirement", () => {
@@ -549,8 +562,13 @@ describe("absence of observation is not evidence of absence", () => {
     backdate(session_id, "last_heartbeat", 120);
     backdate(session_id, "last_progress", 120);
 
+    // However the caller asks, a live recorded agent pid must be reflected in the state and
+    // named in the reason — the runtime corroborates itself without caller cooperation.
     for (const obs of [{}, { observed_pids: null }, { observed_pids: [] }] as ClassifyObservation[]) {
       const c = classifyWorktree(db, wtid("live"), obs);
+      expect(c.state).toBe("PROGRESS-STALLED");
+      expect(c.live_agent_pids).toContain(process.pid);
+      expect(c.reason).toContain(String(process.pid));
     }
   });
 });

@@ -169,10 +169,10 @@ Releasing one session leaves every other occupant's authority untouched.
 | Class | Fields |
 |---|---|
 | **Authoritative stable identity** | `id`, `repo_id`, `worktree_id`, `worktree_path` |
-| **Authoritative live state** | live branch/HEAD (read from Git), `last_heartbeat`, `last_progress`, `progress_count`, live supervisions, contention |
+| **Authoritative live state** | live branch/HEAD (read from Git), `last_heartbeat`, `last_progress`, `progress_count`, contention |
 | **Advisory launch metadata** | `provider_session_id`, `branch_at_registration`, `head_at_registration`, `task_ref`, `pr_ref`, `task_description`, `provider`, `transcript_path`, `worktree_name`, `worktree` |
 | **Correlation only** | `agent_pid`, `host` |
-| **Derived, never stored** | lifecycle state, expiry, stall, retireability, `branch_changed` |
+| **Derived, never stored** | lifecycle state, expiry, stall, `branch_changed` |
 
 Branch/PR/issue *state* is a live query (`live_branch_state`, `live_pr_state`,
 `live_issue_state` in `sources.json`). The registry stores the **reference**, never the state.
@@ -288,8 +288,8 @@ requires *both* an affirmative empty observation *and* a dead (or absent) record
 
 Classification is keyed on `worktree_id` (§2.2), and **protection is a property of the lane, not
 of any one row**. Heartbeat ages are reported from the freshest session, but liveness is
-aggregated across *every* occupant: the lane is protected if any recorded `agent_pid` is alive
-or any supervision is running in it. Selecting a single "primary" by heartbeat freshness and
+aggregated across *every* occupant: a live recorded `agent_pid` anywhere on the lane is
+reported, and named in `reason`. Selecting a single "primary" by heartbeat freshness and
 judging from that row produced `retireable: true` on a lane with a running agent, because a
 crashed peer with a fresher heartbeat won the selection and only its dead pid was checked.
 `contention` reports every occupant.

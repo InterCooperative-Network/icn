@@ -74,17 +74,12 @@ icn-wait file /tmp/run.log --pattern '^EXIT=' --source-pid 12345 --timeout 600
 icn-wait match 'some-unique-marker' --timeout 600
 ```
 
-For long operations, declare them so the lane is not judged abandoned while they run:
-
-```bash
-icn-wait cmd --supervise --harness-key "$SESSION_ID" --timeout 3600 -- cargo build --release
-```
 
 ## Guarantees
 
 | Property | How |
 |---|---|
-| Bounded by default | `--timeout` defaults to 30 min; `--timeout 0` requires `--allow-unbounded` |
+| Bounded by default | `--timeout` defaults to 30 min; `--timeout 0` requires `--allow-unbounded`; option values are required and an oversized timeout is refused |
 | Cannot wait on itself | this process, its ancestors and its descendants are excluded — and the exclusion is **asserted** before the loop, not assumed |
 | Impossible conditions fail fast | missing sentinel directory, directory deleted mid-wait, or `--source-pid` already exited → exit 3 |
 | Timeouts are observable | prints what it waited for and for how long |
@@ -108,4 +103,4 @@ icn-wait cmd --supervise --harness-key "$SESSION_ID" --timeout 3600 -- cargo bui
 - `scripts/tests/test_pre_bash_guard.py` tests the guard in both directions — false negatives
   and false positives — using the real recovered command lines.
 
-See `docs/architecture/AGENT_RUNTIME.md` for how supervision interacts with lane lifecycle.
+See `docs/architecture/AGENT_RUNTIME.md` for the lane lifecycle this feeds.

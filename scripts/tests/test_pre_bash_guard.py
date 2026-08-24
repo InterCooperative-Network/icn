@@ -305,6 +305,22 @@ CASES: list[tuple[str, int, str]] = [
      ALLOW, "FP: grep -c is the documented self-match compensation"),
     ('while ! [ -f /tmp/scratch/EXIT ] 2>/dev/null; do sleep 10; done', BLOCK,
      "FN: a path containing 'EXIT' must not read as an exit statement"),
+
+    # ── ROUND 5: a dead store is not a bound. Round 4 moved the bound from fragment scope to
+    # loop scope; the escape hatch simply moved INSIDE the loop, which is the more natural
+    # place to write it. `max_tries=3` is exactly what an agent writes while TRYING to add a
+    # bound, and accepting it disarmed the guard on a provably non-terminating loop.
+    ('while pgrep -f ZQmk >/dev/null; do max_tries=3; sleep 2; done', BLOCK,
+     "FN: an assignment bounds nothing (max_tries=)"),
+    ('while pgrep -f ZQmk >/dev/null; do DEADLINE=99; sleep 2; done', BLOCK,
+     "FN: an assignment bounds nothing (DEADLINE=)"),
+    ('while pgrep -f ZQmk >/dev/null; do max_wait=0; sleep 2; done', BLOCK,
+     "FN: an assignment bounds nothing (max_wait=)"),
+    # ...but a READ of the same variable genuinely can bound it.
+    ('until ! pgrep -f foo; do sleep 5; [ $max_tries -lt 3 ] || exit 1; done', ALLOW,
+     "a READ of the counter, plus exit, is a real bound"),
+    ('DEADLINE=$((SECONDS+600)); until ! pgrep -f foo; do sleep 5; [ $SECONDS -gt $DEADLINE ] && break; done',
+     ALLOW, "assignment PLUS a read and a break is a real bound"),
 ]
 
 # The block message must describe the ACTUAL property of each shape. An error message an agent

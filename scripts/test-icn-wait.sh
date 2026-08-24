@@ -191,5 +191,54 @@ timeout 8 "$WAIT" pid 2 --timeout 9223372036854775807 >/dev/null 2>&1
 check "an int64-overflowing --timeout is rejected" 2 $?
 
 echo
+
+# ── 6. signals must stop the wait AND reap the child ─────────────────────────
+echo "6. signal handling"
+
+# A previous edit deleted the on_signal() body and left `trap on_signal` in place. Bash printed
+# "on_signal: command not found" and RESUMED the loop, so SIGTERM neither stopped icn-wait nor
+# reaped the child — and because the child runs under setsid, killing our process group missed
+# it too. Verify BOTH halves, finding the child by ppid rather than by pattern (a pgrep here
+# would match this script's own command line — the very defect under test).
+"$WAIT" cmd --timeout 120 -- sleep 247 >/dev/null 2>&1 &
+waiter=$!
+sleep 1.5
+child="$(ps -eo pid,ppid --no-headers | awk -v p="$waiter" '$2==p {print $1}' | head -1)"
+kill -TERM "$waiter" 2>/dev/null
+sleep 3
+if kill -0 "$waiter" 2>/dev/null; then
+  bad "SIGTERM must stop icn-wait" "still running"
+  kill -9 "$waiter" 2>/dev/null
+else
+  ok "SIGTERM stops the wait"
+fi
+if [ -n "$child" ] && kill -0 "$child" 2>/dev/null; then
+  bad "SIGTERM must reap the child" "pid $child survived"
+  kill -9 "$child" 2>/dev/null
+else
+  ok "SIGTERM reaps the setsid-detached child"
+fi
+if grep -q "on_signal" "$WAIT" && ! grep -q "on_signal()" "$WAIT"; then
+  bad "trap references an undefined handler" "on_signal is trapped but never defined"
+else
+  ok "the trapped handler is actually defined"
+fi
+
+# An unvalidated poll interval busy-looped at ~100% CPU firing sleep errors.
+start=$(date +%s)
+ICN_WAIT_POLL_INTERVAL=0 timeout 8 "$WAIT" file "$TMP/never-poll.log" --timeout 3 >/dev/null 2>"$TMP/poll.err"
+elapsed=$(( $(date +%s) - start ))
+# The TIMEOUT line on stderr is expected; a busy-loop shows up as hundreds of `sleep` errors.
+# `grep -c` prints 0 AND exits 1 when there are no matches, so `|| echo 0` appended a second
+# zero and the numeric test then errored on "0\n0".
+sleep_errs=$(grep -c "sleep" "$TMP/poll.err" 2>/dev/null | head -1)
+sleep_errs=${sleep_errs:-0}
+if [ "$elapsed" -ge 2 ] && [ "$sleep_errs" -eq 0 ]; then
+  ok "an invalid ICN_WAIT_POLL_INTERVAL falls back instead of busy-looping"
+else
+  bad "invalid poll interval" "elapsed=${elapsed}s sleep-errors=${sleep_errs}"
+fi
+
+echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

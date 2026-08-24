@@ -48,10 +48,9 @@ degrade() {
   # Visible, specific, non-blocking. Never claims lifecycle tracking is active.
   printf 'agent-runtime: DEGRADED (unregistered) — %s\n' "$1" >&2
   if [ "$cmd" = "classify" ]; then
-    # classify's stdout is a VERDICT that consumers parse. Emitting nothing here made a
-    # degraded wrapper indistinguishable from an empty answer for anything doing
-    # `classify ... | jq -r .retireable`. Emit the same fail-safe envelope the CLI does.
-    printf '{"state":"REGISTRY-UNAVAILABLE","retireable":false,"retireable_with_approval":false,"reason":"%s"}\n' \
+    # classify's stdout is FACTS that consumers parse. Emitting nothing here made a degraded
+    # wrapper indistinguishable from an empty answer. Emit the same envelope the CLI does.
+    printf '{"state":"REGISTRY-UNAVAILABLE","reason":"%s"}\n' \
       "agent runtime unavailable: $1"
     exit 3
   fi

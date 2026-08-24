@@ -271,7 +271,12 @@ function migrate(db: Database.Database): void {
     db.prepare("INSERT INTO schema_version (version) VALUES (3)").run();
   }
 
-  // Schema v4: supervisions are scoped to a LANE, not to whichever session declared them.
+  // Schema v4: adds watchers_process.worktree_id.
+  //
+  // RESERVED. Its consumer (supervision of long-running operations) was removed from this PR
+  // and lives on ops/agent-supervision-lifecycle. The column is retained rather than reverted
+  // because it is already stamped in the live shared registry, an unused column is inert, and
+  // re-editing a published migration is exactly what schema-upgrade.test.ts pins against.
   //
   // A NEW migration rather than an edit to v3. The only v3-stamped databases found on this
   // machine were throwaway test artifacts, not production state — an earlier version of this

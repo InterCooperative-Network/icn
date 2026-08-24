@@ -102,8 +102,10 @@ BOUNDED_RE = re.compile(
     # /tmp/scratch/EXIT and silently disarmed the guard on the very sentinel shape it refuses.
     r"|(^|[;&|\n]\s*)exit\b"
     r"|(^|[;&|(]\s*)icn-wait\b"
-    r"|\$(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b"
-    r"|\b(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\s*=",
+    # A READ (`$deadline`) can bound a loop. An ASSIGNMENT cannot: `max_tries=3` inside the
+    # body is a dead store, and it is exactly what an agent writes while *trying* to add a
+    # bound — so accepting it disarmed the guard on a provably non-terminating loop.
+    r"|\$\{?(?:deadline|DEADLINE|max_?(?:tries|attempts|wait))\b",
     re.M | re.I,
 )
 
@@ -319,11 +321,9 @@ evidence so it can fail fast instead of spinning:
   icn-wait file <PATH> --pattern '^EXIT=' --timeout 600 --source-pid <PID>
   icn-wait match '<pattern>' --timeout 600      # last resort; excludes the observer
 
-For a long build, add --supervise so the lane is not judged abandoned while it runs:
+Give a long build a generous bound rather than no bound:
 
-  icn-wait cmd --supervise --timeout 3600 -- cargo test --workspace
-
-It resolves your session from the worktree; no session id needed.
+  icn-wait cmd --timeout 3600 -- cargo test --workspace
 """
 
 

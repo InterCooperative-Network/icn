@@ -107,8 +107,8 @@ export function registerSessionTools(
           })
         );
       } catch (e) {
-        // supervise_operation already answers structurally; this one threw, so a durable-id
-        // violation surfaced as a protocol error instead of a usable message.
+        // A durable-id violation is an expected answer, not a protocol error: throwing here
+        // surfaced it as a transport failure instead of a usable message.
         return json({ error: "registration_rejected", reason: (e as Error).message });
       }
     }

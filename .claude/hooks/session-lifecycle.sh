@@ -96,7 +96,11 @@ BANNER
 if [ ! -x "$SESSION_BIN" ]; then
   # `force`: when the payload was also unparseable, EVENT is empty and the banner would
   # otherwise return silently — the two failure modes combined into a total silent disable.
-  degraded_banner "ops/scripts/icn-agent-session is missing or not executable" force
+  # `force` only when the event is UNKNOWN. Passing it unconditionally overcorrected the
+  # round-4 silent-disable fix: with the binary missing, the 6-line banner printed after every
+  # PostToolUse, Stop and UserPromptSubmit.
+  degraded_banner "ops/scripts/icn-agent-session is missing or not executable" \
+    "$([ -z "$EVENT" ] && echo force)"
   exit 0
 fi
 if [ -z "$EVENT" ]; then

@@ -47,7 +47,14 @@
 set -uo pipefail
 
 readonly DEFAULT_TIMEOUT="${ICN_WAIT_DEFAULT_TIMEOUT:-1800}"   # 30 min
-readonly POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
+POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
+# Validated like the timeout is. `ICN_WAIT_POLL_INTERVAL=0` (or a non-number) spun at ~100% CPU
+# firing `sleep` errors hundreds of times a second — the "maximally alive, maximally dead"
+# signature this tool exists to eliminate.
+case "$POLL_INTERVAL" in
+  ''|*[!0-9.]*|.|0|0.0) POLL_INTERVAL=2 ;;
+esac
+readonly POLL_INTERVAL
 
 # Resolve our own directory THROUGH symlinks: helpers here are commonly symlinked into ~/bin,
 # and a bare `dirname $0` would then look for its siblings in ~/bin and silently not find them.
@@ -217,6 +224,15 @@ case "$CMD" in
       wait "$child" 2>/dev/null
     }
 
+    # Defined, not merely trapped. A previous edit deleted this body and left the trap, so
+    # bash printed "on_signal: command not found" and RESUMED the wait loop: SIGTERM neither
+    # stopped icn-wait nor reaped the child, and because the child runs under setsid it is in
+    # its own session, so killing our process group missed it too.
+    on_signal() {
+      note "received signal; terminating child"
+      terminate_child
+      exit 143
+    }
     trap on_signal INT TERM HUP
 
     if [ "$DEADLINE" -eq 0 ]; then
