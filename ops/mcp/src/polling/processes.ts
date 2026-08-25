@@ -3,6 +3,11 @@
 
 import type Database from "better-sqlite3";
 import { emitEvent } from "../state/events.js";
+// ONE definition of liveness. This module had its own, which treated EPERM (process exists but
+// belongs to another uid) as DEAD — the opposite of the runtime's. Since this poller runs every
+// 10s over status='running', a watched process owned by a different uid was marked completed
+// within 10s and the agent got a mailbox alert saying its process had finished when it had not.
+import { pidAlive } from "../runtime/session-runtime.js";
 
 const INTERVAL_MS = 10_000;
 
@@ -11,15 +16,6 @@ interface Watcher {
   session_id: string;
   pid: number;
   label: string;
-}
-
-function pidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function pollOnce(db: Database.Database): void {

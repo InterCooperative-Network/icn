@@ -1,0 +1,455 @@
+#!/usr/bin/env bash
+#: capability: safe-waiting
+#: summary: Bounded, self-match-proof waiting for processes, commands and sentinel files.
+#: safety: read_only
+#
+# icn-wait — wait for something, correctly.
+#
+# WHY THIS EXISTS
+#   Agents invent waiting loops, and the loops they invent are reproducibly wrong. Two real
+#   non-terminating examples were recovered from this VM's process table:
+#
+#     until ! pgrep -f "scratchpad/mutate.py"; do sleep 20; done
+#         `pgrep -f` matches full command lines, and the waiting shell's OWN command line
+#         contains the pattern. The shell matches itself, so the predicate is permanently
+#         false. This is a logical deadlock, not a slow process: no future event can end it.
+#
+#     until grep -q "^EXIT=" /tmp/.../full-test-3.log 2>/dev/null; do sleep 20; done
+#         The `2>/dev/null` turns "this file does not exist" into "not ready yet", so a
+#         sentinel whose producer died — or whose scratchpad was cleaned up — is
+#         indistinguishable from one that is still coming. It spins forever.
+#
+#   Both looked maximally alive (a fresh child every few seconds) and were maximally dead.
+#
+# WHAT THIS GUARANTEES
+#   * Every wait is BOUNDED. Unbounded blocking requires --allow-unbounded, explicitly.
+#   * Pattern waits CANNOT match the observer: this process, its ancestors and its own
+#     descendants are excluded from every match set, and the exclusion is asserted, not assumed.
+#   * Impossible conditions FAIL FAST with a distinct exit code instead of spinning: a sentinel
+#     whose directory does not exist, or whose producer has already exited without writing it.
+#   * Timeouts are observable — they print what was being waited for and how long.
+#
+# USAGE
+#   icn-wait cmd  [--timeout SEC] [--label L] -- <command...>   # PREFERRED: launch and wait $!
+#   icn-wait pid  <PID> [--timeout SEC] [--label L]
+#   icn-wait file <PATH> [--pattern REGEX] [--source-pid PID] [--timeout SEC]
+#   icn-wait match <PATTERN> [--timeout SEC]                    # last resort; see NOTES
+#
+# EXIT CODES
+#   0 condition met      1 timed out
+#   2 usage error        3 condition unreachable (can never become true)
+#
+#   `cmd` is the exception, and deliberately so: it PROPAGATES the command's own exit status,
+#   because "did cargo test pass" is the thing a caller needs. To keep that unambiguous it
+#   reports a timeout as 124 (the convention `timeout(1)` uses), not 1 — otherwise "the test
+#   suite failed" and "the wait expired" were indistinguishable for the form both this file
+#   and the README call PREFERRED. A signal-terminated wait reports 143.
+#
+# NOTES
+#   `match` is a last resort. If you started the process, you have its PID — use `cmd` or `pid`,
+#   which are exact. Pattern matching is inherently ambiguous and is offered only because some
+#   waits are genuinely for processes this shell did not create.
+
+set -uo pipefail
+
+readonly DEFAULT_TIMEOUT="${ICN_WAIT_DEFAULT_TIMEOUT:-1800}"   # 30 min
+POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
+# Validated like the timeout is. `ICN_WAIT_POLL_INTERVAL=0` (or a non-number) spun at ~100% CPU
+# firing `sleep` errors hundreds of times a second — the "maximally alive, maximally dead"
+# signature this tool exists to eliminate.
+# Accept only a well-formed, strictly positive decimal. The previous list enumerated a few
+# spellings of zero and missed `00`, `.0`, `0.`, `0.00` and malformed values like `1.2.3` —
+# each of which produced ~130 forks/second.
+# Well-formed AND not absurdly small. Requiring only "contains a non-zero digit" accepted
+# 0.001, which polls ~1000x/second and burns real CPU — it merely scored just under the test's
+# threshold rather than being correct. A poll interval below 0.1s serves no purpose here.
+case "$POLL_INTERVAL" in
+  *[!0123456789.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
+  *[123456789]*)
+    # Bound checked NUMERICALLY, below. The previous guard enumerated spellings — `0.0*|.0*` —
+    # which is anchored at the first character, so one extra leading zero walked straight past
+    # it: `00.001`, `000.0001` and `0000.00001` all validated and then busy-spun (17, 27 and 37
+    # CPU ticks in 3s against a limit of 10). Enumerating spellings is the exact failure this
+    # file's own comments complain about; assert the property instead.
+    ;;
+  *) POLL_INTERVAL=2 ;;
+esac
+# ...and not absurdly LARGE. The lower bound existed; the upper bound did not, so an env var
+# silently overrode an explicit one: `ICN_WAIT_POLL_INTERVAL=45 icn-wait file X --timeout 2`
+# ran for 45 seconds, and 999999 ran until it was killed. That is the same class of defect
+# ICN_WAIT_KILL_GRACE was capped for. The cap bounds the interval; poll_sleep() additionally
+# clamps every individual sleep to the remaining budget, so --timeout is honoured exactly.
+awk -v p="$POLL_INTERVAL" 'BEGIN{exit !(p<0.1)}' && POLL_INTERVAL=2
+awk -v p="$POLL_INTERVAL" 'BEGIN{exit !(p>60)}' && POLL_INTERVAL=60
+readonly POLL_INTERVAL
+
+# Resolve our own directory THROUGH symlinks: helpers here are commonly symlinked into ~/bin,
+# and a bare `dirname $0` would then look for its siblings in ~/bin and silently not find them.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+readonly SCRIPT_DIR="$(cd "$(dirname "$self")" && pwd)"
+
+die()   { printf 'icn-wait: %s\n' "$*" >&2; exit 2; }
+fatal() { printf 'icn-wait: UNREACHABLE — %s\n' "$*" >&2; exit 3; }
+note()  { [ "${QUIET:-0}" = 1 ] || printf 'icn-wait: %s\n' "$*" >&2; }
+
+now() { date +%s; }
+
+# ── argument parsing ─────────────────────────────────────────────────────────
+CMD="${1:-}"; [ -n "$CMD" ] || die "no subcommand (try --help)"
+case "$CMD" in -h|--help|help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+shift
+
+TIMEOUT="$DEFAULT_TIMEOUT"; LABEL=""; PATTERN=""; SOURCE_PID=""; ALLOW_UNBOUNDED=0
+QUIET=0; POSITIONAL=(); PAYLOAD=()
+# `shift 2` with only one argument left FAILS and shifts NOTHING, so the loop spun at 100% CPU
+# forever — the anti-hang tool hanging on a typo like `--timeout $UNSET`. Every option value is
+# now required explicitly.
+need_value() {
+  [ $# -ge 2 ] || die "$1 requires a value"
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --timeout)          need_value "$@"; TIMEOUT="$2"; shift 2 ;;
+    --label)            need_value "$@"; LABEL="$2"; shift 2 ;;
+    --pattern)          need_value "$@"; PATTERN="$2"; shift 2 ;;
+    --source-pid)       need_value "$@"; SOURCE_PID="$2"; shift 2 ;;
+    --allow-unbounded)  ALLOW_UNBOUNDED=1; shift ;;
+    --quiet)            QUIET=1; shift ;;
+    --)                 shift; PAYLOAD=("$@"); break ;;
+    -*)                 die "unknown option: $1" ;;
+    *)                  POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+# NORMALISE VALIDATED DIGIT STRINGS TO BASE 10.
+#
+# NOTE THE EXPLICIT DIGIT SETS. `[0-9]` is a LOCALE-COLLATING RANGE: under en_US.UTF-8 — this
+# machine's locale — bash admits ARABIC-INDIC ٣ and FULLWIDTH ３ as members. They then reach
+# `$((10#...))`, which errors, and the empty result silently unbounds the wait. Measured:
+# `--timeout ٣` ran until an external timeout killed it at 12s, against a 3s control. Spelled
+# out as [0123456789] there is no collation and no hole; `LC_ALL=C` would also work but would
+# change awk's decimal handling and every message in the file.
+# Every numeric input here is validated with a CHARACTER CLASS, which happily
+# accepts leading zeros — and the value is then consumed three inconsistent ways:
+#   [ x -gt y ]   the test builtin reads DECIMAL   -> "08" is 8, passes every bound
+#   $(( x ))      arithmetic expansion reads OCTAL -> "08" is an ERROR, "010" is 8
+#   [ a = b ]     a STRING compare                 -> "0123" != "123"
+#
+# That disagreement produced two live defects. `--timeout 08` passed all three validators, then
+# died in the arithmetic at DEADLINE (no `set -e`), leaving DEADLINE=0 — so `expired()` never
+# fired and a flag that looks like a bound became a SILENTLY UNBOUNDED wait; measured at 16s
+# against an 8s control that bounded itself at 9s. `--timeout 010` waited 8 seconds while
+# reporting "TIMEOUT after 010s". And `pid 0$$` slipped past both the self-wait refusal and the
+# ancestor exclusion, because those compare strings — a permanent silent self-wait, which is the
+# #2644 shape this whole tool exists to make impossible.
+#
+# Normalising ONCE, immediately after validation, makes all three readings agree.
+to_decimal() {  # $1 = a validated digit string -> SETS TO_DECIMAL (does not echo)
+  # NO ARITHMETIC. Leading zeros are stripped with parameter expansion, so there is no
+  # `$(( ))` to fail and therefore no failure mode to guard.
+  #
+  # Two earlier shapes both failed, for reasons worth recording. `printf '%s' "$((10#$1))"`
+  # forced every call site to be a command substitution, so a `die` inside ran in a SUBSHELL and
+  # stopped nothing. Setting a variable instead did not help either: a failed arithmetic
+  # expansion ABORTS the enclosing command list, so `to_decimal x; VAR="$TO_DECIMAL"` skipped the
+  # assignment entirely and VAR silently kept its UN-NORMALISED value — measured directly:
+  # "after: TO_DECIMAL=[] TIMEOUT=[3]". Every guard written after the arithmetic, in the function
+  # or at the call site, was unreachable.
+  #
+  # A pure string transform has none of that. The input is already validated as ASCII digits, so
+  # stripping zeros yields a plain decimal that `[ -gt ]` and `$(( ))` read identically — which
+  # is the whole point: those two disagreed about "08", and that disagreement made a bounded
+  # wait silently unbounded.
+  # This precondition IS live: `die` here runs in the caller's shell and stops the program
+  # (measured: rc=2, nothing after the call executes). It guards a future call site that forgets
+  # to validate first. There is deliberately NO post-check at the call sites — this function
+  # either dies or sets a non-empty value, so `[ -n "$TO_DECIMAL" ] || die` could never fire.
+  case "$1" in
+    ''|*[!0123456789]*) die "internal: cannot read ${1} as a base-10 number" ;;
+  esac
+  local t="$1"
+  while [ "${#t}" -gt 1 ]; do
+    case "$t" in 0*) t="${t#0}" ;; *) break ;; esac
+  done
+  TO_DECIMAL="$t"
+}
+
+case "$TIMEOUT" in
+  ''|*[!0123456789]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
+esac
+# An oversized value is not a bound. `[ "$TIMEOUT" -gt 0 ]` errored on a 20-digit number
+# (no set -e), leaving DEADLINE=0 so expired() was never true — a silently UNBOUNDED wait from
+# a flag that looks like a bound. One year is far beyond any legitimate use.
+readonly MAX_TIMEOUT=31536000
+if [ "${#TIMEOUT}" -gt 9 ] || [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ] 2>/dev/null; then
+  die "--timeout $TIMEOUT exceeds the maximum of ${MAX_TIMEOUT}s (1 year)"
+fi
+# Base 10 from here on. The length guard above bounds it to 9 digits, so this cannot overflow.
+to_decimal "$TIMEOUT"; TIMEOUT="$TO_DECIMAL"
+if [ "$TIMEOUT" -eq 0 ] && [ "$ALLOW_UNBOUNDED" -ne 1 ]; then
+  die "--timeout 0 means wait forever; that needs --allow-unbounded stated explicitly"
+fi
+
+DEADLINE=0
+[ "$TIMEOUT" -gt 0 ] && DEADLINE=$(( $(now) + TIMEOUT ))
+
+expired() { [ "$DEADLINE" -gt 0 ] && [ "$(now)" -ge "$DEADLINE" ]; }
+
+# Sleep one poll interval, but NEVER past the deadline. A long interval must not be able to
+# overshoot --timeout; without this, the timeout was only checked BETWEEN sleeps.
+poll_sleep() {
+  if [ "$DEADLINE" -eq 0 ]; then sleep "$POLL_INTERVAL"; return; fi
+  remaining=$(( DEADLINE - $(now) ))
+  [ "$remaining" -le 0 ] && return
+  sleep "$(awk -v p="$POLL_INTERVAL" -v r="$remaining" 'BEGIN{print (p<r)?p:r}')"
+}
+
+timed_out() {
+  printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL:-$1}" >&2
+  exit 1
+}
+
+# ── observer exclusion set ───────────────────────────────────────────────────
+# Every PID that is "us": this shell, its whole ancestor chain, and anything we spawn. A
+# pattern wait that counted any of these would be waiting on itself — the exact #2644 defect.
+build_exclusions() {
+  local p=$$ guard=0
+  EXCLUDE=" $$ "
+  while [ "$p" -gt 1 ] && [ "$guard" -lt 64 ]; do
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+    [ -n "$p" ] || break
+    EXCLUDE="$EXCLUDE$p "
+    guard=$((guard + 1))
+  done
+}
+
+is_excluded() { case "$EXCLUDE" in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
+# Descendants of this script (the pgrep we spawn, any subshell) are ours too.
+is_our_descendant() {
+  local p="$1" guard=0
+  while [ "$p" -gt 1 ] && [ "$guard" -lt 64 ]; do
+    [ "$p" = "$$" ] && return 0
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+    [ -n "$p" ] || return 1
+    guard=$((guard + 1))
+  done
+  return 1
+}
+
+# Matches for PATTERN excluding the observer. Prints surviving PIDs, one per line.
+# Validate the pattern ONCE, up front. `pgrep` exits 2 on a bad regex while printing nothing,
+# which is indistinguishable from "no matches" — so an invalid pattern reported the wait as
+# SATISFIED (exit 0, "your build finished"). That is the same swallowed-error defect the file
+# branch fixes, and this tool exists so agents do not write them.
+assert_pattern_usable() {
+  local pat="$1" out rc
+  out="$(pgrep -f -- "$pat" 2>&1)"; rc=$?
+  # 0 = matched, 1 = no match. Anything else is pgrep failing, not an answer.
+  if [ "$rc" -ge 2 ]; then
+    fatal "pattern /$pat/ cannot be evaluated by pgrep (exit $rc): ${out:-no detail}"
+  fi
+}
+
+foreign_matches() {
+  local pat="$1" pid
+  pgrep -f -- "$pat" 2>/dev/null | while read -r pid; do
+    [ -n "$pid" ] || continue
+    is_excluded "$pid" && continue
+    is_our_descendant "$pid" && continue
+    printf '%s\n' "$pid"
+  done
+}
+
+# `kill -0` returns 1 for BOTH "no such process" and "permission denied", so a process owned by
+# another uid read as dead: `icn-wait pid 2` reported "already gone" (exit 0 = condition met)
+# for a live kernel thread, and --source-pid called a live producer exited. On Linux /proc is
+# the authoritative existence check and is not permission-sensitive.
+alive() {
+  [ -d "/proc/$1" ] && return 0
+  kill -0 "$1" 2>/dev/null
+}
+
+# ── subcommands ──────────────────────────────────────────────────────────────
+case "$CMD" in
+
+  cmd)
+    # PREFERRED FORM. We create the process, so we own its PID and can `wait` on it exactly.
+    # No pattern, no ambiguity, no self-match possible.
+    [ "${#PAYLOAD[@]}" -gt 0 ] || die "cmd requires: icn-wait cmd [--timeout N] -- <command...>"
+    # Own process group, so a timeout can reap the whole job tree rather than just the direct
+    # child. Without this a wrapper's backgrounded grandchildren survived the "bounded" wait
+    # and kept holding the worktree.
+    # `setsid(2)` FAILS for a process-group leader, and util-linux setsid then FORKS and the
+    # parent exits immediately. With job control on, a background child IS its own group
+    # leader — so `$!` was the short-lived setsid parent, not the payload, and icn-wait
+    # reported "condition met, exit 0" while the real command was still running in a detached
+    # session, outside both the timeout and terminate_child's reach. Disabling job control
+    # makes setsid exec instead of fork, so `$!` is always the payload.
+    set +m
+    if command -v setsid >/dev/null 2>&1; then
+      setsid "${PAYLOAD[@]}" &
+    else
+      "${PAYLOAD[@]}" &
+    fi
+    child=$!
+    LABEL="${LABEL:-${PAYLOAD[0]}}"
+
+    # TERM, grace, then KILL. TERM alone is a request: a child that traps it (for cleanup) or is
+    # wedged in uninterruptible I/O made the timeout unbounded, defeating this tool's one
+    # headline guarantee. Measured before the fix: --timeout 3 returned after 12s.
+    # Validated and capped like the timeout is. Unbounded, ICN_WAIT_KILL_GRACE=999999 turned a
+    # `--timeout 2` wait into an ~11-day one, defeating this tool's one headline guarantee.
+    KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
+    case "$KILL_GRACE" in ''|*[!0123456789]*) KILL_GRACE=10 ;; esac
+    [ "${#KILL_GRACE}" -gt 4 ] && KILL_GRACE=10
+    # 60s, not 300s. A `--timeout 2` wait that can still take five minutes to return is not
+    # meaningfully bounded, which is the whole claim this tool makes.
+    [ "$KILL_GRACE" -gt 60 ] 2>/dev/null && KILL_GRACE=60
+    readonly KILL_GRACE
+    terminate_child() {
+      local pgid
+      pgid="$(ps -o pgid= -p "$child" 2>/dev/null | tr -d " ")"
+      if [ -n "$pgid" ] && [ "$pgid" != "$(ps -o pgid= -p $$ 2>/dev/null | tr -d " ")" ]; then
+        kill -TERM "-$pgid" 2>/dev/null
+      else
+        kill -TERM "$child" 2>/dev/null
+      fi
+      local waited=0
+      while alive "$child" && [ "$waited" -lt "$KILL_GRACE" ]; do
+        sleep 1; waited=$((waited + 1))
+      done
+      if alive "$child"; then
+        note "child did not exit ${KILL_GRACE}s after SIGTERM; escalating to SIGKILL"
+        if [ -n "$pgid" ]; then kill -KILL "-$pgid" 2>/dev/null; else kill -KILL "$child" 2>/dev/null; fi
+      fi
+      wait "$child" 2>/dev/null
+    }
+
+    # Defined, not merely trapped. A previous edit deleted this body and left the trap, so
+    # bash printed "on_signal: command not found" and RESUMED the wait loop: SIGTERM neither
+    # stopped icn-wait nor reaped the child, and because the child runs under setsid it is in
+    # its own session, so killing our process group missed it too.
+    on_signal() {
+      note "received signal; terminating child"
+      terminate_child
+      exit 143
+    }
+    trap on_signal INT TERM HUP
+
+    if [ "$DEADLINE" -eq 0 ]; then
+      wait "$child"; exit $?
+    fi
+    # Bounded wait on our own child: poll cheaply, then reap for the true exit status.
+    while alive "$child"; do
+      if expired; then
+        terminate_child
+        printf 'icn-wait: TIMEOUT after %ss waiting for %s\n' "$TIMEOUT" "${LABEL}" >&2
+        exit 124
+      fi
+      poll_sleep
+    done
+    wait "$child"; exit $?
+    ;;
+
+  pid)
+    target="${POSITIONAL[0]:-}"
+    case "$target" in ''|*[!0123456789]*) die "pid requires a numeric PID" ;; esac
+    # PID 0 is not a process. POSIX gives `kill -0 0` a different meaning entirely — it signals
+    # the CALLER'S OWN process group — so it always succeeds and `icn-wait pid 0` reported the
+    # target alive forever: a logical deadlock, not a wait. Measured: exit 1 only when the
+    # timeout fired, and never at all under --allow-unbounded.
+    [ "${#target}" -gt 18 ] && die "pid $target is not a plausible process id"
+    to_decimal "$target"; target="$TO_DECIMAL"
+    [ "$target" -eq 0 ] && die "PID 0 is not a process (kill -0 0 signals the caller's process group)"
+    [ "$target" = "$$" ] && fatal "asked to wait for this very process ($$)"
+    build_exclusions
+    is_excluded "$target" && fatal "PID $target is this process or one of its ancestors; waiting on it can never complete"
+
+    if ! alive "$target"; then
+      note "PID $target is already gone"
+      exit 0
+    fi
+    LABEL="${LABEL:-PID $target}"
+    # Not our child, so `wait` is unavailable; kill -0 polling is exact and cannot self-match.
+    while alive "$target"; do
+      expired && timed_out "$LABEL"
+      poll_sleep
+    done
+    exit 0
+    ;;
+
+  file)
+    path="${POSITIONAL[0]:-}"
+    [ -n "$path" ] || die "file requires a path"
+    LABEL="${LABEL:-$path}"
+
+    # FAIL FAST on an unreachable sentinel. A missing directory is not "not yet" — nothing is
+    # going to create it, and treating it as pending is how a wait becomes immortal.
+    dir="$(dirname -- "$path")"
+    [ -d "$dir" ] || fatal "sentinel directory does not exist: $dir (nothing can create $path)"
+
+    if [ -n "$SOURCE_PID" ]; then
+      case "$SOURCE_PID" in *[!0123456789]*) die "--source-pid must be numeric" ;; esac
+      [ "${#SOURCE_PID}" -gt 18 ] && die "--source-pid $SOURCE_PID is not a plausible process id"
+      to_decimal "$SOURCE_PID"; SOURCE_PID="$TO_DECIMAL"
+      # Same reason as `pid 0` above: a source-pid of 0 always reads alive, so the dead-producer
+      # fail-fast below could never fire and the wait silently lost its only early exit.
+      [ "$SOURCE_PID" -eq 0 ] && die "--source-pid 0 is not a process"
+    fi
+
+    while :; do
+      if [ -e "$path" ]; then
+        if [ -z "$PATTERN" ]; then exit 0; fi
+        # Branch on grep's EXIT STATUS, not on "did it print". 0 = matched, 1 = not yet,
+        # >=2 = grep itself failed (unreadable file, invalid regex) — which can never become a
+        # match and must fail fast. Swallowing this with 2>/dev/null is precisely the defect
+        # This is the defect the tool replaces; the replacement must not commit it too.
+        grep_err="$(grep -qE -- "$PATTERN" "$path" 2>&1)"; grc=$?
+        if [ "$grc" -eq 0 ]; then exit 0; fi
+        if [ "$grc" -ge 2 ]; then
+          fatal "cannot evaluate the sentinel condition on $path: ${grep_err:-grep exited $grc}"
+        fi
+      fi
+      # The producer died without satisfying the condition: it can never be satisfied.
+      if [ -n "$SOURCE_PID" ] && ! alive "$SOURCE_PID"; then
+        fatal "producer PID $SOURCE_PID exited and $path still does not satisfy the condition"
+      fi
+      # The directory was cleaned up mid-wait (the other half of the #2644 defect).
+      [ -d "$dir" ] || fatal "sentinel directory disappeared during the wait: $dir"
+      expired && timed_out "$LABEL"
+      poll_sleep
+    done
+    ;;
+
+  match)
+    pat="${POSITIONAL[0]:-}"
+    [ -n "$pat" ] || die "match requires a pattern"
+    LABEL="${LABEL:-processes matching /$pat/}"
+    assert_pattern_usable "$pat"
+    build_exclusions
+
+    # ASSERTION, not an assumption. The observer's own command line contains the pattern (it
+    # is right there in argv), so a naive matcher WOULD count it and the wait could never end.
+    # Prove the exclusion actually removes us before entering the loop.
+    if pgrep -f -- "$pat" 2>/dev/null | grep -qx "$$"; then
+      note "observer PID $$ matches /$pat/ and is excluded (this is the #2644 self-match trap)"
+    fi
+    if foreign_matches "$pat" | grep -qx "$$"; then
+      fatal "observer exclusion failed for /$pat/ — refusing to enter a self-matching wait"
+    fi
+
+    while :; do
+      remaining="$(foreign_matches "$pat")"
+      [ -z "$remaining" ] && exit 0
+      expired && timed_out "$LABEL"
+      poll_sleep
+    done
+    ;;
+
+  *) die "unknown subcommand: $CMD (try --help)" ;;
+esac

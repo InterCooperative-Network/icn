@@ -56,6 +56,21 @@ for f in "${TRUTH_FILES[@]}"; do
   fi
 done
 
+# ─── Check 1b: Agent capability manifest is present ─────────────────────────
+#
+# Full verification introspects the live MCP server and lives in
+# scripts/check-agent-capabilities.py (run in CI). Here we only assert the generated manifest
+# EXISTS and parses, because drift-check.sh must stay fast and dependency-free.
+
+CAP_MANIFEST="${REPO_ROOT}/docs/reference/project-index/generated/agent-capabilities.json"
+if [[ ! -f "${CAP_MANIFEST}" ]]; then
+  fail "Generated capability manifest missing: docs/reference/project-index/generated/agent-capabilities.json (run: python3 scripts/generate-agent-capabilities.py --write)"
+elif ! python3 -c "import json,sys; json.load(open(sys.argv[1]))" "${CAP_MANIFEST}" 2>/dev/null; then
+  fail "Capability manifest is not valid JSON: docs/reference/project-index/generated/agent-capabilities.json"
+else
+  ok "Capability manifest present and parses"
+fi
+
 # ─── Check 2: Optional machine-local skill symlinks ──────────────────────────
 #
 # ops/state/truth/skills.json declares that the ops-automation skills have NO provider-facing

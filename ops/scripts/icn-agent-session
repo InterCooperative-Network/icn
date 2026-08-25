@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#: capability: agent-session-lifecycle
+#: summary: Register, progress, release and classify ICN agent sessions.
+#: safety: modifies_local
+#
+# icn-agent-session — the launch-seam entrypoint for the ICN agent session runtime.
+#
+# Claude Code hooks are ordinary subprocesses with no MCP client, so they cannot call
+# register_session. This wrapper resolves the repo, finds the built CLI, and forwards argv to
+# ops/mcp/dist/cli/session.js — the same runtime core the MCP tools use.
+#
+# DEGRADATION POLICY (Refs docs/architecture/AGENT_RUNTIME.md §3)
+#   The registry is observability, not a safety gate, so an unavailable registry must never
+#   block development. But it must never be silently absent either: when this script cannot do
+#   its job it says so on stderr with a specific reason, and exits 0 so the hook survives.
+#   The one exception is `classify`, whose exit code is a verdict and is passed through.
+#
+# Usage: icn-agent-session <register|progress|heartbeat|release|status|classify> [--flags]
+
+set -uo pipefail
+
+cmd="${1:-help}"
+
+# Resolve the repo root. THIS SCRIPT'S OWN LOCATION WINS.
+#
+# Preferring $CLAUDE_PROJECT_DIR meant a wrapper in worktree A would exec worktree B's compiled
+# CLI — observed resolving to mcp-host from this lane — so a stale sibling build could silently
+# classify with old logic. The script and the CLI it calls must be the same checkout. Symlinks
+# are resolved so an entry in ~/bin still finds its own repo.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+ROOT="$(cd "$(dirname "$self")/../.." 2>/dev/null && pwd || true)"
+
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="${CLAUDE_PROJECT_DIR:-}"
+fi
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+if [ -z "$ROOT" ] || [ ! -d "$ROOT/ops/mcp" ]; then
+  ROOT="${ICN_ROOT:-}"
+fi
+
+degrade() {
+  # Visible, specific, non-blocking. Never claims lifecycle tracking is active.
+  printf 'agent-runtime: DEGRADED (unregistered) — %s\n' "$1" >&2
+  if [ "$cmd" = "classify" ]; then
+    # classify's stdout is FACTS that consumers parse. Emitting nothing here made a degraded
+    # wrapper indistinguishable from an empty answer. Emit the same envelope the CLI does.
+    # The FULL field set, structurally identical to a healthy envelope and to the CLI's
+    # degradedClassification(). A consumer typed against the interface reads
+    # `.live_agent_pids.length` and throws on a partial object, so a degraded answer that is
+    # missing fields is not a safer answer — it is an unparseable one.
+    # JSON-ESCAPE THE REASON. It interpolates $CLI/$ROOT — a filesystem path, which may
+    # legitimately contain a double quote, a backslash, a tab or a newline. Any of those
+    # produced an UNPARSEABLE envelope alongside exit 3: a consumer got the fail-safe status
+    # and garbage on stdout, which is precisely the failure this block exists to prevent.
+    # Verified: quote -> "Expecting ',' delimiter", backslash -> "Invalid \escape",
+    # tab -> "Invalid control character".
+    esc=$(printf '%s' "agent runtime unavailable: $1" \
+      | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' \
+      | tr '\n\r' '  ' \
+      | tr -d '\000-\010\013\014\016-\037')
+    printf '{"state":"REGISTRY-UNAVAILABLE","reason":"%s","session_id":null,"heartbeat_age_min":null,"progress_age_min":null,"progress_count":null,"contention":{"count":0,"session_ids":[]},"branch_changed":false,"live_branch":null,"live_agent_pids":[]}\n' \
+      "$esc"
+    exit 3
+  fi
+  exit 0
+}
+
+[ -n "$ROOT" ] && [ -d "$ROOT/ops/mcp" ] || degrade "could not resolve an ICN repo root"
+
+CLI="$ROOT/ops/mcp/dist/cli/session.js"
+if [ ! -f "$CLI" ]; then
+  degrade "session CLI not built ($CLI missing) — run: npm --prefix '$ROOT/ops/mcp' run build"
+fi
+
+command -v node >/dev/null 2>&1 || degrade "node not found on PATH"
+
+exec node "$CLI" "$@"

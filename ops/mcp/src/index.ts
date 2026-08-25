@@ -50,7 +50,7 @@ async function main() {
   registerEventTools(server, db);
   registerCommsTools(server, db);
   registerWatcherTools(server, db);
-  registerAgentOpsTools(server);
+  registerAgentOpsTools(server, db);
 
   // Resources — passively available context (sprint state, repo topology)
   server.resource(
