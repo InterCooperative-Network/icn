@@ -4,7 +4,7 @@
 // production. Reviewer A applied a valid mutant restoring each defect and watched the entire
 // 184-test suite stay green. A fix nobody can break in a test is a fix that comes back.
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
@@ -133,33 +133,66 @@ describe("inherited GIT_* variables cannot misattribute a lane", () => {
     }
   });
 
-  it("resolves the SAME lane with GIT_DIR pointing at an unrelated repository", () => {
+  /**
+   * Load a FRESH copy of the module with the contamination already in the environment.
+   *
+   * THIS IS THE WHOLE POINT. `GIT_SANITISED_ENV` is an import-time IIFE snapshot of
+   * `process.env`, so setting `process.env.GIT_DIR` in a test BODY changes nothing the module
+   * ever reads — the earlier version of these tests did exactly that, and deleting the entire
+   * `delete e[k]` sanitisation loop passed 13/13. (It caught only a different mutant, one that
+   * read the ambient environment at call time.)
+   *
+   * Production hits the contaminated case at process START: git EXPORTS `GIT_DIR` into hooks
+   * when running in a linked worktree, which is the only kind ICN uses. So the variable must be
+   * set BEFORE the module is imported, which is what `resetModules` + dynamic import buys.
+   */
+  async function freshDiscover(env: Record<string, string>) {
+    for (const [k, v] of Object.entries(env)) process.env[k] = v;
+    vi.resetModules();
+    const mod = await import("../runtime/worktree-identity.js");
+    return mod.discoverWorktree;
+  }
+
+  it("resolves the SAME lane when GIT_DIR was already set at module load", async () => {
     const clean = discoverWorktree(wt);
     expect(clean).not.toBeNull();
 
-    // git EXPORTS GIT_DIR into hooks when running in a linked worktree — which is the only kind
-    // ICN uses — so this is the ambient state a hook actually runs in, not a contrived one.
-    process.env["GIT_DIR"] = join(otherRepo, ".git");
-    process.env["GIT_COMMON_DIR"] = join(otherRepo, ".git");
-    process.env["GIT_WORK_TREE"] = otherRepo;
+    const discover = await freshDiscover({
+      GIT_DIR: join(otherRepo, ".git"),
+      GIT_COMMON_DIR: join(otherRepo, ".git"),
+      GIT_WORK_TREE: otherRepo,
+    });
 
-    const dirty = discoverWorktree(wt);
+    const dirty = discover(wt);
     expect(dirty).not.toBeNull();
     expect(dirty!.repo_id).toBe(clean!.repo_id);
     expect(dirty!.worktree_id).toBe(clean!.worktree_id);
     expect(dirty!.repo_name).toBe(clean!.repo_name);
+    // ...and specifically NOT the repository the environment points at.
+    expect(dirty!.repo_id).not.toContain("other");
   });
 
-  it("keeps two lanes DISTINCT under a contaminated environment", () => {
+  it("keeps two lanes DISTINCT under a contaminated environment", async () => {
     // The observed defect was worse than a wrong name: two different lanes collapsed onto ONE
-    // worktree_id, so a session in lane A and a session in lane B looked like co-occupants.
+    // worktree_id pointing at an unrelated repository, so a session in lane A and a session in
+    // lane B looked like co-occupants of the same lane.
     const second = join(root, "lane2");
     git(repo, "worktree", "add", "-q", "-b", "lane2", second);
 
-    process.env["GIT_DIR"] = join(otherRepo, ".git");
-    const a = discoverWorktree(wt);
-    const b = discoverWorktree(second);
+    const discover = await freshDiscover({
+      GIT_DIR: join(otherRepo, ".git"),
+      GIT_COMMON_DIR: join(otherRepo, ".git"),
+      GIT_WORK_TREE: otherRepo,
+    });
+
+    const a = discover(wt);
+    const b = discover(second);
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
     expect(a!.worktree_id).not.toBe(b!.worktree_id);
+    // Each must still name its OWN lane, not the unrelated repo the env advertises.
+    expect(a!.worktree_id).toContain("lane");
+    expect(b!.worktree_id).toContain("lane2");
   });
 });
 

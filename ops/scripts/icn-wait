@@ -125,6 +125,27 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# NORMALISE VALIDATED DIGIT STRINGS TO BASE 10.
+#
+# Every numeric input here is validated with a CHARACTER CLASS (`*[!0-9]*`), which happily
+# accepts leading zeros — and the value is then consumed three inconsistent ways:
+#   [ x -gt y ]   the test builtin reads DECIMAL   -> "08" is 8, passes every bound
+#   $(( x ))      arithmetic expansion reads OCTAL -> "08" is an ERROR, "010" is 8
+#   [ a = b ]     a STRING compare                 -> "0123" != "123"
+#
+# That disagreement produced two live defects. `--timeout 08` passed all three validators, then
+# died in the arithmetic at DEADLINE (no `set -e`), leaving DEADLINE=0 — so `expired()` never
+# fired and a flag that looks like a bound became a SILENTLY UNBOUNDED wait; measured at 16s
+# against an 8s control that bounded itself at 9s. `--timeout 010` waited 8 seconds while
+# reporting "TIMEOUT after 010s". And `pid 0$$` slipped past both the self-wait refusal and the
+# ancestor exclusion, because those compare strings — a permanent silent self-wait, which is the
+# #2644 shape this whole tool exists to make impossible.
+#
+# Normalising ONCE, immediately after validation, makes all three readings agree.
+to_decimal() {  # $1 = a validated digit string -> its base-10 value
+  printf '%s' "$((10#$1))"
+}
+
 case "$TIMEOUT" in
   ''|*[!0-9]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
 esac
@@ -135,6 +156,8 @@ readonly MAX_TIMEOUT=31536000
 if [ "${#TIMEOUT}" -gt 9 ] || [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ] 2>/dev/null; then
   die "--timeout $TIMEOUT exceeds the maximum of ${MAX_TIMEOUT}s (1 year)"
 fi
+# Base 10 from here on. The length guard above bounds it to 9 digits, so this cannot overflow.
+TIMEOUT=$(to_decimal "$TIMEOUT")
 if [ "$TIMEOUT" -eq 0 ] && [ "$ALLOW_UNBOUNDED" -ne 1 ]; then
   die "--timeout 0 means wait forever; that needs --allow-unbounded stated explicitly"
 fi
@@ -308,6 +331,8 @@ case "$CMD" in
     # the CALLER'S OWN process group — so it always succeeds and `icn-wait pid 0` reported the
     # target alive forever: a logical deadlock, not a wait. Measured: exit 1 only when the
     # timeout fired, and never at all under --allow-unbounded.
+    [ "${#target}" -gt 18 ] && die "pid $target is not a plausible process id"
+    target=$(to_decimal "$target")
     [ "$target" -eq 0 ] && die "PID 0 is not a process (kill -0 0 signals the caller's process group)"
     [ "$target" = "$$" ] && fatal "asked to wait for this very process ($$)"
     build_exclusions
@@ -338,6 +363,8 @@ case "$CMD" in
 
     if [ -n "$SOURCE_PID" ]; then
       case "$SOURCE_PID" in *[!0-9]*) die "--source-pid must be numeric" ;; esac
+      [ "${#SOURCE_PID}" -gt 18 ] && die "--source-pid $SOURCE_PID is not a plausible process id"
+      SOURCE_PID=$(to_decimal "$SOURCE_PID")
       # Same reason as `pid 0` above: a source-pid of 0 always reads alive, so the dead-producer
       # fail-fast below could never fire and the wait silently lost its only early exit.
       [ "$SOURCE_PID" -eq 0 ] && die "--source-pid 0 is not a process"

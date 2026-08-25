@@ -204,6 +204,8 @@ echo "wrapper degraded envelope"
 
 wrapper_case() {
   local label="$1" dirname="$2"
+  # The exact directory name must survive escaping and decoding intact.
+  local marker="$dirname"
   local d="$TMP/wrap/$dirname"
   mkdir -p "$d/ops/scripts" "$d/ops/mcp"          # ops/mcp exists, dist/ deliberately does not
   cp -a "$REPO_ROOT/ops/scripts/icn-agent-session" "$d/ops/scripts/"
@@ -222,11 +224,18 @@ try:
 except Exception as e:
     print("UNPARSEABLE: %s" % str(e)[:60]); raise SystemExit(0)
 missing = [k for k in REQUIRED if k not in d]
+marker = sys.argv[1] if len(sys.argv) > 1 else ""
 if missing: print("MISSING: %s" % ",".join(missing))
 elif not isinstance(d.get("live_agent_pids"), list): print("live_agent_pids is not a list")
 elif not isinstance(d.get("contention"), dict): print("contention is not an object")
+# THE REASON MUST ROUND-TRIP THE PATH, not merely parse. Checking parseability alone let a
+# BROKEN backslash escape through: `has\backslash` becomes `\b`, which is a LEGAL JSON escape,
+# so json.loads succeeded while silently decoding it to U+0008 — "hasackslash". The envelope
+# parsed, the keys were all present, and the reason was corrupt.
+elif marker and marker not in d.get("reason", ""):
+    print("REASON CORRUPTED: %r not found in %r" % (marker, d.get("reason", "")[:120]))
 else: print("OK")
-')
+' "$marker")
   if [ "$verdict" = "OK" ] && [ "$rc" -eq 3 ]; then
     ok "$label"
   else

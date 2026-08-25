@@ -19,6 +19,7 @@ import {
   classify,
   classifyWorktree,
   DEFAULT_STALL_MINUTES,
+  degradedClassification,
   MIN_STALL_MINUTES,
   parseObservedPids,
   registerSession,
@@ -139,7 +140,59 @@ describe("the classifier reads those three states differently", () => {
       expect(Array.isArray(e.live_agent_pids)).toBe(true);
       expect(typeof e.contention.count).toBe("number");
       expect(Array.isArray(e.contention.session_ids)).toBe(true);
+      // PRESENCE IS NOT ENOUGH. Every assertion here used to check only that the keys existed,
+      // so a constructor emitting progress_count 999, branch_changed true and
+      // contention {count:-1, session_ids:["FABRICATED"]} passed the whole suite. A degraded
+      // envelope says "no facts can be reported for this lane"; publishing fabricated facts
+      // under that banner is worse than publishing none.
+      expect(e.contention.count).toBeGreaterThanOrEqual(0);
+      expect(e.contention.count).toBe(e.contention.session_ids.length);
+      for (const n of e.live_agent_pids) expect(Number.isInteger(n) && n > 0).toBe(true);
+      for (const k of ["heartbeat_age_min", "progress_age_min", "progress_count"] as const) {
+        const v = e[k];
+        // Either a real measurement or an honest null — never a placeholder.
+        expect(v === null || (typeof v === "number" && Number.isFinite(v) && v >= 0)).toBe(true);
+      }
+      if (e.state === "REGISTRY-UNAVAILABLE") {
+        // Nothing is known, so nothing may be claimed.
+        expect(e.session_id).toBeNull();
+        expect(e.heartbeat_age_min).toBeNull();
+        expect(e.progress_age_min).toBeNull();
+        expect(e.progress_count).toBeNull();
+        expect(e.branch_changed).toBe(false);
+        expect(e.live_branch).toBeNull();
+        expect(e.live_agent_pids).toEqual([]);
+        expect(e.contention).toEqual({ count: 0, session_ids: [] });
+      }
     }
+  });
+});
+
+describe("degradedClassification publishes NO facts, not fabricated ones", () => {
+  it("emits the full field set with honest nulls and an empty contention", () => {
+    // The shared constructor is what the CLI, the MCP tool and (by hand) the shell wrapper all
+    // emit. Its VALUES were pinned by nothing: setting progress_count 999, branch_changed true
+    // and contention {count:-1, session_ids:["FABRICATED"]} passed all 264 tests, because the
+    // envelope assertions elsewhere run against classify() and never call this function.
+    // A degraded envelope states "no facts can be reported for this lane" — publishing invented
+    // facts under that banner is worse than publishing none.
+    const d = degradedClassification("registry unreachable");
+
+    expect(d.state).toBe("REGISTRY-UNAVAILABLE");
+    expect(d.reason).toBe("registry unreachable");
+    expect(d.session_id).toBeNull();
+    expect(d.heartbeat_age_min).toBeNull();
+    expect(d.progress_age_min).toBeNull();
+    expect(d.progress_count).toBeNull();
+    expect(d.branch_changed).toBe(false);
+    expect(d.live_branch).toBeNull();
+    expect(d.live_agent_pids).toEqual([]);
+    expect(d.contention).toEqual({ count: 0, session_ids: [] });
+
+    // ...and the shape matches a healthy envelope exactly, so a typed consumer cannot trip.
+    const healthy = classify([], { observed_pids: [] },
+      { heartbeat_age_min: null, progress_age_min: null }, LIMITS);
+    expect(Object.keys(d).sort()).toEqual(Object.keys(healthy).sort());
   });
 });
 

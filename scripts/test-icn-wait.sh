@@ -281,7 +281,12 @@ fi
 # counts every fork on the box, and measured idle noise of 261-273 per 4s made this assertion
 # report three different outcomes across three runs of the UNMODIFIED script. A test that
 # measures the machine instead of the tool is worse than no test.
-BUSY_TICK_LIMIT=10   # a 2s-interval poll burns ~0 ticks; anything above this is spinning
+# A 2s-interval poll burns ~0 ticks over the sample window; anything above this is spinning.
+# TIGHTENED FROM 10. A mutant admitting `.05` (a 20 Hz poll) burned 6-9 ticks and scored one
+# under the old limit — passing while spinning, and latently flaky besides. That is verbatim the
+# failure icn-wait's own comment names: "scored just under the test's threshold rather than
+# being correct". Measured baseline for every accepted interval is 0.
+BUSY_TICK_LIMIT=3
 cpu_ticks_of() {  # $1 = pid -> utime+stime in clock ticks, or DEAD if it is not running
   # DEAD, not 0. A corpse has no /proc entry, so `|| echo 0` reported the same "0 ticks" as a
   # politely-sleeping waiter — and every assertion below reads low ticks as success. A mutant
@@ -428,13 +433,64 @@ fi
 # THE LOWER BOUND, AS A PROPERTY. It used to be a list of spellings anchored at the first
 # character (`0.0*|.0*`), so one extra leading zero walked past it and busy-spun.
 for spelling in 00.001 000.0001 0000.00001 00.0; do
-  ICN_WAIT_POLL_INTERVAL="$spelling" "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1 &
+  # --timeout 8, sampled at 3s. Section 5's busy_ticks() uses the same 6/3 ratio for the same
+  # reason: sampling at 2.5s against a 3s bound left 0.5s of headroom, so under machine load the
+  # waiter had already exited and the (correct) liveness precondition reported "NOT RUNNING".
+  # The assertion is about CPU burn while waiting, so a longer bound costs nothing.
+  ICN_WAIT_POLL_INTERVAL="$spelling" "$WAIT" file "$TMP/never-appears" --timeout 8 >/dev/null 2>&1 &
   wp=$!
-  sleep 2.5
+  sleep 3
   ticks=$(cpu_ticks_of "$wp")
   kill -TERM "$wp" 2>/dev/null; wait "$wp" 2>/dev/null
   assert_polite "$spelling" "$ticks"
 done
+
+
+# ── 10. zero-padded numbers must not mean something else ───────────────────
+echo "10. leading zeros"
+
+# Validators are character classes, so they accept leading zeros — and the value was then read
+# three inconsistent ways: `[ x -gt y ]` DECIMAL, `$(( x ))` OCTAL, `[ a = b ]` STRING. That gap
+# turned `--timeout 08` into a silently UNBOUNDED wait (the arithmetic errored, DEADLINE stayed
+# 0, expired() never fired) and let `pid 0$$` past the self-wait refusal.
+
+# 08 is invalid octal: it used to die in arithmetic and leave the wait unbounded.
+start=$(date +%s)
+timeout 20 "$WAIT" cmd --timeout 08 -- sleep 300 >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 124 ] && [ "$elapsed" -le 12 ]; then
+  ok "--timeout 08 is bounded (rc 124 after ${elapsed}s), not silently unbounded"
+else
+  bad "--timeout 08 did not bound the wait" "rc=$rc elapsed=${elapsed}s (expected rc=124 within ~8s)"
+fi
+
+# 010 is valid octal for 8 — it must mean TEN.
+start=$(date +%s)
+timeout 25 "$WAIT" file "$TMP/never-appears" --timeout 010 >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 1 ] && [ "$elapsed" -ge 9 ] && [ "$elapsed" -le 14 ]; then
+  ok "--timeout 010 waits TEN seconds, not octal eight (${elapsed}s)"
+else
+  bad "--timeout 010 was misread" "rc=$rc elapsed=${elapsed}s (expected rc=1 at ~10s)"
+fi
+
+# ...and a padded zero is still zero, so it still demands the explicit flag.
+timeout 8 "$WAIT" file "$TMP/never-appears" --timeout 00 >/dev/null 2>&1
+check "--timeout 00 still requires --allow-unbounded (exit 2)" 2 $?
+
+# A padded pid is the SAME pid: string comparison let it through both guards.
+timeout 10 bash -c "exec '$WAIT' pid 0\$\$ --timeout 4" >/dev/null 2>&1
+check "a zero-padded self pid is still refused (exit 3)" 3 $?
+
+timeout 10 bash -c "exec '$WAIT' pid \$\$ --timeout 4" >/dev/null 2>&1
+check "  ...and the unpadded control is refused too" 3 $?
+
+# A real, live, padded pid must still be WAITED on — the guard must not reject everything.
+sleep 6 &
+lp=$!
+timeout 10 "$WAIT" pid "0$lp" --timeout 2 >/dev/null 2>&1
+check "a zero-padded live pid is still waited on (exit 1 = timed out)" 1 $?
+kill "$lp" 2>/dev/null; wait "$lp" 2>/dev/null
 
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"
