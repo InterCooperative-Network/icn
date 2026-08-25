@@ -1,0 +1,754 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Agent Runtime | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>AGENT RUNTIME</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="icn-agent-runtime">ICN Agent Runtime</h1>
+<p><strong>Status:</strong> active · <strong>Owner domain:</strong> <code>agent_runtime_state</code> (see <code>ops/state/truth/sources.json</code>)</p>
+<p>This document describes how an ICN development agent session comes into existence, what
+authoritative identity it carries, how its liveness is judged, and how it discovers the
+capabilities the repository provides for it.</p>
+<p>It is deliberately short. It says <strong>where authoritative information lives</strong>; it does not
+restate that information.</p>
+<hr>
+<h2 id="1-current-agent-launch-architecture-established-truth-not-history">1. Current agent-launch architecture (established truth, not history)</h2>
+<p>There is no single agent &quot;framework&quot;. There are several entrypoints that converge on one
+process shape, and they were verified by inspecting the live <code>icn-dev</code> VM and this repository —
+not by reading prior design docs.</p>
+<h3 id="11-entrypoints">1.1 Entrypoints</h3>
+<table>
+<thead>
+<tr>
+<th>Entrypoint</th>
+<th>What it is</th>
+<th>Shares the lifecycle?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-start [worktree]</code></td>
+<td>Human front door on <code>icn-dev</code>. Resolves a worktree under <code>~/icn-dev/worktrees/icn/</code>, pins <code>ICN_ROOT</code>, <code>exec claude</code>.</td>
+<td>Yes — via Claude Code hooks</td>
+</tr>
+<tr>
+<td><code>icn-claude</code></td>
+<td>Same, from a remote host over SSH; always lands in the <code>mcp-host</code> worktree.</td>
+<td>Yes — same hooks</td>
+</tr>
+<tr>
+<td>Claude Code interactive / remote (<code>ccd-cli</code>)</td>
+<td>The actual agent process. One OS process per session.</td>
+<td>Yes — same hooks</td>
+</tr>
+<tr>
+<td>Claude Code subagents (<code>Agent</code> tool)</td>
+<td>In-process children of a session. They do <strong>not</strong> get their own OS process, hook events, or MCP client.</td>
+<td><strong>No</strong> — see §6</td>
+</tr>
+<tr>
+<td>Provider adapters (<code>.codex/</code>, <code>.cursor/</code>, <code>.opencode/</code>)</td>
+<td>Configuration overlays for other providers. Only <code>.cursor/mcp.json</code> actually declares the ops MCP; <code>.codex/mcp/servers.example.json</code> is an example that omits it, and <code>.opencode/opencode.json</code> has no MCP block at all.</td>
+<td><code>.cursor</code> partially — MCP tools yes, hooks no. <code>.codex</code>/<code>.opencode</code>: manifest file only</td>
+</tr>
+<tr>
+<td>CI agents (<code>.github/workflows/</code>)</td>
+<td>Non-interactive, ephemeral, no worktree, no registry.</td>
+<td>No — out of scope by design</td>
+</tr>
+</tbody></table>
+<p><strong>The real front door is not a script.</strong> <code>icn-start</code> only chooses a directory and execs
+<code>claude</code>; every meaningful startup behaviour is driven by <strong>Claude Code hooks</strong> declared in
+<code>.claude/settings.json</code>. That is the narrowest seam every interactive session passes through,
+so it is where this runtime attaches.</p>
+<h3 id="12-pre-existing-pieces-this-runtime-wires-together-it-invents-little">1.2 Pre-existing pieces this runtime wires together (it invents little)</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Authoritative owner</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Truth-domain ownership</td>
+<td><code>sources.json</code></td>
+<td><code>ops/state/truth/sources.json</code></td>
+</tr>
+<tr>
+<td>Skill ownership + mirror/adapter policy</td>
+<td><code>skills.json</code></td>
+<td><code>ops/state/truth/skills.json</code></td>
+</tr>
+<tr>
+<td>Skill drift enforcement</td>
+<td><code>check-skill-registry.py</code></td>
+<td><code>scripts/</code>, run by <code>.github/workflows/agent-drift-check.yml</code></td>
+</tr>
+<tr>
+<td>Canonical skills</td>
+<td><code>.agents/skills/</code> (mirrored to <code>.claude/skills/</code>)</td>
+<td>repo</td>
+</tr>
+<tr>
+<td>MCP tools</td>
+<td><code>ops/mcp/src/tools/*.ts</code></td>
+<td>repo</td>
+</tr>
+<tr>
+<td>Session registry</td>
+<td><code>sessions</code> table</td>
+<td><code>ops/mcp</code> SQLite (<code>ICN_OPS_DB</code>)</td>
+</tr>
+<tr>
+<td>Process supervision</td>
+<td><code>watchers_process</code> table + <code>watch_process</code> tool</td>
+<td><code>ops/mcp</code></td>
+</tr>
+<tr>
+<td>Startup orientation</td>
+<td><code>session-orient.sh</code></td>
+<td><code>.claude/hooks/</code></td>
+</tr>
+<tr>
+<td>Agent operating contract</td>
+<td><code>AGENTS.md</code></td>
+<td>repo root</td>
+</tr>
+</tbody></table>
+<h3 id="13-why-the-session-registry-was-unused">1.3 Why the session registry was unused</h3>
+<p>The registry was complete and correct, and nothing was obliged to call it:</p>
+<ol>
+<li><strong>No launch seam called it.</strong> <code>register_session</code> is an MCP <em>tool</em>. Tools are invoked by a
+model deciding to invoke them. Nothing in the launch path — <code>icn-start</code>, hooks, or provider
+config — called it, so registration depended entirely on an agent remembering.</li>
+<li><strong>It owned no truth domain.</strong> <code>ops/state/truth/sources.json</code> registers an owner for every
+domain that matters. There was no <code>agent_runtime_state</code> domain, so no consumer was directed
+to the registry and no drift check noticed its absence.</li>
+<li><strong>Its identity was too thin to be worth adopting.</strong> The row held <code>repo</code>, <code>worktree</code>,
+<code>task_description</code>, <code>started_at</code>, <code>last_heartbeat</code> — no branch, PR, task ref, parent, pid,
+or provider. A consumer could not join a row to a process or a lane, so observation of
+<code>/proc</code> was strictly more useful than the registry.</li>
+<li><strong><code>last_heartbeat</code> could not distinguish liveness from progress.</strong> A single timestamp
+advanced by an explicit <code>heartbeat</code> call means &quot;something called heartbeat&quot;, which a
+deadlocked-but-looping agent can do forever. See §4.</li>
+</ol>
+<p>The fix is therefore not &quot;write a registry&quot; — it is to give the existing registry a launch
+seam (§3), a richer identity (§2), a progress signal (§4), and a declared owner (§7).</p>
+<hr>
+<h2 id="2-the-identity-model-repository--lane--activation">2. The identity model: repository → lane → activation</h2>
+<p>The single most important thing this runtime gets right is <em>what is stable</em>. Everything else
+follows from it.</p>
+<pre><code>repository                    repo_id        Git: realpath(--git-common-dir)
+  └── worktree / lane         worktree_id    Git: realpath(--absolute-git-dir)
+        ├── runtime activation(s)   id       one per live activation (0..N per lane)
+        └── branch / HEAD / PR / task        live or advisory, never identity
+</code></pre>
+<h3 id="21-the-worktree-is-the-lane-the-branch-is-not-its-identity">2.1 The worktree is the lane; the branch is not its identity</h3>
+<p>A development session belongs to a concrete Git worktree. During that session the branch moves
+constantly and legitimately: HEAD advances, the branch is rebased, it is renamed, the worktree
+is deliberately detached, occasionally a different branch is checked out. <strong>None of those events
+creates a different lane.</strong> A model that keys on branch would fork a lane&#39;s history every time
+someone rebased.</p>
+<p>Branch and HEAD are therefore <em>live state about</em> a lane, re-read on every query. The branch
+captured at registration is kept only as <code>branch_at_registration</code>, a historical launch fact. It
+is never used as current branch state. When the live branch differs from it, the runtime reports
+<code>branch_changed: true</code> — a warning about state, not evidence that the session moved.</p>
+<h3 id="22-the-lane-key-is-git-derived-never-a-basename">2.2 The lane key is Git-derived, never a basename</h3>
+<p><code>worktree = &quot;task-review&quot;</code> is not an identity: two repositories on this VM can each contain a
+worktree by that name, and the disk/lifecycle tooling has already been bitten by basename
+collisions once. Rather than invent an identifier, the runtime uses what Git already
+guarantees:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Source</th>
+<th>Property</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>repo_id</code></td>
+<td><code>realpath(git rev-parse --git-common-dir)</code></td>
+<td>one per repository</td>
+</tr>
+<tr>
+<td><code>worktree_id</code></td>
+<td><code>realpath(git rev-parse --absolute-git-dir)</code></td>
+<td><strong>one per worktree, unique within <em>and across</em> repositories — in SPACE. Not unique over TIME: see <code>worktree_generation</code>.</strong></td>
+</tr>
+<tr>
+<td><code>worktree_generation</code></td>
+<td>UUID minted into <code>&lt;admin-dir&gt;/icn-lane-generation</code></td>
+<td><strong>which generation of the lane this is</strong></td>
+</tr>
+<tr>
+<td><code>worktree_path</code></td>
+<td><code>realpath(git rev-parse --show-toplevel)</code></td>
+<td>working directory</td>
+</tr>
+<tr>
+<td><code>worktree_name</code></td>
+<td>basename of the path</td>
+<td><strong>display only — never a join key</strong></td>
+</tr>
+</tbody></table>
+<h3 id="221-the-lane-in-time--worktree_generation">2.2.1 The lane in TIME — <code>worktree_generation</code></h3>
+<p><code>worktree_id</code> names a <em>slot</em>, and git reclaims slots. <code>git worktree remove</code> deletes
+<code>&lt;repo&gt;/.git/worktrees/&lt;basename&gt;</code>, and the next <code>git worktree add</code> with the same basename is
+handed <strong>the same admin directory</strong> — so a new worktree, on a new branch, at a different path
+<em>or the same one</em>, inherits the previous lane&#39;s <code>worktree_id</code>.</p>
+<p>That matters because unreleased rows are joined to the lane by that id. Observed directly: a
+freshly created worktree classified <code>REGISTERED-ACTIVE</code> holding the <em>previous</em> lane&#39;s session
+row. Comparing <code>worktree_path</code> does not help — recreate at the same pathname and repo, admin
+dir and path all match while the lane is genuinely a different one.</p>
+<p>So identity carries a <strong>generation</strong>: a UUID minted into <code>&lt;admin-dir&gt;/icn-lane-generation</code>.</p>
+<ul>
+<li><strong>Where it lives is the whole design.</strong> It sits inside the one container git itself deletes,
+so it cannot outlive its generation. Not the working tree (a user may keep that), not the
+repo root, not a global cache — each of those survives removal and reintroduces the aliasing.</li>
+<li><strong>Minted atomically</strong>, by writing a complete temp file and <code>link(2)</code>-ing it into place: a
+single winner, and the target is complete the instant it is visible. (<code>O_CREAT|O_EXCL</code>
+followed by a separate write let a loser read a zero-length file: 6 of 240 concurrent minters
+got nothing.)</li>
+<li><strong>Minted only on the identity path.</strong> <code>discoverWorktree()</code> mints; the classification path
+reads and never writes, because it receives a caller-supplied <code>worktree_id</code> and a read path
+must not create files at an arbitrary location.</li>
+<li><strong>What it survives:</strong> commits, branch switches, branch renames, history-rewriting rebases,
+detached HEAD, <code>git worktree move</code>, and symlinked access. None of those make it a different
+worktree, and the admin directory is untouched by all of them.</li>
+<li><strong>NULL means UNKNOWN, never &quot;different&quot;.</strong> A row written before schema v5, or a lane whose
+token could not be minted, is <em>kept</em> by the filter. Rows are dropped only when both sides are
+known and differ, so this can only ever make a lane look <strong>more</strong> occupied.</li>
+</ul>
+<p>A re-registering session always refreshes its row&#39;s generation, including when the lane id is
+unchanged — otherwise a conversation resuming into a recreated lane would keep the dead
+generation and be filtered out of the lane it is actually working in.</p>
+<p>For a linked worktree the admin dir is <code>&lt;repo&gt;.git/worktrees/&lt;name&gt;</code>; for a main worktree it is
+the repo dir. Either way <code>task-review</code> under <code>icn.git</code> and under <code>nycn.git</code> resolve to different
+ids, so the collision is impossible rather than unlikely.</p>
+<p>Resolution goes through <code>discoverWorktree()</code>, which asks Git — it never parses a path. Two
+consequences that are enforced, not assumed:</p>
+<ul>
+<li><strong>Hook <code>cwd</code> is a starting point, not truth.</strong> Tool execution happens from subdirectories and
+scratch paths; Git resolves the owner from anywhere inside the worktree.</li>
+<li><strong><code>ICN_ROOT</code> is a hint that loses to <code>cwd</code>.</strong> Validating that an env root is a real worktree
+is not sufficient — a valid answer to the wrong question is still wrong. On icn-dev <code>ICN_ROOT</code>
+is pinned to the <code>mcp-host</code> worktree by the shell profile, so an env-root-first resolution
+filed <em>every</em> session under <code>mcp-host</code>. It is consulted only when <code>cwd</code> resolves to nothing.</li>
+</ul>
+<h3 id="23-provider-conversation-vs-runtime-activation">2.3 Provider conversation vs runtime activation</h3>
+<p>Captured from this installation&#39;s real hook payloads:</p>
+<ul>
+<li><code>session_id</code> is present on every hook event and identical across all of them;</li>
+<li>it is <strong>unchanged across <code>claude --resume</code></strong> (<code>SessionStart</code> fires again with <code>source: resume</code>);</li>
+<li>there is <strong>no <code>CLAUDE_SESSION_ID</code> environment variable</strong>.</li>
+</ul>
+<p>So the provider id identifies a <strong>conversation</strong>, which may outlive several runtime activations:</p>
+<pre><code>conversation X ──▶ activation A ──▶ SessionEnd (all authority surrendered)
+               └─▶ (later --resume) ──▶ activation B     A ≠ B, same provider id
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Field</th>
+<th>Lifetime</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime activation</td>
+<td><code>id</code> (UUID)</td>
+<td>one live activation</td>
+</tr>
+<tr>
+<td>Provider conversation</td>
+<td><code>provider_session_id</code></td>
+<td>may span resume cycles</td>
+</tr>
+<tr>
+<td>Process</td>
+<td><code>agent_pid</code>, <code>host</code></td>
+<td>correlation only</td>
+</tr>
+</tbody></table>
+<p>Registration idempotency is scoped to the <em>live</em> activation: a duplicate hook within one
+activation returns the existing row; a resume after release creates a new activation that
+inherits <strong>no</strong> claims, watchers or mailbox authority. The runtime therefore does <strong>not</strong> assert
+&quot;a provider session id is never reused after release&quot; — the live probe disproved that.</p>
+<p><code>pid@host</code> is rejected outright as identity. PIDs are recycled, so a future process could
+inherit a dead session&#39;s claims. It is correlation metadata at best.</p>
+<h3 id="24-several-sessions-may-occupy-one-lane">2.4 Several sessions may occupy one lane</h3>
+<p><code>one worktree == one session</code> is <strong>not</strong> a database invariant. Real situations include an
+interactive agent plus a review session, an old activation briefly overlapping a resumed one,
+operator inspection, and accidental concurrent sessions — the last of which is precisely what
+we want the runtime to <em>detect</em>. Each session keeps its own activation id while pointing at the
+same <code>worktree_id</code>; <code>classify()</code> reports <code>contention: {count, session_ids}</code> and registration
+returns <code>co_occupants</code>.</p>
+<p>File claims, watchers and every other authority stay <strong>session-scoped</strong>, never worktree-scoped.
+Releasing one session leaves every other occupant&#39;s authority untouched.</p>
+<h3 id="25-field-classification">2.5 Field classification</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Fields</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Authoritative stable identity</strong></td>
+<td><code>id</code>, <code>repo_id</code>, <code>worktree_id</code>, <code>worktree_generation</code>, <code>worktree_path</code></td>
+</tr>
+<tr>
+<td><strong>Authoritative live state</strong></td>
+<td>live branch/HEAD (read from Git), <code>last_heartbeat</code>, <code>last_progress</code>, <code>progress_count</code>, contention</td>
+</tr>
+<tr>
+<td><strong>Advisory launch metadata</strong></td>
+<td><code>provider_session_id</code>, <code>branch_at_registration</code>, <code>head_at_registration</code>, <code>task_ref</code>, <code>pr_ref</code>, <code>task_description</code>, <code>provider</code>, <code>transcript_path</code>, <code>worktree_name</code>, <code>worktree</code></td>
+</tr>
+<tr>
+<td><strong>Correlation only</strong></td>
+<td><code>agent_pid</code>, <code>host</code></td>
+</tr>
+<tr>
+<td><strong>Derived, never stored</strong></td>
+<td>lifecycle state, expiry, stall, <code>branch_changed</code></td>
+</tr>
+</tbody></table>
+<p>Branch/PR/issue <em>state</em> is a live query (<code>live_branch_state</code>, <code>live_pr_state</code>,
+<code>live_issue_state</code> in <code>sources.json</code>). The registry stores the <strong>reference</strong>, never the state.</p>
+<h2 id="26-one-registry-per-repository">2.6 One registry per repository</h2>
+<p>The registry is a single SQLite database resolved from <code>git rev-parse --git-common-dir</code>, so
+every worktree of a repo shares it: <code>&lt;repo&gt;.git/icn-ops.db</code>. <code>ICN_OPS_DB</code> still overrides.</p>
+<p>This is load-bearing, not cosmetic. The previous default resolved <em>beside the executing JS</em>,
+which was harmless while the MCP server was the only writer. This runtime adds a second writer —
+the hook CLI, which runs out of the agent&#39;s <strong>own</strong> worktree — while <code>~/.claude.json</code> pins the
+MCP server to an absolute path in the <code>mcp-host</code> worktree. The observed result was two live
+databases with different schemas, hook-registered sessions invisible to every <code>mcp__icn-ops__*</code>
+tool, and <code>claim_files</code> failing a foreign-key check because the session id existed only in the
+other file.</p>
+<p><strong>Operational note:</strong> after this lands, the <code>mcp-host</code> MCP server must be rebuilt and restarted
+for running sessions to pick up the shared registry. Rows in the old per-worktree databases are
+not migrated; they are stale session state and expire by TTL anyway.</p>
+<h2 id="3-registration-seam-and-failure-policy">3. Registration seam and failure policy</h2>
+<p><strong>Seam:</strong> the <code>SessionStart</code> hook, via <code>ops/scripts/icn-agent-session register</code>.</p>
+<p>Claude Code hooks run as ordinary subprocesses and cannot call MCP tools, so the runtime
+exposes the same core through a CLI (<code>ops/mcp/dist/cli/session.js</code>). MCP tools and the CLI call
+<strong>one shared module</strong> (<code>ops/mcp/src/runtime/session-runtime.ts</code>); there is no second
+implementation to drift.</p>
+<p>Idempotency: registration is keyed on the provider conversation id taken from the hook
+payload&#39;s <code>session_id</code> field (§2.3). Re-running <code>register</code> for the same live activation returns
+the existing row, so a hook that fires twice cannot double-register. Launchers with no provider
+id pass <code>--identity-file</code>, which mints a UUID once and persists it for the harness&#39;s lifetime;
+<code>pid@host</code> is never synthesised.</p>
+<p><strong>Failure policy: degrade loudly, never block, never overclaim.</strong></p>
+<ul>
+<li>Registration failure does <strong>not</strong> fail launch. The registry is observability, and ICN policy
+does not gate development on it.</li>
+<li>Failure prints an explicit <code>agent-runtime: DEGRADED (unregistered)</code> line into session context.
+The runtime never reports lifecycle tracking as active when registration failed.</li>
+<li>Operations that <em>require</em> authoritative lifecycle state fail closed: with no row, the
+classifier returns <code>REGISTRY-UNAVAILABLE</code>, and consumers must treat that as <strong>protected</strong>,
+never as &quot;safe to retire&quot; (§5).</li>
+</ul>
+<hr>
+<h2 id="4-heartbeat-and-progress-three-distinct-claims">4. Heartbeat and progress: three distinct claims</h2>
+<p>The <code>#2644</code> lanes proved that a process can emit activity forever without progressing. The
+runtime therefore separates three claims that were previously conflated:</p>
+<pre><code>process alive   !=   session healthy   !=   meaningful progress occurring
+   /proc              last_heartbeat          last_progress + progress_count
+</code></pre>
+<ul>
+<li><p><strong><code>last_heartbeat</code></strong> — &quot;the harness is still running&quot;. Advanced by any hook firing.
+Cheap, and deliberately weak evidence.</p>
+</li>
+<li><p><strong><code>last_progress</code> + <code>progress_count</code></strong> — &quot;work happened&quot;. Advanced <strong>only</strong> by hook events
+that correspond to real runtime effects: a file edit (<code>PostToolUse</code> on <code>Edit|Write</code>) or a
+completed command (<code>PostToolUse</code> on <code>Bash</code>). <code>progress_count</code> is monotonic, so a consumer can
+sample it twice and prove motion without trusting a clock.</p>
+<p><strong>A completed turn is deliberately NOT progress.</strong> <code>Stop</code> and <code>UserPromptSubmit</code> are
+<em>interaction</em>: they prove the harness produced a response or a human is driving, not that
+task state moved. An agent stuck in a retry cycle completes turns indefinitely while nothing
+advances; counting those would let it defeat <code>PROGRESS-STALLED</code>, the one signal that catches
+it. There is no <code>turn</code> progress kind, and a test asserts 200 consecutive turn boundaries
+leave <code>progress_count</code> at 1.</p>
+</li>
+<li><p><strong><code>current_activity</code></strong> — advisory free text for humans reading <code>list_sessions</code>.</p>
+</li>
+</ul>
+<p>A polling wait loop advances <code>last_heartbeat</code> and never <code>progress_count</code>; that is exactly the
+<code>PROGRESS-STALLED</code> signature in §5. No periodic self-heartbeat timer is installed, because a
+timer is precisely the mechanism that makes a deadlocked session look healthy.</p>
+<hr>
+<h2 id="5-lifecycle-classification-fail-safe-by-construction">5. Lifecycle classification (fail-safe by construction)</h2>
+<p><code>icn-agent-session classify --worktree &lt;name&gt;</code> returns one state. The registry is the
+<strong>first</strong> source of evidence; process observation is corroborating, never overriding.</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>REGISTERED-ACTIVE</code></td>
+<td>Row present, heartbeat inside TTL, progress recent.</td>
+</tr>
+<tr>
+<td><code>PROGRESS-STALLED</code></td>
+<td>Row present, heartbeat fresh, <code>progress_count</code> unchanged past the stall window.</td>
+</tr>
+<tr>
+<td><code>REGISTERED-EXPIRED</code></td>
+<td>Row present, heartbeat older than TTL.</td>
+</tr>
+<tr>
+<td><code>UNREGISTERED-OBSERVED</code></td>
+<td>No row for this lane.</td>
+</tr>
+<tr>
+<td><code>REGISTRY-UNAVAILABLE</code></td>
+<td>Registry unreadable, or no lane could be resolved.</td>
+</tr>
+</tbody></table>
+<p><strong>These are observations, not verdicts.</strong> <code>classify</code> returns no <code>retireable</code> field: deciding a
+lane may be reclaimed can mean killing a live agent or destroying an in-flight build, and every
+attempt to answer it inside this module produced a defect that passed its own tests. Consumers
+apply their own policy to the facts, and retirement stays read-only and operator-approved.</p>
+<p><strong>Absence of a row is not evidence of absence of a session.</strong> A missing row is indistinguishable
+from a pre-integration session, an unsupported launcher, or a registry failure.</p>
+<p><strong>Absence of an observation is not evidence of absence either.</strong> <code>observed_pids</code> distinguishes
+three states, and only the SECOND can support retirement:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>omitted / <code>null</code></td>
+<td><strong>nobody looked</strong> — protected</td>
+</tr>
+<tr>
+<td><code>[]</code></td>
+<td>an observation was performed and found nothing — <strong>the only value that can support retirement</strong>, and only alongside a dead or absent recorded pid</td>
+</tr>
+<tr>
+<td><code>[…]</code></td>
+<td>processes are holding the lane — protected</td>
+</tr>
+</tbody></table>
+<p>The registry also <strong>corroborates itself</strong>: it records the session&#39;s own <code>agent_pid</code>, so a live
+agent process protects the lane regardless of what any caller did or did not observe. Retirement
+requires <em>both</em> an affirmative empty observation <em>and</em> a dead (or absent) recorded pid.</p>
+<p>Classification is keyed on <code>worktree_id</code> <strong>and <code>worktree_generation</code></strong> (§2.2, §2.2.1), and
+<strong>protection is a property of the lane, not
+of any one row</strong>. Heartbeat ages are reported from the freshest session, but liveness is
+aggregated across <em>every</em> occupant: a live recorded <code>agent_pid</code> anywhere on the lane is
+reported, and named in <code>reason</code>. Selecting a single &quot;primary&quot; by heartbeat freshness and
+judging from that row produced <code>retireable: true</code> on a lane with a running agent, because a
+crashed peer with a fresher heartbeat won the selection and only its dead pid was checked.
+<code>contention</code> reports every occupant.</p>
+<p>TTL is <code>ICN_SESSION_TTL_MINUTES</code> (default 30, matching the pre-existing <code>list_sessions</code>
+window), clamped to a 5-minute floor — it is read from the ambient environment of whoever runs
+classify, and a value of 1 turned a two-minute-old heartbeat into a retirement candidate. Stall window is <code>ICN_SESSION_STALL_MINUTES</code> (default 90, chosen to match the
+<code>QUIESCENT_AFTER_MIN</code> proposed by icn#2653, which is not merged).</p>
+<h3 id="51-supervision-of-long-running-operations--not-in-this-layer">5.1 Supervision of long-running operations — NOT IN THIS LAYER</h3>
+<p>A legitimately long build emits no hook events, so its heartbeat ages past the TTL and the lane
+looks idle. Declaring the operation is the right answer, and it was implemented here — then
+removed.</p>
+<p>Five of the six P0 defects found across three independent review rounds were in that surface.
+Each repair satisfied its own test and its own comment while breaking the invariant one layer
+out, because a lane&#39;s protection had three competing sources of truth: the supervision row&#39;s
+lane, the owning session&#39;s lane, and the live pid. That is a design problem, not a diligence
+one, so it is being redesigned rather than patched again.</p>
+<p>The work is preserved on <code>ops/agent-supervision-lifecycle</code> for a separate PR. Until it lands,
+a long build shows as <code>PROGRESS-STALLED</code> or <code>REGISTERED-EXPIRED</code> — which is honest, because
+this layer genuinely does not know the difference between a long build and an abandoned lane.
+No consumer may act on that without operator approval.</p>
+<h2 id="6-release-guarantees--stated-exactly">6. Release guarantees — stated exactly</h2>
+<table>
+<thead>
+<tr>
+<th>Exit path</th>
+<th>Released?</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Normal completion / user exit</td>
+<td>Yes</td>
+<td><code>SessionEnd</code> hook</td>
+</tr>
+<tr>
+<td>Controlled shutdown (SIGTERM/SIGINT to the harness)</td>
+<td>Yes, if the harness runs <code>SessionEnd</code></td>
+<td>same</td>
+</tr>
+<tr>
+<td>Agent error with harness still alive</td>
+<td>Yes</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Parent cancellation of a child session</td>
+<td>Yes</td>
+<td>parent releases children it registered</td>
+</tr>
+<tr>
+<td><code>SIGKILL</code>, VM death, OOM, power loss</td>
+<td><strong>No</strong></td>
+<td>not representable; heartbeat expiry (§5) covers it</td>
+</tr>
+</tbody></table>
+<p>The runtime does not pretend otherwise. A row that stops heartbeating becomes
+<code>REGISTERED-EXPIRED</code> after TTL; that is the only mechanism for abrupt death, by design.</p>
+<h3 id="what-release-surrenders">What release surrenders</h3>
+<p>Release keeps the <strong>pre-existing DELETE semantics</strong> — the session row is removed and
+<code>file_claims</code> cascade — so there is no &quot;released but still holding claims&quot; state to get wrong.
+History was already owned by <code>ops/state/session-log.jsonl</code> and stays there. The complete
+inventory of session-scoped resources, kept beside the code that clears it:</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Class</th>
+<th>On release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>file_claims.session_id</code></td>
+<td>authority</td>
+<td>deleted (FK cascade)</td>
+</tr>
+<tr>
+<td><code>watchers_process.session_id</code></td>
+<td><strong>not touched</strong></td>
+<td>That table belongs to the pre-existing <code>watch_process</code> feature and its background poller. Supervision, which also used it, left with <code>ops/agent-supervision-lifecycle</code>, and clearing watcher rows went with it. A row whose session is deleted survives as <code>running</code> until its pid exits — a pre-existing leak on <code>main</code>, not one this layer introduces or fixes.</td>
+</tr>
+<tr>
+<td><code>mailbox.to_session</code> (unread)</td>
+<td>authority</td>
+<td>invalidated → marked read</td>
+</tr>
+<tr>
+<td><code>mailbox.from_session</code></td>
+<td>history</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>events.scope = session:&lt;id&gt;</code></td>
+<td>history</td>
+<td>kept</td>
+</tr>
+</tbody></table>
+<p>The rule: <strong>a released session retains history and surrenders every authority this layer
+grants.</strong> Because rows are deleted rather than soft-marked, that much is true by construction
+rather than by discipline.</p>
+<p>One honest exception, listed above: <code>watchers_process</code> rows are not cleared. That table and its
+poller predate this work and are not part of the session runtime — a watcher outliving its
+session is a pre-existing leak on <code>main</code>, and clearing it belongs with the supervision surface
+that was split out. It is named here rather than quietly omitted, because an inventory that
+claims to be complete has to be.</p>
+<p>Deliberately <strong>not</strong> introduced: a <code>state=&#39;released&#39;</code> column. It would create rows that read as
+inactive while still owning claims — the precise failure this table avoids.</p>
+<h3 id="subagents-and-child-sessions">Subagents and child sessions</h3>
+<p>Claude Code subagents (<code>Agent</code> tool) run <strong>in-process</strong>. They receive no <code>SessionStart</code> event,
+no separate pid, and no MCP client of their own, so they cannot be auto-registered — this is a
+provider limitation, stated honestly rather than papered over. What <em>is</em> supported:</p>
+<ul>
+<li>A session spawned as its own process (a second <code>icn-start</code>, a review lane) registers
+normally and may declare <code>--parent-session &lt;id&gt;</code>.</li>
+<li>Children are released independently; releasing a parent does not release children, and an
+orphaned child does <strong>not</strong> keep its parent classified as active, because classification
+reads the parent&#39;s own <code>progress_count</code>.</li>
+</ul>
+<hr>
+<h2 id="7-capability-discovery--the-mechanism-not-a-list">7. Capability discovery — the mechanism, not a list</h2>
+<p>The failure mode this replaces is a hand-maintained prompt listing every tool, which drifts the
+day someone adds a skill.</p>
+<p><code>docs/reference/project-index/generated/agent-capabilities.json</code> is <strong>generated</strong> by
+<code>scripts/generate-agent-capabilities.py</code>, which derives capabilities from their canonical
+locations:</p>
+<table>
+<thead>
+<tr>
+<th>Capability kind</th>
+<th>Derived from</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MCP tools</td>
+<td>a live <code>tools/list</code> from the built server — introspected, never grepped from source</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td><code>ops/state/truth/skills.json</code> (the registry that already owns them)</td>
+</tr>
+<tr>
+<td>Hooks</td>
+<td><code>.claude/settings.json</code> hook declarations</td>
+</tr>
+<tr>
+<td>Repo helper scripts</td>
+<td><code>ops/scripts/</code> executables with a <code>#:capability</code> header</td>
+</tr>
+<tr>
+<td>Truth domains</td>
+<td><code>ops/state/truth/sources.json</code></td>
+</tr>
+</tbody></table>
+<p>It is surfaced three ways: the <code>icn_ops_agent_runtime</code> MCP tool, the startup context emitted
+by <code>session-lifecycle.sh</code> (a pointer, not a dump), and the file itself.</p>
+<p><code>scripts/check-agent-capabilities.py</code> regenerates the manifest and fails if it differs from the
+committed copy. It runs in <code>agent-drift-check.yml</code> on <strong>every</strong> PR.</p>
+<p><strong>Therefore:</strong> adding a capability in its canonical location and regenerating makes it
+discoverable to every launcher that reads the manifest, and <em>forgetting</em> to regenerate fails
+CI. No launcher, provider adapter, or prompt is edited to add a capability.</p>
+<p>Limits, stated plainly: the manifest describes capabilities to a session that reads it. No
+provider outside Claude Code gets the startup line or automatic registration, because none of
+them run Claude Code hooks — and the MCP route is narrower than it looks. Only <code>.cursor/mcp.json</code>
+declares the ops MCP server today, so only Cursor can call <code>icn_ops_agent_runtime</code> and the
+session tools (explicitly — it still cannot auto-register). <code>.codex/mcp/servers.example.json</code> is
+an <em>example</em> file that does not declare the ops MCP at all, and its entries point at the retired
+<code>~/projects/icn</code> path; <code>.opencode/opencode.json</code> has no MCP block. Those two get the generated
+manifest as a file on disk and nothing else. <code>check-agent-runtime-adoption.py</code> prints this same
+breakdown, so the claim is verified on every run rather than asserted here. See §1.1.</p>
+<hr>
+<h2 id="8-lifecycle-consumers">8. Lifecycle consumers</h2>
+<p><code>icn-lane-audit</code> (icn#2653 — not merged, so it does not exist in this tree yet) and any future consumer should join on <strong>canonical lane identity</strong>
+first and corroborate with observation second:</p>
+<pre><code>icn-agent-session classify --path &lt;worktree&gt;     # or --worktree-id &lt;id&gt;
+</code></pre>
+<p>It returns JSON facts — <code>state</code>, <code>reason</code>, <code>contention</code>, <code>branch_changed</code>, <code>live_branch</code>,
+<code>live_agent_pids</code>, heartbeat/progress ages and <code>progress_count</code>. The exit code reports whether
+facts could be produced (<code>0</code>) or not (<code>3</code>); there is deliberately <strong>no</strong> &quot;retirement candidate&quot;
+code.</p>
+<p>Binding rules for every consumer:</p>
+<ul>
+<li><strong>A missing row is not permission.</strong> A lane with no row may be a pre-integration session, an
+unsupported launcher, or a registry failure.</li>
+<li><strong>This layer issues no retirement verdict at all.</strong> A consumer that wants one owns that
+policy, and owns the consequences.</li>
+<li><strong>A merged PR is not permission either.</strong> Merge state is one input; it says nothing about who
+is currently working in the lane.</li>
+<li><strong>Process observation may only make a verdict safer</strong>, never more permissive: an expired
+heartbeat plus a live process downgrades to protected, not the reverse.</li>
+<li><strong>The disk guard gets no process-control authority.</strong> <code>icn-disk-guard</code> classifies and
+reclaims build output under its own policy; it does not signal processes, and retirement
+stays a separate, operator-approved step.</li>
+</ul>
+<p>The hierarchy consumers should model is the one in §2: repository → lane → activation(s), with
+branch/HEAD/PR hanging off the lane as live or advisory metadata, never as identity.</p>
+<h2 id="9-safe-waiting">9. Safe waiting</h2>
+<p><code>ops/scripts/icn-wait</code> is the supported way to wait for something. It exists because the
+alternative agents invent is defective in two reproducible — and materially different — ways.
+A self-matching <code>pgrep -f</code> predicate is <strong>logically non-terminating</strong>: the observer matches
+itself, so no future event can satisfy it. An unbounded sentinel wait is <strong>not</strong> impossible —
+the file may legitimately arrive later — but with stderr swallowed and no bound or producer
+identity it cannot distinguish a working producer from a dead one, a deleted scratch directory,
+or a sentinel that will never come, so it can spin indefinitely while appearing active. Both are
+documented in
+<code>ops/scripts/README-icn-wait.md</code> and pinned by regression tests in <code>scripts/test-icn-wait.sh</code>.</p>
+<p>A blocking Bash-seam guard was implemented and then removed. It failed four rewrites in four
+review rounds; its last false negative was the most natural phrasing of the loop, it refused
+the canonical <code>ps aux | grep -v grep</code> idiom, and it exceeded its own hook timeout on large
+inputs — failing open. Static analysis of arbitrary shell is not a solvable problem at this
+seam, so this layer relies on the positive path instead: a supported primitive, named in the
+startup context. The attempt is preserved on <code>ops/agent-wait-guard</code>.</p>
+<p>Every wait is bounded. Indefinite blocking is available only behind an explicit flag.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/AGENT_RUNTIME.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
