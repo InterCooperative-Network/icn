@@ -169,6 +169,61 @@ else
   bad "a literal-\$ hook command passed the gate" "rc=$rc"
 fi
 
+# ── 1e. an apostrophe must not desynchronise the quoting model ─────────────
+# The first version of the masker tracked ONLY single quotes, so an ordinary apostrophe inside a
+# double-quoted word — `NOTE="agent's lane"` — toggled its state and left a genuinely
+# single-quoted $CLAUDE_PROJECT_DIR later on the line unmasked. The gate reported 25/0 while
+# `bash -c` on the identical string exited 127. Case 1d's single spelling did not catch it.
+F="$TMP/quotedesync"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                o[k] = "NOTE=\"agent's lane\" " + v.replace('"$CLAUDE_PROJECT_DIR"', "'$CLAUDE_PROJECT_DIR'")
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/quotedesync.log")
+if [ "$rc" -ne 0 ] && grep -q "does not invoke" "$TMP/quotedesync.log"; then
+  ok "an apostrophe in a \"...\" word cannot desynchronise the quoting model"
+else
+  bad "a desynchronised quote tracker let a literal-\$ hook through" "rc=$rc"
+fi
+
+# ...and the CONTROL: the same apostrophe with a properly DOUBLE-quoted $VAR must still pass,
+# or the fix would simply be rejecting anything containing an apostrophe.
+F="$TMP/quoteok"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                o[k] = "NOTE=\"agent's lane\" " + v
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/quoteok.log")
+if [ "$rc" -eq 0 ]; then
+  ok "  ...and a legitimately double-quoted command with an apostrophe still passes"
+else
+  bad "the quoting model now falsely rejects a runnable command" "rc=$rc: $(grep 'does not invoke' "$TMP/quoteok.log" | head -1)"
+fi
+
 # ── 2. a provider adapter the gate CLAIMS coverage for ─────────────────────
 F="$TMP/nocursor"; make_fixture "$F"; rm -f "$F/.cursor/mcp.json"
 rc=$(run_gate "$F" "$TMP/nocursor.log")

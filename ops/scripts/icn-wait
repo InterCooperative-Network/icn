@@ -148,17 +148,34 @@ done
 # #2644 shape this whole tool exists to make impossible.
 #
 # Normalising ONCE, immediately after validation, makes all three readings agree.
-to_decimal() {  # $1 = a validated digit string -> its base-10 value
-  # DEFENCE IN DEPTH. If `10#` ever fails, the arithmetic writes to stderr and the command
-  # substitution yields the EMPTY STRING — which then no-ops every downstream guard, leaves
-  # DEADLINE at 0, and produces the silently unbounded wait this helper exists to prevent.
-  # A conversion that cannot be trusted must stop the program, not return nothing.
-  local out
-  out=$( (exit 0); printf '%s' "$((10#$1))" 2>/dev/null ) || out=""
-  case "$out" in
+to_decimal() {  # $1 = a validated digit string -> SETS TO_DECIMAL (does not echo)
+  # NO ARITHMETIC. Leading zeros are stripped with parameter expansion, so there is no
+  # `$(( ))` to fail and therefore no failure mode to guard.
+  #
+  # Two earlier shapes both failed, for reasons worth recording. `printf '%s' "$((10#$1))"`
+  # forced every call site to be a command substitution, so a `die` inside ran in a SUBSHELL and
+  # stopped nothing. Setting a variable instead did not help either: a failed arithmetic
+  # expansion ABORTS the enclosing command list, so `to_decimal x; VAR="$TO_DECIMAL"` skipped the
+  # assignment entirely and VAR silently kept its UN-NORMALISED value — measured directly:
+  # "after: TO_DECIMAL=[] TIMEOUT=[3]". Every guard written after the arithmetic, in the function
+  # or at the call site, was unreachable.
+  #
+  # A pure string transform has none of that. The input is already validated as ASCII digits, so
+  # stripping zeros yields a plain decimal that `[ -gt ]` and `$(( ))` read identically — which
+  # is the whole point: those two disagreed about "08", and that disagreement made a bounded
+  # wait silently unbounded.
+  # This precondition IS live: `die` here runs in the caller's shell and stops the program
+  # (measured: rc=2, nothing after the call executes). It guards a future call site that forgets
+  # to validate first. There is deliberately NO post-check at the call sites — this function
+  # either dies or sets a non-empty value, so `[ -n "$TO_DECIMAL" ] || die` could never fire.
+  case "$1" in
     ''|*[!0123456789]*) die "internal: cannot read ${1} as a base-10 number" ;;
   esac
-  printf '%s' "$out"
+  local t="$1"
+  while [ "${#t}" -gt 1 ]; do
+    case "$t" in 0*) t="${t#0}" ;; *) break ;; esac
+  done
+  TO_DECIMAL="$t"
 }
 
 case "$TIMEOUT" in
@@ -172,7 +189,7 @@ if [ "${#TIMEOUT}" -gt 9 ] || [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ] 2>/dev/null; the
   die "--timeout $TIMEOUT exceeds the maximum of ${MAX_TIMEOUT}s (1 year)"
 fi
 # Base 10 from here on. The length guard above bounds it to 9 digits, so this cannot overflow.
-TIMEOUT=$(to_decimal "$TIMEOUT")
+to_decimal "$TIMEOUT"; TIMEOUT="$TO_DECIMAL"
 if [ "$TIMEOUT" -eq 0 ] && [ "$ALLOW_UNBOUNDED" -ne 1 ]; then
   die "--timeout 0 means wait forever; that needs --allow-unbounded stated explicitly"
 fi
@@ -347,7 +364,7 @@ case "$CMD" in
     # target alive forever: a logical deadlock, not a wait. Measured: exit 1 only when the
     # timeout fired, and never at all under --allow-unbounded.
     [ "${#target}" -gt 18 ] && die "pid $target is not a plausible process id"
-    target=$(to_decimal "$target")
+    to_decimal "$target"; target="$TO_DECIMAL"
     [ "$target" -eq 0 ] && die "PID 0 is not a process (kill -0 0 signals the caller's process group)"
     [ "$target" = "$$" ] && fatal "asked to wait for this very process ($$)"
     build_exclusions
@@ -379,7 +396,7 @@ case "$CMD" in
     if [ -n "$SOURCE_PID" ]; then
       case "$SOURCE_PID" in *[!0123456789]*) die "--source-pid must be numeric" ;; esac
       [ "${#SOURCE_PID}" -gt 18 ] && die "--source-pid $SOURCE_PID is not a plausible process id"
-      SOURCE_PID=$(to_decimal "$SOURCE_PID")
+      to_decimal "$SOURCE_PID"; SOURCE_PID="$TO_DECIMAL"
       # Same reason as `pid 0` above: a source-pid of 0 always reads alive, so the dead-producer
       # fail-fast below could never fire and the wait silently lost its only early exit.
       [ "$SOURCE_PID" -eq 0 ] && die "--source-pid 0 is not a process"

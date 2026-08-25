@@ -496,14 +496,75 @@ kill "$lp" 2>/dev/null; wait "$lp" 2>/dev/null
 # ── 11. digits that are not ASCII digits ───────────────────────────────────
 echo "11. locale-collating digit classes"
 
-# `[0-9]` in a bash `case` is a LOCALE-COLLATING RANGE. Under en_US.UTF-8 — this machine's
-# locale — it admits ARABIC-INDIC ٣ and FULLWIDTH ３. They passed validation, reached
+# `[0-9]` in a bash `case` is a LOCALE-COLLATING RANGE. Under a full UTF-8 locale it admits
+# ARABIC-INDIC ٣, FULLWIDTH ３ and EXTENDED-ARABIC ۳. They passed validation, reached
 # `$((10#...))`, errored, and left TIMEOUT empty: every downstream guard no-oped, DEADLINE
 # stayed 0, expired() could never fire, and the wait was SILENTLY UNBOUNDED. Measured before the
 # fix: `--timeout ٣` ran until an external timeout killed it at 12s, against a 3s control.
 # The classes are spelled out as [0123456789] now, so there is no collation and no hole.
-for bad in "$(printf '\u0663')" "$(printf '\uff13')" "$(printf '\u06f3')"; do
-  timeout 12 "$WAIT" file "$TMP/never-appears" --timeout "$bad" >/dev/null 2>&1
+#
+# THE LOCALE IS THE TEST, AND IT CANNOT BE ASSUMED. `[0-9]` only collates non-ASCII digits under
+# a full UTF-8 locale; under C / C.UTF-8 / POSIX it rejects them anyway, so these cases pass
+# whether the defect is present or not. Measured with the pre-fix `[0-9]` restored:
+# en_US.UTF-8 -> 3 failures (caught), C.UTF-8 -> 0 failures (SURVIVES), C -> 0, unset -> 0.
+# ubuntu-latest defaults to C.UTF-8 — a surviving row — so a section written against the ambient
+# locale is inert exactly where it gates the merge.
+#
+# So the locale is DISCOVERED BEHAVIOURALLY and, failing that, BUILT. A locale NAME is not
+# evidence: what this section needs is a locale in which `[0-9]` demonstrably matches U+0663, so
+# every candidate is probed with a real bash before it is trusted. If none qualifies the section
+# fails loudly rather than passing without power.
+probe_collates() {  # $1 = LOCPATH ('' for the system one), $2 = locale name
+  # Checks ALL THREE digits the cases below actually use, not just one. Collation tables are
+  # per-locale; a locale that admits ٣ but not ３ would satisfy a one-digit probe and then
+  # fail case 2 for a reason that has nothing to do with icn-wait. The assertion has to be
+  # exactly the property the cases depend on.
+  [ "$(LOCPATH="$1" LC_ALL="$2" bash -c '
+        for d in ٣ ３ ۳; do
+          case "$d" in [0-9]) ;; *) echo no; exit ;; esac
+        done
+        echo yes' 2>/dev/null)" = "yes" ]
+}
+
+COLLATING_LOCALE=""
+COLLATING_LOCPATH=""
+
+# (a) Prefer a locale the machine already has. C/POSIX are skipped by name only to avoid probing
+#     the ones that definitionally cannot collate; everything else still has to prove it.
+for cand in $(locale -a 2>/dev/null); do
+  case "$cand" in C|C.*|POSIX) continue ;; esac
+  if probe_collates "" "$cand"; then COLLATING_LOCALE="$cand"; break; fi
+done
+
+# (b) Otherwise BUILD one into the sandbox. `localedef` ships in libc-bin (Priority: required),
+#     and the en_US/UTF-8 source files ship in `locales`, which is present on the ubuntu-latest
+#     runner image — so this needs no root, no apt and no network. LOCPATH makes it visible to
+#     the child shell without touching the system locale set.
+if [ -z "$COLLATING_LOCALE" ] && command -v localedef >/dev/null 2>&1; then
+  mkdir -p "$TMP/loc"
+  # localedef's EXIT CODE is deliberately ignored: it warns (and can exit non-zero) about things
+  # that do not stop the locale being usable. The behavioural probe is the authority here, as it
+  # is for branch (a) — what matters is whether `[0-9]` collates, not what a tool reported.
+  localedef -i en_US -f UTF-8 "$TMP/loc/en_US.UTF-8" >/dev/null 2>&1
+  if probe_collates "$TMP/loc" "en_US.UTF-8"; then
+    COLLATING_LOCALE="en_US.UTF-8"
+    COLLATING_LOCPATH="$TMP/loc"
+  fi
+fi
+
+if [ -z "$COLLATING_LOCALE" ]; then
+  # Do NOT silently pass. Without a collating locale these cases cannot tell the fixed helper
+  # from the defective one, and a green run would misreport that as proof.
+  bad "no locale found or built in which [0-9] collates" \
+      "section 11 cannot see the defect it exists for (locale -a: $(locale -a 2>/dev/null | tr '\n' ' '))"
+else
+  ok "verified [0-9] admits all three non-ASCII digits under ${COLLATING_LOCALE}${COLLATING_LOCPATH:+ (built in-sandbox)} — this section can see the defect"
+fi
+
+# Every case below runs under that verified locale, NOT the ambient one.
+for digit in "$(printf '٣')" "$(printf '３')" "$(printf '۳')"; do
+  LOCPATH="$COLLATING_LOCPATH" LC_ALL="${COLLATING_LOCALE:-C}" \
+    timeout 12 "$WAIT" file "$TMP/never-appears" --timeout "$digit" >/dev/null 2>&1
   rc=$?
   if [ "$rc" -eq 2 ]; then
     ok "a non-ASCII digit --timeout is REJECTED (exit 2), not silently unbounded"
@@ -512,10 +573,12 @@ for bad in "$(printf '\u0663')" "$(printf '\uff13')" "$(printf '\u06f3')"; do
   fi
 done
 
-timeout 12 "$WAIT" pid "$(printf '\u0663')" --timeout 3 >/dev/null 2>&1
+LOCPATH="$COLLATING_LOCPATH" LC_ALL="${COLLATING_LOCALE:-C}" \
+  timeout 12 "$WAIT" pid "$(printf '٣')" --timeout 3 >/dev/null 2>&1
 check "a non-ASCII digit pid is rejected (exit 2)" 2 $?
 
-timeout 12 "$WAIT" file "$TMP/never-appears" --source-pid "$(printf '\u0663')" --timeout 3 >/dev/null 2>&1
+LOCPATH="$COLLATING_LOCPATH" LC_ALL="${COLLATING_LOCALE:-C}" \
+  timeout 12 "$WAIT" file "$TMP/never-appears" --source-pid "$(printf '٣')" --timeout 3 >/dev/null 2>&1
 check "a non-ASCII digit --source-pid is rejected (exit 2)" 2 $?
 
 # ...and the ASCII control still behaves, so the guard is not simply refusing everything.

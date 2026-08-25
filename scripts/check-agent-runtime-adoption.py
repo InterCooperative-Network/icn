@@ -58,29 +58,46 @@ def _mask_unexpanded_dollars(command: str) -> str:
     A shell expands `$VAR` when it is bare or inside DOUBLE quotes, and leaves it literal inside
     SINGLE quotes or after a backslash. `shlex.split` strips quoting before we ever see it, so
     `'$CLAUDE_PROJECT_DIR'/.claude/hooks/session-lifecycle.sh` — which a shell runs as a literal
-    path and fails with exit 127, lifecycle tracking entirely off — arrived here looking exactly
-    like the expanded form and resolved to the real hook file. The gate reported
-    "25 check(s) passed, 0 failure(s)" for a configuration that provably never runs.
+    path, failing with exit 127 and no lifecycle tracking at all — arrived here looking exactly
+    like the expanded form and resolved to the real hook file.
 
-    Masking first means those forms keep their literal `$`, fail to resolve, and are rejected —
-    the same outcome as the nonexistent-path case this gate already catches.
+    THIS TRACKS BOTH QUOTE STATES, and the first version did not. Tracking only single quotes
+    meant an ordinary apostrophe inside a double-quoted word — `NOTE="agent's lane"` — toggled
+    the tracker, desynchronising it by one, so a genuinely single-quoted `$CLAUDE_PROJECT_DIR`
+    later on the same line was seen as unquoted and left unmasked. Measured: the gate reported
+    "25 check(s) passed, 0 failure(s)" while `bash -c` on the identical string exited 127.
+    A quoting model that is wrong about quoting is worse than no model, because it looks like one.
     """
     out: list[str] = []
-    i, n, in_single = 0, len(command), False
+    i, n = 0, len(command)
+    in_single = False
+    in_double = False
     while i < n:
         c = command[i]
-        if c == "'":
-            in_single = not in_single
+        if in_single:
+            # Inside '...' NOTHING is special except the closing quote — not even backslash.
+            if c == "'":
+                in_single = False
+            elif c == "$":
+                out.append(LITERAL_DOLLAR)
+                i += 1
+                continue
             out.append(c)
-        elif c == "\\" and not in_single and i + 1 < n:
-            # A backslash-escaped $ is literal too. Keep both characters, masked.
+        elif c == "\\" and i + 1 < n:
+            # A backslash-escaped $ is literal in both the unquoted and double-quoted contexts.
             out.append(c)
             out.append(LITERAL_DOLLAR if command[i + 1] == "$" else command[i + 1])
             i += 2
             continue
-        elif c == "$" and in_single:
-            out.append(LITERAL_DOLLAR)
+        elif in_double:
+            if c == '"':
+                in_double = False
+            out.append(c)          # `$` IS expanded inside double quotes — leave it alone.
         else:
+            if c == "'":
+                in_single = True
+            elif c == '"':
+                in_double = True
             out.append(c)
         i += 1
     return "".join(out)
