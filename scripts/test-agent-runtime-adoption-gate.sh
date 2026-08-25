@@ -224,6 +224,95 @@ else
   bad "the quoting model now falsely rejects a runnable command" "rc=$rc: $(grep 'does not invoke' "$TMP/quoteok.log" | head -1)"
 fi
 
+# ── 1f. the ESCAPE half of the quoting model ───────────────────────────────
+# Cases 1d/1e pin the SINGLE-QUOTE half. Nothing pinned the escape branch, and three mutants of
+# it — swapping it below the in_double branch, adding `and not in_double`, and dropping the
+# LITERAL_DOLLAR mask — all left the suite at 15/0 while making the gate ACCEPT a command
+# `bash -c` exits 127 on. Fail-OPEN, in the half of the model that had no assertion.
+#
+# The spelling matters. `"\$VAR"` — escaped INSIDE double quotes — is rejected by every one of
+# those mutants too, but for the wrong reason: the stray backslash makes the path unresolvable,
+# so it would pass while proving nothing. The UNQUOTED `\$VAR` is the one that discriminates
+# (it kills the dropped-mask mutant); 1g below kills the other two.
+F="$TMP/escapedollar"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                # \$VAR unquoted — the backslash makes the $ LITERAL, so the shell looks for a
+                # directory actually named $CLAUDE_PROJECT_DIR and fails with 127.
+                o[k] = v.replace('"$CLAUDE_PROJECT_DIR"', '\\$CLAUDE_PROJECT_DIR')
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/escapedollar.log")
+if [ "$rc" -ne 0 ] && grep -q "does not invoke" "$TMP/escapedollar.log"; then
+  ok "an unquoted escaped \$ is literal, and is rejected"
+else
+  bad "an escaped-\$ hook command passed the gate" "rc=$rc"
+fi
+
+# ...and the CONTROL: a backslash-escaped DOUBLE QUOTE inside a double-quoted word is ordinary,
+# and must not make the gate reject a command the shell runs perfectly well.
+F="$TMP/escapeok"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                o[k] = 'NOTE="a\\"b" ' + v
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/escapeok.log")
+if [ "$rc" -eq 0 ]; then
+  ok "  ...and an escaped quote in a \"...\" word still passes"
+else
+  bad "the quoting model now falsely rejects a runnable command" "rc=$rc"
+fi
+
+# ── 1g. an escaped quote must not desynchronise the model either ───────────
+# Same shape as 1e, but the desync vector is a BACKSLASH-ESCAPED double quote rather than an
+# apostrophe. It reaches the escape/in_double interaction that 1e does not.
+F="$TMP/escapedesync"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                o[k] = 'NOTE="a\\"b" ' + v.replace('"$CLAUDE_PROJECT_DIR"', "'$CLAUDE_PROJECT_DIR'")
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/escapedesync.log")
+if [ "$rc" -ne 0 ] && grep -q "does not invoke" "$TMP/escapedesync.log"; then
+  ok "an escaped quote cannot desynchronise the model either"
+else
+  bad "an escaped-quote desync let a literal-\$ hook through" "rc=$rc"
+fi
+
 # ── 2. a provider adapter the gate CLAIMS coverage for ─────────────────────
 F="$TMP/nocursor"; make_fixture "$F"; rm -f "$F/.cursor/mcp.json"
 rc=$(run_gate "$F" "$TMP/nocursor.log")

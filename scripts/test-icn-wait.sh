@@ -582,8 +582,11 @@ LOCPATH="$COLLATING_LOCPATH" LC_ALL="${COLLATING_LOCALE:-C}" \
 check "a non-ASCII digit --source-pid is rejected (exit 2)" 2 $?
 
 # ...and the ASCII control still behaves, so the guard is not simply refusing everything.
+# It runs under the SAME verified locale as the cases above — the point is that ASCII digits keep
+# working in the very locale where the collating range goes wrong, not merely in the ambient one.
 start=$(date +%s)
-timeout 12 "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1
+LOCPATH="$COLLATING_LOCPATH" LC_ALL="${COLLATING_LOCALE:-C}" \
+  timeout 12 "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1
 rc=$?; elapsed=$(( $(date +%s) - start ))
 if [ "$rc" -eq 1 ] && [ "$elapsed" -ge 2 ] && [ "$elapsed" -le 6 ]; then
   ok "ASCII --timeout 3 still waits and bounds itself (${elapsed}s)"
