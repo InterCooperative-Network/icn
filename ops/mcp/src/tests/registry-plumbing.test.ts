@@ -210,6 +210,32 @@ describe("lane resolution", () => {
     expect(discoverWorktree(sub)!.worktree_id).toBe(discoverWorktree(wt)!.worktree_id);
   });
 
+  it("normalises repo_id through a symlinked parent, so ONE repo has ONE id", () => {
+    // `canonical()`'s realpathSync was pinned by nothing: removing it left all 265 tests green.
+    // The two tests named for symlinks assert only `worktree_id`, which the KERNEL already
+    // normalises — `git -C dir` chdirs, and getcwd() returns the physical path — so they answer
+    // the same with or without the call. A control that agrees with the defect proves nothing.
+    //
+    // `repo_id` is the registry's repository key and is documented "realpath of the shared
+    // repository directory". A PLAIN CLONE reached through a symlinked parent is where the
+    // difference shows: without realpath, one repository acquires two ids.
+    const realParent = join(root, "sym-real");
+    mkdirSync(realParent, { recursive: true });
+    const clone = join(realParent, "plainclone");
+    makeRepo(clone);
+    const linkParent = join(root, "sym-link");
+    symlinkSync(realParent, linkParent);
+
+    const direct = discoverWorktree(clone);
+    const viaLink = discoverWorktree(join(linkParent, "plainclone"));
+    expect(direct).not.toBeNull();
+    expect(viaLink).not.toBeNull();
+    expect(viaLink!.repo_id).toBe(direct!.repo_id);
+    expect(viaLink!.repo_id).not.toContain("sym-link");
+    // ...and the same for the lane's own path, for completeness.
+    expect(viaLink!.worktree_path).toBe(direct!.worktree_path);
+  });
+
   it("resolves identically through a symlink to the worktree", () => {
     const link = join(root, "wt-symlink");
     symlinkSync(wt, link);

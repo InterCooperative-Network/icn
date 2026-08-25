@@ -310,12 +310,12 @@ apply their own policy to the facts, and retirement stays read-only and operator
 from a pre-integration session, an unsupported launcher, or a registry failure.
 
 **Absence of an observation is not evidence of absence either.** `observed_pids` distinguishes
-three states, and only the third can support retirement:
+three states, and only the SECOND can support retirement:
 
 | Value | Means |
 |---|---|
 | omitted / `null` | **nobody looked** — protected |
-| `[]` | an observation was performed and found nothing |
+| `[]` | an observation was performed and found nothing — **the only value that can support retirement**, and only alongside a dead or absent recorded pid |
 | `[…]` | processes are holding the lane — protected |
 
 The registry also **corroborates itself**: it records the session's own `agent_pid`, so a live
@@ -376,13 +376,20 @@ inventory of session-scoped resources, kept beside the code that clears it:
 | Resource | Class | On release |
 |---|---|---|
 | `file_claims.session_id` | authority | deleted (FK cascade) |
-| `watchers_process.session_id` | authority | invalidated → `status='released'` (no FK; would otherwise stay `running` and keep supervising for a dead session) |
+| `watchers_process.session_id` | **not touched** | That table belongs to the pre-existing `watch_process` feature and its background poller. Supervision, which also used it, left with `ops/agent-supervision-lifecycle`, and clearing watcher rows went with it. A row whose session is deleted survives as `running` until its pid exits — a pre-existing leak on `main`, not one this layer introduces or fixes. |
 | `mailbox.to_session` (unread) | authority | invalidated → marked read |
 | `mailbox.from_session` | history | kept |
 | `events.scope = session:<id>` | history | kept |
 
-The rule: **a released session retains history and surrenders every authority.** Because rows
-are deleted rather than soft-marked, this is true by construction rather than by discipline.
+The rule: **a released session retains history and surrenders every authority this layer
+grants.** Because rows are deleted rather than soft-marked, that much is true by construction
+rather than by discipline.
+
+One honest exception, listed above: `watchers_process` rows are not cleared. That table and its
+poller predate this work and are not part of the session runtime — a watcher outliving its
+session is a pre-existing leak on `main`, and clearing it belongs with the supervision surface
+that was split out. It is named here rather than quietly omitted, because an inventory that
+claims to be complete has to be.
 
 Deliberately **not** introduced: a `state='released'` column. It would create rows that read as
 inactive while still owning claims — the precise failure this table avoids.

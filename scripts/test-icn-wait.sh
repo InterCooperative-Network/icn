@@ -492,6 +492,42 @@ timeout 10 "$WAIT" pid "0$lp" --timeout 2 >/dev/null 2>&1
 check "a zero-padded live pid is still waited on (exit 1 = timed out)" 1 $?
 kill "$lp" 2>/dev/null; wait "$lp" 2>/dev/null
 
+
+# ── 11. digits that are not ASCII digits ───────────────────────────────────
+echo "11. locale-collating digit classes"
+
+# `[0-9]` in a bash `case` is a LOCALE-COLLATING RANGE. Under en_US.UTF-8 — this machine's
+# locale — it admits ARABIC-INDIC ٣ and FULLWIDTH ３. They passed validation, reached
+# `$((10#...))`, errored, and left TIMEOUT empty: every downstream guard no-oped, DEADLINE
+# stayed 0, expired() could never fire, and the wait was SILENTLY UNBOUNDED. Measured before the
+# fix: `--timeout ٣` ran until an external timeout killed it at 12s, against a 3s control.
+# The classes are spelled out as [0123456789] now, so there is no collation and no hole.
+for bad in "$(printf '\u0663')" "$(printf '\uff13')" "$(printf '\u06f3')"; do
+  timeout 12 "$WAIT" file "$TMP/never-appears" --timeout "$bad" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq 2 ]; then
+    ok "a non-ASCII digit --timeout is REJECTED (exit 2), not silently unbounded"
+  else
+    bad "a non-ASCII digit --timeout was accepted" "rc=$rc (expected 2)"
+  fi
+done
+
+timeout 12 "$WAIT" pid "$(printf '\u0663')" --timeout 3 >/dev/null 2>&1
+check "a non-ASCII digit pid is rejected (exit 2)" 2 $?
+
+timeout 12 "$WAIT" file "$TMP/never-appears" --source-pid "$(printf '\u0663')" --timeout 3 >/dev/null 2>&1
+check "a non-ASCII digit --source-pid is rejected (exit 2)" 2 $?
+
+# ...and the ASCII control still behaves, so the guard is not simply refusing everything.
+start=$(date +%s)
+timeout 12 "$WAIT" file "$TMP/never-appears" --timeout 3 >/dev/null 2>&1
+rc=$?; elapsed=$(( $(date +%s) - start ))
+if [ "$rc" -eq 1 ] && [ "$elapsed" -ge 2 ] && [ "$elapsed" -le 6 ]; then
+  ok "ASCII --timeout 3 still waits and bounds itself (${elapsed}s)"
+else
+  bad "the ASCII control regressed" "rc=$rc elapsed=${elapsed}s"
+fi
+
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

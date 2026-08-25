@@ -46,6 +46,46 @@ REQUIRED_MATCHER_TOKENS = {
 }
 
 
+# Stands in for a `$` the shell would NOT expand. Printable on purpose: a NUL byte makes
+# Path.resolve() raise ValueError rather than simply failing to match.
+LITERAL_DOLLAR = "__ICN_LITERAL_DOLLAR__"
+
+
+def _mask_unexpanded_dollars(command: str) -> str:
+    """
+    Neutralise every `$` a shell would NOT expand.
+
+    A shell expands `$VAR` when it is bare or inside DOUBLE quotes, and leaves it literal inside
+    SINGLE quotes or after a backslash. `shlex.split` strips quoting before we ever see it, so
+    `'$CLAUDE_PROJECT_DIR'/.claude/hooks/session-lifecycle.sh` — which a shell runs as a literal
+    path and fails with exit 127, lifecycle tracking entirely off — arrived here looking exactly
+    like the expanded form and resolved to the real hook file. The gate reported
+    "25 check(s) passed, 0 failure(s)" for a configuration that provably never runs.
+
+    Masking first means those forms keep their literal `$`, fail to resolve, and are rejected —
+    the same outcome as the nonexistent-path case this gate already catches.
+    """
+    out: list[str] = []
+    i, n, in_single = 0, len(command), False
+    while i < n:
+        c = command[i]
+        if c == "'":
+            in_single = not in_single
+            out.append(c)
+        elif c == "\\" and not in_single and i + 1 < n:
+            # A backslash-escaped $ is literal too. Keep both characters, masked.
+            out.append(c)
+            out.append(LITERAL_DOLLAR if command[i + 1] == "$" else command[i + 1])
+            i += 2
+            continue
+        elif c == "$" and in_single:
+            out.append(LITERAL_DOLLAR)
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
 def _invokes_hook(command: str, root: Path) -> bool:
     """
     The hook must be THE COMMAND — the program actually executed — not merely the last word
@@ -57,7 +97,8 @@ def _invokes_hook(command: str, root: Path) -> bool:
     reporting "25 check(s) passed, 0 failure(s)". A gate whose entire purpose is to prove the
     runtime is wired must not accept a command that provably never runs it.
     """
-    stripped = command.split("#", 1)[0].strip()
+    # Mask literal `$` BEFORE shlex removes the quoting that decides whether it expands.
+    stripped = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
 
     # NO SHELL OPERATORS. Everything after argv0 used to be ignored, so appending ` </dev/null`
     # to each hook left the gate at 25/0 while the hook received no payload at all and answered
@@ -96,7 +137,8 @@ def _invokes_hook(command: str, root: Path) -> bool:
         candidate = root / resolved
     try:
         return candidate.resolve() == (root / HOOK).resolve() and candidate.is_file()
-    except OSError:
+    except (OSError, ValueError):
+        # An unresolvable path is not the hook. Fail CLOSED.
         return False
 
 

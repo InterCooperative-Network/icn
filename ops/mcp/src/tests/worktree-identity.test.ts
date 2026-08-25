@@ -642,6 +642,33 @@ describe("worktree generation — identity in time", () => {
     expect(activeSessionsForWorktree(db, id.worktree_id)).toHaveLength(1);
   });
 
+  it("classifyWorktree — the real read path — never mints a token", () => {
+    // The existing read-path test asserts on laneGeneration() DIRECTLY, so the one call site
+    // that must opt OUT of minting was pinned by nothing: flipping
+    // `laneGeneration(worktreeId)` to `{ mint: true }` inside activeSessionsForWorktree left
+    // all 265 tests green while a read-only classify created a file in the caller-named
+    // directory — verbatim the regression the source comment describes.
+    const wt = join(gRoot, "readpath-nomint");
+    git(gRepo, "worktree", "add", "-q", "-b", "readpath-nomint", wt);
+    const admin = git(wt, "rev-parse", "--absolute-git-dir");
+    const token = join(admin, "icn-lane-generation");
+    rmSync(token, { force: true });
+    expect(existsSync(token)).toBe(false);
+
+    const db = initDb(":memory:");
+    // Drive the ACTUAL consumer entrypoints, not the primitive.
+    activeSessionsForWorktree(db, admin);
+    classifyWorktree(db, admin, { observed_pids: [] });
+    classifyWorktree(db, admin, { observed_pids: null });
+
+    expect(existsSync(token)).toBe(false);
+
+    // Control: the identity path still mints, or this test would pass on a runtime that never
+    // mints at all.
+    expect(discoverWorktree(wt)!.worktree_generation).toBeTruthy();
+    expect(existsSync(token)).toBe(true);
+  });
+
   it("keeps rows when the generation is UNKNOWN on either side (fail safe)", () => {
     const wt = join(gRoot, "unknown-gen");
     git(gRepo, "worktree", "add", "-q", "-b", "unknown-lane", wt);

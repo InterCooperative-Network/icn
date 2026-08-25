@@ -141,6 +141,34 @@ else
   bad "a stdin-redirected hook passed the gate" "rc=$rc"
 fi
 
+# ── 1d. a $VAR the shell would NOT expand ──────────────────────────────────
+# `shlex` strips quoting before the gate substitutes $CLAUDE_PROJECT_DIR, so a SINGLE-quoted
+# reference — which a shell leaves literal, so the hook exits 127 and tracking is entirely off —
+# resolved to the real hook path and passed 25/0.
+F="$TMP/literaldollar"; make_fixture "$F"
+python3 - "$F" <<'PY'
+import json, sys
+p = sys.argv[1] + "/.claude/settings.json"
+d = json.load(open(p))
+def walk(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k == "command" and isinstance(v, str) and "session-lifecycle.sh" in v:
+                o[k] = v.replace('"$CLAUDE_PROJECT_DIR"', "'$CLAUDE_PROJECT_DIR'")
+            else:
+                walk(v)
+    elif isinstance(o, list):
+        for i in o: walk(i)
+walk(d)
+json.dump(d, open(p, "w"), indent=2)
+PY
+rc=$(run_gate "$F" "$TMP/literaldollar.log")
+if [ "$rc" -ne 0 ] && grep -q "does not invoke" "$TMP/literaldollar.log"; then
+  ok "a single-quoted \$CLAUDE_PROJECT_DIR is rejected — the shell would not expand it"
+else
+  bad "a literal-\$ hook command passed the gate" "rc=$rc"
+fi
+
 # ── 2. a provider adapter the gate CLAIMS coverage for ─────────────────────
 F="$TMP/nocursor"; make_fixture "$F"; rm -f "$F/.cursor/mcp.json"
 rc=$(run_gate "$F" "$TMP/nocursor.log")

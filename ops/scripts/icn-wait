@@ -64,8 +64,8 @@ POLL_INTERVAL="${ICN_WAIT_POLL_INTERVAL:-2}"
 # 0.001, which polls ~1000x/second and burns real CPU — it merely scored just under the test's
 # threshold rather than being correct. A poll interval below 0.1s serves no purpose here.
 case "$POLL_INTERVAL" in
-  *[!0-9.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
-  *[1-9]*)
+  *[!0123456789.]*|*.*.*|''|.) POLL_INTERVAL=2 ;;
+  *[123456789]*)
     # Bound checked NUMERICALLY, below. The previous guard enumerated spellings — `0.0*|.0*` —
     # which is anchored at the first character, so one extra leading zero walked straight past
     # it: `00.001`, `000.0001` and `0000.00001` all validated and then busy-spun (17, 27 and 37
@@ -127,7 +127,13 @@ done
 
 # NORMALISE VALIDATED DIGIT STRINGS TO BASE 10.
 #
-# Every numeric input here is validated with a CHARACTER CLASS (`*[!0-9]*`), which happily
+# NOTE THE EXPLICIT DIGIT SETS. `[0-9]` is a LOCALE-COLLATING RANGE: under en_US.UTF-8 — this
+# machine's locale — bash admits ARABIC-INDIC ٣ and FULLWIDTH ３ as members. They then reach
+# `$((10#...))`, which errors, and the empty result silently unbounds the wait. Measured:
+# `--timeout ٣` ran until an external timeout killed it at 12s, against a 3s control. Spelled
+# out as [0123456789] there is no collation and no hole; `LC_ALL=C` would also work but would
+# change awk's decimal handling and every message in the file.
+# Every numeric input here is validated with a CHARACTER CLASS, which happily
 # accepts leading zeros — and the value is then consumed three inconsistent ways:
 #   [ x -gt y ]   the test builtin reads DECIMAL   -> "08" is 8, passes every bound
 #   $(( x ))      arithmetic expansion reads OCTAL -> "08" is an ERROR, "010" is 8
@@ -143,11 +149,20 @@ done
 #
 # Normalising ONCE, immediately after validation, makes all three readings agree.
 to_decimal() {  # $1 = a validated digit string -> its base-10 value
-  printf '%s' "$((10#$1))"
+  # DEFENCE IN DEPTH. If `10#` ever fails, the arithmetic writes to stderr and the command
+  # substitution yields the EMPTY STRING — which then no-ops every downstream guard, leaves
+  # DEADLINE at 0, and produces the silently unbounded wait this helper exists to prevent.
+  # A conversion that cannot be trusted must stop the program, not return nothing.
+  local out
+  out=$( (exit 0); printf '%s' "$((10#$1))" 2>/dev/null ) || out=""
+  case "$out" in
+    ''|*[!0123456789]*) die "internal: cannot read ${1} as a base-10 number" ;;
+  esac
+  printf '%s' "$out"
 }
 
 case "$TIMEOUT" in
-  ''|*[!0-9]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
+  ''|*[!0123456789]*) die "--timeout must be a non-negative integer (seconds), got: $TIMEOUT" ;;
 esac
 # An oversized value is not a bound. `[ "$TIMEOUT" -gt 0 ]` errored on a 20-digit number
 # (no set -e), leaving DEADLINE=0 so expired() was never true — a silently UNBOUNDED wait from
@@ -273,7 +288,7 @@ case "$CMD" in
     # Validated and capped like the timeout is. Unbounded, ICN_WAIT_KILL_GRACE=999999 turned a
     # `--timeout 2` wait into an ~11-day one, defeating this tool's one headline guarantee.
     KILL_GRACE="${ICN_WAIT_KILL_GRACE:-10}"
-    case "$KILL_GRACE" in ''|*[!0-9]*) KILL_GRACE=10 ;; esac
+    case "$KILL_GRACE" in ''|*[!0123456789]*) KILL_GRACE=10 ;; esac
     [ "${#KILL_GRACE}" -gt 4 ] && KILL_GRACE=10
     # 60s, not 300s. A `--timeout 2` wait that can still take five minutes to return is not
     # meaningfully bounded, which is the whole claim this tool makes.
@@ -326,7 +341,7 @@ case "$CMD" in
 
   pid)
     target="${POSITIONAL[0]:-}"
-    case "$target" in ''|*[!0-9]*) die "pid requires a numeric PID" ;; esac
+    case "$target" in ''|*[!0123456789]*) die "pid requires a numeric PID" ;; esac
     # PID 0 is not a process. POSIX gives `kill -0 0` a different meaning entirely — it signals
     # the CALLER'S OWN process group — so it always succeeds and `icn-wait pid 0` reported the
     # target alive forever: a logical deadlock, not a wait. Measured: exit 1 only when the
@@ -362,7 +377,7 @@ case "$CMD" in
     [ -d "$dir" ] || fatal "sentinel directory does not exist: $dir (nothing can create $path)"
 
     if [ -n "$SOURCE_PID" ]; then
-      case "$SOURCE_PID" in *[!0-9]*) die "--source-pid must be numeric" ;; esac
+      case "$SOURCE_PID" in *[!0123456789]*) die "--source-pid must be numeric" ;; esac
       [ "${#SOURCE_PID}" -gt 18 ] && die "--source-pid $SOURCE_PID is not a plausible process id"
       SOURCE_PID=$(to_decimal "$SOURCE_PID")
       # Same reason as `pid 0` above: a source-pid of 0 always reads alive, so the dead-producer
