@@ -99,10 +99,13 @@ print("no field is associated with the other enum's values, anywhere in the file
 MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS       # MERGEABLE, CONFLICTING
 STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE          # DIRTY, BLOCKED, BEHIND, ...
 
-# Keys whose whole purpose is to DOCUMENT the confusion. Excluded by name, not by pattern, so
-# adding a new prose key cannot silently widen the exemption.
-DOC_KEYS = {"field_note", "allowlist_note", "scope_note", "note",
-            "agent_tooling_check_note", "description"}
+# EXACTLY ONE key is exempt: `field_note` exists to state "mergeStateStatus ... never takes the
+# value MERGEABLE", which no negation-aware scanner should have to special-case twice. Review on
+# #2656 was right that the earlier set was too broad — `note` and `description` are generic
+# names, and `auto_merge.note` carries operative instructions, so a conflict planted there would
+# have left this "whole-file" test green. Everything else is scanned; the window rules
+# (stop at the next field, at a sentence break, at a negation) are what let genuine prose pass.
+DOC_KEYS = {"field_note"}
 
 
 def walk_strings(node, key=None, path="$"):
@@ -326,6 +329,26 @@ for name, canonical, mirrors in skill_paths:
           and "required_check_pending_allowlist" in body)
     check(f"{name}: names the states an allowlist must exclude",
           "STARTUP_FAILURE" in body and "STALE" in body)
+    # Review round 3: a merge gate is only as good as the commit and branch it was computed
+    # against, and as complete as the thread page it read.
+    merges = [c for c in commands if re.search(r"gh pr merge\b", c)]
+    check(f"{name}: every merge invocation pins the inspected head: {len(merges)} found",
+          bool(merges) and all("--match-head-commit" in c for c in merges))
+    check(f"{name}: captures headRefOid to pin against", "headRefOid" in body)
+    check(f"{name}: reads protection for the PR's actual base, not a hardcoded main",
+          "${BASE}/protection" in body
+          and "branches/main/protection" not in body)
+    # Inspect the COMMAND, not the body: an earlier revision of this check read the prose
+    # mention of `--paginate` and stayed green when the flag was removed from the query itself.
+    # Same prose/command confusion this file already had to learn once.
+    # The GraphQL call spans several fenced lines, so the machinery is asserted across the
+    # extracted COMMAND lines collectively — never against the body, where a prose mention of
+    # `--paginate` kept this green after the flag was removed from the query itself.
+    cmd_text = " ".join(commands)
+    check(f"{name}: reads review threads at all", "reviewThreads" in cmd_text)
+    check(f"{name}: and paginates them rather than reading one page",
+          all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
+
     # The bypass overrides every protection, so the skill must check the review gates too.
     check(f"{name}: checks the gates --admin would also bypass",
           all(t in body for t in ("is_draft", "review_decision_allowlist",

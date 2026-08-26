@@ -9,7 +9,7 @@ truth_contract:
     - ops/state/truth/policy.json       # required_checks, merge_strategy, admin_bypass rules
   live_load_required:
     - "gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup"
-    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+    - "gh api repos/InterCooperative-Network/icn/branches/$BASE/protection --jq '.required_status_checks.contexts'"
   examples_only: []
   never_hardcode:
     - required check list (always query live or read policy.json)
@@ -46,8 +46,12 @@ file to execute.
    wrong one:
 
    ```bash
-   gh pr view <N> --json number,title,headRefName,baseRefName,state,isDraft,mergeable,mergeStateStatus
+   gh pr view <N> --json number,title,headRefName,baseRefName,headRefOid,state,isDraft,mergeable,mergeStateStatus
    ```
+
+   Keep two values from this snapshot: `HEAD_OID=<headRefOid>` and `BASE=<baseRefName>`. Every
+   later command is pinned to them — the checks you inspect and the commit you merge must be the
+   same commit, and the protection you check must be the branch you are actually merging into.
 
    With no number in `$ARGUMENTS`, resolve the current branch's PR once and use its number from
    then on. Note `mergeable` and `mergeStateStatus` are **different fields with different
@@ -56,7 +60,10 @@ file to execute.
 3. Check the **required** checks against the actual head commit — not every check:
    - `gh pr checks <N>`, cross-referenced against `.merge.required_checks`, and confirm the live
      set with
-     `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
+     `gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" --jq '.required_status_checks.contexts'`
+     — `${BASE}`, not a hardcoded `main`: a stacked PR targets another branch, whose required
+     set can differ, and merging with `--admin` against the wrong protection would bypass a
+     check unique to the real base.
    - A red or pending check that is not required does not block. When
      `.merge.unstable_is_mergeable` is true, `mergeStateStatus: UNSTABLE` is mergeable provided
      every required check is green.
@@ -64,7 +71,8 @@ file to execute.
      it from the structured fields — the policy carries flags and a strategy pointer, not a
      command to run:
      ```bash
-     gh pr merge <N> $(jq -r '.merge.auto_merge.gh_flags|join(" ")' ops/state/truth/policy.json) --"${STRATEGY}"
+     gh pr merge <N> --match-head-commit "${HEAD_OID}" \
+       $(jq -r '.merge.auto_merge.gh_flags|join(" ")' ops/state/truth/policy.json) --"${STRATEGY}"
      ```
 
 4. Merging is **authorized per PR by a human**, not by green checks. Green required checks are a
@@ -72,8 +80,12 @@ file to execute.
    `.merge.default_strategy`:
 
    ```bash
-   gh pr merge <N> --"${STRATEGY}"
+   gh pr merge <N> --match-head-commit "${HEAD_OID}" --"${STRATEGY}"
    ```
+
+   `--match-head-commit` on **every** merge invocation. Without it a commit pushed between
+   inspection and merge is merged instead, carrying none of the gates you just verified — and on
+   the `--admin` path that is precisely the bypass this procedure exists to bound.
 
    The single exception is the one `.merge.exception` describes; state the reason explicitly
    when you invoke it.
@@ -93,9 +105,13 @@ file to execute.
       — do not bypass.
       ```bash
       gh pr view <N> --json isDraft,reviewDecision
-      gh api graphql -f query='query($n:Int!){repository(owner:"InterCooperative-Network",name:"icn"){
-        pullRequest(number:$n){reviewThreads(first:100){nodes{isResolved}}}}}' -F n=<N>
+      gh api graphql --paginate -f query='query($n:Int!,$endCursor:String){repository(owner:"InterCooperative-Network",name:"icn"){
+        pullRequest(number:$n){reviewThreads(first:100,after:$endCursor){
+          pageInfo{hasNextPage endCursor} nodes{isResolved}}}}}' -F n=<N>
       ```
+      `--paginate` with `$endCursor`/`pageInfo` because a single page caps at 100: an
+      unresolved thread on page two is invisible to an unpaginated query, and invisible is not
+      resolved. If pagination cannot complete, that is missing evidence — do not bypass.
    5. **Every** required check is either concluded with a value in
       `.requires.required_check_conclusion_allowlist`, or pending with a state in
       `.requires.required_check_pending_allowlist`. These are allowlists: a check in any other
