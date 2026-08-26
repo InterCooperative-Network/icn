@@ -17,6 +17,7 @@ on:
       - 'ops/mcp/src/**'
       - 'ops/scripts/**'
       - 'scripts/tests/test_skill_registry_invariants.py'
+      - 'scripts/tests/test_merge_policy_invariants.py'
       - 'ops/scripts/setup-skill-symlinks.sh'
       - 'ops/state/truth/**'
       - 'ops/scripts/drift-check.sh'
@@ -92,6 +93,12 @@ jobs:
 
       - name: Sprint-state currency + SessionStart source guard tests (Refs icn#2634)
         run: python3 scripts/tests/test_sprint_state_invariants.py
+
+      # icn#2651 / icn#2656: the canonical merge policy must not name a field that cannot hold
+      # the value it is compared against, and a consumer must not restate a value it claims to
+      # load. Both got past every other gate because prose is not type-checked.
+      - name: Merge-policy invariants
+        run: python3 scripts/tests/test_merge_policy_invariants.py
 
       - name: SessionStart hook runs and degrades honestly (Refs icn#2634)
         run: |
