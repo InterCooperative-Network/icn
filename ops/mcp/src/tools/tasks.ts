@@ -23,6 +23,71 @@ export interface SprintState {
   goals: string[];
   tasks: Task[];
   epics: Record<string, string>;
+  /**
+   * Cadence status. Optional because this interface predates `icn-sprint-state/v2`
+   * (#2636) and pre-v2 archives on disk do not carry it. Absent is NOT "active":
+   * see `assertSprintMutable`.
+   */
+  status?: string;
+  /**
+   * v2 only, and deliberately `null` today: two numbering planes disagree and a human
+   * must reconcile them (#2637). Nothing here may infer it.
+   */
+  next_sprint_number?: number | null;
+}
+
+/**
+ * The only cadence status under which the sprint board may be mutated.
+ *
+ * `ops/state/sprint/current.json` is the registered `sprint_state` truth owner and is an
+ * honestly CLOSED record — Sprint 26 was closed retroactively by the 2026-07-13 truth refresh
+ * (#2413) and re-declared dormant by #2636. Every mutating tool below used to load it, edit it
+ * and save it with no status check at all, so any agent calling `create_task` would silently
+ * resurrect "current work" inside a closed sprint: exactly the stale-as-current failure the
+ * refresh removed.
+ */
+const MUTABLE_STATUS = "active";
+
+export interface SprintMutationRefusal {
+  ok: false;
+  message: string;
+}
+
+/**
+ * Fail CLOSED on anything that is not explicitly `active`.
+ *
+ * A MISSING status is refused too, and that is the important half. Treating absent as
+ * mutable would restore the exact pre-#2413 behaviour for any record that predates v2, which
+ * is the failure mode this guard exists to remove — and "the field I use to decide is not
+ * there" is never evidence that mutation is safe.
+ *
+ * Pure, and exported, so the refusal can be tested without redirecting the real state file.
+ */
+export function assertSprintMutable(
+  sprint: Pick<SprintState, "sprint" | "status">
+): { ok: true } | SprintMutationRefusal {
+  if (sprint.status === MUTABLE_STATUS) return { ok: true };
+  const observed = sprint.status === undefined ? "no status field" : `status "${sprint.status}"`;
+  return {
+    ok: false,
+    message:
+      `Refusing to mutate the sprint board: sprint ${sprint.sprint} has ${observed}, ` +
+      `not "${MUTABLE_STATUS}". ops/state/sprint/current.json is the sprint_state truth owner ` +
+      "and is dormant by design, not stale — see its `notes` field.\n\n" +
+      "Opening the next sprint is NOT available here: the next sprint number is undetermined " +
+      "because two numbering planes disagree, and picking one would fabricate board lineage. " +
+      "That decision is tracked at icn#2637 and must be made by a human first.\n\n" +
+      "Current work is a live query, not a board row: " +
+      "gh issue list --repo InterCooperative-Network/icn --state open",
+  };
+}
+
+/** Uniform MCP error result for a refused mutation. */
+function refuse(refusal: SprintMutationRefusal) {
+  return {
+    content: [{ type: "text" as const, text: refusal.message }],
+    isError: true as const,
+  };
 }
 
 function loadSprint(): SprintState {
@@ -103,6 +168,8 @@ export function registerTaskTools(
     },
     async ({ task_id, agent_name }) => {
       const sprint = loadSprint();
+      const mutable = assertSprintMutable(sprint);
+      if (!mutable.ok) return refuse(mutable);
       const task = sprint.tasks.find((t) => t.id === task_id);
       if (!task) {
         return {
@@ -143,6 +210,8 @@ export function registerTaskTools(
     },
     async ({ task_id, status, pr, assignee }) => {
       const sprint = loadSprint();
+      const mutable = assertSprintMutable(sprint);
+      if (!mutable.ok) return refuse(mutable);
       const task = sprint.tasks.find((t) => t.id === task_id);
       if (!task) {
         return {
@@ -168,6 +237,8 @@ export function registerTaskTools(
     },
     async ({ task_id }) => {
       const sprint = loadSprint();
+      const mutable = assertSprintMutable(sprint);
+      if (!mutable.ok) return refuse(mutable);
       const idx = sprint.tasks.findIndex((t) => t.id === task_id);
       if (idx === -1) {
         return {
@@ -195,6 +266,8 @@ export function registerTaskTools(
     },
     async ({ next_name, next_goals }) => {
       const sprint = loadSprint();
+      const mutable = assertSprintMutable(sprint);
+      if (!mutable.ok) return refuse(mutable);
       const historyDir = join(dirname(SPRINT_FILE), "history");
       if (!existsSync(historyDir)) mkdirSync(historyDir, { recursive: true });
 
@@ -232,6 +305,8 @@ export function registerTaskTools(
     },
     async ({ id, title, epic }) => {
       const sprint = loadSprint();
+      const mutable = assertSprintMutable(sprint);
+      if (!mutable.ok) return refuse(mutable);
       if (sprint.tasks.find((t) => t.id === id)) {
         return {
           content: [{ type: "text", text: `Error: task ${id} already exists` }],
