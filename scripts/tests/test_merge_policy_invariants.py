@@ -349,6 +349,21 @@ for name, canonical, mirrors in skill_paths:
     check(f"{name}: and paginates them rather than reading one page",
           all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
 
+    # Review round 4: `--auto` waits for BRANCH PROTECTION's requirements, not for
+    # policy.json's. A policy-required check that is not a live protection context would not
+    # hold the merge. And `--auto` returns without merging, so the procedure must not fall
+    # through to post-merge steps or report a merge it has not confirmed.
+    check(f"{name}: proves pending policy-required checks are live protection contexts",
+          "required_status_checks.contexts" in cmd_text and "PENDING" in body)
+    check(f"{name}: stops after arming auto-merge instead of reporting a merge",
+          "Then STOP" in body and "does not merge" in body)
+    check(f"{name}: confirms merged state before the post-merge steps",
+          "state,mergedAt,mergeCommit" in cmd_text)
+    check(f"{name}: pulls the actual base branch, not a hardcoded main",
+          "git checkout main" not in body)
+    check(f"{name}: its output contract admits a not-merged outcome",
+          "Auto-merge armed" in body and "has **not** merged" in body)
+
     # The bypass overrides every protection, so the skill must check the review gates too.
     check(f"{name}: checks the gates --admin would also bypass",
           all(t in body for t in ("is_draft", "review_decision_allowlist",

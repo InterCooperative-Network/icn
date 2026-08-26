@@ -67,13 +67,35 @@ file to execute.
    - A red or pending check that is not required does not block. When
      `.merge.unstable_is_mergeable` is true, `mergeStateStatus: UNSTABLE` is mergeable provided
      every required check is green.
-   - If a required check is still *pending*, prefer auto-merge over waiting or polling. Compose
-     it from the structured fields — the policy carries flags and a strategy pointer, not a
-     command to run:
+   - If a required check is still *pending*, auto-merge is available — but only for checks
+     GitHub itself will wait on. `--auto` waits for **branch protection's** requirements, not
+     for `.merge.required_checks`, so a policy-required check that is not a live protection
+     context on `${BASE}` would not hold the merge and the PR could land without it. Prove the
+     pending policy-required checks are a subset of the live contexts first:
+
+     ```bash
+     PENDING=$(gh pr checks <N> --json name,state --jq '[.[]|select(.state=="PENDING")|.name]')
+     POLICY=$(jq -r '.merge.required_checks' ops/state/truth/policy.json)
+     LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" \
+              --jq '.required_status_checks.contexts')
+     # every check in (PENDING ∩ POLICY) must also appear in LIVE
+     ```
+
+     If any pending policy-required check is missing from `LIVE`, do **not** enable auto-merge:
+     the two authorities disagree, and only the union of both being green is readiness. Report
+     and wait.
+
+     Otherwise compose it from the structured fields — the policy carries flags and a strategy
+     pointer, not a command to run:
      ```bash
      gh pr merge <N> --match-head-commit "${HEAD_OID}" \
        $(jq -r '.merge.auto_merge.gh_flags|join(" ")' ops/state/truth/policy.json) --"${STRATEGY}"
      ```
+
+     **Then STOP.** `--auto` *enables* a future merge and returns; it does not merge. The PR is
+     still open. Do not continue to step 4, do not run the post-merge steps, and do not report a
+     merge. Report the live state instead: auto-merge armed, which checks are outstanding, and
+     that the PR has not merged.
 
 4. Merging is **authorized per PR by a human**, not by green checks. Green required checks are a
    precondition; they are not permission. With that authorization, merge using
@@ -127,8 +149,25 @@ file to execute.
    If one has actually failed, stop and report; `.merge.admin_bypass.never_for` forbids
    bypassing it, and no user "yes" lifts that.
 
-6. After merge: `git checkout main && git pull`
+6. **Confirm the merge actually happened before doing anything post-merge.** A returned
+   `gh pr merge` is not proof — with `--auto` it never was, and a direct merge can still be
+   refused:
+
+   ```bash
+   gh pr view <N> --json state,mergedAt,mergeCommit
+   ```
+
+   Only when `state` is `MERGED` and `mergedAt` is non-null: `git checkout "${BASE}" && git pull`.
+   Otherwise report the live state and stop.
 
 ## Output
 
-Report: merged PR #, the merge strategy used, commit SHA, and any follow-ups needed.
+Exactly one of:
+
+- **Merged** — PR #, the merge strategy used, the merge commit SHA (from `mergeCommit`, not
+  assumed), and any follow-ups.
+- **Auto-merge armed** — PR #, the outstanding required checks, and an explicit statement that
+  the PR has **not** merged.
+- **Not merged** — PR #, and which gate stopped it.
+
+Never report a merge that `state: MERGED` has not confirmed.
