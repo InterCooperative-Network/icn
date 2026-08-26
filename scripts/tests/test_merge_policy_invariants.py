@@ -63,6 +63,11 @@ STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE          # DIRTY, BLOCKED, BE
 # No merge gate may accept a check that ran and did not pass.
 FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED",
                       "STALE", "STARTUP_FAILURE", "ERROR"}
+# The ONLY conclusions that mean "this check is finished and did not block the merge". A
+# conclusion allowlist may hold nothing else — in particular no pending state, which is a
+# different axis entirely and would make a still-running check read as ready.
+TERMINAL_SAFE = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+PENDING_STATES = {"QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED", "PENDING", "EXPECTED"}
 
 STRATEGY_FLAG_RE = re.compile(r"--(merge|squash|rebase)\b")
 
@@ -146,6 +151,15 @@ def check_state_gate(label, gate, *, must_include_clean):
           isinstance(done, list) and len(done) > 0)
     leaked = FAILED_CONCLUSIONS & set(done or [])
     check(f"{label}: no failing/aborted conclusion is allowlisted: {sorted(leaked)}", not leaked)
+    # Review of cc0c78a3: excluding the FAILING states is not enough. A PENDING state added to
+    # the CONCLUSION allowlist passed both this check and the separate "no pending allowlist
+    # key" check, and step 4 consumes the conclusion allowlist directly — so a pending required
+    # check would have read as ready. A closed set of terminal-safe values is the fail-closed
+    # shape, exactly as everywhere else in this file: not-listed blocks, rather than
+    # listed-as-bad blocks.
+    stray = sorted(set(done or []) - TERMINAL_SAFE)
+    check(f"{label}: conclusion allowlist holds only terminal-safe values: stray={stray}",
+          not stray)
 
 
 # `.merge.ready_when` is the ONLY gate an agent skill evaluates (icn#2656). It is the ordinary
@@ -155,8 +169,17 @@ ready = merge.get("ready_when", {})
 check_state_gate("ready_when", ready, must_include_clean=True)
 # Pending is not ready. An ordinary merge waits; it never arms and never bypasses, so a pending
 # allowlist here would be a state nobody decided about.
-check("ready_when allowlists no pending state at all",
+check("ready_when declares no pending allowlist key",
       isinstance(ready, dict) and "required_check_pending_allowlist" not in ready)
+check("ready_when smuggles no pending state into the CONCLUSION allowlist",
+      isinstance(ready, dict)
+      and not (PENDING_STATES & set(ready.get("required_check_conclusion_allowlist") or [])))
+# CONTROL: absence of the pending KEY was the only thing asserted before, and it passed on a
+# conclusion allowlist that contained a pending VALUE (icn#2656 review of cc0c78a3).
+_pending_leak = {"required_check_conclusion_allowlist": ["SUCCESS", "PENDING"]}
+check("CONTROL: a pending value in the conclusion allowlist WOULD be caught",
+      "required_check_pending_allowlist" not in _pending_leak
+      and bool(set(_pending_leak["required_check_conclusion_allowlist"]) - TERMINAL_SAFE))
 check("ready_when points at the enum note rather than restating it",
       isinstance(ready, dict) and ready.get("field_note_ref") == "merge.admin_bypass.field_note")
 # The gate must stay STRUCTURED. This is what replaces the deleted prose scanner: rather than
@@ -409,6 +432,18 @@ for name, canonical, mirrors in skill_paths:
     i_argjson = body.find("--argjson live")
     check(f"{name}: the UNAVAILABLE sentinel is caught before it reaches --argjson",
           i_guard != -1 and i_argjson != -1 and i_guard < i_argjson)
+    # Review of cc0c78a3: `[ ... ] && echo` made the HEALTHY path exit 1 and the unavailable
+    # path exit 0 — exactly inverted, so a ready merge looked like a failed command. The guard
+    # must be a conditional whose non-sentinel branch succeeds.
+    check(f"{name}: the sentinel guard is a conditional, not a trailing && list",
+          'if [ "${LIVE}" = "UNAVAILABLE" ]; then' in body
+          and '[ "${LIVE}" = "UNAVAILABLE" ] &&' not in body)
+    # Base revalidation: --match-head-commit pins the head and nothing pins the base.
+    check(f"{name}: revalidates head AND base immediately before merging",
+          "headRefOid,baseRefName" in cmd_text
+          and bool(re.search(r"nothing pins the base", " ".join(body.split()), re.I)))
+    check(f"{name}: a moved head or base refuses rather than proceeding",
+          bool(re.search(r"refuse and start over", " ".join(body.split()), re.I)))
     check(f"{name}: treats an unsuccessful protection load as missing evidence",
           bool(re.search(r"unsuccessful load is missing evidence", " ".join(body.split()), re.I))
           and "LIVE=UNAVAILABLE" in body)

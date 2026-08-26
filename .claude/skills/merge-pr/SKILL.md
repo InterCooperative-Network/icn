@@ -124,28 +124,37 @@ its job there.
    POLICY=$(jq -c '.merge.required_checks' ops/state/truth/policy.json)
    LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
             --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
-   [ "${LIVE}" = "UNAVAILABLE" ] && echo "base protection unavailable for ${BASE} — stop, not merged"
    ```
 
-   Stop on that sentinel **here**, before the table is built. `UNAVAILABLE` is not JSON, so
-   falling through hands `--argjson` a parse error instead of the clean refusal step 4 promises —
-   and an error is a worse way to learn you have no evidence than being told you have none. A
-   protected branch that genuinely declares no required contexts is a different case and is fine:
-   `.required_status_checks.contexts` is `null` there, and `null` is the identity for `+` in jq,
-   so the union is just `POLICY`.
-
-   Then build **one row per required check**, so that a check GitHub did not report becomes a
-   value rather than a gap:
+   Branch on that sentinel **before** the table is built, so the unavailable path never reaches
+   `--argjson`, and build **one row per required check** on the other side — a check GitHub did
+   not report becomes a value rather than a gap:
 
    ```bash
-   REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
-                          --argjson live "${LIVE}" '
-     ($policy + $live | unique) as $required
-     | INDEX($checks[]; .name) as $seen
-     | $required | map({name: .,
-                        state:  ($seen[.].state  // "ABSENT"),
-                        bucket: ($seen[.].bucket // "absent")})')
+   if [ "${LIVE}" = "UNAVAILABLE" ]; then
+     echo "STOP: base protection unavailable for ${BASE} — report Not merged, do not continue"
+   else
+     REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
+                            --argjson live "${LIVE}" '
+       ($policy + $live | unique) as $required
+       | INDEX($checks[]; .name) as $seen
+       | $required | map({name: .,
+                          state:  ($seen[.].state  // "ABSENT"),
+                          bucket: ($seen[.].bucket // "absent")})')
+   fi
    ```
+
+   `if`/`else`, not `[ ... ] && echo`. A trailing `&&` list makes the **healthy** path the failing
+   one: with `LIVE` holding real JSON the test is false, the whole block exits `1`, and an agent
+   applying this skill's own fail-closed rule would refuse a merge that was actually ready —
+   verified, healthy `1` / unavailable `0`, exactly inverted (icn#2656 review). Both branches of
+   the `if` exit `0`; which one ran is carried by the message, as everywhere else here.
+
+   `UNAVAILABLE` is not JSON, so falling through would hand `--argjson` a parse error instead of
+   the clean refusal step 4 promises — and an error is a worse way to learn you have no evidence
+   than being told you have none. A protected branch that genuinely declares **no** required
+   contexts is a different case and is fine: `.required_status_checks.contexts` is `null` there,
+   and `null` is the identity for `+` in jq, so the union is just `POLICY`.
 
    **Filtering for the states you expect loses the ones you did not.** `gh pr checks` sorts every
    check into one of *five* buckets — `pass`, `fail`, `pending`, `skipping`, `cancel` — so
@@ -232,7 +241,22 @@ its job there.
    every one of these, and none of them is a reason to acquire more authority.
 
 5. **Merge.** Only when step 4 held completely, and merging this PR is authorized by a human —
-   green checks are a precondition, not permission:
+   green checks are a precondition, not permission.
+
+   First confirm the PR is still the one the evidence describes:
+
+   ```bash
+   gh pr view <N> --json headRefOid,baseRefName
+   ```
+
+   Both must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the evidence is stale:
+   **refuse and start over.** `--match-head-commit` pins the head and **nothing pins the base** —
+   a retarget leaves the head SHA untouched, so the flag still succeeds while the merge lands on
+   a branch whose required-check set and protection were never inspected, and the gate you passed
+   was computed for a different base (icn#2656 review). GitHub still enforces the new base's own
+   protection, so this is a defect in the skill's *claim* rather than a way past a gate — but
+   reporting a merge as validated when it was validated against another branch is exactly the
+   false confidence the rest of this procedure exists to prevent.
 
    ```bash
    gh pr merge <N> --match-head-commit "${HEAD_OID}" --"${STRATEGY}"
