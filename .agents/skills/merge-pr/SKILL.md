@@ -124,7 +124,15 @@ its job there.
    POLICY=$(jq -c '.merge.required_checks' ops/state/truth/policy.json)
    LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
             --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
+   [ "${LIVE}" = "UNAVAILABLE" ] && echo "base protection unavailable for ${BASE} — stop, not merged"
    ```
+
+   Stop on that sentinel **here**, before the table is built. `UNAVAILABLE` is not JSON, so
+   falling through hands `--argjson` a parse error instead of the clean refusal step 4 promises —
+   and an error is a worse way to learn you have no evidence than being told you have none. A
+   protected branch that genuinely declares no required contexts is a different case and is fine:
+   `.required_status_checks.contexts` is `null` there, and `null` is the identity for `+` in jq,
+   so the union is just `POLICY`.
 
    Then build **one row per required check**, so that a check GitHub did not report becomes a
    value rather than a gap:

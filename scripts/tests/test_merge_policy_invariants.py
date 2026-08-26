@@ -403,6 +403,12 @@ for name, canonical, mirrors in skill_paths:
     check(f"{name}: reads review threads, and paginates them rather than reading one page",
           "reviewThreads" in cmd_text
           and all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
+    # `UNAVAILABLE` is a sentinel, not JSON. Reaching `--argjson` with it produces a parse error
+    # instead of the refusal step 4 promises, so the guard must come first.
+    i_guard = body.find('"${LIVE}" = "UNAVAILABLE"')
+    i_argjson = body.find("--argjson live")
+    check(f"{name}: the UNAVAILABLE sentinel is caught before it reaches --argjson",
+          i_guard != -1 and i_argjson != -1 and i_guard < i_argjson)
     check(f"{name}: treats an unsuccessful protection load as missing evidence",
           bool(re.search(r"unsuccessful load is missing evidence", " ".join(body.split()), re.I))
           and "LIVE=UNAVAILABLE" in body)
