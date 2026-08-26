@@ -73,8 +73,13 @@ file to execute.
      context on `${BASE}` would not hold the merge and the PR could land without it. Prove the
      pending policy-required checks are a subset of the live contexts first:
 
+     Use `bucket`, which normalises every pending spelling — queued, in-progress, waiting,
+     requested, expected — into one value. Matching a single state string instead misses the
+     rest, the same incomplete-enumeration fail-open that
+     `.requires.required_check_pending_allowlist` exists to prevent.
+
      ```bash
-     PENDING=$(gh pr checks <N> --json name,state --jq '[.[]|select(.state=="PENDING")|.name]')
+     PENDING=$(gh pr checks <N> --json name,bucket --jq '[.[]|select(.bucket=="pending")|.name]')
      POLICY=$(jq -r '.merge.required_checks' ops/state/truth/policy.json)
      LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" \
               --jq '.required_status_checks.contexts')
@@ -142,6 +147,14 @@ file to execute.
    6. At least one required check has been pending longer than
       `.requires.stalled_required_check.min_pending_minutes` with
       `.requires.stalled_required_check.elapsed_seconds` duration.
+
+   Only when **every** item above holds, perform the bypass — head-pinned like any other merge.
+   A policy that permits an exception the procedure never invokes is a policy the skill cannot
+   implement:
+
+   ```bash
+   gh pr merge <N> --match-head-commit "${HEAD_OID}" --admin --"${STRATEGY}"
+   ```
 
    `.merge.admin_bypass.fail_closed` governs everything else: if a field is absent, `UNKNOWN`,
    or ambiguous, **do not bypass**. "Branch protection blocked the merge" is not on its own a

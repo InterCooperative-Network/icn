@@ -353,8 +353,18 @@ for name, canonical, mirrors in skill_paths:
     # policy.json's. A policy-required check that is not a live protection context would not
     # hold the merge. And `--auto` returns without merging, so the procedure must not fall
     # through to post-merge steps or report a merge it has not confirmed.
+    # Review round 5: filtering on state=="PENDING" alone missed QUEUED/IN_PROGRESS/WAITING/
+    # REQUESTED/EXPECTED — the same incomplete enumeration the pending ALLOWLIST exists to
+    # avoid. `gh pr checks --json bucket` normalises all of them to one value.
     check(f"{name}: proves pending policy-required checks are live protection contexts",
-          "required_status_checks.contexts" in cmd_text and "PENDING" in body)
+          "required_status_checks.contexts" in cmd_text)
+    check(f"{name}: detects pending checks by normalised bucket, not one state spelling",
+          'bucket=="pending"' in cmd_text.replace(" ", "")
+          and 'state=="PENDING"' not in cmd_text.replace(" ", ""))
+    # A permitted exception the procedure never invokes is one the skill cannot perform.
+    admin_cmds = [c for c in commands if "--admin" in c]
+    check(f"{name}: actually invokes the authorized admin merge: {len(admin_cmds)}",
+          bool(admin_cmds) and all("--match-head-commit" in c for c in admin_cmds))
     check(f"{name}: stops after arming auto-merge instead of reporting a merge",
           "Then STOP" in body and "does not merge" in body)
     check(f"{name}: confirms merged state before the post-merge steps",
