@@ -498,6 +498,15 @@ for name, canonical, _m in skill_paths:
         ordinary = " ".join(stepping[auto_i][1].split())
         check("the ordinary path forbids escalation in prose too",
               bool(re.search(r"never to escalate|no admin escalation", ordinary, re.I)))
+        # Bounded audit, round 6: 5a/5b/5c covered green and both pending shapes and nothing
+        # else, so a FAILING required check fell through step 5 into the merged-state check and
+        # was refused only implicitly. An unhandled state on a merge path is a state nobody
+        # decided about.
+        check("the ordinary path handles a FAILING required check explicitly",
+              bool(re.search(r"A required check has failed", ordinary))
+              and bool(re.search(r"exhaustive", ordinary, re.I)))
+        check("and refuses rather than offering escalation",
+              bool(re.search(r"do not offer, suggest or escalate", ordinary, re.I)))
 
 # CONTROLS: the model must reject the round-5 shape it was written against.
 _r5 = ("## Steps\n\n3. pending\n\n   ```bash\n   gh pr merge <N> --auto --squash\n   ```\n\n"

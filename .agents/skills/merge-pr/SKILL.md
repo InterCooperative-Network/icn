@@ -206,6 +206,14 @@ existed for.
    disagree, and only the union of both being green is readiness. Do **not** enable auto-merge.
    Report and wait.
 
+   **5d · A required check has failed.** Not green, not pending — `FAILURE`, `TIMED_OUT`,
+   `CANCELLED`, `ACTION_REQUIRED`, `STALE`, `STARTUP_FAILURE`, a legacy `ERROR`, or any state
+   the allowlists do not name. **Refuse and report which check failed.** This is the case
+   `.merge.admin_bypass.never_for` exists for: do not offer, suggest or escalate to `--admin`,
+   and do not ask for the authorization that would unlock step 4. The four cases 5a–5d are
+   exhaustive by construction — green, pending-protected, pending-policy-only, everything else —
+   so no required-check state falls through step 5 unhandled.
+
 6. **Confirm the merge actually happened before doing anything post-merge.** A returned
    `gh pr merge` is not proof — with `--auto` it never was, and a direct merge can still be
    refused:
