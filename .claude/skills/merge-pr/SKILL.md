@@ -78,14 +78,21 @@ file to execute.
    The single exception is the one `.merge.exception` describes; state the reason explicitly
    when you invoke it.
 
-5. **`--admin` is not a way past a failing gate.** It is permitted only for a queue-stalled
-   runner. Check `.merge.admin_bypass.requires` mechanically against live state — every field,
-   not the summary:
-   - `mergeable` equals the required value (`MERGEABLE`);
-   - `mergeStateStatus` is one of `merge_state_status_in`;
-   - **no** required check has concluded with any value in `no_required_check_concluded`;
-   - at least one required check has been pending longer than `min_pending_minutes` with
-     `elapsed_seconds` duration.
+5. **`--admin` is not a way past a failing gate.** Check `.merge.admin_bypass` mechanically
+   against live state — every field, in this order, and stop at the first that does not hold:
+
+   1. `.merge.admin_bypass.allowed` is `true`. This is the owner's off switch: if it is `false`,
+      **there is no admin path at all** and the remaining requirements are not consulted.
+   2. `mergeable` equals `.requires.mergeable` (`MERGEABLE`).
+   3. `mergeStateStatus` is one of `.requires.merge_state_status_in`.
+   4. **Every** required check is either concluded with a value in
+      `.requires.required_check_conclusion_allowlist`, or pending with a state in
+      `.requires.required_check_pending_allowlist`. These are allowlists: a check in any other
+      state — `FAILURE`, `TIMED_OUT`, `CANCELLED`, `ACTION_REQUIRED`, `STALE`,
+      `STARTUP_FAILURE`, a legacy `ERROR`, or anything GitHub adds later — blocks the bypass.
+   5. At least one required check has been pending longer than
+      `.requires.stalled_required_check.min_pending_minutes` with
+      `.requires.stalled_required_check.elapsed_seconds` duration.
 
    `.merge.admin_bypass.fail_closed` governs everything else: if a field is absent, `UNKNOWN`,
    or ambiguous, **do not bypass**. "Branch protection blocked the merge" is not on its own a

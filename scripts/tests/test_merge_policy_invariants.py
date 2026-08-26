@@ -91,6 +91,34 @@ blob = json.dumps({k: v for k, v in merge.items() if k != "admin_bypass"}) + jso
 check("no `mergeStateStatus=MERGEABLE` anywhere in the policy",
       "mergeStateStatus=MERGEABLE" not in blob)
 
+# --- (1b) the bypass gate must be fail-closed and revocable ------------------
+# Review on #2656: a DENYLIST of bad conclusions silently permits any state nobody enumerated.
+# GitHub's check-run conclusions include `stale` and `startup_failure`; legacy commit statuses
+# add `error`. Only an allowlist is fail-closed against states GitHub has not invented yet.
+print("admin bypass is fail-closed and revocable")
+
+check("admin_bypass exposes an `allowed` switch the owner can flip",
+      isinstance(bypass.get("allowed"), bool))
+check("admin_bypass uses no conclusion DENYLIST",
+      isinstance(req, dict) and "no_required_check_concluded" not in req)
+if isinstance(req, dict):
+    allow_done = req.get("required_check_conclusion_allowlist")
+    allow_pend = req.get("required_check_pending_allowlist")
+    check("required_check_conclusion_allowlist is a non-empty list",
+          isinstance(allow_done, list) and len(allow_done) > 0)
+    check("required_check_pending_allowlist is a non-empty list",
+          isinstance(allow_pend, list) and len(allow_pend) > 0)
+    # A bypass that tolerates a failure is not a bypass exception, it is a bypass.
+    FORBIDDEN = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED",
+                 "STALE", "STARTUP_FAILURE", "ERROR"}
+    leaked = FORBIDDEN & set(allow_done or []) | FORBIDDEN & set(allow_pend or [])
+    check(f"no failing/aborted state is allowlisted: {sorted(leaked)}", not leaked)
+    check("the two allowlists are disjoint",
+          not (set(allow_done or []) & set(allow_pend or [])))
+
+# The skill must honour the off switch, and must consult BOTH allowlists.
+# (asserted against the skill body in section 4)
+
 # --- (2) required/non-required sets cannot overlap ---------------------------
 required = set(merge.get("required_checks", []))
 non_blocking = set(merge.get("non_blocking_checks", []))
@@ -179,6 +207,16 @@ for name, canonical, mirrors in skill_paths:
             and not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", c)]
     check(f"{name}: every gh pr view/checks/merge command is explicitly addressed: {bare}",
           not bare)
+    # Review on #2656: `allowed: false` must actually revoke the bypass. A skill that only
+    # checks `.requires` treats a present `false` as neither absent nor ambiguous.
+    check(f"{name}: gates the admin path on .merge.admin_bypass.allowed",
+          "admin_bypass.allowed" in body)
+    check(f"{name}: consults both required-check allowlists",
+          "required_check_conclusion_allowlist" in body
+          and "required_check_pending_allowlist" in body)
+    check(f"{name}: names the states an allowlist must exclude",
+          "STARTUP_FAILURE" in body and "STALE" in body)
+
     for mirror in mirrors:
         check(f"{name}: provider mirror {mirror.relative_to(ROOT)} is byte-identical",
               mirror.read_text(encoding="utf-8") == body)
@@ -188,6 +226,24 @@ check("CONTROL: the pre-#2651 skill body would FAIL the strategy-literal check",
       bool(MERGE_CMD_RE.search("3. If all checks are green, merge:\n   - `gh pr merge --merge`")))
 check("CONTROL: a bare `gh pr view --json state` would FAIL the addressing check",
       not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", "gh pr view --json state"))
+
+# --- (5) a disabled bypass must be expressible and must be honoured ----------
+print("a disabled bypass is expressible")
+
+_disabled = dict(bypass)
+_disabled["allowed"] = False
+check("CONTROL: `allowed: false` is a valid shape the owner can write",
+      _disabled["allowed"] is False and "requires" in _disabled)
+# The skill's own text must reach `allowed` BEFORE the detailed requirements, otherwise a
+# revoked bypass is still performed.
+for name, canonical, _m in skill_paths:
+    if name != "merge-pr":
+        continue
+    body = canonical.read_text(encoding="utf-8")
+    i_allowed = body.find("admin_bypass.allowed")
+    i_requires = body.find(".requires.mergeable")
+    check("merge-pr: `allowed` is checked before the detailed requirements",
+          i_allowed != -1 and i_requires != -1 and i_allowed < i_requires)
 
 print()
 if failures:
