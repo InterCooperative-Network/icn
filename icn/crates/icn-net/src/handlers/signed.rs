@@ -551,13 +551,15 @@ impl ConnectionContext {
                     // unique current key.
                     warn!(
                         from = %envelope.from,
-                        "Refusing hybrid envelope: live connections disagree about this                          sender's current ML-DSA key (#2646)"
+                        "Refusing hybrid envelope: live connections disagree about this \
+                         sender's current ML-DSA key (#2646)"
                     );
                     icn_obs::metrics::network::hybrid_verification_failed_inc(
                         icn_obs::metrics::network::HybridVerificationFailure::ConflictingPqKeys,
                     );
                     return Err(anyhow::anyhow!(
-                        "conflicting current ML-DSA keys for this sender; refusing rather than                          verifying classically"
+                        "conflicting current ML-DSA keys for this sender; refusing rather \
+                         than verifying classically"
                     ));
                 }
                 CurrentPqKey::NoCurrentKey => {
