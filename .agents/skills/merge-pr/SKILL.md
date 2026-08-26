@@ -84,9 +84,19 @@ its job there.
    stayed unconditionally `default_strategy`, so the exempt category was squash-merged anyway
    and the documented exception could not be applied at all.
 
-2. Resolve the PR **explicitly**. If `$ARGUMENTS` names a number, pass it to every `gh` call;
-   a bare `gh pr view` resolves the current branch's PR instead, which is how you merge the
-   wrong one:
+2. Resolve the PR **explicitly**, to exactly one number, before anything else reads it.
+
+   If `$ARGUMENTS` names a number, that is `<N>`. If it does not — the argument is optional —
+   resolve the current branch's PR **once**, and use the number it returns for every call after:
+
+   ```bash
+   N=$(gh pr view --json number --jq .number)
+   ```
+
+   This is the **only** unaddressed `gh pr view` in the procedure, and its only job is to produce
+   the number. Every later call names `<N>` explicitly, because a bare `gh pr view` re-resolves
+   the current branch each time — and a branch that changes underneath you is how you inspect one
+   PR and merge another. Resolve once, then address everything.
 
    ```bash
    gh pr view <N> --json number,title,headRefName,baseRefName,headRefOid,state,isDraft,mergeable,mergeStateStatus,reviewDecision

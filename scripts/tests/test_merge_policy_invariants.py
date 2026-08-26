@@ -383,10 +383,19 @@ for name, canonical, mirrors in skill_paths:
     check(f"{name}: substitutes the strategy from the policy", "${STRATEGY}" in body)
     check(f"{name}: does not shell-eval policy values",
           not any(EVAL_RE.search(c) for c in commands))
+    # Exactly ONE unaddressed call is legitimate: the no-argument resolver that produces the
+    # number. Review of 0a15481a: deleting it made `/merge-pr` with no argument unable to start,
+    # because every later command reused an unresolved `<N>`. It is exempted by SHAPE, not by
+    # position, so a second bare call cannot hide behind the exemption.
+    RESOLVER_RE = re.compile(r"^N=\$\(gh pr view --json number --jq \.number\)$")
+    resolvers = [c for c in commands if RESOLVER_RE.match(c)]
+    check(f"{name}: resolves the PR number when the argument is omitted: {len(resolvers)}",
+          len(resolvers) == 1)
     bare = [c for c in commands
             if re.search(r"gh pr (view|checks|merge)\b", c)
-            and not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", c)]
-    check(f"{name}: every gh pr view/checks/merge command is explicitly addressed: {bare}",
+            and not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", c)
+            and not RESOLVER_RE.match(c)]
+    check(f"{name}: every other gh pr view/checks/merge command is explicitly addressed: {bare}",
           not bare)
     check(f"{name}: captures headRefOid to pin against", "headRefOid" in body)
     check(f"{name}: reads protection for the PR's actual base, not a hardcoded main",
@@ -460,6 +469,41 @@ for name, canonical, mirrors in skill_paths:
     for mirror in mirrors:
         check(f"{name}: provider mirror {mirror.relative_to(ROOT)} is byte-identical",
               mirror.read_text(encoding="utf-8") == body)
+
+# --- (3d) the WHOLE registry, not just merge-pr --------------------------------------
+# Review of 0a15481a: `admin_bypass.agent_execution` claimed no agent skill executes the bypass
+# while `merge-prs` and `integrate-pr-stack` still did, so canonical policy asserted something
+# false. Scoping the assertions to `merge-pr` is correct for THIS PR — the other two are tracked
+# separately — but the CLAIM must be scoped to match, and the scope must be mechanically true.
+print("no unexpected skill can perform a privileged merge")
+
+PRIVILEGED_ALLOWED = {"merge-prs", "integrate-pr-stack"}
+privileged = set()
+for entry in registry.get("skills", {}).get("icn_level", []):
+    cp = ROOT / entry.get("canonical_path", "")
+    if not cp.exists():
+        continue
+    sbody = cp.read_text(encoding="utf-8")
+    # A skill can PERFORM a privileged merge only from a fenced command line. Prose and advice
+    # tables (repair-gh-workflow, watch-ci-and-advance) discuss `--admin` without running one.
+    if any(ADMIN_FLAG_RE.search(line) for line in fenced_lines(sbody)):
+        privileged.add(entry["name"])
+
+check(f"merge-pr cannot perform a privileged merge: privileged={sorted(privileged)}",
+      "merge-pr" not in privileged)
+unexpected = sorted(privileged - PRIVILEGED_ALLOWED)
+check(f"no skill outside the tracked set gained a privileged merge: {unexpected}",
+      not unexpected)
+# The policy's claim must NAME the skills that still have one, so it cannot silently overclaim.
+_agent_exec = merge.get("admin_bypass", {}).get("agent_execution", "")
+check("admin_bypass.agent_execution names every skill that still performs a bypass",
+      all(n in _agent_exec for n in sorted(privileged)))
+check("admin_bypass.agent_execution names merge-pr as the skill that does not",
+      "merge-pr" in _agent_exec)
+# CONTROL: the unnarrowed claim would have passed nothing here.
+_overclaim = "No agent skill performs, evaluates or routes to this bypass."
+check("CONTROL: the unnarrowed agent_execution claim WOULD be caught",
+      not all(n in _overclaim for n in sorted(privileged)))
 
 # CONTROLS: every authority check must reject the pre-#2656 skill text.
 _old_admin = ('   ```bash\n   gh pr merge <N> --match-head-commit "${HEAD_OID}" '
