@@ -492,9 +492,13 @@ for entry in registry.get("skills", {}).get("icn_level", []):
     if not cp.exists():
         continue
     sbody = cp.read_text(encoding="utf-8")
-    # A skill can PERFORM a privileged merge only from a fenced command line. Prose and advice
-    # tables (repair-gh-workflow, watch-ci-and-advance) discuss `--admin` without running one.
-    if any(ADMIN_FLAG_RE.search(line) for line in fenced_lines(sbody)):
+    # Review of e7a1b719: this scanned only FENCED lines while `extract_commands()` also treats
+    # inline command bullets (`- Run `gh pr merge <N> --admin``) as executable — a style used
+    # throughout these skills — so the whole-registry claim was unenforced for it. Use the same
+    # extractor, so "is this executable?" has ONE answer in this file. Prose and advice tables
+    # (repair-gh-workflow, watch-ci-and-advance) still do not match: their backticked tokens are
+    # `--admin` and `enforce_admins`, neither of which starts a command.
+    if any(ADMIN_FLAG_RE.search(c) for c in extract_commands(sbody)):
         privileged.add(entry["name"])
 
 check(f"merge-pr cannot perform a privileged merge: privileged={sorted(privileged)}",
@@ -512,6 +516,27 @@ check("admin_bypass.agent_execution names merge-pr as the skill that does not",
 _overclaim = "No agent skill performs, evaluates or routes to this bypass."
 check("CONTROL: the unnarrowed agent_execution claim WOULD be caught",
       not all(n in _overclaim for n in sorted(privileged)))
+
+# Review of e7a1b719: `agent_execution` was held to this standard and `ready_when.note` was not,
+# so it still claimed to be "the only merge gate an agent skill evaluates" while `merge-prs` and
+# `integrate-pr-stack` classify readiness without loading it. A gate is only the owner of what
+# actually reads it. Same check, same reason — an untested claim is the one that drifts.
+unmigrated = sorted(
+    entry["name"]
+    for entry in registry.get("skills", {}).get("icn_level", [])
+    if entry.get("name") in {"merge-prs", "integrate-pr-stack"}
+    and (ROOT / entry.get("canonical_path", "")).exists()
+    and "ready_when" not in (ROOT / entry["canonical_path"]).read_text(encoding="utf-8")
+)
+_rw_note = merge.get("ready_when", {}).get("note", "")
+check(f"ready_when.note names every merge skill that does NOT consume it: {unmigrated}",
+      all(n in _rw_note for n in unmigrated))
+check("ready_when.note does not claim to be the only gate any agent skill evaluates",
+      "the only merge gate an agent skill evaluates" not in _rw_note)
+_rw_overclaim = "the only merge gate an agent skill evaluates"
+check("CONTROL: the unnarrowed ready_when claim WOULD be caught",
+      _rw_overclaim in ("The structured definition of ready, and "
+                        "the only merge gate an agent skill evaluates."))
 
 # CONTROLS: every authority check must reject the pre-#2656 skill text.
 _old_admin = ('   ```bash\n   gh pr merge <N> --match-head-commit "${HEAD_OID}" '
