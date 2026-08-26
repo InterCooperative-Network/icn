@@ -451,6 +451,10 @@ for name, canonical, _m in skill_paths:
     if name != "merge-pr":
         continue
     md = canonical.read_text(encoding="utf-8")
+    # Prose assertions match against this. Markdown wraps phrases across lines, and a literal
+    # match has silently failed on the very text it was written to find five times in this
+    # file's history. Commands are still matched against `md`/`commands`, never `flat`.
+    flat = " ".join(md.split())
     stepping = numbered_steps(md)
     admin_i = auto_i = None
     for idx, (n, t) in enumerate(stepping):
@@ -495,7 +499,7 @@ for name, canonical, _m in skill_paths:
         check(f"no --admin command outside the authorized branch: {others}", not others)
         # Whitespace-normalised: the phrase wraps across lines in the rendered markdown, and
         # a literal match silently failed on the very text it was written to find.
-        ordinary = " ".join(stepping[auto_i][1].split())
+        ordinary = " ".join(stepping[auto_i][1].split())  # normalised: see `flat` above
         check("the ordinary path forbids escalation in prose too",
               bool(re.search(r"never to escalate|no admin escalation", ordinary, re.I)))
         # Bounded audit, round 6: 5a/5b/5c covered green and both pending shapes and nothing
@@ -507,6 +511,27 @@ for name, canonical, _m in skill_paths:
               and bool(re.search(r"exhaustive", ordinary, re.I)))
         check("and refuses rather than offering escalation",
               bool(re.search(r"do not offer, suggest or escalate", ordinary, re.I)))
+        # Final-head review of 10de4f3d. Route 2 of the authorization gate (fresh confirmation
+        # after a block) was unreachable: step 4 runs before step 5 and nothing routed back —
+        # the same unreachable-branch class as the round-6 finding, reintroduced one step over.
+        check("a blocked stalled state can return to the admin gate",
+              bool(re.search(r"return to step 4", ordinary, re.I)))
+        check("...but only from the stalled states, never from the failing one",
+              bool(re.search(r"5d must never offer one|do not offer, suggest or escalate",
+                             flat, re.I)))
+        # `--match-head-commit` pins the head and nothing pins the base; a retarget leaves the
+        # head unchanged while the admin merge lands on protection never inspected.
+        admin_txt = stepping[admin_i][1]
+        admin_flat = " ".join(admin_txt.split())
+        check("the admin path revalidates head AND base immediately before the bypass",
+              "headRefOid,baseRefName" in admin_txt
+              and bool(re.search(r"nothing pins the base", admin_flat, re.I)))
+        check("a moved head or base refuses rather than proceeding",
+              bool(re.search(r"refuse and start over", admin_flat, re.I)))
+        # An unsuccessful protection load is missing evidence, not "no requirements".
+        check("an unavailable protection load is treated as missing evidence",
+              bool(re.search(r"unsuccessful load is missing evidence", flat, re.I))
+              and "LIVE=UNAVAILABLE" in md)
 
 # CONTROLS: the model must reject the round-5 shape it was written against.
 _r5 = ("## Steps\n\n3. pending\n\n   ```bash\n   gh pr merge <N> --auto --squash\n   ```\n\n"

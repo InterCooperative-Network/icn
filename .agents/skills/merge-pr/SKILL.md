@@ -99,9 +99,16 @@ existed for.
      PENDING=$(gh pr checks <N> --json name,bucket --jq '[.[]|select(.bucket=="pending")|.name]')
      POLICY=$(jq -r '.merge.required_checks' ops/state/truth/policy.json)
      LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" \
-              --jq '.required_status_checks.contexts')
+              --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
      # (PENDING ∩ POLICY) is the set the paths below reason about
      ```
+
+     A slashed base such as `feat/next` resolves in that path as-is — verified against the live
+     API, which returns the same result encoded or not. What is *not* safe is failing to check:
+     a 404 (`Branch not protected`), a permissions error and a genuinely empty context list are
+     three different facts that all leave `LIVE` looking empty. **An unsuccessful load is
+     missing evidence, not "no requirements".** Do not arm auto-merge and do not bypass on it —
+     report and stop.
 
    **Now choose the path.** Admin escalation is taken only when it was explicitly authorized for
    *this* escalation — see step 4. Otherwise go to step 5. Never arrive at the admin path by
@@ -114,9 +121,12 @@ existed for.
    `"go ahead"` is **never** retroactively read as admin authorization:
 
    1. `$ARGUMENTS` includes `--admin` — the user invoked the escalation themselves; or
-   2. the ordinary path was blocked and you obtained a **fresh confirmation** whose wording said
-      that this action will use **administrator privileges to override branch protection** for
+   2. you arrived here from **5b or 5c** — a required check stalled, which is the only state
+      this exception exists for — and obtained a **fresh confirmation** whose wording said that
+      this action will use **administrator privileges to override branch protection** for
       **this PR**. Solicited for this escalation, in this invocation, naming this PR number.
+      That is the only return path into this step; 5a needs no escalation and **5d must never
+      offer one**.
 
    That authorization is scoped to this PR and this invocation. It does not carry to another PR,
    to a later invocation, or to a different head. If neither holds, **there is no admin path**:
@@ -154,8 +164,17 @@ existed for.
       `.requires.stalled_required_check.min_pending_minutes` with
       `.requires.stalled_required_check.elapsed_seconds` duration.
 
-   Only when authorization holds **and** every item above holds, perform the bypass —
-   head-pinned like any other merge:
+   Only when authorization holds **and** every item above holds, re-read the PR and confirm it
+   is still the one you gathered evidence about. `--match-head-commit` pins the head and
+   **nothing pins the base**: a retarget leaves the head SHA unchanged, so the flag still
+   succeeds while `--admin` merges into a branch whose protection you never inspected.
+
+   ```bash
+   gh pr view <N> --json headRefOid,baseRefName
+   ```
+
+   Both must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the evidence is stale:
+   **refuse and start over.** Then, and only then:
 
    ```bash
    gh pr merge <N> --match-head-commit "${HEAD_OID}" --admin --"${STRATEGY}"
@@ -202,9 +221,15 @@ existed for.
    still open. Do not run the post-merge steps and do not report a merge. Report the live state:
    auto-merge armed, which checks are outstanding, and that the PR has not merged.
 
+   *Escalation return path:* if the stall persists and the operator wants the queue-stall
+   exception, solicit the fresh confirmation described in step 4 route 2 and, if it is granted,
+   **return to step 4** and evaluate the complete gate there. Do not merge with `--admin` from
+   here.
+
    **5c · A pending policy-required check is missing from `LIVE`.** The two authorities
    disagree, and only the union of both being green is readiness. Do **not** enable auto-merge.
-   Report and wait.
+   Report and wait. The same *escalation return path* as 5b applies: a fresh confirmation per
+   step 4 route 2 returns to step 4, never to an `--admin` command here.
 
    **5d · A required check has failed.** Not green, not pending — `FAILURE`, `TIMED_OUT`,
    `CANCELLED`, `ACTION_REQUIRED`, `STALE`, `STARTUP_FAILURE`, a legacy `ERROR`, or any state
