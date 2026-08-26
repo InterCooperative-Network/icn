@@ -85,12 +85,23 @@ file to execute.
       **there is no admin path at all** and the remaining requirements are not consulted.
    2. `mergeable` equals `.requires.mergeable` (`MERGEABLE`).
    3. `mergeStateStatus` is one of `.requires.merge_state_status_in`.
-   4. **Every** required check is either concluded with a value in
+   4. The gates `--admin` would *also* bypass are independently clear — it overrides **every**
+      branch protection, not just the check gate, so these mirror the top-level
+      `readiness_definition`: `isDraft` equals `.requires.is_draft`, `reviewDecision` is not in
+      `.requires.review_decision_not_in`, and the unresolved review-thread count equals
+      `.requires.unresolved_review_threads`. If any cannot be loaded, that is missing evidence
+      — do not bypass.
+      ```bash
+      gh pr view <N> --json isDraft,reviewDecision
+      gh api graphql -f query='query($n:Int!){repository(owner:"InterCooperative-Network",name:"icn"){
+        pullRequest(number:$n){reviewThreads(first:100){nodes{isResolved}}}}}' -F n=<N>
+      ```
+   5. **Every** required check is either concluded with a value in
       `.requires.required_check_conclusion_allowlist`, or pending with a state in
       `.requires.required_check_pending_allowlist`. These are allowlists: a check in any other
       state — `FAILURE`, `TIMED_OUT`, `CANCELLED`, `ACTION_REQUIRED`, `STALE`,
       `STARTUP_FAILURE`, a legacy `ERROR`, or anything GitHub adds later — blocks the bypass.
-   5. At least one required check has been pending longer than
+   6. At least one required check has been pending longer than
       `.requires.stalled_required_check.min_pending_minutes` with
       `.requires.stalled_required_check.elapsed_seconds` duration.
 

@@ -41,6 +41,12 @@
           "BLOCKED",
           "UNSTABLE"
         ],
+        "is_draft": false,
+        "review_decision_not_in": [
+          "CHANGES_REQUESTED",
+          "REVIEW_REQUIRED"
+        ],
+        "unresolved_review_threads": 0,
         "required_check_conclusion_allowlist": [
           "SUCCESS",
           "NEUTRAL",
@@ -62,7 +68,8 @@
       "field_note": "`MERGEABLE` is a value of the `mergeable` field (GraphQL `MergeableState`: MERGEABLE | CONFLICTING | UNKNOWN). `mergeStateStatus` is a DIFFERENT enum (`MergeStateStatus`: DIRTY | UNKNOWN | BLOCKED | BEHIND | UNSTABLE | HAS_HOOKS | CLEAN) and never takes the value MERGEABLE. Until icn#2656 this condition read `mergeStateStatus=MERGEABLE`, which no PR can ever satisfy, so the documented exception was unreachable as written. Re-verify with: gh api graphql -f query='{__type(name:\"MergeStateStatus\"){enumValues{name}}}'",
       "fail_closed": "If any field above is absent, UNKNOWN, or ambiguous, do NOT bypass. Absence of evidence that a runner is stalled is not evidence that it is.",
       "never_for": "Bypassing genuinely failing required checks",
-      "allowlist_note": "Every required check must be in one of the two allowlists above: acceptably CONCLUDED, or genuinely PENDING. An allowlist rather than a denylist because a denylist silently permits any state nobody enumerated \u2014 GitHub's check-run conclusions include `stale` and `startup_failure`, and legacy commit statuses add `error`, none of which the pre-review denylist named (icn#2656 review). Anything outside both lists blocks the bypass by construction, including a state GitHub adds in future."
+      "allowlist_note": "Every required check must be in one of the two allowlists above: acceptably CONCLUDED, or genuinely PENDING. An allowlist rather than a denylist because a denylist silently permits any state nobody enumerated \u2014 GitHub's check-run conclusions include `stale` and `startup_failure`, and legacy commit statuses add `error`, none of which the pre-review denylist named (icn#2656 review). Anything outside both lists blocks the bypass by construction, including a state GitHub adds in future.",
+      "scope_note": "`--admin` bypasses EVERY branch protection, not only the check gate, so these requirements must reproduce every clause of the top-level readiness_definition that a bypass would otherwise skip \u2014 draft state, review decision and unresolved threads included (icn#2656 review). A stalled runner is the only condition this exception exists for; it is not a reason to skip a review gate that is independently unmet."
     },
     "auto_merge": {
       "use_when": "A required check is still pending (not failed)",
@@ -94,7 +101,7 @@
     "No CHANGES_REQUESTED reviews outstanding",
     "All PR comment threads resolved",
     "Branch is up-to-date with main (strict mode)",
-    "mergeStateStatus is MERGEABLE or UNSTABLE (UNSTABLE = non-blocking checks only)"
+    "mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE (UNSTABLE = non-blocking checks only). MERGEABLE is a value of `mergeable`, never of `mergeStateStatus` \u2014 see merge.admin_bypass.field_note."
   ],
   "workspace": {
     "rust_commands_run_from": "icn/",

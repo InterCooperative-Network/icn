@@ -85,11 +85,87 @@ if isinstance(req, dict):
     check("admin bypass is not permitted on a CLEAN merge state",
           isinstance(mss, list) and "CLEAN" not in mss)
 
-# The whole policy blob must not compare any field against a value its enum cannot hold.
-blob = json.dumps({k: v for k, v in merge.items() if k != "admin_bypass"}) + json.dumps(
-    {k: v for k, v in bypass.items() if k != "field_note"})
-check("no `mergeStateStatus=MERGEABLE` anywhere in the policy",
-      "mergeStateStatus=MERGEABLE" not in blob)
+# The WHOLE FILE must not associate either field with a value the other's enum owns. Review on
+# #2656 caught the first version of this check: it rejected the one literal
+# `mergeStateStatus=MERGEABLE` and sailed past `readiness_definition`'s
+# "mergeStateStatus is MERGEABLE or UNSTABLE" — the identical truth conflict, spelled with a
+# word instead of an `=`, in a top-level key the check never looked at. A guard that only knows
+# one spelling of a defect is a guard against that spelling, not against the defect.
+print("no field is associated with the other enum's values, anywhere in the file")
+
+# Values each enum owns EXCLUSIVELY. UNKNOWN is in both, so it proves nothing and is omitted.
+MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS       # MERGEABLE, CONFLICTING
+STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE          # DIRTY, BLOCKED, BEHIND, ...
+
+# Keys whose whole purpose is to DOCUMENT the confusion. Excluded by name, not by pattern, so
+# adding a new prose key cannot silently widen the exemption.
+DOC_KEYS = {"field_note", "allowlist_note", "scope_note", "note",
+            "agent_tooling_check_note", "description"}
+
+
+def walk_strings(node, key=None, path="$"):
+    """Yield (path, key, string) for every string value in the document."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from walk_strings(v, k, f"{path}.{k}")
+    elif isinstance(node, list):
+        for n, v in enumerate(node):
+            yield from walk_strings(v, key, f"{path}[{n}]")
+    elif isinstance(node, str):
+        yield path, key, node
+
+
+# An association holds only inside ONE clause about ONE field. The window therefore ends at the
+# next mention of EITHER field — otherwise "mergeable is MERGEABLE, and mergeStateStatus is
+# CLEAN" reads as `mergeable … CLEAN` and the checker flags the sentence that states the rule
+# correctly. It also ends at a sentence break or a negation, so prose that says a field NEVER
+# takes a value is not read as saying it does.
+# CASE-SENSITIVE on purpose: the field names are camelCase and the enum values are UPPERCASE,
+# so an IGNORECASE pattern made `mergeable` match the VALUE `MERGEABLE` and truncated the
+# window to nothing — which silently disarmed the whole check. Caught by its own controls.
+FIELD_RE = re.compile(r"\bmergeStateStatus\b|\bmergeable\b")
+
+
+def associations(text: str, field: str, values: set[str]) -> list[str]:
+    hits = []
+    for m in re.finditer(rf"\b{field}\b", text):
+        rest = text[m.end():]
+        nxt = FIELD_RE.search(rest)
+        window = rest[: nxt.start()] if nxt else rest[:80]
+        window = re.split(r"[.;]|\bnever\b|\bnot\b|\bdifferent\b", window, maxsplit=1)[0]
+        for v in values:
+            if re.search(rf"\b{v}\b", window):
+                hits.append(f"{field} … {v}")
+    return hits
+
+
+whole = json.loads(POLICY.read_text(encoding="utf-8"))
+conflicts = []
+for path, key, text in walk_strings(whole):
+    if key in DOC_KEYS:
+        continue
+    conflicts += [f"{path}: {h}" for h in associations(text, "mergeStateStatus", MERGEABLE_ONLY)]
+    conflicts += [f"{path}: {h}" for h in associations(text, "mergeable", STATUS_ONLY)]
+check(f"no cross-enum field/value association in any string: {conflicts}", not conflicts)
+
+# CONTROLS: the scanner must catch BOTH spellings of the defect, in ANY key.
+_c1 = associations("Required checks green AND mergeStateStatus=MERGEABLE but stalled",
+                   "mergeStateStatus", MERGEABLE_ONLY)
+check("CONTROL: catches the `mergeStateStatus=MERGEABLE` spelling", bool(_c1))
+_c2 = associations("mergeStateStatus is MERGEABLE or UNSTABLE", "mergeStateStatus", MERGEABLE_ONLY)
+check("CONTROL: catches the `mergeStateStatus is MERGEABLE` spelling", bool(_c2))
+_c3 = associations("mergeable is CLEAN", "mergeable", STATUS_ONLY)
+check("CONTROL: catches the reverse confusion (`mergeable is CLEAN`)", bool(_c3))
+# ...and must NOT fire on the note that documents the distinction.
+_c4 = associations("`mergeStateStatus` is a DIFFERENT enum and never takes the value MERGEABLE",
+                   "mergeStateStatus", MERGEABLE_ONLY)
+check("CONTROL: does not fire on prose documenting the distinction", not _c4)
+_c5 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
+                   "mergeable", STATUS_ONLY)
+check("CONTROL: a correct two-field sentence is not a conflict", not _c5)
+_c6 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
+                   "mergeStateStatus", MERGEABLE_ONLY)
+check("CONTROL: ...and its second clause is clean too", not _c6)
 
 # --- (1b) the bypass gate must be fail-closed and revocable ------------------
 # Review on #2656: a DENYLIST of bad conclusions silently permits any state nobody enumerated.
@@ -118,6 +194,29 @@ if isinstance(req, dict):
 
 # The skill must honour the off switch, and must consult BOTH allowlists.
 # (asserted against the skill body in section 4)
+
+# --- (1c) the bypass must not skip gates readiness independently requires ----
+# `--admin` bypasses EVERY branch protection, not only the check gate. Review on #2656: with a
+# stalled runner AND a CHANGES_REQUESTED review, every check-shaped requirement still held.
+print("admin bypass reproduces the readiness review gates")
+
+readiness = " ".join(whole.get("readiness_definition", []))
+if isinstance(req, dict):
+    check("bypass refuses a draft PR", req.get("is_draft") is False)
+    rd_block = req.get("review_decision_not_in")
+    check("bypass refuses CHANGES_REQUESTED",
+          isinstance(rd_block, list) and "CHANGES_REQUESTED" in rd_block)
+    check("bypass refuses unresolved review threads",
+          req.get("unresolved_review_threads") == 0)
+    # Tie the two documents together so neither can drift alone.
+    if "CHANGES_REQUESTED" in readiness:
+        check("readiness requires no CHANGES_REQUESTED, and so does the bypass",
+              isinstance(rd_block, list) and "CHANGES_REQUESTED" in rd_block)
+    if "threads resolved" in readiness:
+        check("readiness requires resolved threads, and so does the bypass",
+              req.get("unresolved_review_threads") == 0)
+check("admin_bypass states why it must mirror readiness",
+      bool(bypass.get("scope_note")))
 
 # --- (2) required/non-required sets cannot overlap ---------------------------
 required = set(merge.get("required_checks", []))
@@ -216,6 +315,10 @@ for name, canonical, mirrors in skill_paths:
           and "required_check_pending_allowlist" in body)
     check(f"{name}: names the states an allowlist must exclude",
           "STARTUP_FAILURE" in body and "STALE" in body)
+    # The bypass overrides every protection, so the skill must check the review gates too.
+    check(f"{name}: checks the gates --admin would also bypass",
+          all(t in body for t in ("is_draft", "review_decision_not_in",
+                                  "unresolved_review_threads")))
 
     for mirror in mirrors:
         check(f"{name}: provider mirror {mirror.relative_to(ROOT)} is byte-identical",
