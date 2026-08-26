@@ -7,13 +7,28 @@ drift got past every existing gate:
   1. The owner named a field that cannot hold the value it was compared against.
      `admin_bypass.condition` read `mergeStateStatus=MERGEABLE`. `MERGEABLE` is a member of
      GitHub's `MergeableState` enum (the `mergeable` field); `mergeStateStatus` is
-     `MergeStateStatus` and has no such member. The documented admin exception was therefore
+     `MergeStateStatus` and has no such member. The documented exception was therefore
      unsatisfiable, and nothing noticed because prose is not type-checked.
 
   2. A consumer restated a value the owner owns. `.agents/skills/merge-pr/SKILL.md` merged with
-     `--merge` while `default_strategy` was `squash`, and `auto_merge.command` baked `--squash`
-     into a string inside the owner itself — so the owner duplicated its own field and could
-     contradict it.
+     `--merge` while `default_strategy` was `squash`.
+
+WHAT THIS FILE DOES NOT DO, on purpose (icn#2656 final correction). An earlier revision tried to
+close (1) by scanning every string in the policy for `field ... VALUE` associations, with a
+clause window that ended at a sentence break or a negation. Review kept finding inputs it got
+wrong — the last being `mergeStateStatus must not remain UNKNOWN and instead must be MERGEABLE`,
+where a `not` negating one value silently truncated the window before another. Each fix added
+grammar. That is a natural-language parser wearing a test's clothes, and its failure mode is a
+false negative: silence that reads as proof.
+
+The fix was structural, not grammatical. Facts that must mechanically agree now live in
+STRUCTURED policy (`.merge.ready_when`), where they are compared as JSON values against pinned
+GitHub enums. Prose that used to carry those facts now points at the structured owner instead.
+
+Prose is still checked, but only by ABSENCE: "this token appears nowhere". An absence assertion
+has no grammar to get wrong — no clause window, no negation handling, so no false negative of
+the kind that kept reappearing. Where prose must not carry an operative value, the test proves
+the value is not there, rather than trying to work out what the sentence means.
 
 Every MUST-FAIL case below is a reconstruction of real pre-fix state; the controls prove the
 checks are not simply failing on everything.
@@ -42,6 +57,13 @@ MERGE_STATE_STATUS = {
 GH_MERGE_STRATEGIES = {"merge", "squash", "rebase"}
 # gh api graphql -f query='{__type(name:"PullRequestReviewDecision"){enumValues{name}}}'
 REVIEW_DECISIONS = {"CHANGES_REQUESTED", "APPROVED", "REVIEW_REQUIRED"}
+# Values each enum owns EXCLUSIVELY. UNKNOWN is in both, so it proves nothing.
+MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS       # MERGEABLE, CONFLICTING
+STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE          # DIRTY, BLOCKED, BEHIND, ...
+# No merge gate may accept a check that ran and did not pass.
+FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED",
+                      "STALE", "STARTUP_FAILURE", "ERROR"}
+
 STRATEGY_FLAG_RE = re.compile(r"--(merge|squash|rebase)\b")
 
 failures = []
@@ -55,217 +77,142 @@ def check(desc, cond):
         failures.append(desc)
 
 
-merge = json.loads(POLICY.read_text(encoding="utf-8"))["merge"]
+whole = json.loads(POLICY.read_text(encoding="utf-8"))
+merge = whole["merge"]
 
-# --- (1) impossible field/value combinations in the canonical policy ---------
+# --- (1) the canonical policy is structurally coherent ----------------------
 print("field/value coherence")
 
 strategy = merge.get("default_strategy")
 check(f"default_strategy {strategy!r} is a real gh pr merge strategy",
       strategy in GH_MERGE_STRATEGIES)
 
-bypass = merge.get("admin_bypass", {})
-req = bypass.get("requires")
-check("admin_bypass declares machine-checkable `requires`, not only prose",
-      isinstance(req, dict) and req != {})
-check("admin_bypass still declares never_for", bool(bypass.get("never_for")))
-check("admin_bypass declares fail_closed behaviour", bool(bypass.get("fail_closed")))
-
-if isinstance(req, dict):
-    check(f"requires.mergeable {req.get('mergeable')!r} is a MergeableState member",
-          req.get("mergeable") in MERGEABLE_STATE)
-    mss = req.get("merge_state_status_in", [])
-    check("requires.merge_state_status_in is a non-empty list",
-          isinstance(mss, list) and len(mss) > 0)
-    check(f"every merge_state_status_in value is a MergeStateStatus member: {mss}",
-          isinstance(mss, list) and all(v in MERGE_STATE_STATUS for v in mss))
-    # THE REGRESSION. The pre-fix owner compared mergeStateStatus against MERGEABLE.
-    check("no MergeableState value has leaked into a mergeStateStatus field",
-          isinstance(mss, list)
-          and not (set(mss) & (MERGEABLE_STATE - MERGE_STATE_STATUS)))
-    # CLEAN needs no bypass; permitting it would make the exception a general bypass.
-    check("admin bypass is not permitted on a CLEAN merge state",
-          isinstance(mss, list) and "CLEAN" not in mss)
-
-# The WHOLE FILE must not associate either field with a value the other's enum owns. Review on
-# #2656 caught the first version of this check: it rejected the one literal
-# `mergeStateStatus=MERGEABLE` and sailed past `readiness_definition`'s
-# "mergeStateStatus is MERGEABLE or UNSTABLE" — the identical truth conflict, spelled with a
-# word instead of an `=`, in a top-level key the check never looked at. A guard that only knows
-# one spelling of a defect is a guard against that spelling, not against the defect.
-print("no field is associated with the other enum's values, anywhere in the file")
-
-# Values each enum owns EXCLUSIVELY. UNKNOWN is in both, so it proves nothing and is omitted.
-MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS       # MERGEABLE, CONFLICTING
-STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE          # DIRTY, BLOCKED, BEHIND, ...
-
-# EXACTLY ONE key is exempt: `field_note` exists to state "mergeStateStatus ... never takes the
-# value MERGEABLE", which no negation-aware scanner should have to special-case twice. Review on
-# #2656 was right that the earlier set was too broad — `note` and `description` are generic
-# names, and `auto_merge.note` carries operative instructions, so a conflict planted there would
-# have left this "whole-file" test green. Everything else is scanned; the window rules
-# (stop at the next field, at a sentence break, at a negation) are what let genuine prose pass.
-DOC_KEYS = {"field_note"}
-
-
-def walk_strings(node, key=None, path="$"):
-    """Yield (path, key, string) for every string value in the document."""
-    if isinstance(node, dict):
-        for k, v in node.items():
-            yield from walk_strings(v, k, f"{path}.{k}")
-    elif isinstance(node, list):
-        for n, v in enumerate(node):
-            yield from walk_strings(v, key, f"{path}[{n}]")
-    elif isinstance(node, str):
-        yield path, key, node
-
-
-# An association holds only inside ONE clause about ONE field. The window therefore ends at the
-# next mention of EITHER field — otherwise "mergeable is MERGEABLE, and mergeStateStatus is
-# CLEAN" reads as `mergeable … CLEAN` and the checker flags the sentence that states the rule
-# correctly. It also ends at a sentence break or a negation, so prose that says a field NEVER
-# takes a value is not read as saying it does.
-# CASE-SENSITIVE on purpose: the field names are camelCase and the enum values are UPPERCASE,
-# so an IGNORECASE pattern made `mergeable` match the VALUE `MERGEABLE` and truncated the
-# window to nothing — which silently disarmed the whole check. Caught by its own controls.
-FIELD_RE = re.compile(r"\bmergeStateStatus\b|\bmergeable\b")
-
-
-# The clause ends where MEANING ends: at the next field, a sentence break, or a negation.
-# Never at a character count — an 80-char cutoff let
-# "mergeStateStatus must, after every required check ... be MERGEABLE" (value at offset 119)
-# read as clean, missing the identical conflict a short clause caught (icn#2656 final-head
-# review). A longer number would only move the blind spot.
-CLAUSE_END = re.compile(r"[.;]|\bnever\b|\bnot\b|\bdifferent\b")
-
-
-def associations(text: str, field: str, values: set[str]) -> list[str]:
-    hits = []
-    for m in re.finditer(rf"\b{field}\b", text):
-        rest = text[m.end():]
-        nxt = FIELD_RE.search(rest)
-        window = rest[: nxt.start()] if nxt else rest   # to the next field, or to the end
-        window = CLAUSE_END.split(window, maxsplit=1)[0]  # then to the clause terminator
-        for v in values:
-            if re.search(rf"\b{v}\b", window):
-                hits.append(f"{field} … {v}")
-    return hits
-
-
-whole = json.loads(POLICY.read_text(encoding="utf-8"))
-conflicts = []
-for path, key, text in walk_strings(whole):
-    if key in DOC_KEYS:
-        continue
-    conflicts += [f"{path}: {h}" for h in associations(text, "mergeStateStatus", MERGEABLE_ONLY)]
-    conflicts += [f"{path}: {h}" for h in associations(text, "mergeable", STATUS_ONLY)]
-check(f"no cross-enum field/value association in any string: {conflicts}", not conflicts)
-
-# CONTROLS: the scanner must catch BOTH spellings of the defect, in ANY key.
-_c1 = associations("Required checks green AND mergeStateStatus=MERGEABLE but stalled",
-                   "mergeStateStatus", MERGEABLE_ONLY)
-check("CONTROL: catches the `mergeStateStatus=MERGEABLE` spelling", bool(_c1))
-_c2 = associations("mergeStateStatus is MERGEABLE or UNSTABLE", "mergeStateStatus", MERGEABLE_ONLY)
-check("CONTROL: catches the `mergeStateStatus is MERGEABLE` spelling", bool(_c2))
-_c3 = associations("mergeable is CLEAN", "mergeable", STATUS_ONLY)
-check("CONTROL: catches the reverse confusion (`mergeable is CLEAN`)", bool(_c3))
-# ...and must NOT fire on the note that documents the distinction.
-_c4 = associations("`mergeStateStatus` is a DIFFERENT enum and never takes the value MERGEABLE",
-                   "mergeStateStatus", MERGEABLE_ONLY)
-check("CONTROL: does not fire on prose documenting the distinction", not _c4)
-_c5 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
-                   "mergeable", STATUS_ONLY)
-check("CONTROL: a correct two-field sentence is not a conflict", not _c5)
-# Final-head review of 569e0a73: the scan stopped at 80 characters, so the same conflict in a
-# longer operative clause read as clean. Bounded by meaning now, not by length.
-_long_bad = ("mergeStateStatus must, after every required check and review gate has been "
-             "independently inspected and found clear, be MERGEABLE")
-check("CONTROL: a LONG invalid clause is caught (value at offset > 80)",
-      bool(associations(_long_bad, "mergeStateStatus", MERGEABLE_ONLY)))
-_long_ok = ("mergeStateStatus must, after every required check and review gate has been "
-            "independently inspected and found clear, be CLEAN or UNSTABLE")
-check("CONTROL: a LONG valid clause stays clean",
-      not associations(_long_ok, "mergeStateStatus", MERGEABLE_ONLY))
-_later = "mergeStateStatus is checked first. Separately, MERGEABLE is a mergeable value."
-check("CONTROL: a value in a LATER sentence is not associated backward",
-      not associations(_later, "mergeStateStatus", MERGEABLE_ONLY))
-_long_rev = ("mergeable must, after every required check and review gate has been "
-             "independently inspected and found clear, be CLEAN")
-check("CONTROL: the reverse confusion is caught in a long clause too",
-      bool(associations(_long_rev, "mergeable", STATUS_ONLY)))
-_c6 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
-                   "mergeStateStatus", MERGEABLE_ONLY)
-check("CONTROL: ...and its second clause is clean too", not _c6)
-
-# --- (1b) the bypass gate must be fail-closed and revocable ------------------
-# Review on #2656: a DENYLIST of bad conclusions silently permits any state nobody enumerated.
-# GitHub's check-run conclusions include `stale` and `startup_failure`; legacy commit statuses
-# add `error`. Only an allowlist is fail-closed against states GitHub has not invented yet.
-print("admin bypass is fail-closed and revocable")
-
-check("admin_bypass exposes an `allowed` switch the owner can flip",
-      isinstance(bypass.get("allowed"), bool))
-check("admin_bypass uses no conclusion DENYLIST",
-      isinstance(req, dict) and "no_required_check_concluded" not in req)
-if isinstance(req, dict):
-    allow_done = req.get("required_check_conclusion_allowlist")
-    allow_pend = req.get("required_check_pending_allowlist")
-    check("required_check_conclusion_allowlist is a non-empty list",
-          isinstance(allow_done, list) and len(allow_done) > 0)
-    check("required_check_pending_allowlist is a non-empty list",
-          isinstance(allow_pend, list) and len(allow_pend) > 0)
-    # A bypass that tolerates a failure is not a bypass exception, it is a bypass.
-    FORBIDDEN = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED",
-                 "STALE", "STARTUP_FAILURE", "ERROR"}
-    leaked = FORBIDDEN & set(allow_done or []) | FORBIDDEN & set(allow_pend or [])
-    check(f"no failing/aborted state is allowlisted: {sorted(leaked)}", not leaked)
-    check("the two allowlists are disjoint",
-          not (set(allow_done or []) & set(allow_pend or [])))
-
-# The skill must honour the off switch, and must consult BOTH allowlists.
-# (asserted against the skill body in section 4)
-
-# --- (1c) the bypass must not skip gates readiness independently requires ----
-# `--admin` bypasses EVERY branch protection, not only the check gate. Review on #2656: with a
-# stalled runner AND a CHANGES_REQUESTED review, every check-shaped requirement still held.
-print("admin bypass reproduces the readiness review gates")
-
-readiness = " ".join(whole.get("readiness_definition", []))
-if isinstance(req, dict):
-    check("bypass refuses a draft PR", req.get("is_draft") is False)
-    # An ALLOWLIST, like every other state requirement here. A `*_not_in` denylist would let a
-    # fourth PullRequestReviewDecision value pass by omission — the same fail-open the
-    # conclusion denylist had (icn#2656 review).
-    check("review decision uses an allowlist, not a denylist",
-          "review_decision_not_in" not in req
-          and isinstance(req.get("review_decision_allowlist"), list))
-    rd_allow = req.get("review_decision_allowlist") or []
-    check("bypass refuses CHANGES_REQUESTED", "CHANGES_REQUESTED" not in rd_allow)
-    check("bypass refuses REVIEW_REQUIRED", "REVIEW_REQUIRED" not in rd_allow)
-    check("the live null decision is admitted EXPLICITLY, not by omission", None in rd_allow)
-    check("every non-null allowlisted decision is a real PullRequestReviewDecision",
-          all(v in REVIEW_DECISIONS for v in rd_allow if v is not None))
-    check("bypass refuses unresolved review threads",
-          req.get("unresolved_review_threads") == 0)
-    # Tie the two documents together so neither can drift alone.
-    if "CHANGES_REQUESTED" in readiness:
-        check("readiness requires no CHANGES_REQUESTED, and so does the bypass",
-              "CHANGES_REQUESTED" not in rd_allow)
-    if "threads resolved" in readiness:
-        check("readiness requires resolved threads, and so does the bypass",
-              req.get("unresolved_review_threads") == 0)
-check("admin_bypass states why it must mirror readiness",
-      bool(bypass.get("scope_note")))
-
-# --- (2) required/non-required sets cannot overlap ---------------------------
 required = set(merge.get("required_checks", []))
 non_blocking = set(merge.get("non_blocking_checks", []))
 check("required_checks is non-empty", len(required) > 0)
 check(f"required_checks and non_blocking_checks are disjoint: {sorted(required & non_blocking)}",
       not (required & non_blocking))
+check("the agent tooling check is itself a required check",
+      merge.get("agent_tooling_check") in required)
 
-# --- (3) the owner must not duplicate its own strategy -----------------------
-print("no duplicated strategy inside the owner")
+
+def check_state_gate(label, gate, *, must_include_clean):
+    """Structural validation shared by every gate that names GitHub merge state."""
+    check(f"{label}: declares machine-checkable fields, not only prose",
+          isinstance(gate, dict) and gate != {})
+    if not isinstance(gate, dict):
+        return
+    check(f"{label}: mergeable {gate.get('mergeable')!r} is a MergeableState member",
+          gate.get("mergeable") in MERGEABLE_STATE)
+    mss = gate.get("merge_state_status_in")
+    check(f"{label}: merge_state_status_in is a non-empty list",
+          isinstance(mss, list) and len(mss) > 0)
+    check(f"{label}: every merge_state_status_in value is a MergeStateStatus member: {mss}",
+          isinstance(mss, list) and all(v in MERGE_STATE_STATUS for v in mss))
+    # THE #2651 REGRESSION, now a value comparison rather than a prose scan.
+    check(f"{label}: no MergeableState value has leaked into a mergeStateStatus field",
+          isinstance(mss, list) and not (set(mss) & MERGEABLE_ONLY))
+    check(f"{label}: CLEAN is {'required' if must_include_clean else 'excluded'}",
+          isinstance(mss, list) and (("CLEAN" in mss) == must_include_clean))
+    # Review gates, as allowlists. A denylist admits any value nobody enumerated.
+    check(f"{label}: refuses a draft PR", gate.get("is_draft") is False)
+    check(f"{label}: review decision uses an allowlist, not a denylist",
+          "review_decision_not_in" not in gate
+          and isinstance(gate.get("review_decision_allowlist"), list))
+    rd = gate.get("review_decision_allowlist") or []
+    check(f"{label}: refuses CHANGES_REQUESTED", "CHANGES_REQUESTED" not in rd)
+    check(f"{label}: refuses REVIEW_REQUIRED", "REVIEW_REQUIRED" not in rd)
+    check(f"{label}: the live null decision is admitted EXPLICITLY, not by omission", None in rd)
+    check(f"{label}: every non-null allowlisted decision is a real PullRequestReviewDecision",
+          all(v in REVIEW_DECISIONS for v in rd if v is not None))
+    check(f"{label}: refuses unresolved review threads",
+          gate.get("unresolved_review_threads") == 0)
+    done = gate.get("required_check_conclusion_allowlist")
+    check(f"{label}: required_check_conclusion_allowlist is a non-empty list",
+          isinstance(done, list) and len(done) > 0)
+    leaked = FAILED_CONCLUSIONS & set(done or [])
+    check(f"{label}: no failing/aborted conclusion is allowlisted: {sorted(leaked)}", not leaked)
+
+
+# `.merge.ready_when` is the ONLY gate an agent skill evaluates (icn#2656). It is the ordinary
+# merge gate, so CLEAN must be admitted — that is the state it exists for.
+print("ready_when: the structured ordinary-merge gate")
+ready = merge.get("ready_when", {})
+check_state_gate("ready_when", ready, must_include_clean=True)
+# Pending is not ready. An ordinary merge waits; it never arms and never bypasses, so a pending
+# allowlist here would be a state nobody decided about.
+check("ready_when allowlists no pending state at all",
+      isinstance(ready, dict) and "required_check_pending_allowlist" not in ready)
+check("ready_when points at the enum note rather than restating it",
+      isinstance(ready, dict) and ready.get("field_note_ref") == "merge.admin_bypass.field_note")
+# The gate must stay STRUCTURED. This is what replaces the deleted prose scanner: rather than
+# parsing explanation to find an operative claim, the gate is closed against explanation
+# entirely — an operative field must be one of these keys, with the type given, and anything
+# free-form has to live in a `*note` key that no consumer evaluates.
+READY_OPERATIVE = {
+    "mergeable": str,
+    "merge_state_status_in": list,
+    "is_draft": bool,
+    "review_decision_allowlist": list,
+    "unresolved_review_threads": int,
+    "required_check_conclusion_allowlist": list,
+}
+if isinstance(ready, dict):
+    extra = sorted(k for k in ready
+                   if k not in READY_OPERATIVE and not k.endswith(("note", "note_ref")))
+    check(f"ready_when carries only structured gate fields; explanation lives in *note: {extra}",
+          not extra)
+    missing = sorted(k for k in READY_OPERATIVE if k not in ready)
+    check(f"ready_when declares every operative gate field: missing {missing}", not missing)
+    mistyped = sorted(k for k, ty in READY_OPERATIVE.items()
+                      if k in ready and not isinstance(ready[k], ty))
+    check(f"every operative ready_when field has its structured type: {mistyped}", not mistyped)
+    # CONTROL: an operative claim smuggled in as prose must be rejected, which is the defect
+    # class the whole-file scanner was trying to catch by reading English.
+    _prose_gate = dict(ready, condition="merge when mergeStateStatus is MERGEABLE")
+    check("CONTROL: an operative prose field added to the gate WOULD be caught",
+          bool([k for k in _prose_gate
+                if k not in READY_OPERATIVE and not k.endswith(("note", "note_ref"))]))
+
+# `.merge.admin_bypass` remains: docs/adr/ADR-0016 owns the HUMAN queue-stall exception and
+# .agents/skills/watch-ci-and-advance references it. No agent skill executes it (asserted in
+# section 3). Its structural validity is still checked — that is the #2651 regression's home.
+print("admin_bypass: still structurally valid, no longer agent-executable")
+bypass = merge.get("admin_bypass", {})
+req = bypass.get("requires", {})
+check_state_gate("admin_bypass.requires", req, must_include_clean=False)
+check("admin_bypass exposes an `allowed` switch the owner can flip",
+      isinstance(bypass.get("allowed"), bool))
+check("admin_bypass still declares never_for", bool(bypass.get("never_for")))
+check("admin_bypass declares fail_closed behaviour", bool(bypass.get("fail_closed")))
+check("admin_bypass uses no conclusion DENYLIST",
+      isinstance(req, dict) and "no_required_check_concluded" not in req)
+if isinstance(req, dict):
+    pend = req.get("required_check_pending_allowlist")
+    check("admin_bypass required_check_pending_allowlist is a non-empty list",
+          isinstance(pend, list) and len(pend) > 0)
+    check("admin_bypass: no failing/aborted state is allowlisted as pending",
+          not (FAILED_CONCLUSIONS & set(pend or [])))
+    check("admin_bypass: the two allowlists are disjoint",
+          not (set(req.get("required_check_conclusion_allowlist") or []) & set(pend or [])))
+check("admin_bypass records that no agent skill executes it",
+      bool(bypass.get("agent_execution")))
+
+# CONTROLS: the shape checks would be vacuous if the pre-fix policy passed them.
+_pre_fix_bypass = {"condition": "Required checks are green AND mergeStateStatus=MERGEABLE ..."}
+check("CONTROL: the pre-#2656 admin_bypass shape would FAIL these checks",
+      "requires" not in _pre_fix_bypass
+      and "mergeStateStatus=MERGEABLE" in json.dumps(_pre_fix_bypass))
+_leaky = {"mergeable": "MERGEABLE", "merge_state_status_in": ["MERGEABLE", "UNSTABLE"]}
+check("CONTROL: a cross-enum leak in merge_state_status_in is caught by value comparison",
+      bool(set(_leaky["merge_state_status_in"]) & MERGEABLE_ONLY))
+_denylisted = {"review_decision_not_in": ["CHANGES_REQUESTED"]}
+check("CONTROL: a review-decision DENYLIST shape would FAIL",
+      "review_decision_not_in" in _denylisted
+      and not isinstance(_denylisted.get("review_decision_allowlist"), list))
+
+# --- (2) the owner must not duplicate its own values ------------------------
+print("no duplicated values inside the owner")
 auto = merge.get("auto_merge", {})
 check("auto_merge carries no executable command string",
       not any(k in auto for k in ("command", "cmd", "run")))
@@ -274,37 +221,76 @@ check("auto_merge points at default_strategy rather than naming a strategy",
 auto_blob = json.dumps({k: v for k, v in auto.items() if k != "note"})
 check(f"auto_merge hardcodes no --merge/--squash/--rebase flag: {auto_blob[:80]}",
       STRATEGY_FLAG_RE.search(auto_blob) is None)
-check("auto_merge still declares its flags structurally",
-      isinstance(auto.get("gh_flags"), list) and auto["gh_flags"])
-
-# CONTROL: the checks above would be vacuous if they passed on the pre-fix shape.
 _pre_fix_auto = {"command": "gh pr merge <N> --auto --squash", "use_when": "..."}
 check("CONTROL: the pre-#2656 auto_merge shape would FAIL these checks",
       "command" in _pre_fix_auto and STRATEGY_FLAG_RE.search(json.dumps(_pre_fix_auto)))
-_pre_fix_bypass = {"condition": "Required checks are green AND mergeStateStatus=MERGEABLE ..."}
-check("CONTROL: the pre-#2656 admin_bypass shape would FAIL these checks",
-      "requires" not in _pre_fix_bypass
-      and "mergeStateStatus=MERGEABLE" in json.dumps(_pre_fix_bypass))
 
-# Commands live in fenced blocks or in `- \`...\`` bullets. Prose about a command is not a
-# command: an earlier revision of this checker flagged the sentence explaining why a bare
-# `gh pr view` is wrong, which is the checker failing on its own documentation.
+# `readiness_definition` is EXPLANATORY prose. The operative gate is `.merge.ready_when`, so the
+# prose must not carry the values — checked by ABSENCE, which cannot produce the false negatives
+# the old semantic scanner did. It is also why no negation grammar is needed: there is no
+# sentence to interpret, only a token that must not be present.
+print("readiness_definition carries no operative values")
+readiness = whole.get("readiness_definition", [])
+check("readiness_definition is a non-empty list", isinstance(readiness, list) and readiness)
+readiness_text = " ".join(readiness)
+strays = sorted({v for v in (MERGEABLE_ONLY | STATUS_ONLY)
+                 if re.search(rf"\b{v}\b", readiness_text)})
+check(f"readiness_definition restates no merge-state enum value: {strays}", not strays)
+counts = re.findall(r"\b(\d+)\s+required\b", readiness_text)
+check(f"readiness_definition restates no required-check count: {counts}", not counts)
+check("readiness_definition names the structured owner instead",
+      "merge.ready_when" in readiness_text)
+# CONTROLS: the absence checks must fire on the prose they replaced.
+_old_readiness = ("All 11 required CI checks passed. mergeable is MERGEABLE, and "
+                  "mergeStateStatus is CLEAN or UNSTABLE.")
+check("CONTROL: the pre-#2656 readiness prose WOULD be caught (enum literal)",
+      bool([v for v in (MERGEABLE_ONLY | STATUS_ONLY)
+            if re.search(rf"\b{v}\b", _old_readiness)]))
+check("CONTROL: the pre-#2656 readiness prose WOULD be caught (restated count)",
+      bool(re.findall(r"\b(\d+)\s+required\b", _old_readiness)))
+
+# --- (3) the merge skill's authority surface --------------------------------
+print("merge-pr: reduced authority and no duplicated policy values")
+
+registry = json.loads(SKILLS.read_text(encoding="utf-8"))
+skill_paths = []
+for entry in registry.get("skills", {}).get("icn_level", []):
+    if entry.get("name") == "merge-pr":
+        skill_paths.append((entry["name"], ROOT / entry["canonical_path"],
+                            [ROOT / m["path"] for m in entry.get("provider_mirrors", [])]))
+check("merge-pr is resolvable from the canonical registry", len(skill_paths) == 1)
+
 EVAL_RE = re.compile(r"\beval\s+[\"'`$]")
+MERGE_CMD_RE = re.compile(r"gh pr merge[^\n`]*--(merge|squash|rebase)\b")
+# A privileged invocation is a single line: inside a fence, or a one-line command. Prose may
+# name the flag in order to forbid it; nothing may be positioned to RUN it.
+ADMIN_FLAG_RE = re.compile(r"--admin\b")
+ADMIN_INVOKE_RE = re.compile(r"gh pr merge[^\n]*--admin")
+AUTO_FLAG_RE = re.compile(r"--auto\b|auto_merge")
+AUTO_INVOKE_RE = re.compile(r"gh pr merge[^\n]*--auto\b")
 
 
-def extract_commands(markdown: str) -> list[str]:
+def fenced_lines(markdown: str) -> list[str]:
     out, in_fence = [], False
     for line in markdown.splitlines():
         if line.lstrip().startswith("```"):
             in_fence = not in_fence
             continue
-        if in_fence:
-            if line.strip():
-                out.append(line.strip())
+        if in_fence and line.strip():
+            out.append(line.strip())
+    return out
+
+
+def extract_commands(markdown: str) -> list[str]:
+    """Fenced-block lines, plus inline command BULLETS. Prose about a command is not a command:
+    an earlier revision flagged the sentence explaining why a bare `gh pr view` is wrong."""
+    out = fenced_lines(markdown)
+    in_fence = False
+    for line in markdown.splitlines():
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
             continue
-        # An inline command BULLET only: `- \`gh pr checks <N>\`, ...`. A command named
-        # mid-paragraph is prose about a command, not an instruction to run one.
-        if not line.lstrip().startswith("- "):
+        if in_fence or not line.lstrip().startswith("- "):
             continue
         for m in re.finditer(r"`([^`]+)`", line):
             tok = m.group(1).strip()
@@ -313,31 +299,51 @@ def extract_commands(markdown: str) -> list[str]:
     return out
 
 
-# --- (4) consumers must not restate what they claim to load ------------------
-print("consumers do not duplicate policy values")
-
-registry = json.loads(SKILLS.read_text(encoding="utf-8"))
-skill_paths = []
-for entry in registry.get("skills", {}).get("icn_level", []):
-    if entry.get("name") in ("merge-pr", "merge-prs", "integrate-pr-stack"):
-        skill_paths.append((entry["name"], ROOT / entry["canonical_path"],
-                            [ROOT / m["path"] for m in entry.get("provider_mirrors", [])]))
-check("the merge skills are resolvable from the canonical registry", len(skill_paths) >= 1)
-
-# `merge-pr` is the thin skill that declares policy.json canonical AND lists the strategy under
-# never_hardcode. It is held to its own contract: no literal strategy flag in a merge command.
-MERGE_CMD_RE = re.compile(r"gh pr merge[^\n`]*--(merge|squash|rebase)\b")
 for name, canonical, mirrors in skill_paths:
     body = canonical.read_text(encoding="utf-8")
-    if name != "merge-pr":
-        continue
-    hits = MERGE_CMD_RE.findall(body)
-    check(f"{name}: no `gh pr merge --<strategy>` literal; the strategy is substituted: {hits}",
-          not hits)
-    check(f"{name}: substitutes the strategy from the policy", "${STRATEGY}" in body)
-    # Only real commands are inspected, never prose. A sentence explaining why a bare
-    # `gh pr view` is wrong must not be mistaken for one.
     commands = extract_commands(body)
+    cmd_text = " ".join(commands)
+    fenced = fenced_lines(body)
+    lines = body.splitlines()
+    frontmatter = body.split("---", 2)[1] if body.startswith("---") else ""
+
+    # -- (3a) THE REDUCED AUTHORITY SURFACE. The heart of icn#2656.
+    check(f"{name}: no command carries --admin: "
+          f"{[c for c in commands if ADMIN_FLAG_RE.search(c)]}",
+          not any(ADMIN_FLAG_RE.search(c) for c in commands))
+    check(f"{name}: no fenced block carries --admin",
+          not any(ADMIN_FLAG_RE.search(f) for f in fenced))
+    check(f"{name}: no line positions --admin as a merge invocation",
+          not any(ADMIN_INVOKE_RE.search(ln) for ln in lines))
+    check(f"{name}: --admin is not advertised in argument-hint",
+          not ADMIN_FLAG_RE.search(frontmatter))
+    # An ordinary invocation must not be able to become a deferred one either.
+    check(f"{name}: no command arms auto-merge: "
+          f"{[c for c in commands if AUTO_FLAG_RE.search(c)]}",
+          not any(AUTO_FLAG_RE.search(c) for c in commands))
+    check(f"{name}: no fenced block arms auto-merge",
+          not any(AUTO_FLAG_RE.search(f) for f in fenced))
+    check(f"{name}: no line positions --auto as a merge invocation",
+          not any(AUTO_INVOKE_RE.search(ln) for ln in lines))
+    # Exactly one way to merge. Two merge commands is two authority levels.
+    merges = [c for c in commands if re.search(r"gh pr merge\b", c)]
+    check(f"{name}: exactly one merge invocation exists: {len(merges)}", len(merges) == 1)
+    check(f"{name}: that invocation pins the inspected head",
+          bool(merges) and all("--match-head-commit" in c for c in merges))
+    check(f"{name}: states that a GitHub refusal terminates rather than escalating",
+          bool(re.search(r"that refusal is the answer", " ".join(body.split()), re.I)))
+    # The output contract must not admit an outcome the skill can no longer produce.
+    outputs = body.split("## Output", 1)[-1]
+    check(f"{name}: the output contract offers no auto-merge outcome",
+          "Auto-merge armed" not in outputs and "**Merged**" in outputs
+          and "**Not merged**" in outputs)
+
+    # -- (3b) evidence must be current, complete, and pinned.
+    check(f"{name}: reads the structured readiness gate rather than restating it",
+          "ready_when" in body)
+    check(f"{name}: no `gh pr merge --<strategy>` literal; the strategy is substituted: "
+          f"{MERGE_CMD_RE.findall(body)}", not MERGE_CMD_RE.findall(body))
+    check(f"{name}: substitutes the strategy from the policy", "${STRATEGY}" in body)
     check(f"{name}: does not shell-eval policy values",
           not any(EVAL_RE.search(c) for c in commands))
     bare = [c for c in commands
@@ -345,243 +351,91 @@ for name, canonical, mirrors in skill_paths:
             and not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", c)]
     check(f"{name}: every gh pr view/checks/merge command is explicitly addressed: {bare}",
           not bare)
-    # Review on #2656: `allowed: false` must actually revoke the bypass. A skill that only
-    # checks `.requires` treats a present `false` as neither absent nor ambiguous.
-    check(f"{name}: gates the admin path on .merge.admin_bypass.allowed",
-          "admin_bypass.allowed" in body)
-    check(f"{name}: consults both required-check allowlists",
-          "required_check_conclusion_allowlist" in body
-          and "required_check_pending_allowlist" in body)
-    check(f"{name}: names the states an allowlist must exclude",
-          "STARTUP_FAILURE" in body and "STALE" in body)
-    # Review round 3: a merge gate is only as good as the commit and branch it was computed
-    # against, and as complete as the thread page it read.
-    merges = [c for c in commands if re.search(r"gh pr merge\b", c)]
-    check(f"{name}: every merge invocation pins the inspected head: {len(merges)} found",
-          bool(merges) and all("--match-head-commit" in c for c in merges))
     check(f"{name}: captures headRefOid to pin against", "headRefOid" in body)
     check(f"{name}: reads protection for the PR's actual base, not a hardcoded main",
-          "${BASE_ENC}/protection" in body
-          and "branches/main/protection" not in body)
-    # Final-head review of 569e0a73: `feat%2Fnext` is a valid Git ref and GitHub decodes `%2F`
-    # in that path segment, so a raw `${BASE}` loads `feat/next`'s protection instead — the
-    # admin path would then validate the wrong required-check set. Distinct from the slash-only
-    # claim, which did not reproduce.
+          "${BASE_ENC}/protection" in body and "branches/main/protection" not in body)
     check(f"{name}: no protection path interpolates the UNENCODED base",
           "${BASE}/protection" not in body)
     check(f"{name}: encodes the base with a real encoder, not a hand-rolled substitution",
-          "@uri" in " ".join(extract_commands(body))
+          "@uri" in cmd_text
           and not re.search(r"BASE.*(//|s#|tr ).*%2F", body)
-          and not re.search(r'\$\{BASE//', body))
+          and not re.search(r"\$\{BASE//", body))
     check(f"{name}: names baseRefName as the sole branch-identity authority",
           bool(re.search(r"baseRefName[^.]{0,40}sole authority",
                          " ".join(body.split()), re.I)))
-    # Inspect the COMMAND, not the body: an earlier revision of this check read the prose
-    # mention of `--paginate` and stayed green when the flag was removed from the query itself.
-    # Same prose/command confusion this file already had to learn once.
-    # The GraphQL call spans several fenced lines, so the machinery is asserted across the
-    # extracted COMMAND lines collectively — never against the body, where a prose mention of
-    # `--paginate` kept this green after the flag was removed from the query itself.
-    cmd_text = " ".join(commands)
-    check(f"{name}: reads review threads at all", "reviewThreads" in cmd_text)
-    check(f"{name}: and paginates them rather than reading one page",
-          all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
-
-    # Review round 4: `--auto` waits for BRANCH PROTECTION's requirements, not for
-    # policy.json's. A policy-required check that is not a live protection context would not
-    # hold the merge. And `--auto` returns without merging, so the procedure must not fall
-    # through to post-merge steps or report a merge it has not confirmed.
-    # Review round 5: filtering on state=="PENDING" alone missed QUEUED/IN_PROGRESS/WAITING/
-    # REQUESTED/EXPECTED — the same incomplete enumeration the pending ALLOWLIST exists to
-    # avoid. `gh pr checks --json bucket` normalises all of them to one value.
-    check(f"{name}: proves pending policy-required checks are live protection contexts",
+    check(f"{name}: proves policy-required checks against live protection contexts",
           "required_status_checks.contexts" in cmd_text)
     check(f"{name}: detects pending checks by normalised bucket, not one state spelling",
           'bucket=="pending"' in cmd_text.replace(" ", "")
           and 'state=="PENDING"' not in cmd_text.replace(" ", ""))
-    # A permitted exception the procedure never invokes is one the skill cannot perform.
-    admin_cmds = [c for c in commands if "--admin" in c]
-    check(f"{name}: actually invokes the authorized admin merge: {len(admin_cmds)}",
-          bool(admin_cmds) and all("--match-head-commit" in c for c in admin_cmds))
-    check(f"{name}: stops after arming auto-merge instead of reporting a merge",
-          "Then STOP" in body and "does not merge" in body)
+    check(f"{name}: reads review threads, and paginates them rather than reading one page",
+          "reviewThreads" in cmd_text
+          and all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
+    check(f"{name}: treats an unsuccessful protection load as missing evidence",
+          bool(re.search(r"unsuccessful load is missing evidence", " ".join(body.split()), re.I))
+          and "LIVE=UNAVAILABLE" in body)
+
+    # -- (3c) success is only ever reported from freshly re-read state.
     check(f"{name}: confirms merged state before the post-merge steps",
           "state,mergedAt,mergeCommit" in cmd_text)
+    check(f"{name}: requires a fresh MERGED state before reporting a merge",
+          bool(re.search(r"Never report a merge that a fresh `state: MERGED` has not confirmed",
+                         " ".join(body.split()))))
     check(f"{name}: pulls the actual base branch, not a hardcoded main",
           "git checkout main" not in body)
-    check(f"{name}: its output contract admits a not-merged outcome",
-          "Auto-merge armed" in body and "has **not** merged" in body)
-
-    # The bypass overrides every protection, so the skill must check the review gates too.
-    check(f"{name}: checks the gates --admin would also bypass",
-          all(t in body for t in ("is_draft", "review_decision_allowlist",
-                                  "unresolved_review_threads")))
 
     for mirror in mirrors:
         check(f"{name}: provider mirror {mirror.relative_to(ROOT)} is byte-identical",
               mirror.read_text(encoding="utf-8") == body)
 
-# CONTROL: the regex must actually catch the pre-fix skill text.
+# CONTROLS: every authority check must reject the pre-#2656 skill text.
+_old_admin = ('   ```bash\n   gh pr merge <N> --match-head-commit "${HEAD_OID}" '
+              '--admin --"${STRATEGY}"\n   ```\n')
+check("CONTROL: the pre-#2656 --admin command WOULD be caught in a fence",
+      any(ADMIN_FLAG_RE.search(f) for f in fenced_lines(_old_admin)))
+check("CONTROL: the pre-#2656 --admin command WOULD be caught as an invocation line",
+      any(ADMIN_INVOKE_RE.search(ln) for ln in _old_admin.splitlines()))
+_old_auto = ('   ```bash\n   gh pr merge <N> --match-head-commit "${HEAD_OID}" \\\n'
+             "     $(jq -r '.merge.auto_merge.gh_flags|join(\" \")' ops/state/truth/policy.json)"
+             ' --"${STRATEGY}"\n   ```\n')
+check("CONTROL: the pre-#2656 auto-merge command WOULD be caught",
+      any(AUTO_FLAG_RE.search(f) for f in fenced_lines(_old_auto)))
+check("CONTROL: `argument-hint: \"[PR number] [--admin]\"` WOULD be caught",
+      bool(ADMIN_FLAG_RE.search('argument-hint: "[PR number] [--admin]"')))
 check("CONTROL: the pre-#2651 skill body would FAIL the strategy-literal check",
       bool(MERGE_CMD_RE.search("3. If all checks are green, merge:\n   - `gh pr merge --merge`")))
 check("CONTROL: a bare `gh pr view --json state` would FAIL the addressing check",
       not re.search(r"gh pr (view|checks|merge) +(<N>|\$)", "gh pr view --json state"))
+check("CONTROL: two merge invocations would FAIL the single-invocation check",
+      len(["gh pr merge <N> --squash", "gh pr merge <N> --admin"]) != 1)
 
-# --- (5) a disabled bypass must be expressible and must be honoured ----------
-print("a disabled bypass is expressible")
+# --- (4) every non-ready state terminates -----------------------------------
+# The procedure's whole contract is "merge, or stop". A state that is neither merged nor
+# explicitly stopped is a state nobody decided about — the defect class that produced an
+# unreachable branch twice in this PR's history. Each class below must be named as a stop.
+print("every non-ready state terminates")
 
-_disabled = dict(bypass)
-_disabled["allowed"] = False
-check("CONTROL: `allowed: false` is a valid shape the owner can write",
-      _disabled["allowed"] is False and "requires" in _disabled)
-# The skill's own text must reach `allowed` BEFORE the detailed requirements, otherwise a
-# revoked bypass is still performed.
-for name, canonical, _m in skill_paths:
-    if name != "merge-pr":
-        continue
-    body = canonical.read_text(encoding="utf-8")
-    i_allowed = body.find("admin_bypass.allowed")
-    i_requires = body.find(".requires.mergeable")
-    check("merge-pr: `allowed` is checked before the detailed requirements",
-          i_allowed != -1 and i_requires != -1 and i_allowed < i_requires)
-
-
-# --- (6) control-flow reachability, not just command existence ---------------
-# Five rounds of static string checks passed while the procedure contained an unreachable
-# security-sensitive branch (icn#2656 round 6): the `--admin` command EXISTED, and every state
-# that could qualify for it was consumed by the pending/auto handler two steps earlier. Strings
-# prove a command exists; these prove it is reachable in the state it handles, and unreachable
-# without escalation-specific authorization.
-#
-# Deliberately a lexer over numbered steps, not a parser: the properties are orderings and
-# containments over step indices, the smallest model that can express "step 3 consumes the
-# state step 5 needs".
-print("admin branch reachability and authorization")
-
-ADMIN_CMD = re.compile(r"gh pr merge\b[^\n]*--admin")
-AUTO_CMD = re.compile(r"auto_merge\.gh_flags|--auto\b")
-STOPS = re.compile(r"\*\*Then STOP\.\*\*|\bSTOP the procedure\b")
-AUTH_ARG = re.compile(r"\$ARGUMENTS[^\n]*--admin|includes\s+`--admin`")
-AUTH_FRESH = re.compile(r"fresh(?:ly)?\s+(?:explicit\s+)?confirmation"
-                        r"|confirmation[^\n]{0,80}administrator privileges", re.I)
-AUTH_SCOPE = re.compile(r"this PR|that PR number", re.I)
-
-
-def numbered_steps(md: str):
-    """[(n, text)] for the top-level numbered steps of the procedure."""
-    body = md.split("## Steps", 1)[-1].split("## Output", 1)[0]
-    parts = re.split(r"^(\d+)\.\s", body, flags=re.M)
-    return [(int(parts[i]), parts[i + 1]) for i in range(1, len(parts) - 1, 2)]
-
-
-def step_commands(text: str):
-    out, inf = [], False
-    for ln in text.splitlines():
-        if ln.lstrip().startswith("```"):
-            inf = not inf
-            continue
-        if inf and ln.strip():
-            out.append(ln.strip())
-    return out
-
-
-for name, canonical, _m in skill_paths:
-    if name != "merge-pr":
-        continue
-    md = canonical.read_text(encoding="utf-8")
-    # Prose assertions match against this. Markdown wraps phrases across lines, and a literal
-    # match has silently failed on the very text it was written to find five times in this
-    # file's history. Commands are still matched against `md`/`commands`, never `flat`.
-    flat = " ".join(md.split())
-    stepping = numbered_steps(md)
-    admin_i = auto_i = None
-    for idx, (n, t) in enumerate(stepping):
-        cmds = step_commands(t)
-        if any(ADMIN_CMD.search(c) for c in cmds):
-            admin_i = idx
-        if any(AUTO_CMD.search(c) for c in cmds):
-            auto_i = idx
-    check("the procedure parses into numbered steps", len(stepping) >= 5)
-    check("an --admin merge command exists", admin_i is not None)
-    check("an auto-merge command exists", auto_i is not None)
-
-    if admin_i is not None and auto_i is not None:
-        an, at = stepping[admin_i]
-        # THE ROUND-6 DEFECT. The admin exception requires a PENDING required check; if the
-        # pending handler runs first and terminates, no qualifying state ever reaches it.
-        check(f"admin branch precedes the pending/auto handler (admin=step {an}, "
-              f"auto=step {stepping[auto_i][0]})", admin_i < auto_i)
-        stopping = [n for n, t in stepping[:admin_i] if STOPS.search(t)]
-        check(f"no step before the admin branch terminates the procedure: {stopping}",
-              not stopping)
-
-        # Authorization must gate EXECUTION, not merely be mentioned somewhere.
-        cmd_pos = min((m.start() for m in ADMIN_CMD.finditer(at)), default=len(at))
-        pre = at[:cmd_pos]
-        check("the admin step demands the --admin argument or a fresh confirmation",
-              bool(AUTH_ARG.search(at) or AUTH_FRESH.search(at)))
-        check("that demand appears BEFORE the --admin command in the same step",
-              bool(AUTH_ARG.search(pre) or AUTH_FRESH.search(pre)))
-        check("authorization is scoped to this PR / this invocation",
-              bool(AUTH_SCOPE.search(pre)))
-        check("a generic prior yes is explicitly insufficient",
-              bool(re.search(r"generic|retroactiv", at, re.I)))
-        check("a failed admin gate refuses rather than falling back",
-              bool(re.search(r"refuse the escalation|not a downgrade|do not fall back", at, re.I)))
-        check("human authorization is stated not to lift eligibility",
-              "never_for" in at and bool(re.search(r"not sufficient|does not lift", at, re.I)))
-
-        # No --admin anywhere else, and specifically not on the ordinary path.
-        others = [n for j, (n, t) in enumerate(stepping)
-                  if j != admin_i and any(ADMIN_CMD.search(c) for c in step_commands(t))]
-        check(f"no --admin command outside the authorized branch: {others}", not others)
-        # Whitespace-normalised: the phrase wraps across lines in the rendered markdown, and
-        # a literal match silently failed on the very text it was written to find.
-        ordinary = " ".join(stepping[auto_i][1].split())  # normalised: see `flat` above
-        check("the ordinary path forbids escalation in prose too",
-              bool(re.search(r"never to escalate|no admin escalation", ordinary, re.I)))
-        # Bounded audit, round 6: 5a/5b/5c covered green and both pending shapes and nothing
-        # else, so a FAILING required check fell through step 5 into the merged-state check and
-        # was refused only implicitly. An unhandled state on a merge path is a state nobody
-        # decided about.
-        check("the ordinary path handles a FAILING required check explicitly",
-              bool(re.search(r"A required check has failed", ordinary))
-              and bool(re.search(r"exhaustive", ordinary, re.I)))
-        check("and refuses rather than offering escalation",
-              bool(re.search(r"do not offer, suggest or escalate", ordinary, re.I)))
-        # Final-head review of 10de4f3d. Route 2 of the authorization gate (fresh confirmation
-        # after a block) was unreachable: step 4 runs before step 5 and nothing routed back —
-        # the same unreachable-branch class as the round-6 finding, reintroduced one step over.
-        check("a blocked stalled state can return to the admin gate",
-              bool(re.search(r"return to step 4", ordinary, re.I)))
-        check("...but only from the stalled states, never from the failing one",
-              bool(re.search(r"5d must never offer one|do not offer, suggest or escalate",
-                             flat, re.I)))
-        # `--match-head-commit` pins the head and nothing pins the base; a retarget leaves the
-        # head unchanged while the admin merge lands on protection never inspected.
-        admin_txt = stepping[admin_i][1]
-        admin_flat = " ".join(admin_txt.split())
-        check("the admin path revalidates head AND base immediately before the bypass",
-              "headRefOid,baseRefName" in admin_txt
-              and bool(re.search(r"nothing pins the base", admin_flat, re.I)))
-        check("a moved head or base refuses rather than proceeding",
-              bool(re.search(r"refuse and start over", admin_flat, re.I)))
-        # An unsuccessful protection load is missing evidence, not "no requirements".
-        check("an unavailable protection load is treated as missing evidence",
-              bool(re.search(r"unsuccessful load is missing evidence", flat, re.I))
-              and "LIVE=UNAVAILABLE" in md)
-
-# CONTROLS: the model must reject the round-5 shape it was written against.
-_r5 = ("## Steps\n\n3. pending\n\n   ```bash\n   gh pr merge <N> --auto --squash\n   ```\n\n"
-       "   **Then STOP.**\n\n5. bypass\n\n   ```bash\n   gh pr merge <N> --admin --squash\n   ```\n\n## Output\n")
-_st = numbered_steps(_r5)
-_ai = next(i for i, (n, t) in enumerate(_st) if any(ADMIN_CMD.search(c) for c in step_commands(t)))
-_ui = next(i for i, (n, t) in enumerate(_st) if any(AUTO_CMD.search(c) for c in step_commands(t)))
-check("CONTROL: the round-5 ordering (admin after auto) is rejected", not (_ai < _ui))
-check("CONTROL: the round-5 STOP before the admin branch is detected",
-      bool([n for n, t in _st[:_ai] if STOPS.search(t)]))
-check("CONTROL: a step with no authorization demand is rejected",
-      not (AUTH_ARG.search(_st[_ai][1]) or AUTH_FRESH.search(_st[_ai][1])))
+TERMINATING = {
+    "a pending required check": r"required check still pending",
+    "a stalled runner (reported, never escalated)": r"whether or not the\s+runner is stalled",
+    "a failing or aborted required check": r"STARTUP_FAILURE",
+    "an unknown mergeable state": r"mergeable: `?UNKNOWN",
+    "a blocked/behind merge state": r"`BLOCKED`, `BEHIND`",
+    "a draft or unreviewed PR": r"a draft PR, `CHANGES_REQUESTED`",
+    "evidence that could not be loaded": r"could not be loaded",
+}
+for _n, _c, _m in skill_paths:
+    body = _c.read_text(encoding="utf-8")
+    flat = " ".join(body.split())
+    for label, pattern in TERMINATING.items():
+        check(f"merge-pr: {label} is named as a stop condition",
+              bool(re.search(pattern, body) or re.search(pattern, flat)))
+    check("merge-pr: states there is no weaker route out of the decision step",
+          bool(re.search(r"no weaker route out of this step", flat, re.I)))
+    check("merge-pr: states that stopping is the complete outcome, not a deferral",
+          bool(re.search(r"Stopping is the complete and correct outcome", flat, re.I)))
+    check("merge-pr: states it does not route to the ADR-0016 human exception",
+          bool(re.search(r"does not execute it, evaluate it, or route to it", flat, re.I)))
 
 print()
 if failures:

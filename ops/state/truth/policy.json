@@ -32,6 +32,27 @@
       "Check API Types Drift"
     ],
     "unstable_is_mergeable": true,
+    "ready_when": {
+      "mergeable": "MERGEABLE",
+      "merge_state_status_in": [
+        "CLEAN",
+        "UNSTABLE"
+      ],
+      "is_draft": false,
+      "review_decision_allowlist": [
+        "APPROVED",
+        null
+      ],
+      "unresolved_review_threads": 0,
+      "required_check_conclusion_allowlist": [
+        "SUCCESS",
+        "NEUTRAL",
+        "SKIPPED"
+      ],
+      "note": "The structured definition of `this PR is ready for an ordinary merge`, and the only merge gate an agent skill evaluates. `merge-pr` reads exactly these fields and merges only when every one holds against current evidence; anything else \u2014 a required check that is merely pending, an unloadable protection list, an UNKNOWN mergeable \u2014 stops it. There is no weaker fallback and no privileged path. Added in icn#2656 so `readiness_definition` could stop restating enum values as prose: the prose now points here, and these values are validated against GitHub's live enums by scripts/tests/test_merge_policy_invariants.py.",
+      "allowlist_note": "Allowlists, not denylists, for the same reason `admin_bypass.requires` uses them: a denylist admits any state nobody enumerated. `null` is listed in review_decision_allowlist on purpose \u2014 it is what this repo reports today (required_approving_review_count: 0), and admitting it by omission would be a fail-open. No pending state is allowlisted here at all: pending is not ready, so an ordinary merge waits for a human to run the skill again.",
+      "field_note_ref": "merge.admin_bypass.field_note"
+    },
     "admin_bypass": {
       "allowed": true,
       "summary": "Only when the PR has no conflict, no required check has failed, and a required check's runner is queue-stalled. Never to defeat a failing gate.",
@@ -69,7 +90,8 @@
       "fail_closed": "If any field above is absent, UNKNOWN, or ambiguous, do NOT bypass. Absence of evidence that a runner is stalled is not evidence that it is.",
       "never_for": "Bypassing genuinely failing required checks",
       "allowlist_note": "Every required check must be in one of the two allowlists above: acceptably CONCLUDED, or genuinely PENDING. An allowlist rather than a denylist because a denylist silently permits any state nobody enumerated \u2014 GitHub's check-run conclusions include `stale` and `startup_failure`, and legacy commit statuses add `error`, none of which the pre-review denylist named (icn#2656 review). Anything outside both lists blocks the bypass by construction, including a state GitHub adds in future. The same shape governs review_decision_allowlist: a decision that is not explicitly accepted blocks the bypass, so GitHub adding a fourth PullRequestReviewDecision value cannot open a hole. `null` is listed on purpose \u2014 it is what this repo reports today (required_approving_review_count: 0) and admitting it by omission would be the same fail-open in a different place.",
-      "scope_note": "`--admin` bypasses EVERY branch protection, not only the check gate, so these requirements must reproduce every clause of the top-level readiness_definition that a bypass would otherwise skip \u2014 draft state, review decision and unresolved threads included (icn#2656 review). A stalled runner is the only condition this exception exists for; it is not a reason to skip a review gate that is independently unmet."
+      "scope_note": "`--admin` bypasses EVERY branch protection, not only the check gate, so these requirements must reproduce every clause of the top-level readiness_definition that a bypass would otherwise skip \u2014 draft state, review decision and unresolved threads included (icn#2656 review). A stalled runner is the only condition this exception exists for; it is not a reason to skip a review gate that is independently unmet.",
+      "agent_execution": "Human decision under docs/adr/ADR-0016-admin-merge-exception-policy.md. No agent skill performs, evaluates or routes to this bypass. `merge-pr` deliberately stopped consuming this block in icn#2656: a privileged merge overrides EVERY branch protection, so any automated consumer would have to prove the entire live protection set safe to override AND still safe at the instant of the merge, and review demonstrated it could do neither. The block remains because the ADR-governed human exception remains."
     },
     "auto_merge": {
       "use_when": "A required check is still pending (not failed)",
@@ -97,11 +119,11 @@
     }
   },
   "readiness_definition": [
-    "All 11 required CI checks passed (includes Agent Tooling Drift Check)",
+    "Every check in `merge.required_checks` passed (the list is the count; do not restate one here)",
     "No CHANGES_REQUESTED reviews outstanding",
     "All PR comment threads resolved",
     "Branch is up-to-date with main (strict mode)",
-    "mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE (UNSTABLE = non-blocking checks only). MERGEABLE is a value of `mergeable`, never of `mergeStateStatus` \u2014 see merge.admin_bypass.field_note."
+    "The `mergeable` / `mergeStateStatus` gate is defined structurally by `merge.ready_when` \u2014 read that field, do not restate it here. Until icn#2656 this line duplicated the enum values in prose, and a checker had to parse English to notice when the duplicate drifted."
   ],
   "workspace": {
     "rust_commands_run_from": "icn/",
