@@ -22,7 +22,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from "fs";
+import {
+  mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, copyFileSync,
+} from "fs";
+import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -135,6 +138,68 @@ describe("cadence vocabulary tracks scripts/check-truth-spine.py", () => {
     expect(keys).not.toBeNull();
     const pyKeys = [...keys![1]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!);
     expect([...tasks.DORMANCY_KEYS]).toEqual(pyKeys);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Differential: the TS resolver must agree with the shell resolver it mirrors.
+// ---------------------------------------------------------------------------
+//
+// The vocabulary test above catches drift in the WORD LISTS. This catches drift in the
+// ALGORITHM, which is the other half of "one canonical source": `resolveSprintCadence` is a
+// hand-mirror of `.claude/hooks/session-orient.sh`, and nothing but this stops the two
+// diverging. Both are driven over the same records and their verdicts compared.
+
+describe("resolveSprintCadence agrees with .claude/hooks/session-orient.sh", () => {
+  const CASES: Array<[string, unknown]> = [
+    ["dormant declared", { cadence: "dormant", active_sprint: null, status: "closed" }],
+    ["active with an in-progress label", { cadence: "active", active_sprint: 31, status: "in-progress" }],
+    ["running with an open label", { cadence: "running", active_sprint: 7, status: "open" }],
+    ["absent active_sprint is silence", { sprint: 26, status: "closed", tasks: [] }],
+    ["active + null active_sprint", { cadence: "active", active_sprint: null }],
+    ["dormant + a sprint number", { cadence: "dormant", active_sprint: 31 }],
+    ["unrecognised cadence", { cadence: "weekly", active_sprint: 31 }],
+    ["active_sprint null, no cadence", { active_sprint: null, status: "closed" }],
+    ["a status label alone decides nothing", { status: "active" }],
+    ["case and whitespace tolerant", { cadence: "  Dormant " }],
+  ];
+
+  /** Run the real hook against `record` in a throwaway repo skeleton. */
+  function hookVerdict(record: unknown): "active" | "dormant" | "unresolved" {
+    const box = mkdtempSync(join(tmpdir(), "icn-hook-"));
+    mkdirSync(join(box, "ops", "state", "sprint"), { recursive: true });
+    mkdirSync(join(box, "ops", "state", "truth"), { recursive: true });
+    mkdirSync(join(box, ".claude", "hooks"), { recursive: true });
+    copyFileSync(
+      join(REPO_ROOT, ".claude", "hooks", "session-orient.sh"),
+      join(box, ".claude", "hooks", "session-orient.sh")
+    );
+    copyFileSync(
+      join(REPO_ROOT, "ops", "state", "truth", "sources.json"),
+      join(box, "ops", "state", "truth", "sources.json")
+    );
+    writeFileSync(join(box, "ops", "state", "sprint", "current.json"), JSON.stringify(record));
+    const out = execFileSync("bash", [join(box, ".claude", "hooks", "session-orient.sh")], {
+      env: { ...process.env, CLAUDE_PROJECT_DIR: box, ICN_ROOT: box },
+      encoding: "utf-8",
+    });
+    rmSync(box, { recursive: true, force: true });
+    const line = out.split("\n").find((l) => l.includes("sprint: ")) ?? "";
+    const verdict = line.split("sprint: ")[1] ?? "";
+    if (verdict.startsWith("none active")) return "dormant";
+    if (verdict.startsWith("unresolved")) return "unresolved";
+    return "active";
+  }
+
+  it.each(CASES)("%s", async (_name, record) => {
+    await boot(DORMANT_V2);
+    expect(tasks.resolveSprintCadence(record).kind).toBe(hookVerdict(record));
+  });
+
+  // CONTROL: the comparison would be vacuous if the hook answered the same thing every time.
+  it("the hook itself produces all three verdicts across these cases", () => {
+    const seen = new Set(CASES.map(([, r]) => hookVerdict(r)));
+    expect([...seen].sort()).toEqual(["active", "dormant", "unresolved"]);
   });
 });
 
