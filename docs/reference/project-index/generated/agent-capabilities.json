@@ -36,7 +36,7 @@
     },
     {
       "name": "close_sprint",
-      "summary": "Archive current sprint to history/ and start a new sprint, carrying over unfinished tasks."
+      "summary": "REFUSES on any v2 record: archiving would round-trip it through a v1 write model that drops schema/cadence/lineage, and the successor number is never inferred."
     },
     {
       "name": "cluster_health",
