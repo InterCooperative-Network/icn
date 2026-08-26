@@ -341,6 +341,21 @@ describe("assertSprintMutable", () => {
     expect(settled.message).toContain("no sprint is active");
   });
 
+  // Review round 3: the refusal asserted "no sprint is active" for records whose cadence the
+  // resolver expressly refused to resolve — a cadence fact this surface must not emit.
+  it("reports unresolved cadence as unresolved, not as dormancy", () => {
+    const dormant = tasks.assertSprintMutable({ cadence: "dormant", active_sprint: null });
+    if (dormant.ok) throw new Error("expected a refusal");
+    expect(dormant.message).toContain("no sprint is active");
+
+    for (const rec of [{ sprint: 26 }, { cadence: "weekly", active_sprint: 3 }, { cadence: "active", active_sprint: null }]) {
+      const r = tasks.assertSprintMutable(rec);
+      if (r.ok) throw new Error(`expected a refusal for ${JSON.stringify(rec)}`);
+      expect(r.message, JSON.stringify(rec)).toContain("cadence cannot be resolved");
+      expect(r.message, JSON.stringify(rec)).not.toContain("no sprint is active");
+    }
+  });
+
   it("routes the caller to the numbering decision, not to a guess", () => {
     const r = tasks.assertSprintMutable(DORMANT_V2);
     if (r.ok) throw new Error("expected a refusal");
@@ -447,6 +462,37 @@ describe("close_sprint cannot fabricate a successor", () => {
     expect(res.isError).toBe(true);
     expect(res.content[0]?.text).toContain("would DELETE");
     expect(res.content[0]?.text).not.toContain("UNDETERMINED");
+  });
+
+  // Review round 3: the generic refusal was de-hardcoded but close_sprint's own kept citing
+  // this board's 26/27/28 lineage, which would be false guidance on any other board.
+  it("its refusal states no particular board's lineage", async () => {
+    await boot({ ...ACTIVE_V1, sprint: 77, active_sprint: 77 });
+    const res = await callRaw("close_sprint", { next_name: "x" });
+    const text = res.content[0]!.text;
+    expect(res.isError).toBe(true);
+    // Word-bounded: `icn#2637` legitimately contains "26", and the point is that no bare
+    // sprint NUMBER from this board's history is stated.
+    for (const stale of ["26", "27", "28"]) {
+      expect(text, `must not hardcode sprint ${stale}`).not.toMatch(new RegExp(`\\b${stale}\\b`));
+    }
+    for (const stale of ["numbering planes", "narrated cadence"]) {
+      expect(text, `must not hardcode "${stale}"`).not.toContain(stale);
+    }
+    // Still actionable: names the field to set and where the decision lives.
+    expect(text).toContain("next_sprint_number");
+    expect(text).toContain("icn#2637");
+  });
+
+  // Review round 3: the MCP description advertised archive-and-start, which cannot occur —
+  // passing the identity gate requires `next_sprint_number`, itself a non-v1 key the shape
+  // gate then rejects.
+  it("does not advertise an operation it can never perform", async () => {
+    await boot(DORMANT_V2);
+    const { tools } = await client.listTools();
+    const desc = tools.find((t) => t.name === "close_sprint")!.description!;
+    expect(desc).toMatch(/REFUSES/);
+    expect(desc).not.toMatch(/start a new sprint/i);
   });
 
   it("resolveSuccessorSprint never derives a number", async () => {

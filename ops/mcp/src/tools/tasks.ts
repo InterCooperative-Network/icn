@@ -213,7 +213,14 @@ export function assertSprintMutable(state: unknown): { ok: true } | SprintMutati
   return {
     ok: false,
     message:
-      `Refusing to mutate the sprint board: no sprint is active (${resolved.kind} — ${because}). ` +
+      // `unresolved` is not `dormant`. Saying "no sprint is active" for a silent or
+      // self-contradictory record asserts a cadence fact the resolver expressly refused to
+      // assert (review, #2657) — the write refusal is identical either way, but the reason is
+      // not, and this surface must not emit a claim its own resolver rejected.
+      (resolved.kind === "dormant"
+        ? `Refusing to mutate the sprint board: no sprint is active (${because}). `
+        : "Refusing to mutate the sprint board: the board's cadence cannot be resolved " +
+          `(${because}), so whether a sprint is running is unknown. `) +
       "ops/state/sprint/current.json is the sprint_state truth owner; activity is decided by " +
       "cadence/active_sprint, not by the status label." +
       numbering +
@@ -453,7 +460,10 @@ export function registerTaskTools(
 
   server.tool(
     "close_sprint",
-    "Archive current sprint to history/ and start a new sprint, carrying over unfinished tasks.",
+    "REFUSES on any v2 record: archiving would round-trip it through a v1 write model that " +
+      "drops schema/cadence/lineage, and the successor number is never inferred. Archive-and-" +
+      "start is unavailable until a v2 transition contract exists (icn#2419). Reads are " +
+      "unaffected; use get_tasks.",
     {
       next_name: z.string().describe("Name for the next sprint"),
       next_goals: z
@@ -478,10 +488,11 @@ export function registerTaskTools(
           message:
             "Refusing to close the sprint: the successor sprint number is UNDETERMINED " +
             `(${successor.reason}).\n\n` +
-            "This tool will not infer one. Two numbering planes disagree \u2014 the board never " +
-            "advanced past 26, while the narrated cadence already spent 27 and 28 \u2014 so both " +
-            "27 and 29 are lineage claims the repository cannot support. The decision is " +
-            "tracked at icn#2637; set next_sprint_number in the record once it is made.",
+            "This tool will not infer one, and deliberately does not restate any particular " +
+            "board's lineage here: a successor number derived from arithmetic is a lineage " +
+            "claim the record has not made. Set next_sprint_number in the record once the " +
+            "owner has decided it. For the current board that decision is tracked at " +
+            "icn#2637; read ops/state/sprint/current.json for what this record itself says.",
         });
       }
 
