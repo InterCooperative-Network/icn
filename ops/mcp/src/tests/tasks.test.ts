@@ -73,18 +73,23 @@ describe("computeNextSprint", () => {
     ],
   };
 
-  it("increments the sprint number", () => {
-    expect(computeNextSprint(base, "Sprint 27", [], "2026-07-01").sprint).toBe(27);
+  // Renamed from "increments the sprint number": it no longer does, and must not. The
+  // successor is supplied by the caller from `resolveSuccessorSprint` (#2419 / #2637).
+  it("uses the successor number it is given, never current.sprint + 1", () => {
+    expect(computeNextSprint(base, 31, "Sprint 31", [], "2026-07-01").sprint).toBe(31);
+    // Discriminating: 27 IS base.sprint + 1, so a test that only asserted 27 would pass
+    // against restored arithmetic. 31 cannot be produced by incrementing 26.
+    expect(computeNextSprint(base, 27, "Sprint 27", [], "2026-07-01").sprint).toBe(27);
   });
 
   it("carries over only non-done tasks and clears their assignee", () => {
-    const next = computeNextSprint(base, "Sprint 27", [], "2026-07-01");
+    const next = computeNextSprint(base, 27, "Sprint 27", [], "2026-07-01");
     expect(next.tasks.map((t) => t.id)).toEqual(["t2", "t3"]);
     expect(next.tasks.every((t) => t.assignee === null)).toBe(true);
   });
 
   it("applies the new name, goals, and start date; preserves epics", () => {
-    const next = computeNextSprint(base, "Sprint 27", ["land pilot"], "2026-07-01");
+    const next = computeNextSprint(base, 27, "Sprint 27", ["land pilot"], "2026-07-01");
     expect(next.name).toBe("Sprint 27");
     expect(next.goals).toEqual(["land pilot"]);
     expect(next.started).toBe("2026-07-01");
@@ -93,13 +98,13 @@ describe("computeNextSprint", () => {
 
   it("does not mutate the input sprint", () => {
     const snapshot = JSON.parse(JSON.stringify(base));
-    computeNextSprint(base, "Sprint 27", [], "2026-07-01");
+    computeNextSprint(base, 27, "Sprint 27", [], "2026-07-01");
     expect(base).toEqual(snapshot);
   });
 
   it("returns state that shares no mutable references with the input", () => {
     const goals = ["ship"];
-    const next = computeNextSprint(base, "Sprint 27", goals, "2026-07-01");
+    const next = computeNextSprint(base, 27, "Sprint 27", goals, "2026-07-01");
     expect(next.epics).not.toBe(base.epics);
     expect(next.goals).not.toBe(goals);
     // Mutating the result must not leak back into the inputs via aliasing.
