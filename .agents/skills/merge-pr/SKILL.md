@@ -253,14 +253,29 @@ its job there.
 5. **Merge.** Only when step 4 held completely, and merging this PR is authorized by a human —
    green checks are a precondition, not permission.
 
-   First confirm the PR is still the one the evidence describes:
+   First confirm the PR is still the one the evidence describes, **and that the gates only this
+   skill enforces are still green**:
 
    ```bash
    gh pr view <N> --json headRefOid,baseRefName
+   gh pr checks <N> --json name,state,bucket      # rebuild REQUIRED_STATE, re-evaluate step 4.6
    ```
 
-   Both must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the evidence is stale:
-   **refuse and start over.** `--match-head-commit` pins the head and **nothing pins the base** —
+   Both identity values must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the
+   evidence is stale: **refuse and start over.**
+
+   Re-reading the checks matters for a specific subset. For a check GitHub itself requires, GitHub
+   re-evaluates protection at merge time and refuses — that backstop is real, and it is why an
+   ordinary merge needs no race-free gate of its own. But this procedure enforces the **union** of
+   `POLICY` and `LIVE`, and for a policy-required check that is *not* a live protection context,
+   nothing but this skill enforces it: if it is rerun and fails between step 3 and here, an
+   ordinary merge succeeds anyway and the gate was decorative (icn#2656 review). `POLICY \ LIVE`
+   is empty on `main` today, so this does not currently reproduce — the union exists precisely
+   because the two sets *can* diverge, and `agent_tooling_check_note` records that this one did.
+
+   Re-reading **narrows** the window to the merge call itself; it does not close it, because there
+   is no atomic evaluate-and-merge. That is an honest limit, not a gap to keep patching — the
+   answer to an unclosable race is not more authority, and where GitHub can enforce, it does. `--match-head-commit` pins the head and **nothing pins the base** —
    a retarget leaves the head SHA untouched, so the flag still succeeds while the merge lands on
    a branch whose required-check set and protection were never inspected, and the gate you passed
    was computed for a different base (icn#2656 review). GitHub still enforces the new base's own

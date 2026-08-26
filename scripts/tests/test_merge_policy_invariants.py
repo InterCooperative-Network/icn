@@ -453,6 +453,14 @@ for name, canonical, mirrors in skill_paths:
           and bool(re.search(r"nothing pins the base", " ".join(body.split()), re.I)))
     check(f"{name}: a moved head or base refuses rather than proceeding",
           bool(re.search(r"refuse and start over", " ".join(body.split()), re.I)))
+    # Review of 9f18c08f: for a policy-required check that is NOT a live protection context,
+    # this skill is the ONLY enforcer — GitHub's merge-time re-evaluation does not cover it. So
+    # the pre-merge refresh must re-read check state, not only branch identity.
+    merge_step = body.split("5. **Merge.**", 1)[-1].split("6. **Confirm", 1)[0]
+    check(f"{name}: the pre-merge refresh re-reads check state, not only head and base",
+          "gh pr checks <N> --json name,state,bucket" in merge_step)
+    check(f"{name}: and states the limit rather than claiming the race is closed",
+          bool(re.search(r"does not close it", " ".join(merge_step.split()), re.I)))
     check(f"{name}: treats an unsuccessful protection load as missing evidence",
           bool(re.search(r"unsuccessful load is missing evidence", " ".join(body.split()), re.I))
           and "LIVE=UNAVAILABLE" in body)
