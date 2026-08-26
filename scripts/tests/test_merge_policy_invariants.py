@@ -131,13 +131,21 @@ def walk_strings(node, key=None, path="$"):
 FIELD_RE = re.compile(r"\bmergeStateStatus\b|\bmergeable\b")
 
 
+# The clause ends where MEANING ends: at the next field, a sentence break, or a negation.
+# Never at a character count — an 80-char cutoff let
+# "mergeStateStatus must, after every required check ... be MERGEABLE" (value at offset 119)
+# read as clean, missing the identical conflict a short clause caught (icn#2656 final-head
+# review). A longer number would only move the blind spot.
+CLAUSE_END = re.compile(r"[.;]|\bnever\b|\bnot\b|\bdifferent\b")
+
+
 def associations(text: str, field: str, values: set[str]) -> list[str]:
     hits = []
     for m in re.finditer(rf"\b{field}\b", text):
         rest = text[m.end():]
         nxt = FIELD_RE.search(rest)
-        window = rest[: nxt.start()] if nxt else rest[:80]
-        window = re.split(r"[.;]|\bnever\b|\bnot\b|\bdifferent\b", window, maxsplit=1)[0]
+        window = rest[: nxt.start()] if nxt else rest   # to the next field, or to the end
+        window = CLAUSE_END.split(window, maxsplit=1)[0]  # then to the clause terminator
         for v in values:
             if re.search(rf"\b{v}\b", window):
                 hits.append(f"{field} … {v}")
@@ -168,6 +176,23 @@ check("CONTROL: does not fire on prose documenting the distinction", not _c4)
 _c5 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
                    "mergeable", STATUS_ONLY)
 check("CONTROL: a correct two-field sentence is not a conflict", not _c5)
+# Final-head review of 569e0a73: the scan stopped at 80 characters, so the same conflict in a
+# longer operative clause read as clean. Bounded by meaning now, not by length.
+_long_bad = ("mergeStateStatus must, after every required check and review gate has been "
+             "independently inspected and found clear, be MERGEABLE")
+check("CONTROL: a LONG invalid clause is caught (value at offset > 80)",
+      bool(associations(_long_bad, "mergeStateStatus", MERGEABLE_ONLY)))
+_long_ok = ("mergeStateStatus must, after every required check and review gate has been "
+            "independently inspected and found clear, be CLEAN or UNSTABLE")
+check("CONTROL: a LONG valid clause stays clean",
+      not associations(_long_ok, "mergeStateStatus", MERGEABLE_ONLY))
+_later = "mergeStateStatus is checked first. Separately, MERGEABLE is a mergeable value."
+check("CONTROL: a value in a LATER sentence is not associated backward",
+      not associations(_later, "mergeStateStatus", MERGEABLE_ONLY))
+_long_rev = ("mergeable must, after every required check and review gate has been "
+             "independently inspected and found clear, be CLEAN")
+check("CONTROL: the reverse confusion is caught in a long clause too",
+      bool(associations(_long_rev, "mergeable", STATUS_ONLY)))
 _c6 = associations("mergeable is MERGEABLE, and mergeStateStatus is CLEAN or UNSTABLE",
                    "mergeStateStatus", MERGEABLE_ONLY)
 check("CONTROL: ...and its second clause is clean too", not _c6)
@@ -336,8 +361,21 @@ for name, canonical, mirrors in skill_paths:
           bool(merges) and all("--match-head-commit" in c for c in merges))
     check(f"{name}: captures headRefOid to pin against", "headRefOid" in body)
     check(f"{name}: reads protection for the PR's actual base, not a hardcoded main",
-          "${BASE}/protection" in body
+          "${BASE_ENC}/protection" in body
           and "branches/main/protection" not in body)
+    # Final-head review of 569e0a73: `feat%2Fnext` is a valid Git ref and GitHub decodes `%2F`
+    # in that path segment, so a raw `${BASE}` loads `feat/next`'s protection instead — the
+    # admin path would then validate the wrong required-check set. Distinct from the slash-only
+    # claim, which did not reproduce.
+    check(f"{name}: no protection path interpolates the UNENCODED base",
+          "${BASE}/protection" not in body)
+    check(f"{name}: encodes the base with a real encoder, not a hand-rolled substitution",
+          "@uri" in " ".join(extract_commands(body))
+          and not re.search(r"BASE.*(//|s#|tr ).*%2F", body)
+          and not re.search(r'\$\{BASE//', body))
+    check(f"{name}: names baseRefName as the sole branch-identity authority",
+          bool(re.search(r"baseRefName[^.]{0,40}sole authority",
+                         " ".join(body.split()), re.I)))
     # Inspect the COMMAND, not the body: an earlier revision of this check read the prose
     # mention of `--paginate` and stayed green when the flag was removed from the query itself.
     # Same prose/command confusion this file already had to learn once.

@@ -74,6 +74,22 @@ existed for.
    later command is pinned to them — the checks you inspect and the commit you merge must be the
    same commit, and the protection you check must be the branch you are actually merging into.
 
+   `baseRefName` is the **sole authority** for branch identity. Encode it as one path component
+   before it ever appears in an API path — with a real encoder, never a hand-written
+   `/` → `%2F` substitution:
+
+   ```bash
+   BASE_ENC=$(jq -rn --arg s "${BASE}" '$s|@uri')
+   ```
+
+   This matters for a ref whose *literal name contains a percent escape*. `feat%2Fnext` is a
+   valid Git ref (`git check-ref-format refs/heads/feat%2Fnext` accepts it), and GitHub decodes
+   `%2F` in that path segment — verified live: requesting `branches/fix%2F2651-...` returns
+   `.name = fix/2651-...`. So interpolating `${BASE}` raw would load **`feat/next`'s**
+   protection for a PR based on **`feat%2Fnext`**, and the admin path would validate the wrong
+   required-check set. Encoding keeps the two distinct: `feat/next` → `feat%2Fnext`,
+   `feat%2Fnext` → `feat%252Fnext`.
+
    With no number in `$ARGUMENTS`, resolve the current branch's PR once and use its number from
    then on. Note `mergeable` and `mergeStateStatus` are **different fields with different
    enums** — `MERGEABLE` is a value of the former only.
@@ -82,8 +98,8 @@ existed for.
 
    - `gh pr checks <N>`, cross-referenced against `.merge.required_checks`, and confirm the live
      set with
-     `gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" --jq '.required_status_checks.contexts'`
-     — `${BASE}`, not a hardcoded `main`: a stacked PR targets another branch, whose required
+     `gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" --jq '.required_status_checks.contexts'`
+     — `${BASE_ENC}`, not a hardcoded `main`: a stacked PR targets another branch, whose required
      set can differ, and merging with `--admin` against the wrong protection would bypass a
      check unique to the real base.
    - A red or pending check that is not required does not block. When
@@ -98,13 +114,15 @@ existed for.
      ```bash
      PENDING=$(gh pr checks <N> --json name,bucket --jq '[.[]|select(.bucket=="pending")|.name]')
      POLICY=$(jq -r '.merge.required_checks' ops/state/truth/policy.json)
-     LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE}/protection" \
+     LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
               --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
      # (PENDING ∩ POLICY) is the set the paths below reason about
      ```
 
      A slashed base such as `feat/next` resolves in that path as-is — verified against the live
-     API, which returns the same result encoded or not. What is *not* safe is failing to check:
+     API, which returns the same result encoded or not, which is why the *slash-only* concern
+     did not reproduce. The percent case above is a different defect and does. What is also
+     *not* safe is failing to check the load:
      a 404 (`Branch not protected`), a permissions error and a genuinely empty context list are
      three different facts that all leave `LIVE` looking empty. **An unsuccessful load is
      missing evidence, not "no requirements".** Do not arm auto-merge and do not bypass on it —
