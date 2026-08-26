@@ -407,6 +407,110 @@ for name, canonical, _m in skill_paths:
     check("merge-pr: `allowed` is checked before the detailed requirements",
           i_allowed != -1 and i_requires != -1 and i_allowed < i_requires)
 
+
+# --- (6) control-flow reachability, not just command existence ---------------
+# Five rounds of static string checks passed while the procedure contained an unreachable
+# security-sensitive branch (icn#2656 round 6): the `--admin` command EXISTED, and every state
+# that could qualify for it was consumed by the pending/auto handler two steps earlier. Strings
+# prove a command exists; these prove it is reachable in the state it handles, and unreachable
+# without escalation-specific authorization.
+#
+# Deliberately a lexer over numbered steps, not a parser: the properties are orderings and
+# containments over step indices, the smallest model that can express "step 3 consumes the
+# state step 5 needs".
+print("admin branch reachability and authorization")
+
+ADMIN_CMD = re.compile(r"gh pr merge\b[^\n]*--admin")
+AUTO_CMD = re.compile(r"auto_merge\.gh_flags|--auto\b")
+STOPS = re.compile(r"\*\*Then STOP\.\*\*|\bSTOP the procedure\b")
+AUTH_ARG = re.compile(r"\$ARGUMENTS[^\n]*--admin|includes\s+`--admin`")
+AUTH_FRESH = re.compile(r"fresh(?:ly)?\s+(?:explicit\s+)?confirmation"
+                        r"|confirmation[^\n]{0,80}administrator privileges", re.I)
+AUTH_SCOPE = re.compile(r"this PR|that PR number", re.I)
+
+
+def numbered_steps(md: str):
+    """[(n, text)] for the top-level numbered steps of the procedure."""
+    body = md.split("## Steps", 1)[-1].split("## Output", 1)[0]
+    parts = re.split(r"^(\d+)\.\s", body, flags=re.M)
+    return [(int(parts[i]), parts[i + 1]) for i in range(1, len(parts) - 1, 2)]
+
+
+def step_commands(text: str):
+    out, inf = [], False
+    for ln in text.splitlines():
+        if ln.lstrip().startswith("```"):
+            inf = not inf
+            continue
+        if inf and ln.strip():
+            out.append(ln.strip())
+    return out
+
+
+for name, canonical, _m in skill_paths:
+    if name != "merge-pr":
+        continue
+    md = canonical.read_text(encoding="utf-8")
+    stepping = numbered_steps(md)
+    admin_i = auto_i = None
+    for idx, (n, t) in enumerate(stepping):
+        cmds = step_commands(t)
+        if any(ADMIN_CMD.search(c) for c in cmds):
+            admin_i = idx
+        if any(AUTO_CMD.search(c) for c in cmds):
+            auto_i = idx
+    check("the procedure parses into numbered steps", len(stepping) >= 5)
+    check("an --admin merge command exists", admin_i is not None)
+    check("an auto-merge command exists", auto_i is not None)
+
+    if admin_i is not None and auto_i is not None:
+        an, at = stepping[admin_i]
+        # THE ROUND-6 DEFECT. The admin exception requires a PENDING required check; if the
+        # pending handler runs first and terminates, no qualifying state ever reaches it.
+        check(f"admin branch precedes the pending/auto handler (admin=step {an}, "
+              f"auto=step {stepping[auto_i][0]})", admin_i < auto_i)
+        stopping = [n for n, t in stepping[:admin_i] if STOPS.search(t)]
+        check(f"no step before the admin branch terminates the procedure: {stopping}",
+              not stopping)
+
+        # Authorization must gate EXECUTION, not merely be mentioned somewhere.
+        cmd_pos = min((m.start() for m in ADMIN_CMD.finditer(at)), default=len(at))
+        pre = at[:cmd_pos]
+        check("the admin step demands the --admin argument or a fresh confirmation",
+              bool(AUTH_ARG.search(at) or AUTH_FRESH.search(at)))
+        check("that demand appears BEFORE the --admin command in the same step",
+              bool(AUTH_ARG.search(pre) or AUTH_FRESH.search(pre)))
+        check("authorization is scoped to this PR / this invocation",
+              bool(AUTH_SCOPE.search(pre)))
+        check("a generic prior yes is explicitly insufficient",
+              bool(re.search(r"generic|retroactiv", at, re.I)))
+        check("a failed admin gate refuses rather than falling back",
+              bool(re.search(r"refuse the escalation|not a downgrade|do not fall back", at, re.I)))
+        check("human authorization is stated not to lift eligibility",
+              "never_for" in at and bool(re.search(r"not sufficient|does not lift", at, re.I)))
+
+        # No --admin anywhere else, and specifically not on the ordinary path.
+        others = [n for j, (n, t) in enumerate(stepping)
+                  if j != admin_i and any(ADMIN_CMD.search(c) for c in step_commands(t))]
+        check(f"no --admin command outside the authorized branch: {others}", not others)
+        # Whitespace-normalised: the phrase wraps across lines in the rendered markdown, and
+        # a literal match silently failed on the very text it was written to find.
+        ordinary = " ".join(stepping[auto_i][1].split())
+        check("the ordinary path forbids escalation in prose too",
+              bool(re.search(r"never to escalate|no admin escalation", ordinary, re.I)))
+
+# CONTROLS: the model must reject the round-5 shape it was written against.
+_r5 = ("## Steps\n\n3. pending\n\n   ```bash\n   gh pr merge <N> --auto --squash\n   ```\n\n"
+       "   **Then STOP.**\n\n5. bypass\n\n   ```bash\n   gh pr merge <N> --admin --squash\n   ```\n\n## Output\n")
+_st = numbered_steps(_r5)
+_ai = next(i for i, (n, t) in enumerate(_st) if any(ADMIN_CMD.search(c) for c in step_commands(t)))
+_ui = next(i for i, (n, t) in enumerate(_st) if any(AUTO_CMD.search(c) for c in step_commands(t)))
+check("CONTROL: the round-5 ordering (admin after auto) is rejected", not (_ai < _ui))
+check("CONTROL: the round-5 STOP before the admin branch is detected",
+      bool([n for n, t in _st[:_ai] if STOPS.search(t)]))
+check("CONTROL: a step with no authorization demand is rejected",
+      not (AUTH_ARG.search(_st[_ai][1]) or AUTH_FRESH.search(_st[_ai][1])))
+
 print()
 if failures:
     print(f"check-merge-policy: {len(failures)} failure(s)")
