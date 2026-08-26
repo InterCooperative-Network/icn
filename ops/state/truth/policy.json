@@ -3,7 +3,11 @@
   "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values \u2014 read this file.",
   "merge": {
     "default_strategy": "squash",
-    "exception": "Subtree merge commits (git subtree add --squash) must use --merge. State reason explicitly.",
+    "exception": {
+      "strategy": "merge",
+      "applies_to": "Subtree merge commits (git subtree add --squash)",
+      "note": "The one documented departure from default_strategy. Structured in icn#2656 because it was prose: `merge-pr` displayed the sentence but loaded STRATEGY unconditionally from default_strategy, so the exempt category was still squash-merged and the exception could never be applied. The strategy now comes from THIS field, so neither value is ever typed into a command. Selecting it is an operator statement \u2014 whether a PR is a subtree import is not mechanically derivable \u2014 and the reason must be stated explicitly at merge time."
+    },
     "required_checks": [
       "Build Release",
       "Test",

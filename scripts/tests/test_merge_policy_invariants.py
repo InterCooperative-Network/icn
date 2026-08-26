@@ -87,6 +87,20 @@ strategy = merge.get("default_strategy")
 check(f"default_strategy {strategy!r} is a real gh pr merge strategy",
       strategy in GH_MERGE_STRATEGIES)
 
+# Review of 58d29370: `.merge.exception` was prose, so the skill printed it while STRATEGY
+# stayed unconditionally `default_strategy` — the exempt category was squash-merged anyway and
+# the exception could not be applied. A strategy the procedure cannot select is not a policy.
+exc = merge.get("exception")
+check("merge.exception is structured, not prose", isinstance(exc, dict))
+if isinstance(exc, dict):
+    check(f"exception.strategy {exc.get('strategy')!r} is a real gh pr merge strategy",
+          exc.get("strategy") in GH_MERGE_STRATEGIES)
+    check("exception declares the category it applies to", bool(exc.get("applies_to")))
+    check("the exception names a DIFFERENT strategy from the default",
+          exc.get("strategy") != strategy)
+check("CONTROL: the pre-#2656 prose exception WOULD be caught",
+      not isinstance("Subtree merge commits must use --merge. State reason explicitly.", dict))
+
 required = set(merge.get("required_checks", []))
 non_blocking = set(merge.get("non_blocking_checks", []))
 check("required_checks is non-empty", len(required) > 0)
@@ -365,9 +379,27 @@ for name, canonical, mirrors in skill_paths:
                          " ".join(body.split()), re.I)))
     check(f"{name}: proves policy-required checks against live protection contexts",
           "required_status_checks.contexts" in cmd_text)
-    check(f"{name}: detects pending checks by normalised bucket, not one state spelling",
-          'bucket=="pending"' in cmd_text.replace(" ", "")
-          and 'state=="PENDING"' not in cmd_text.replace(" ", ""))
+    # Review of 58d29370: `gh pr checks` sorts into FIVE buckets (pass, fail, pending,
+    # skipping, cancel), so collecting only the pending and failing names silently dropped
+    # `cancel` — a cancelled required check read as green. The gate is now a row per required
+    # check with an explicit value for the unreported ones, so there is nothing to drop.
+    squashed = cmd_text.replace(" ", "")
+    check(f"{name}: builds one row per required check over POLICY union LIVE",
+          "REQUIRED_STATE" in cmd_text and "INDEX(" in cmd_text
+          and "$policy+$live|unique" in squashed)
+    check(f"{name}: an unreported required check becomes an explicit value, not a gap",
+          '"ABSENT"' in cmd_text)
+    check(f"{name}: reads each check's state, not only its bucket",
+          "name,state,bucket" in cmd_text)
+    check(f"{name}: gates on no single pending spelling",
+          'state=="PENDING"' not in squashed)
+    # A bare `gh pr merge` against a merge-queue base ENQUEUES rather than merging, which is a
+    # deferred merge on stale evidence — the thing dropping `--auto` was meant to prevent.
+    check(f"{name}: detects a merge-queue base and the PR's queue membership",
+          "mergeQueue" in cmd_text and "isInMergeQueue" in cmd_text)
+    # The documented strategy exception must be selectable, not merely displayed.
+    check(f"{name}: can actually select the documented strategy exception",
+          "merge.exception.strategy" in cmd_text)
     check(f"{name}: reads review threads, and paginates them rather than reading one page",
           "reviewThreads" in cmd_text
           and all(tok in cmd_text for tok in ("--paginate", "hasNextPage", "endCursor")))
@@ -423,6 +455,8 @@ TERMINATING = {
     "a blocked/behind merge state": r"`BLOCKED`, `BEHIND`",
     "a draft or unreviewed PR": r"a draft PR, `CHANGES_REQUESTED`",
     "evidence that could not be loaded": r"could not be loaded",
+    "a required check GitHub never reported": r"`ABSENT`",
+    "a base that defers merges to a queue": r"deferred to a merge queue",
 }
 for _n, _c, _m in skill_paths:
     body = _c.read_text(encoding="utf-8")

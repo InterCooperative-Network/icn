@@ -67,8 +67,22 @@ its job there.
    STRATEGY=$(jq -r '.merge.default_strategy' ops/state/truth/policy.json)
    ```
 
-   `${STRATEGY}` builds the one merge command below. The single exception is the one
-   `.merge.exception` describes; state the reason explicitly when you invoke it.
+   `${STRATEGY}` builds the one merge command below.
+
+   The single documented departure is `.merge.exception`, and it is a **strategy** selection,
+   not an authority one — both values are ordinary merges. It applies only when the operator
+   states that this PR is the category `.merge.exception.applies_to` names; whether a PR is a
+   subtree import is not mechanically derivable, so it is never inferred. When they do, take
+   that strategy from the policy as well, and state the reason explicitly at merge time:
+
+   ```bash
+   STRATEGY=$(jq -r '.merge.exception.strategy' ops/state/truth/policy.json)
+   ```
+
+   Both branches read the strategy from `policy.json`. Neither value is ever typed into a
+   command — before icn#2656 this step printed the exception as a sentence while `STRATEGY`
+   stayed unconditionally `default_strategy`, so the exempt category was squash-merged anyway
+   and the documented exception could not be applied at all.
 
 2. Resolve the PR **explicitly**. If `$ARGUMENTS` names a number, pass it to every `gh` call;
    a bare `gh pr view` resolves the current branch's PR instead, which is how you merge the
@@ -106,12 +120,33 @@ its job there.
    missing evidence, not an absent requirement:
 
    ```bash
-   PENDING=$(gh pr checks <N> --json name,bucket --jq '[.[]|select(.bucket=="pending")|.name]')
-   FAILING=$(gh pr checks <N> --json name,bucket --jq '[.[]|select(.bucket=="fail")|.name]')
-   POLICY=$(jq -r '.merge.required_checks' ops/state/truth/policy.json)
+   CHECKS=$(gh pr checks <N> --json name,state,bucket)
+   POLICY=$(jq -c '.merge.required_checks' ops/state/truth/policy.json)
    LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
             --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
    ```
+
+   Then build **one row per required check**, so that a check GitHub did not report becomes a
+   value rather than a gap:
+
+   ```bash
+   REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
+                          --argjson live "${LIVE}" '
+     ($policy + $live | unique) as $required
+     | INDEX($checks[]; .name) as $seen
+     | $required | map({name: .,
+                        state:  ($seen[.].state  // "ABSENT"),
+                        bucket: ($seen[.].bucket // "absent")})')
+   ```
+
+   **Filtering for the states you expect loses the ones you did not.** `gh pr checks` sorts every
+   check into one of *five* buckets — `pass`, `fail`, `pending`, `skipping`, `cancel` — so
+   collecting only the pending and failing names drops the other three, and a required check that
+   GitHub **cancelled** would appear in neither list and read as green (icn#2656 review). A check
+   absent from the rollup entirely reads the same way. The table above has a row for every member
+   of `POLICY ∪ LIVE` and an explicit `ABSENT` for anything unreported, so step 4 compares a
+   value in every case. For the report, the outstanding ones are
+   `jq -r '[.[]|select(.bucket=="pending")|.name]' <<<"${REQUIRED_STATE}"`.
 
    `${BASE_ENC}`, not a hardcoded `main`: a stacked PR targets another branch whose required set
    can differ. A 404 (`Branch not protected`), a permissions error and a genuinely empty context
@@ -134,6 +169,17 @@ its job there.
    thread on page two is invisible to an unpaginated query, and invisible is not resolved. If
    pagination cannot complete, that is missing evidence — stop.
 
+   Finally, whether the base defers merges to a **merge queue**:
+
+   ```bash
+   gh api graphql -f query='query($o:String!,$r:String!,$b:String!,$n:Int!){repository(owner:$o,name:$r){
+     mergeQueue(branch:$b){id} pullRequest(number:$n){isInMergeQueue}}}' \
+     -f o=InterCooperative-Network -f r=icn -f b="${BASE}" -F n=<N>
+   ```
+
+   `${BASE}` unencoded here on purpose: this is a GraphQL argument, not a URL path component, so
+   the encoding that step 2 requires for the protection path would corrupt it.
+
 4. **Decide from `.merge.ready_when`, and from nothing else.** Every field must hold against the
    step-3 evidence. Evaluate in order and stop at the first that does not:
 
@@ -147,10 +193,18 @@ its job there.
    4. `reviewDecision` is in `.ready_when.review_decision_allowlist` (`null` is listed there
       explicitly, because it is what this repo reports today).
    5. The unresolved review-thread count equals `.ready_when.unresolved_review_threads`.
-   6. **Every** required check — the union of `POLICY` and `LIVE`, so neither authority can
-      admit a check the other requires — has concluded with a value in
-      `.ready_when.required_check_conclusion_allowlist`. `LIVE=UNAVAILABLE` fails here by
-      construction: an unproven union is not a proven one.
+   6. **Every row** of `REQUIRED_STATE` — the union of `POLICY` and `LIVE`, so neither authority
+      can admit a check the other requires — has a `state` in
+      `.ready_when.required_check_conclusion_allowlist`. Every other value stops the merge, and
+      because the table has a row per required check, that includes `CANCELLED` and the
+      synthetic `ABSENT`: a check nobody reported is not a check that passed.
+      `LIVE=UNAVAILABLE` fails here by construction — an unproven union is not a proven one.
+   7. The base does **not** defer merges: `mergeQueue` is `null` for `${BASE}` and the PR is not
+      already `isInMergeQueue`. A bare `gh pr merge` against a merge-queue base *enqueues* the PR
+      rather than merging it, which would leave a merge armed to happen later on evidence that is
+      no longer current — exactly what dropping `--auto` was meant to prevent (icn#2656 review).
+      Enqueuing is a legitimate outcome; it is not one this skill is shaped to own, so it stops
+      and says so.
 
    **Any other state stops the skill.** Report which gate stopped it and what its live value was,
    then stop:
@@ -159,7 +213,9 @@ its job there.
      runner is stalled;
    - a required check in any state the allowlist does not name — `FAILURE`, `TIMED_OUT`,
      `CANCELLED`, `ACTION_REQUIRED`, `STALE`, `STARTUP_FAILURE`, a legacy `ERROR`, or anything
-     GitHub adds later;
+     GitHub adds later; and equally a required check that is `ABSENT`, which GitHub never
+     reported at all;
+   - a base whose merges are deferred to a merge queue;
    - `mergeable: UNKNOWN`, a `mergeStateStatus` outside the list (`BLOCKED`, `BEHIND`, `DIRTY`,
      `HAS_HOOKS`), a draft PR, `CHANGES_REQUESTED`, an unresolved thread;
    - any evidence in step 3 that could not be loaded.
