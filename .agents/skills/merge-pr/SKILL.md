@@ -87,8 +87,8 @@ file to execute.
    3. `mergeStateStatus` is one of `.requires.merge_state_status_in`.
    4. The gates `--admin` would *also* bypass are independently clear — it overrides **every**
       branch protection, not just the check gate, so these mirror the top-level
-      `readiness_definition`: `isDraft` equals `.requires.is_draft`, `reviewDecision` is not in
-      `.requires.review_decision_not_in`, and the unresolved review-thread count equals
+      `readiness_definition`: `isDraft` equals `.requires.is_draft`, `reviewDecision` is in
+      `.requires.review_decision_allowlist` (`null` is listed there explicitly), and the unresolved review-thread count equals
       `.requires.unresolved_review_threads`. If any cannot be loaded, that is missing evidence
       — do not bypass.
       ```bash

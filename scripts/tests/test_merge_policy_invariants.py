@@ -40,6 +40,8 @@ MERGE_STATE_STATUS = {
 }
 # `gh pr merge` accepts exactly these strategies.
 GH_MERGE_STRATEGIES = {"merge", "squash", "rebase"}
+# gh api graphql -f query='{__type(name:"PullRequestReviewDecision"){enumValues{name}}}'
+REVIEW_DECISIONS = {"CHANGES_REQUESTED", "APPROVED", "REVIEW_REQUIRED"}
 STRATEGY_FLAG_RE = re.compile(r"--(merge|squash|rebase)\b")
 
 failures = []
@@ -203,15 +205,24 @@ print("admin bypass reproduces the readiness review gates")
 readiness = " ".join(whole.get("readiness_definition", []))
 if isinstance(req, dict):
     check("bypass refuses a draft PR", req.get("is_draft") is False)
-    rd_block = req.get("review_decision_not_in")
-    check("bypass refuses CHANGES_REQUESTED",
-          isinstance(rd_block, list) and "CHANGES_REQUESTED" in rd_block)
+    # An ALLOWLIST, like every other state requirement here. A `*_not_in` denylist would let a
+    # fourth PullRequestReviewDecision value pass by omission — the same fail-open the
+    # conclusion denylist had (icn#2656 review).
+    check("review decision uses an allowlist, not a denylist",
+          "review_decision_not_in" not in req
+          and isinstance(req.get("review_decision_allowlist"), list))
+    rd_allow = req.get("review_decision_allowlist") or []
+    check("bypass refuses CHANGES_REQUESTED", "CHANGES_REQUESTED" not in rd_allow)
+    check("bypass refuses REVIEW_REQUIRED", "REVIEW_REQUIRED" not in rd_allow)
+    check("the live null decision is admitted EXPLICITLY, not by omission", None in rd_allow)
+    check("every non-null allowlisted decision is a real PullRequestReviewDecision",
+          all(v in REVIEW_DECISIONS for v in rd_allow if v is not None))
     check("bypass refuses unresolved review threads",
           req.get("unresolved_review_threads") == 0)
     # Tie the two documents together so neither can drift alone.
     if "CHANGES_REQUESTED" in readiness:
         check("readiness requires no CHANGES_REQUESTED, and so does the bypass",
-              isinstance(rd_block, list) and "CHANGES_REQUESTED" in rd_block)
+              "CHANGES_REQUESTED" not in rd_allow)
     if "threads resolved" in readiness:
         check("readiness requires resolved threads, and so does the bypass",
               req.get("unresolved_review_threads") == 0)
@@ -317,7 +328,7 @@ for name, canonical, mirrors in skill_paths:
           "STARTUP_FAILURE" in body and "STALE" in body)
     # The bypass overrides every protection, so the skill must check the review gates too.
     check(f"{name}: checks the gates --admin would also bypass",
-          all(t in body for t in ("is_draft", "review_decision_not_in",
+          all(t in body for t in ("is_draft", "review_decision_allowlist",
                                   "unresolved_review_threads")))
 
     for mirror in mirrors:
