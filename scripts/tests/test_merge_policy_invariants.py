@@ -457,8 +457,23 @@ for name, canonical, mirrors in skill_paths:
     # this skill is the ONLY enforcer — GitHub's merge-time re-evaluation does not cover it. So
     # the pre-merge refresh must re-read check state, not only branch identity.
     merge_step = body.split("5. **Merge.**", 1)[-1].split("6. **Confirm", 1)[0]
-    check(f"{name}: the pre-merge refresh re-reads check state, not only head and base",
-          "gh pr checks <N> --json name,state,bucket" in merge_step)
+    # Review of c0c1ee80: the refresh ran `gh pr checks` WITHOUT assigning it, so it printed the
+    # new JSON and discarded it while item 6 was re-evaluated against the stale step-3 table.
+    # The old assertion checked the command's PRESENCE and so passed on that. Assert the EFFECT:
+    # the refresh must reassign CHECKS and rebuild REQUIRED_STATE.
+    check(f"{name}: the pre-merge refresh reassigns CHECKS rather than printing it",
+          "CHECKS=$(gh pr checks <N> --json name,state,bucket)" in merge_step)
+    check(f"{name}: and rebuilds REQUIRED_STATE from the refreshed checks",
+          "REQUIRED_STATE=$(jq -n" in merge_step)
+    check(f"{name}: and re-evaluates the required-check gate against the rebuilt table",
+          bool(re.search(r"re-evaluate step 4 item 6", " ".join(merge_step.split()), re.I)))
+    # The construction is duplicated on purpose (visible where it runs). Duplication is exactly
+    # what this PR exists to prevent, so prove the copies cannot diverge.
+    builds = re.findall(r"REQUIRED_STATE=\$\(jq -n.*?\)'\)", body, re.S)
+    normalised = {" ".join(b.split()) for b in builds}
+    check(f"{name}: both REQUIRED_STATE constructions exist: {len(builds)}", len(builds) == 2)
+    check(f"{name}: and they are identical, so the copies cannot drift: {len(normalised)} distinct",
+          len(normalised) == 1)
     check(f"{name}: and states the limit rather than claiming the race is closed",
           bool(re.search(r"does not close it", " ".join(merge_step.split()), re.I)))
     check(f"{name}: treats an unsuccessful protection load as missing evidence",

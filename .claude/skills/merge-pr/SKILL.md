@@ -258,11 +258,29 @@ its job there.
 
    ```bash
    gh pr view <N> --json headRefOid,baseRefName
-   gh pr checks <N> --json name,state,bucket      # rebuild REQUIRED_STATE, re-evaluate step 4.6
+   CHECKS=$(gh pr checks <N> --json name,state,bucket)
+   REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
+                          --argjson live "${LIVE}" '
+     ($policy + $live | unique) as $required
+     | INDEX($checks[]; .name) as $seen
+     | $required | map({name: .,
+                        state:  ($seen[.].state  // "ABSENT"),
+                        bucket: ($seen[.].bucket // "absent")})')
    ```
 
    Both identity values must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the
-   evidence is stale: **refuse and start over.**
+   evidence is stale: **refuse and start over.** Then **re-evaluate step 4 item 6** against the
+   rebuilt `REQUIRED_STATE`, and stop on any row outside the allowlist exactly as step 4 does.
+
+   The refresh **reassigns** `CHECKS` and **rebuilds** `REQUIRED_STATE`. An earlier revision ran
+   `gh pr checks` here without assigning it, so the command printed the new JSON and discarded it
+   while item 6 was re-evaluated against the stale step-3 table — a refresh that refreshed nothing
+   (icn#2656 review). Its test asserted the command's presence rather than its effect, which is
+   why it passed. Re-running a read is not the same as replacing what you reason about.
+
+   This is the same construction as step 3, deliberately repeated rather than referenced so that
+   what runs here is visible where it runs; a test asserts the two are character-for-character
+   identical, so they cannot drift apart the way `merge-pr` and `policy.json` originally did.
 
    Re-reading the checks matters for a specific subset. For a check GitHub itself requires, GitHub
    re-evaluates protection at merge time and refuses — that backstop is real, and it is why an
