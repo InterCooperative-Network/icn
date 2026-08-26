@@ -292,6 +292,55 @@ describe("assertSprintMutable", () => {
     expect(tasks.assertSprintMutable({ lifecycle: "inactive", active_sprint: 31 }).ok).toBe(false);
   });
 
+  // Review round 2, reproduced before fixing: `declares_dormancy` returns on the FIRST key it
+  // recognises, so mirroring it let `cadence: "active"` short-circuit past `lifecycle:
+  // "inactive"`. Every dormancy key is scanned now.
+  it("refuses when one cadence key says active and another declares dormancy", () => {
+    expect(
+      tasks.assertSprintMutable({ cadence: "active", lifecycle: "inactive", active_sprint: 31 }).ok
+    ).toBe(false);
+    expect(
+      tasks.assertSprintMutable({ lifecycle: "dormant", cadence: "running", active_sprint: 7 }).ok
+    ).toBe(false);
+    // Control: agreeing keys are still mutable, so the check is not refusing on key count.
+    expect(
+      tasks.assertSprintMutable({ cadence: "active", lifecycle: "running", active_sprint: 31 }).ok
+    ).toBe(true);
+  });
+
+  // Review round 2: the state file is parsed with an unchecked assertion, so a non-null but
+  // unusable `active_sprint` read as an active board.
+  it("refuses an active_sprint that cannot name a sprint", () => {
+    for (const bad of [false, true, {}, [], "", "   ", NaN, Infinity]) {
+      expect(
+        tasks.assertSprintMutable({ cadence: "active", active_sprint: bad }).ok,
+        `active_sprint: ${JSON.stringify(bad)}`
+      ).toBe(false);
+    }
+    // Controls: real identifiers stay mutable, including 0 and a string id.
+    for (const good of [31, 0, "31", "2026-Q3"]) {
+      expect(
+        tasks.assertSprintMutable({ cadence: "active", active_sprint: good }).ok,
+        `active_sprint: ${JSON.stringify(good)}`
+      ).toBe(true);
+    }
+  });
+
+  // Review round 2: the refusal used to hardcode today's lineage dispute, so it would keep
+  // citing icn#2637 long after the number was settled.
+  it("mentions the numbering decision only while the successor is undetermined", () => {
+    const undetermined = tasks.assertSprintMutable(DORMANT_V2);
+    if (undetermined.ok) throw new Error("expected a refusal");
+    expect(undetermined.message).toContain("icn#2637");
+
+    const settled = tasks.assertSprintMutable({ ...DORMANT_V2, next_sprint_number: 44 });
+    if (settled.ok) throw new Error("expected a refusal");
+    expect(settled.message).not.toContain("icn#2637");
+    expect(settled.message).not.toMatch(/numbering planes/);
+    // Still refuses, and still says why — only the stale recovery advice is gone.
+    expect(settled.message).toContain("no sprint is active");
+  });
+
   it("routes the caller to the numbering decision, not to a guess", () => {
     const r = tasks.assertSprintMutable(DORMANT_V2);
     if (r.ok) throw new Error("expected a refusal");

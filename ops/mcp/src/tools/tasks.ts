@@ -130,22 +130,43 @@ export function resolveSprintCadence(state: unknown): SprintCadence {
 }
 
 /**
- * The `declares_dormancy()` predicate from `scripts/check-truth-spine.py`, over BOTH
- * dormancy keys.
+ * Does ANY supported cadence key declare dormancy?
  *
- * Used only to make the guard stricter. `resolveSprintCadence` mirrors the session hook,
- * which reads `cadence` alone; this catches a record whose `lifecycle` declares dormancy that
- * the hook would not look at. It can only ever turn "mutable" into "refused", never the
- * reverse, so honouring the wider owner here cannot open a hole.
+ * Deliberately **not** a faithful port of `declares_dormancy()` in
+ * `scripts/check-truth-spine.py`. That function returns on the first key it recognises, so
+ * `{cadence: "active", lifecycle: "inactive"}` short-circuits on `cadence` and never inspects
+ * `lifecycle` — which let a record explicitly declaring dormancy on its second key be treated
+ * as mutable (review, #2657). Every key is scanned here, and any dormancy declaration wins.
+ *
+ * The divergence is only ever in the refusing direction, and the polarity matters: this is a
+ * write gate, not the dormancy oracle. `declares_dormancy` answers "has the owner declared
+ * nothing is running", where an early return is harmless; this answers "is it safe to write",
+ * where it is not.
  */
-function declaresDormancy(rec: Record<string, unknown>): boolean {
+function anyKeyDeclaresDormancy(rec: Record<string, unknown>): boolean {
   for (const key of DORMANCY_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(rec, key)) continue;
-    const raw = String(rec[key]).trim().toLowerCase();
-    if (DORMANT_CADENCES.has(raw)) return true;
-    if (ACTIVE_CADENCES.has(raw)) return false;
+    if (DORMANT_CADENCES.has(String(rec[key]).trim().toLowerCase())) return true;
   }
   return Object.keys(rec).some((k) => k.startsWith("active_") && rec[k] === null);
+}
+
+/**
+ * Is `active_sprint` a value that can actually name a sprint?
+ *
+ * `resolveSprintCadence` only asks whether the value is non-null, because that is what
+ * `session-orient.sh` asks. But the state file is parsed with an unchecked type assertion, so
+ * `active_sprint: false`, `{}`, `[]` or `""` all reached the resolver as "not null" and were
+ * read as an active board (review, #2657). A malformed record must fail closed, not open.
+ *
+ * Checked here rather than in the resolver so the resolver stays a faithful mirror of the
+ * hook. The hook shares this leniency; that is an upstream observation, not something this
+ * guard can fix on its behalf.
+ */
+function isUsableSprintIdentifier(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") return value.trim() !== "";
+  return false;
 }
 
 export interface SprintMutationRefusal {
@@ -169,23 +190,34 @@ export function assertSprintMutable(state: unknown): { ok: true } | SprintMutati
       ? (state as Record<string, unknown>)
       : {};
 
-  if (resolved.kind === "active" && !declaresDormancy(rec)) return { ok: true };
+  let because: string | null = null;
+  if (resolved.kind !== "active") {
+    because = resolved.reason;
+  } else if (anyKeyDeclaresDormancy(rec)) {
+    because = "another cadence key declares dormancy, contradicting the active one";
+  } else if (!isUsableSprintIdentifier(resolved.sprint)) {
+    because = `active_sprint is ${JSON.stringify(resolved.sprint)}, which cannot name a sprint`;
+  }
+  if (because === null) return { ok: true };
 
-  const because =
-    resolved.kind === "active"
-      ? "a dormancy declaration on another cadence key contradicts it"
-      : resolved.reason;
+  // Recovery guidance is generated from the record in hand, never copied from today's owner
+  // state (review, #2657). Once the lineage dispute is settled and `next_sprint_number` is
+  // set, repeating the icn#2637 paragraph would be false guidance.
+  const successor = resolveSuccessorSprint(state);
+  const numbering =
+    successor.kind === "explicit"
+      ? ""
+      : "\n\nNote that the successor sprint number is also undetermined " +
+        `(${successor.reason}); that decision is tracked at icn#2637 and belongs to a human.`;
 
   return {
     ok: false,
     message:
       `Refusing to mutate the sprint board: no sprint is active (${resolved.kind} — ${because}). ` +
       "ops/state/sprint/current.json is the sprint_state truth owner; activity is decided by " +
-      "cadence/active_sprint, not by the status label. See its `notes` field.\n\n" +
-      "Opening the next sprint is NOT available here: the next sprint number is undetermined " +
-      "because two numbering planes disagree, and picking one would fabricate board lineage. " +
-      "That decision is tracked at icn#2637 and must be made by a human first.\n\n" +
-      "Current work is a live query, not a board row: " +
+      "cadence/active_sprint, not by the status label." +
+      numbering +
+      "\n\nCurrent work is a live query, not a board row: " +
       "gh issue list --repo InterCooperative-Network/icn --state open",
   };
 }
