@@ -126,6 +126,15 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
           "stale" in message and head[:12] in message, message[:160])
     check("nothing was installed from the stale checkout", not (tmp / "prefix-stale").exists())
 
+    # The tip can move between resolving it and fetching. A checkout at the OLD commit is stale
+    # the moment the fetch lands, and must not install looking clean.
+    moved = iter([{"branch": "main", "oid": head}, {"branch": "main", "oid": "e" * 40}])
+    install.github_default_branch = lambda owner, name: next(moved)
+    message = refusal(source, tmp / "prefix-moved")
+    check("a default tip that advances between resolving and fetching is refused",
+          "stale" in message and "moved mid-install" in message, message[:200])
+    check("nothing was installed after a mid-install move", not (tmp / "prefix-moved").exists())
+
     stub_github(head)
     evaluator = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "evaluate.py"
     original = evaluator.read_text(encoding="utf-8")

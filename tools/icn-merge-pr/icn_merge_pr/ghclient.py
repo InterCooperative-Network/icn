@@ -303,10 +303,14 @@ class GhCli:
              "-f", f"sha={sha}", "-f", f"merge_method={merge_method}"],
             on_failure=GitHubRefused)
         try:
-            return json.loads(raw)
+            decoded = json.loads(raw)
         except ValueError:
             # The request was accepted; we simply cannot read the reply. The post-read decides.
             return {}
+        # `null` and `[]` are valid JSON and neither is a merge response. Returning one would make
+        # the caller raise AttributeError AFTER a mutation was dispatched — a crash exactly where
+        # the program is supposed to report uncertainty.
+        return decoded if isinstance(decoded, dict) else {}
 
     def pull_request_merge_state(self, owner: str, name: str, number: int) -> dict:
         repo = self._graphql(_PR_MERGE_STATE, {"owner": owner, "name": name, "number": number})

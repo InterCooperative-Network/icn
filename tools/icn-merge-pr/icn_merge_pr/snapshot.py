@@ -220,8 +220,13 @@ def _collect_checks(client, owner, name, number,
 
     A name can appear more than once when a check is re-run; all occurrences are kept so the gate
     can take the worst rather than whichever the API happened to list last.
+
+    That is exactly why the count is RECONCILED here as well, and why "a missing check refuses
+    anyway" is not the whole story. If a name has a red occurrence and a green one and the red is
+    the node that goes missing, the name is still present and every occurrence the gate can see is
+    green — so it would report ready on the strength of evidence it never received.
     """
-    cursor, pages = None, 0
+    cursor, total, seen, pages = None, None, 0, 0
     found: dict[str, list[CheckOccurrence]] = {}
     while True:
         page = client.check_contexts_page(owner, name, number, cursor)
@@ -230,16 +235,28 @@ def _collect_checks(client, owner, name, number,
             # data to work around; it is inconsistent evidence, and the run must not decide on it.
             raise EvidenceUnavailable(
                 f"check rollup is for {page.get('head_oid')}, but the PR head is {head_oid}")
+        if total is None:
+            total = page.get("totalCount")
+            if type(total) is not int:
+                raise EvidenceUnavailable("status check rollup totalCount is unreadable")
         nodes = page.get("nodes")
         if not isinstance(nodes, list):
             raise EvidenceUnavailable("status check rollup page had no nodes")
         for node in nodes:
             entry = _normalise_check(node)
-            if entry is not None:
-                found.setdefault(entry[0], []).append(entry[1])
+            if entry is None:
+                # A node in the rollup this program cannot read is still a node it must account
+                # for; leaving it out silently would be the same hole as dropping it.
+                raise EvidenceUnavailable("a status check rollup entry was unreadable")
+            found.setdefault(entry[0], []).append(entry[1])
+            seen += 1
         info = page.get("pageInfo") or {}
         pages += 1
         if not info.get("hasNextPage"):
+            if seen != total:
+                raise EvidenceUnavailable(
+                    f"GitHub reports {total} status check result(s) but only {seen} could be "
+                    "read; an occurrence that went unread cannot be shown to be green")
             return {k: tuple(v) for k, v in found.items()}
         cursor = info.get("endCursor")
         if not cursor or pages >= _MAX_PAGES:

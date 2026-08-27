@@ -96,6 +96,12 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
             f"know a weaker way to ask.",
             None, attempted=True)
 
+    # The transport normalises this too, but the guarantee that matters — nothing raises after a
+    # mutation has been dispatched — belongs where the value is USED. A crash here would lose the
+    # one fact worth reporting: that a merge request went out and its result is unknown.
+    if not isinstance(response, dict):
+        response = {}
+
     # POST-READ. The merge response is a claim; this is the evidence.
     after = _read_back(client, snap)
     if after is None:

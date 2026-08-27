@@ -375,6 +375,32 @@ for node in unbound["check_pages"][0]:
         node["checkSuite"] = {"app": {"databaseId": IMPOSTOR_APP}}
 expect("protection that pins no producer accepts any producer", unbound, codes.READY)
 
+class ShortRollupCount(FakeGitHub):
+    """The rollup reports more results than it hands back.
+
+    The dangerous shape is not a missing NAME — that already refuses — but a missing OCCURRENCE of
+    a name whose other occurrence is green.
+    """
+
+    def check_contexts_page(self, owner, name, number, after):
+        page = super().check_contexts_page(owner, name, number, after)
+        page["totalCount"] += 1
+        return page
+
+
+short_rollup = ShortRollupCount(world())
+short_rollup_result = run(short_rollup, "example", "icn", 1, authorize=False)
+check("a rollup count larger than the results actually readable -> "
+      "REFUSED_UNAVAILABLE_EVIDENCE",
+      short_rollup_result.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE,
+      f"got {short_rollup_result.outcome}")
+check("the refusal says an unread occurrence cannot be shown green",
+      any("cannot be shown to be green" in r.detail for r in short_rollup_result.reasons))
+unreadable_node = world()
+unreadable_node["check_pages"][0].append({"__typename": "SomethingNew", "name": "x"})
+expect("a rollup entry this program cannot read", unreadable_node,
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+
 stale_rollup = world(rollup_head="9" * 40)
 expect("a rollup belonging to a different head is inconsistent evidence", stale_rollup,
        codes.REFUSED_UNAVAILABLE_EVIDENCE)
@@ -690,6 +716,19 @@ check("API success with a post-read that does not say merged -> MERGE_UNCONFIRME
 check("an unconfirmed merge is not success", codes.exit_code(result.outcome) != codes.EXIT_OK)
 check("an unconfirmed merge does not claim confirmation",
       result.merge["confirmed_merged"] is False, f"{result.merge}")
+
+# `null` and `[]` are valid JSON and neither is a merge response. Crashing on one AFTER the
+# mutation was dispatched is the failure this program exists to avoid.
+for shape in (None, [], "ok", 7):
+    odd = world(merge_response=shape,
+                post_merge={"state": "OPEN", "merged": False, "merge_commit_sha": None})
+    try:
+        _, result = merge_world(odd)
+        got = result.outcome
+    except Exception as exc:                                  # noqa: BLE001 — that is the point
+        got = f"raised {type(exc).__name__}"
+    check(f"a merge response of {shape!r} reports an outcome instead of raising",
+          got == codes.MERGE_UNCONFIRMED, f"got {got}")
 
 null_merged = world(post_merge={"state": "OPEN", "merged": None, "merge_commit_sha": None})
 _, result = merge_world(null_merged)

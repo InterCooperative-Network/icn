@@ -141,12 +141,20 @@ def verify_provenance(source: pathlib.Path) -> dict:
 
     _git(source, "fetch", "origin", external["branch"])
 
+    # The tip can move between resolving it and fetching. Comparing HEAD against the OID read
+    # BEFORE the fetch would then accept a checkout the fetch itself has already left behind, and
+    # a stale evaluator would install looking perfectly clean. Re-read the external tip afterwards
+    # and require agreement with what the fetch actually obtained.
+    external = github_default_branch(owner, name)
+    fetched = _git(source, "rev-parse", f"refs/remotes/origin/{external['branch']}")
     head = _git(source, "rev-parse", "HEAD")
-    if head != external["oid"]:
+    if head != external["oid"] or head != fetched:
         raise InstallRefused(
-            f"refusing to install from a stale checkout: HEAD is {head[:12]} but "
-            f"{external['branch']} on GitHub is at {external['oid'][:12]}. Pull first, then "
-            "install — an older default-branch commit is still not the code review approved.")
+            f"refusing to install from a stale checkout: HEAD is {head[:12]}, the fetched "
+            f"origin/{external['branch']} is {fetched[:12]}, and GitHub reports "
+            f"{external['oid'][:12]}. Pull until all three agree, then install — an older "
+            "default-branch commit is still not the code review approved, and a tip that moved "
+            "mid-install is not one this checkout has.")
 
     assert_clean(source)
     return {"repository": f"{owner}/{name}", "default_branch": external["branch"],
