@@ -185,6 +185,17 @@ for _sub in ("/etc/passwd", "README.md", "docs/adr/ADR-0010-app-topology.md",
              "../../../etc/hosts", "", "docs/adr/ADR-0016-admin-merge-exception-policy.md.bak"):
     must_fail(f"authoritative_source = {_sub!r}",
               lambda d, s=_sub: d["merge"]["admin_bypass"].update(authoritative_source=s))
+# Path operations throw on data the filesystem cannot represent, so they belong with set()/sorted()
+# in the "never see unvalidated input" category. These crashed the CI schema step (icn#2658 review).
+for _lbl, _bad in (("embedded NUL", "docs/adr/AD\x00R.md"),
+                   ("NUL alone", "\x00"),
+                   ("overlong component", "docs/adr/" + "a" * 5000 + ".md"),
+                   ("very long path", "x" * 100000)):
+    never_raises(f"authoritative_source with an {_lbl}",
+                 mutated(lambda d, v=_bad: d["merge"]["admin_bypass"].update(
+                     authoritative_source=v)))
+    must_fail(f"authoritative_source with an {_lbl} is rejected",
+              lambda d, v=_bad: d["merge"]["admin_bypass"].update(authoritative_source=v))
 must_pass("the exact accepted ADR path is accepted",
           lambda d: d["merge"]["admin_bypass"].update(
               authoritative_source="docs/adr/ADR-0016-admin-merge-exception-policy.md"))

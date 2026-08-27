@@ -7,8 +7,13 @@
 
 ## Context
 
-ICN uses GitHub branch protection with four required status checks:
+At acceptance in March 2026, the repository had four required status checks:
 `Build Release`, `Test`, `Clippy`, `Format Check`.
+
+**The repository's required-check set may expand independently of this ADR, and has.**
+This ADR does not enumerate the canonical current set — `ops/state/truth/policy.json#merge.required_checks`
+owns that. The scope of this exception is defined in the Decision below, and is deliberately
+narrower than "the required checks".
 
 All four run on `ubuntu-latest` (GitHub-hosted runners). The self-hosted `ci-runner`
 (VM 446, operator-supplied host, labels `homelab,k3s`) handles Docker build/deploy
@@ -34,7 +39,33 @@ ceremonial theater. This ADR names the exception explicitly so it remains a
 
 ## Decision
 
+### Scope
+
+**The queue-starvation exception is scoped only to required checks for which this ADR explicitly
+defines equivalent local verification.** Currently those are:
+
+- `Format Check`
+- `Clippy`
+- `Test`
+- `Build Release`
+
+A different required check that is pending — including a future required check added after this
+ADR — is **NOT** bypassable under this exception, unless this ADR is explicitly amended to define
+equivalent verification for it. If such a check is what is blocking the merge, wait or fix.
+
+Scope stated explicitly 2026-08-27 (icn#2651/#2658 review). The canonical set had grown from four
+to eleven while condition 3 below still named only the four `cargo` commands, so a maintainer
+following this ADR literally could have admin-merged past a stalled `Meaning Firewall Check`,
+`TypeScript SDK` or `Accessibility Tests` having verified none of them. The exception was always
+about the checks it knows how to substitute for; that is now written down rather than inferred.
+
+### Conditions
+
 `gh pr merge --admin` is **permitted** when ALL of the following conditions hold:
+
+0. **The stalled check is in scope.** Every required check being bypassed is one of the four named
+   under Scope. A stalled required check outside that list ends the exception — no local
+   verification defined here substitutes for it.
 
 1. **All completed required checks are green.** Any required check that has started
    and finished must have passed. Only checks that are `pending at 0s` (queued, not
@@ -45,7 +76,8 @@ ceremonial theater. This ADR names the exception explicitly so it remains a
    be `pending` at 0s duration, not `failure` or `timed out`. A job that has started
    and failed is not starvation — it is evidence. Do not admin-merge past evidence.
 
-3. **Local verification matches required scope.**
+3. **Local verification matches the in-scope required checks.** These four commands are the
+   equivalence this ADR defines; they are the reason the Scope list is what it is.
    - `cargo fmt --check` (mirrors Format Check)
    - `cargo clippy -p <changed-crates> -- -D warnings` (mirrors Clippy)
    - `cargo test -p <changed-crates>` or equivalent integration tests (mirrors Test)
@@ -58,8 +90,8 @@ ceremonial theater. This ADR names the exception explicitly so it remains a
 5. **The merge is documented.** The commit/PR description must note: "admin merge —
    required runner jobs queue-stalled; local verification complete."
 
-When all five conditions hold, admin merge is a legitimate operational decision,
-not a policy bypass. When any condition is absent, wait or fix.
+When all conditions hold, admin merge is a legitimate operational decision, not a policy bypass.
+When any condition is absent — including condition 0, the scope check — wait or fix.
 
 ## Consequences
 

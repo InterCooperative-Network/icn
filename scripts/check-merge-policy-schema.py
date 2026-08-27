@@ -126,6 +126,24 @@ def as_str_list(v):
     return (True, v) if all(isinstance(x, str) for x in v) else (False, None)
 
 
+def repo_file_exists(rel: str) -> bool:
+    """Is `rel` an existing file inside ROOT? Never raises.
+
+    Path operations throw on data the filesystem cannot represent — an embedded NUL raises
+    ValueError, an overlong component raises OSError — so `resolve()`/`is_file()` belong with
+    `set()` and `sorted()` in the category of calls that must not see unvalidated input. An earlier
+    revision reached them after recording the exact-path mismatch and crashed the CI schema step
+    instead of reporting a malformed policy (icn#2658 review).
+    """
+    try:
+        if pathlib.PurePath(rel).is_absolute():
+            return False
+        resolved = (ROOT / rel).resolve()
+        return resolved.is_relative_to(ROOT.resolve()) and resolved.is_file()
+    except (ValueError, OSError):
+        return False
+
+
 def as_str_or_null_list(v):
     if not isinstance(v, list):
         return (False, None)
@@ -284,17 +302,16 @@ def validate(policy) -> list[str]:
             req(decision == "human", "admin_bypass.decision must be 'human'")
         sok, src = field(bypass, "authoritative_source", as_str, "admin_bypass.authoritative_source")
         if sok:
-            # Exact, repo-relative, and inside ROOT. An existence check alone accepted any readable
-            # file — /etc/passwd, README.md, or a different ADR — which would let a contributor
-            # substitute another eligibility contract while passing this gate (icn#2658 review).
-            req(src == ADMIN_BYPASS_ADR,
-                f"admin_bypass.authoritative_source must be exactly {ADMIN_BYPASS_ADR!r}, got {src!r}")
-            resolved = (ROOT / src).resolve()
-            req(not pathlib.PurePath(src).is_absolute() and resolved.is_relative_to(ROOT.resolve()),
-                f"admin_bypass.authoritative_source must be a repo-relative path inside the "
-                f"repository: {src!r}")
-            req(resolved.is_file(),
-                f"admin_bypass.authoritative_source does not exist: {src}")
+            # Exact, repo-relative, inside ROOT, and present. An existence check alone accepted any
+            # readable file — /etc/passwd, README.md, or a different ADR — which would let a
+            # contributor substitute another eligibility contract while passing this gate. The
+            # identity check comes FIRST and the filesystem is touched only on an exact match, so a
+            # path the filesystem cannot represent is reported, never resolved (icn#2658 review).
+            if req(src == ADMIN_BYPASS_ADR,
+                   f"admin_bypass.authoritative_source must be exactly {ADMIN_BYPASS_ADR!r}, "
+                   f"got {src[:80]!r}"):
+                req(repo_file_exists(src),
+                    f"admin_bypass.authoritative_source does not exist as a repo file: {src}")
         for key in ("never_for", "eligibility_note", "fail_closed", "consumer_note"):
             field(bypass, key, as_str, f"admin_bypass.{key}")
         # A CLOSED OBJECT, not a denylist of eligibility synonyms. ADR-0016 requires five
