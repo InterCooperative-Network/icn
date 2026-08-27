@@ -39,6 +39,12 @@ def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
 
     A required check GitHub never reported is MISSING, not absent-so-fine. A green non-required
     check is not consulted at all, so it can never stand in for a missing required one.
+
+    THE NAME IS NOT THE CHECK. Branch protection can pin a required check to one GitHub App, and
+    this repository does exactly that. A check matching only by name would let a green result from
+    some other producer — another App, or a plain commit status posted by any token holding
+    `repo:status` — satisfy a gate the configured producer never passed. Where protection names a
+    producer, only that producer's runs are consulted; everything else is as good as absent.
     """
     canonical = sorted(snap.policy.required_checks | snap.protection.required_contexts)
     allow = snap.policy.check_conclusion_allowlist
@@ -46,11 +52,16 @@ def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
     pending: list[str] = []
     missing: list[str] = []
     for name in canonical:
-        outcomes = snap.checks.get(name)
-        if not outcomes:
-            missing.append(name)
+        reported = snap.checks.get(name, ())
+        want = snap.protection.required_bindings.get(name)
+        occurrences = ([o for o in reported if o.app_id == want] if want is not None
+                       else list(reported))
+        if not occurrences:
+            missing.append(f"{name} (no run from the required producer, app {want})"
+                           if want is not None and reported else name)
             continue
         # Worst wins. A re-run that went green does not erase a red occurrence for this gate.
+        outcomes = [o.outcome for o in occurrences]
         if any(o != PENDING and o not in allow for o in outcomes):
             failed.append(f"{name} ({', '.join(outcomes)})")
         elif any(o == PENDING for o in outcomes):

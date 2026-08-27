@@ -74,7 +74,7 @@ query($owner:String!,$name:String!,$number:Int!,$after:String){
           pageInfo{ hasNextPage endCursor }
           nodes{
             __typename
-            ... on CheckRun{ name status conclusion }
+            ... on CheckRun{ name status conclusion checkSuite{ app{ databaseId } } }
             ... on StatusContext{ context state }
           }
         }
@@ -223,18 +223,27 @@ class GhCli:
         checks = doc.get("required_status_checks") or {}
         if not isinstance(checks, dict):
             raise EvidenceUnavailable("branch protection required_status_checks was not an object")
+        # `checks[]` carries the PRODUCER as well as the name. A positive `app_id` pins the
+        # required check to one GitHub App; `-1` (or the legacy `contexts[]` form, which cannot
+        # express a producer at all) permits any. Discarding it would let a green check of the
+        # right NAME from the wrong source satisfy a gate its configured producer never passed.
         contexts: list[str] = []
+        bindings: dict[str, int | None] = {}
         for entry in checks.get("checks") or []:
             if isinstance(entry, dict) and isinstance(entry.get("context"), str):
                 contexts.append(entry["context"])
+                app = entry.get("app_id")
+                bindings[entry["context"]] = app if type(app) is int and app > 0 else None
         if not contexts:
             for entry in checks.get("contexts") or []:
                 if isinstance(entry, str):
                     contexts.append(entry)
+                    bindings[entry] = None
         reviews = doc.get("required_pull_request_reviews") or {}
         count = reviews.get("required_approving_review_count") if isinstance(reviews, dict) else 0
         return {
             "required_contexts": contexts,
+            "required_bindings": bindings,
             "required_approving_review_count": count if type(count) is int else 0,
             "strict": bool(checks.get("strict")),
             "configured": "required_status_checks" in doc,

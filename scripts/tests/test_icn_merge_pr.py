@@ -41,6 +41,8 @@ HEAD = "1" * 40
 BASE = "2" * 40
 DEFAULT_OID = "2" * 40           # a ready PR is up to date; base and default agree
 MERGE_COMMIT = "3" * 40
+ACTIONS_APP = 15368          # this repository pins every required check to the Actions App
+IMPOSTOR_APP = 99999
 
 failures: list[str] = []
 
@@ -71,10 +73,14 @@ def world(**overrides) -> dict:
         },
         "thread_pages": [[{"isResolved": True}, {"isResolved": True}]],
         "check_pages": [[{"__typename": "CheckRun", "name": name, "status": "COMPLETED",
-                          "conclusion": "SUCCESS"} for name in REQUIRED]
+                          "conclusion": "SUCCESS",
+                          "checkSuite": {"app": {"databaseId": ACTIONS_APP}}}
+                         for name in REQUIRED]
                         + [{"__typename": "CheckRun", "name": "Compare Against Base",
-                            "status": "COMPLETED", "conclusion": "FAILURE"}]],
+                            "status": "COMPLETED", "conclusion": "FAILURE",
+                            "checkSuite": {"app": {"databaseId": ACTIONS_APP}}}]],
         "protection": {"required_contexts": list(REQUIRED),
+                       "required_bindings": {name: ACTIONS_APP for name in REQUIRED},
                        "required_approving_review_count": 0, "strict": True},
         "blobs": {POLICY_PATH: POLICY_TEXT, ADR_PATH: ADR_TEXT},
         "post_merge": {"state": "MERGED", "merged": True, "merge_commit_sha": MERGE_COMMIT},
@@ -294,12 +300,14 @@ expect("one required check entirely absent from the rollup", missing,
        codes.REFUSED_REQUIRED_CHECK_MISSING)
 noise = copy.deepcopy(missing)
 noise["check_pages"][0].append({"__typename": "CheckRun", "name": "Some Other Job",
-                                "status": "COMPLETED", "conclusion": "SUCCESS"})
+                                "status": "COMPLETED", "conclusion": "SUCCESS",
+                                "checkSuite": {"app": {"databaseId": ACTIONS_APP}}})
 expect("a green NON-required check does not substitute for the missing required one", noise,
        codes.REFUSED_REQUIRED_CHECK_MISSING)
 rerun = world()
 rerun["check_pages"][0].append({"__typename": "CheckRun", "name": REQUIRED[0],
-                                "status": "COMPLETED", "conclusion": "FAILURE"})
+                                "status": "COMPLETED", "conclusion": "FAILURE",
+                                "checkSuite": {"app": {"databaseId": ACTIONS_APP}}})
 expect("a re-run that went green does not erase a red occurrence", rerun,
        codes.REFUSED_REQUIRED_CHECK_FAILED)
 neutral = checks_with(REQUIRED[5], conclusion="NEUTRAL")
@@ -307,6 +315,30 @@ expect("a policy-allowlisted terminal conclusion is accepted", neutral, codes.RE
 paged = world()
 paged["check_pages"] = [paged["check_pages"][0][:3], paged["check_pages"][0][3:]]
 expect("required checks split across rollup pages are all accounted for", paged, codes.READY)
+print("a required check is a name AND a producer")
+impostor = world()
+for node in impostor["check_pages"][0]:
+    if node.get("name") == REQUIRED[0]:
+        node["checkSuite"] = {"app": {"databaseId": IMPOSTOR_APP}}
+expect("a green check of the right name from the wrong App", impostor,
+       codes.REFUSED_REQUIRED_CHECK_MISSING)
+_, impostor_result = evaluate_world(impostor)
+check("the refusal names the required producer",
+      any("required producer" in r.detail for r in impostor_result.reasons))
+status_only = world()
+status_only["check_pages"] = [[n for n in status_only["check_pages"][0]
+                               if n.get("name") != REQUIRED[1]]
+                              + [{"__typename": "StatusContext", "context": REQUIRED[1],
+                                  "state": "SUCCESS"}]]
+expect("a plain commit status standing in for a producer-bound required check", status_only,
+       codes.REFUSED_REQUIRED_CHECK_MISSING)
+unbound = world()
+unbound["protection"]["required_bindings"] = {}
+for node in unbound["check_pages"][0]:
+    if node.get("name") == REQUIRED[0]:
+        node["checkSuite"] = {"app": {"databaseId": IMPOSTOR_APP}}
+expect("protection that pins no producer accepts any producer", unbound, codes.READY)
+
 stale_rollup = world(rollup_head="9" * 40)
 expect("a rollup belonging to a different head is inconsistent evidence", stale_rollup,
        codes.REFUSED_UNAVAILABLE_EVIDENCE)

@@ -28,6 +28,7 @@ a checkout the operator happens to be standing in cannot supply the code that de
 ```bash
 icn-merge-pr check <PR>              # evaluate; mutates nothing
 icn-merge-pr merge <PR> --authorize  # re-read everything, then merge once, or refuse
+                                     # (only an INSTALLED copy may mutate)
 icn-merge-pr provenance              # which commit is installed
 ```
 
@@ -47,13 +48,19 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    with `scripts/check-merge-policy-schema.py` (vendored at install time, one owner for the rule).
 4. Gather every signal in one snapshot loader — state, draft, mergeability, merge state, reviews,
    *every page* of review threads, *every page* of the check rollup, live branch protection, merge
-   queue, auto-merge. Unavailable evidence is not ready.
-5. Evaluate the structured `merge.ready_when` gate. Fail closed on any drift between the pinned
+   queue, auto-merge. Unavailable evidence is not ready, and a thread count larger than the threads
+   actually readable is unavailable evidence.
+5. Match each required check by **name and producer**. Where branch protection pins a check to a
+   GitHub App, only that App's runs are consulted — a green result of the right name from another
+   source is as good as absent.
+6. Evaluate the structured `merge.ready_when` gate. Fail closed on any drift between the pinned
    policy and live branch protection.
-6. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
+7. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
    re-evaluate every gate.
-7. Merge once, with the expected head SHA pinned in the request. A GitHub refusal is final. Success
-   is a fresh read reporting `merged == true`, not what the merge call returned.
+8. Merge once, with the expected head SHA pinned in the request. Success is a fresh read
+   reporting `merged == true`, not what the merge call returned. A refusal is reported only when a
+   fresh read confirms the PR is not merged; once a request has been dispatched, an outcome that
+   cannot be established is `MERGE_UNCONFIRMED` — never "it did not merge".
 
 ## Layout
 

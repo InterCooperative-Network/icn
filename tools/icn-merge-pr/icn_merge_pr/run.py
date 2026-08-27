@@ -63,12 +63,15 @@ def _evidence(snap: Snapshot) -> dict:
         "is_in_merge_queue": snap.is_in_merge_queue,
         "auto_merge_armed": snap.auto_merge_armed,
         "required_check_outcomes": {
-            name: list(snap.checks.get(name, ()))
+            name: [{"outcome": o.outcome, "app_id": o.app_id}
+                   for o in snap.checks.get(name, ())]
             for name in sorted(snap.policy.required_checks | snap.protection.required_contexts)
         },
         "protection": {
             "branch": snap.default_branch,
             "required_contexts": sorted(snap.protection.required_contexts),
+            "required_producers": {k: v for k, v in
+                                   sorted(snap.protection.required_bindings.items())},
             "required_approving_review_count": snap.protection.required_approving_review_count,
             "strict": snap.protection.strict,
         },

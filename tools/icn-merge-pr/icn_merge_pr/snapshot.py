@@ -47,10 +47,19 @@ _MAX_PAGES = 100          # 100 pages x 100 nodes. A cursor that never advances 
 
 
 @dataclass(frozen=True)
+class CheckOccurrence:
+    """One reported run of a check: what it concluded, and which GitHub App produced it."""
+
+    outcome: str
+    app_id: int | None
+
+
+@dataclass(frozen=True)
 class Protection:
     """Live branch-protection configuration for the branch actually being merged into."""
 
     required_contexts: frozenset[str]
+    required_bindings: dict[str, int | None]
     required_approving_review_count: int
     strict: bool
 
@@ -78,7 +87,7 @@ class Snapshot:
     merge_queue_present: bool
     is_in_merge_queue: bool
     auto_merge_armed: bool
-    checks: dict[str, tuple[str, ...]]
+    checks: dict[str, tuple[CheckOccurrence, ...]]
     protection: Protection
     allowed_merge_methods: frozenset[str]
     policy: MergePolicy
@@ -98,8 +107,13 @@ def _enum(value, allowed, label):
     return value
 
 
-def _normalise_check(node) -> tuple[str, str] | None:
-    """(name, outcome) for one rollup context, or None when the node is not one we can read."""
+def _app_id(node) -> int | None:
+    app = ((node.get("checkSuite") or {}).get("app") or {}).get("databaseId")
+    return app if type(app) is int else None
+
+
+def _normalise_check(node) -> tuple[str, CheckOccurrence] | None:
+    """(name, occurrence) for one rollup context, or None when the node is not one we can read."""
     if not isinstance(node, dict):
         return None
     kind = node.get("__typename")
@@ -109,14 +123,16 @@ def _normalise_check(node) -> tuple[str, str] | None:
             return None
         status = node.get("status")
         if status in _RUNNING or status != "COMPLETED":
-            return (name, PENDING)
+            return (name, CheckOccurrence(PENDING, _app_id(node)))
         conclusion = node.get("conclusion")
-        return (name, conclusion if isinstance(conclusion, str) else PENDING)
+        return (name, CheckOccurrence(conclusion if isinstance(conclusion, str) else PENDING,
+                                      _app_id(node)))
     if kind == "StatusContext":
         name = node.get("context")
         if not isinstance(name, str):
             return None
-        return (name, _STATUS_CONTEXT.get(node.get("state"), PENDING))
+        # A commit status has no App behind it, so it can never satisfy a producer-bound check.
+        return (name, CheckOccurrence(_STATUS_CONTEXT.get(node.get("state"), PENDING), None))
     return None
 
 
@@ -162,14 +178,15 @@ def _collect_threads(client, owner, name, number) -> tuple[int, int]:
             raise EvidenceUnavailable("review thread pagination did not terminate")
 
 
-def _collect_checks(client, owner, name, number, head_oid) -> dict[str, tuple[str, ...]]:
+def _collect_checks(client, owner, name, number,
+                    head_oid) -> dict[str, tuple[CheckOccurrence, ...]]:
     """name -> every outcome reported for it, across EVERY page of the rollup.
 
     A name can appear more than once when a check is re-run; all occurrences are kept so the gate
     can take the worst rather than whichever the API happened to list last.
     """
     cursor, pages = None, 0
-    found: dict[str, list[str]] = {}
+    found: dict[str, list[CheckOccurrence]] = {}
     while True:
         page = client.check_contexts_page(owner, name, number, cursor)
         if page.get("head_oid") not in (None, head_oid):
@@ -235,6 +252,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     protection_raw = client.branch_protection(owner, name, default_branch)
     protection = Protection(
         required_contexts=frozenset(protection_raw["required_contexts"]),
+        required_bindings=dict(protection_raw.get("required_bindings") or {}),
         required_approving_review_count=protection_raw["required_approving_review_count"],
         strict=protection_raw["strict"],
     )
