@@ -335,6 +335,47 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("and the installation is still usable after those runs", proc.returncode == 0,
           proc.stdout[:160])
 
+    print("the provenance record is typed evidence, not whatever JSON happened to parse")
+    record_file = lib / "provenance.json"
+    good_record = json.loads(record_file.read_text(encoding="utf-8"))
+    check("the installer records a full Git object id",
+          isinstance(good_record["source_commit"], str)
+          and len(good_record["source_commit"]) == 40
+          and all(c in "0123456789abcdef" for c in good_record["source_commit"]),
+          repr(good_record.get("source_commit")))
+
+    for label, value in (("an integer", 7), ("a boolean", True), ("null", None),
+                         ("a list", []), ("an object", {}), ("an empty string", ""),
+                         ("a short sha", good_record["source_commit"][:7]),
+                         ("40 non-hex characters", "z" * 40),
+                         ("a sha with trailing whitespace", good_record["source_commit"] + " ")):
+        broken = dict(good_record, source_commit=value)
+        record_file.write_text(json.dumps(broken), encoding="utf-8")
+        proc = subprocess.run([str(binary), "merge", "1", "--authorize", "--repo", "example/icn"],
+                              capture_output=True, text=True, env=no_gh)
+        structured = "REFUSED_NOT_INSTALLED" in proc.stdout and "Traceback" not in proc.stderr
+        check(f"a source commit that is {label} refuses structurally",
+              proc.returncode != 0 and structured,
+              (proc.stdout[:100] + proc.stderr[:100]))
+    for label, field, value in (("repository", "repository", 7),
+                                ("repository", "repository", "no-slash"),
+                                ("default branch", "default_branch", None),
+                                ("a digest", "files", {"icn_merge_pr/cli.py": "nothex"}),
+                                ("a file path", "files", {"../escape.py": "a" * 64})):
+        broken = dict(good_record); broken[field] = value
+        record_file.write_text(json.dumps(broken), encoding="utf-8")
+        proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True,
+                              env=no_gh)
+        check(f"a malformed {label} refuses structurally",
+              proc.returncode != 0 and "REFUSED_NOT_INSTALLED" in proc.stdout
+              and "Traceback" not in proc.stderr, (proc.stdout[:100] + proc.stderr[:100]))
+
+    record_file.write_text(json.dumps(good_record, indent=2, sort_keys=True) + "\n",
+                           encoding="utf-8")
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("the installer's own record is accepted", proc.returncode == 0 and head in proc.stdout,
+          proc.stdout[:160])
+
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"
     hostile = candidate / "icn_merge_pr"

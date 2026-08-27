@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import codes
-from .errors import MergeToolError
+from .errors import MergeToolError, NotInstalled
 from .evaluate import Decision, Reason, evaluate
 from .merge import perform_merge
 from .snapshot import Snapshot, load_snapshot
@@ -191,6 +191,13 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
 
     if installed_commit:
         try:
+            if not isinstance(installed_commit, str):
+                # `provenance.read()` establishes this, and this is where it would have hurt: the
+                # staleness report slices the value, so a malformed record used to raise TypeError
+                # instead of refusing. Guarded here as well, in the existing refusal family.
+                raise NotInstalled(
+                    f"the installed source commit is {installed_commit!r}, which is not a commit "
+                    "id; reinstall rather than merging on a record this program cannot read")
             drifted = stale_evaluator(client, owner, name, installed_commit,
                                       fresh.default_branch_oid)
         except MergeToolError as exc:

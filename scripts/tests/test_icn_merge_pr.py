@@ -1110,6 +1110,13 @@ print("the exit-code contract does not invite a retry")
 for name, text in (("the CLI usage text", cli.USAGE), ("the README", readme)):
     check(f"{name} says exit 1 covers MERGE_UNCONFIRMED, not refusal alone",
           "MERGE_UNCONFIRMED" in text and "Exit 1" in text)
+# A malformed installed commit must never reach the staleness report's string slicing.
+_, typed = merge_world(world(), installed_commit=7)
+check("a non-string installed commit refuses instead of raising",
+      typed.outcome == codes.REFUSED_NOT_INSTALLED, f"got {typed.outcome}")
+fake, typed = merge_world(world(), installed_commit=7)
+check("no merge is attempted from a record this program cannot read", fake.merge_calls == [])
+
 # The bootstrap must be able to refuse before it may import anything, so it carries its own copy
 # of this code spelling. The two must agree.
 bootstrap = (ROOT / "tools" / "icn-merge-pr" / "icn_merge_pr" / "__main__.py").read_text(

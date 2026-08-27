@@ -10,12 +10,20 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import re
 
 from .errors import NotInstalled
 
 FILENAME = "provenance.json"
 # The directory name the source layout uses. An installed copy never lands here.
 SOURCE_DIR_NAME = "icn-merge-pr"
+PACKAGE_DIR_NAME = "icn_merge_pr"
+# A full Git object id, as `git rev-parse HEAD` produces and as this repository uses. Validated at
+# the boundary where the record becomes trusted structured evidence, rather than wherever it is
+# first used: a truthy non-string reached `installed_commit[:12]` in the staleness report and
+# raised TypeError, so malformed provenance crashed instead of refusing (icn#2659 review).
+_GIT_OID = re.compile(r"\A[0-9a-fA-F]{40}\Z")
+_SHA256 = re.compile(r"\A[0-9a-f]{64}\Z")
 
 
 def record_path() -> pathlib.Path:
@@ -61,8 +69,9 @@ def read() -> dict:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise NotInstalled(f"provenance record at {path} is unreadable: {exc}") from exc
-    if not isinstance(record, dict) or not record.get("source_commit"):
-        raise NotInstalled(f"provenance record at {path} names no source commit")
+    if not isinstance(record, dict):
+        raise NotInstalled(f"provenance record at {path} is not a provenance record")
+    _typed_fields(path, record)
 
     # A record is a claim, and a claim shipped by the change under evaluation is worth nothing.
     # Committing `tools/icn-merge-pr/provenance.json` in a pull request would otherwise make the
@@ -87,6 +96,29 @@ def read() -> dict:
     return record
 
 
+def _typed_fields(path: pathlib.Path, record: dict) -> None:
+    """Every field this program later uses with an assumed type, established here.
+
+    One bounded pass over the record, not a schema: the only field with the reported defect was
+    `source_commit`, and the rest are pinned to the same standard so the next consumer of any of
+    them cannot inherit the same surprise.
+    """
+    commit = record.get("source_commit")
+    if not isinstance(commit, str) or not _GIT_OID.match(commit):
+        raise NotInstalled(
+            f"provenance record at {path} names {commit!r} as its source commit, which is not a "
+            "full Git object id. Malformed provenance is refused here rather than surprising "
+            "something further down that expected a string.")
+    slug = record.get("repository")
+    if not isinstance(slug, str) or slug.count("/") != 1 or not all(slug.split("/")):
+        raise NotInstalled(
+            f"provenance record at {path} names {slug!r} as its repository, which is not OWNER/NAME")
+    branch = record.get("default_branch")
+    if not isinstance(branch, str) or not branch:
+        raise NotInstalled(
+            f"provenance record at {path} names {branch!r} as its default branch")
+
+
 def _verify_files(root: pathlib.Path, record: dict) -> None:
     """Every file the record names must be present and byte-for-byte what it names.
 
@@ -103,6 +135,18 @@ def _verify_files(root: pathlib.Path, record: dict) -> None:
     for relative, digest in sorted(files.items()):
         if not isinstance(relative, str) or not isinstance(digest, str):
             raise NotInstalled("provenance record has a malformed file entry")
+        if not _SHA256.match(digest):
+            raise NotInstalled(
+                f"provenance record describes {relative} with {digest!r}, which is not a sha256 "
+                "digest")
+        # The same shape the bootstrap requires: a file inside the package directory, and nothing
+        # that could climb out of it. `root / "../.."` would have been read and compared rather
+        # than refused.
+        parts = relative.replace("\\", "/").split("/")
+        if len(parts) != 2 or parts[0] != PACKAGE_DIR_NAME or not parts[1] or ".." in parts:
+            raise NotInstalled(
+                f"provenance record names {relative!r}, which is not a file inside "
+                f"{PACKAGE_DIR_NAME}/")
         target = root / relative
         try:
             if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
@@ -119,8 +163,5 @@ def default_repository() -> tuple[str, str] | None:
         record = read()
     except NotInstalled:
         return None
-    slug = record.get("repository")
-    if not isinstance(slug, str) or slug.count("/") != 1:
-        return None
-    owner, name = slug.split("/", 1)
-    return (owner, name) if owner and name else None
+    owner, name = record["repository"].split("/", 1)   # shape established by read()
+    return owner, name
