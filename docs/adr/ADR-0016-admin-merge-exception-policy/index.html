@@ -41,8 +41,12 @@
 <strong>Tags</strong>: ci, governance, deployment
 <strong>Note</strong>: Originally filed as ADR-0010 in <code>ops/state/decisions/</code> (collided with <code>ADR-0010-app-topology</code> in <code>docs/adr/</code>). Renumbered to 0016 when ADRs were canonicalized under <code>docs/adr/</code>.</p>
 <h2 id="context">Context</h2>
-<p>ICN uses GitHub branch protection with four required status checks:
+<p>At acceptance in March 2026, the repository had four required status checks:
 <code>Build Release</code>, <code>Test</code>, <code>Clippy</code>, <code>Format Check</code>.</p>
+<p><strong>The repository&#39;s required-check set may expand independently of this ADR, and has.</strong>
+This ADR does not enumerate the canonical current set — <code>ops/state/truth/policy.json#merge.required_checks</code>
+owns that. The scope of this exception is defined in the Decision below, and is deliberately
+narrower than &quot;the required checks&quot;.</p>
 <p>All four run on <code>ubuntu-latest</code> (GitHub-hosted runners). The self-hosted <code>ci-runner</code>
 (VM 446, operator-supplied host, labels <code>homelab,k3s</code>) handles Docker build/deploy
 (<code>docker-build-deploy.yml</code>) only — it is not in the required-check path.</p>
@@ -63,8 +67,30 @@ infrastructure scarcity, not test failure.</p>
 ceremonial theater. This ADR names the exception explicitly so it remains a
 <em>conscious exception</em>, not a habit.</p>
 <h2 id="decision">Decision</h2>
+<h3 id="scope">Scope</h3>
+<p><strong>The queue-starvation exception is scoped only to required checks for which this ADR explicitly
+defines equivalent local verification.</strong> Currently those are:</p>
+<ul>
+<li><code>Format Check</code></li>
+<li><code>Clippy</code></li>
+<li><code>Test</code></li>
+<li><code>Build Release</code></li>
+</ul>
+<p>A different required check that is pending — including a future required check added after this
+ADR — is <strong>NOT</strong> bypassable under this exception, unless this ADR is explicitly amended to define
+equivalent verification for it. If such a check is what is blocking the merge, wait or fix.</p>
+<p>Scope stated explicitly 2026-08-27 (icn#2651/#2658 review). The canonical set had grown from four
+to eleven while condition 3 below still named only the four <code>cargo</code> commands, so a maintainer
+following this ADR literally could have admin-merged past a stalled <code>Meaning Firewall Check</code>,
+<code>TypeScript SDK</code> or <code>Accessibility Tests</code> having verified none of them. The exception was always
+about the checks it knows how to substitute for; that is now written down rather than inferred.</p>
+<h3 id="conditions">Conditions</h3>
 <p><code>gh pr merge --admin</code> is <strong>permitted</strong> when ALL of the following conditions hold:</p>
-<ol>
+<ol start="0">
+<li><p><strong>The stalled check is in scope.</strong> Every required check being bypassed is one of the four named
+under Scope. A stalled required check outside that list ends the exception — no local
+verification defined here substitutes for it.</p>
+</li>
 <li><p><strong>All completed required checks are green.</strong> Any required check that has started
 and finished must have passed. Only checks that are <code>pending at 0s</code> (queued, not
 yet assigned a runner) may be bypassed. If any check has completed with failure or
@@ -74,7 +100,8 @@ a timeout result, do not admin-merge — that is evidence, not queue starvation.
 be <code>pending</code> at 0s duration, not <code>failure</code> or <code>timed out</code>. A job that has started
 and failed is not starvation — it is evidence. Do not admin-merge past evidence.</p>
 </li>
-<li><p><strong>Local verification matches required scope.</strong></p>
+<li><p><strong>Local verification matches the in-scope required checks.</strong> These four commands are the
+equivalence this ADR defines; they are the reason the Scope list is what it is.</p>
 <ul>
 <li><code>cargo fmt --check</code> (mirrors Format Check)</li>
 <li><code>cargo clippy -p &lt;changed-crates&gt; -- -D warnings</code> (mirrors Clippy)</li>
@@ -90,8 +117,8 @@ be verifiably pre-existing on <code>main</code>, not introduced by the branch.</
 required runner jobs queue-stalled; local verification complete.&quot;</p>
 </li>
 </ol>
-<p>When all five conditions hold, admin merge is a legitimate operational decision,
-not a policy bypass. When any condition is absent, wait or fix.</p>
+<p>When all conditions hold, admin merge is a legitimate operational decision, not a policy bypass.
+When any condition is absent — including condition 0, the scope check — wait or fix.</p>
 <h2 id="consequences">Consequences</h2>
 <p><strong>Easier</strong>: Refactor and documentation PRs are no longer indefinitely blocked by
 runner queue depth when local verification is clean.</p>
