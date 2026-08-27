@@ -201,9 +201,10 @@ def refuse_if_run_from_a_candidate_checkout() -> None:
                 "under review cannot vouch for anything, including itself. Run the copy on the "
                 f"default branch instead:\n"
                 f"    git -C <repo> fetch origin\n"
-                f"    git -C <repo> show origin/{default}:tools/icn-merge-pr/install.py > "
-                f"/tmp/icn-install.py\n"
-                f"    python3 /tmp/icn-install.py --source <a checkout on {default}>")
+                f"    d=\"$(mktemp -d)\"\n"
+                f"    git -C <repo> show origin/{default}:tools/icn-merge-pr/install.py "
+                f"> \"$d/install.py\"\n"
+                f"    python3 \"$d/install.py\" --source <a checkout on {default}>")
         return
 
 

@@ -855,6 +855,16 @@ legacy_only = read_protection({"contexts": ["Build Release"], "strict": True})
 check("a legacy-only document is read, with no producer bound",
       legacy_only["required_contexts"] == ["Build Release"]
       and legacy_only["required_bindings"] == {"Build Release": None}, f"{legacy_only}")
+conflicting = read_protection({"checks": [{"context": "Test", "app_id": 15368},
+                                          {"context": "Test", "app_id": 99999}], "strict": True})
+check("a context named twice with different producers is unavailable evidence",
+      isinstance(conflicting, str) and "different producers" in conflicting, f"{conflicting}")
+repeated = read_protection({"checks": [{"context": "Test", "app_id": 15368},
+                                       {"context": "Test", "app_id": 15368}], "strict": True})
+check("an exact repeat states the same requirement twice and is harmless",
+      not isinstance(repeated, str) and repeated["required_contexts"] == ["Test"]
+      and repeated["required_bindings"] == {"Test": 15368}, f"{repeated}")
+
 bound = read_protection({"checks": [{"context": "Build Release", "app_id": 15368},
                                     {"context": "Test", "app_id": -1}], "strict": True})
 check("producers are carried through, and -1 means any",
@@ -874,8 +884,16 @@ for detail, definitive in (("gh: Method Not Allowed (HTTP 405)", True),
     verb = "is a decision" if definitive else "is NOT a decision"
     check(f"{detail!r} {verb}", definitive_http_failure(detail) is definitive)
 
-print("the exit-code contract does not invite a retry")
+print("the bootstrap recipe does not stage through a predictable path")
+skill_text = (ROOT / ".agents" / "skills" / "merge-pr" / "SKILL.md").read_text(encoding="utf-8")
 readme = (ROOT / "tools" / "icn-merge-pr" / "README.md").read_text(encoding="utf-8")
+for name, text in (("the skill", skill_text), ("the README", readme)):
+    check(f"{name} stages the trusted installer in a private temporary directory",
+          "mktemp -d" in text and "/tmp/icn-install.py" not in text)
+    check(f"{name} takes the installer from the default-branch ref, not the working tree",
+          "show origin/" in text)
+
+print("the exit-code contract does not invite a retry")
 for name, text in (("the CLI usage text", cli.USAGE), ("the README", readme)):
     check(f"{name} says exit 1 covers MERGE_UNCONFIRMED, not refusal alone",
           "MERGE_UNCONFIRMED" in text and "Exit 1" in text)

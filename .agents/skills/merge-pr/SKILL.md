@@ -72,9 +72,14 @@ it at a checkout that is on that branch.
 
 ```bash
 git -C <repo> fetch origin
-git -C <repo> show origin/<default-branch>:tools/icn-merge-pr/install.py > /tmp/icn-install.py
-python3 /tmp/icn-install.py --source <a checkout on the default branch>
+d="$(mktemp -d)"
+git -C <repo> show origin/<default-branch>:tools/icn-merge-pr/install.py > "$d/install.py"
+python3 "$d/install.py" --source <a checkout on the default branch>
 ```
+
+`mktemp -d` matters: a fixed path under a world-writable directory can be pre-created as someone
+else's symlink, or replaced between the write and the run, which would execute their code with the
+operator's credentials.
 
 Resolve `<default-branch>` from GitHub, not from a file in the repository. The installer then
 refuses unless that source checkout is clean and at the current remote head. The installed program

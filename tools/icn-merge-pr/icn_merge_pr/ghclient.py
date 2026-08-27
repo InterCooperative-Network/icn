@@ -290,20 +290,31 @@ class GhCli:
                     raise EvidenceUnavailable(
                         f"branch protection reported an unreadable required-check entry "
                         f"({entry!r}); an entry this program cannot read is not one it may skip")
-                contexts.append(entry["context"])
+                context = entry["context"]
                 app = entry.get("app_id")
                 # null and -1 are GitHub's documented "any producer". Everything else must be a
                 # real app id: mapping an unreadable value like "15368" to None would silently
                 # UNBIND the check, and an unbound check accepts a green run from any source.
                 if app is None or app == -1:
-                    bindings[entry["context"]] = None
+                    binding = None
                 elif type(app) is int and app > 0:
-                    bindings[entry["context"]] = app
+                    binding = app
                 else:
                     raise EvidenceUnavailable(
-                        f"branch protection reports an unreadable producer for "
-                        f"{entry['context']!r} (app_id={app!r}); an unreadable binding is not an "
-                        "absent one")
+                        f"branch protection reports an unreadable producer for {context!r} "
+                        f"(app_id={app!r}); an unreadable binding is not an absent one")
+                # A context named twice with DIFFERENT producers states two requirements, and the
+                # snapshot collapses contexts into a set. Keeping the last one seen would drop a
+                # requirement that never passed, so a conflict is unavailable evidence. An exact
+                # repeat states the same requirement twice and is harmless.
+                if context in bindings and bindings[context] != binding:
+                    raise EvidenceUnavailable(
+                        f"branch protection reports {context!r} twice with different producers "
+                        f"({bindings[context]!r} and {binding!r}); this program cannot satisfy "
+                        "both from one result and will not choose between them")
+                if context not in bindings:
+                    contexts.append(context)
+                bindings[context] = binding
         else:
             legacy = checks.get("contexts")
             if legacy is not None:
@@ -311,7 +322,8 @@ class GhCli:
                     raise EvidenceUnavailable(
                         "branch protection reported an unreadable legacy required-check list")
                 for entry in legacy:
-                    contexts.append(entry)
+                    if entry not in bindings:
+                        contexts.append(entry)
                     bindings[entry] = None      # the legacy form cannot express a producer
         # An ABSENT review requirement genuinely means none. A requirement that is PRESENT but
         # whose count cannot be read is unavailable evidence: defaulting it to zero would let an
