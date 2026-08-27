@@ -1,9 +1,14 @@
 {
   "schema": "icn-policy/v1",
-  "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values — read this file.",
+  "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values \u2014 read this file.",
   "merge": {
     "default_strategy": "squash",
-    "exception": "Subtree merge commits (git subtree add --squash) must use --merge. State reason explicitly.",
+    "strategy_note": "The set of valid merge strategies is CLOSED and owned by the CONSUMER'S CODE, never by this file: merge | squash | rebase. A consumer must map the value through that closed set and reject anything else \u2014 it must never form a command flag by prefixing this text with `--`. Adding a value here does not make it valid. This is stated because a consumer that interpolated the value directly would let a policy saying `admin` reconstruct `--admin`, and for a stacked PR the base that supplies this file can be contributor-controlled (icn#2656 review).",
+    "exception": {
+      "strategy": "merge",
+      "applies_to": "Subtree import commits (a squashed subtree add)",
+      "note": "The one documented departure from default_strategy. Structured so a consumer can SELECT it: as prose it could be displayed but never applied, so the exempt category was squash-merged anyway. The category is the merge commit produced by a squashed subtree import (`git subtree add --squash`); `applies_to` describes it without spelling a command, because operative fields may not hold command-shaped strings. Whether a PR is a subtree import is not mechanically derivable, so selecting this is an operator statement and the reason must be stated explicitly at merge time. `strategy` is subject to the closed set in strategy_note exactly like default_strategy."
+    },
     "required_checks": [
       "Build Release",
       "Test",
@@ -31,17 +36,50 @@
       "Pilot Provenance Invariant",
       "Check API Types Drift"
     ],
-    "unstable_is_mergeable": true,
+    "required_checks_live_source": "github_branch_protection",
+    "required_checks_live_source_note": "A SYMBOLIC source, not a command. The consumer's code knows how to read branch protection for the branch it is actually merging into; it must not be handed a command string from data, and must not assume `main` \u2014 this field previously baked `branches/main/protection`, which is wrong for any non-primary base.",
+    "ready_when": {
+      "mergeable": "MERGEABLE",
+      "merge_state_status_in": [
+        "CLEAN",
+        "UNSTABLE"
+      ],
+      "is_draft": false,
+      "review_decision_allowlist": [
+        "APPROVED",
+        null
+      ],
+      "unresolved_review_threads": 0,
+      "required_check_conclusion_allowlist": [
+        "SUCCESS",
+        "NEUTRAL",
+        "SKIPPED"
+      ],
+      "not_deferred": {
+        "merge_queue_absent": true,
+        "is_in_merge_queue": false,
+        "auto_merge_request_absent": true,
+        "note": "An ordinary merge must complete or refuse, never arm something to happen later. A bare `gh pr merge` against a merge-queue base ENQUEUES the PR; a PR another actor already armed with auto-merge will merge on its own once requirements are met. Either way a consumer reporting `Not merged` would be stating a complete outcome while a deferred merge stayed live. Detect and report; do not disarm another actor's request."
+      },
+      "note": "The structured definition of `this PR is ready for an ordinary merge`. NOT YET CONSUMED by any skill or program: this entry is the schema owner, landed ahead of the evaluator that will read it, because that evaluator must load policy from its target's PINNED BASE COMMIT and therefore cannot depend on a field that exists only on the candidate branch (icn#2651/#2656). Until that consumer exists, this is a declaration of intent validated by scripts/check-merge-policy-schema.py, not a live gate.",
+      "allowlist_note": "Allowlists, not denylists: a denylist admits any state nobody enumerated. `null` is listed in review_decision_allowlist on purpose \u2014 it is what this repo reports today (required_approving_review_count: 0) and admitting it by omission would be a fail-open. No pending state is allowlisted at all: pending is not ready. A consumer must treat a required check it cannot account for as NOT ready, including one GitHub never reported. `merge_state_status_in` is the SOLE owner of which merge states are ready: it admits only CLEAN and UNSTABLE, and UNSTABLE only because non-blocking checks do not gate \u2014 the required set is proved green separately by required_check_conclusion_allowlist, so UNSTABLE cannot smuggle a red required check past this gate. A separate `unstable_is_mergeable` boolean used to own that same decision; it was removed in icn#2658 review because two owners can disagree and nothing would notice. DIRTY, BLOCKED, BEHIND, HAS_HOOKS and UNKNOWN are not ready states and are rejected by the validator, not merely absent here.",
+      "field_note": "`MERGEABLE` is a value of the `mergeable` field (GraphQL `MergeableState`: MERGEABLE | CONFLICTING | UNKNOWN). `mergeStateStatus` is a DIFFERENT enum (`MergeStateStatus`: DIRTY | UNKNOWN | BLOCKED | BEHIND | UNSTABLE | HAS_HOOKS | CLEAN) and never takes the value MERGEABLE. Until icn#2651 the admin-bypass condition compared `mergeStateStatus` against `MERGEABLE`, which no PR can ever satisfy, so the documented exception was unreachable as written. That defect is gone twice over: the values that must agree now live here as structured data checked against pinned enums, and the human exception no longer restates them at all. Re-verify with: gh api graphql -f query='{__type(name:\"MergeStateStatus\"){enumValues{name}}}'",
+      "consumer_contract_note": "Trust sequence for the ordinary-merge evaluator planned in icn#2651 stage B, in this order: (1) resolve the repository's trusted default branch from an EXTERNAL live source the target PR cannot alter \u2014 GitHub repository metadata, `repository.defaultBranchRef`; (2) resolve the target PR and read its `baseRefName`; (3) if `baseRefName` differs from that externally resolved default branch, REFUSE evaluation and report that non-default/stacked bases belong to the separate stack flow; (4) only once that equality holds, pin the base OID, load merge policy from that pinned OID, and validate it. The target policy therefore never establishes its own authority. An earlier revision compared `baseRefName` against `branch.primary` \u2014 a field inside the very document whose authority was being decided, so a contributor-controlled stacked base could name itself primary and become authoritative for required_checks and ready_when (icn#2658 review). The fix is removing that circular dependency, not validating the untrusted field more strictly: no field in this file is the trust root, and none may claim to be. `branch.primary` remains repository configuration for other consumers; the stage-B evaluator must not use it as a trust root. Relatedly, an evaluator executed from the candidate worktree is candidate-controlled: stage B must run from a trusted locus whose executable code does not come from the PR under evaluation."
+    },
     "admin_bypass": {
-      "allowed": true,
-      "condition": "Required checks are green AND mergeStateStatus=MERGEABLE but runner is queue-stalled (pending >30min with 0s duration)",
-      "never_for": "Bypassing genuinely failing required checks"
+      "decision": "human",
+      "authoritative_source": "docs/adr/ADR-0016-admin-merge-exception-policy.md",
+      "never_for": "Bypassing genuinely failing required checks",
+      "eligibility_note": "THIS OBJECT IS NOT AUTHORITATIVE FOR ELIGIBILITY, AND HAS NO SWITCH. `authoritative_source` alone defines when a human maintainer may admin-merge, and it requires more than PR state: local verification matching the required scope, proof that non-required failures are pre-existing on the default branch, and a documented exception. Two earlier revisions competed with it and were removed: a structured `requires` object encoding only the PR-state and queue-starvation prerequisites, so a maintainer following it could believe a merge was permitted while the ADR said wait; and an `allowed: true` boolean, whose only possible meaning was whether the bypass is available \u2014 which is an eligibility statement, and the ADR's own `Status: accepted` is already the adoption record. Nothing consumed it. The fix in both cases is ONE OWNER, not a fuller copy or a synchronised flag: a duplicate rots the moment the ADR changes, and nothing detects the divergence. Consult the ADR. If it cannot be consulted, no bypass is inferred (icn#2658 review).",
+      "fail_closed": "Absence of evidence that a runner is stalled is not evidence that it is. An unreadable or unavailable authoritative_source means NO bypass, never a default-allow.",
+      "consumer_note": "Documentary and non-operative for the ordinary-merge evaluator planned in icn#2651 stage B: that evaluator performs ordinary merges only, MUST NOT consume this exception, and MUST NOT provide a privileged merge path. This file makes NO claim about what any currently shipped skill does \u2014 `.agents/skills/merge-pr/SKILL.md` still contains an executable `--admin` path today (and merges with `--merge` while default_strategy is `squash`), which is known follow-up work that stage B supersedes. An earlier revision asserted `agent_execution: false`, which was false about the repository as it actually ships; a data file cannot make a statement true about live behaviour it does not control (icn#2658 review). Claims here are limited to what this document owns."
     },
     "auto_merge": {
-      "command": "gh pr merge <N> --auto --squash",
-      "use_when": "Required checks are still pending (not failed)"
-    },
-    "verify_required_checks": "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+      "enabled": true,
+      "use_when": "A required check is still pending (not failed)",
+      "strategy_from": "default_strategy",
+      "note": "SEMANTIC, not a command. Until icn#2651 this read `gh pr merge <N> --auto --squash`, duplicating default_strategy; the repair replaced it with `gh_flags: ['--auto']`, which was worse in a different way \u2014 arbitrary CLI authority encoded as data. A contributor-controlled base could set `['--admin']` or `['--disable-auto']` and the validator accepted it (icn#2658 review). The consumer's CODE owns the mapping from `enabled` to `--auto`, exactly as it owns the strategy mapping. Policy declares intent; only code spells flags. NOT for the ordinary-merge evaluator, which merges now or refuses \u2014 this documents the batch/stack flows."
+    }
   },
   "branch": {
     "primary": "main",
@@ -59,11 +97,11 @@
     }
   },
   "readiness_definition": [
-    "All 11 required CI checks passed (includes Agent Tooling Drift Check)",
+    "Every check in `merge.required_checks` passed (the list is the count; do not restate one here)",
     "No CHANGES_REQUESTED reviews outstanding",
     "All PR comment threads resolved",
     "Branch is up-to-date with main (strict mode)",
-    "mergeStateStatus is MERGEABLE or UNSTABLE (UNSTABLE = non-blocking checks only)"
+    "The `mergeable` / `mergeStateStatus` gate is defined structurally by `merge.ready_when` \u2014 read that field, do not restate it here. Until icn#2651 this line duplicated the enum values in prose, and a checker had to parse English to notice when the duplicate drifted."
   ],
   "workspace": {
     "rust_commands_run_from": "icn/",
