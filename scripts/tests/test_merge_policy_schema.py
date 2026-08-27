@@ -272,6 +272,16 @@ must_fail("MergeableState value in ready_when.merge_state_status_in",
           lambda d: d["merge"]["ready_when"].update(merge_state_status_in=["MERGEABLE", "UNSTABLE"]))
 must_fail("a non-MergeableState `mergeable`",
           lambda d: d["merge"]["ready_when"].update(mergeable="CLEAN"))
+# Enum membership is not readiness for `mergeable` either — the same distinction already applied
+# to merge_state_status_in, which this field had been left out of (icn#2658 review).
+must_fail("ready_when.mergeable = CONFLICTING (a conflicted PR is not ready)",
+          lambda d: d["merge"]["ready_when"].update(mergeable="CONFLICTING"),
+          expect="not a ready value")
+must_fail("ready_when.mergeable = UNKNOWN (mergeability not yet computed is not ready)",
+          lambda d: d["merge"]["ready_when"].update(mergeable="UNKNOWN"),
+          expect="not a ready value")
+must_pass("ready_when.mergeable = MERGEABLE is the only ready value",
+          lambda d: d["merge"]["ready_when"].update(mergeable="MERGEABLE"))
 must_fail("ordinary gate without CLEAN (the state it exists for)",
           lambda d: d["merge"]["ready_when"].update(merge_state_status_in=["UNSTABLE"]))
 

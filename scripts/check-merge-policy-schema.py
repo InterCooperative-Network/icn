@@ -73,6 +73,10 @@ LIVE_SOURCES = {"github_branch_protection"}                  # CLOSED symbolic s
 # validate clean (icn#2658 review). UNSTABLE is admitted only because non-blocking checks do not
 # gate — the required set is proved green separately.
 READY_MERGE_STATES = {"CLEAN", "UNSTABLE"}
+# The ONLY `mergeable` value that is readiness. CONFLICTING is a conflict and UNKNOWN means GitHub
+# has not finished computing mergeability — both are legitimate `MergeableState` members and
+# neither is ready, so membership in the enum is not readiness here either (icn#2658 review).
+READY_MERGEABLE = "MERGEABLE"
 # The accepted ADR that owns admin-bypass eligibility. Pinned exactly: an existence check alone
 # certified any readable file, including an absolute path such as /etc/passwd or a different ADR,
 # so a contributor could substitute another eligibility contract and still pass the gate.
@@ -184,6 +188,10 @@ def validate(policy) -> list[str]:
         if mok:
             req(mval in MERGEABLE_STATE,
                 f"ready_when.mergeable {mval!r} is not a MergeableState member")
+            # Enum membership is not readiness — the same distinction as merge_state_status_in.
+            req(mval == READY_MERGEABLE,
+                f"ready_when.mergeable {mval!r} is not a ready value; only {READY_MERGEABLE!r} is "
+                "(CONFLICTING is a conflict, UNKNOWN is mergeability not yet computed)")
         sok, mss = field(ready, "merge_state_status_in", as_str_list,
                          "ready_when.merge_state_status_in")
         if sok:
