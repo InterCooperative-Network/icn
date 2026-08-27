@@ -82,7 +82,8 @@ def world(**overrides) -> dict:
                             "checkSuite": {"app": {"databaseId": ACTIONS_APP}}}]],
         "protection": {"required_contexts": list(REQUIRED),
                        "required_bindings": {name: ACTIONS_APP for name in REQUIRED},
-                       "required_approving_review_count": 0, "strict": True},
+                       "required_approving_review_count": 0, "strict": True,
+                       "enforce_admins": True},
         "blobs": {POLICY_PATH: POLICY_TEXT, ADR_PATH: ADR_TEXT},
         "post_merge": {"state": "MERGED", "merged": True, "merge_commit_sha": MERGE_COMMIT},
     }
@@ -467,9 +468,41 @@ no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
 no_claim["protection"]["required_approving_review_count"] = 0
 expect("a policy that makes no approval claim has no approval drift to report", no_claim,
        codes.READY)
-enforce_admins_disagrees = policy_with(lambda d: d["branch"].update(enforce_admins=True))
-expect("a protection control this evaluator does not rely on is not gated",
-       enforce_admins_disagrees, codes.READY)
+print("an ordinary merge is ordinary only if the server enforces protection on the caller")
+bypassable = world()
+bypassable["protection"]["enforce_admins"] = False
+expect("live protection that does not apply to bypass-capable roles", bypassable,
+       codes.REFUSED_PROTECTION_BYPASSABLE)
+_, bypass_result = evaluate_world(bypassable)
+check("the refusal explains that the SERVER must re-enforce protection",
+      any("enforces protection against the caller" in r.detail for r in bypass_result.reasons))
+for bad in (None, "true", "false", 1, 0, [], {}):
+    unreadable = world()
+    unreadable["protection"]["enforce_admins"] = bad
+    _, r = evaluate_world(unreadable)
+    check(f"an enforce_admins setting of {bad!r} is unreadable evidence, not enforcement",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+missing_admins = world()
+missing_admins["protection"].pop("enforce_admins")
+expect("live protection that reports nothing about bypass at all", missing_admins,
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+policy_says_bypassable = policy_with(lambda d: d["branch"].update(enforce_admins=False))
+expect("policy declaring bypassable protection while live enforces it", policy_says_bypassable,
+       codes.REFUSED_POLICY_DRIFT)
+expect("policy that declares enforce_admins as something other than a boolean",
+       policy_with(lambda d: d["branch"].update(enforce_admins="yes")),
+       codes.REFUSED_POLICY_INVALID)
+
+
+def drop_enforcement(w):
+    w["protection"]["enforce_admins"] = False
+
+
+fake, bypass_race = merge_world(world(on_refresh=drop_enforcement))
+check("protection becoming bypassable on the refresh -> REFUSED_PROTECTION_BYPASSABLE",
+      bypass_race.outcome == codes.REFUSED_PROTECTION_BYPASSABLE, f"got {bypass_race.outcome}")
+check("no merge was attempted once protection stopped applying to the caller",
+      fake.merge_calls == [])
 
 other_protection_objects = world()
 other_protection_objects["protection"]["required_approving_review_count"] = 0
@@ -836,10 +869,11 @@ print("branch protection is read, never degraded")
 from icn_merge_pr.ghclient import GhCli                            # noqa: E402
 
 
-def read_protection(required_status_checks):
+def read_protection(required_status_checks, enforce_admins={"enabled": True}):
     """Drive the real transport parser over one branch-protection document."""
     client = GhCli()
-    client._rest = lambda path: {"required_status_checks": required_status_checks}
+    client._rest = lambda path: {"required_status_checks": required_status_checks,
+                                 "enforce_admins": enforce_admins}
     try:
         return client.branch_protection("o", "n", "main")
     except EvidenceUnavailable as exc:
@@ -855,6 +889,15 @@ for label, doc in (
 ):
     got = read_protection(doc)
     check(f"{label} is unreadable evidence", isinstance(got, str), f"got {got}")
+
+for label, admins in (("an enforce_admins object with no enabled flag", {}),
+                      ("an enforce_admins flag that is a string", {"enabled": "true"}),
+                      ("no enforce_admins key at all", None)):
+    got = read_protection({"checks": [], "strict": True}, enforce_admins=admins)
+    check(f"{label} is unreadable evidence", isinstance(got, str), f"got {got}")
+enforced = read_protection({"checks": [], "strict": True}, enforce_admins={"enabled": True})
+check("a readable enforce_admins flag is carried through",
+      not isinstance(enforced, str) and enforced["enforce_admins"] is True, f"{enforced}")
 
 # `checks` PRESENT is authoritative even when empty: falling through to the legacy array would
 # unbind every producer, which is the degradation this rejects.
@@ -907,6 +950,17 @@ print("the exit-code contract does not invite a retry")
 for name, text in (("the CLI usage text", cli.USAGE), ("the README", readme)):
     check(f"{name} says exit 1 covers MERGE_UNCONFIRMED, not refusal alone",
           "MERGE_UNCONFIRMED" in text and "Exit 1" in text)
+# The bootstrap must be able to refuse before it may import anything, so it carries its own copy
+# of this code spelling. The two must agree.
+bootstrap = (ROOT / "tools" / "icn-merge-pr" / "icn_merge_pr" / "__main__.py").read_text(
+    encoding="utf-8")
+check("the bootstrap's refusal code matches the shared vocabulary",
+      f'_REFUSED = "{codes.REFUSED_NOT_INSTALLED}"' in bootstrap)
+check("the bootstrap does not import the package before verifying the tree",
+      bootstrap.index("_verify_closed_tree()") < bootstrap.index("from icn_merge_pr.cli import"))
+check("the bootstrap seals the import path before verifying",
+      bootstrap.index("_seal_import_path()") < bootstrap.index("sys.path.insert(0, _LIB)"))
+
 check("both exit codes for MERGED and MERGE_UNCONFIRMED differ from each other",
       codes.exit_code(codes.MERGED) != codes.exit_code(codes.MERGE_UNCONFIRMED))
 

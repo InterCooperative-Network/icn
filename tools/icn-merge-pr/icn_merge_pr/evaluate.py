@@ -77,6 +77,24 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
     def refuse(code: str, detail: str) -> None:
         reasons.append(Reason(code, detail))
 
+    # --- is this merge actually an ORDINARY one? -------------------------------------------------
+    # First, because it is a precondition for everything below rather than one gate among them.
+    # The merge request carries a head SHA and a strategy; it does not carry the readiness this
+    # program just proved. What makes the request ordinary is that the SERVER re-applies branch
+    # protection to it. If protection does not apply to the credential doing the merging — a
+    # repository administrator's, say — then GitHub may accept the merge even though a required
+    # check, a review gate or the base tip moved after the final refresh, and no `--admin` need
+    # appear anywhere for that to happen. Review proved an earlier judgement of mine wrong here:
+    # this evaluator DOES rely on enforce_admins, because its whole claim to be "ordinary" rests
+    # on the server, not on the shape of the request.
+    if not snap.protection.enforce_admins:
+        refuse(codes.REFUSED_PROTECTION_BYPASSABLE,
+               f"branch protection on {snap.default_branch!r} does not apply to administrators "
+               f"and other bypass-capable roles, so the server would not re-enforce it against "
+               f"the credential performing this merge. An ordinary merge is ordinary only when "
+               f"the server enforces protection against the caller; this program has no "
+               f"privileged path and will not stand in for one.")
+
     # --- configuration soundness ---------------------------------------------------------------
     # Fail closed on drift between the pinned policy and live branch protection. Either direction
     # is a real disagreement about what gates a merge, and neither owner may be quietly preferred.
@@ -87,11 +105,18 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
     # current, and how many approvals are required. Live protection may not quietly erase any of
     # those, in either direction.
     #
-    # `enforce_admins` is the instructive exclusion. It is declared in policy and it currently
-    # DISAGREES with live protection (policy says false, live has it on) — but this evaluator has
-    # no privileged path whose availability could depend on it, so it is not a control this gate
-    # relies on. Adding it would refuse every merge over a disagreement this program neither owns
-    # nor uses, which is a gate nobody could use.
+    # `enforce_admins` was excluded here on the reasoning that this evaluator has no privileged
+    # path whose availability could depend on it. Review showed that reasoning to be wrong: the
+    # evaluator relies on the setting not to gain a privilege but to be denied one, because a
+    # bypass-capable credential turns an ordinary request into a privileged merge server-side.
+    # It is a gated control now, in both directions.
+    want_admins = snap.policy.require_enforce_admins
+    if want_admins is not None and snap.protection.enforce_admins != want_admins:
+        refuse(codes.REFUSED_POLICY_DRIFT,
+               f"pinned policy at {policy.oid[:12]} declares enforce_admins={want_admins} but "
+               f"live protection on {snap.default_branch!r} reports "
+               f"{snap.protection.enforce_admins}; whether protection applies to the caller is "
+               f"not something live configuration may quietly change")
     want_approvals = snap.policy.require_approvals
     if want_approvals is not None and \
             snap.protection.required_approving_review_count != want_approvals:

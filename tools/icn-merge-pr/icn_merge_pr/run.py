@@ -74,6 +74,7 @@ def _evidence(snap: Snapshot) -> dict:
                                    sorted(snap.protection.required_bindings.items())},
             "required_approving_review_count": snap.protection.required_approving_review_count,
             "strict": snap.protection.strict,
+            "enforce_admins": snap.protection.enforce_admins,
         },
         "policy": {
             "loaded_from_oid": snap.policy_oid,

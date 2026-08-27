@@ -277,6 +277,52 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
           "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
     forged.unlink()
 
+    print("the install tree is CLOSED before anything is imported from it")
+    # An unrecorded top-level module is the whole defect: `cli` imports `json`, the install root
+    # is what goes on the import path, and every recorded digest stays intact.
+    marker = tmp / "HOSTILE-EXECUTED"
+    hostile_module = lib / "json.py"
+    hostile_module.write_text(
+        f"open({str(marker)!r}, 'w').write('executed')\nraise SystemExit(0)\n", encoding="utf-8")
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("an unrecorded top-level module does NOT execute",
+          not marker.exists(), "the hostile module ran")
+    check("an unrecorded top-level module refuses the invocation",
+          proc.returncode != 0 and "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:160])
+    check("the refusal names the file the record does not describe",
+          "json.py" in proc.stdout, proc.stdout[:200])
+    hostile_module.unlink()
+
+    smuggled_module = lib / "icn_merge_pr" / "sneaky.py"
+    smuggled_module.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("an unrecorded module inside the package refuses before the package is imported",
+          proc.returncode != 0 and "REFUSED_NOT_INSTALLED" in proc.stdout
+          and "sneaky.py" in proc.stdout, proc.stdout[:200])
+    smuggled_module.unlink()
+
+    recorded_file = lib / "icn_merge_pr" / "evaluate.py"
+    kept_bytes = recorded_file.read_bytes()
+    recorded_file.unlink()
+    recorded_file.symlink_to(tmp / "elsewhere.py")
+    (tmp / "elsewhere.py").write_bytes(kept_bytes)
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("a recorded file replaced by a symlink refuses even with identical content",
+          proc.returncode != 0 and "symlink" in proc.stdout, proc.stdout[:200])
+    recorded_file.unlink()
+    recorded_file.write_bytes(kept_bytes)
+
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("a clean closed installation still works", proc.returncode == 0 and head in proc.stdout,
+          proc.stdout[:160])
+    for _ in range(3):
+        subprocess.run([str(binary), "--help"], capture_output=True, text=True, env=no_gh)
+    check("repeated runs leave no bytecode behind, so the tree stays closed",
+          not (lib / "icn_merge_pr" / "__pycache__").exists() and not (lib / "__pycache__").exists())
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("and the installation is still usable after those runs", proc.returncode == 0,
+          proc.stdout[:160])
+
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"
     hostile = candidate / "icn_merge_pr"

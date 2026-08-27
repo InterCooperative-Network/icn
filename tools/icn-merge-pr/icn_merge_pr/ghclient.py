@@ -267,6 +267,16 @@ class GhCli:
         doc = self._rest(f"repos/{owner}/{name}/branches/{quote(branch, safe='')}/protection")
         if not isinstance(doc, dict):
             raise EvidenceUnavailable("branch protection response was not an object")
+        # Does protection apply to administrators and other bypass-capable roles? This program
+        # sends an ordinary merge request with an ordinary credential; whether that request is
+        # actually subject to the gates depends on the server, not on the shape of the request.
+        admins = doc.get("enforce_admins")
+        enabled = admins.get("enabled") if isinstance(admins, dict) else admins
+        if type(enabled) is not bool:
+            raise EvidenceUnavailable(
+                f"branch protection did not report a readable enforce_admins setting "
+                f"({admins!r}); whether protection applies to the caller is not something this "
+                "program will assume")
         checks = doc.get("required_status_checks") or {}
         if not isinstance(checks, dict):
             raise EvidenceUnavailable("branch protection required_status_checks was not an object")
@@ -352,6 +362,7 @@ class GhCli:
             "required_bindings": bindings,
             "required_approving_review_count": count,
             "strict": strict,
+            "enforce_admins": enabled,
             "configured": "required_status_checks" in doc,
         }
 

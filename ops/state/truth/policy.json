@@ -87,7 +87,7 @@
     "no_direct_push": true,
     "strict_up_to_date": true,
     "required_approvals": 0,
-    "enforce_admins": false,
+    "enforce_admins": true,
     "naming": {
       "feature": "feat/<slug>",
       "bugfix": "fix/<slug>",

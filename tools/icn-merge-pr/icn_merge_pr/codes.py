@@ -36,6 +36,9 @@ REFUSED_STATE = "REFUSED_STATE"                          # PR is not OPEN
 REFUSED_DRAFT = "REFUSED_DRAFT"
 REFUSED_NOT_MERGEABLE = "REFUSED_NOT_MERGEABLE"          # MergeableState is not MERGEABLE
 REFUSED_MERGE_STATE = "REFUSED_MERGE_STATE"              # mergeStateStatus outside the ready set
+# The server would not enforce branch protection against the credential doing the merging,
+# so the merge would not be an ORDINARY one however ordinary the request looked.
+REFUSED_PROTECTION_BYPASSABLE = "REFUSED_PROTECTION_BYPASSABLE"
 REFUSED_REVIEW = "REFUSED_REVIEW"
 REFUSED_THREADS = "REFUSED_THREADS"
 REFUSED_REQUIRED_CHECK_PENDING = "REFUSED_REQUIRED_CHECK_PENDING"

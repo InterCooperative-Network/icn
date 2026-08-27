@@ -67,6 +67,7 @@ class Protection:
     required_bindings: dict[str, int | None]
     required_approving_review_count: int
     strict: bool
+    enforce_admins: bool
 
 
 @dataclass(frozen=True)
@@ -320,6 +321,11 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable strict setting ({strict!r}); an "
             "unreadable up-to-date requirement is not a satisfied one")
+    enforce_admins = protection_raw.get("enforce_admins")
+    if type(enforce_admins) is not bool:
+        raise EvidenceUnavailable(
+            f"branch protection did not report a readable enforce_admins setting "
+            f"({enforce_admins!r}); unreadable is not enforced")
     if type(approvals) is not int:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable approving-review count ({approvals!r}); "
@@ -334,6 +340,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         required_bindings=dict(bindings),
         required_approving_review_count=approvals,
         strict=strict,
+        enforce_admins=enforce_admins,
     )
 
     review_decision = pr.get("reviewDecision")

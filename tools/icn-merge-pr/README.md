@@ -36,8 +36,20 @@ wearing a respectable name.
 
 The program installs to `~/.local/lib/icn/merge-pr/` with a launcher at `~/.local/bin/icn-merge-pr`
 — outside every ICN worktree, because a program executed from the PR's own worktree is
-candidate-controlled. The launcher runs with `-E -s` and pins `sys.path[0]` to the install root, so
-a checkout the operator happens to be standing in cannot supply the code that decides a merge.
+candidate-controlled.
+
+**Closed-tree integrity.** The launcher runs `python3 -I -B`, and `__main__.py` verifies the
+install tree *before* putting it on the import path or importing any package module: every
+recorded file must be a regular file with its recorded digest, and the tree must be **closed** —
+the install root holds only the record and the package directory, the package directory holds only
+the recorded files, and nothing is a symlink. Without this, an unrecorded top-level `json.py`
+executed during `import icn_merge_pr.cli`, ahead of any provenance check, and the digest check
+never noticed because it only inspected paths the record named.
+
+Call this what it is: **integrity, not authentication.** A local actor who can rewrite the whole
+installation *and* its record is outside this program's threat model — they already hold the
+credentials it would use. What is closed off is narrower and worth having on its own: a tree that
+has merely gained an unexpected importable file no longer gets to run it.
 
 ## Use
 
@@ -72,14 +84,18 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    *every page* of review threads, *every page* of the check rollup, live branch protection, merge
    queue, auto-merge. Unavailable evidence is not ready, and a thread count larger than the threads
    actually readable is unavailable evidence.
-5. Match each required check by **name and producer**. Where branch protection pins a check to a
+5. Refuse unless live branch protection applies to administrators and other bypass-capable roles.
+   The merge request carries a head SHA and a strategy, not the readiness just proved; what makes
+   it *ordinary* is that the server re-applies protection to it. A bypass-capable credential turns
+   an ordinary-looking request into a privileged merge server-side, with no `--admin` anywhere.
+6. Match each required check by **name and producer**. Where branch protection pins a check to a
    GitHub App, only that App's runs are consulted — a green result of the right name from another
    source is as good as absent.
-6. Evaluate the structured `merge.ready_when` gate. Fail closed on any drift between the pinned
+7. Evaluate the structured `merge.ready_when` gate. Fail closed on any drift between the pinned
    policy and live branch protection.
-7. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
+8. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
    re-evaluate every gate.
-8. Merge once, with the expected head SHA pinned in the request. Success is a fresh read
+9. Merge once, with the expected head SHA pinned in the request. Success is a fresh read
    reporting `merged == true`, not what the merge call returned. A refusal is reported only when a
    fresh read confirms the PR is not merged; once a request has been dispatched, an outcome that
    cannot be established is `MERGE_UNCONFIRMED` — never "it did not merge".

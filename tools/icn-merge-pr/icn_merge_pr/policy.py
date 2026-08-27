@@ -94,6 +94,7 @@ class MergePolicy:
     require_auto_merge_absent: bool
     require_strict_status_checks: bool | None
     require_approvals: int | None
+    require_enforce_admins: bool | None
 
 
 def _typed(node, key, kind, label):
@@ -179,6 +180,11 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
         raise PolicyInvalid("branch.strict_up_to_date is present but is not a boolean; a "
                             "malformed declaration about a branch-protection control is not a "
                             "claim this program will act on")
+    admins_declared = branch.get("enforce_admins")
+    if admins_declared is not None and not isinstance(admins_declared, bool):
+        raise PolicyInvalid("branch.enforce_admins is present but is not a boolean; a malformed "
+                            "declaration about a branch-protection control is not a claim this "
+                            "program will act on")
     approvals_declared = branch.get("required_approvals")
     if approvals_declared is not None and type(approvals_declared) is not int:
         raise PolicyInvalid("branch.required_approvals is present but is not an integer; a "
@@ -209,4 +215,5 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
         require_auto_merge_absent=bool(ready["not_deferred"]["auto_merge_request_absent"]),
         require_strict_status_checks=strict_declared,
         require_approvals=approvals_declared,
+        require_enforce_admins=admins_declared,
     )
