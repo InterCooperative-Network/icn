@@ -1,9 +1,14 @@
 {
   "schema": "icn-policy/v1",
-  "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values — read this file.",
+  "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values \u2014 read this file.",
   "merge": {
     "default_strategy": "squash",
-    "exception": "Subtree merge commits (git subtree add --squash) must use --merge. State reason explicitly.",
+    "strategy_note": "The set of valid merge strategies is CLOSED and owned by the CONSUMER'S CODE, never by this file: merge | squash | rebase. A consumer must map the value through that closed set and reject anything else \u2014 it must never form a command flag by prefixing this text with `--`. Adding a value here does not make it valid. This is stated because a consumer that interpolated the value directly would let a policy saying `admin` reconstruct `--admin`, and for a stacked PR the base that supplies this file can be contributor-controlled (icn#2656 review).",
+    "exception": {
+      "strategy": "merge",
+      "applies_to": "Subtree merge commits (git subtree add --squash)",
+      "note": "The one documented departure from default_strategy. Structured so a consumer can SELECT it: as prose it could be displayed but never applied, so the exempt category was squash-merged anyway. Whether a PR is a subtree import is not mechanically derivable, so selecting this is an operator statement and the reason must be stated explicitly at merge time. `strategy` is subject to the closed set in strategy_note exactly like default_strategy."
+    },
     "required_checks": [
       "Build Release",
       "Test",
@@ -32,14 +37,91 @@
       "Check API Types Drift"
     ],
     "unstable_is_mergeable": true,
+    "ready_when": {
+      "mergeable": "MERGEABLE",
+      "merge_state_status_in": [
+        "CLEAN",
+        "UNSTABLE"
+      ],
+      "is_draft": false,
+      "review_decision_allowlist": [
+        "APPROVED",
+        null
+      ],
+      "unresolved_review_threads": 0,
+      "required_check_conclusion_allowlist": [
+        "SUCCESS",
+        "NEUTRAL",
+        "SKIPPED"
+      ],
+      "not_deferred": {
+        "merge_queue_absent": true,
+        "is_in_merge_queue": false,
+        "auto_merge_request_absent": true,
+        "note": "An ordinary merge must complete or refuse, never arm something to happen later. A bare `gh pr merge` against a merge-queue base ENQUEUES the PR; a PR another actor already armed with auto-merge will merge on its own once requirements are met. Either way a consumer reporting `Not merged` would be stating a complete outcome while a deferred merge stayed live. Detect and report; do not disarm another actor's request."
+      },
+      "note": "The structured definition of `this PR is ready for an ordinary merge`. NOT YET CONSUMED by any skill or program: this entry is the schema owner, landed ahead of the evaluator that will read it, because that evaluator must load policy from its target's PINNED BASE COMMIT and therefore cannot depend on a field that exists only on the candidate branch (icn#2651/#2656). Until that consumer exists, this is a declaration of intent validated by scripts/check-merge-policy-schema.py, not a live gate.",
+      "allowlist_note": "Allowlists, not denylists: a denylist admits any state nobody enumerated. `null` is listed in review_decision_allowlist on purpose \u2014 it is what this repo reports today (required_approving_review_count: 0) and admitting it by omission would be a fail-open. No pending state is allowlisted at all: pending is not ready. A consumer must treat a required check it cannot account for as NOT ready, including one GitHub never reported.",
+      "field_note_ref": "merge.admin_bypass.field_note"
+    },
     "admin_bypass": {
       "allowed": true,
-      "condition": "Required checks are green AND mergeStateStatus=MERGEABLE but runner is queue-stalled (pending >30min with 0s duration)",
-      "never_for": "Bypassing genuinely failing required checks"
+      "never_for": "Bypassing genuinely failing required checks",
+      "summary": "Only when the PR has no conflict, no required check has failed, and a required check's runner is queue-stalled. Never to defeat a failing gate.",
+      "requires": {
+        "mergeable": "MERGEABLE",
+        "merge_state_status_in": [
+          "BLOCKED",
+          "UNSTABLE"
+        ],
+        "is_draft": false,
+        "review_decision_allowlist": [
+          "APPROVED",
+          null
+        ],
+        "unresolved_review_threads": 0,
+        "required_check_conclusion_allowlist": [
+          "SUCCESS",
+          "NEUTRAL",
+          "SKIPPED"
+        ],
+        "required_check_pending_allowlist": [
+          "QUEUED",
+          "WAITING",
+          "REQUESTED",
+          "PENDING",
+          "EXPECTED"
+        ],
+        "stalled_required_check": {
+          "qualifying_states": [
+            "QUEUED",
+            "WAITING",
+            "REQUESTED",
+            "PENDING",
+            "EXPECTED"
+          ],
+          "excluded_states": [
+            "IN_PROGRESS",
+            "COMPLETED"
+          ],
+          "min_pending_minutes": 30,
+          "elapsed_seconds": 0,
+          "note": "Structural so it cannot be read as `any pending state`. ADR-0016 conditions 1-2 permit bypassing only checks `pending at 0s` \u2014 queued, NOT YET ASSIGNED a runner \u2014 because a job that has started is producing evidence, and bypassing evidence is what the ADR forbids. A job that waited 30 minutes and then started is no longer stalled. Started states are excluded BY NAME rather than by omission, and excluded_states is checked before qualifying_states. `.agents/skills/watch-ci-and-advance` states the same distinction from the other side: `in_progress` is a productive wait."
+        }
+      },
+      "field_note": "`MERGEABLE` is a value of the `mergeable` field (GraphQL `MergeableState`: MERGEABLE | CONFLICTING | UNKNOWN). `mergeStateStatus` is a DIFFERENT enum (`MergeStateStatus`: DIRTY | UNKNOWN | BLOCKED | BEHIND | UNSTABLE | HAS_HOOKS | CLEAN) and never takes the value MERGEABLE. Until icn#2651 this condition read `Required checks are green AND mergeStateStatus=MERGEABLE but...`, which no PR can ever satisfy, so the documented exception was unreachable as written. Re-verify with: gh api graphql -f query='{__type(name:\"MergeStateStatus\"){enumValues{name}}}'",
+      "fail_closed": "If any field above is absent, UNKNOWN, or ambiguous, do NOT bypass. Absence of evidence that a runner is stalled is not evidence that it is.",
+      "allowlist_note": "Every required check must be in one of the two allowlists: acceptably CONCLUDED, or genuinely PENDING. An allowlist rather than a denylist because a denylist silently permits any state nobody enumerated \u2014 GitHub's check-run conclusions include `stale` and `startup_failure`, and legacy commit statuses add `error`. The same shape governs review_decision_allowlist.",
+      "scope_note": "`--admin` bypasses EVERY branch protection, not only the check gate, so these requirements reproduce every clause of readiness that a bypass would otherwise skip \u2014 draft state, review decision and unresolved threads included. A stalled runner is the only condition this exception exists for.",
+      "agent_execution": "HUMAN decision under docs/adr/ADR-0016-admin-merge-exception-policy.md. This block exists to make that human exception precise; it is not an agent execution route, and the ordinary-merge evaluator planned in icn#2651 will not consume it. Scope claim deliberately limited to that evaluator: this file does NOT assert anything about what other skills do, because a claim about `every skill` cannot be made true by a data file."
     },
     "auto_merge": {
-      "command": "gh pr merge <N> --auto --squash",
-      "use_when": "Required checks are still pending (not failed)"
+      "use_when": "A required check is still pending (not failed)",
+      "gh_flags": [
+        "--auto"
+      ],
+      "strategy_from": "default_strategy",
+      "note": "Structured on purpose: there is no baked command string here. Until icn#2651 this field read `gh pr merge <N> --auto --squash`, duplicating default_strategy \u2014 changing the strategy in one place would have left the other silently wrong. Compose as `gh pr merge <N> ${gh_flags} --<mapped default_strategy>`, mapping through the closed set in strategy_note. Never shell-eval a value from this file. NOT for the ordinary-merge evaluator, which merges now or refuses; this documents the batch/stack flows that own `--auto`."
     },
     "verify_required_checks": "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
   },
@@ -59,11 +141,11 @@
     }
   },
   "readiness_definition": [
-    "All 11 required CI checks passed (includes Agent Tooling Drift Check)",
+    "Every check in `merge.required_checks` passed (the list is the count; do not restate one here)",
     "No CHANGES_REQUESTED reviews outstanding",
     "All PR comment threads resolved",
     "Branch is up-to-date with main (strict mode)",
-    "mergeStateStatus is MERGEABLE or UNSTABLE (UNSTABLE = non-blocking checks only)"
+    "The `mergeable` / `mergeStateStatus` gate is defined structurally by `merge.ready_when` \u2014 read that field, do not restate it here. Until icn#2651 this line duplicated the enum values in prose, and a checker had to parse English to notice when the duplicate drifted."
   ],
   "workspace": {
     "rust_commands_run_from": "icn/",
