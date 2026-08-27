@@ -234,6 +234,18 @@ if isinstance(req, dict):
           not (set(req.get("required_check_conclusion_allowlist") or []) & set(pend or [])))
 check("admin_bypass records that no agent skill executes it",
       bool(bypass.get("agent_execution")))
+# Review of 36a4b731: ADR-0016 permits bypassing only checks `pending at 0s` (queued, not yet
+# assigned a runner). `IN_PROGRESS` means assigned and producing evidence, so allowlisting it
+# contradicted the ADR this block mirrors — the exact defect class icn#2651 was filed about.
+ASSIGNED_STATES = {"IN_PROGRESS", "COMPLETED"}
+if isinstance(req, dict):
+    assigned = ASSIGNED_STATES & set(req.get("required_check_pending_allowlist") or [])
+    check(f"admin_bypass allowlists no state meaning the runner already started: {sorted(assigned)}",
+          not assigned)
+    check("admin_bypass records why a started job is not a stall",
+          bool(req.get("pending_allowlist_note")))
+check("CONTROL: an IN_PROGRESS entry in the stall allowlist WOULD be caught",
+      bool(ASSIGNED_STATES & {"QUEUED", "IN_PROGRESS"}))
 
 # CONTROLS: the shape checks would be vacuous if the pre-fix policy passed them.
 _pre_fix_bypass = {"condition": "Required checks are green AND mergeStateStatus=MERGEABLE ..."}
@@ -402,6 +414,26 @@ for name, canonical, mirrors in skill_paths:
           "${BASE_ENC}/protection" in body and "branches/main/protection" not in body)
     check(f"{name}: no protection path interpolates the UNENCODED base",
           "${BASE}/protection" not in body)
+    # Review of 36a4b731: policy was read from the WORKING TREE, which in this repo's per-branch
+    # worktree layout is normally the PR branch — so a PR editing policy.json supplied the rules
+    # that admitted it. `--match-head-commit` pins the remote head, not the local policy revision.
+    check(f"{name}: reads merge policy pinned to the PR's base, not the working tree",
+          "contents/ops/state/truth/policy.json?ref=${BASE_ENC}" in cmd_text)
+    steps_only = body.split("## Steps", 1)[-1]
+    worktree_reads = [ln for ln in steps_only.splitlines()
+                      if "policy.json'" in ln or "policy.json)" in ln]
+    check(f"{name}: no command reads policy.json from the worktree: {worktree_reads}",
+          not worktree_reads)
+    check(f"{name}: refuses when the base's policy lacks the gate",
+          bool(re.search(r"no `?\.?merge\.ready_when`?, \*\*stop", " ".join(body.split()), re.I)
+               or "has no `.merge.ready_when`, **stop.**" in " ".join(body.split())))
+    # The base must be resolved BEFORE the policy is pinned to it.
+    check(f"{name}: resolves the base before pinning the policy to it",
+          body.index("BASE_ENC=$(jq -rn") < body.index("policy.json?ref="))
+    # The declared truth_contract must not tell consumers to interpolate the RAW base.
+    check(f"{name}: the live-load contract uses the ENCODED base",
+          "branches/$BASE_ENC/protection" in frontmatter
+          and "branches/$BASE/protection" not in frontmatter)
     check(f"{name}: encodes the base with a real encoder, not a hand-rolled substitution",
           "@uri" in cmd_text
           and not re.search(r"BASE.*(//|s#|tr ).*%2F", body)
@@ -466,7 +498,14 @@ for name, canonical, mirrors in skill_paths:
     check(f"{name}: and rebuilds REQUIRED_STATE from the refreshed checks",
           "REQUIRED_STATE=$(jq -n" in merge_step)
     check(f"{name}: and re-evaluates the required-check gate against the rebuilt table",
-          bool(re.search(r"re-evaluate step 4 item 6", " ".join(merge_step.split()), re.I)))
+          bool(re.search(r"re-evaluate step 4 items 3, 4, 5 and 6",
+                         " ".join(merge_step.split()), re.I)))
+    # Review of 36a4b731: only the checks were refreshed, so a review flipping to
+    # CHANGES_REQUESTED or a thread reopened after step 3 still merged — and this repo reports
+    # required_approving_review_count: 0, so GitHub does not re-check those either. Every gate
+    # that is this skill's alone must be refreshed.
+    for gate in ("isDraft", "reviewDecision", "reviewThreads"):
+        check(f"{name}: the pre-merge refresh reloads {gate}", gate in merge_step)
     # The construction is duplicated on purpose (visible where it runs). Duplication is exactly
     # what this PR exists to prevent, so prove the copies cannot diverge.
     builds = re.findall(r"REQUIRED_STATE=\$\(jq -n.*?\)'\)", body, re.S)

@@ -6,10 +6,10 @@ user-invocable: true
 allowed-tools: "Bash"
 truth_contract:
   canonical_sources:
-    - ops/state/truth/policy.json       # default_strategy, required_checks, ready_when
+    - ops/state/truth/policy.json@BASE  # default_strategy, required_checks, ready_when — read at the PR's base, never the worktree
   live_load_required:
     - "gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup"
-    - "gh api repos/InterCooperative-Network/icn/branches/$BASE/protection --jq '.required_status_checks.contexts'"
+    - "gh api repos/InterCooperative-Network/icn/branches/$BASE_ENC/protection --jq '.required_status_checks.contexts'"
   examples_only: []
   never_hardcode:
     - required check list (always query live or read policy.json)
@@ -58,33 +58,7 @@ its job there.
 
 ## Steps
 
-1. **Load the policy first**, before touching the PR:
-
-   ```bash
-   jq '.merge | {strategy: .default_strategy, exception,
-                 required: .required_checks, non_blocking: .non_blocking_checks,
-                 unstable_is_mergeable, ready_when}' ops/state/truth/policy.json
-   STRATEGY=$(jq -r '.merge.default_strategy' ops/state/truth/policy.json)
-   ```
-
-   `${STRATEGY}` builds the one merge command below.
-
-   The single documented departure is `.merge.exception`, and it is a **strategy** selection,
-   not an authority one — both values are ordinary merges. It applies only when the operator
-   states that this PR is the category `.merge.exception.applies_to` names; whether a PR is a
-   subtree import is not mechanically derivable, so it is never inferred. When they do, take
-   that strategy from the policy as well, and state the reason explicitly at merge time:
-
-   ```bash
-   STRATEGY=$(jq -r '.merge.exception.strategy' ops/state/truth/policy.json)
-   ```
-
-   Both branches read the strategy from `policy.json`. Neither value is ever typed into a
-   command — before icn#2656 this step printed the exception as a sentence while `STRATEGY`
-   stayed unconditionally `default_strategy`, so the exempt category was squash-merged anyway
-   and the documented exception could not be applied at all.
-
-2. Resolve the PR **explicitly**, to exactly one number, before anything else reads it.
+1. Resolve the PR **explicitly**, to exactly one number, before anything else reads it.
 
    If `$ARGUMENTS` names a number, that is `<N>`. If it does not — the argument is optional —
    resolve the current branch's PR **once**, and use the number it returns for every call after:
@@ -126,12 +100,58 @@ its job there.
    `MERGEABLE` is a value of the former only. `.merge.admin_bypass.field_note` records the
    distinction and how to re-verify it against the live schema.
 
+2. **Load the policy from the PR's base**, never from the working tree:
+
+   ```bash
+   POLICY_JSON=$(gh api \
+     "repos/InterCooperative-Network/icn/contents/ops/state/truth/policy.json?ref=${BASE_ENC}" \
+     -H "Accept: application/vnd.github.raw") || POLICY_JSON=UNAVAILABLE
+   if [ "${POLICY_JSON}" = "UNAVAILABLE" ]; then
+     echo "STOP: cannot read merge policy at ${BASE} — report Not merged, do not continue"
+   else
+     STRATEGY=$(jq -r '.merge.default_strategy' <<<"${POLICY_JSON}")
+     jq '.merge | {strategy: .default_strategy, exception,
+                   required: .required_checks, non_blocking: .non_blocking_checks,
+                   unstable_is_mergeable, ready_when}' <<<"${POLICY_JSON}"
+   fi
+   ```
+
+   **Which revision of the rules admits this change is not the change's decision.** Reading
+   `ops/state/truth/policy.json` from the working tree means reading it from whatever is checked
+   out — which, in this repo's per-branch worktree layout, is normally the PR branch itself. A PR
+   that edits `policy.json` would then supply the strategy and the readiness gates that admit it,
+   and `--match-head-commit` does not help: it pins the remote head, not the local policy
+   revision (icn#2656 review). Pinning the read to `${BASE_ENC}` makes the rules the ones already
+   in force on the branch being merged into. That is also why step 1 comes first: the base has to
+   be known before the policy can be pinned to it.
+
+   If the base's policy has no `.merge.ready_when`, **stop.** The gate must already be in force on
+   the branch you are merging into; a PR that introduces the gate cannot be admitted by it. That
+   is not a limitation to work around — it is the same rule, applied to itself.
+
+   `${STRATEGY}` builds the one merge command below.
+
+   The single documented departure is `.merge.exception`, and it is a **strategy** selection,
+   not an authority one — both values are ordinary merges. It applies only when the operator
+   states that this PR is the category `.merge.exception.applies_to` names; whether a PR is a
+   subtree import is not mechanically derivable, so it is never inferred. When they do, take
+   that strategy from the policy as well, and state the reason explicitly at merge time:
+
+   ```bash
+   STRATEGY=$(jq -r '.merge.exception.strategy' <<<"${POLICY_JSON}")
+   ```
+
+   Both branches read the strategy from the base's `policy.json`. Neither value is ever typed
+   into a command — before icn#2656 this step printed the exception as a sentence while
+   `STRATEGY` stayed unconditionally `default_strategy`, so the exempt category was
+   squash-merged anyway and the documented exception could not be applied at all.
+
 3. **Gather the current evidence, once.** Every load below is required. An unsuccessful load is
    missing evidence, not an absent requirement:
 
    ```bash
    CHECKS=$(gh pr checks <N> --json name,state,bucket)
-   POLICY=$(jq -c '.merge.required_checks' ops/state/truth/policy.json)
+   POLICY=$(jq -c '.merge.required_checks' <<<"${POLICY_JSON}")
    LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
             --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
    ```
@@ -257,7 +277,10 @@ its job there.
    skill enforces are still green**:
 
    ```bash
-   gh pr view <N> --json headRefOid,baseRefName
+   gh pr view <N> --json headRefOid,baseRefName,isDraft,reviewDecision
+   gh api graphql --paginate -f query='query($n:Int!,$endCursor:String){repository(owner:"InterCooperative-Network",name:"icn"){
+     pullRequest(number:$n){reviewThreads(first:100,after:$endCursor){
+       pageInfo{hasNextPage endCursor} nodes{isResolved}}}}}' -F n=<N>
    CHECKS=$(gh pr checks <N> --json name,state,bucket)
    REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
                           --argjson live "${LIVE}" '
@@ -269,8 +292,16 @@ its job there.
    ```
 
    Both identity values must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the
-   evidence is stale: **refuse and start over.** Then **re-evaluate step 4 item 6** against the
-   rebuilt `REQUIRED_STATE`, and stop on any row outside the allowlist exactly as step 4 does.
+   evidence is stale: **refuse and start over.** Then **re-evaluate step 4 items 3, 4, 5 and 6**
+   against what was just read, and stop on any that no longer holds, exactly as step 4 does.
+
+   **Every gate this skill alone enforces is refreshed, not just the checks.** An earlier revision
+   refreshed `gh pr checks` and nothing else, so a review flipping to `CHANGES_REQUESTED`, a thread
+   reopened, or a PR converted to draft after step 3 still merged — this repo reports
+   `required_approving_review_count: 0`, so GitHub does not enforce the review gates either, and
+   `.ready_when.review_decision_allowlist` and `.unresolved_review_threads` are this skill's rules
+   alone (icn#2656 review). The rule is not "refresh the checks"; it is **refresh every gate GitHub
+   will not re-check for you**.
 
    The refresh **reassigns** `CHECKS` and **rebuilds** `REQUIRED_STATE`. An earlier revision ran
    `gh pr checks` here without assigning it, so the command printed the new JSON and discarded it
