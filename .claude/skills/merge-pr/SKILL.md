@@ -165,7 +165,13 @@ its job there.
    missing evidence, not an absent requirement:
 
    ```bash
-   CHECKS=$(gh pr checks <N> --json name,state,bucket)
+   if CHECKS=$(gh pr checks <N> --json name,state,bucket); then
+     :                     # 0 — every check has reached a terminal state
+   elif [ $? -eq 8 ]; then
+     :                     # 8 — documented "checks pending"; the JSON is complete and valid
+   else
+     CHECKS=UNAVAILABLE    # anything else is a genuine load failure
+   fi
    POLICY=$(jq -c '.merge.required_checks' <<<"${POLICY_JSON}")
    LIVE=$(gh api "repos/InterCooperative-Network/icn/branches/${BASE_ENC}/protection" \
             --jq '.required_status_checks.contexts') || LIVE=UNAVAILABLE
@@ -176,8 +182,8 @@ its job there.
    not report becomes a value rather than a gap:
 
    ```bash
-   if [ "${LIVE}" = "UNAVAILABLE" ]; then
-     echo "STOP: base protection unavailable for ${BASE} — report Not merged, do not continue"
+   if [ "${LIVE}" = "UNAVAILABLE" ] || [ "${CHECKS}" = "UNAVAILABLE" ]; then
+     echo "STOP: evidence unavailable for ${BASE} — report Not merged, do not continue"
    else
      REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
                             --argjson live "${LIVE}" '
@@ -188,6 +194,20 @@ its job there.
                           bucket: ($seen[.].bucket // "absent")})')
    fi
    ```
+
+   **`gh pr checks` reports status through its exit code, and pending is not failure.** It
+   documents `8: Checks pending`, so a bare `CHECKS=$(...)` has the wrong failure semantics: under
+   `set -e` the assignment aborts, and an agent applying this skill's own "an unsuccessful load is
+   missing evidence" rule would stop before examining JSON it already has — refusing to name the
+   very gate it was asked to report (icn#2656 review). The `if`/`elif [ $? -eq 8 ]`/`else` shape
+   consumes the JSON on 0 **and** on 8, and treats every other status as a genuine load failure.
+   Verified under `set -euo pipefail`: 0 and 8 both preserve the payload, 1 and 4 both yield
+   `UNAVAILABLE`, and the script survives. Not `|| true`, which would turn an auth error into
+   "no checks"; the point is to classify the status, not to discard it.
+
+   Observed on gh 2.97.0, `--json` returns 0 even with checks pending — the documented 8 appears
+   in the human-readable status mode. This shape is correct either way, which is why it does not
+   depend on which behaviour a given `gh` build has.
 
    `if`/`else`, not `[ ... ] && echo`. A trailing `&&` list makes the **healthy** path the failing
    one: with `LIVE` holding real JSON the test is false, the whole block exits `1`, and an agent
@@ -305,7 +325,13 @@ its job there.
    gh api graphql -f query='query($o:String!,$r:String!,$b:String!,$n:Int!){repository(owner:$o,name:$r){
      mergeQueue(branch:$b){id} pullRequest(number:$n){isInMergeQueue autoMergeRequest{enabledAt}}}}' \
      -f o=InterCooperative-Network -f r=icn -f b="${BASE}" -F n=<N>
-   CHECKS=$(gh pr checks <N> --json name,state,bucket)
+   if CHECKS=$(gh pr checks <N> --json name,state,bucket); then
+     :                     # 0 — every check has reached a terminal state
+   elif [ $? -eq 8 ]; then
+     :                     # 8 — documented "checks pending"; the JSON is complete and valid
+   else
+     CHECKS=UNAVAILABLE    # anything else is a genuine load failure
+   fi
    REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
                           --argjson live "${LIVE}" '
      ($policy + $live | unique) as $required

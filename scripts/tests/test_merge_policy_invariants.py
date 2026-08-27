@@ -348,8 +348,34 @@ def fenced_lines(markdown: str) -> list[str]:
     return out
 
 
+# Recognising more list markers is a secondary tidy-up, NOT the fix for the class below: chasing
+# Markdown spellings (`-`, `1.`, `1)`, `*`, `+`, nested, prose-prefixed) is an unbounded game.
+LIST_MARKER_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
+
+# THE PRIVILEGED-COMMAND SCAN IS CONTENT-BASED, not marker-based (review of 03246425). Whether a
+# span is an executable privileged merge is a property of what it SAYS, so the scan looks at the
+# inline-code content anywhere in the document — after a dash, a number, an asterisk, ordinary
+# prose, or no wrapper at all — and asks only whether the span is shaped like `gh pr merge … --admin`.
+# That is one predicate over content rather than a growing list of Markdown syntaxes, and it is
+# deliberately NOT a Markdown parser.
+#
+# Narrow on purpose: the span must BE the command. A prose mention of the bare flag (`--admin`), or
+# of a related identifier (`enforce_admins`), is not a command and must not count — which is what
+# keeps `watch-ci-and-advance` and `repair-gh-workflow` correctly unclassified while they discuss
+# the flag without presenting an executable merge.
+PRIVILEGED_MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b[^`\n]*--admin\b")
+
+
+def performs_privileged_merge(markdown: str) -> bool:
+    """True if the skill presents an EXECUTABLE privileged merge, in a fence or any inline span."""
+    if any(PRIVILEGED_MERGE_RE.search(line) for line in fenced_lines(markdown)):
+        return True
+    return any(PRIVILEGED_MERGE_RE.search(m.group(1))
+               for m in re.finditer(r"`([^`\n]+)`", markdown))
+
+
 def extract_commands(markdown: str) -> list[str]:
-    """Fenced-block lines, plus inline command BULLETS. Prose about a command is not a command:
+    """Fenced-block lines, plus inline command LIST ITEMS. Prose about a command is not a command:
     an earlier revision flagged the sentence explaining why a bare `gh pr view` is wrong."""
     out = fenced_lines(markdown)
     in_fence = False
@@ -357,7 +383,7 @@ def extract_commands(markdown: str) -> list[str]:
         if line.lstrip().startswith("```"):
             in_fence = not in_fence
             continue
-        if in_fence or not line.lstrip().startswith("- "):
+        if in_fence or not LIST_MARKER_RE.match(line):
             continue
         for m in re.finditer(r"`([^`]+)`", line):
             tok = m.group(1).strip()
@@ -540,8 +566,23 @@ for name, canonical, mirrors in skill_paths:
     # path exit 0 — exactly inverted, so a ready merge looked like a failed command. The guard
     # must be a conditional whose non-sentinel branch succeeds.
     check(f"{name}: the sentinel guard is a conditional, not a trailing && list",
-          'if [ "${LIVE}" = "UNAVAILABLE" ]; then' in body
+          bool(re.search(r'if \[ "\$\{LIVE\}" = "UNAVAILABLE" \][^\n]*; then', body))
           and '[ "${LIVE}" = "UNAVAILABLE" ] &&' not in body)
+    # Both evidence sentinels must gate the table, not just the protection one.
+    check(f"{name}: an unavailable CHECKS load also stops before the table is built",
+          '[ "${CHECKS}" = "UNAVAILABLE" ]' in body)
+    # `gh pr checks` signals pending via exit status; pending is not a failed load.
+    check(f"{name}: the check load accepts the documented pending status",
+          "elif [ $? -eq 8 ]; then" in body)
+    # Against COMMANDS, not the body: the step's own prose explains why `|| true` is wrong, so a
+    # body-level substring check fails on the document that forbids it. Fifth instance of this.
+    check(f"{name}: no command fails open with `|| true`",
+          not any("|| true" in c for c in commands))
+    # Both loads must have IDENTICAL exit semantics; two copies that can drift are two policies.
+    loads = re.findall(r"if CHECKS=\$\(gh pr checks.*?\n   fi", body, re.S)
+    check(f"{name}: both check loads exist: {len(loads)}", len(loads) == 2)
+    check(f"{name}: and are identical, so their exit semantics cannot drift",
+          len({" ".join(l.split()) for l in loads}) == 1)
     # Base revalidation: --match-head-commit pins the head and nothing pins the base.
     check(f"{name}: revalidates head AND base immediately before merging",
           "headRefOid,baseRefName" in cmd_text
@@ -633,13 +674,7 @@ for entry in registry.get("skills", {}).get("icn_level", []):
     if not cp.exists():
         continue
     sbody = cp.read_text(encoding="utf-8")
-    # Review of e7a1b719: this scanned only FENCED lines while `extract_commands()` also treats
-    # inline command bullets (`- Run `gh pr merge <N> --admin``) as executable — a style used
-    # throughout these skills — so the whole-registry claim was unenforced for it. Use the same
-    # extractor, so "is this executable?" has ONE answer in this file. Prose and advice tables
-    # (repair-gh-workflow, watch-ci-and-advance) still do not match: their backticked tokens are
-    # `--admin` and `enforce_admins`, neither of which starts a command.
-    if any(ADMIN_FLAG_RE.search(c) for c in extract_commands(sbody)):
+    if performs_privileged_merge(sbody):
         privileged.add(entry["name"])
 
 check(f"merge-pr cannot perform a privileged merge: privileged={sorted(privileged)}",
@@ -657,6 +692,40 @@ check("admin_bypass.agent_execution names merge-pr as the skill that does not",
 _overclaim = "No agent skill performs, evaluates or routes to this bypass."
 check("CONTROL: the unnarrowed agent_execution claim WOULD be caught",
       not all(n in _overclaim for n in sorted(privileged)))
+# CONTROLS: the predicate is marker-INDEPENDENT — same command, every wrapper, all detected.
+_CMD = "gh pr merge <N> --admin"
+for _label, _probe in (
+    ("fenced",          "```bash\n" + _CMD + "\n```\n"),
+    ("dash bullet",     "- Run `" + _CMD + "` now.\n"),
+    ("numbered list",   "1. Run `" + _CMD + "` now.\n"),
+    ("paren list",      "1) Run `" + _CMD + "` now.\n"),
+    ("asterisk list",   "* Run `" + _CMD + "` now.\n"),
+    ("nested list",     "  - sub: run `" + _CMD + "` now.\n"),
+    ("bare prose",      "When stalled, run `" + _CMD + "` to land it.\n"),
+    ("table cell",      "| stalled | `" + _CMD + "` |\n"),
+):
+    check(f"CONTROL: a privileged merge in a {_label} is detected",
+          performs_privileged_merge(_probe))
+# ...and prose ABOUT the flag is not a command, which is what keeps the advice skills unflagged.
+for _label, _probe in (
+    ("bare flag mention", "Use `--admin` only for a queue-stalled runner.\n"),
+    ("related identifier", "Check `enforce_admins` before assuming `--admin` works.\n"),
+    ("advice table row",  "| `pending / 0s` > 30 min | local verify + `--admin` is valid |\n"),
+    ("ordinary merge",    "- Run `gh pr merge <N> --squash` when green.\n"),
+):
+    check(f"CONTROL: {_label} is NOT a privileged merge",
+          not performs_privileged_merge(_probe))
+
+# CONTROLS: every Markdown list form must be recognised as executable, not just `- `.
+for _marker, _probe in (("dash", "- Run `gh pr merge <N> --admin` now.\n"),
+                        ("numbered", "1. Run `gh pr merge <N> --admin` now.\n"),
+                        ("paren", "1) Run `gh pr merge <N> --admin` now.\n"),
+                        ("asterisk", "* Run `gh pr merge <N> --admin` now.\n"),
+                        ("plus", "+ Run `gh pr merge <N> --admin` now.\n")):
+    check(f"CONTROL: an inline {_marker} list command is seen as executable",
+          any(ADMIN_FLAG_RE.search(c) for c in extract_commands(_probe)))
+check("CONTROL: ordinary prose naming a command is still NOT executable",
+      not extract_commands("A bare `gh pr view` resolves the current branch, which is wrong.\n"))
 
 # Review of e7a1b719: `agent_execution` was held to this standard and `ready_when.note` was not,
 # so it still claimed to be "the only merge gate an agent skill evaluates" while `merge-prs` and
