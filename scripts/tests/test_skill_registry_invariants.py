@@ -166,6 +166,37 @@ def merge_prs_drops_authorization(root: Path) -> None:
     p.write_text(p.read_text().replace("explicit, per-PR maintainer authorization", "authorization"))
 
 
+def merge_pr_regrows_a_raw_merge_path(root: Path) -> None:
+    """icn#2651 stage B: the thin wrapper must not carry a merge it can execute by itself."""
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    p.write_text(p.read_text() + "\nIf the executable is unavailable, run `gh pr merge $PR`.\n")
+
+
+def merge_pr_regrows_a_privileged_path(root: Path) -> None:
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    p.write_text(p.read_text() + "\nIf protection blocks the merge, retry with --admin.\n")
+
+
+def merge_pr_regrows_a_deferred_merge(root: Path) -> None:
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    p.write_text(p.read_text() + "\nIf a required check is still running, arm it with --auto.\n")
+
+
+def merge_pr_bakes_a_protection_path(root: Path) -> None:
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    p.write_text(p.read_text()
+                 + "\nRead contexts from repos/o/n/branches/main/protection before merging.\n")
+
+
+def merge_pr_drops_the_executable(root: Path) -> None:
+    """A wrapper that no longer names the program it wraps has become an owner again."""
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    text = p.read_text().replace("icn-merge-pr", "the merge helper")
+    p.write_text(text)
+    mirror = root / ".claude" / "skills" / "merge-pr" / "SKILL.md"
+    mirror.write_text(text)
+
+
 def canonical_declares_state_canonical(root: Path) -> None:
     p = root / ".agents" / "skills" / "icn-dev" / "SKILL.md"
     p.write_text(p.read_text() + "\n- Current state: `docs/STATE.md` (canonical)\n")
@@ -314,6 +345,16 @@ def main() -> int:
                 merge_prs_hardcodes_check_list, "literal required-check name")
     expect_fail("merge-prs dropping the merge-authorization boundary is rejected",
                 merge_prs_drops_authorization, "explicit, per-PR maintainer authorization")
+    expect_fail("merge-pr regrowing a raw merge command is rejected",
+                merge_pr_regrows_a_raw_merge_path, "gh")
+    expect_fail("merge-pr regrowing a privileged merge path is rejected",
+                merge_pr_regrows_a_privileged_path, "privileged path")
+    expect_fail("merge-pr regrowing a deferred/armed merge is rejected",
+                merge_pr_regrows_a_deferred_merge, "never arms")
+    expect_fail("merge-pr baking a branch-protection path is rejected",
+                merge_pr_bakes_a_protection_path, "baked path")
+    expect_fail("merge-pr no longer naming the trusted executable is rejected",
+                merge_pr_drops_the_executable, "icn-merge-pr")
     expect_fail("a skill declaring STATE.md canonical is rejected",
                 canonical_declares_state_canonical, "state-phase-canonicality")
     expect_fail("provider-only skill without a rationale is rejected",
