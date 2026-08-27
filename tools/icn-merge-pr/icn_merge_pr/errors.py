@@ -31,6 +31,16 @@ class EvidenceUnavailable(MergeToolError):
     outcome = codes.REFUSED_UNAVAILABLE_EVIDENCE
 
 
+class TransportIndeterminate(EvidenceUnavailable):
+    """The request may or may not have reached GitHub. Nobody knows what happened.
+
+    Distinct from a refusal ON PURPOSE. A timeout, a dropped connection, or an error `gh` reports
+    without an HTTP status means GitHub never answered — so for a MUTATION, a read taken straight
+    afterwards is a point-in-time observation, not proof that the request is finished. For every
+    read-only call this is simply unavailable evidence, which is why it derives from that.
+    """
+
+
 class NotDefaultBase(MergeToolError):
     """The target's base is not the externally resolved default branch.
 
@@ -69,3 +79,14 @@ class ForbiddenOption(MergeToolError):
 
 class NotInstalled(MergeToolError):
     outcome = codes.REFUSED_NOT_INSTALLED
+
+
+class UntrustedTarget(MergeToolError):
+    """Mutating a repository other than the one the install was proved against.
+
+    Installation proves one repository's default-branch tip. It does not bless the binary to act
+    on any repository someone names afterwards: an installer pointed at a fork would otherwise
+    produce an executable that could merge into the original.
+    """
+
+    outcome = codes.REFUSED_UNTRUSTED_TARGET

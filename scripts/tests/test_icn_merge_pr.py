@@ -27,7 +27,8 @@ sys.path.insert(0, str(ROOT / "tools" / "icn-merge-pr"))
 
 from icn_merge_pr import cli, codes                                          # noqa: E402
 from icn_merge_pr.errors import (EvidenceUnavailable, GitHubRefused,         # noqa: E402
-                                 MergeToolError, StrategyInvalid)
+                                 MergeToolError, StrategyInvalid,
+                                 TransportIndeterminate)
 from icn_merge_pr.policy import POLICY_PATH                                  # noqa: E402
 from icn_merge_pr.run import run                                             # noqa: E402
 from icn_merge_pr.strategy import api_merge_method                           # noqa: E402
@@ -69,8 +70,8 @@ def world(**overrides) -> dict:
             "baseRefName": "main", "baseRefOid": BASE, "mergeable": "MERGEABLE",
             "mergeStateStatus": "CLEAN", "reviewDecision": None, "isInMergeQueue": False,
             "mergeQueueEntry": None, "autoMergeRequest": None,
-            "latestOpinionatedReviews": {"nodes": []},
         },
+        "review_pages": [[]],
         "thread_pages": [[{"isResolved": True}, {"isResolved": True}]],
         "check_pages": [[{"__typename": "CheckRun", "name": name, "status": "COMPLETED",
                           "conclusion": "SUCCESS",
@@ -127,6 +128,9 @@ class FakeGitHub:
                              "endCursor": str(index + 1) if has_next else None},
                 "nodes": pages[index], **(extra or {})}
 
+    def opinionated_reviews_page(self, owner, name, number, after):
+        return self._page(self.w["review_pages"], after)
+
     def review_threads_page(self, owner, name, number, after):
         return self._page(self.w["thread_pages"], after)
 
@@ -145,6 +149,8 @@ class FakeGitHub:
 
     def merge_pull_request(self, owner, name, number, *, sha, merge_method):
         self.merge_calls.append({"number": number, "sha": sha, "merge_method": merge_method})
+        if self.w.get("merge_transport_lost"):
+            raise TransportIndeterminate(self.w["merge_transport_lost"])
         if self.w.get("merge_refused"):
             raise GitHubRefused(self.w["merge_refused"])
         return self.w.get("merge_response", {"merged": True, "sha": MERGE_COMMIT})
@@ -243,8 +249,29 @@ expect("reviewDecision CHANGES_REQUESTED", mutate(reviewDecision="CHANGES_REQUES
 expect("REVIEW_REQUIRED is not in the allowlist", mutate(reviewDecision="REVIEW_REQUIRED"),
        codes.REFUSED_REVIEW)
 expect("a reviewer's latest opinionated review requests changes",
-       mutate(latestOpinionatedReviews={"nodes": [{"state": "CHANGES_REQUESTED"}]}),
+       world(review_pages=[[{"state": "CHANGES_REQUESTED"}]]), codes.REFUSED_REVIEW)
+expect("an objection ONLY on a later page of opinionated reviews",
+       world(review_pages=[[{"state": "APPROVED"}] * 100, [{"state": "CHANGES_REQUESTED"}]]),
        codes.REFUSED_REVIEW)
+
+
+class ShortReviewCount(FakeGitHub):
+    """GitHub reports more opinionated reviews than it hands back."""
+
+    def opinionated_reviews_page(self, owner, name, number, after):
+        page = super().opinionated_reviews_page(owner, name, number, after)
+        page["totalCount"] += 3
+        return page
+
+
+short_reviews = ShortReviewCount(world())
+short_reviews_result = run(short_reviews, "example", "icn", 1, authorize=False)
+check("a review count larger than the reviews actually readable -> "
+      "REFUSED_UNAVAILABLE_EVIDENCE",
+      short_reviews_result.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE,
+      f"got {short_reviews_result.outcome}")
+check("the refusal says the unread reviews cannot be shown not to object",
+      any("cannot be shown not to object" in r.detail for r in short_reviews_result.reasons))
 needs_approval = world()
 needs_approval["protection"]["required_approving_review_count"] = 1
 expect("live protection requires an approval that has not been given", needs_approval,
@@ -639,6 +666,21 @@ check("an unreadable outcome is reported as UNKNOWN, never as a refusal",
 
 _, result = merge_world(world(post_merge_error="network down"))
 check("an ACCEPTED request that cannot be read back -> MERGE_UNCONFIRMED",
+      result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
+
+# A lost answer is not a refusal, and a read taken straight afterwards cannot make it one.
+lost_answer = world(merge_transport_lost="context deadline exceeded",
+                    post_merge={"state": "OPEN", "merged": False, "merge_commit_sha": None})
+fake, result = merge_world(lost_answer)
+check("a transport failure with an immediate negative read -> MERGE_UNCONFIRMED, not a refusal",
+      result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
+check("the refusal explains that a point-in-time read cannot prove a dispatched request finished",
+      any("cannot " in r.detail and "finished" in r.detail for r in result.reasons))
+check("a lost answer still issued exactly one request", len(fake.merge_calls) == 1)
+_, result = merge_world(world(merge_transport_lost="connection reset",
+                              post_merge={"state": "MERGED", "merged": True,
+                                          "merge_commit_sha": MERGE_COMMIT}))
+check("a transport failure whose PR now reads MERGED -> MERGE_UNCONFIRMED",
       result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
 
 unconfirmed = world(post_merge={"state": "OPEN", "merged": False, "merge_commit_sha": None})

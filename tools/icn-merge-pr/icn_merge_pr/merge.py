@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import codes
-from .errors import GitHubRefused, MergeToolError
+from .errors import GitHubRefused, MergeToolError, TransportIndeterminate
 from .snapshot import Snapshot
 from .strategy import api_merge_method
 
@@ -49,22 +49,44 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
     try:
         response = client.merge_pull_request(snap.owner, snap.name, snap.number,
                                              sha=snap.head_oid, merge_method=method)
+    except TransportIndeterminate as exc:
+        # GitHub never answered. A read taken now is a point-in-time observation, not proof the
+        # dispatched request is finished — the server may still be processing it — so a negative
+        # read here may NOT be reported as a refusal. The uncertainty is the finding.
+        after = _read_back(client, snap)
+        if after is not None and after.get("merged") is True:
+            return MergeOutcome(
+                codes.MERGE_UNCONFIRMED,
+                f"the merge request got no answer ({exc.detail}) and a fresh read reports PR "
+                f"#{snap.number} MERGED at {after.get('merge_commit_sha')}. This run may or may "
+                f"not have caused that, and it does not claim to have: a human must establish "
+                f"which before anything else acts on it.",
+                after.get("merge_commit_sha"), attempted=True)
+        seen = ("the PR could not be re-read" if after is None
+                else f"a read taken immediately afterwards reports merged={after.get('merged')!r}")
+        return MergeOutcome(
+            codes.MERGE_UNCONFIRMED,
+            f"the merge request got no answer from GitHub ({exc.detail}) and {seen}, which cannot "
+            f"prove a dispatched request is finished. Whether PR #{snap.number} merges is UNKNOWN: "
+            f"a human must establish the state, and nothing may re-issue the merge in the "
+            f"meantime.",
+            None, attempted=True)
     except GitHubRefused as exc:
+        # GitHub ANSWERED, with a status. That is a decision, not a lost message.
         after = _read_back(client, snap)
         if after is None:
             return MergeOutcome(
                 codes.MERGE_UNCONFIRMED,
-                f"the merge request failed ({exc.detail}) and the PR could not be re-read, so "
-                f"whether PR #{snap.number} merged is UNKNOWN. A human must establish the state "
-                f"before anything else acts on it.",
+                f"GitHub refused the merge ({exc.detail}) but the PR could not be re-read, so its "
+                f"state is UNKNOWN. A human must establish it before anything else acts on "
+                f"PR #{snap.number}.",
                 None, attempted=True)
         if after.get("merged") is True:
             return MergeOutcome(
                 codes.MERGE_UNCONFIRMED,
-                f"the merge request failed ({exc.detail}) but a fresh read reports PR "
-                f"#{snap.number} MERGED at {after.get('merge_commit_sha')}. This run may or may "
-                f"not have caused that, and it does not claim to have: a human must establish "
-                f"which before anything else acts on it.",
+                f"GitHub refused the merge ({exc.detail}) but a fresh read reports PR "
+                f"#{snap.number} MERGED at {after.get('merge_commit_sha')}. This run does not "
+                f"claim to have caused that: a human must establish what did.",
                 after.get("merge_commit_sha"), attempted=True)
         # Refusal CONFIRMED by evidence, not merely by the call having failed.
         return MergeOutcome(

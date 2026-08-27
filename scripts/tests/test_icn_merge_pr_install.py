@@ -179,6 +179,30 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("the installed program passes the mutation trust gate",
           "REFUSED_NOT_INSTALLED" not in proc.stdout
           and "REFUSED_UNAVAILABLE_EVIDENCE" in proc.stdout, proc.stdout[:200])
+    proc = subprocess.run([str(binary), "merge", "1", "--authorize", "--repo", "someone/fork"],
+                          capture_output=True, text=True, env=no_gh)
+    check("an installed program refuses to merge a repository it was not installed from",
+          "REFUSED_UNTRUSTED_TARGET" in proc.stdout, proc.stdout[:200])
+    proc = subprocess.run([str(binary), "check", "1", "--repo", "someone/fork"],
+                          capture_output=True, text=True, env=no_gh)
+    check("evaluating another repository is still allowed — it mutates nothing",
+          "REFUSED_UNTRUSTED_TARGET" not in proc.stdout, proc.stdout[:200])
+
+    # An install directory outlives the install, so an edited tree is the realistic tampering.
+    evaluator_installed = lib / "icn_merge_pr" / "evaluate.py"
+    kept = evaluator_installed.read_text(encoding="utf-8")
+    evaluator_installed.write_text(kept + "\n# edited after installation\n", encoding="utf-8")
+    proc = subprocess.run([str(binary), "merge", "1", "--authorize", "--repo", "example/icn"],
+                          capture_output=True, text=True, env=no_gh)
+    check("an installed file edited after installation refuses to mutate",
+          "REFUSED_NOT_INSTALLED" in proc.stdout and "evaluate.py" in proc.stdout,
+          proc.stdout[:220])
+    evaluator_installed.write_text(kept, encoding="utf-8")
+    proc = subprocess.run([str(binary), "merge", "1", "--authorize", "--repo", "example/icn"],
+                          capture_output=True, text=True, env=no_gh)
+    check("restoring the file restores the install",
+          "REFUSED_NOT_INSTALLED" not in proc.stdout, proc.stdout[:200])
+
     source_copy = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "__main__.py"
     proc = subprocess.run([sys.executable, str(source_copy), "merge", "1", "--authorize",
                            "--repo", "example/icn"], capture_output=True, text=True, env=no_gh)

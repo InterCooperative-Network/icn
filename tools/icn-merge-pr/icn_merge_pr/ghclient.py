@@ -12,13 +12,17 @@ query text; callers pass values. No caller ever interpolates a value into a quer
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from urllib.parse import quote
 
-from .errors import EvidenceUnavailable, GitHubRefused
+from .errors import EvidenceUnavailable, GitHubRefused, TransportIndeterminate
 
 _TIMEOUT = 120
+# `gh` renders an HTTP status when GitHub actually answered. Its absence means the
+# request may never have been answered at all, which is a different fact entirely.
+_HTTP_STATUS = re.compile(r"\bHTTP\s+[1-5]\d\d\b")
 
 _REPO_META = """
 query($owner:String!,$name:String!){
@@ -44,7 +48,20 @@ query($owner:String!,$name:String!,$number:Int!){
       isInMergeQueue
       mergeQueueEntry{ position }
       autoMergeRequest{ enabledAt }
-      latestOpinionatedReviews(first:100){ nodes{ state } }
+    }
+  }
+}
+"""
+
+_REVIEWS = """
+query($owner:String!,$name:String!,$number:Int!,$after:String){
+  repository(owner:$owner,name:$name){
+    pullRequest(number:$number){
+      latestOpinionatedReviews(first:100, after:$after){
+        totalCount
+        pageInfo{ hasNextPage endCursor }
+        nodes{ state }
+      }
     }
   }
 }
@@ -136,10 +153,15 @@ class GhCli:
             proc = subprocess.run([self.gh, *argv], capture_output=True, text=True,
                                   timeout=self.timeout, check=False)
         except (OSError, subprocess.SubprocessError) as exc:
-            raise on_failure(f"{self.gh} {' '.join(argv[:2])} failed to run: {exc}") from exc
+            # No answer was ever received. For a mutation that is NOT the same as a refusal.
+            raise TransportIndeterminate(
+                f"{self.gh} {' '.join(argv[:2])} did not complete: {exc}") from exc
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "").strip()[:600]
-            raise on_failure(f"{self.gh} {' '.join(argv[:2])} exited {proc.returncode}: {detail}")
+            summary = f"{self.gh} {' '.join(argv[:2])} exited {proc.returncode}: {detail}"
+            if not _HTTP_STATUS.search(detail):
+                raise TransportIndeterminate(summary)
+            raise on_failure(summary)
         return proc.stdout
 
     def _graphql(self, query: str, variables: dict) -> dict:
@@ -196,6 +218,12 @@ class GhCli:
         repo = self._graphql(_THREADS, {"owner": owner, "name": name, "number": number,
                                         "after": after})
         return _dig(repo, "pullRequest", "reviewThreads")
+
+    def opinionated_reviews_page(self, owner: str, name: str, number: int,
+                                 after: str | None) -> dict:
+        repo = self._graphql(_REVIEWS, {"owner": owner, "name": name, "number": number,
+                                        "after": after})
+        return _dig(repo, "pullRequest", "latestOpinionatedReviews")
 
     def check_contexts_page(self, owner: str, name: str, number: int, after: str | None) -> dict:
         repo = self._graphql(_CHECKS, {"owner": owner, "name": name, "number": number,

@@ -20,7 +20,8 @@ import json
 import sys
 
 from . import codes, provenance
-from .errors import ForbiddenOption, MergeToolError, NotInstalled, UsageError
+from .errors import (ForbiddenOption, MergeToolError, NotInstalled, UntrustedTarget,
+                     UsageError)
 from .ghclient import GhCli
 from .run import Result, run
 
@@ -156,7 +157,7 @@ def _resolve_repository(inv: Invocation) -> tuple[str, str]:
         "repository recorded at install time; this one has no provenance record.)")
 
 
-def _require_trusted_runtime(inv: Invocation) -> None:
+def _require_trusted_runtime(inv: Invocation, owner: str, name: str) -> None:
     """Only an INSTALLED copy may mutate. A source-tree copy evaluates and stops there.
 
     Passing `--repo` explicitly used to route around the provenance record entirely, so a copy
@@ -168,7 +169,23 @@ def _require_trusted_runtime(inv: Invocation) -> None:
     """
     if inv.command != "merge":
         return
-    if provenance.is_installed():
+    try:
+        record = provenance.read()
+    except NotInstalled:
+        if provenance.record_path().is_file():
+            # A record IS there and does not hold up. Telling the operator to install would send
+            # them past the actual problem — an edited tree, or a record about somewhere else.
+            raise
+        record = None
+    if record is not None:
+        target, blessed = f"{owner}/{name}", record.get("repository")
+        if target != blessed:
+            # Installation proves ONE repository's default-branch tip. An installer pointed at a
+            # fork would otherwise mint an executable that could merge into the original.
+            raise UntrustedTarget(
+                f"this icn-merge-pr was installed from {blessed!r} and may only merge there; "
+                f"{target!r} is a different repository. Install from {target!r} if that is the "
+                "one you mean to merge into.")
         return
     raise NotInstalled(
         "refusing to merge from a copy that was never installed. This process is running from a "
@@ -211,8 +228,8 @@ def main(argv: list[str]) -> int:
         return codes.EXIT_OK
 
     try:
-        _require_trusted_runtime(inv)
         owner, name = _resolve_repository(inv)
+        _require_trusted_runtime(inv, owner, name)
     except MergeToolError as exc:
         print(json.dumps({"tool": "icn-merge-pr", "outcome": exc.outcome,
                           "reasons": [{"code": exc.outcome, "detail": exc.detail}]}, indent=2))

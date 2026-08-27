@@ -7,6 +7,7 @@ been proved to be the live default-branch tip, so its presence is the marker of 
 
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 
@@ -82,7 +83,34 @@ def read() -> dict:
         raise NotInstalled(
             f"provenance record at {path} was written for {recorded!r}, not for {root}; a record "
             "copied beside a different copy of the code proves nothing about that copy.")
+    _verify_files(root, record)
     return record
+
+
+def _verify_files(root: pathlib.Path, record: dict) -> None:
+    """Every file the record names must be present and byte-for-byte what it names.
+
+    This is an INTEGRITY check, not an authentication one, and the difference is worth stating: it
+    catches an installed tree that has been edited or partially replaced since it was installed —
+    the realistic tampering, because an install directory outlives the install. It does not, and
+    cannot, make a wholly fabricated record detectable; a local file is not evidence about itself
+    without a signature or an out-of-band root, and pretending otherwise would be the more
+    dangerous mistake.
+    """
+    files = record.get("files")
+    if not isinstance(files, dict) or not files:
+        raise NotInstalled("provenance record names no installed files")
+    for relative, digest in sorted(files.items()):
+        if not isinstance(relative, str) or not isinstance(digest, str):
+            raise NotInstalled("provenance record has a malformed file entry")
+        target = root / relative
+        try:
+            if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+                raise NotInstalled(
+                    f"installed file {relative} is missing or is not what the provenance record "
+                    "describes; reinstall rather than trusting an edited tree")
+        except OSError as exc:
+            raise NotInstalled(f"installed file {relative} is unreadable: {exc}") from exc
 
 
 def default_repository() -> tuple[str, str] | None:

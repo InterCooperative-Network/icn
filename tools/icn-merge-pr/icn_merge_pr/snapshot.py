@@ -178,6 +178,42 @@ def _collect_threads(client, owner, name, number) -> tuple[int, int]:
             raise EvidenceUnavailable("review thread pagination did not terminate")
 
 
+def _collect_reviews(client, owner, name, number) -> tuple[str, ...]:
+    """Every reviewer's latest opinionated review, across EVERY page.
+
+    Same shape of fail-open as the review threads, and the same answer. `reviewDecision` alone is
+    not enough here — policy explicitly admits a null decision, which is what this repository
+    reports with no required approvals — so an unread CHANGES_REQUESTED sitting on page two would
+    be an objection the gate never saw.
+    """
+    cursor, total, pages = None, None, 0
+    states: list[str] = []
+    while True:
+        page = client.opinionated_reviews_page(owner, name, number, cursor)
+        if total is None:
+            total = page.get("totalCount")
+            if type(total) is not int:
+                raise EvidenceUnavailable("opinionated review totalCount is unreadable")
+        nodes = page.get("nodes")
+        if not isinstance(nodes, list):
+            raise EvidenceUnavailable("opinionated review page had no nodes")
+        for node in nodes:
+            if not isinstance(node, dict) or not isinstance(node.get("state"), str):
+                raise EvidenceUnavailable("a review did not report a state")
+            states.append(node["state"])
+        info = page.get("pageInfo") or {}
+        pages += 1
+        if not info.get("hasNextPage"):
+            if len(states) != total:
+                raise EvidenceUnavailable(
+                    f"GitHub reports {total} opinionated review(s) but only {len(states)} could "
+                    "be read; the unread ones cannot be shown not to object")
+            return tuple(states)
+        cursor = info.get("endCursor")
+        if not cursor or pages >= _MAX_PAGES:
+            raise EvidenceUnavailable("opinionated review pagination did not terminate")
+
+
 def _collect_checks(client, owner, name, number,
                     head_oid) -> dict[str, tuple[CheckOccurrence, ...]]:
     """name -> every outcome reported for it, across EVERY page of the rollup.
@@ -260,9 +296,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     review_decision = pr.get("reviewDecision")
     if review_decision is not None:
         _enum(review_decision, REVIEW_DECISIONS, "reviewDecision")
-    reviews = (pr.get("latestOpinionatedReviews") or {}).get("nodes") or []
-    review_states = tuple(r.get("state") for r in reviews
-                          if isinstance(r, dict) and isinstance(r.get("state"), str))
+    review_states = _collect_reviews(client, owner, name, number)
 
     total_threads, unresolved = _collect_threads(client, owner, name, number)
     checks = _collect_checks(client, owner, name, number, head_oid)
