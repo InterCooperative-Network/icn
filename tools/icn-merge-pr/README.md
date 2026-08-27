@@ -118,7 +118,16 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    policy and live branch protection.
 8. Before mutating, run the **same** loader again, refuse if any pinned identity moved, and
    re-evaluate every gate.
-9. Merge once, with the expected head SHA pinned in the request. Success is a fresh read
+9. Merge once, with the expected head SHA pinned in the request.
+
+   **Accepted platform limitation.** GitHub conditions an ordinary pull-request merge on the
+   expected *head* SHA and offers no expected-*base* precondition — `MergePullRequestInput` has
+   `expectedHeadOid` and nothing else, and the REST endpoint conditions on `sha` alone.
+   Retargeting a PR does not change its head, so a concurrent retarget in the final network
+   interval cannot be excluded by any client. The base is verified as late as the platform allows
+   and the one identity GitHub will enforce is pinned; the residual race is documented rather than
+   claimed to be solved, because closing it would mean abandoning ordinary pull-request merge.
+ Success is a fresh read
    reporting `merged == true`, not what the merge call returned. A refusal is reported only when a
    fresh read confirms the PR is not merged; once a request has been dispatched, an outcome that
    cannot be established is `MERGE_UNCONFIRMED` — never "it did not merge".

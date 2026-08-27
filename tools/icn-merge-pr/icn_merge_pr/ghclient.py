@@ -524,8 +524,14 @@ class GhCli:
         repo = self._graphql(_PR_MERGE_STATE, {"owner": owner, "name": name, "number": number})
         pr = _dig(repo, "pullRequest")
         commit = pr.get("mergeCommit") or {}
+        merged = pr.get("merged")
+        if type(merged) is not bool:
+            # The single fact the whole post-read exists to establish. Missing or oddly typed, it
+            # is unreadable evidence — and must never reach a caller that would read it as False.
+            raise EvidenceUnavailable(
+                f"GitHub did not report a readable merged flag for #{number} ({merged!r})")
         return {
             "state": pr.get("state"),
-            "merged": pr.get("merged"),
+            "merged": merged,
             "merge_commit_sha": commit.get("oid") if isinstance(commit, dict) else None,
         }

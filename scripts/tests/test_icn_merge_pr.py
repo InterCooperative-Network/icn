@@ -1040,6 +1040,44 @@ check("a valid merge-response sha is accepted when the post-read omits one",
       fallback.outcome == codes.MERGED
       and fallback.merge["merge_commit_sha"] == MERGE_COMMIT, f"{fallback.merge}")
 
+print("a refusal is confirmed only by an exact merged=false")
+for label, value in (("null", None), ("missing", "__omit__"), ("the string 'false'", "false"),
+                     ("0", 0), ("a list", []), ("an object", {})):
+    post = {"state": "OPEN", "merge_commit_sha": None}
+    if value != "__omit__":
+        post["merged"] = value
+    fake, r = merge_world(world(merge_refused="405 Method Not Allowed (HTTP 405)",
+                                post_merge=post))
+    check(f"a 4xx refusal with a merged flag that is {label} -> MERGE_UNCONFIRMED",
+          r.outcome == codes.MERGE_UNCONFIRMED, f"got {r.outcome}")
+    check(f"malformed merged evidence ({label}) is never read as false",
+          not any("confirms PR" in x.detail for x in r.reasons))
+    check(f"still exactly one mutation with a {label} merged flag", len(fake.merge_calls) == 1)
+_, exact_false = merge_world(world(merge_refused="405 Method Not Allowed (HTTP 405)",
+                                   post_merge={"state": "OPEN", "merged": False,
+                                               "merge_commit_sha": None}))
+check("an exact merged=false supports a confirmed REFUSED_GITHUB",
+      exact_false.outcome == codes.REFUSED_GITHUB, f"got {exact_false.outcome}")
+_, exact_true = merge_world(world(merge_refused="405 Method Not Allowed (HTTP 405)",
+                                  post_merge={"state": "MERGED", "merged": True,
+                                              "merge_commit_sha": MERGE_COMMIT}))
+check("an exact merged=true keeps the attribution-safe unconfirmed path",
+      exact_true.outcome == codes.MERGE_UNCONFIRMED, f"got {exact_true.outcome}")
+
+# The residual base-retarget race is a PLATFORM limitation, accepted and documented. These pin the
+# claim so a later change cannot quietly start asserting the base is atomically bound.
+merge_doc = (ROOT / "tools" / "icn-merge-pr" / "icn_merge_pr" / "merge.py").read_text(
+    encoding="utf-8")
+check("the mutation documents that GitHub exposes no expected-base precondition",
+      "expected-BASE precondition" in merge_doc and "expectedHeadOid" in merge_doc)
+flat_doc = " ".join(merge_doc.split())          # the claim is wrapped across lines
+check("the mutation does not claim the verified base is the base GitHub merges into",
+      "does NOT guarantee that the base it verified is the base GitHub merges into" in flat_doc)
+fake, merged_ok = merge_world(world())
+check("the merge request pins the head and names no base precondition",
+      fake.merge_calls == [{"number": 1, "sha": HEAD, "merge_method": "squash"}],
+      f"{fake.merge_calls}")
+
 null_merged = world(post_merge={"state": "OPEN", "merged": None, "merge_commit_sha": None})
 _, result = merge_world(null_merged)
 check("a post-read that reports nothing about merging is not success",

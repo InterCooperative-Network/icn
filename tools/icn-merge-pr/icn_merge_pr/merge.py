@@ -7,6 +7,20 @@ WHAT MAKES IT SAFE
   privileged second attempt. That path does not exist in this file to be reached.
 - Success is not what the merge call returned. It is what a fresh read of the PR says afterwards.
 
+WHAT THIS CANNOT DO — AN ACCEPTED PLATFORM LIMITATION
+The evaluator re-reads and re-checks the target base immediately before mutating, and GitHub
+atomically conditions an ordinary pull-request merge on the EXPECTED HEAD SHA. It exposes no
+expected-BASE precondition: `MergePullRequestInput` offers `expectedHeadOid` and nothing else, and
+the REST endpoint conditions on `sha` alone. Retargeting a pull request does not change its head,
+so a concurrent or malicious retarget inside the final network interval cannot be excluded by any
+client — the refreshed base check narrows that window but does not close it.
+
+This is stated because the alternative would be to overclaim. This program does NOT guarantee that
+the base it verified is the base GitHub merges into; it guarantees that it verified the base as
+late as the platform allows and pinned the one identity the platform will enforce. Eliminating the
+residual race would require abandoning ordinary pull-request merge, which is the thing this
+primitive is for.
+
 WHAT MAKES IT HONEST
 Once a request has been dispatched, "it failed" is no longer a free thing to say. A transport
 that dies after the PUT leaves the world in a state this process cannot see, and reporting
@@ -101,6 +115,17 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
                 f"#{snap.number} MERGED at {after.get('merge_commit_sha')}. This run does not "
                 f"claim to have caused that: a human must establish what did.",
                 after.get("merge_commit_sha"), attempted=True)
+        if after.get("merged") is not False:
+            # Malformed is not False. Falling through here would let unreadable evidence produce
+            # REFUSED_GITHUB, whose detail asserts the PR is confirmed not merged — a final claim
+            # about a state nobody established.
+            return MergeOutcome(
+                codes.MERGE_UNCONFIRMED,
+                f"GitHub refused the merge ({exc.detail}) and a fresh read did not report a "
+                f"readable merged flag ({after.get('merged')!r}), so whether PR #{snap.number} is "
+                f"merged is UNKNOWN. This is not a confirmed refusal: a human must establish the "
+                f"state before anything else acts on it.",
+                None, attempted=True)
         # Refusal CONFIRMED by evidence, not merely by the call having failed.
         return MergeOutcome(
             codes.REFUSED_GITHUB,
