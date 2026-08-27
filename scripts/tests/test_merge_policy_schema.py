@@ -125,8 +125,6 @@ must_fail("is_draft = 0 (int is not a bool)",
           lambda d: d["merge"]["ready_when"].update(is_draft=0))
 must_fail("not_deferred.is_in_merge_queue = 0 (int is not a bool)",
           lambda d: d["merge"]["ready_when"]["not_deferred"].update(is_in_merge_queue=0))
-must_fail("admin_bypass.agent_execution = 0 (int is not a bool)",
-          lambda d: d["merge"]["admin_bypass"].update(agent_execution=0))
 must_fail("default_strategy = true (bool is not a string)",
           lambda d: d["merge"].update(default_strategy=True))
 
@@ -195,20 +193,32 @@ must_pass("the exact accepted ADR path is accepted",
 print("ADR-0016 is the sole owner of admin-bypass eligibility")
 must_fail("a structured `requires` eligibility replica returning",
           lambda d: d["merge"]["admin_bypass"].update(requires={"mergeable": "MERGEABLE"}),
-          expect="restates eligibility")
+          expect="non-schema fields")
 must_fail("the prose `condition` returning",
           lambda d: d["merge"]["admin_bypass"].update(
               condition="green AND mergeStateStatus=MERGEABLE but stalled"))
-must_fail("a partial replica under another name",
-          lambda d: d["merge"]["admin_bypass"].update(prerequisites={"x": 1}))
-must_fail("individual eligibility fields hoisted onto the bypass object",
-          lambda d: d["merge"]["admin_bypass"].update(stalled_required_check={"m": 30}))
-must_fail("bypass claiming to be an agent execution route",
-          lambda d: d["merge"]["admin_bypass"].update(agent_execution=True))
+# CLOSED OBJECT, not a denylist. The previous repair enumerated forbidden spellings; every alias
+# below passed it. These now fail because they are simply not schema fields.
+for _alias in ("requirements", "eligibility_rules", "admit_when", "gate", "preconditions",
+               "prerequisites", "criteria", "conditions", "eligibility",
+               "stalled_required_check", "mergeable", "merge_state_status_in",
+               "required_check_conclusion_allowlist", "is_draft",
+               "totally_unrelated_operative_key", "x"):
+    must_fail(f"eligibility reintroduced as admin_bypass.{_alias}",
+              lambda d, a=_alias: d["merge"]["admin_bypass"].update({a: {"mergeable": "MERGEABLE"}}),
+              expect="non-schema fields")
+must_fail("agent_execution reintroduced (a claim this policy cannot guarantee)",
+          lambda d: d["merge"]["admin_bypass"].update(agent_execution=False))
+must_pass("a documentary *note extension is still accepted",
+          lambda d: d["merge"]["admin_bypass"].update(sequencing_note="stage B supersedes this"))
+must_fail("a near-miss key that does not end in `note`",
+          lambda d: d["merge"]["admin_bypass"].update(sequencing_notes="x"))
 must_fail("bypass decision not human",
           lambda d: d["merge"]["admin_bypass"].update(decision="agent"))
 must_fail("authoritative_source pointing at a file that does not exist",
           lambda d: d["merge"]["admin_bypass"].update(authoritative_source="docs/adr/NOPE.md"))
+must_fail("agent_execution present at all (removed: unguaranteeable by a data file)",
+          lambda d: d["merge"]["admin_bypass"].update(agent_execution=True))
 must_fail("authoritative_source removed",
           lambda d: d["merge"]["admin_bypass"].pop("authoritative_source"))
 must_fail("the fail-closed statement removed",

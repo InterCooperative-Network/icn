@@ -32,7 +32,13 @@ TWO AUTHORITY RULES THIS FILE ENFORCES
    document under validation. A consumer interpolating `default_strategy` would let a policy saying
    `admin` reconstruct `gh pr merge --admin`, and for a stacked PR the base supplying that file can
    be contributor-controlled. A closed set owned by code cannot be widened by data.
-2. POLICY DATA MAY NOT SPELL COMMANDS. No operative field may hold a command- or flag-shaped
+2. NO FIELD IS THE TRUST ROOT. Nothing in this document establishes its own authority: an
+   earlier revision had a consumer compare a PR's base against `branch.primary`, a field inside the
+   very document whose authority was being decided. A consumer's trusted default-branch identity
+   must come from outside the evaluated repository state (GitHub `repository.defaultBranchRef`).
+   This validator therefore does NOT hardcode a default branch and does not treat any policy field
+   as a trust root.
+3. POLICY DATA MAY NOT SPELL COMMANDS. No operative field may hold a command- or flag-shaped
    string. `gh_flags: ["--auto"]` was arbitrary CLI authority as data: `["--admin"]` and
    `["--disable-auto"]` validated clean. Intent is declared symbolically; only code maps it to
    flags.
@@ -71,6 +77,9 @@ READY_MERGE_STATES = {"CLEAN", "UNSTABLE"}
 # certified any readable file, including an absolute path such as /etc/passwd or a different ADR,
 # so a contributor could substitute another eligibility contract and still pass the gate.
 ADMIN_BYPASS_ADR = "docs/adr/ADR-0016-admin-merge-exception-policy.md"
+# `admin_bypass` is a CLOSED object: exactly these structural fields, plus documentary `*note`
+# keys. Not a denylist of eligibility synonyms — a denylist admits every alias nobody enumerated.
+ADMIN_BYPASS_FIELDS = {"allowed", "decision", "authoritative_source", "never_for", "fail_closed"}
 # A value that looks like a shell command or a CLI flag has no business in policy data.
 COMMAND_SHAPED = re.compile(r"(^|\s)(gh|git|jq|eval|bash|sh)\s|(^|\s)--[a-z]")
 
@@ -247,10 +256,6 @@ def validate(policy) -> list[str]:
         dok, decision = field(bypass, "decision", as_str, "admin_bypass.decision")
         if dok:
             req(decision == "human", "admin_bypass.decision must be 'human'")
-        eok, agent_exec = field(bypass, "agent_execution", as_exact_bool,
-                                "admin_bypass.agent_execution")
-        if eok:
-            req(agent_exec is False, "admin_bypass.agent_execution must be false")
         sok, src = field(bypass, "authoritative_source", as_str, "admin_bypass.authoritative_source")
         if sok:
             # Exact, repo-relative, and inside ROOT. An existence check alone accepted any readable
@@ -266,19 +271,20 @@ def validate(policy) -> list[str]:
                 f"admin_bypass.authoritative_source does not exist: {src}")
         for key in ("never_for", "eligibility_note", "fail_closed", "consumer_note"):
             field(bypass, key, as_str, f"admin_bypass.{key}")
-        # A PARTIAL ELIGIBILITY REPLICA MUST NOT REAPPEAR. ADR-0016 requires five conditions; a
-        # structured `requires` here encoded only two, so a maintainer following it could believe a
-        # merge was permitted while the ADR said wait. The fix is ONE OWNER — not a fuller copy,
-        # which would rot the moment the ADR changed (icn#2658 review).
-        REPLICA_KEYS = {"condition", "conditions", "requires", "prerequisites", "criteria",
-                        "eligibility", "stalled_required_check", "merge_state_status_in",
-                        "mergeable", "required_check_conclusion_allowlist",
-                        "required_check_pending_allowlist", "review_decision_allowlist",
-                        "unresolved_review_threads", "is_draft"}
-        replicas = sorted(k for k in bypass if isinstance(k, str) and k in REPLICA_KEYS)
-        req(not replicas,
-            f"admin_bypass restates eligibility that ADR-0016 owns: {replicas} — this object is "
-            "non-authoritative; consult authoritative_source instead of duplicating it")
+        # A CLOSED OBJECT, not a denylist of eligibility synonyms. ADR-0016 requires five
+        # conditions; a structured `requires` here encoded only two, so a maintainer following it
+        # could believe a merge was permitted while the ADR said wait. The first repair enumerated
+        # forbidden spellings — which is a denylist, and `requirements`, `eligibility_rules`,
+        # `admit_when`, `gate` and `preconditions` all passed it (icn#2658 review). Only the known
+        # fields are permitted; a replica under ANY name is rejected by construction, including one
+        # nobody has thought of. `*note` keys follow this file's documentary convention.
+        unknown = sorted(k for k in bypass
+                         if isinstance(k, str)
+                         and k not in ADMIN_BYPASS_FIELDS and not k.endswith("note"))
+        req(not unknown,
+            f"admin_bypass has non-schema fields: {unknown} — this object is closed and "
+            "non-authoritative for eligibility; consult authoritative_source rather than "
+            "restating it here under any name")
 
     # --- (5) the owner must not duplicate its own values, nor spell commands --------------------
     got, auto = field(merge, "auto_merge", as_obj, "auto_merge")
