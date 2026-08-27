@@ -123,6 +123,21 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
     # evaluator relies on the setting not to gain a privilege but to be denied one, because a
     # bypass-capable credential turns an ordinary request into a privileged merge server-side.
     # It is a gated control now, in both directions.
+    # DERIVED, not a second policy switch. Policy already states the requirement — zero unresolved
+    # review threads — and the only question here is whether the SERVER will hold that requirement
+    # at the moment of the merge. Opening or resolving a thread does not move the head SHA, so the
+    # head pin cannot bind thread state to the mutation and the client-side gate can only describe
+    # a moment that has already passed; GitHub's own conversation-resolution protection is what
+    # closes that window. Deriving it keeps ONE owner for the requirement: if policy ever permitted
+    # unresolved threads, this stops asking for an enforcement it no longer needs.
+    if policy.max_unresolved_threads == 0 and not snap.protection.conversation_resolution:
+        refuse(codes.REFUSED_POLICY_DRIFT,
+               f"pinned policy at {policy.oid[:12]} requires "
+               f"{policy.max_unresolved_threads} unresolved review thread(s), but live protection "
+               f"on {snap.default_branch!r} does not require conversation resolution. Resolving "
+               f"or opening a thread does not change the head SHA, so nothing this program pins "
+               f"can stop a thread appearing between its final check and the merge; the server "
+               f"has to be the one enforcing it.")
     want_admins = snap.policy.require_enforce_admins
     if want_admins is not None and snap.protection.enforce_admins != want_admins:
         refuse(codes.REFUSED_POLICY_DRIFT,

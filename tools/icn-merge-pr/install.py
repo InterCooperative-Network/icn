@@ -30,6 +30,7 @@ Default prefix is ~/.local, matching scripts/install.sh: the executable lands at
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import os
@@ -55,6 +56,25 @@ _REMOTE = re.compile(r"^(?:https://github\.com/|git@github\.com:|ssh://git@githu
 
 class InstallRefused(Exception):
     """Installation refused. The message says which trust condition failed."""
+
+
+# One input to the install: where it came from in the pinned commit, where it lands, the EXACT
+# bytes of that Git blob, and the digest of those same bytes. Hashing one source and copying
+# another is the defect this shape exists to make impossible.
+InstallInput = collections.namedtuple("InstallInput", "repo_path relative data digest")
+
+
+def _git_bytes(source: pathlib.Path, *args: str) -> bytes:
+    """Run git and return raw stdout. Binary-safe, unlike the text helper beside it."""
+    try:
+        proc = subprocess.run(["git", "-C", str(source), *args], capture_output=True,
+                              timeout=120, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise InstallRefused(f"git {' '.join(args)} failed to run: {exc}") from exc
+    if proc.returncode != 0:
+        raise InstallRefused(f"git {' '.join(args)} exited {proc.returncode}: "
+                             f"{proc.stderr.decode('utf-8', 'replace').strip()[:300]}")
+    return proc.stdout
 
 
 def _git(source: pathlib.Path, *args: str) -> str:
@@ -100,24 +120,82 @@ def repository_identity(source: pathlib.Path) -> tuple[str, str]:
     return match.group("owner"), match.group("name")
 
 
-def installed_files(source: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
-    """(absolute source path, path relative to the install lib root) for everything installed."""
-    package_dir = source / TOOL_DIR / PACKAGE
-    if not package_dir.is_dir():
-        raise InstallRefused(f"{package_dir} does not exist; --source is not an ICN checkout")
-    files = [(path, str(pathlib.PurePath(PACKAGE, path.name)))
-             for path in sorted(package_dir.glob("*.py"))]
+def _tree_entries(source: pathlib.Path, tree_ish: str,
+                  pathspec: str | None = None) -> list[tuple[str, str, str, str]]:
+    """(mode, type, oid, name) for one Git tree, read from the object store."""
+    argv = ["ls-tree", "-z", tree_ish] + (["--", pathspec] if pathspec else [])
+    raw = _git_bytes(source, *argv).decode("utf-8", "strict")
+    entries = []
+    for record in raw.split("\0"):
+        if not record:
+            continue
+        meta, _, name = record.partition("\t")
+        parts = meta.split()
+        if len(parts) != 3 or not name:
+            raise InstallRefused(f"git ls-tree produced an entry this installer cannot read: "
+                                 f"{record!r}")
+        entries.append((parts[0], parts[1], parts[2], name))
+    return entries
+
+
+def _blob(source: pathlib.Path, mode: str, kind: str, oid: str, label: str) -> bytes:
+    """The bytes of one regular-file blob, or a refusal.
+
+    Modes are checked, not assumed. `120000` is a symlink and `160000` a submodule; neither is
+    Python source, and either would install something other than the file it appears to be.
+    """
+    if kind != "blob" or mode not in ("100644", "100755"):
+        raise InstallRefused(
+            f"{label} is a {kind} with mode {mode} in the pinned commit, not a regular file; "
+            "refusing to install something that is not the source it claims to be")
+    return _git_bytes(source, "cat-file", "blob", oid)
+
+
+def pinned_inputs(source: pathlib.Path, commit: str) -> list[InstallInput]:
+    """Everything to install, enumerated and READ FROM the pinned commit's Git objects.
+
+    The working tree identifies the repository, proves operator state and carries the fetch. It is
+    NOT authoritative for the bytes: globbing it and hashing its paths meant another process could
+    change a file after `assert_clean()` returned and before it was read, so provenance could name
+    commit X while installing bytes that were never in X. The commit is the byte authority now, and
+    the same `data` is hashed, recorded and written.
+    """
+    package_tree = f"{commit}:{TOOL_DIR.as_posix()}/{PACKAGE}"
+    inputs = []
+    for mode, kind, oid, name in sorted(_tree_entries(source, package_tree), key=lambda e: e[3]):
+        if not name.endswith(".py"):
+            continue          # the installed surface is exactly what it was: the package modules
+        data = _blob(source, mode, kind, oid, f"{package_tree}/{name}")
+        inputs.append(InstallInput(f"{TOOL_DIR.as_posix()}/{PACKAGE}/{name}",
+                                   str(pathlib.PurePath(PACKAGE, name)),
+                                   data, hashlib.sha256(data).hexdigest()))
+    if not inputs:
+        raise InstallRefused(f"{package_tree} holds no Python modules in the pinned commit")
+
     # The schema validator is VENDORED rather than re-implemented: one owner for the rule, and the
     # installed program never reaches into a checkout to find it.
-    files.append((source / VALIDATOR_SOURCE, str(pathlib.PurePath(PACKAGE, VALIDATOR_INSTALLED))))
-    for path, _ in files:
-        if not path.is_file():
-            raise InstallRefused(f"required source file is missing: {path}")
-    return files
+    validator = VALIDATOR_SOURCE.as_posix()
+    # A pathspec, so a path absent from the commit comes back as an empty listing rather than a
+    # git error about an object name — the refusal below says what is wrong, git does not.
+    found = [e for e in _tree_entries(source, commit, validator) if e[3] == validator]
+    if not found:
+        raise InstallRefused(f"{validator} is not present in {commit[:12]}")
+    mode, kind, oid, _ = found[0]
+    data = _blob(source, mode, kind, oid, validator)
+    inputs.append(InstallInput(validator, str(pathlib.PurePath(PACKAGE, VALIDATOR_INSTALLED)),
+                               data, hashlib.sha256(data).hexdigest()))
+    return inputs
 
 
 def assert_clean(source: pathlib.Path) -> None:
-    """Nothing being installed may be modified or untracked in the source checkout."""
+    """Operator hygiene: nothing being installed may be modified or untracked in the checkout.
+
+    This is NOT what binds installed bytes to the commit any more — Git-object extraction in
+    `pinned_inputs` is that boundary, because a cleanliness check is a point-in-time observation
+    and another process can write the tree the moment after it returns. It stays because it is
+    useful: it catches an operator who has forgotten uncommitted evaluator work, and it keeps an
+    install from silently ignoring changes someone believes they are installing.
+    """
     paths = [str(TOOL_DIR), str(VALIDATOR_SOURCE)]
     dirty = _git(source, "status", "--porcelain", "--untracked-files=all", "--", *paths)
     if dirty:
@@ -174,10 +252,6 @@ def verify_provenance(source: pathlib.Path) -> dict:
             "source_commit": head}
 
 
-def _sha256(path: pathlib.Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 LAUNCHER = """#!/bin/sh
 # Generated by tools/icn-merge-pr/install.py from {commit}. Do not edit.
 # -I is isolated mode: it drops PYTHONPATH and the per-user site directory, and it leaves the
@@ -229,7 +303,10 @@ def install(source: pathlib.Path, prefix: pathlib.Path, dry_run: bool = False) -
         raise InstallRefused(f"python >= {'.'.join(map(str, MIN_PYTHON))} is required")
     refuse_if_run_from_a_candidate_checkout()
     record = verify_provenance(source)
-    files = installed_files(source)
+    # Read from the PINNED COMMIT, after it has been proved, not from the working tree. The same
+    # `data` is hashed here, recorded below and written out, so bytes hashed == bytes written ==
+    # bytes in source_commit, and nothing that happens to the checkout in between can change that.
+    inputs = pinned_inputs(source, record["source_commit"])
 
     lib = prefix / LIB_SUFFIX
     binary = prefix / "bin" / BIN_NAME
@@ -241,7 +318,7 @@ def install(source: pathlib.Path, prefix: pathlib.Path, dry_run: bool = False) -
         "python": sys.executable,
         "lib": str(lib),
         "bin": str(binary),
-        "files": {relative: _sha256(path) for path, relative in files},
+        "files": {item.relative: item.digest for item in inputs},
     })
     if dry_run:
         return record
@@ -251,8 +328,8 @@ def install(source: pathlib.Path, prefix: pathlib.Path, dry_run: bool = False) -
     if package_dir.exists():
         shutil.rmtree(package_dir)
     package_dir.mkdir(parents=True, exist_ok=True)
-    for path, relative in files:
-        shutil.copyfile(path, lib / relative)
+    for item in inputs:
+        (lib / item.relative).write_bytes(item.data)
 
     (lib / "provenance.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n",
                                          encoding="utf-8")

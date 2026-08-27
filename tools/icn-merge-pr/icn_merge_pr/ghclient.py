@@ -322,6 +322,17 @@ class GhCli:
                 f"branch protection did not report a readable enforce_admins setting "
                 f"({admins!r}); whether protection applies to the caller is not something this "
                 "program will assume")
+        # Does the SERVER refuse a merge while a conversation is unresolved? The client-side
+        # thread gate can only describe a moment that has passed: resolving or opening a thread
+        # does not move the head SHA, so the head pin cannot bind thread state to the mutation.
+        resolution = doc.get("required_conversation_resolution")
+        resolution_enabled = (resolution.get("enabled") if isinstance(resolution, dict)
+                              else resolution)
+        if type(resolution_enabled) is not bool:
+            raise EvidenceUnavailable(
+                f"branch protection did not report a readable required_conversation_resolution "
+                f"setting ({resolution!r}); whether the server enforces thread resolution is not "
+                "something this program will assume")
         checks = doc.get("required_status_checks") or {}
         if not isinstance(checks, dict):
             raise EvidenceUnavailable("branch protection required_status_checks was not an object")
@@ -432,6 +443,7 @@ class GhCli:
             "required_approving_review_count": count,
             "strict": strict,
             "enforce_admins": enabled,
+            "required_conversation_resolution": resolution_enabled,
             "configured": "required_status_checks" in doc,
         }
 

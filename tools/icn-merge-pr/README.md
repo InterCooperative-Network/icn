@@ -28,6 +28,13 @@ catches the honest accident of running the copy in front of you. That check cann
 installer — a pull request editing the file deletes the check too — which is exactly why the
 instruction above starts from the ref rather than the tree.
 
+**The pinned commit is the byte authority.** Files are enumerated and read from the proved
+`source_commit`'s Git objects, so the bytes hashed, the bytes recorded and the bytes written are
+the bytes in that commit. The working tree identifies the repository, proves operator state and
+carries the fetch, but it does not supply what gets installed — a cleanliness check is a
+point-in-time observation, and another process could write the tree the instant after it returned.
+`assert_clean` stays as operator hygiene, not as the trust boundary.
+
 Installation **refuses** unless its source checkout is provably the live default-branch tip: the
 default branch and its head OID come from GitHub, the checkout must be on that branch, `git fetch`
 runs, local `HEAD` must equal the externally reported OID, and every file being installed must be
@@ -90,6 +97,13 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    actors. Rulesets are enumerated through GitHub's own applicability endpoint, so inherited
    organisation and enterprise rules are covered without needing `admin:org`; if any of that
    evidence cannot be read, the answer is refuse.
+
+   Where the pinned policy requires zero unresolved review threads, live protection must also
+   enforce conversation resolution server-side. That requirement is *derived* from the policy claim
+   rather than being a second switch: opening or resolving a thread does not move the head SHA, so
+   the head pin cannot bind thread state to the mutation and the client-side check can only
+   describe a moment that has passed. GitHub closes that window; this program refuses if it will
+   not.
 
    This deliberately does **not** ask whether the current caller matches a particular grant. That
    would mean resolving user, team, app and custom-role membership — an authorization engine this

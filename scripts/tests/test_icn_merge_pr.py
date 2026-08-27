@@ -83,7 +83,8 @@ def world(**overrides) -> dict:
         "protection": {"required_contexts": list(REQUIRED),
                        "required_bindings": {name: ACTIONS_APP for name in REQUIRED},
                        "required_approving_review_count": 0, "strict": True,
-                       "enforce_admins": True, "bypass_allowances": []},
+                       "enforce_admins": True, "bypass_allowances": [],
+                       "required_conversation_resolution": True},
         "branch_rules": [],
         "rulesets_listing": [],
         "rulesets": {},
@@ -550,6 +551,48 @@ non_enforcing_later["rulesets"][LATER] = dict(later_page_bypass["rulesets"][LATE
                                               enforcement="disabled")
 expect("a later-page DISABLED ruleset keeps its established non-active semantics",
        non_enforcing_later, codes.READY)
+
+print("a zero-thread policy requires the SERVER to enforce conversation resolution")
+unenforced = world()
+unenforced["protection"]["required_conversation_resolution"] = False
+expect("policy requiring zero threads while the server does not enforce resolution", unenforced,
+       codes.REFUSED_POLICY_DRIFT)
+_, unenforced_result = evaluate_world(unenforced)
+check("the refusal explains that the head pin cannot bind thread state",
+      any("does not change the head SHA" in r.detail for r in unenforced_result.reasons))
+for bad in (None, "true", "false", 1, 0, [], {}):
+    broken = world()
+    broken["protection"]["required_conversation_resolution"] = bad
+    _, r = evaluate_world(broken)
+    check(f"a conversation-resolution setting of {bad!r} is unreadable, not enforced",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+absent_resolution = world()
+absent_resolution["protection"].pop("required_conversation_resolution")
+expect("live protection reporting nothing about conversation resolution", absent_resolution,
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+
+
+def stop_enforcing_resolution(w):
+    w["protection"]["required_conversation_resolution"] = False
+
+
+fake, resolution_race = merge_world(world(on_refresh=stop_enforcing_resolution))
+check("server enforcement dropping on the refresh refuses",
+      resolution_race.outcome == codes.REFUSED_POLICY_DRIFT, f"got {resolution_race.outcome}")
+check("no mutation occurs once the server stops enforcing resolution", fake.merge_calls == [])
+# ONE owner: the requirement is derived from policy, so a policy that permitted unresolved threads
+# would not demand an enforcement it no longer needs. (The landed schema pins 0, so this is a
+# statement about the derivation, exercised through a mutated policy document.)
+permissive = policy_with(lambda d: d["merge"]["ready_when"].update(unresolved_review_threads=1))
+permissive["protection"]["required_conversation_resolution"] = False
+_, permissive_result = evaluate_world(permissive)
+check("the derived requirement is not asked for when policy does not need it",
+      permissive_result.outcome == codes.REFUSED_POLICY_INVALID,
+      f"got {permissive_result.outcome}")
+still_gated = world()
+still_gated["thread_pages"] = [[{"isResolved": False}]]
+expect("the client-side thread gate still refuses an existing unresolved thread", still_gated,
+       codes.REFUSED_THREADS)
 
 print("the ordinary merger mutates only when NO server-side bypass path exists")
 
@@ -1061,10 +1104,12 @@ print("branch protection is read, never degraded")
 from icn_merge_pr.ghclient import GhCli                            # noqa: E402
 
 
-def read_protection(required_status_checks, enforce_admins={"enabled": True}, reviews=None):
+def read_protection(required_status_checks, enforce_admins={"enabled": True}, reviews=None,
+                    resolution={"enabled": True}):
     """Drive the real transport parser over one branch-protection document."""
     client = GhCli()
-    doc = {"required_status_checks": required_status_checks, "enforce_admins": enforce_admins}
+    doc = {"required_status_checks": required_status_checks, "enforce_admins": enforce_admins,
+           "required_conversation_resolution": resolution}
     if reviews is not None:
         doc["required_pull_request_reviews"] = reviews
     client._rest = lambda path: doc
@@ -1089,6 +1134,16 @@ for label, admins in (("an enforce_admins object with no enabled flag", {}),
                       ("no enforce_admins key at all", None)):
     got = read_protection({"checks": [], "strict": True}, enforce_admins=admins)
     check(f"{label} is unreadable evidence", isinstance(got, str), f"got {got}")
+for label, res in (("an object with no enabled flag", {}), ("a string flag", {"enabled": "yes"}),
+                   ("no key at all", None)):
+    got = read_protection({"checks": [], "strict": True}, resolution=res)
+    check(f"conversation resolution as {label} is unreadable evidence", isinstance(got, str),
+          f"got {got}")
+resolved = read_protection({"checks": [], "strict": True}, resolution={"enabled": True})
+check("a readable conversation-resolution flag is carried through",
+      not isinstance(resolved, str) and resolved["required_conversation_resolution"] is True,
+      f"{resolved}")
+
 enforced = read_protection({"checks": [], "strict": True}, enforce_admins={"enabled": True})
 check("a readable enforce_admins flag is carried through",
       not isinstance(enforced, str) and enforced["enforce_admins"] is True, f"{enforced}")

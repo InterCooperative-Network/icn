@@ -75,6 +75,7 @@ def _evidence(snap: Snapshot) -> dict:
             "required_approving_review_count": snap.protection.required_approving_review_count,
             "strict": snap.protection.strict,
             "enforce_admins": snap.protection.enforce_admins,
+            "required_conversation_resolution": snap.protection.conversation_resolution,
         },
         "bypass": {
             "enforce_admins": snap.bypass.enforce_admins,

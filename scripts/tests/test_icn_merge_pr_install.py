@@ -19,6 +19,7 @@ Run: python3 scripts/tests/test_icn_merge_pr_install.py
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import pathlib
@@ -288,6 +289,74 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("an installed tree moved away from the location its record names does not mutate",
           "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
     forged.unlink()
+
+    print("installed bytes come from the pinned Git object, not the working tree")
+    # The race, made deterministic: mutate the checkout AFTER the cleanliness check returns, which
+    # is exactly the window another process had. `assert_clean` is the hook because it is the last
+    # thing to touch the working tree before the bytes are read.
+    evaluator_src = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "evaluate.py"
+    committed_bytes = evaluator_src.read_bytes()
+    committed_digest = hashlib.sha256(committed_bytes).hexdigest()
+    tampered = committed_bytes + b"\n# written after the cleanliness check\n"
+    smuggled = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "late_arrival.py"
+
+    real_assert_clean = install.assert_clean
+
+    def mutate_after_check(src):
+        real_assert_clean(src)                     # passes: the tree IS clean at this instant
+        evaluator_src.write_bytes(tampered)        # ...and then it is not
+        smuggled.write_text("raise SystemExit(0)\n", encoding="utf-8")
+        (source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "codes.py").unlink()
+
+    install.assert_clean = mutate_after_check
+    stub_github(head)
+    raced = tmp / "prefix-raced"
+    raced_record = install.install(source, raced)
+    install.assert_clean = real_assert_clean
+    evaluator_src.write_bytes(committed_bytes)
+    smuggled.unlink(missing_ok=True)
+    git(source, "checkout", "--", "tools/icn-merge-pr/icn_merge_pr/codes.py")
+
+    raced_lib = pathlib.Path(raced_record["lib"])
+    installed_eval = (raced_lib / "icn_merge_pr" / "evaluate.py").read_bytes()
+    check("bytes written come from the pinned commit, not the mutated working tree",
+          installed_eval == committed_bytes and installed_eval != tampered)
+    check("the recorded digest is of those same pinned bytes",
+          raced_record["files"]["icn_merge_pr/evaluate.py"] == committed_digest
+          and hashlib.sha256(installed_eval).hexdigest() == committed_digest)
+    check("an untracked module appearing after verification is not installed",
+          "icn_merge_pr/late_arrival.py" not in raced_record["files"]
+          and not (raced_lib / "icn_merge_pr" / "late_arrival.py").exists())
+    check("a tracked file deleted from the working tree after verification still installs",
+          (raced_lib / "icn_merge_pr" / "codes.py").is_file()
+          and "icn_merge_pr/codes.py" in raced_record["files"])
+    check("the vendored validator bytes also come from the pinned commit",
+          hashlib.sha256((raced_lib / "icn_merge_pr" / "_policy_schema.py").read_bytes()).hexdigest()
+          == raced_record["files"]["icn_merge_pr/_policy_schema.py"])
+    proc = subprocess.run([str(raced_lib.parent.parent.parent / "bin" / "icn-merge-pr"),
+                           "provenance"], capture_output=True, text=True, env={"PATH": "/usr/bin",
+                                                                              "HOME": str(tmp)})
+    check("the object-backed install passes its own closed-tree verification",
+          proc.returncode == 0, proc.stdout[:160] + proc.stderr[:160])
+
+    dry = install.install(source, tmp / "prefix-dry2", dry_run=True)
+    check("a dry run describes the same object-backed inputs the real install writes",
+          dry["files"] == raced_record["files"], "dry-run digests differ")
+
+    print("the pinned commit must actually contain the required objects")
+    git(source, "rm", "-q", "scripts/check-merge-policy-schema.py")
+    git(source, "commit", "-q", "-m", "drop validator")
+    git(source, "push", "-q", "origin", "main")
+    headless = git(source, "rev-parse", "HEAD")
+    stub_github(headless)
+    message = refusal(source, tmp / "prefix-noblob")
+    check("a required blob missing from the pinned commit is refused",
+          "not present in" in message, message[:200])
+    # Restore the fixture to the commit the earlier install was made from, rather than advancing
+    # past it: later cases assert against that install's recorded provenance.
+    git(source, "reset", "--hard", head)
+    git(source, "push", "-q", "--force", "origin", "main")
+    stub_github(head)
 
     print("the install tree is CLOSED before anything is imported from it")
     # An unrecorded top-level module is the whole defect: `cli` imports `json`, the install root

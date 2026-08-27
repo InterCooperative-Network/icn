@@ -116,6 +116,7 @@ class Protection:
     required_approving_review_count: int
     strict: bool
     enforce_admins: bool
+    conversation_resolution: bool
 
 
 @dataclass(frozen=True)
@@ -431,6 +432,11 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable enforce_admins setting "
             f"({enforce_admins!r}); unreadable is not enforced")
+    resolution = protection_raw.get("required_conversation_resolution")
+    if type(resolution) is not bool:
+        raise EvidenceUnavailable(
+            f"branch protection did not report a readable conversation-resolution setting "
+            f"({resolution!r}); unreadable is not enforced")
     if type(approvals) is not int:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable approving-review count ({approvals!r}); "
@@ -450,6 +456,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         required_approving_review_count=approvals,
         strict=strict,
         enforce_admins=enforce_admins,
+        conversation_resolution=resolution,
     )
 
     review_decision = pr.get("reviewDecision")
