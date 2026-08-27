@@ -83,7 +83,10 @@ def world(**overrides) -> dict:
         "protection": {"required_contexts": list(REQUIRED),
                        "required_bindings": {name: ACTIONS_APP for name in REQUIRED},
                        "required_approving_review_count": 0, "strict": True,
-                       "enforce_admins": True},
+                       "enforce_admins": True, "bypass_allowances": []},
+        "branch_rules": [],
+        "rulesets_listing": [],
+        "rulesets": {},
         "blobs": {POLICY_PATH: POLICY_TEXT, ADR_PATH: ADR_TEXT},
         "post_merge": {"state": "MERGED", "merged": True, "merge_commit_sha": MERGE_COMMIT},
     }
@@ -138,6 +141,24 @@ class FakeGitHub:
     def check_contexts_page(self, owner, name, number, after):
         return self._page(self.w["check_pages"], after,
                           {"head_oid": self.w.get("rollup_head", self.w["pr"]["headRefOid"])})
+
+    def rulesets(self, owner, name):
+        if self.w.get("rulesets_error"):
+            raise EvidenceUnavailable(self.w["rulesets_error"])
+        return list(self.w["rulesets_listing"])
+
+    def branch_rules(self, owner, name, branch):
+        if self.w.get("branch_rules_error"):
+            raise EvidenceUnavailable(self.w["branch_rules_error"])
+        return list(self.w["branch_rules"])
+
+    def ruleset(self, owner, name, ruleset_id):
+        if self.w.get("ruleset_error"):
+            raise EvidenceUnavailable(self.w["ruleset_error"])
+        detail = self.w["rulesets"].get(ruleset_id)
+        if detail is None:
+            raise EvidenceUnavailable(f"ruleset {ruleset_id} is unreadable")
+        return dict(detail)
 
     def branch_protection(self, owner, name, branch):
         if self.w.get("protection_error"):
@@ -468,6 +489,88 @@ no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
 no_claim["protection"]["required_approving_review_count"] = 0
 expect("a policy that makes no approval claim has no approval drift to report", no_claim,
        codes.READY)
+print("the ordinary merger mutates only when NO server-side bypass path exists")
+
+
+def with_ruleset(enforcement, actors, ruleset_id=7, name="a ruleset"):
+    w = world()
+    w["branch_rules"] = [{"type": "pull_request", "ruleset_id": ruleset_id,
+                          "ruleset_source_type": "Organization"}]
+    w["rulesets_listing"] = [{"id": ruleset_id, "name": name, "enforcement": enforcement}]
+    w["rulesets"] = {ruleset_id: {"id": ruleset_id, "name": name, "enforcement": enforcement,
+                                  "bypass_actors": actors}}
+    return w
+
+
+ACTOR = [{"actor_id": 5, "actor_type": "Team", "bypass_mode": "always"}]
+
+for kind in ("users", "teams", "apps"):
+    grant = world()
+    grant["protection"]["bypass_allowances"] = [f"{kind}:someone"]
+    expect(f"a classic pull-request bypass allowance for {kind}", grant,
+           codes.REFUSED_PROTECTION_BYPASSABLE)
+_, grant_result = evaluate_world(
+    dict(world(), protection=dict(world()["protection"], bypass_allowances=["teams:reviewers"])))
+check("the refusal lists the configured bypass path, whoever it belongs to",
+      any("teams:reviewers" in r.detail for r in grant_result.reasons))
+check("the refusal says an ordinary merger requires no bypass path at all",
+      any("no server-side bypass path exists at all" in r.detail
+          for r in grant_result.reasons))
+
+expect("an ACTIVE ruleset carrying a bypass actor", with_ruleset("active", ACTOR),
+       codes.REFUSED_PROTECTION_BYPASSABLE)
+expect("an inherited applicable ruleset carrying a bypass actor",
+       with_ruleset("active", ACTOR, ruleset_id=99, name="org-wide"),
+       codes.REFUSED_PROTECTION_BYPASSABLE)
+# Exact semantics, documented by test: a bypass actor on a ruleset that does not ENFORCE cannot
+# open a path, because that ruleset gates nothing in the first place.
+expect("a DISABLED ruleset carrying a bypass actor is not an open path",
+       with_ruleset("disabled", ACTOR), codes.READY)
+expect("an EVALUATE-mode ruleset carrying a bypass actor is not an open path",
+       with_ruleset("evaluate", ACTOR), codes.READY)
+expect("an active ruleset with no bypass actors", with_ruleset("active", []), codes.READY)
+expect("an active ruleset reporting no bypass_actors field at all",
+       with_ruleset("active", None), codes.READY)
+
+expect("an enforcement mode this program does not know", with_ruleset("shadow", []),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("bypass actors that are not a list", with_ruleset("active", "nobody"),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("a bypass actor that is not an object", with_ruleset("active", ["someone"]),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("ruleset enumeration unavailable", world(rulesets_error="403 Forbidden"),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("branch-rule enumeration unavailable", world(branch_rules_error="502 Bad Gateway"),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+untraceable = world()
+untraceable["branch_rules"] = [{"type": "pull_request"}]
+expect("a rule in force that cannot be traced to a ruleset", untraceable,
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+unreadable_detail = with_ruleset("active", [])
+unreadable_detail["ruleset_error"] = "404 Not Found"
+expect("an applicable ruleset whose detail cannot be read", unreadable_detail,
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+for bad in (None, "none", {}, [1]):
+    malformed = world()
+    malformed["protection"]["bypass_allowances"] = bad
+    _, r = evaluate_world(malformed)
+    check(f"classic bypass evidence of {bad!r} is unreadable, not absent",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+
+
+def grant_bypass(w):
+    w["protection"]["bypass_allowances"] = ["users:someone"]
+
+
+fake, bypass_appeared = merge_world(world(on_refresh=grant_bypass))
+check("a bypass actor appearing on the refresh -> REFUSED_PROTECTION_BYPASSABLE",
+      bypass_appeared.outcome == codes.REFUSED_PROTECTION_BYPASSABLE,
+      f"got {bypass_appeared.outcome}")
+check("no merge was attempted once a bypass path appeared", fake.merge_calls == [])
+_, clean_bypass = evaluate_world(world())
+check("a repository with no bypass paths reports none",
+      clean_bypass.evidence["bypass"]["open_paths"] == [], f"{clean_bypass.evidence['bypass']}")
+
 print("an ordinary merge is ordinary only if the server enforces protection on the caller")
 bypassable = world()
 bypassable["protection"]["enforce_admins"] = False
@@ -869,11 +972,13 @@ print("branch protection is read, never degraded")
 from icn_merge_pr.ghclient import GhCli                            # noqa: E402
 
 
-def read_protection(required_status_checks, enforce_admins={"enabled": True}):
+def read_protection(required_status_checks, enforce_admins={"enabled": True}, reviews=None):
     """Drive the real transport parser over one branch-protection document."""
     client = GhCli()
-    client._rest = lambda path: {"required_status_checks": required_status_checks,
-                                 "enforce_admins": enforce_admins}
+    doc = {"required_status_checks": required_status_checks, "enforce_admins": enforce_admins}
+    if reviews is not None:
+        doc["required_pull_request_reviews"] = reviews
+    client._rest = lambda path: doc
     try:
         return client.branch_protection("o", "n", "main")
     except EvidenceUnavailable as exc:
@@ -922,6 +1027,61 @@ bound = read_protection({"checks": [{"context": "Build Release", "app_id": 15368
                                     {"context": "Test", "app_id": -1}], "strict": True})
 check("producers are carried through, and -1 means any",
       bound["required_bindings"] == {"Build Release": 15368, "Test": None}, f"{bound}")
+
+print("classic bypass allowances are read, and every actor kind is inspected")
+plain = {"checks": [], "strict": True}
+for label, reviews in (
+    ("a user allowance", {"required_approving_review_count": 0,
+                          "bypass_pull_request_allowances": {"users": [{"login": "someone"}]}}),
+    ("a team allowance", {"required_approving_review_count": 0,
+                          "bypass_pull_request_allowances": {"teams": [{"slug": "reviewers"}]}}),
+    ("an app allowance", {"required_approving_review_count": 0,
+                          "bypass_pull_request_allowances": {"apps": [{"slug": "a-bot"}]}}),
+    ("an actor kind nobody enumerated", {"required_approving_review_count": 0,
+                                         "bypass_pull_request_allowances":
+                                             {"custom_roles": [{"name": "releaser"}]}}),
+):
+    got = read_protection(plain, reviews=reviews)
+    check(f"{label} is carried through as an open path",
+          not isinstance(got, str) and len(got["bypass_allowances"]) == 1, f"{got}")
+empty = read_protection(plain, reviews={"required_approving_review_count": 0,
+                                        "bypass_pull_request_allowances":
+                                            {"users": [], "teams": [], "apps": []}})
+check("structurally empty allowances are no path at all",
+      not isinstance(empty, str) and empty["bypass_allowances"] == [], f"{empty}")
+absent = read_protection(plain, reviews={"required_approving_review_count": 0})
+check("absent allowances are no path at all",
+      not isinstance(absent, str) and absent["bypass_allowances"] == [], f"{absent}")
+for bad in ("everyone", 7, [{"login": "x"}]):
+    got = read_protection(plain, reviews={"required_approving_review_count": 0,
+                                          "bypass_pull_request_allowances": bad})
+    check(f"bypass allowances of {bad!r} are unreadable evidence", isinstance(got, str), f"{got}")
+
+print("repository merge-method metadata must be exact booleans")
+from icn_merge_pr.ghclient import GhCli as _Gh                     # noqa: E402
+
+
+def read_repo_metadata(**fields):
+    client = _Gh()
+    base = {"defaultBranchRef": {"name": "main", "target": {"oid": "a" * 40}},
+            "mergeCommitAllowed": False, "squashMergeAllowed": True, "rebaseMergeAllowed": True}
+    base.update(fields)
+    client._graphql = lambda query, variables: base
+    try:
+        return client.repository_metadata("o", "n")
+    except EvidenceUnavailable as exc:
+        return f"REFUSED: {exc.detail}"
+
+
+for field in ("mergeCommitAllowed", "squashMergeAllowed", "rebaseMergeAllowed"):
+    for bad in ("false", "true", 0, 1, None, [], {}):
+        got = read_repo_metadata(**{field: bad})
+        check(f"{field}={bad!r} is unreadable evidence, not a permitted method",
+              isinstance(got, str), f"got {got}")
+good = read_repo_metadata()
+check("readable merge-method metadata is carried through exactly",
+      not isinstance(good, str) and good["merge_allowed"] is False
+      and good["squash_allowed"] is True and good["rebase_allowed"] is True, f"{good}")
 
 print("a server error is not a decision")
 from icn_merge_pr.ghclient import definitive_http_failure          # noqa: E402

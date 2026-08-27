@@ -140,6 +140,18 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
           "stale" in message and "moved mid-install" in message, message[:200])
     check("nothing was installed after a mid-install move", not (tmp / "prefix-moved").exists())
 
+    # A RENAME between the two reads, where the new name already has a tracking ref at the same
+    # commit: every OID comparison would agree while the checkout sat on the old branch.
+    git(source, "branch", "-f", "trunk", "main")
+    git(source, "push", "-q", "origin", "trunk")
+    renamed = iter([{"branch": "main", "oid": head}, {"branch": "trunk", "oid": head}])
+    install.github_default_branch = lambda owner, name: next(renamed)
+    message = refusal(source, tmp / "prefix-renamed")
+    check("a default branch RENAMED between the two reads is refused",
+          "changed from 'main' to 'trunk'" in message and "reconciling by assumption" in message,
+          message[:200])
+    check("nothing was installed after a mid-install rename", not (tmp / "prefix-renamed").exists())
+
     stub_github(head)
     evaluator = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "evaluate.py"
     original = evaluator.read_text(encoding="utf-8")

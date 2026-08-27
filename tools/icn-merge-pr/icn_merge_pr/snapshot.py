@@ -59,6 +59,54 @@ class CheckOccurrence:
     app_id: int | None
 
 
+# Ruleset enforcement values. Only ACTIVE enforces; `disabled` and `evaluate` are report-only and
+# cannot gate a merge, so a bypass actor on one of them cannot open a path that was never closed.
+# A value outside this set is a mode this program does not understand, and it fails closed.
+RULESET_ENFORCEMENT = frozenset({"active", "disabled", "evaluate"})
+ENFORCING = "active"
+
+
+@dataclass(frozen=True)
+class RulesetEvidence:
+    """One ruleset applying to the target branch, and whether anyone may bypass it."""
+
+    id: int
+    name: str
+    enforcement: str
+    bypass_actors: tuple[str, ...]
+
+    @property
+    def enforcing(self) -> bool:
+        return self.enforcement == ENFORCING
+
+
+@dataclass(frozen=True)
+class BypassEvidence:
+    """Every server-side path by which branch protection could be bypassed on the target branch.
+
+    THE INVARIANT THIS SERVES. An ordinary merge is ordinary because the server re-applies branch
+    protection to it. Asking whether the CURRENT caller happens to match a particular bypass grant
+    would mean resolving user, team, app and custom-role membership — an authorization engine this
+    primitive has no business containing. The simpler and stronger rule is that the ordinary merger
+    mutates only when NO active bypass path exists at all. It is deliberately incompatible with
+    configured bypass actors: if a repository needs them, that is a privileged authority design and
+    must not arrive quietly inside ordinary merge.
+    """
+
+    enforce_admins: bool
+    classic_allowances: tuple[str, ...]
+    rulesets: tuple[RulesetEvidence, ...]
+
+    @property
+    def open_paths(self) -> tuple[str, ...]:
+        paths = [f"classic bypass allowance {a}" for a in self.classic_allowances]
+        for rule in self.rulesets:
+            if rule.enforcing:
+                paths += [f"ruleset {rule.id} ({rule.name}) bypass actor {actor}"
+                          for actor in rule.bypass_actors]
+        return tuple(paths)
+
+
 @dataclass(frozen=True)
 class Protection:
     """Live branch-protection configuration for the branch actually being merged into."""
@@ -95,6 +143,7 @@ class Snapshot:
     auto_merge_armed: bool
     checks: dict[str, tuple[CheckOccurrence, ...]]
     protection: Protection
+    bypass: BypassEvidence
     allowed_merge_methods: frozenset[str]
     policy: MergePolicy
 
@@ -269,6 +318,62 @@ def _collect_checks(client, owner, name, number,
             raise EvidenceUnavailable("status check pagination did not terminate")
 
 
+def _actor_label(actor) -> str:
+    if not isinstance(actor, dict):
+        raise EvidenceUnavailable(f"a ruleset bypass actor was unreadable ({actor!r})")
+    kind = actor.get("actor_type") or "actor"
+    ident = actor.get("actor_id")
+    mode = actor.get("bypass_mode")
+    return f"{kind}:{ident}({mode})"
+
+
+def _collect_bypass(client, owner, name, branch, enforce_admins, classic_allowances):
+    """Enumerate every server-side bypass path on `branch`, or refuse.
+
+    Two external reads, and BOTH must succeed. The listing proves ruleset enumeration is available
+    to this caller at all; the branch-rules endpoint says which rulesets actually apply here,
+    including ones inherited from an organisation or enterprise that this credential cannot list
+    directly. Inferring "none" from a call that failed, was truncated or was not understood is the
+    one thing that must not happen, so nothing here treats an error as an empty result.
+    """
+    client.rulesets(owner, name)                     # enumeration must be available at all
+    applicable: dict[int, None] = {}
+    for rule in client.branch_rules(owner, name, branch):
+        if not isinstance(rule, dict):
+            raise EvidenceUnavailable(f"a branch rule was unreadable ({rule!r})")
+        ruleset_id = rule.get("ruleset_id")
+        if type(ruleset_id) is not int:
+            raise EvidenceUnavailable(
+                f"a rule in force on {branch!r} names no readable ruleset "
+                f"({rule.get('type')!r}); a rule this program cannot trace to a ruleset is a "
+                "bypass surface it cannot inspect")
+        applicable[ruleset_id] = None
+
+    evidence = []
+    for ruleset_id in sorted(applicable):
+        detail = client.ruleset(owner, name, ruleset_id)
+        enforcement = detail.get("enforcement")
+        if enforcement not in RULESET_ENFORCEMENT:
+            raise EvidenceUnavailable(
+                f"ruleset {ruleset_id} reports enforcement {enforcement!r}, which is not a mode "
+                "this program knows; an unknown enforcement mode is not a safe one")
+        actors = detail.get("bypass_actors")
+        if actors is None:
+            actors = []
+        if not isinstance(actors, list):
+            raise EvidenceUnavailable(
+                f"ruleset {ruleset_id} reported unreadable bypass actors ({actors!r})")
+        evidence.append(RulesetEvidence(
+            id=ruleset_id,
+            name=detail.get("name") if isinstance(detail.get("name"), str) else str(ruleset_id),
+            enforcement=enforcement,
+            bypass_actors=tuple(_actor_label(a) for a in actors),
+        ))
+    return BypassEvidence(enforce_admins=enforce_admins,
+                          classic_allowances=tuple(classic_allowances),
+                          rulesets=tuple(evidence))
+
+
 def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     """Gather all decision evidence. Raises rather than returning a half-known state."""
     # (1) EXTERNAL trust root. Nothing in the repository's own content participates in this.
@@ -335,6 +440,10 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
             value is None or type(value) is int for value in bindings.values()):
         raise EvidenceUnavailable(
             "branch protection did not report readable required-check producers")
+    allowances = protection_raw.get("bypass_allowances")
+    if not isinstance(allowances, list) or not all(isinstance(a, str) for a in allowances):
+        raise EvidenceUnavailable(
+            "branch protection did not report readable pull-request bypass allowances")
     protection = Protection(
         required_contexts=frozenset(contexts),
         required_bindings=dict(bindings),
@@ -346,6 +455,8 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     review_decision = pr.get("reviewDecision")
     if review_decision is not None:
         _enum(review_decision, REVIEW_DECISIONS, "reviewDecision")
+    bypass = _collect_bypass(client, owner, name, default_branch, enforce_admins, allowances)
+
     review_states = _collect_reviews(client, owner, name, number)
 
     total_threads, unresolved = _collect_threads(client, owner, name, number)
@@ -383,6 +494,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         auto_merge_armed=auto_merge is not None,
         checks=checks,
         protection=protection,
+        bypass=bypass,
         allowed_merge_methods=frozenset(allowed),
         policy=policy,
     )

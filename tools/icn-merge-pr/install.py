@@ -141,18 +141,31 @@ def verify_provenance(source: pathlib.Path) -> dict:
 
     _git(source, "fetch", "origin", external["branch"])
 
-    # The tip can move between resolving it and fetching. Comparing HEAD against the OID read
-    # BEFORE the fetch would then accept a checkout the fetch itself has already left behind, and
-    # a stale evaluator would install looking perfectly clean. Re-read the external tip afterwards
-    # and require agreement with what the fetch actually obtained.
-    external = github_default_branch(owner, name)
-    fetched = _git(source, "rev-parse", f"refs/remotes/origin/{external['branch']}")
+    # The tip can move between resolving it and fetching, so it is re-read. The SECOND read is a
+    # full refreshed trust root, not merely a fresher OID: the default branch can also be RENAMED,
+    # and a rename that leaves the new name pointing at the same commit — with its tracking ref
+    # already present locally — would otherwise pass every OID comparison while the checkout sat
+    # on the old branch. Name first, then the checkout, then the ref, then the commit.
+    refreshed = github_default_branch(owner, name)
+    if refreshed["branch"] != external["branch"]:
+        raise InstallRefused(
+            f"the repository's default branch changed from {external['branch']!r} to "
+            f"{refreshed['branch']!r} while installing. Refusing rather than reconciling by "
+            "assumption: run the install again against the branch that is now default.")
+    branch_now = _git(source, "rev-parse", "--abbrev-ref", "HEAD")
+    if branch_now != refreshed["branch"]:
+        raise InstallRefused(
+            f"the checkout is on {branch_now!r} but the repository's default branch is "
+            f"{refreshed['branch']!r}; the branch this install would take its code from is not "
+            "the one GitHub calls default.")
+    _git(source, "fetch", "origin", refreshed["branch"])
+    fetched = _git(source, "rev-parse", f"refs/remotes/origin/{refreshed['branch']}")
     head = _git(source, "rev-parse", "HEAD")
-    if head != external["oid"] or head != fetched:
+    if head != refreshed["oid"] or head != fetched:
         raise InstallRefused(
             f"refusing to install from a stale checkout: HEAD is {head[:12]}, the fetched "
-            f"origin/{external['branch']} is {fetched[:12]}, and GitHub reports "
-            f"{external['oid'][:12]}. Pull until all three agree, then install — an older "
+            f"origin/{refreshed['branch']} is {fetched[:12]}, and GitHub reports "
+            f"{refreshed['oid'][:12]}. Pull until all three agree, then install — an older "
             "default-branch commit is still not the code review approved, and a tip that moved "
             "mid-install is not one this checkout has.")
 

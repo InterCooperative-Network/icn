@@ -211,12 +211,22 @@ class GhCli:
     def repository_metadata(self, owner: str, name: str) -> dict:
         repo = self._graphql(_REPO_META, {"owner": owner, "name": name})
         ref = _dig(repo, "defaultBranchRef")
+        allowed = {}
+        for field, key in (("mergeCommitAllowed", "merge_allowed"),
+                           ("squashMergeAllowed", "squash_allowed"),
+                           ("rebaseMergeAllowed", "rebase_allowed")):
+            value = repo.get(field)
+            # `bool("false")` is True. Casting here would let unreadable metadata say a strategy
+            # is permitted, and the run would reach the mutation before GitHub disagreed.
+            if type(value) is not bool:
+                raise EvidenceUnavailable(
+                    f"GitHub did not report a readable {field} ({value!r}); which merge methods "
+                    "the repository permits is not something this program will assume")
+            allowed[key] = value
         return {
             "default_branch": _dig(ref, "name"),
             "default_branch_oid": _dig(ref, "target", "oid"),
-            "merge_allowed": bool(repo.get("mergeCommitAllowed")),
-            "squash_allowed": bool(repo.get("squashMergeAllowed")),
-            "rebase_allowed": bool(repo.get("rebaseMergeAllowed")),
+            **allowed,
         }
 
     def merge_queue_present(self, owner: str, name: str, branch: str) -> bool:
@@ -357,14 +367,65 @@ class GhCli:
             # would have left the up-to-date requirement satisfiable by unreadable evidence.
             raise EvidenceUnavailable(
                 f"branch protection did not report a readable strict setting ({strict!r})")
+        # Classic pull-request bypass allowances. Every key is inspected, not a known list of
+        # them: a denylist of actor types admits whichever type nobody enumerated.
+        allowances: list[str] = []
+        reviews_raw = doc.get("required_pull_request_reviews")
+        if reviews_raw is not None:
+            if not isinstance(reviews_raw, dict):
+                raise EvidenceUnavailable(
+                    "branch protection required_pull_request_reviews was not an object")
+            grants = reviews_raw.get("bypass_pull_request_allowances")
+            if grants is not None:
+                if not isinstance(grants, dict):
+                    raise EvidenceUnavailable(
+                        f"branch protection reported unreadable bypass allowances ({grants!r})")
+                for kind in sorted(grants):
+                    holders = grants[kind]
+                    if not isinstance(holders, list):
+                        raise EvidenceUnavailable(
+                            f"branch protection reported unreadable bypass allowances for "
+                            f"{kind!r} ({holders!r})")
+                    for holder in holders:
+                        label = holder.get("slug") or holder.get("login") or holder.get("name") \
+                            if isinstance(holder, dict) else holder
+                        allowances.append(f"{kind}:{label}")
         return {
             "required_contexts": contexts,
             "required_bindings": bindings,
+            "bypass_allowances": allowances,
             "required_approving_review_count": count,
             "strict": strict,
             "enforce_admins": enabled,
             "configured": "required_status_checks" in doc,
         }
+
+    def branch_rules(self, owner: str, name: str, branch: str) -> list:
+        """The rules ACTIVELY in force on `branch`, from every source GitHub applies.
+
+        This is the applicability oracle. Enumerating rulesets by hand would mean re-implementing
+        GitHub's condition matching (`~DEFAULT_BRANCH`, include/exclude patterns) and would miss
+        organisation and enterprise rulesets outright — `orgs/{org}/rulesets` needs `admin:org`,
+        which an ordinary merger's credential has no business holding. This endpoint reports
+        inherited rules to a caller with ordinary repository access.
+        """
+        doc = self._rest(f"repos/{owner}/{name}/rules/branches/{quote(branch, safe='')}")
+        if not isinstance(doc, list):
+            raise EvidenceUnavailable("branch rules response was not a list")
+        return doc
+
+    def rulesets(self, owner: str, name: str) -> list:
+        """Every ruleset visible for this repository, INCLUDING those inherited from a parent."""
+        doc = self._rest(f"repos/{owner}/{name}/rulesets?includes_parents=true")
+        if not isinstance(doc, list):
+            raise EvidenceUnavailable("ruleset listing response was not a list")
+        return doc
+
+    def ruleset(self, owner: str, name: str, ruleset_id: int) -> dict:
+        doc = self._rest(f"repos/{owner}/{name}/rulesets/{ruleset_id}")
+        if not isinstance(doc, dict):
+            raise EvidenceUnavailable(f"ruleset {ruleset_id} response was not an object")
+        return doc
 
     def blob_text(self, owner: str, name: str, oid: str, path: str) -> str | None:
         """Read one file at a PINNED commit. Returns None when the path does not exist there."""

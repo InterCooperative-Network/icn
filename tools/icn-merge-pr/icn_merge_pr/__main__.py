@@ -100,6 +100,7 @@ def _listdir(path, label):
         return set(os.listdir(path))
     except OSError as exc:
         _refuse(f"the installed {label} at {path} cannot be read: {exc}")
+        raise AssertionError("unreachable: _refuse exits")   # explicit for readers and analysers
 
 
 def _verify_closed_tree():

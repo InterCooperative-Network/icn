@@ -76,6 +76,14 @@ def _evidence(snap: Snapshot) -> dict:
             "strict": snap.protection.strict,
             "enforce_admins": snap.protection.enforce_admins,
         },
+        "bypass": {
+            "enforce_admins": snap.bypass.enforce_admins,
+            "classic_allowances": list(snap.bypass.classic_allowances),
+            "rulesets": [{"id": r.id, "name": r.name, "enforcement": r.enforcement,
+                          "enforcing": r.enforcing, "bypass_actors": list(r.bypass_actors)}
+                         for r in snap.bypass.rulesets],
+            "open_paths": list(snap.bypass.open_paths),
+        },
         "policy": {
             "loaded_from_oid": snap.policy_oid,
             "sha256": snap.policy_sha256,

@@ -84,10 +84,19 @@ Unknown options fail. `--admin`, `--auto` and their privileged or deferred relat
    *every page* of review threads, *every page* of the check rollup, live branch protection, merge
    queue, auto-merge. Unavailable evidence is not ready, and a thread count larger than the threads
    actually readable is unavailable evidence.
-5. Refuse unless live branch protection applies to administrators and other bypass-capable roles.
-   The merge request carries a head SHA and a strategy, not the readiness just proved; what makes
-   it *ordinary* is that the server re-applies protection to it. A bypass-capable credential turns
-   an ordinary-looking request into a privileged merge server-side, with no `--admin` anywhere.
+5. Refuse unless **no server-side bypass path exists at all** on the target branch: protection
+   must apply to administrators (`enforce_admins`), classic pull-request bypass allowances must be
+   absent or empty, and every ruleset actively in force on that branch must have zero bypass
+   actors. Rulesets are enumerated through GitHub's own applicability endpoint, so inherited
+   organisation and enterprise rules are covered without needing `admin:org`; if any of that
+   evidence cannot be read, the answer is refuse.
+
+   This deliberately does **not** ask whether the current caller matches a particular grant. That
+   would mean resolving user, team, app and custom-role membership — an authorization engine this
+   primitive has no business holding. The existence of an active bypass path is what makes the
+   merge non-ordinary, whoever it belongs to. The ordinary merger is intentionally incompatible
+   with configured bypass actors: if a repository needs them, that is a privileged authority
+   design and must not arrive quietly inside ordinary merge.
 6. Match each required check by **name and producer**. Where branch protection pins a check to a
    GitHub App, only that App's runs are consulted — a green result of the right name from another
    source is as good as absent.

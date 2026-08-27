@@ -94,6 +94,19 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
                f"the credential performing this merge. An ordinary merge is ordinary only when "
                f"the server enforces protection against the caller; this program has no "
                f"privileged path and will not stand in for one.")
+    # `enforce_admins` alone does not close every bypass path: classic pull-request allowances and
+    # bypass actors on an actively enforced ruleset each let some caller merge past the gates while
+    # that flag is true. This program does NOT ask whether the current caller matches one of them —
+    # that would be an authorization engine, and identity resolution is exactly the authority this
+    # primitive should not hold. The EXISTENCE of an active bypass path is what makes the merge
+    # non-ordinary, so any open path refuses, whoever it belongs to.
+    open_paths = snap.bypass.open_paths
+    if open_paths:
+        refuse(codes.REFUSED_PROTECTION_BYPASSABLE,
+               f"branch protection on {snap.default_branch!r} has {len(open_paths)} configured "
+               f"bypass path(s): {list(open_paths)}. The ordinary merger mutates only when no "
+               f"server-side bypass path exists at all; if this repository needs bypass actors "
+               f"that is a privileged authority design and does not belong inside ordinary merge.")
 
     # --- configuration soundness ---------------------------------------------------------------
     # Fail closed on drift between the pinned policy and live branch protection. Either direction
