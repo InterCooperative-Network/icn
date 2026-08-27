@@ -155,6 +155,9 @@ class FakeGitHub:
             raise GitHubRefused(self.w["merge_refused"])
         return self.w.get("merge_response", {"merged": True, "sha": MERGE_COMMIT})
 
+    def object_oid(self, owner, name, oid, path):
+        return self.w.get("object_oids", {}).get((oid, path), f"tree-of-{path}")
+
     def pull_request_merge_state(self, owner, name, number):
         if self.w.get("post_merge_error"):
             raise EvidenceUnavailable(self.w["post_merge_error"])
@@ -739,6 +742,50 @@ fake, _ = merge_world(mutate(isDraft=True))
 check("a refused evaluation never reaches the mutation", fake.merge_calls == [])
 fake, _ = evaluate_world(world())
 check("`check` never mutates even when everything is green", fake.merge_calls == [])
+
+print("an evaluator the default branch has moved past does not merge")
+INSTALLED = "5" * 40
+_, current = merge_world(world(), installed_commit=INSTALLED)
+check("an installed commit behind an unchanged evaluator still merges",
+      current.outcome == codes.MERGED, f"got {current.outcome}")
+fake, unrelated = merge_world(world(), installed_commit=DEFAULT_OID)
+check("an installed commit equal to the live tip needs no comparison at all",
+      unrelated.outcome == codes.MERGED, f"got {unrelated.outcome}")
+
+changed = world(object_oids={(INSTALLED, "tools/icn-merge-pr"): "old-tree",
+                             (DEFAULT_OID, "tools/icn-merge-pr"): "new-tree"})
+fake, stale = merge_world(changed, installed_commit=INSTALLED)
+check("the evaluator's own source changing on the default branch -> REFUSED_EVALUATOR_STALE",
+      stale.outcome == codes.REFUSED_EVALUATOR_STALE, f"got {stale.outcome}")
+check("no merge was attempted with a stale evaluator", fake.merge_calls == [])
+check("the refusal names the path that changed and tells the operator to reinstall",
+      any("tools/icn-merge-pr" in r.detail and "reinstall" in r.detail for r in stale.reasons))
+
+validator_changed = world(
+    object_oids={(INSTALLED, "scripts/check-merge-policy-schema.py"): "old-blob",
+                 (DEFAULT_OID, "scripts/check-merge-policy-schema.py"): "new-blob"})
+_, stale2 = merge_world(validator_changed, installed_commit=INSTALLED)
+check("the vendored policy validator changing is also staleness",
+      stale2.outcome == codes.REFUSED_EVALUATOR_STALE, f"got {stale2.outcome}")
+
+vanished = world(object_oids={(INSTALLED, "tools/icn-merge-pr"): None})
+_, stale3 = merge_world(vanished, installed_commit=INSTALLED)
+check("a path that cannot be resolved at either commit counts as changed",
+      stale3.outcome == codes.REFUSED_EVALUATOR_STALE, f"got {stale3.outcome}")
+_, checked = evaluate_world(world(object_oids={(INSTALLED, "tools/icn-merge-pr"): "old-tree",
+                                               (DEFAULT_OID, "tools/icn-merge-pr"): "new-tree"}))
+check("evaluation is never blocked by staleness — it mutates nothing",
+      checked.outcome == codes.READY, f"got {checked.outcome}")
+
+print("review and protection evidence must be readable")
+expect("an opinionated review state this program does not know",
+       world(review_pages=[[{"state": "SOMETHING_NEW"}]]), codes.REFUSED_UNAVAILABLE_EVIDENCE)
+for bad in (None, "two", True, 1.5, [], {}):
+    broken = world()
+    broken["protection"]["required_approving_review_count"] = bad
+    _, r = evaluate_world(broken)
+    check(f"an approving-review count of {bad!r} is unreadable evidence, not zero",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
 
 # --- the result envelope ------------------------------------------------------------------------------------
 print("results are machine-readable")

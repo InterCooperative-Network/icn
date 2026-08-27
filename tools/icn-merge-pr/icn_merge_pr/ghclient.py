@@ -109,6 +109,12 @@ query($owner:String!,$name:String!,$expr:String!){
 }
 """
 
+_OBJECT_OID = """
+query($owner:String!,$name:String!,$expr:String!){
+  repository(owner:$owner,name:$name){ object(expression:$expr){ oid } }
+}
+"""
+
 _PR_MERGE_STATE = """
 query($owner:String!,$name:String!,$number:Int!){
   repository(owner:$owner,name:$name){
@@ -267,12 +273,26 @@ class GhCli:
                 if isinstance(entry, str):
                     contexts.append(entry)
                     bindings[entry] = None
-        reviews = doc.get("required_pull_request_reviews") or {}
-        count = reviews.get("required_approving_review_count") if isinstance(reviews, dict) else 0
+        # An ABSENT review requirement genuinely means none. A requirement that is PRESENT but
+        # whose count cannot be read is unavailable evidence: defaulting it to zero would let an
+        # unreadable protection response retire the approval gate, and policy admits a null
+        # review decision, so nothing downstream would notice.
+        reviews = doc.get("required_pull_request_reviews")
+        if reviews is None:
+            count = 0
+        elif not isinstance(reviews, dict):
+            raise EvidenceUnavailable(
+                "branch protection required_pull_request_reviews was not an object")
+        else:
+            count = reviews.get("required_approving_review_count")
+            if type(count) is not int:
+                raise EvidenceUnavailable(
+                    "branch protection reports a review requirement whose approving-review count "
+                    f"is unreadable ({count!r}); an unreadable requirement is not no requirement")
         return {
             "required_contexts": contexts,
             "required_bindings": bindings,
-            "required_approving_review_count": count if type(count) is int else 0,
+            "required_approving_review_count": count,
             "strict": bool(checks.get("strict")),
             "configured": "required_status_checks" in doc,
         }
@@ -287,6 +307,19 @@ class GhCli:
             raise EvidenceUnavailable(f"{path} at {oid} was truncated by the API")
         text = blob.get("text")
         return text if isinstance(text, str) else None
+
+    def object_oid(self, owner: str, name: str, oid: str, path: str) -> str | None:
+        """The git object id of `path` at commit `oid`, or None when it is not there.
+
+        Used to ask one narrow question: has the evaluator's own source changed since the copy
+        running right now was installed. Comparing tree ids answers it without reading any content.
+        """
+        repo = self._graphql(_OBJECT_OID, {"owner": owner, "name": name, "expr": f"{oid}:{path}"})
+        obj = repo.get("object")
+        if not isinstance(obj, dict):
+            return None
+        found = obj.get("oid")
+        return found if isinstance(found, str) else None
 
     # -- the one mutation ----------------------------------------------------------------------
 

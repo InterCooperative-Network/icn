@@ -59,6 +59,7 @@ REFUSED_GITHUB = "REFUSED_GITHUB"                        # GitHub refused the me
 REFUSED_UNAVAILABLE_EVIDENCE = "REFUSED_UNAVAILABLE_EVIDENCE"  # evidence missing/unreadable
 REFUSED_NOT_INSTALLED = "REFUSED_NOT_INSTALLED"          # provenance record missing/unreadable
 REFUSED_UNTRUSTED_TARGET = "REFUSED_UNTRUSTED_TARGET"    # target is not the installed repository
+REFUSED_EVALUATOR_STALE = "REFUSED_EVALUATOR_STALE"      # this program changed on the default branch
 
 ALL_CODES = frozenset(
     v for k, v in list(globals().items())

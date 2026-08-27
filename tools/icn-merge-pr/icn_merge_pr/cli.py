@@ -236,8 +236,13 @@ def main(argv: list[str]) -> int:
         print(exc.detail, file=sys.stderr)
         return codes.exit_code(exc.outcome)
 
+    installed_commit = None
+    if inv.authorize:
+        record = provenance.read()          # already validated by _require_trusted_runtime
+        installed_commit = record.get("source_commit")
     result = run(GhCli(), owner, name, inv.number, authorize=inv.authorize,
-                 requested_strategy=inv.strategy, exception_reason=inv.reason)
+                 requested_strategy=inv.strategy, exception_reason=inv.reason,
+                 installed_commit=installed_commit)
     print(json.dumps(result.as_dict(), indent=2, sort_keys=True))
     print(_summary(result), file=sys.stderr)
     return codes.exit_code(result.outcome)

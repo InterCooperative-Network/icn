@@ -35,6 +35,11 @@ MERGEABLE_STATE = frozenset({"MERGEABLE", "CONFLICTING", "UNKNOWN"})
 MERGE_STATE_STATUS = frozenset({"DIRTY", "UNKNOWN", "BLOCKED", "BEHIND", "UNSTABLE",
                                 "HAS_HOOKS", "CLEAN"})
 REVIEW_DECISIONS = frozenset({"CHANGES_REQUESTED", "APPROVED", "REVIEW_REQUIRED"})
+# PullRequestReviewState. `latestOpinionatedReviews` should only ever yield the first two,
+# but the gate blocks one literal value, so a state outside this set is a review whose
+# meaning this program does not know — and it may be an objection.
+REVIEW_STATES = frozenset({"APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED",
+                           "PENDING"})
 
 # Non-terminal check states. Anything here, and anything unrecognised, normalises to PENDING —
 # never to a conclusion, because "I do not know what this is" may not read as green.
@@ -200,7 +205,7 @@ def _collect_reviews(client, owner, name, number) -> tuple[str, ...]:
         for node in nodes:
             if not isinstance(node, dict) or not isinstance(node.get("state"), str):
                 raise EvidenceUnavailable("a review did not report a state")
-            states.append(node["state"])
+            states.append(_enum(node["state"], REVIEW_STATES, "an opinionated review state"))
         info = page.get("pageInfo") or {}
         pages += 1
         if not info.get("hasNextPage"):
@@ -303,11 +308,22 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     policy = load_policy(client, owner, name, default_oid)
 
     protection_raw = client.branch_protection(owner, name, default_branch)
+    # Type-checked HERE as well as in the transport. The transport is where a malformed response
+    # is detected; this is where the value is used, and a gate that compares `None > 0` does not
+    # refuse — it raises, mid-decision, which reports nothing anyone can act on.
+    contexts = protection_raw.get("required_contexts")
+    approvals = protection_raw.get("required_approving_review_count")
+    if not isinstance(contexts, list) or not all(isinstance(c, str) for c in contexts):
+        raise EvidenceUnavailable("branch protection did not report a readable required-check set")
+    if type(approvals) is not int:
+        raise EvidenceUnavailable(
+            f"branch protection did not report a readable approving-review count ({approvals!r}); "
+            "an unreadable requirement is not no requirement")
     protection = Protection(
-        required_contexts=frozenset(protection_raw["required_contexts"]),
+        required_contexts=frozenset(contexts),
         required_bindings=dict(protection_raw.get("required_bindings") or {}),
-        required_approving_review_count=protection_raw["required_approving_review_count"],
-        strict=protection_raw["strict"],
+        required_approving_review_count=approvals,
+        strict=bool(protection_raw.get("strict")),
     )
 
     review_decision = pr.get("reviewDecision")

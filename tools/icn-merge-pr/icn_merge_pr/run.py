@@ -109,8 +109,36 @@ def detect_race(before: Snapshot, after: Snapshot) -> Reason | None:
     return None
 
 
+# The evaluator's own source. If either of these changed on the default branch since the copy now
+# running was installed, that copy is out of date about how to decide a merge.
+EVALUATOR_PATHS = ("tools/icn-merge-pr", "scripts/check-merge-policy-schema.py")
+
+
+def stale_evaluator(client, owner: str, name: str, installed: str, live: str) -> str | None:
+    """The first evaluator path that differs between the installed commit and the live tip.
+
+    Deliberately NOT "the installed commit must be the live tip". Merging advances the default
+    branch, so that rule would refuse every merge after the first one — a gate nobody can use is
+    a gate that gets bypassed. The question that actually matters is narrower: has THIS PROGRAM,
+    or the policy validator it vendored at install time, changed since it was installed. An
+    unrelated commit landing on the default branch does not make an evaluator wrong; a fix to the
+    evaluator does.
+
+    Fails closed: a path that cannot be resolved at either commit counts as changed.
+    """
+    if installed == live:
+        return None
+    for path in EVALUATOR_PATHS:
+        was = client.object_oid(owner, name, installed, path)
+        now = client.object_oid(owner, name, live, path)
+        if was is None or now is None or was != now:
+            return path
+    return None
+
+
 def run(client, owner: str, name: str, number: int, *, authorize: bool,
-        requested_strategy: str | None = None, exception_reason: str | None = None) -> Result:
+        requested_strategy: str | None = None, exception_reason: str | None = None,
+        installed_commit: str | None = None) -> Result:
     """`check` when `authorize` is false; the full evaluate-refresh-merge path when it is true."""
     command = "merge" if authorize else "check"
     result = Result(command=command, owner=owner, name=name, number=number,
@@ -151,6 +179,25 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
         result.outcome = race.code
         result.reasons = [race]
         return result
+
+    if installed_commit:
+        try:
+            drifted = stale_evaluator(client, owner, name, installed_commit,
+                                      fresh.default_branch_oid)
+        except MergeToolError as exc:
+            result.outcome = exc.outcome
+            result.reasons = [Reason(exc.outcome,
+                                     f"checking whether this evaluator is current: {exc.detail}")]
+            return result
+        if drifted is not None:
+            result.outcome = codes.REFUSED_EVALUATOR_STALE
+            result.reasons = [Reason(
+                codes.REFUSED_EVALUATOR_STALE,
+                f"{drifted} changed on {fresh.default_branch} since this copy was installed from "
+                f"{installed_commit[:12]} (now {fresh.default_branch_oid[:12]}). The program "
+                f"deciding this merge is not the program the default branch now describes — "
+                f"reinstall with `python3 tools/icn-merge-pr/install.py` and evaluate again.")]
+            return result
 
     recheck = evaluate(fresh, strategy)
     if not recheck.ready:
