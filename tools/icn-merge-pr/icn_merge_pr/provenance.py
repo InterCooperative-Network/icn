@@ -13,6 +13,8 @@ import pathlib
 from .errors import NotInstalled
 
 FILENAME = "provenance.json"
+# The directory name the source layout uses. An installed copy never lands here.
+SOURCE_DIR_NAME = "icn-merge-pr"
 
 
 def record_path() -> pathlib.Path:
@@ -20,7 +22,12 @@ def record_path() -> pathlib.Path:
 
 
 def is_installed() -> bool:
-    return record_path().is_file()
+    """True only for a copy whose provenance record it could not have written about itself."""
+    try:
+        read()
+    except NotInstalled:
+        return False
+    return True
 
 
 def read() -> dict:
@@ -36,6 +43,20 @@ def read() -> dict:
         raise NotInstalled(f"provenance record at {path} is unreadable: {exc}") from exc
     if not isinstance(record, dict) or not record.get("source_commit"):
         raise NotInstalled(f"provenance record at {path} names no source commit")
+
+    # A record is a claim, and a claim shipped by the change under evaluation is worth nothing.
+    # Committing `tools/icn-merge-pr/provenance.json` in a pull request would otherwise make the
+    # candidate copy look installed and unlock mutation — the exact boundary the file marks.
+    root = path.parent
+    if root.name == SOURCE_DIR_NAME:
+        raise NotInstalled(
+            f"{path} sits in the tool's own source layout ({SOURCE_DIR_NAME}/), so it is a "
+            "provenance record a checkout can write about itself. Install the program instead.")
+    recorded = record.get("lib")
+    if not isinstance(recorded, str) or pathlib.Path(recorded).resolve() != root.resolve():
+        raise NotInstalled(
+            f"provenance record at {path} was written for {recorded!r}, not for {root}; a record "
+            "copied beside a different copy of the code proves nothing about that copy.")
     return record
 
 

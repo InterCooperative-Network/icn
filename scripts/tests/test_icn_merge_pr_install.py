@@ -185,6 +185,23 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("the same code run straight out of the checkout refuses to mutate",
           "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
 
+    # The record is a claim, and a pull request can commit a file. A checkout that writes itself
+    # a provenance record must not thereby unlock the mutation it was written to gate.
+    forged = source / "tools" / "icn-merge-pr" / "provenance.json"
+    shutil.copyfile(lib / "provenance.json", forged)
+    proc = subprocess.run([sys.executable, str(source_copy), "merge", "1", "--authorize",
+                           "--repo", "example/icn"], capture_output=True, text=True, env=no_gh)
+    check("a provenance record committed into the source layout does not unlock mutation",
+          "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
+    relocated = tmp / "relocated" / "merge-pr"
+    shutil.copytree(lib, relocated, ignore=shutil.ignore_patterns("__pycache__"))
+    proc = subprocess.run([sys.executable, str(relocated / "icn_merge_pr" / "__main__.py"),
+                           "merge", "1", "--authorize", "--repo", "example/icn"],
+                          capture_output=True, text=True, env=no_gh)
+    check("an installed tree moved away from the location its record names does not mutate",
+          "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
+    forged.unlink()
+
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"
     hostile = candidate / "icn_merge_pr"
