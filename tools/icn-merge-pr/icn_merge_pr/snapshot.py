@@ -324,9 +324,14 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable approving-review count ({approvals!r}); "
             "an unreadable requirement is not no requirement")
+    bindings = protection_raw.get("required_bindings") or {}
+    if not isinstance(bindings, dict) or not all(
+            value is None or type(value) is int for value in bindings.values()):
+        raise EvidenceUnavailable(
+            "branch protection did not report readable required-check producers")
     protection = Protection(
         required_contexts=frozenset(contexts),
-        required_bindings=dict(protection_raw.get("required_bindings") or {}),
+        required_bindings=dict(bindings),
         required_approving_review_count=approvals,
         strict=strict,
     )

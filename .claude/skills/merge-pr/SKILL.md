@@ -63,16 +63,23 @@ silently rots (icn#2651).
 
 ## When the executable is missing
 
-Refuse the merge and hand the operator the install command. There is no fallback:
+Refuse the merge. There is no fallback merge path, and **do not run the installer that is sitting
+in the working tree** — a change under review can edit its own installer, so an installer taken
+from the checkout being reviewed vouches for nothing, including itself.
+
+Hand the operator this instead: take the installer from the trusted default-branch ref, and point
+it at a checkout that is on that branch.
 
 ```bash
-python3 tools/icn-merge-pr/install.py
+git -C <repo> fetch origin
+git -C <repo> show origin/<default-branch>:tools/icn-merge-pr/install.py > /tmp/icn-install.py
+python3 /tmp/icn-install.py --source <a checkout on the default branch>
 ```
 
-Installation refuses unless its source checkout is the repository's default branch, clean, and at
-the current remote head — so a checkout of the PR under review cannot install the program that
-would merge it. The installed program lives under `~/.local`, outside every worktree.
-`icn-merge-pr provenance` reports which commit is installed.
+Resolve `<default-branch>` from GitHub, not from a file in the repository. The installer then
+refuses unless that source checkout is clean and at the current remote head. The installed program
+lives under `~/.local`, outside every worktree. `icn-merge-pr provenance` reports which commit is
+installed.
 
 ## Boundaries
 

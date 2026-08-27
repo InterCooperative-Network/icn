@@ -372,6 +372,14 @@ status_only["check_pages"] = [[n for n in status_only["check_pages"][0]
                                   "state": "SUCCESS"}]]
 expect("a plain commit status standing in for a producer-bound required check", status_only,
        codes.REFUSED_REQUIRED_CHECK_MISSING)
+for bad in ("15368", 15368.0, [], {}, True):
+    junk = world()
+    junk["protection"]["required_bindings"] = dict(world()["protection"]["required_bindings"])
+    junk["protection"]["required_bindings"][REQUIRED[0]] = bad
+    _, r = evaluate_world(junk)
+    check(f"a required-check producer of {bad!r} is unreadable, not unbound",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+
 unbound = world()
 unbound["protection"]["required_bindings"] = {}
 for node in unbound["check_pages"][0]:

@@ -8,9 +8,20 @@ auto-merge, never enqueues, and never leaves a future merge armed.
 
 ## Install
 
+Take the installer from the trusted default-branch ref, not from the working tree — a change under
+review can edit its own installer, and one taken from the checkout being reviewed vouches for
+nothing, including itself:
+
 ```bash
-python3 tools/icn-merge-pr/install.py
+git -C <repo> fetch origin
+git -C <repo> show origin/<default-branch>:tools/icn-merge-pr/install.py > /tmp/icn-install.py
+python3 /tmp/icn-install.py --source <a checkout on the default branch>
 ```
+
+The installer also refuses to run out of a checkout that is not on the default branch, which
+catches the honest accident of running the copy in front of you. That check cannot bind a tampered
+installer — a pull request editing the file deletes the check too — which is exactly why the
+instruction above starts from the ref rather than the tree.
 
 Installation **refuses** unless its source checkout is provably the live default-branch tip: the
 default branch and its head OID come from GitHub, the checkout must be on that branch, `git fetch`

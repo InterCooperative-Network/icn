@@ -174,9 +174,43 @@ exec "{python}" -E -s "{entry}" "$@"
 """
 
 
+def refuse_if_run_from_a_candidate_checkout() -> None:
+    """Refuse when THIS FILE is being run out of a checkout that is not on the default branch.
+
+    Read what this can and cannot do. It catches the honest accident — an operator or agent
+    standing in the worktree under review and running the installer that happens to be in front of
+    them. It CANNOT bind a tampered installer: a pull request that edits this file deletes this
+    function along with every other check, which is why the operating instruction is to run the
+    installer from the trusted default-branch ref rather than from the working tree. The check is
+    worth having anyway, because the accident is the common case and the tamper is not.
+    """
+    here = pathlib.Path(__file__).resolve().parent
+    for directory in (here, *here.parents):
+        if not (directory / ".git").exists():
+            continue
+        try:
+            branch = _git(directory, "rev-parse", "--abbrev-ref", "HEAD")
+            owner, name = repository_identity(directory)
+            default = github_default_branch(owner, name)["branch"]
+        except InstallRefused:
+            return                                  # not a checkout we can reason about
+        if branch != default:
+            raise InstallRefused(
+                f"this installer is itself running out of {directory}, which is on {branch!r} "
+                f"rather than the default branch {default!r}. An installer taken from the change "
+                "under review cannot vouch for anything, including itself. Run the copy on the "
+                f"default branch instead:\n"
+                f"    git -C <repo> fetch origin\n"
+                f"    git -C <repo> show origin/{default}:tools/icn-merge-pr/install.py > "
+                f"/tmp/icn-install.py\n"
+                f"    python3 /tmp/icn-install.py --source <a checkout on {default}>")
+        return
+
+
 def install(source: pathlib.Path, prefix: pathlib.Path, dry_run: bool = False) -> dict:
     if sys.version_info < MIN_PYTHON:
         raise InstallRefused(f"python >= {'.'.join(map(str, MIN_PYTHON))} is required")
+    refuse_if_run_from_a_candidate_checkout()
     record = verify_provenance(source)
     files = installed_files(source)
 

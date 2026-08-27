@@ -280,7 +280,18 @@ class GhCli:
             if isinstance(entry, dict) and isinstance(entry.get("context"), str):
                 contexts.append(entry["context"])
                 app = entry.get("app_id")
-                bindings[entry["context"]] = app if type(app) is int and app > 0 else None
+                # null and -1 are GitHub's documented "any producer". Everything else must be a
+                # real app id: mapping an unreadable value like "15368" to None would silently
+                # UNBIND the check, and an unbound check accepts a green run from any source.
+                if app is None or app == -1:
+                    bindings[entry["context"]] = None
+                elif type(app) is int and app > 0:
+                    bindings[entry["context"]] = app
+                else:
+                    raise EvidenceUnavailable(
+                        f"branch protection reports an unreadable producer for "
+                        f"{entry['context']!r} (app_id={app!r}); an unreadable binding is not an "
+                        "absent one")
         if not contexts:
             for entry in checks.get("contexts") or []:
                 if isinstance(entry, str):

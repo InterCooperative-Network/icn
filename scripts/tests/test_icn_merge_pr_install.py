@@ -33,6 +33,12 @@ _spec = importlib.util.spec_from_file_location(
 install = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(install)
 
+# This module IS the copy in the checkout under test, which is normally a feature branch, so its
+# own "am I being run out of a candidate checkout" guard would refuse every case below. It is
+# neutralised here and tested separately, against a fixture copy whose branch we control.
+_real_self_check = install.refuse_if_run_from_a_candidate_checkout
+install.refuse_if_run_from_a_candidate_checkout = lambda: None
+
 failures: list[str] = []
 
 
@@ -150,6 +156,31 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("an untracked file inside the evaluator source is refused",
           "not clean" in message, message[:160])
     smuggled.unlink()
+
+    print("the installer refuses to run out of a checkout it cannot vouch for")
+    fixture_spec = importlib.util.spec_from_file_location(
+        "fixture_install", source / "tools" / "icn-merge-pr" / "install.py")
+    fixture = importlib.util.module_from_spec(fixture_spec)
+    fixture_spec.loader.exec_module(fixture)
+    fixture.repository_identity = lambda src: ("example", "icn")
+    fixture.github_default_branch = lambda owner, name: {"branch": "main", "oid": head}
+
+    git(source, "checkout", "-q", "-b", "feat/self-check")
+    try:
+        fixture.refuse_if_run_from_a_candidate_checkout()
+        check("an installer run out of a feature-branch checkout refuses", False, "it proceeded")
+    except fixture.InstallRefused as exc:
+        check("an installer run out of a feature-branch checkout refuses",
+              "cannot vouch for anything" in str(exc) and "feat/self-check" in str(exc),
+              str(exc)[:200])
+        check("the refusal tells the operator to take the installer from the ref",
+              "show origin/main:tools/icn-merge-pr/install.py" in str(exc), str(exc)[:200])
+    git(source, "checkout", "-q", "main")
+    try:
+        fixture.refuse_if_run_from_a_candidate_checkout()
+        check("an installer run out of the default branch proceeds", True)
+    except fixture.InstallRefused as exc:
+        check("an installer run out of the default branch proceeds", False, str(exc)[:160])
 
     print("a clean, current default-branch checkout installs")
     prefix = tmp / "prefix"
