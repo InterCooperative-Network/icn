@@ -158,6 +158,39 @@ must_pass("the semantic auto-merge declaration remains expressible",
 must_pass("auto-merge can be declared disabled",
           lambda d: d["merge"]["auto_merge"].update(enabled=False))
 
+# --- readiness is a CLOSED subset of MergeStateStatus, not the whole enum ----------------------
+print("only genuinely-ready merge states are admitted")
+for _bad in ("DIRTY", "BLOCKED", "BEHIND", "HAS_HOOKS", "UNKNOWN"):
+    must_fail(f"merge_state_status_in admitting {_bad} alongside CLEAN",
+              lambda d, b=_bad: d["merge"]["ready_when"].update(merge_state_status_in=["CLEAN", b]),
+              expect="non-ready merge states")
+must_fail("merge_state_status_in = every enum member",
+          lambda d: d["merge"]["ready_when"].update(merge_state_status_in=[
+              "DIRTY", "UNKNOWN", "BLOCKED", "BEHIND", "UNSTABLE", "HAS_HOOKS", "CLEAN"]))
+must_pass("CLEAN alone is ready", lambda d: d["merge"]["ready_when"].update(
+    merge_state_status_in=["CLEAN"]))
+must_pass("CLEAN + UNSTABLE is ready", lambda d: d["merge"]["ready_when"].update(
+    merge_state_status_in=["CLEAN", "UNSTABLE"]))
+
+# --- ONE OWNER: the UNSTABLE decision has exactly one home -------------------------------------
+print("no second owner of the unstable-readiness decision")
+must_fail("unstable_is_mergeable reappearing as a duplicate owner",
+          lambda d: d["merge"].update(unstable_is_mergeable=True),
+          expect="second owner")
+must_fail("unstable_is_mergeable reappearing and DISAGREEING with the allowlist",
+          lambda d: d["merge"].update(unstable_is_mergeable=False))
+
+# --- the authoritative source is pinned, not merely existent -----------------------------------
+print("admin-bypass eligibility source is pinned to the accepted ADR")
+for _sub in ("/etc/passwd", "README.md", "docs/adr/ADR-0010-app-topology.md",
+             "docs/adr/../adr/ADR-0016-admin-merge-exception-policy.md",
+             "../../../etc/hosts", "", "docs/adr/ADR-0016-admin-merge-exception-policy.md.bak"):
+    must_fail(f"authoritative_source = {_sub!r}",
+              lambda d, s=_sub: d["merge"]["admin_bypass"].update(authoritative_source=s))
+must_pass("the exact accepted ADR path is accepted",
+          lambda d: d["merge"]["admin_bypass"].update(
+              authoritative_source="docs/adr/ADR-0016-admin-merge-exception-policy.md"))
+
 # --- ONE OWNER: ADR-0016 owns admin-bypass eligibility ------------------------------------------
 print("ADR-0016 is the sole owner of admin-bypass eligibility")
 must_fail("a structured `requires` eligibility replica returning",

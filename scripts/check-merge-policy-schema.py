@@ -61,6 +61,16 @@ MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS
 STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE
 TERMINAL_SAFE = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 LIVE_SOURCES = {"github_branch_protection"}                  # CLOSED symbolic sources.
+# The ONLY merge states in which an ordinary merge may proceed. A CLOSED subset, not "any member of
+# MergeStateStatus": DIRTY (conflict), BLOCKED (unmet requirements), BEHIND (out of date),
+# HAS_HOOKS and UNKNOWN are not readiness. Checking enum membership alone let `["CLEAN","DIRTY"]`
+# validate clean (icn#2658 review). UNSTABLE is admitted only because non-blocking checks do not
+# gate — the required set is proved green separately.
+READY_MERGE_STATES = {"CLEAN", "UNSTABLE"}
+# The accepted ADR that owns admin-bypass eligibility. Pinned exactly: an existence check alone
+# certified any readable file, including an absolute path such as /etc/passwd or a different ADR,
+# so a contributor could substitute another eligibility contract and still pass the gate.
+ADMIN_BYPASS_ADR = "docs/adr/ADR-0016-admin-merge-exception-policy.md"
 # A value that looks like a shell command or a CLI flag has no business in policy data.
 COMMAND_SHAPED = re.compile(r"(^|\s)(gh|git|jq|eval|bash|sh)\s|(^|\s)--[a-z]")
 
@@ -174,6 +184,16 @@ def validate(policy) -> list[str]:
             leak = sorted(set(mss) & MERGEABLE_ONLY)
             req(not leak, f"ready_when: MergeableState value leaked into a mergeStateStatus field: {leak}")
             req("CLEAN" in mss, "ready_when: CLEAN must be admitted — it is the state it exists for")
+            # Membership in the full enum is not readiness.
+            notready = sorted(set(mss) - READY_MERGE_STATES)
+            req(not notready,
+                f"ready_when.merge_state_status_in admits non-ready merge states: {notready} "
+                f"(only {sorted(READY_MERGE_STATES)} may be treated as ready)")
+        # ONE OWNER for the UNSTABLE decision. A separate boolean duplicating it could disagree
+        # with the allowlist and nothing would notice (icn#2658 review).
+        req("unstable_is_mergeable" not in merge,
+            "merge.unstable_is_mergeable: a second owner of a decision ready_when.merge_state_"
+            "status_in already makes — remove it rather than keeping two answers in sync")
         dok, draft = field(ready, "is_draft", as_exact_bool, "ready_when.is_draft")
         if dok:
             req(draft is False, "ready_when.is_draft must be false")
@@ -233,7 +253,16 @@ def validate(policy) -> list[str]:
             req(agent_exec is False, "admin_bypass.agent_execution must be false")
         sok, src = field(bypass, "authoritative_source", as_str, "admin_bypass.authoritative_source")
         if sok:
-            req((ROOT / src).is_file(),
+            # Exact, repo-relative, and inside ROOT. An existence check alone accepted any readable
+            # file — /etc/passwd, README.md, or a different ADR — which would let a contributor
+            # substitute another eligibility contract while passing this gate (icn#2658 review).
+            req(src == ADMIN_BYPASS_ADR,
+                f"admin_bypass.authoritative_source must be exactly {ADMIN_BYPASS_ADR!r}, got {src!r}")
+            resolved = (ROOT / src).resolve()
+            req(not pathlib.PurePath(src).is_absolute() and resolved.is_relative_to(ROOT.resolve()),
+                f"admin_bypass.authoritative_source must be a repo-relative path inside the "
+                f"repository: {src!r}")
+            req(resolved.is_file(),
                 f"admin_bypass.authoritative_source does not exist: {src}")
         for key in ("never_for", "eligibility_note", "fail_closed", "consumer_note"):
             field(bypass, key, as_str, f"admin_bypass.{key}")
