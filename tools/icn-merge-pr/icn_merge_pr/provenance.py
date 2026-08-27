@@ -21,6 +21,25 @@ def record_path() -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parent.parent / FILENAME
 
 
+def _containing_source_checkout(start: pathlib.Path) -> pathlib.Path | None:
+    """The git checkout carrying THIS TOOL'S SOURCE that `start` sits inside, if any.
+
+    Refusing every path under any git repository would break a legitimate install for anyone who
+    versions their home directory, so the test is specific: a repository is disqualifying only
+    when it also contains `tools/icn-merge-pr`. That is the repository whose pull requests could
+    have written the record, and a candidate that renames its directory to dodge the name check
+    is still sitting inside it.
+    """
+    try:
+        here = start.resolve()
+    except OSError:
+        return None
+    for directory in (here, *here.parents):
+        if (directory / ".git").exists() and (directory / "tools" / SOURCE_DIR_NAME).is_dir():
+            return directory
+    return None
+
+
 def is_installed() -> bool:
     """True only for a copy whose provenance record it could not have written about itself."""
     try:
@@ -52,6 +71,12 @@ def read() -> dict:
         raise NotInstalled(
             f"{path} sits in the tool's own source layout ({SOURCE_DIR_NAME}/), so it is a "
             "provenance record a checkout can write about itself. Install the program instead.")
+    checkout = _containing_source_checkout(root)
+    if checkout is not None:
+        raise NotInstalled(
+            f"{path} is inside {checkout}, a checkout that carries this tool's source, so the "
+            "record is a file that repository can write about itself — renaming the directory "
+            "does not change that. An installed copy lives outside every worktree.")
     recorded = record.get("lib")
     if not isinstance(recorded, str) or pathlib.Path(recorded).resolve() != root.resolve():
         raise NotInstalled(

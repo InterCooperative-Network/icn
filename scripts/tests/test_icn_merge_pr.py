@@ -184,6 +184,15 @@ def mutate(**pr_fields) -> dict:
     return w
 
 
+def policy_with(fn) -> dict:
+    """A world serving the real policy with one mutation applied at the pinned revision."""
+    document = json.loads(POLICY_TEXT)
+    fn(document)
+    w = world()
+    w["blobs"] = {POLICY_PATH: json.dumps(document), ADR_PATH: ADR_TEXT}
+    return w
+
+
 # --- the ready control ------------------------------------------------------------------------
 print("a clean PR is ready")
 fake, result = evaluate_world(world())
@@ -353,6 +362,24 @@ drift_extra = world()
 drift_extra["protection"]["required_contexts"] = list(REQUIRED) + ["A New Gate"]
 expect("live protection requires a check policy does not declare", drift_extra,
        codes.REFUSED_POLICY_DRIFT)
+loose = world()
+loose["protection"]["strict"] = False
+expect("the up-to-date requirement policy relies on is switched off live", loose,
+       codes.REFUSED_POLICY_DRIFT)
+_, loose_result = evaluate_world(loose)
+check("the strict drift refusal says which setting disagrees",
+      any("strict_up_to_date" in r.detail for r in loose_result.reasons))
+expect("policy that declares strict_up_to_date as something other than a boolean",
+       policy_with(lambda d: d["branch"].update(strict_up_to_date="yes")),
+       codes.REFUSED_POLICY_INVALID)
+silent = policy_with(lambda d: d["branch"].pop("strict_up_to_date"))
+silent["protection"]["strict"] = False
+expect("a policy that makes no strict claim has no strict drift to report", silent,
+       codes.READY)
+other_protection_objects = world()
+other_protection_objects["protection"]["required_approving_review_count"] = 0
+expect("the drift gate does not reach into protection objects policy does not own",
+       other_protection_objects, codes.READY)
 
 # --- deferral ---------------------------------------------------------------------------------------
 print("nothing may be deferred")
@@ -385,14 +412,6 @@ print("policy must satisfy its own schema before it is consumed")
 expect("policy that is not decodable JSON", world(blobs={POLICY_PATH: "{not json",
                                                         ADR_PATH: ADR_TEXT}),
        codes.REFUSED_POLICY_INVALID)
-
-
-def policy_with(fn) -> dict:
-    document = json.loads(POLICY_TEXT)
-    fn(document)
-    w = world()
-    w["blobs"] = {POLICY_PATH: json.dumps(document), ADR_PATH: ADR_TEXT}
-    return w
 
 
 expect("policy naming a strategy outside the closed set",

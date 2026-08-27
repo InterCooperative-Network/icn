@@ -92,6 +92,7 @@ class MergePolicy:
     require_queue_absent: bool
     require_not_in_queue: bool
     require_auto_merge_absent: bool
+    require_strict_status_checks: bool | None
 
 
 def _typed(node, key, kind, label):
@@ -162,6 +163,22 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
                             "this program knows how to read")
 
     required = _typed(merge, "required_checks", list, "merge.required_checks")
+
+    # `branch.strict_up_to_date` is the pinned document's declaration about the SAME live object
+    # `required_checks_live_source` points at: `required_status_checks`, whose `strict` flag says
+    # whether a branch must be current before it may merge. Reading it is not the circularity the
+    # trust sequence forbids — that prohibition is on treating a policy field as the TRUST ROOT,
+    # and `branch.primary` is still never consulted. By the time this runs, the base has already
+    # been proved to be the externally resolved default branch, so the document is trusted.
+    # It sits outside `merge`, which the landed schema validator does not cover, so its type is
+    # established here: a malformed declaration about a protection control is not a soft failure.
+    strict_declared = (document.get("branch") or {}).get("strict_up_to_date") \
+        if isinstance(document.get("branch"), dict) else None
+    if strict_declared is not None and not isinstance(strict_declared, bool):
+        raise PolicyInvalid("branch.strict_up_to_date is present but is not a boolean; a "
+                            "malformed declaration about a branch-protection control is not a "
+                            "claim this program will act on")
+
     return MergePolicy(
         oid=oid,
         text_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
@@ -184,4 +201,5 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
         require_queue_absent=bool(ready["not_deferred"]["merge_queue_absent"]),
         require_not_in_queue=not bool(ready["not_deferred"]["is_in_merge_queue"]),
         require_auto_merge_absent=bool(ready["not_deferred"]["auto_merge_request_absent"]),
+        require_strict_status_checks=strict_declared,
     )

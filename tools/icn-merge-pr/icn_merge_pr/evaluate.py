@@ -80,6 +80,20 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
     # --- configuration soundness ---------------------------------------------------------------
     # Fail closed on drift between the pinned policy and live branch protection. Either direction
     # is a real disagreement about what gates a merge, and neither owner may be quietly preferred.
+    #
+    # The gate covers the REQUIRED-STATUS-CHECKS configuration — which contexts, and whether a
+    # branch must be current — because that is the object `required_checks_live_source` names.
+    # It deliberately does not reach into other protection objects: this repository's policy and
+    # its live `enforce_admins` already disagree, that disagreement is owned by the document
+    # rather than by this program, and a gate that refused every merge over it would be a gate
+    # nobody could use.
+    want_strict = snap.policy.require_strict_status_checks
+    if want_strict is not None and snap.protection.strict != want_strict:
+        refuse(codes.REFUSED_POLICY_DRIFT,
+               f"pinned policy at {policy.oid[:12]} declares strict_up_to_date={want_strict} but "
+               f"live protection on {snap.default_branch!r} reports strict="
+               f"{snap.protection.strict}; the up-to-date requirement policy relies on is not the "
+               f"one in force")
     declared = snap.policy.required_checks
     live = snap.protection.required_contexts
     if declared != live:

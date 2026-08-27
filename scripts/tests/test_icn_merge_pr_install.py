@@ -193,6 +193,18 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
                            "--repo", "example/icn"], capture_output=True, text=True, env=no_gh)
     check("a provenance record committed into the source layout does not unlock mutation",
           "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
+    renamed = source / "tools" / "vendored-helper"
+    shutil.copytree(lib, renamed, ignore=shutil.ignore_patterns("__pycache__"))
+    forged_record = json.loads((renamed / "provenance.json").read_text(encoding="utf-8"))
+    forged_record["lib"] = str(renamed)
+    (renamed / "provenance.json").write_text(json.dumps(forged_record), encoding="utf-8")
+    proc = subprocess.run([sys.executable, str(renamed / "icn_merge_pr" / "__main__.py"),
+                           "merge", "1", "--authorize", "--repo", "example/icn"],
+                          capture_output=True, text=True, env=no_gh)
+    check("a renamed copy inside the source checkout, with a matching record, still does not "
+          "mutate", "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:220])
+    shutil.rmtree(renamed)
+
     relocated = tmp / "relocated" / "merge-pr"
     shutil.copytree(lib, relocated, ignore=shutil.ignore_patterns("__pycache__"))
     proc = subprocess.run([sys.executable, str(relocated / "icn_merge_pr" / "__main__.py"),
