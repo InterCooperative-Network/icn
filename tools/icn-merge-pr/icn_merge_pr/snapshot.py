@@ -158,14 +158,40 @@ class Snapshot:
 
 
 def _enum(value, allowed, label):
-    if value not in allowed:
+    """Membership in a pinned vocabulary — after establishing the value can be tested at all.
+
+    `value not in allowed` raises TypeError on an unhashable value, and a JSON array or object is
+    unhashable. That escapes MergeToolError handling entirely and crashes the run instead of
+    refusing, so the type is established first.
+    """
+    if not isinstance(value, str) or value not in allowed:
         raise EvidenceUnavailable(f"{label} is {value!r}, which is not a value this program knows")
     return value
 
 
 def _app_id(node) -> int | None:
-    app = ((node.get("checkSuite") or {}).get("app") or {}).get("databaseId")
-    return app if type(app) is int else None
+    """The producing App's id, or None when the run genuinely names no App.
+
+    Each nesting level is type-checked rather than chained through `or {}`: a truthy non-object
+    `checkSuite` or `app` raises AttributeError on the next `.get`, which terminates the evaluator
+    with a traceback instead of a structured refusal. Absent is None; unreadable refuses.
+    """
+    suite = node.get("checkSuite")
+    if suite is None:
+        return None
+    if not isinstance(suite, dict):
+        raise EvidenceUnavailable(f"a check run reported an unreadable check suite ({suite!r})")
+    app = suite.get("app")
+    if app is None:
+        return None
+    if not isinstance(app, dict):
+        raise EvidenceUnavailable(f"a check run reported an unreadable producing app ({app!r})")
+    app_id = app.get("databaseId")
+    if app_id is not None and type(app_id) is not int:
+        raise EvidenceUnavailable(
+            f"a check run reported an unreadable producer id ({app_id!r}); unreadable is not "
+            "unbound")
+    return app_id
 
 
 def _normalise_check(node) -> tuple[str, CheckOccurrence] | None:
@@ -286,11 +312,14 @@ def _collect_checks(client, owner, name, number,
     found: dict[str, list[CheckOccurrence]] = {}
     while True:
         page = client.check_contexts_page(owner, name, number, cursor)
-        if page.get("head_oid") not in (None, head_oid):
-            # The rollup belongs to a different commit than the PR reported. That is not stale
-            # data to work around; it is inconsistent evidence, and the run must not decide on it.
+        rollup_head = page.get("head_oid")
+        if not isinstance(rollup_head, str) or rollup_head != head_oid:
+            # The rollup must SAY which commit it describes, and say the right one. Accepting a
+            # missing identity let green checks count for the PR head without proving they belong
+            # to it; a different identity is inconsistent evidence. Neither is decidable on.
             raise EvidenceUnavailable(
-                f"check rollup is for {page.get('head_oid')}, but the PR head is {head_oid}")
+                f"check rollup reports head {rollup_head!r}, but the PR head is {head_oid}; "
+                "checks that cannot be tied to this head do not describe it")
         if total is None:
             total = page.get("totalCount")
             if type(total) is not int:

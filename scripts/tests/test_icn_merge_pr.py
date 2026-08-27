@@ -446,6 +446,40 @@ unreadable_node["check_pages"][0].append({"__typename": "SomethingNew", "name": 
 expect("a rollup entry this program cannot read", unreadable_node,
        codes.REFUSED_UNAVAILABLE_EVIDENCE)
 
+print("malformed external evidence refuses instead of crashing")
+for field in ("state", "mergeable", "mergeStateStatus"):
+    for shape in (["OPEN"], {"v": "OPEN"}, 7, None):
+        try:
+            _, r = evaluate_world(mutate(**{field: shape}))
+            got = r.outcome
+        except Exception as exc:                              # noqa: BLE001 — that is the point
+            got = f"raised {type(exc).__name__}"
+        check(f"{field}={shape!r} refuses instead of raising",
+              got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+for shape in ("not-an-object", 7, []):
+    bad_suite = world()
+    bad_suite["check_pages"][0][0] = dict(bad_suite["check_pages"][0][0], checkSuite=shape)
+    try:
+        _, r = evaluate_world(bad_suite)
+        got = r.outcome
+    except Exception as exc:                                  # noqa: BLE001
+        got = f"raised {type(exc).__name__}"
+    check(f"a checkSuite of {shape!r} refuses instead of raising",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+bad_app = world()
+bad_app["check_pages"][0][0] = dict(bad_app["check_pages"][0][0], checkSuite={"app": "nope"})
+_, r = evaluate_world(bad_app)
+check("an unreadable producing app refuses", r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE,
+      f"got {r.outcome}")
+bad_app_id = world()
+bad_app_id["check_pages"][0][0] = dict(bad_app_id["check_pages"][0][0],
+                                       checkSuite={"app": {"databaseId": "15368"}})
+_, r = evaluate_world(bad_app_id)
+check("an unreadable producer id is not treated as unbound",
+      r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+expect("a rollup that names no head commit at all", world(rollup_head=None),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+
 stale_rollup = world(rollup_head="9" * 40)
 expect("a rollup belonging to a different head is inconsistent evidence", stale_rollup,
        codes.REFUSED_UNAVAILABLE_EVIDENCE)
