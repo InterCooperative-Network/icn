@@ -238,14 +238,32 @@ check("admin_bypass records that no agent skill executes it",
 # assigned a runner). `IN_PROGRESS` means assigned and producing evidence, so allowlisting it
 # contradicted the ADR this block mirrors — the exact defect class icn#2651 was filed about.
 ASSIGNED_STATES = {"IN_PROGRESS", "COMPLETED"}
+stall = req.get("stalled_required_check", {}) if isinstance(req, dict) else {}
+check("the queue-stall qualifier is structural, not a bare threshold",
+      isinstance(stall, dict)
+      and isinstance(stall.get("qualifying_states"), list)
+      and isinstance(stall.get("excluded_states"), list))
+qual = set(stall.get("qualifying_states") or [])
+excl = set(stall.get("excluded_states") or [])
+check(f"no assigned/running state qualifies as a stall: {sorted(qual & ASSIGNED_STATES)}",
+      not (qual & ASSIGNED_STATES))
+check("a started job is excluded BY NAME, not merely omitted",
+      ASSIGNED_STATES <= excl)
+check("qualifying and excluded states are disjoint", not (qual & excl))
+check("the 30-minute threshold applies to the qualifying condition",
+      stall.get("min_pending_minutes") == 30 and stall.get("elapsed_seconds") == 0)
+check("the stall qualifier records why a started job is not a stall", bool(stall.get("note")))
 if isinstance(req, dict):
     assigned = ASSIGNED_STATES & set(req.get("required_check_pending_allowlist") or [])
-    check(f"admin_bypass allowlists no state meaning the runner already started: {sorted(assigned)}",
-          not assigned)
-    check("admin_bypass records why a started job is not a stall",
-          bool(req.get("pending_allowlist_note")))
-check("CONTROL: an IN_PROGRESS entry in the stall allowlist WOULD be caught",
-      bool(ASSIGNED_STATES & {"QUEUED", "IN_PROGRESS"}))
+    check(f"the pending allowlist admits no started state: {sorted(assigned)}", not assigned)
+    check("pending allowlist and stall qualifying_states agree",
+          set(req.get("required_check_pending_allowlist") or []) == qual)
+# CONTROLS: a genuinely queued stall qualifies; a running check cannot.
+check("CONTROL: a QUEUED check can still qualify as a stall", "QUEUED" in qual)
+check("CONTROL: an IN_PROGRESS check cannot qualify as a stall",
+      "IN_PROGRESS" not in qual and "IN_PROGRESS" in excl)
+check("CONTROL: the pre-review allowlist (with IN_PROGRESS) WOULD be caught",
+      bool(ASSIGNED_STATES & {"QUEUED", "IN_PROGRESS", "WAITING"}))
 
 # CONTROLS: the shape checks would be vacuous if the pre-fix policy passed them.
 _pre_fix_bypass = {"condition": "Required checks are green AND mergeStateStatus=MERGEABLE ..."}
@@ -355,6 +373,14 @@ for name, canonical, mirrors in skill_paths:
     fenced = fenced_lines(body)
     lines = body.splitlines()
     frontmatter = body.split("---", 2)[1] if body.startswith("---") else ""
+    merge_step = body.split("5. **Merge.**", 1)[-1].split("6. **Confirm", 1)[0]
+    resolve_step = body.split("1. Resolve the PR", 1)[-1].split("2. **Load the policy", 1)[0]
+    # Assert against COMMANDS, never step prose. The evidence TABLE in step 5 names the very
+    # fields the refresh must load, so a substring check over prose passes on a refresh that
+    # loads none of them — the same prose/command confusion this file has had to learn
+    # repeatedly (the `--paginate` mention, the non-mutating refresh, and this).
+    resolve_cmds = " ".join(fenced_lines(resolve_step))
+    merge_cmds = " ".join(fenced_lines(merge_step))
 
     # -- (3a) THE REDUCED AUTHORITY SURFACE. The heart of icn#2656.
     check(f"{name}: no command carries --admin: "
@@ -418,7 +444,18 @@ for name, canonical, mirrors in skill_paths:
     # worktree layout is normally the PR branch — so a PR editing policy.json supplied the rules
     # that admitted it. `--match-head-commit` pins the remote head, not the local policy revision.
     check(f"{name}: reads merge policy pinned to the PR's base, not the working tree",
-          "contents/ops/state/truth/policy.json?ref=${BASE_ENC}" in cmd_text)
+          "contents/ops/state/truth/policy.json?ref=${BASE_OID}" in cmd_text)
+    # A branch name re-resolves; only a commit OID is a pin. Review of 36a4b731/549d8bdc.
+    check(f"{name}: pins the policy to an immutable commit, not a branch name",
+          "policy.json?ref=${BASE}" not in cmd_text
+          and "policy.json?ref=${BASE_ENC}" not in cmd_text)
+    check(f"{name}: the resolve step COMMAND captures baseRefOid",
+          "baseRefOid" in resolve_cmds)
+    # Base MOVEMENT (not just retarget) invalidates: it changes the policy revision evaluated.
+    check(f"{name}: the pre-merge COMMAND re-reads baseRefOid so a moved base is caught",
+          "baseRefOid" in merge_cmds)
+    check(f"{name}: and says why a moved base is staleness",
+          bool(re.search(r"base branch advancing", " ".join(body.split()), re.I)))
     steps_only = body.split("## Steps", 1)[-1]
     worktree_reads = [ln for ln in steps_only.splitlines()
                       if "policy.json'" in ln or "policy.json)" in ln]
@@ -427,13 +464,21 @@ for name, canonical, mirrors in skill_paths:
     check(f"{name}: refuses when the base's policy lacks the gate",
           bool(re.search(r"no `?\.?merge\.ready_when`?, \*\*stop", " ".join(body.split()), re.I)
                or "has no `.merge.ready_when`, **stop.**" in " ".join(body.split())))
-    # The base must be resolved BEFORE the policy is pinned to it.
-    check(f"{name}: resolves the base before pinning the policy to it",
-          body.index("BASE_ENC=$(jq -rn") < body.index("policy.json?ref="))
+    # The base must be resolved BEFORE the policy is pinned to it. Scoped to the PROCEDURE:
+    # the frontmatter contract also names the pinned path, and it precedes every step.
+    _steps = body.split("## Steps", 1)[-1]
+    check(f"{name}: resolves the base OID before pinning the policy to it",
+          "baseRefOid" in _steps
+          and _steps.index("baseRefOid") < _steps.index("policy.json?ref="))
     # The declared truth_contract must not tell consumers to interpolate the RAW base.
     check(f"{name}: the live-load contract uses the ENCODED base",
           "branches/$BASE_ENC/protection" in frontmatter
           and "branches/$BASE/protection" not in frontmatter)
+    check(f"{name}: the contract declares the policy comes from the PINNED BASE COMMIT",
+          "policy.json?ref=$BASE_OID" in frontmatter
+          and "policy.json@$BASE_OID" in frontmatter)
+    check(f"{name}: the contract does not still name a bare worktree policy source",
+          not re.search(r"^\s*- ops/state/truth/policy\.json\s*(#|$)", frontmatter, re.M))
     check(f"{name}: encodes the base with a real encoder, not a hand-rolled substitution",
           "@uri" in cmd_text
           and not re.search(r"BASE.*(//|s#|tr ).*%2F", body)
@@ -488,7 +533,6 @@ for name, canonical, mirrors in skill_paths:
     # Review of 9f18c08f: for a policy-required check that is NOT a live protection context,
     # this skill is the ONLY enforcer — GitHub's merge-time re-evaluation does not cover it. So
     # the pre-merge refresh must re-read check state, not only branch identity.
-    merge_step = body.split("5. **Merge.**", 1)[-1].split("6. **Confirm", 1)[0]
     # Review of c0c1ee80: the refresh ran `gh pr checks` WITHOUT assigning it, so it printed the
     # new JSON and discarded it while item 6 was re-evaluated against the stale step-3 table.
     # The old assertion checked the command's PRESENCE and so passed on that. Assert the EFFECT:
@@ -504,8 +548,36 @@ for name, canonical, mirrors in skill_paths:
     # CHANGES_REQUESTED or a thread reopened after step 3 still merged — and this repo reports
     # required_approving_review_count: 0, so GitHub does not re-check those either. Every gate
     # that is this skill's alone must be refreshed.
-    for gate in ("isDraft", "reviewDecision", "reviewThreads"):
-        check(f"{name}: the pre-merge refresh reloads {gate}", gate in merge_step)
+    # Review of 36a4b731: refreshing a hand-picked subset is how a gate goes stale. Derive the
+    # required evidence FROM THE POLICY, so adding a ready_when field fails this until the
+    # pre-merge refresh reloads its evidence too.
+    EVIDENCE_FOR = {
+        "mergeable": ["mergeable"],
+        "merge_state_status_in": ["mergeStateStatus"],
+        "is_draft": ["isDraft"],
+        "review_decision_allowlist": ["reviewDecision"],
+        "unresolved_review_threads": ["reviewThreads"],
+        "required_check_conclusion_allowlist": ["CHECKS=", "REQUIRED_STATE="],
+    }
+    unmapped = sorted(k for k in (ready or {})
+                      if k in READY_OPERATIVE and k not in EVIDENCE_FOR)
+    check(f"{name}: every operative ready_when field has a declared evidence source: {unmapped}",
+          not unmapped)
+    for field, tokens in EVIDENCE_FOR.items():
+        if field not in (ready or {}):
+            continue
+        missing = [tok for tok in tokens if tok not in merge_cmds]
+        check(f"{name}: the pre-merge COMMANDS reload evidence for {field}: missing {missing}",
+              not missing)
+    check(f"{name}: requires the FULL ready_when gate to hold again, not a subset",
+          bool(re.search(r"require the \*\*full\*\* `?\.?merge\.ready_when`? gate to hold again",
+                         " ".join(merge_step.split()), re.I)))
+    check(f"{name}: refuses when refreshed evidence cannot be reloaded",
+          bool(re.search(r"any evidence that cannot be reloaded, refuses",
+                         " ".join(merge_step.split()), re.I)))
+    check(f"{name}: states the residual race rather than claiming atomicity",
+          bool(re.search(r"does not eliminate it", " ".join(merge_step.split()), re.I))
+          and bool(re.search(r"no atomic evaluate-and-merge", " ".join(merge_step.split()), re.I)))
     # The construction is duplicated on purpose (visible where it runs). Duplication is exactly
     # what this PR exists to prevent, so prove the copies cannot diverge.
     builds = re.findall(r"REQUIRED_STATE=\$\(jq -n.*?\)'\)", body, re.S)

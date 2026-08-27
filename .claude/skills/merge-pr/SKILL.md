@@ -6,9 +6,11 @@ user-invocable: true
 allowed-tools: "Bash"
 truth_contract:
   canonical_sources:
-    - ops/state/truth/policy.json@BASE  # default_strategy, required_checks, ready_when — read at the PR's base, never the worktree
+    - ops/state/truth/policy.json@$BASE_OID   # default_strategy, required_checks, ready_when,
+                                              # read at the PINNED BASE COMMIT, never the worktree
   live_load_required:
-    - "gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup"
+    - "gh pr view <N> --json headRefOid,baseRefName,baseRefOid,isDraft,mergeable,mergeStateStatus,reviewDecision"
+    - "gh api repos/InterCooperative-Network/icn/contents/ops/state/truth/policy.json?ref=$BASE_OID -H 'Accept: application/vnd.github.raw'"
     - "gh api repos/InterCooperative-Network/icn/branches/$BASE_ENC/protection --jq '.required_status_checks.contexts'"
   examples_only: []
   never_hardcode:
@@ -73,12 +75,18 @@ its job there.
    PR and merge another. Resolve once, then address everything.
 
    ```bash
-   gh pr view <N> --json number,title,headRefName,baseRefName,headRefOid,state,isDraft,mergeable,mergeStateStatus,reviewDecision
+   gh pr view <N> --json number,title,headRefName,baseRefName,baseRefOid,headRefOid,state,isDraft,mergeable,mergeStateStatus,reviewDecision
    ```
 
-   Keep `HEAD_OID=<headRefOid>` and `BASE=<baseRefName>`. Every later command is pinned to them —
-   the checks you inspect and the commit you merge must be the same commit, and the protection
-   you read must belong to the branch you are actually merging into.
+   Keep three values: `HEAD_OID=<headRefOid>`, `BASE=<baseRefName>` and
+   `BASE_OID=<baseRefOid>`. Every later command is pinned to them — the checks you inspect and the
+   commit you merge must be the same commit, the protection you read must belong to the branch you
+   are actually merging into, and the policy you apply must be the revision already on that branch.
+
+   `baseRefOid` is a `GitObjectID!` on `PullRequest` — confirmed against the live schema, not
+   assumed. It is what makes the policy read *pinned*: a branch name is a moving target, so
+   `?ref=main` re-resolves to whatever `main` is at the moment of the call, and a policy that can
+   change between reading it and merging is not a pinned policy (icn#2656 review).
 
    `baseRefName` is the **sole authority** for branch identity. Encode it as one path component
    before it ever appears in an API path — with a real encoder, never a hand-written
@@ -104,10 +112,10 @@ its job there.
 
    ```bash
    POLICY_JSON=$(gh api \
-     "repos/InterCooperative-Network/icn/contents/ops/state/truth/policy.json?ref=${BASE_ENC}" \
+     "repos/InterCooperative-Network/icn/contents/ops/state/truth/policy.json?ref=${BASE_OID}" \
      -H "Accept: application/vnd.github.raw") || POLICY_JSON=UNAVAILABLE
    if [ "${POLICY_JSON}" = "UNAVAILABLE" ]; then
-     echo "STOP: cannot read merge policy at ${BASE} — report Not merged, do not continue"
+     echo "STOP: cannot read merge policy at ${BASE_OID} — report Not merged, do not continue"
    else
      STRATEGY=$(jq -r '.merge.default_strategy' <<<"${POLICY_JSON}")
      jq '.merge | {strategy: .default_strategy, exception,
@@ -121,9 +129,16 @@ its job there.
    out — which, in this repo's per-branch worktree layout, is normally the PR branch itself. A PR
    that edits `policy.json` would then supply the strategy and the readiness gates that admit it,
    and `--match-head-commit` does not help: it pins the remote head, not the local policy
-   revision (icn#2656 review). Pinning the read to `${BASE_ENC}` makes the rules the ones already
+   revision (icn#2656 review). Pinning the read to `${BASE_OID}` makes the rules the ones already
    in force on the branch being merged into. That is also why step 1 comes first: the base has to
    be known before the policy can be pinned to it.
+
+   **A commit, not a branch name.** `?ref=${BASE}` re-resolves on every call, so the policy could
+   change between the read and the merge and nothing would notice — pinning to a name is not
+   pinning. `${BASE_OID}` is immutable, so the blob this step reads is the blob that was evaluated,
+   and step 5 refuses if `baseRefOid` has moved since. Running the skill from `main` is not the fix
+   either: that makes the read correct by accident of where you happened to stand, and the next
+   invocation from a worktree is wrong again.
 
    If the base's policy has no `.merge.ready_when`, **stop.** The gate must already be in force on
    the branch you are merging into; a PR that introduces the gate cannot be admitted by it. That
@@ -277,7 +292,7 @@ its job there.
    skill enforces are still green**:
 
    ```bash
-   gh pr view <N> --json headRefOid,baseRefName,isDraft,reviewDecision
+   gh pr view <N> --json headRefOid,baseRefName,baseRefOid,isDraft,mergeable,mergeStateStatus,reviewDecision
    gh api graphql --paginate -f query='query($n:Int!,$endCursor:String){repository(owner:"InterCooperative-Network",name:"icn"){
      pullRequest(number:$n){reviewThreads(first:100,after:$endCursor){
        pageInfo{hasNextPage endCursor} nodes{isResolved}}}}}' -F n=<N>
@@ -291,17 +306,42 @@ its job there.
                         bucket: ($seen[.].bucket // "absent")})')
    ```
 
-   Both identity values must still equal `${HEAD_OID}` and `${BASE}`. If either moved, the
-   evidence is stale: **refuse and start over.** Then **re-evaluate step 4 items 3, 4, 5 and 6**
+   All three identity values must still equal `${HEAD_OID}`, `${BASE}` and `${BASE_OID}`. If any
+   moved, the evidence is stale: **refuse and start over.** `baseRefOid` is included because the
+   base branch advancing — someone else merging into it — changes the policy revision your gate was
+   computed from without changing the base's *name*. A retarget and a base that merely moved are
+   both staleness, and neither is visible to `--match-head-commit`, which pins only the head. Then **re-evaluate step 4 items 3, 4, 5 and 6**
    against what was just read, and stop on any that no longer holds, exactly as step 4 does.
 
-   **Every gate this skill alone enforces is refreshed, not just the checks.** An earlier revision
-   refreshed `gh pr checks` and nothing else, so a review flipping to `CHANGES_REQUESTED`, a thread
-   reopened, or a PR converted to draft after step 3 still merged — this repo reports
-   `required_approving_review_count: 0`, so GitHub does not enforce the review gates either, and
-   `.ready_when.review_decision_allowlist` and `.unresolved_review_threads` are this skill's rules
-   alone (icn#2656 review). The rule is not "refresh the checks"; it is **refresh every gate GitHub
-   will not re-check for you**.
+   **The whole gate is re-evaluated, not a remembered subset of it.** The rule is not "refresh the
+   checks" and not "refresh the fields someone listed here" — it is: *every operative field of
+   `.merge.ready_when` has an evidence source, and all of them are reloaded and the full gate
+   recomputed.* Today that mapping is
+
+   | `ready_when` field | evidence reloaded above |
+   |---|---|
+   | `mergeable`, `merge_state_status_in` | `gh pr view … mergeable,mergeStateStatus` |
+   | `is_draft` | `gh pr view … isDraft` |
+   | `review_decision_allowlist` | `gh pr view … reviewDecision` |
+   | `unresolved_review_threads` | the paginated `reviewThreads` query |
+   | `required_check_conclusion_allowlist` | `CHECKS` → `REQUIRED_STATE` |
+
+   **If a field is added to `.merge.ready_when`, this step must reload its evidence too**; the
+   invariant test derives the field list from the policy itself and fails until it does, so the
+   table cannot fall behind the gate. An earlier revision refreshed `gh pr checks` and nothing
+   else, so a review flipping to `CHANGES_REQUESTED`, a thread reopened, or a PR converted to
+   draft after step 3 still merged — this repo reports `required_approving_review_count: 0`, so
+   GitHub enforces none of the review gates and they are this skill's rules alone (icn#2656
+   review).
+
+   Then require the **full** `.merge.ready_when` gate to hold again on the reloaded values, exactly
+   as step 4 evaluated it the first time. Any field that no longer holds, or any evidence that
+   cannot be reloaded, refuses — it does not fall through to the merge.
+
+   This **narrows** the window to the merge call itself. It does not eliminate it: GitHub offers no
+   atomic evaluate-and-merge, so a gate can still change between this read and the request landing.
+   Where GitHub enforces a gate it re-checks at merge time and refuses; where it does not, this is
+   the closest honest approximation, and the residual race is stated rather than papered over.
 
    The refresh **reassigns** `CHECKS` and **rebuilds** `REQUIRED_STATE`. An earlier revision ran
    `gh pr checks` here without assigning it, so the command printed the new JSON and discarded it
