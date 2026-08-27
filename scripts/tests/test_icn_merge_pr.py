@@ -822,6 +822,44 @@ for bad in (None, "two", True, 1.5, [], {}):
     check(f"an approving-review count of {bad!r} is unreadable evidence, not zero",
           r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
 
+print("branch protection is read, never degraded")
+from icn_merge_pr.ghclient import GhCli                            # noqa: E402
+
+
+def read_protection(required_status_checks):
+    """Drive the real transport parser over one branch-protection document."""
+    client = GhCli()
+    client._rest = lambda path: {"required_status_checks": required_status_checks}
+    try:
+        return client.branch_protection("o", "n", "main")
+    except EvidenceUnavailable as exc:
+        return f"REFUSED: {exc.detail}"
+
+
+for label, doc in (
+    ("a check entry with no context", {"checks": [{}], "strict": True}),
+    ("a check collection that is not a list", {"checks": {"a": 1}, "strict": True}),
+    ("a check entry that is not an object", {"checks": ["Build"], "strict": True}),
+    ("a legacy list holding a non-string", {"contexts": ["Build", 7], "strict": True}),
+    ("a strict flag that is not a boolean", {"checks": [], "strict": "true"}),
+):
+    got = read_protection(doc)
+    check(f"{label} is unreadable evidence", isinstance(got, str), f"got {got}")
+
+# `checks` PRESENT is authoritative even when empty: falling through to the legacy array would
+# unbind every producer, which is the degradation this rejects.
+empty_modern = read_protection({"checks": [], "contexts": ["Build Release"], "strict": True})
+check("an empty modern collection does not fall back to the legacy array",
+      empty_modern["required_contexts"] == [], f"{empty_modern}")
+legacy_only = read_protection({"contexts": ["Build Release"], "strict": True})
+check("a legacy-only document is read, with no producer bound",
+      legacy_only["required_contexts"] == ["Build Release"]
+      and legacy_only["required_bindings"] == {"Build Release": None}, f"{legacy_only}")
+bound = read_protection({"checks": [{"context": "Build Release", "app_id": 15368},
+                                    {"context": "Test", "app_id": -1}], "strict": True})
+check("producers are carried through, and -1 means any",
+      bound["required_bindings"] == {"Build Release": 15368, "Test": None}, f"{bound}")
+
 print("a server error is not a decision")
 from icn_merge_pr.ghclient import definitive_http_failure          # noqa: E402
 for detail, definitive in (("gh: Method Not Allowed (HTTP 405)", True),

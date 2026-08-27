@@ -276,8 +276,20 @@ class GhCli:
         # right NAME from the wrong source satisfy a gate its configured producer never passed.
         contexts: list[str] = []
         bindings: dict[str, int | None] = {}
-        for entry in checks.get("checks") or []:
-            if isinstance(entry, dict) and isinstance(entry.get("context"), str):
+        modern = checks.get("checks")
+        if modern is not None:
+            # PRESENT means authoritative, including when it is empty. Skipping members it cannot
+            # read and then falling through to the legacy array was a silent DEGRADATION: the
+            # legacy form cannot express a producer, so every check came back unbound and a green
+            # run from any source would satisfy it.
+            if not isinstance(modern, list):
+                raise EvidenceUnavailable(
+                    "branch protection reported a required-check collection that is not a list")
+            for entry in modern:
+                if not isinstance(entry, dict) or not isinstance(entry.get("context"), str):
+                    raise EvidenceUnavailable(
+                        f"branch protection reported an unreadable required-check entry "
+                        f"({entry!r}); an entry this program cannot read is not one it may skip")
                 contexts.append(entry["context"])
                 app = entry.get("app_id")
                 # null and -1 are GitHub's documented "any producer". Everything else must be a
@@ -292,11 +304,15 @@ class GhCli:
                         f"branch protection reports an unreadable producer for "
                         f"{entry['context']!r} (app_id={app!r}); an unreadable binding is not an "
                         "absent one")
-        if not contexts:
-            for entry in checks.get("contexts") or []:
-                if isinstance(entry, str):
+        else:
+            legacy = checks.get("contexts")
+            if legacy is not None:
+                if not isinstance(legacy, list) or not all(isinstance(e, str) for e in legacy):
+                    raise EvidenceUnavailable(
+                        "branch protection reported an unreadable legacy required-check list")
+                for entry in legacy:
                     contexts.append(entry)
-                    bindings[entry] = None
+                    bindings[entry] = None      # the legacy form cannot express a producer
         # An ABSENT review requirement genuinely means none. A requirement that is PRESENT but
         # whose count cannot be read is unavailable evidence: defaulting it to zero would let an
         # unreadable protection response retire the approval gate, and policy admits a null

@@ -36,7 +36,6 @@ _spec.loader.exec_module(install)
 # This module IS the copy in the checkout under test, which is normally a feature branch, so its
 # own "am I being run out of a candidate checkout" guard would refuse every case below. It is
 # neutralised here and tested separately, against a fixture copy whose branch we control.
-_real_self_check = install.refuse_if_run_from_a_candidate_checkout
 install.refuse_if_run_from_a_candidate_checkout = lambda: None
 
 failures: list[str] = []
