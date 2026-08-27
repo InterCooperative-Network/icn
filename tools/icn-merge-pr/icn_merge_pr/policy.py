@@ -93,6 +93,7 @@ class MergePolicy:
     require_not_in_queue: bool
     require_auto_merge_absent: bool
     require_strict_status_checks: bool | None
+    require_approvals: int | None
 
 
 def _typed(node, key, kind, label):
@@ -172,10 +173,15 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
     # been proved to be the externally resolved default branch, so the document is trusted.
     # It sits outside `merge`, which the landed schema validator does not cover, so its type is
     # established here: a malformed declaration about a protection control is not a soft failure.
-    strict_declared = (document.get("branch") or {}).get("strict_up_to_date") \
-        if isinstance(document.get("branch"), dict) else None
+    branch = document.get("branch") if isinstance(document.get("branch"), dict) else {}
+    strict_declared = branch.get("strict_up_to_date")
     if strict_declared is not None and not isinstance(strict_declared, bool):
         raise PolicyInvalid("branch.strict_up_to_date is present but is not a boolean; a "
+                            "malformed declaration about a branch-protection control is not a "
+                            "claim this program will act on")
+    approvals_declared = branch.get("required_approvals")
+    if approvals_declared is not None and type(approvals_declared) is not int:
+        raise PolicyInvalid("branch.required_approvals is present but is not an integer; a "
                             "malformed declaration about a branch-protection control is not a "
                             "claim this program will act on")
 
@@ -202,4 +208,5 @@ def load_policy(client, owner: str, name: str, oid: str) -> MergePolicy:
         require_not_in_queue=not bool(ready["not_deferred"]["is_in_merge_queue"]),
         require_auto_merge_absent=bool(ready["not_deferred"]["auto_merge_request_absent"]),
         require_strict_status_checks=strict_declared,
+        require_approvals=approvals_declared,
     )

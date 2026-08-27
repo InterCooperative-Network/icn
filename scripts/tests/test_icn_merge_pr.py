@@ -275,14 +275,15 @@ check("a review count larger than the reviews actually readable -> "
       f"got {short_reviews_result.outcome}")
 check("the refusal says the unread reviews cannot be shown not to object",
       any("cannot be shown not to object" in r.detail for r in short_reviews_result.reasons))
-needs_approval = world()
+# Policy and live both say one approval, so these exercise the REVIEW gate rather than the
+# drift gate — raising only the live count would be configuration drift, which is tested below.
+needs_approval = policy_with(lambda d: d["branch"].update(required_approvals=1))
 needs_approval["protection"]["required_approving_review_count"] = 1
-expect("live protection requires an approval that has not been given", needs_approval,
-       codes.REFUSED_REVIEW)
-approved = world()
+expect("a required approval that has not been given", needs_approval, codes.REFUSED_REVIEW)
+approved = policy_with(lambda d: d["branch"].update(required_approvals=1))
 approved["protection"]["required_approving_review_count"] = 1
 approved["pr"]["reviewDecision"] = "APPROVED"
-expect("live protection satisfied by an approval", approved, codes.READY)
+expect("a required approval that was given", approved, codes.READY)
 
 # --- threads -----------------------------------------------------------------------------------
 print("review threads, across every page")
@@ -432,6 +433,26 @@ silent = policy_with(lambda d: d["branch"].pop("strict_up_to_date"))
 silent["protection"]["strict"] = False
 expect("a policy that makes no strict claim has no strict drift to report", silent,
        codes.READY)
+weakened = policy_with(lambda d: d["branch"].update(required_approvals=1))
+expect("live protection erasing an approval requirement policy states", weakened,
+       codes.REFUSED_POLICY_DRIFT)
+_, weak_result = evaluate_world(weakened)
+check("the approval drift refusal says which requirement was erased",
+      any("required_approvals" in r.detail for r in weak_result.reasons))
+expect("policy that declares required_approvals as something other than an integer",
+       policy_with(lambda d: d["branch"].update(required_approvals="one")),
+       codes.REFUSED_POLICY_INVALID)
+expect("a boolean is not an approval count",
+       policy_with(lambda d: d["branch"].update(required_approvals=True)),
+       codes.REFUSED_POLICY_INVALID)
+no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
+no_claim["protection"]["required_approving_review_count"] = 0
+expect("a policy that makes no approval claim has no approval drift to report", no_claim,
+       codes.READY)
+enforce_admins_disagrees = policy_with(lambda d: d["branch"].update(enforce_admins=True))
+expect("a protection control this evaluator does not rely on is not gated",
+       enforce_admins_disagrees, codes.READY)
+
 other_protection_objects = world()
 other_protection_objects["protection"]["required_approving_review_count"] = 0
 expect("the drift gate does not reach into protection objects policy does not own",

@@ -81,12 +81,25 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
     # Fail closed on drift between the pinned policy and live branch protection. Either direction
     # is a real disagreement about what gates a merge, and neither owner may be quietly preferred.
     #
-    # The gate covers the REQUIRED-STATUS-CHECKS configuration — which contexts, and whether a
-    # branch must be current — because that is the object `required_checks_live_source` names.
-    # It deliberately does not reach into other protection objects: this repository's policy and
-    # its live `enforce_admins` already disagree, that disagreement is owned by the document
-    # rather than by this program, and a gate that refused every merge over it would be a gate
-    # nobody could use.
+    # WHAT THE GATE COVERS, and why it is not "every branch-protection setting". A control belongs
+    # here when the pinned policy makes a checkable declaration about it AND this evaluator relies
+    # on it to decide readiness: the required-check set and its producers, whether a branch must be
+    # current, and how many approvals are required. Live protection may not quietly erase any of
+    # those, in either direction.
+    #
+    # `enforce_admins` is the instructive exclusion. It is declared in policy and it currently
+    # DISAGREES with live protection (policy says false, live has it on) — but this evaluator has
+    # no privileged path whose availability could depend on it, so it is not a control this gate
+    # relies on. Adding it would refuse every merge over a disagreement this program neither owns
+    # nor uses, which is a gate nobody could use.
+    want_approvals = snap.policy.require_approvals
+    if want_approvals is not None and \
+            snap.protection.required_approving_review_count != want_approvals:
+        refuse(codes.REFUSED_POLICY_DRIFT,
+               f"pinned policy at {policy.oid[:12]} declares required_approvals={want_approvals} "
+               f"but live protection on {snap.default_branch!r} requires "
+               f"{snap.protection.required_approving_review_count}; live protection may not erase "
+               f"an approval requirement the canonical policy states")
     want_strict = snap.policy.require_strict_status_checks
     if want_strict is not None and snap.protection.strict != want_strict:
         refuse(codes.REFUSED_POLICY_DRIFT,
