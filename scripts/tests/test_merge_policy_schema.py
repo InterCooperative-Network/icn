@@ -189,6 +189,30 @@ must_pass("the exact accepted ADR path is accepted",
           lambda d: d["merge"]["admin_bypass"].update(
               authoritative_source="docs/adr/ADR-0016-admin-merge-exception-policy.md"))
 
+# --- CLOSED OBJECTS: no unknown operative field may enter any object this schema owns ----------
+# icn#2658 audit. `ready_when` and `admin_bypass` were closed first; every remaining operative
+# object had the same fail-open, so an unknown field could reintroduce a second owner under a name
+# nobody enumerated. One mechanism, applied to all of them.
+print("every operative object in the merge schema is closed")
+CLOSED_OBJECTS = [
+    ("merge", lambda d: d["merge"]),
+    ("exception", lambda d: d["merge"]["exception"]),
+    ("ready_when", lambda d: d["merge"]["ready_when"]),
+    ("ready_when.not_deferred", lambda d: d["merge"]["ready_when"]["not_deferred"]),
+    ("admin_bypass", lambda d: d["merge"]["admin_bypass"]),
+    ("auto_merge", lambda d: d["merge"]["auto_merge"]),
+]
+# Plausible-looking authority fields, plus a key nobody has specially named.
+INTRUDERS = ["force", "strategy_override", "mode", "execution", "allow_queue", "defer_when",
+             "override", "bypass", "allowed", "zzz_arbitrary_unknown_key"]
+for _oname, _get in CLOSED_OBJECTS:
+    for _k in INTRUDERS:
+        must_fail(f"{_oname}.{_k} (unknown operative field)",
+                  lambda d, g=_get, k=_k: g(d).update({k: True}),
+                  expect="non-schema fields")
+    must_pass(f"{_oname}: a documentary *note extension is still accepted",
+              lambda d, g=_get, o=_oname: g(d).update({"audit_note": f"why {o} exists"}))
+
 # --- ONE OWNER: ADR-0016 owns admin-bypass eligibility ------------------------------------------
 print("ADR-0016 is the sole owner of admin-bypass eligibility")
 must_fail("a structured `requires` eligibility replica returning",
@@ -217,6 +241,10 @@ must_fail("bypass decision not human",
           lambda d: d["merge"]["admin_bypass"].update(decision="agent"))
 must_fail("authoritative_source pointing at a file that does not exist",
           lambda d: d["merge"]["admin_bypass"].update(authoritative_source="docs/adr/NOPE.md"))
+must_fail("admin_bypass.allowed reintroduced (a second owner of bypass availability)",
+          lambda d: d["merge"]["admin_bypass"].update(allowed=True))
+must_fail("admin_bypass.allowed reintroduced as false",
+          lambda d: d["merge"]["admin_bypass"].update(allowed=False))
 must_fail("agent_execution present at all (removed: unguaranteeable by a data file)",
           lambda d: d["merge"]["admin_bypass"].update(agent_execution=True))
 must_fail("authoritative_source removed",
@@ -252,7 +280,6 @@ for s in ("merge", "squash", "rebase"):
 print("the pre-#2651 shapes on main are rejected")
 must_fail("the whole pre-#2651 admin_bypass object (prose `condition`, no owner pointer)",
           lambda d: d["merge"].__setitem__("admin_bypass", {
-              "allowed": True,
               "condition": "Required checks green AND mergeStateStatus=MERGEABLE but stalled",
               "never_for": "Bypassing genuinely failing required checks"}))
 must_fail("the pre-#2651 auto_merge object (baked command string)",
@@ -329,8 +356,6 @@ must_fail("not_deferred removed entirely",
           lambda d: d["merge"]["ready_when"].pop("not_deferred"))
 
 # --- the queue-stall qualifier (ADR-0016) ------------------------------------------------------
-must_fail("the bypass revocation switch removed",
-          lambda d: d["merge"]["admin_bypass"].pop("allowed"))
 
 # --- check sets --------------------------------------------------------------------------------
 print("required-check configuration")

@@ -83,7 +83,20 @@ READY_MERGEABLE = "MERGEABLE"
 ADMIN_BYPASS_ADR = "docs/adr/ADR-0016-admin-merge-exception-policy.md"
 # `admin_bypass` is a CLOSED object: exactly these structural fields, plus documentary `*note`
 # keys. Not a denylist of eligibility synonyms — a denylist admits every alias nobody enumerated.
-ADMIN_BYPASS_FIELDS = {"allowed", "decision", "authoritative_source", "never_for", "fail_closed"}
+# EVERY operative object in this schema is CLOSED: exactly these structural fields, plus
+# documentary `*note` keys. Not a denylist of synonyms — a denylist admits every alias nobody
+# enumerated, which is how a second owner reappears under a new name. Unknown operative fields fail
+# by construction, so a field a future consumer might read cannot enter unreviewed (icn#2658).
+MERGE_FIELDS = {"default_strategy", "exception", "required_checks", "agent_tooling_check",
+                "non_blocking_checks", "required_checks_live_source", "ready_when",
+                "admin_bypass", "auto_merge"}
+EXCEPTION_FIELDS = {"strategy", "applies_to"}
+READY_WHEN_FIELDS = {"mergeable", "merge_state_status_in", "is_draft", "review_decision_allowlist",
+                     "unresolved_review_threads", "required_check_conclusion_allowlist",
+                     "not_deferred"}
+NOT_DEFERRED_FIELDS = {"merge_queue_absent", "is_in_merge_queue", "auto_merge_request_absent"}
+ADMIN_BYPASS_FIELDS = {"decision", "authoritative_source", "never_for", "fail_closed"}
+AUTO_MERGE_FIELDS = {"enabled", "use_when", "strategy_from"}
 # A value that looks like a shell command or a CLI flag has no business in policy data.
 COMMAND_SHAPED = re.compile(r"(^|\s)(gh|git|jq|eval|bash|sh)\s|(^|\s)--[a-z]")
 
@@ -136,6 +149,15 @@ def validate(policy) -> list[str]:
     if not req(ok, "merge: missing or not an object"):
         return bad
 
+    def closed(obj, known, label):
+        """Reject any operative field outside `known`; `*note` keys are documentary by convention."""
+        unknown = sorted(k for k in obj
+                         if isinstance(k, str) and k not in known and not k.endswith("note"))
+        req(not unknown,
+            f"{label}: non-schema fields {unknown} — this object is closed, so an operative field "
+            "cannot enter without a schema change (an unknown field is how a second owner "
+            "reappears under a new name)")
+
     def field(obj, key, caster, label):
         """Type-check one field, recording a message on failure. Returns (ok, value)."""
         got, val = caster(obj.get(key))
@@ -160,6 +182,7 @@ def validate(policy) -> list[str]:
             req(estrat != strategy,
                 "exception.strategy equals default_strategy — then it is not an exception")
         field(exc, "applies_to", as_str, "exception.applies_to")
+        closed(exc, EXCEPTION_FIELDS, "exception")
 
     # --- (2) check sets -------------------------------------------------------------------------
     rok, required = field(merge, "required_checks", as_str_list, "required_checks")
@@ -249,18 +272,13 @@ def validate(policy) -> list[str]:
                     req(bval is want,
                         f"ready_when.not_deferred.{key} must be {json.dumps(want)} — an ordinary "
                         "merge completes or refuses, it never arms something to happen later")
+            closed(nd, NOT_DEFERRED_FIELDS, "ready_when.not_deferred")
 
-        OPERATIVE = {"mergeable", "merge_state_status_in", "is_draft", "review_decision_allowlist",
-                     "unresolved_review_threads", "required_check_conclusion_allowlist",
-                     "not_deferred"}
-        extra = sorted(k for k in ready
-                       if isinstance(k, str) and k not in OPERATIVE and not k.endswith("note"))
-        req(not extra, f"ready_when: non-structured operative fields present: {extra}")
+        closed(ready, READY_WHEN_FIELDS, "ready_when")
 
     # --- (4) the human admin exception is NOT owned here ----------------------------------------
     got, bypass = field(merge, "admin_bypass", as_obj, "admin_bypass")
     if got:
-        field(merge["admin_bypass"], "allowed", as_exact_bool, "admin_bypass.allowed")
         dok, decision = field(bypass, "decision", as_str, "admin_bypass.decision")
         if dok:
             req(decision == "human", "admin_bypass.decision must be 'human'")
@@ -286,13 +304,7 @@ def validate(policy) -> list[str]:
         # `admit_when`, `gate` and `preconditions` all passed it (icn#2658 review). Only the known
         # fields are permitted; a replica under ANY name is rejected by construction, including one
         # nobody has thought of. `*note` keys follow this file's documentary convention.
-        unknown = sorted(k for k in bypass
-                         if isinstance(k, str)
-                         and k not in ADMIN_BYPASS_FIELDS and not k.endswith("note"))
-        req(not unknown,
-            f"admin_bypass has non-schema fields: {unknown} — this object is closed and "
-            "non-authoritative for eligibility; consult authoritative_source rather than "
-            "restating it here under any name")
+        closed(bypass, ADMIN_BYPASS_FIELDS, "admin_bypass")
 
     # --- (5) the owner must not duplicate its own values, nor spell commands --------------------
     got, auto = field(merge, "auto_merge", as_obj, "auto_merge")
@@ -303,6 +315,7 @@ def validate(policy) -> list[str]:
             req(sfrom == "default_strategy",
                 "auto_merge.strategy_from must point at default_strategy rather than naming one")
         FLAG_KEYS = {"gh_flags", "flags", "args", "argv", "command", "cmd", "run", "exec"}
+        closed(auto, AUTO_MERGE_FIELDS, "auto_merge")
         raw = sorted(k for k in auto if isinstance(k, str) and k in FLAG_KEYS)
         req(not raw,
             f"auto_merge holds raw CLI authority as data: {raw} — a contributor-controlled base "
@@ -323,6 +336,7 @@ def validate(policy) -> list[str]:
             bad.append(f"{path}: operative field holds a command- or flag-shaped string "
                        f"({node[:48]!r}) — policy declares intent, only code spells commands")
 
+    closed(merge, MERGE_FIELDS, "merge")
     scan(merge, "merge")
 
     # --- (6) prose carries no operative value, checked by ABSENCE -------------------------------
