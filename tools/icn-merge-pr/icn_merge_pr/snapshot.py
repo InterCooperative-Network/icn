@@ -315,6 +315,11 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     approvals = protection_raw.get("required_approving_review_count")
     if not isinstance(contexts, list) or not all(isinstance(c, str) for c in contexts):
         raise EvidenceUnavailable("branch protection did not report a readable required-check set")
+    strict = protection_raw.get("strict")
+    if type(strict) is not bool:
+        raise EvidenceUnavailable(
+            f"branch protection did not report a readable strict setting ({strict!r}); an "
+            "unreadable up-to-date requirement is not a satisfied one")
     if type(approvals) is not int:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable approving-review count ({approvals!r}); "
@@ -323,7 +328,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         required_contexts=frozenset(contexts),
         required_bindings=dict(protection_raw.get("required_bindings") or {}),
         required_approving_review_count=approvals,
-        strict=bool(protection_raw.get("strict")),
+        strict=strict,
     )
 
     review_decision = pr.get("reviewDecision")

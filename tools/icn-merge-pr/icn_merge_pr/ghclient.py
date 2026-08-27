@@ -22,7 +22,20 @@ from .errors import EvidenceUnavailable, GitHubRefused, TransportIndeterminate
 _TIMEOUT = 120
 # `gh` renders an HTTP status when GitHub actually answered. Its absence means the
 # request may never have been answered at all, which is a different fact entirely.
-_HTTP_STATUS = re.compile(r"\bHTTP\s+[1-5]\d\d\b")
+_HTTP_STATUS = re.compile(r"\bHTTP\s+([1-5]\d\d)\b")
+
+
+def definitive_http_failure(detail: str) -> bool:
+    """Did GitHub DECIDE, or did something merely go wrong?
+
+    A 4xx is a decision: 405 Method Not Allowed, 409 Conflict, 422 Unprocessable. GitHub read the
+    request and declined it. A 5xx is not — the server or a gateway failed, and it may have failed
+    AFTER the mutation was dispatched, so an immediate read showing `merged == false` proves
+    nothing. No status at all means no answer was rendered. Both of those are indeterminate, and
+    for a mutation the difference decides whether a caller may treat the result as final.
+    """
+    found = _HTTP_STATUS.search(detail or "")
+    return bool(found) and not found.group(1).startswith("5")
 
 _REPO_META = """
 query($owner:String!,$name:String!){
@@ -165,7 +178,7 @@ class GhCli:
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "").strip()[:600]
             summary = f"{self.gh} {' '.join(argv[:2])} exited {proc.returncode}: {detail}"
-            if not _HTTP_STATUS.search(detail):
+            if not definitive_http_failure(detail):
                 raise TransportIndeterminate(summary)
             raise on_failure(summary)
         return proc.stdout
@@ -289,11 +302,17 @@ class GhCli:
                 raise EvidenceUnavailable(
                     "branch protection reports a review requirement whose approving-review count "
                     f"is unreadable ({count!r}); an unreadable requirement is not no requirement")
+        strict = checks.get("strict")
+        if type(strict) is not bool:
+            # `bool("false")` is True. Requiring exactness for the approval count and casting here
+            # would have left the up-to-date requirement satisfiable by unreadable evidence.
+            raise EvidenceUnavailable(
+                f"branch protection did not report a readable strict setting ({strict!r})")
         return {
             "required_contexts": contexts,
             "required_bindings": bindings,
             "required_approving_review_count": count,
-            "strict": bool(checks.get("strict")),
+            "strict": strict,
             "configured": "required_status_checks" in doc,
         }
 

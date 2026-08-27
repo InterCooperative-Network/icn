@@ -33,7 +33,13 @@ icn-merge-pr provenance              # which commit is installed
 ```
 
 Results are JSON on stdout with a stable `outcome` code (`icn_merge_pr/codes.py`); a summary goes
-to stderr. Exit 0 = READY or MERGED, 1 = refused, 2 = bad invocation.
+to stderr.
+
+Exit 0 = READY or MERGED. Exit 2 = bad invocation. **Exit 1 means refused _or_ `MERGE_UNCONFIRMED`,
+and those are not the same thing**: a refusal means nothing happened, while `MERGE_UNCONFIRMED`
+means a merge request went out and its result could not be established. A consumer must read the
+structured `outcome` — re-issuing a merge on the strength of exit 1 alone is exactly the mistake
+the outcome vocabulary exists to prevent.
 
 Unknown options fail. `--admin`, `--auto` and their privileged or deferred relatives are refused
 **by name**, so an operator reaching for the habit is told the primitive has no such mode.

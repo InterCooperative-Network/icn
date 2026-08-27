@@ -801,12 +801,40 @@ check("evaluation is never blocked by staleness — it mutates nothing",
 print("review and protection evidence must be readable")
 expect("an opinionated review state this program does not know",
        world(review_pages=[[{"state": "SOMETHING_NEW"}]]), codes.REFUSED_UNAVAILABLE_EVIDENCE)
+for bad in (None, "false", "true", 1, 0, []):
+    broken = world()
+    broken["protection"]["strict"] = bad
+    _, r = evaluate_world(broken)
+    check(f"a strict setting of {bad!r} is unreadable evidence, not a satisfied requirement",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
 for bad in (None, "two", True, 1.5, [], {}):
     broken = world()
     broken["protection"]["required_approving_review_count"] = bad
     _, r = evaluate_world(broken)
     check(f"an approving-review count of {bad!r} is unreadable evidence, not zero",
           r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+
+print("a server error is not a decision")
+from icn_merge_pr.ghclient import definitive_http_failure          # noqa: E402
+for detail, definitive in (("gh: Method Not Allowed (HTTP 405)", True),
+                           ("Conflict (HTTP 409)", True),
+                           ("Unprocessable Entity (HTTP 422)", True),
+                           ("Internal Server Error (HTTP 500)", False),
+                           ("Bad Gateway (HTTP 502)", False),
+                           ("Service Unavailable (HTTP 503)", False),
+                           ("Gateway Timeout (HTTP 504)", False),
+                           ("connection reset by peer", False),
+                           ("", False)):
+    verb = "is a decision" if definitive else "is NOT a decision"
+    check(f"{detail!r} {verb}", definitive_http_failure(detail) is definitive)
+
+print("the exit-code contract does not invite a retry")
+readme = (ROOT / "tools" / "icn-merge-pr" / "README.md").read_text(encoding="utf-8")
+for name, text in (("the CLI usage text", cli.USAGE), ("the README", readme)):
+    check(f"{name} says exit 1 covers MERGE_UNCONFIRMED, not refusal alone",
+          "MERGE_UNCONFIRMED" in text and "Exit 1" in text)
+check("both exit codes for MERGED and MERGE_UNCONFIRMED differ from each other",
+      codes.exit_code(codes.MERGED) != codes.exit_code(codes.MERGE_UNCONFIRMED))
 
 # --- the result envelope ------------------------------------------------------------------------------------
 print("results are machine-readable")

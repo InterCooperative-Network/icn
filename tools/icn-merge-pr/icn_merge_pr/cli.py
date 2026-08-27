@@ -35,7 +35,12 @@ USAGE = """icn-merge-pr — the trusted ordinary-merge primitive for ICN (icn#26
 `check` evaluates and mutates nothing. `merge` re-reads every piece of evidence immediately
 before acting and performs at most one head-pinned ordinary merge. It has no privileged mode and
 cannot arm, enqueue or defer a merge. Results are JSON on stdout; a one-line summary goes to
-stderr. Exit 0 = READY or MERGED, 1 = refused, 2 = bad invocation."""
+stderr.
+
+Exit 0 = READY or MERGED. Exit 2 = bad invocation. Exit 1 = refused OR MERGE_UNCONFIRMED, which
+are NOT the same thing: a refusal means nothing happened, while MERGE_UNCONFIRMED means a merge
+request went out and its result could not be established. Read the structured `outcome`; never
+re-issue a merge on the strength of exit 1 alone."""
 
 # Options that name a privileged, deferred or otherwise non-ordinary merge. Refused by name.
 FORBIDDEN_OPTIONS = {
