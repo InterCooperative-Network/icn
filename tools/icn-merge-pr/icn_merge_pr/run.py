@@ -158,10 +158,12 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
     try:
         merged = perform_merge(client, fresh, strategy)
     except MergeToolError as exc:
-        # GitHub refused. FINAL — the program does not know a weaker way to ask.
+        # Reached only BEFORE a request is dispatched — an invalid strategy is the one way in.
+        # Everything after dispatch is resolved inside perform_merge against a fresh read, so no
+        # path here can report "not merged" on evidence nobody has.
         result.outcome = exc.outcome
         result.reasons = [Reason(exc.outcome, exc.detail)]
-        result.merge = {"attempted": True, "confirmed_merged": False, "merge_commit_sha": None}
+        result.merge = {"attempted": False, "confirmed_merged": False, "merge_commit_sha": None}
         return result
 
     result.outcome = merged.outcome

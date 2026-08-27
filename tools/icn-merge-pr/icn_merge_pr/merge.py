@@ -3,9 +3,16 @@
 WHAT MAKES IT SAFE
 - The expected head SHA is sent with the request, so GitHub itself refuses if the branch moved
   after the refreshed snapshot was taken.
-- Exactly one request is issued. A refusal is FINAL: there is no retry, no weaker flag, no
+- Exactly one merge request is issued. A refusal is FINAL: there is no retry, no weaker flag, no
   privileged second attempt. That path does not exist in this file to be reached.
 - Success is not what the merge call returned. It is what a fresh read of the PR says afterwards.
+
+WHAT MAKES IT HONEST
+Once a request has been dispatched, "it failed" is no longer a free thing to say. A transport
+that dies after the PUT leaves the world in a state this process cannot see, and reporting
+REFUSED there would state a complete outcome — nothing happened — on evidence nobody has. So
+every post-dispatch failure resolves through a fresh read, and when that read cannot settle the
+question the outcome is MERGE_UNCONFIRMED: not success, and not a claim that nothing happened.
 """
 
 from __future__ import annotations
@@ -13,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import codes
+from .errors import GitHubRefused, MergeToolError
 from .snapshot import Snapshot
 from .strategy import api_merge_method
 
@@ -25,14 +33,56 @@ class MergeOutcome:
     attempted: bool
 
 
+def _read_back(client, snap: Snapshot) -> dict | None:
+    """A fresh read of the PR, or None when even that could not be obtained."""
+    try:
+        return client.pull_request_merge_state(snap.owner, snap.name, snap.number)
+    except MergeToolError:
+        return None
+
+
 def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
     """Merge `snap` at exactly the head it recorded, then re-read GitHub to prove what happened."""
     method = api_merge_method(strategy)          # closed-set lookup; never a constructed flag
-    response = client.merge_pull_request(snap.owner, snap.name, snap.number,
-                                         sha=snap.head_oid, merge_method=method)
+    # Anything raised from here on is resolved against a fresh read, never reported as a refusal
+    # on the strength of the failure alone.
+    try:
+        response = client.merge_pull_request(snap.owner, snap.name, snap.number,
+                                             sha=snap.head_oid, merge_method=method)
+    except GitHubRefused as exc:
+        after = _read_back(client, snap)
+        if after is None:
+            return MergeOutcome(
+                codes.MERGE_UNCONFIRMED,
+                f"the merge request failed ({exc.detail}) and the PR could not be re-read, so "
+                f"whether PR #{snap.number} merged is UNKNOWN. A human must establish the state "
+                f"before anything else acts on it.",
+                None, attempted=True)
+        if after.get("merged") is True:
+            return MergeOutcome(
+                codes.MERGE_UNCONFIRMED,
+                f"the merge request failed ({exc.detail}) but a fresh read reports PR "
+                f"#{snap.number} MERGED at {after.get('merge_commit_sha')}. This run may or may "
+                f"not have caused that, and it does not claim to have: a human must establish "
+                f"which before anything else acts on it.",
+                after.get("merge_commit_sha"), attempted=True)
+        # Refusal CONFIRMED by evidence, not merely by the call having failed.
+        return MergeOutcome(
+            codes.REFUSED_GITHUB,
+            f"GitHub refused the merge and a fresh read confirms PR #{snap.number} is not merged "
+            f"(state={after.get('state')!r}): {exc.detail}. This is final — the program does not "
+            f"know a weaker way to ask.",
+            None, attempted=True)
 
     # POST-READ. The merge response is a claim; this is the evidence.
-    after = client.pull_request_merge_state(snap.owner, snap.name, snap.number)
+    after = _read_back(client, snap)
+    if after is None:
+        return MergeOutcome(
+            codes.MERGE_UNCONFIRMED,
+            f"the merge request was accepted but the PR could not be re-read, so whether PR "
+            f"#{snap.number} merged is UNKNOWN. A human must establish the state before anything "
+            f"else acts on it.",
+            response.get("sha"), attempted=True)
     if after.get("merged") is not True:
         return MergeOutcome(
             codes.MERGE_UNCONFIRMED,
@@ -40,8 +90,7 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
             f"{after.get('merged')!r} (state={after.get('state')!r}). This is NOT success: a "
             f"human must establish what happened to PR #{snap.number} before anything else acts "
             f"on it.",
-            after.get("merge_commit_sha") or response.get("sha"),
-            attempted=True)
+            after.get("merge_commit_sha") or response.get("sha"), attempted=True)
 
     sha = after.get("merge_commit_sha") or response.get("sha")
     return MergeOutcome(

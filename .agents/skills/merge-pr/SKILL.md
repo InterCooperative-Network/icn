@@ -54,8 +54,12 @@ silently rots (icn#2651).
    report, not a promise. A refusal here means the state genuinely changed; it is not a glitch to
    retry.
 
-6. **Report** the final outcome. `MERGED` carries the merge commit SHA. Every other outcome means
-   the PR did not merge — say so plainly and quote the code.
+6. **Report** the final outcome, quoting the code.
+   - `MERGED` carries the merge commit SHA.
+   - A `REFUSED_*` outcome means the PR did not merge. Say so plainly.
+   - `MERGE_UNCONFIRMED` means neither. The request went out and GitHub would not confirm the
+     result, so the merge status is **unknown** and needs a human to establish what happened.
+     Never report it as "did not merge", and do not run anything else against this PR first.
 
 ## When the executable is missing
 

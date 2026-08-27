@@ -144,6 +144,8 @@ class FakeGitHub:
         return self.w.get("merge_response", {"merged": True, "sha": MERGE_COMMIT})
 
     def pull_request_merge_state(self, owner, name, number):
+        if self.w.get("post_merge_error"):
+            raise EvidenceUnavailable(self.w["post_merge_error"])
         return copy.deepcopy(self.w["post_merge"])
 
 
@@ -212,6 +214,10 @@ for state in ("DIRTY", "BLOCKED", "BEHIND", "HAS_HOOKS", "UNKNOWN"):
     expect(f"mergeStateStatus {state}", mutate(mergeStateStatus=state), codes.REFUSED_MERGE_STATE)
 expect("a mergeable value this program does not know", mutate(mergeable="SOMETHING_NEW"),
        codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("a draft state GitHub did not report is not a non-draft PR", mutate(isDraft=None),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("a missing base branch is unreadable evidence, not a stacked base",
+       mutate(baseRefName=None), codes.REFUSED_UNAVAILABLE_EVIDENCE)
 expect("a merge state this program does not know", mutate(mergeStateStatus="SOMETHING_NEW"),
        codes.REFUSED_UNAVAILABLE_EVIDENCE)
 
@@ -446,6 +452,23 @@ with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
 check("a privileged option exits non-zero without touching GitHub",
       admin_exit == codes.EXIT_USAGE, f"exit={admin_exit}")
 
+# This suite runs from the source tree, which is exactly the situation the gate exists for.
+buffer = io.StringIO()
+with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+    source_exit = cli.main(["merge", "1", "--authorize", "--repo", "example/icn"])
+payload = json.loads(buffer.getvalue())
+check("a source-tree copy refuses to mutate even with an explicit --repo",
+      payload["outcome"] == codes.REFUSED_NOT_INSTALLED and source_exit != codes.EXIT_OK,
+      f"{payload['outcome']} exit={source_exit}")
+check("the refusal points at the installer",
+      "install.py" in payload["reasons"][0]["detail"])
+buffer = io.StringIO()
+with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+    cli.main(["check", "1"])
+check("evaluation from source is refused for want of a repository, not for want of an install",
+      json.loads(buffer.getvalue())["outcome"] == codes.REFUSED_USAGE,
+      json.loads(buffer.getvalue())["outcome"])
+
 # --- races ---------------------------------------------------------------------------------------------
 print("evaluation is not permission: everything is re-read before mutating")
 
@@ -533,7 +556,9 @@ check("the resulting merge commit is reported",
       merged.merge["merge_commit_sha"] == MERGE_COMMIT and merged.merge["confirmed_merged"],
       f"{merged.merge}")
 
-fake, refused = merge_world(world(merge_refused="405 Method Not Allowed"))
+refused_world = world(merge_refused="405 Method Not Allowed",
+                      post_merge={"state": "OPEN", "merged": False, "merge_commit_sha": None})
+fake, refused = merge_world(refused_world)
 check("GitHub refusing the merge -> REFUSED_GITHUB", refused.outcome == codes.REFUSED_GITHUB,
       f"got {refused.outcome}")
 check("a GitHub refusal is final — no second attempt, no weaker flags",
@@ -541,6 +566,29 @@ check("a GitHub refusal is final — no second attempt, no weaker flags",
 check("a refused merge does not claim a commit",
       refused.merge == {"attempted": True, "confirmed_merged": False, "merge_commit_sha": None},
       f"{refused.merge}")
+check("the refusal is confirmed by a fresh read, not by the call having failed",
+      any("fresh read confirms" in r.detail for r in refused.reasons))
+
+# Once a request has been dispatched, "nothing happened" is a claim that needs evidence.
+lost = world(merge_refused="context deadline exceeded",
+             post_merge={"state": "MERGED", "merged": True, "merge_commit_sha": MERGE_COMMIT})
+fake, result = merge_world(lost)
+check("a failed request whose PR now reads MERGED -> MERGE_UNCONFIRMED",
+      result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
+check("it does not claim this run caused the merge",
+      any("does not claim" in r.detail for r in result.reasons))
+check("one request was still the only request", len(fake.merge_calls) == 1)
+
+blind = world(merge_refused="context deadline exceeded", post_merge_error="network down")
+_, result = merge_world(blind)
+check("a failed request that cannot be read back -> MERGE_UNCONFIRMED",
+      result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
+check("an unreadable outcome is reported as UNKNOWN, never as a refusal",
+      any("UNKNOWN" in r.detail for r in result.reasons))
+
+_, result = merge_world(world(post_merge_error="network down"))
+check("an ACCEPTED request that cannot be read back -> MERGE_UNCONFIRMED",
+      result.outcome == codes.MERGE_UNCONFIRMED, f"got {result.outcome}")
 
 unconfirmed = world(post_merge={"state": "OPEN", "merged": False, "merge_commit_sha": None})
 fake, result = merge_world(unconfirmed)

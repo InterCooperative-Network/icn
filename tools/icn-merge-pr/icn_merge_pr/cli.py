@@ -20,7 +20,7 @@ import json
 import sys
 
 from . import codes, provenance
-from .errors import ForbiddenOption, MergeToolError, UsageError
+from .errors import ForbiddenOption, MergeToolError, NotInstalled, UsageError
 from .ghclient import GhCli
 from .run import Result, run
 
@@ -156,6 +156,28 @@ def _resolve_repository(inv: Invocation) -> tuple[str, str]:
         "repository recorded at install time; this one has no provenance record.)")
 
 
+def _require_trusted_runtime(inv: Invocation) -> None:
+    """Only an INSTALLED copy may mutate. A source-tree copy evaluates and stops there.
+
+    Passing `--repo` explicitly used to route around the provenance record entirely, so a copy
+    running out of a candidate checkout could authorise a merge of the very change that shipped
+    it. The installer's trust boundary is worth nothing if the code it refuses to install can be
+    run directly instead. Evaluation stays available from source: it reads, it decides nothing
+    that outlives the process, and being able to run it while developing is the reason the gate
+    is on mutation rather than on startup.
+    """
+    if inv.command != "merge":
+        return
+    if provenance.is_installed():
+        return
+    raise NotInstalled(
+        "refusing to merge from a copy that was never installed. This process is running from a "
+        "source tree, which for a merge evaluator means it could be the change under evaluation. "
+        "Install from a clean, current default-branch checkout with "
+        "`python3 tools/icn-merge-pr/install.py` and run the installed `icn-merge-pr`. "
+        "`icn-merge-pr check` remains available from source; mutation does not.")
+
+
 def _summary(result: Result) -> str:
     head = f"{result.outcome}  {result.owner}/{result.name}#{result.number}"
     if not result.reasons:
@@ -189,6 +211,7 @@ def main(argv: list[str]) -> int:
         return codes.EXIT_OK
 
     try:
+        _require_trusted_runtime(inv)
         owner, name = _resolve_repository(inv)
     except MergeToolError as exc:
         print(json.dumps({"tool": "icn-merge-pr", "outcome": exc.outcome,

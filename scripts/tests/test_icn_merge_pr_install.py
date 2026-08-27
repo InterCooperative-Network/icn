@@ -58,10 +58,14 @@ def build_source(tmp: pathlib.Path) -> pathlib.Path:
     subprocess.run(["git", "init", "-b", "main", str(source)], check=True, capture_output=True)
     git(source, "config", "user.email", "test@example.invalid")
     git(source, "config", "user.name", "provenance test")
-    shutil.copytree(ROOT / "tools" / "icn-merge-pr", source / "tools" / "icn-merge-pr")
+    shutil.copytree(ROOT / "tools" / "icn-merge-pr", source / "tools" / "icn-merge-pr",
+                    ignore=shutil.ignore_patterns("__pycache__"))
     (source / "scripts").mkdir()
     shutil.copyfile(ROOT / "scripts" / "check-merge-policy-schema.py",
                     source / "scripts" / "check-merge-policy-schema.py")
+    # As the real repository does. Without it, merely running the source copy would leave
+    # bytecode that the cleanliness gate then reports as an untracked change to the evaluator.
+    (source / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
     git(source, "add", "-A")
     git(source, "commit", "-m", "evaluator source")
     git(source, "remote", "add", "origin", str(origin))
@@ -166,6 +170,20 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
                           capture_output=True, text=True)
     check("the installed program refuses a privileged option",
           proc.returncode == 2 and "REFUSED_FORBIDDEN_OPTION" in proc.stdout, proc.stdout[:160])
+
+    # Only an installed copy may mutate. `gh` is kept off PATH so this stops at the transport
+    # rather than reaching GitHub; what matters is WHICH refusal it is.
+    no_gh = {"PATH": str(tmp / "no-such-bin"), "HOME": str(tmp)}
+    proc = subprocess.run([str(binary), "merge", "1", "--authorize", "--repo", "example/icn"],
+                          capture_output=True, text=True, env=no_gh)
+    check("the installed program passes the mutation trust gate",
+          "REFUSED_NOT_INSTALLED" not in proc.stdout
+          and "REFUSED_UNAVAILABLE_EVIDENCE" in proc.stdout, proc.stdout[:200])
+    source_copy = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "__main__.py"
+    proc = subprocess.run([sys.executable, str(source_copy), "merge", "1", "--authorize",
+                           "--repo", "example/icn"], capture_output=True, text=True, env=no_gh)
+    check("the same code run straight out of the checkout refuses to mutate",
+          "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:200])
 
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"

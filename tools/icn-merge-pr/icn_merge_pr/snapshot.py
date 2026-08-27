@@ -205,6 +205,10 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     # (2) the target's declared base.
     pr = client.pull_request_core(owner, name, number)
     base_ref_name = pr.get("baseRefName")
+    if not isinstance(base_ref_name, str) or not base_ref_name:
+        # Not "some other branch" — no branch at all. Reporting this as a stacked base would send
+        # the operator to the stack flow for a PR whose base GitHub never told us.
+        raise EvidenceUnavailable("PR did not report a base branch")
 
     # (3) refuse a non-default base BEFORE any policy is read from it.
     if base_ref_name != default_branch:
@@ -219,6 +223,11 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
     base_ref_oid = pr.get("baseRefOid")
     if not isinstance(base_ref_oid, str) or not base_ref_oid:
         raise EvidenceUnavailable("PR did not report a base OID")
+    is_draft = pr.get("isDraft")
+    if not isinstance(is_draft, bool):
+        # `bool(None)` is False, and False is the value the draft gate accepts. A cast here would
+        # turn evidence GitHub did not send into evidence that the PR is ready.
+        raise EvidenceUnavailable("PR did not report a draft state")
 
     # (4) pin the trusted revision and load policy FROM IT.
     policy = load_policy(client, owner, name, default_oid)
@@ -256,7 +265,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         default_branch=default_branch,
         default_branch_oid=default_oid,
         state=_enum(pr.get("state"), PR_STATES, "PR state"),
-        is_draft=bool(pr.get("isDraft")),
+        is_draft=is_draft,
         head_oid=head_oid,
         base_ref_name=base_ref_name,
         base_ref_oid=base_ref_oid,
