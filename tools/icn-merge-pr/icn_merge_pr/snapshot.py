@@ -126,8 +126,14 @@ def _collect_threads(client, owner, name, number) -> tuple[int, int]:
     Pagination is the whole point. A single `first: 100` page cannot prove a clean thread state
     on a PR with more threads than that, and "the first page looked clean" is exactly the shape
     of a fail-open that nobody notices until it merges over an unresolved objection.
+
+    The count is RECONCILED against the nodes actually read. Paging to the last page is not the
+    same as having seen every thread: a response can carry `totalCount: 12` and hand back fewer
+    nodes — a partial GraphQL error, or filtering — and then "no unresolved thread was found"
+    would be a statement about threads nobody looked at. Seeing fewer than the count is missing
+    evidence, and missing evidence is not ready.
     """
-    cursor, total, unresolved, pages = None, None, 0, 0
+    cursor, total, unresolved, seen, pages = None, None, 0, 0, 0
     while True:
         page = client.review_threads_page(owner, name, number, cursor)
         if total is None:
@@ -140,11 +146,16 @@ def _collect_threads(client, owner, name, number) -> tuple[int, int]:
         for node in nodes:
             if not isinstance(node, dict) or not isinstance(node.get("isResolved"), bool):
                 raise EvidenceUnavailable("a review thread did not report a resolution state")
+            seen += 1
             if not node["isResolved"]:
                 unresolved += 1
         info = page.get("pageInfo") or {}
         pages += 1
         if not info.get("hasNextPage"):
+            if seen != total:
+                raise EvidenceUnavailable(
+                    f"GitHub reports {total} review thread(s) but only {seen} could be read; the "
+                    "unread ones cannot be shown to be resolved")
             return total, unresolved
         cursor = info.get("endCursor")
         if not cursor or pages >= _MAX_PAGES:

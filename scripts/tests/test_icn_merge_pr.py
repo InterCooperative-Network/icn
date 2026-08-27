@@ -242,6 +242,24 @@ expect("an unresolved thread ONLY on a later page", page_two, codes.REFUSED_THRE
 clean_pages = world(thread_pages=[[{"isResolved": True}] * 100, [{"isResolved": True}]])
 expect("many threads, all resolved, across pages", clean_pages, codes.READY)
 
+
+class ShortCount(FakeGitHub):
+    """GitHub reports more threads than it hands back — a count without the nodes behind it."""
+
+    def review_threads_page(self, owner, name, number, after):
+        page = super().review_threads_page(owner, name, number, after)
+        page["totalCount"] += 5
+        return page
+
+
+short = ShortCount(world())
+short_result = run(short, "example", "icn", 1, authorize=False)
+check("a thread count larger than the threads actually readable -> "
+      "REFUSED_UNAVAILABLE_EVIDENCE",
+      short_result.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {short_result.outcome}")
+check("the refusal says the unread threads cannot be shown resolved",
+      any("cannot be shown to be resolved" in r.detail for r in short_result.reasons))
+
 # --- required checks ----------------------------------------------------------------------------
 print("required checks")
 

@@ -162,7 +162,7 @@ LAUNCHER = """#!/bin/sh
 # -E drops PYTHONPATH, -s drops the per-user site directory: the installed package is the only
 # icn_merge_pr that can be imported, whatever checkout the operator is standing in.
 set -eu
-exec {python} -E -s "{entry}" "$@"
+exec "{python}" -E -s "{entry}" "$@"
 """
 
 
