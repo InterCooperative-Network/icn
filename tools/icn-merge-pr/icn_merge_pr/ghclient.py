@@ -200,11 +200,46 @@ class GhCli:
         return _dig(doc, "data", "repository")
 
     def _rest(self, path: str) -> object:
+        """ONE REST document. For a paginated collection use `_rest_paginated_list`.
+
+        Deliberately not made to paginate: two of its callers read a single object, and a client
+        that paginated everything would have to guess which shape it was looking at.
+        """
         raw = self._run(["api", path])
         try:
             return json.loads(raw)
         except ValueError as exc:
             raise EvidenceUnavailable(f"GitHub returned undecodable JSON: {exc}") from exc
+
+    def _rest_paginated_list(self, path: str) -> list:
+        """EVERY page of a paginated REST collection, or refuse.
+
+        Verified against the installed gh (2.97.0) rather than assumed from the flag names:
+        `--paginate` alone streams ONE JSON DOCUMENT PER PAGE, which is not a single decodable
+        value — concatenating those and hoping `json.loads` copes is the trap. `--paginate --slurp`
+        wraps them into one array whose elements are the page arrays, which is what this decodes.
+
+        Partial enumeration is never a result. A page that will not decode, a document that is not
+        an array of arrays, or a `gh` invocation that fails part-way through pagination all raise:
+        "no further bypass actors were found" must never be inferred from pages nobody read.
+        """
+        raw = self._run(["api", "--paginate", "--slurp", path])
+        try:
+            pages = json.loads(raw)
+        except ValueError as exc:
+            raise EvidenceUnavailable(
+                f"GitHub returned undecodable paginated JSON for {path}: {exc}") from exc
+        if not isinstance(pages, list):
+            raise EvidenceUnavailable(
+                f"paginated response for {path} was not an array of pages")
+        items: list = []
+        for index, page in enumerate(pages, 1):
+            if not isinstance(page, list):
+                raise EvidenceUnavailable(
+                    f"page {index} of {path} was not a list; an unreadable page is not an empty "
+                    "one")
+            items.extend(page)
+        return items
 
     # -- named operations ----------------------------------------------------------------------
 
@@ -409,17 +444,15 @@ class GhCli:
         which an ordinary merger's credential has no business holding. This endpoint reports
         inherited rules to a caller with ordinary repository access.
         """
-        doc = self._rest(f"repos/{owner}/{name}/rules/branches/{quote(branch, safe='')}")
-        if not isinstance(doc, list):
-            raise EvidenceUnavailable("branch rules response was not a list")
-        return doc
+        return self._rest_paginated_list(
+            f"repos/{owner}/{name}/rules/branches/{quote(branch, safe='')}")
 
     def rulesets(self, owner: str, name: str) -> list:
         """Every ruleset visible for this repository, INCLUDING those inherited from a parent."""
-        doc = self._rest(f"repos/{owner}/{name}/rulesets?includes_parents=true")
-        if not isinstance(doc, list):
-            raise EvidenceUnavailable("ruleset listing response was not a list")
-        return doc
+        # Paginated for the same reason as the branch rules, and NOT because the review named it:
+        # it is the identical page-one defect, and a ruleset listed only on a later page would go
+        # unenumerated while this program claimed enumeration was available.
+        return self._rest_paginated_list(f"repos/{owner}/{name}/rulesets?includes_parents=true")
 
     def ruleset(self, owner: str, name: str, ruleset_id: int) -> dict:
         doc = self._rest(f"repos/{owner}/{name}/rulesets/{ruleset_id}")

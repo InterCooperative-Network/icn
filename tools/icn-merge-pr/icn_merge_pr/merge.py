@@ -17,12 +17,25 @@ question the outcome is MERGE_UNCONFIRMED: not success, and not a claim that not
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import codes
 from .errors import GitHubRefused, MergeToolError, TransportIndeterminate
 from .snapshot import Snapshot
 from .strategy import api_merge_method
+
+# The merge commit's identity, as GitHub reports it. Same expectation the provenance record is
+# held to: a full Git object id, not merely something truthy.
+_MERGE_OID = re.compile(r"\A[0-9a-fA-F]{40}\Z")
+
+
+def _usable_sha(*candidates) -> str | None:
+    """The first candidate that is actually a commit id, or None. Never a truthy stand-in."""
+    for candidate in candidates:
+        if isinstance(candidate, str) and _MERGE_OID.match(candidate):
+            return candidate
+    return None
 
 
 @dataclass(frozen=True)
@@ -120,7 +133,21 @@ def perform_merge(client, snap: Snapshot, strategy: str) -> MergeOutcome:
             f"on it.",
             after.get("merge_commit_sha") or response.get("sha"), attempted=True)
 
-    sha = after.get("merge_commit_sha") or response.get("sha")
+    # MERGED means BOTH things: a fresh read proves merged, AND the merge commit can be named.
+    # Source order is unchanged — the post-read first, then the merge response, which the merge
+    # API documents as the resulting merge commit — but whichever supplies it must be a real
+    # commit id. Returning success with `merge_commit_sha: None` broke the result contract the
+    # skill states and threw away the audit identity callers rely on.
+    sha = _usable_sha(after.get("merge_commit_sha"), response.get("sha"))
+    if sha is None:
+        return MergeOutcome(
+            codes.MERGE_UNCONFIRMED,
+            f"GitHub reports PR #{snap.number} merged, but the merge commit identity could not be "
+            f"established (post-read {after.get('merge_commit_sha')!r}, merge response "
+            f"{response.get('sha')!r}), so this invocation will not claim a confirmed MERGED. The "
+            f"merge did happen; what is missing is the commit it produced, and a human should "
+            f"record that before anything else acts on it.",
+            None, attempted=True)
     return MergeOutcome(
         codes.MERGED,
         f"PR #{snap.number} merged into {snap.default_branch} with the {strategy} strategy at "

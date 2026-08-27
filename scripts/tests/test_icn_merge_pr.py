@@ -489,6 +489,68 @@ no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
 no_claim["protection"]["required_approving_review_count"] = 0
 expect("a policy that makes no approval claim has no approval drift to report", no_claim,
        codes.READY)
+print("bypass evidence is enumerated across EVERY page")
+from icn_merge_pr.ghclient import GhCli                            # noqa: E402
+
+
+def paginated(pages, gh_fails=False):
+    """Drive the real transport over a `gh api --paginate --slurp` document."""
+    client = GhCli()
+
+    def run(argv, on_failure=EvidenceUnavailable):
+        check(f"pagination asks for every page ({argv[:3]})",
+              "--paginate" in argv and "--slurp" in argv, f"{argv}")
+        if gh_fails:
+            raise EvidenceUnavailable("gh failed part-way through pagination")
+        return pages if isinstance(pages, str) else json.dumps(pages)
+
+    client._run = run
+    try:
+        return client.branch_rules("o", "n", "main")
+    except EvidenceUnavailable as exc:
+        return f"REFUSED: {exc.detail}"
+
+
+two_pages = paginated([[{"type": "pull_request", "ruleset_id": 1}],
+                       [{"type": "required_status_checks", "ruleset_id": 99}]])
+check("rules spread over two pages are all returned",
+      not isinstance(two_pages, str) and [r["ruleset_id"] for r in two_pages] == [1, 99],
+      f"{two_pages}")
+check("a single empty page is an empty enumeration, not a failure",
+      paginated([[]]) == [], f"{paginated([[]])}")
+check("a later page that is not a list refuses",
+      isinstance(paginated([[{"type": "x", "ruleset_id": 1}], {"not": "a list"}]), str))
+check("a document that is not an array of pages refuses",
+      isinstance(paginated({"not": "pages"}), str))
+check("undecodable pagination output refuses", isinstance(paginated("{not json"), str))
+check("gh failing part-way through pagination refuses",
+      isinstance(paginated([[]], gh_fails=True), str))
+
+# The gate must act on the COMPLETE enumeration: a bypass actor first seen on page two.
+LATER = 99
+later_page_bypass = world()
+later_page_bypass["branch_rules"] = [{"type": "pull_request", "ruleset_id": 1},
+                                     {"type": "required_status_checks", "ruleset_id": LATER}]
+later_page_bypass["rulesets_listing"] = [{"id": 1, "name": "first", "enforcement": "active"},
+                                         {"id": LATER, "name": "inherited", "enforcement": "active"}]
+later_page_bypass["rulesets"] = {
+    1: {"id": 1, "name": "first", "enforcement": "active", "bypass_actors": []},
+    LATER: {"id": LATER, "name": "inherited", "enforcement": "active",
+            "bypass_actors": [{"actor_id": 3, "actor_type": "Team", "bypass_mode": "always"}]}}
+expect("an active bypass actor reachable only on a later page", later_page_bypass,
+       codes.REFUSED_PROTECTION_BYPASSABLE)
+_, later_result = evaluate_world(later_page_bypass)
+check("the refusal names the later-page ruleset",
+      any("inherited" in r.detail for r in later_result.reasons))
+fake, later_merge = merge_world(later_page_bypass)
+check("no mutation occurs when a later-page bypass path exists", fake.merge_calls == [])
+non_enforcing_later = dict(later_page_bypass)
+non_enforcing_later["rulesets"] = dict(later_page_bypass["rulesets"])
+non_enforcing_later["rulesets"][LATER] = dict(later_page_bypass["rulesets"][LATER],
+                                              enforcement="disabled")
+expect("a later-page DISABLED ruleset keeps its established non-active semantics",
+       non_enforcing_later, codes.READY)
+
 print("the ordinary merger mutates only when NO server-side bypass path exists")
 
 
@@ -907,6 +969,33 @@ for shape in (None, [], "ok", 7):
         got = f"raised {type(exc).__name__}"
     check(f"a merge response of {shape!r} reports an outcome instead of raising",
           got == codes.MERGE_UNCONFIRMED, f"got {got}")
+
+print("MERGED requires the merge commit's identity, not just a merged flag")
+for label, sha in (("null", None), ("missing", "__omit__"), ("an integer", 7),
+                   ("a list", []), ("an object", {}), ("an empty string", ""),
+                   ("a short sha", "abc1234")):
+    post = {"state": "MERGED", "merged": True}
+    if sha != "__omit__":
+        post["merge_commit_sha"] = sha
+    fake, r = merge_world(world(post_merge=post, merge_response={"merged": True}))
+    check(f"merged with {label} commit identity -> MERGE_UNCONFIRMED",
+          r.outcome == codes.MERGE_UNCONFIRMED, f"got {r.outcome}")
+    check(f"still exactly one mutation with {label} commit identity",
+          len(fake.merge_calls) == 1, f"{fake.merge_calls}")
+_, identity = merge_world(world(post_merge={"state": "MERGED", "merged": True,
+                                            "merge_commit_sha": None},
+                                merge_response={"merged": True}))
+check("the detail says the merge happened but its identity is missing",
+      any("merge commit identity could not be established" in r.detail
+          for r in identity.reasons))
+check("an unestablished identity is never reported as a refusal",
+      not identity.outcome.startswith("REFUSED"), identity.outcome)
+_, fallback = merge_world(world(post_merge={"state": "MERGED", "merged": True,
+                                            "merge_commit_sha": None},
+                                merge_response={"merged": True, "sha": MERGE_COMMIT}))
+check("a valid merge-response sha is accepted when the post-read omits one",
+      fallback.outcome == codes.MERGED
+      and fallback.merge["merge_commit_sha"] == MERGE_COMMIT, f"{fallback.merge}")
 
 null_merged = world(post_merge={"state": "OPEN", "merged": None, "merge_commit_sha": None})
 _, result = merge_world(null_merged)
