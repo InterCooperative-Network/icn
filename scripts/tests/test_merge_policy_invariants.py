@@ -380,6 +380,8 @@ for name, canonical, mirrors in skill_paths:
     # loads none of them — the same prose/command confusion this file has had to learn
     # repeatedly (the `--paginate` mention, the non-mutating refresh, and this).
     resolve_cmds = " ".join(fenced_lines(resolve_step))
+    gather_step = body.split("3. **Gather", 1)[-1].split("4. **Decide", 1)[0]
+    gather_cmds = " ".join(fenced_lines(gather_step))
     merge_cmds = " ".join(fenced_lines(merge_step))
 
     # -- (3a) THE REDUCED AUTHORITY SURFACE. The heart of icn#2656.
@@ -504,8 +506,24 @@ for name, canonical, mirrors in skill_paths:
           'state=="PENDING"' not in squashed)
     # A bare `gh pr merge` against a merge-queue base ENQUEUES rather than merging, which is a
     # deferred merge on stale evidence — the thing dropping `--auto` was meant to prevent.
-    check(f"{name}: detects a merge-queue base and the PR's queue membership",
-          "mergeQueue" in cmd_text and "isInMergeQueue" in cmd_text)
+    # Review of 549d8bdc: item 7 covered only the queue, so a PR ALREADY armed with auto-merge
+    # was reported "Not merged" while a deferred merge stayed live. Every way a merge can be
+    # deferred must be evidence.
+    # Scoped to the GATHER step: a token present only in the pre-merge refresh would satisfy a
+    # whole-body check while step 4 had nothing to evaluate.
+    for tok in ("mergeQueue", "isInMergeQueue", "autoMergeRequest"):
+        check(f"{name}: the gather step COMMAND collects deferral evidence: {tok}",
+              tok in gather_cmds)
+    check(f"{name}: re-reads deferral evidence immediately before merging",
+          all(tok in merge_cmds for tok in ("mergeQueue", "isInMergeQueue", "autoMergeRequest")))
+    # Enumerating which items to recheck is how one stops being rechecked.
+    check(f"{name}: re-evaluates step 4 IN FULL, not an enumerated subset",
+          bool(re.search(r"re-evaluate step 4 in full", " ".join(merge_step.split()), re.I))
+          and not re.search(r"re-evaluate step 4 items? [0-9]", " ".join(merge_step.split()), re.I))
+    check(f"{name}: reports an existing auto-merge request rather than disabling it",
+          "--disable-auto" not in cmd_text
+          and bool(re.search(r"does not disable an existing auto-merge request",
+                             " ".join(body.split()), re.I)))
     # The documented strategy exception must be selectable, not merely displayed.
     check(f"{name}: can actually select the documented strategy exception",
           "merge.exception.strategy" in cmd_text)
@@ -541,9 +559,6 @@ for name, canonical, mirrors in skill_paths:
           "CHECKS=$(gh pr checks <N> --json name,state,bucket)" in merge_step)
     check(f"{name}: and rebuilds REQUIRED_STATE from the refreshed checks",
           "REQUIRED_STATE=$(jq -n" in merge_step)
-    check(f"{name}: and re-evaluates the required-check gate against the rebuilt table",
-          bool(re.search(r"re-evaluate step 4 items 3, 4, 5 and 6",
-                         " ".join(merge_step.split()), re.I)))
     # Review of 36a4b731: only the checks were refreshed, so a review flipping to
     # CHANGES_REQUESTED or a thread reopened after step 3 still merged — and this repo reports
     # required_approving_review_count: 0, so GitHub does not re-check those either. Every gate

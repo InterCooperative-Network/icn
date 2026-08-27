@@ -235,7 +235,7 @@ its job there.
 
    ```bash
    gh api graphql -f query='query($o:String!,$r:String!,$b:String!,$n:Int!){repository(owner:$o,name:$r){
-     mergeQueue(branch:$b){id} pullRequest(number:$n){isInMergeQueue}}}' \
+     mergeQueue(branch:$b){id} pullRequest(number:$n){isInMergeQueue autoMergeRequest{enabledAt}}}}' \
      -f o=InterCooperative-Network -f r=icn -f b="${BASE}" -F n=<N>
    ```
 
@@ -261,12 +261,18 @@ its job there.
       because the table has a row per required check, that includes `CANCELLED` and the
       synthetic `ABSENT`: a check nobody reported is not a check that passed.
       `LIVE=UNAVAILABLE` fails here by construction — an unproven union is not a proven one.
-   7. The base does **not** defer merges: `mergeQueue` is `null` for `${BASE}` and the PR is not
-      already `isInMergeQueue`. A bare `gh pr merge` against a merge-queue base *enqueues* the PR
-      rather than merging it, which would leave a merge armed to happen later on evidence that is
-      no longer current — exactly what dropping `--auto` was meant to prevent (icn#2656 review).
-      Enqueuing is a legitimate outcome; it is not one this skill is shaped to own, so it stops
-      and says so.
+   7. **Nothing is, or would be, armed to merge later.** All three must hold: `mergeQueue` is
+      `null` for `${BASE}`, the PR is not already `isInMergeQueue`, and `autoMergeRequest` is
+      `null`. A bare `gh pr merge` against a merge-queue base *enqueues* the PR rather than
+      merging it; and a PR someone else already armed with auto-merge will merge on its own once
+      requirements are met, so reporting "Not merged" and stopping would be false — a complete
+      outcome claimed while a deferred merge stayed live (icn#2656 review). `autoMergeRequest` is
+      a field on `PullRequest`, confirmed against the live schema.
+
+      Both are legitimate outcomes; neither is one this skill owns. It **reports and stops** — it
+      does not disable an existing auto-merge request. Someone else armed that deliberately, and
+      `--disable-auto` would be this skill overriding a decision that was not its own, which is
+      the authority boundary it was reduced to respect.
 
    **Any other state stops the skill.** Report which gate stopped it and what its live value was,
    then stop:
@@ -296,6 +302,9 @@ its job there.
    gh api graphql --paginate -f query='query($n:Int!,$endCursor:String){repository(owner:"InterCooperative-Network",name:"icn"){
      pullRequest(number:$n){reviewThreads(first:100,after:$endCursor){
        pageInfo{hasNextPage endCursor} nodes{isResolved}}}}}' -F n=<N>
+   gh api graphql -f query='query($o:String!,$r:String!,$b:String!,$n:Int!){repository(owner:$o,name:$r){
+     mergeQueue(branch:$b){id} pullRequest(number:$n){isInMergeQueue autoMergeRequest{enabledAt}}}}' \
+     -f o=InterCooperative-Network -f r=icn -f b="${BASE}" -F n=<N>
    CHECKS=$(gh pr checks <N> --json name,state,bucket)
    REQUIRED_STATE=$(jq -n --argjson checks "${CHECKS}" --argjson policy "${POLICY}" \
                           --argjson live "${LIVE}" '
@@ -310,8 +319,15 @@ its job there.
    moved, the evidence is stale: **refuse and start over.** `baseRefOid` is included because the
    base branch advancing — someone else merging into it — changes the policy revision your gate was
    computed from without changing the base's *name*. A retarget and a base that merely moved are
-   both staleness, and neither is visible to `--match-head-commit`, which pins only the head. Then **re-evaluate step 4 items 3, 4, 5 and 6**
-   against what was just read, and stop on any that no longer holds, exactly as step 4 does.
+   both staleness, and neither is visible to `--match-head-commit`, which pins only the head.
+
+   Then **re-evaluate step 4 in full** against what was just read, and stop on any item that no
+   longer holds, exactly as step 4 does. *In full*, not a list of item numbers: an earlier revision
+   said "items 3, 4, 5 and 6" and so silently omitted item 7, leaving a merge queue enabled after
+   step 3 — or an auto-merge request armed in the interval — undetected, and the ordinary merge
+   deferred rather than completed (icn#2656 review). Enumerating which items to recheck is how one
+   stops being rechecked; the rule is the whole of step 4, and the evidence above is everything
+   step 4 reads.
 
    **The whole gate is re-evaluated, not a remembered subset of it.** The rule is not "refresh the
    checks" and not "refresh the fields someone listed here" — it is: *every operative field of
@@ -325,6 +341,7 @@ its job there.
    | `review_decision_allowlist` | `gh pr view … reviewDecision` |
    | `unresolved_review_threads` | the paginated `reviewThreads` query |
    | `required_check_conclusion_allowlist` | `CHECKS` → `REQUIRED_STATE` |
+   | *(item 7 — deferral)* | `mergeQueue`, `isInMergeQueue`, `autoMergeRequest` |
 
    **If a field is added to `.merge.ready_when`, this step must reload its evidence too**; the
    invariant test derives the field list from the policy itself and fails until it does, so the
