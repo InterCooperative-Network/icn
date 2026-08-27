@@ -54,12 +54,16 @@ silently rots (icn#2651).
    report, not a promise. A refusal here means the state genuinely changed; it is not a glitch to
    retry.
 
-6. **Report** the final outcome, quoting the code.
-   - `MERGED` carries the merge commit SHA.
-   - A `REFUSED_*` outcome means the PR did not merge. Say so plainly.
-   - `MERGE_UNCONFIRMED` means neither. The request went out and GitHub would not confirm the
-     result, so the merge status is **unknown** and needs a human to establish what happened.
-     Never report it as "did not merge", and do not run anything else against this PR first.
+6. **Report** the final outcome, quoting the code. Each one describes **this invocation**, not
+   the pull request's history.
+   - `MERGED` — this invocation completed a confirmed merge. It carries the merge commit SHA.
+   - `REFUSED_*` — this invocation did not complete a confirmed ordinary merge. That is a
+     statement about the invocation and not about the pull request, which may already have been
+     merged or closed by someone else. Report the structured reason and observed state exactly as
+     step 2 requires, and infer nothing beyond them.
+   - `MERGE_UNCONFIRMED` — a merge request went out and its result could not be established. The
+     status is **unknown** and needs a human to establish what happened. Never report it as "did
+     not merge", and do not run anything else against this PR first.
 
 ## When the executable is missing
 

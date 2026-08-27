@@ -315,6 +315,10 @@
             {
               "pattern": "\\b(all\\s+)?\\d+\\s+required\\s+(CI\\s+)?checks\\b",
               "why": "a required-check count rots the moment branch protection changes"
+            },
+            {
+              "pattern": "REFUSED.*\\bdid not merge\\b|\\bthe (PR|pull request) (did not merge|is not merged|was not merged)\\b",
+              "why": "an outcome describes this invocation, not about the pull request: a target may already have been merged or closed by another actor, in which case the evaluator refuses with the observed state and this wording would state the opposite of the evidence it was told to quote"
             }
           ]
         }

@@ -188,6 +188,17 @@ def merge_pr_bakes_a_protection_path(root: Path) -> None:
                  + "\nRead contexts from repos/o/n/branches/main/protection before merging.\n")
 
 
+def merge_pr_claims_a_refusal_means_unmerged(root: Path) -> None:
+    """icn#2651: a refusal describes the invocation, not the pull request.
+
+    A target merged by someone else before this invocation refuses with REFUSED_STATE and the
+    observed state; wording that translates every refusal into "the PR did not merge" makes the
+    wrapper state the opposite of the evidence it was told to quote.
+    """
+    p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
+    p.write_text(p.read_text() + "\nA REFUSED_* outcome means the PR did not merge.\n")
+
+
 def merge_pr_drops_the_executable(root: Path) -> None:
     """A wrapper that no longer names the program it wraps has become an owner again."""
     p = root / ".agents" / "skills" / "merge-pr" / "SKILL.md"
@@ -353,6 +364,8 @@ def main() -> int:
                 merge_pr_regrows_a_deferred_merge, "never arms")
     expect_fail("merge-pr baking a branch-protection path is rejected",
                 merge_pr_bakes_a_protection_path, "baked path")
+    expect_fail("merge-pr claiming a refusal means the PR is unmerged is rejected",
+                merge_pr_claims_a_refusal_means_unmerged, "not about the pull request")
     expect_fail("merge-pr no longer naming the trusted executable is rejected",
                 merge_pr_drops_the_executable, "icn-merge-pr")
     expect_fail("a skill declaring STATE.md canonical is rejected",

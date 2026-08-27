@@ -232,6 +232,16 @@ print("PR state")
 expect("a draft", mutate(isDraft=True), codes.REFUSED_DRAFT)
 expect("a CLOSED target", mutate(state="CLOSED"), codes.REFUSED_STATE)
 expect("an already MERGED target", mutate(state="MERGED"), codes.REFUSED_STATE)
+# The wrapper is told to quote the structured reason and observed state rather than translate a
+# refusal into "the PR did not merge". That instruction is only honest if the evidence is here.
+_, already = evaluate_world(mutate(state="MERGED"))
+check("a refusal on an already-merged target reports the OBSERVED state, not an assumed one",
+      already.evidence["state"] == "MERGED"
+      and any("MERGED" in r.detail for r in already.reasons), f"{already.reasons[:1]}")
+_, closed_pr = evaluate_world(mutate(state="CLOSED"))
+check("a refusal on a closed target names CLOSED",
+      closed_pr.evidence["state"] == "CLOSED"
+      and any("CLOSED" in r.detail for r in closed_pr.reasons), f"{closed_pr.reasons[:1]}")
 expect("CONFLICTING", mutate(mergeable="CONFLICTING"), codes.REFUSED_NOT_MERGEABLE)
 expect("UNKNOWN mergeability", mutate(mergeable="UNKNOWN"), codes.REFUSED_NOT_MERGEABLE)
 for state in ("DIRTY", "BLOCKED", "BEHIND", "HAS_HOOKS", "UNKNOWN"):
