@@ -2,33 +2,40 @@
 """check-merge-policy-schema.py — validate the STRUCTURED merge policy (icn#2651).
 
 `ops/state/truth/policy.json#merge` is the registered owner of merge requirements. This validates
-its shape and values so that a consumer can deserialize it and act on it without re-deriving what
-the fields mean.
+its shape and values so a consumer can deserialize it and act on it without re-deriving meanings.
 
-WHY THIS EXISTS, AND WHY IT IS STRUCTURED-ONLY.
+CONTRACT
+    validate(value) -> list[str]
 
-Two classes of drift got past every prior gate:
+TOTAL over any JSON-shaped input. It must never raise merely because the decoded document is
+malformed — a validator that crashes on bad input reports nothing, and nothing reads as clean.
+Every type is therefore established before the value is used: nothing is passed to `set()`,
+`sorted()`, `in <set>` or `.get()` until it is known safe, and unhashable members (objects, arrays)
+are rejected as data rather than reaching a hash (icn#2658 review).
 
-  1. The owner named a field that cannot hold the value it was compared against.
-     `admin_bypass.condition` read `mergeStateStatus=MERGEABLE`. `MERGEABLE` belongs to
-     `MergeableState` (the `mergeable` field); `mergeStateStatus` is `MergeStateStatus` and has no
-     such member, so the documented exception was unsatisfiable and nothing noticed.
+JSON TYPES MEAN JSON TYPES
+`isinstance(False, int)` is True in Python, so JSON `false` satisfied an integer check and
+`false == 0` compared equal — a malformed policy was reported clean while a strictly typed consumer
+would reject it. Integer fields use `type(v) is int`; booleans require real booleans.
 
-  2. The owner duplicated its own values. `auto_merge.command` baked `--squash` while
-     `default_strategy` was the owner of that choice, so the two could contradict each other.
+WHY STRUCTURED-ONLY
+Two classes of drift got past every prior gate: the owner named a field that cannot hold the value
+it was compared against (`mergeStateStatus=MERGEABLE` — `MERGEABLE` belongs to `MergeableState`, so
+the documented exception was unsatisfiable), and the owner duplicated values it owned
+(`auto_merge.command` baked `--squash`). An earlier attempt caught these by scanning the file's
+PROSE, which needed a clause window and a negation rule and kept producing false negatives. Facts
+that must mechanically agree therefore live in structured policy and are compared here as values.
+Prose is checked only by ABSENCE — an assertion with no grammar to get wrong.
 
-An earlier attempt caught these by scanning the file's PROSE for `field ... VALUE` associations.
-That needed a clause window, a negation rule and an exempt-key set, and review kept finding inputs
-it got wrong — its failure mode is a false negative, silence that reads as proof. Facts that must
-mechanically agree therefore live in STRUCTURED policy, compared here as JSON values against
-pinned enums. Prose is checked only by ABSENCE — an assertion with no grammar to get wrong.
-
-THE STRATEGY ENUM IS CODE, NOT DATA.
-
-`GH_MERGE_STRATEGIES` below is hardcoded and is NOT read from the file being validated. That is
-the point: a consumer that interpolated `default_strategy` straight into a command would let a
-policy saying `admin` reconstruct `gh pr merge --admin`, and for a stacked PR the base supplying
-that file can be contributor-controlled. A closed set owned by code cannot be widened by data.
+TWO AUTHORITY RULES THIS FILE ENFORCES
+1. The strategy enum is CODE, NOT DATA. `GH_MERGE_STRATEGIES` is hardcoded and never read from the
+   document under validation. A consumer interpolating `default_strategy` would let a policy saying
+   `admin` reconstruct `gh pr merge --admin`, and for a stacked PR the base supplying that file can
+   be contributor-controlled. A closed set owned by code cannot be widened by data.
+2. POLICY DATA MAY NOT SPELL COMMANDS. No operative field may hold a command- or flag-shaped
+   string. `gh_flags: ["--auto"]` was arbitrary CLI authority as data: `["--admin"]` and
+   `["--disable-auto"]` validated clean. Intent is declared symbolically; only code maps it to
+   flags.
 
 Run: python3 scripts/check-merge-policy-schema.py
 """
@@ -49,188 +56,243 @@ POLICY = ROOT / "ops" / "state" / "truth" / "policy.json"
 MERGEABLE_STATE = {"MERGEABLE", "CONFLICTING", "UNKNOWN"}
 MERGE_STATE_STATUS = {"DIRTY", "UNKNOWN", "BLOCKED", "BEHIND", "UNSTABLE", "HAS_HOOKS", "CLEAN"}
 REVIEW_DECISIONS = {"CHANGES_REQUESTED", "APPROVED", "REVIEW_REQUIRED"}
-# `gh pr merge` accepts exactly these. A CLOSED set: anything else is not a strategy.
-GH_MERGE_STRATEGIES = {"merge", "squash", "rebase"}
-# Values each merge-state enum owns EXCLUSIVELY (UNKNOWN is in both, so it proves nothing).
+GH_MERGE_STRATEGIES = {"merge", "squash", "rebase"}          # CLOSED. Owned by code.
 MERGEABLE_ONLY = MERGEABLE_STATE - MERGE_STATE_STATUS
 STATUS_ONLY = MERGE_STATE_STATUS - MERGEABLE_STATE
-# A check that ran and did not pass. No gate may allowlist one.
-FAILED_CONCLUSIONS = {"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED",
-                      "STALE", "STARTUP_FAILURE", "ERROR"}
-# Terminal-and-benign. A conclusion allowlist may hold nothing else — in particular no pending
-# state, which is a different axis and would make a still-running check read as ready.
 TERMINAL_SAFE = {"SUCCESS", "NEUTRAL", "SKIPPED"}
-PENDING_STATES = {"QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED", "PENDING", "EXPECTED"}
-# States meaning a runner has already picked the job up.
-ASSIGNED_STATES = {"IN_PROGRESS", "COMPLETED"}
-STRATEGY_FLAG_RE = re.compile(r"--(merge|squash|rebase)\b")
+LIVE_SOURCES = {"github_branch_protection"}                  # CLOSED symbolic sources.
+# A value that looks like a shell command or a CLI flag has no business in policy data.
+COMMAND_SHAPED = re.compile(r"(^|\s)(gh|git|jq|eval|bash|sh)\s|(^|\s)--[a-z]")
 
 
-def validate(policy: dict) -> list[str]:
-    """Return a list of failure messages; empty means the policy is structurally sound."""
+# --- one reusable type mechanism ---------------------------------------------------------------
+# Each returns (ok, value_or_None). Nothing downstream touches a value these have rejected.
+def as_obj(v):
+    return (True, v) if isinstance(v, dict) else (False, None)
+
+
+def as_str(v):
+    return (True, v) if isinstance(v, str) and v else (False, None)
+
+
+def as_exact_bool(v):
+    return (True, v) if type(v) is bool else (False, None)
+
+
+def as_exact_int(v):
+    # `type(v) is int` on purpose: bool is a subclass of int, so JSON `false` would pass isinstance.
+    return (True, v) if type(v) is int else (False, None)
+
+
+def as_str_list(v):
+    if not isinstance(v, list):
+        return (False, None)
+    return (True, v) if all(isinstance(x, str) for x in v) else (False, None)
+
+
+def as_str_or_null_list(v):
+    if not isinstance(v, list):
+        return (False, None)
+    return (True, v) if all(x is None or isinstance(x, str) for x in v) else (False, None)
+
+
+def validate(policy) -> list[str]:
+    """Total over any JSON-shaped value. Returns failure messages; empty means sound."""
     bad: list[str] = []
 
     def req(cond, msg):
         if not cond:
             bad.append(msg)
+        return bool(cond)
 
-    merge = policy.get("merge")
-    req(isinstance(merge, dict), "merge: missing or not an object")
-    if not isinstance(merge, dict):
+    ok, policy = as_obj(policy)
+    if not req(ok, "policy: top-level value is not a JSON object"):
         return bad
 
+    ok, merge = as_obj(policy.get("merge"))
+    if not req(ok, "merge: missing or not an object"):
+        return bad
+
+    def field(obj, key, caster, label):
+        """Type-check one field, recording a message on failure. Returns (ok, value)."""
+        got, val = caster(obj.get(key))
+        req(got, f"{label}: missing or wrong JSON type")
+        return got, val
+
     # --- (1) strategy: a value from a CLOSED set owned by code ---------------------------------
-    strategy = merge.get("default_strategy")
-    req(strategy in GH_MERGE_STRATEGIES,
-        f"default_strategy {strategy!r} is not one of {sorted(GH_MERGE_STRATEGIES)}")
-    req(bool(merge.get("strategy_note")),
-        "strategy_note: missing — the closed-set rule must be stated where the value lives")
+    got, strategy = field(merge, "default_strategy", as_str, "default_strategy")
+    if got:
+        req(strategy in GH_MERGE_STRATEGIES,
+            f"default_strategy {strategy!r} is not one of {sorted(GH_MERGE_STRATEGIES)}")
+    field(merge, "strategy_note", as_str, "strategy_note")
 
-    exc = merge.get("exception")
-    req(isinstance(exc, dict), "exception: must be structured, not prose (a strategy a consumer "
-                               "cannot select is not a policy)")
-    if isinstance(exc, dict):
-        req(exc.get("strategy") in GH_MERGE_STRATEGIES,
-            f"exception.strategy {exc.get('strategy')!r} is not one of {sorted(GH_MERGE_STRATEGIES)}")
-        req(bool(exc.get("applies_to")), "exception.applies_to: missing")
-        req(exc.get("strategy") != strategy,
-            "exception.strategy equals default_strategy — then it is not an exception")
+    got, exc = field(merge, "exception", as_obj,
+                     "exception (must be structured, not prose — a strategy a consumer cannot "
+                     "select is not a policy)")
+    if got:
+        eok, estrat = field(exc, "strategy", as_str, "exception.strategy")
+        if eok:
+            req(estrat in GH_MERGE_STRATEGIES,
+                f"exception.strategy {estrat!r} is not one of {sorted(GH_MERGE_STRATEGIES)}")
+            req(estrat != strategy,
+                "exception.strategy equals default_strategy — then it is not an exception")
+        field(exc, "applies_to", as_str, "exception.applies_to")
 
-    # --- (2) required/non-required sets ---------------------------------------------------------
-    required = set(merge.get("required_checks") or [])
-    non_blocking = set(merge.get("non_blocking_checks") or [])
-    req(len(required) > 0, "required_checks: empty")
-    overlap = sorted(required & non_blocking)
-    req(not overlap, f"required_checks and non_blocking_checks overlap: {overlap}")
-    req(merge.get("agent_tooling_check") in required,
-        "agent_tooling_check is not itself a required check")
+    # --- (2) check sets -------------------------------------------------------------------------
+    rok, required = field(merge, "required_checks", as_str_list, "required_checks")
+    nok, non_blocking = field(merge, "non_blocking_checks", as_str_list, "non_blocking_checks")
+    if rok:
+        req(len(required) > 0, "required_checks: empty")
+        if nok:
+            overlap = sorted(set(required) & set(non_blocking))
+            req(not overlap, f"required_checks and non_blocking_checks overlap: {overlap}")
+        aok, atc = field(merge, "agent_tooling_check", as_str, "agent_tooling_check")
+        if aok:
+            req(atc in required, "agent_tooling_check is not itself a required check")
+    lok, live_src = field(merge, "required_checks_live_source", as_str,
+                          "required_checks_live_source")
+    if lok:
+        req(live_src in LIVE_SOURCES,
+            f"required_checks_live_source {live_src!r} is not one of {sorted(LIVE_SOURCES)}")
+    req("verify_required_checks" not in merge,
+        "verify_required_checks: an executable gh command string must not be carried as data "
+        "(use the symbolic required_checks_live_source)")
 
-    # --- (3) shared shape for every gate that names GitHub merge state --------------------------
-    def check_gate(label, gate, *, must_include_clean):
-        req(isinstance(gate, dict) and gate != {}, f"{label}: missing machine-checkable fields")
-        if not isinstance(gate, dict):
-            return
-        req(gate.get("mergeable") in MERGEABLE_STATE,
-            f"{label}.mergeable {gate.get('mergeable')!r} is not a MergeableState member")
-        mss = gate.get("merge_state_status_in")
-        req(isinstance(mss, list) and len(mss) > 0, f"{label}.merge_state_status_in: empty")
-        if isinstance(mss, list):
+    # --- (3) the ordinary-merge gate -----------------------------------------------------------
+    got, ready = field(merge, "ready_when", as_obj, "ready_when")
+    if got:
+        mok, mval = field(ready, "mergeable", as_str, "ready_when.mergeable")
+        if mok:
+            req(mval in MERGEABLE_STATE,
+                f"ready_when.mergeable {mval!r} is not a MergeableState member")
+        sok, mss = field(ready, "merge_state_status_in", as_str_list,
+                         "ready_when.merge_state_status_in")
+        if sok:
+            req(len(mss) > 0, "ready_when.merge_state_status_in: empty")
             stray = sorted(set(mss) - MERGE_STATE_STATUS)
-            req(not stray, f"{label}.merge_state_status_in has non-MergeStateStatus values: {stray}")
-            # THE #2651 REGRESSION, as a value comparison rather than a prose scan.
+            req(not stray, f"ready_when.merge_state_status_in has non-MergeStateStatus values: {stray}")
             leak = sorted(set(mss) & MERGEABLE_ONLY)
-            req(not leak, f"{label}: MergeableState value leaked into a mergeStateStatus field: {leak}")
-            req(("CLEAN" in mss) == must_include_clean,
-                f"{label}: CLEAN must be {'present' if must_include_clean else 'absent'}")
-        req(gate.get("is_draft") is False, f"{label}.is_draft must be false")
-        req("review_decision_not_in" not in gate and isinstance(gate.get("review_decision_allowlist"), list),
-            f"{label}: review decision must use an allowlist, not a denylist")
-        rd = gate.get("review_decision_allowlist") or []
-        req("CHANGES_REQUESTED" not in rd, f"{label}: allowlists CHANGES_REQUESTED")
-        req("REVIEW_REQUIRED" not in rd, f"{label}: allowlists REVIEW_REQUIRED")
-        req(None in rd, f"{label}: the live null review decision must be admitted EXPLICITLY")
-        badrd = sorted(v for v in rd if v is not None and v not in REVIEW_DECISIONS)
-        req(not badrd, f"{label}: non-PullRequestReviewDecision values allowlisted: {badrd}")
-        req(gate.get("unresolved_review_threads") == 0,
-            f"{label}.unresolved_review_threads must be 0")
-        done = gate.get("required_check_conclusion_allowlist")
-        req(isinstance(done, list) and len(done) > 0,
-            f"{label}.required_check_conclusion_allowlist: empty")
-        strayc = sorted(set(done or []) - TERMINAL_SAFE)
-        req(not strayc,
-            f"{label}: conclusion allowlist holds non-terminal-safe values: {strayc} "
-            f"(a pending value here would make a running check read as ready)")
-
-    ready = merge.get("ready_when")
-    check_gate("ready_when", ready, must_include_clean=True)
-    if isinstance(ready, dict):
-        # The gate must stay STRUCTURED: operative fields are these keys with these types, and
-        # anything free-form must live in a `*note` key that no consumer evaluates.
-        OPERATIVE = {"mergeable": str, "merge_state_status_in": list, "is_draft": bool,
-                     "review_decision_allowlist": list, "unresolved_review_threads": int,
-                     "required_check_conclusion_allowlist": list, "not_deferred": dict}
-        extra = sorted(k for k in ready
-                       if k not in OPERATIVE and not k.endswith(("note", "note_ref")))
-        req(not extra, f"ready_when: non-structured operative fields present: {extra}")
-        missing = sorted(k for k in OPERATIVE if k not in ready)
-        req(not missing, f"ready_when: missing operative fields: {missing}")
-        mistyped = sorted(k for k, ty in OPERATIVE.items()
-                          if k in ready and not isinstance(ready[k], ty))
-        req(not mistyped, f"ready_when: fields with the wrong type: {mistyped}")
+            req(not leak, f"ready_when: MergeableState value leaked into a mergeStateStatus field: {leak}")
+            req("CLEAN" in mss, "ready_when: CLEAN must be admitted — it is the state it exists for")
+        dok, draft = field(ready, "is_draft", as_exact_bool, "ready_when.is_draft")
+        if dok:
+            req(draft is False, "ready_when.is_draft must be false")
+        req("review_decision_not_in" not in ready,
+            "ready_when: review decision must use an allowlist, not a denylist")
+        vok, rd = field(ready, "review_decision_allowlist", as_str_or_null_list,
+                        "ready_when.review_decision_allowlist")
+        if vok:
+            req("CHANGES_REQUESTED" not in rd, "ready_when allowlists CHANGES_REQUESTED")
+            req("REVIEW_REQUIRED" not in rd, "ready_when allowlists REVIEW_REQUIRED")
+            req(None in rd, "ready_when: the live null review decision must be admitted EXPLICITLY")
+            badrd = sorted(v for v in rd if v is not None and v not in REVIEW_DECISIONS)
+            req(not badrd, f"ready_when: non-PullRequestReviewDecision values allowlisted: {badrd}")
+        tok, threads = field(ready, "unresolved_review_threads", as_exact_int,
+                             "ready_when.unresolved_review_threads (integer; JSON true/false is "
+                             "not an integer)")
+        if tok:
+            req(threads == 0, "ready_when.unresolved_review_threads must be 0")
+        cok, done = field(ready, "required_check_conclusion_allowlist", as_str_list,
+                          "ready_when.required_check_conclusion_allowlist")
+        if cok:
+            req(len(done) > 0, "ready_when.required_check_conclusion_allowlist: empty")
+            strayc = sorted(set(done) - TERMINAL_SAFE)
+            req(not strayc,
+                f"ready_when: conclusion allowlist holds non-terminal-safe values: {strayc} "
+                "(a pending value here would make a running check read as ready)")
         req("required_check_pending_allowlist" not in ready,
             "ready_when: pending is not ready — it must allowlist no pending state at all")
-        nd = ready.get("not_deferred") or {}
-        req(nd.get("merge_queue_absent") is True
-            and nd.get("is_in_merge_queue") is False
-            and nd.get("auto_merge_request_absent") is True,
-            "ready_when.not_deferred must require all three: no merge queue, not in the queue, "
-            "no existing auto-merge request")
 
-    bypass = merge.get("admin_bypass")
-    req(isinstance(bypass, dict), "admin_bypass: missing")
-    if isinstance(bypass, dict):
-        req(isinstance(bypass.get("allowed"), bool),
-            "admin_bypass.allowed: missing revocation switch")
-        req("condition" not in bypass,
-            "admin_bypass.condition: prose condition replaced by structured `requires` (icn#2651)")
-        for k in ("never_for", "fail_closed", "scope_note", "field_note", "agent_execution"):
-            req(bool(bypass.get(k)), f"admin_bypass.{k}: missing")
-        breq = bypass.get("requires")
-        check_gate("admin_bypass.requires", breq, must_include_clean=False)
-        if isinstance(breq, dict):
-            pend = breq.get("required_check_pending_allowlist")
-            req(isinstance(pend, list) and len(pend) > 0,
-                "admin_bypass.requires.required_check_pending_allowlist: empty")
-            strayp = sorted(set(pend or []) - PENDING_STATES)
-            req(not strayp, f"admin_bypass: non-pending values in the pending allowlist: {strayp}")
-            assigned = sorted(ASSIGNED_STATES & set(pend or []))
-            req(not assigned,
-                f"admin_bypass: pending allowlist admits a started job: {assigned} "
-                "(ADR-0016 permits bypassing only checks not yet assigned a runner)")
-            req(not (set(breq.get("required_check_conclusion_allowlist") or []) & set(pend or [])),
-                "admin_bypass: the two allowlists overlap")
-            stall = breq.get("stalled_required_check")
-            req(isinstance(stall, dict), "admin_bypass.requires.stalled_required_check: missing")
-            if isinstance(stall, dict):
-                qual = set(stall.get("qualifying_states") or [])
-                excl = set(stall.get("excluded_states") or [])
-                req(bool(qual) and bool(excl),
-                    "stalled_required_check: qualifying_states/excluded_states must both be set "
-                    "(a bare threshold reads as `any pending state`)")
-                req(not (qual & ASSIGNED_STATES),
-                    f"stalled_required_check: a started job qualifies as stalled: "
-                    f"{sorted(qual & ASSIGNED_STATES)}")
-                req(ASSIGNED_STATES <= excl,
-                    "stalled_required_check: started states must be excluded BY NAME, not omitted")
-                req(not (qual & excl), "stalled_required_check: qualifying/excluded overlap")
-                req(set(pend or []) == qual,
-                    "stalled_required_check.qualifying_states must equal the pending allowlist")
-                req(stall.get("min_pending_minutes") == 30 and stall.get("elapsed_seconds") == 0,
-                    "stalled_required_check: threshold must be 30 minutes at 0s elapsed (ADR-0016)")
-                req(bool(stall.get("note")), "stalled_required_check.note: missing")
+        nok2, nd = field(ready, "not_deferred", as_obj, "ready_when.not_deferred")
+        if nok2:
+            for key, want in (("merge_queue_absent", True), ("is_in_merge_queue", False),
+                              ("auto_merge_request_absent", True)):
+                bok, bval = field(nd, key, as_exact_bool, f"ready_when.not_deferred.{key}")
+                if bok:
+                    req(bval is want,
+                        f"ready_when.not_deferred.{key} must be {json.dumps(want)} — an ordinary "
+                        "merge completes or refuses, it never arms something to happen later")
 
-    # --- (4) the owner must not duplicate its own values ----------------------------------------
-    auto = merge.get("auto_merge") or {}
-    req(not any(k in auto for k in ("command", "cmd", "run")),
-        "auto_merge: carries an executable command string (icn#2651)")
-    req(auto.get("strategy_from") == "default_strategy",
-        "auto_merge: must point at default_strategy rather than naming a strategy")
-    req(isinstance(auto.get("gh_flags"), list) and auto["gh_flags"],
-        "auto_merge.gh_flags: missing")
-    blob = json.dumps({k: v for k, v in auto.items() if k != "note"})
-    req(STRATEGY_FLAG_RE.search(blob) is None,
-        "auto_merge: hardcodes a --merge/--squash/--rebase flag")
+        OPERATIVE = {"mergeable", "merge_state_status_in", "is_draft", "review_decision_allowlist",
+                     "unresolved_review_threads", "required_check_conclusion_allowlist",
+                     "not_deferred"}
+        extra = sorted(k for k in ready
+                       if isinstance(k, str) and k not in OPERATIVE and not k.endswith("note"))
+        req(not extra, f"ready_when: non-structured operative fields present: {extra}")
 
-    # --- (5) prose carries no operative value, checked by ABSENCE -------------------------------
-    readiness = policy.get("readiness_definition")
-    req(isinstance(readiness, list) and readiness, "readiness_definition: missing")
-    text = " ".join(readiness or [])
-    strays = sorted(v for v in (MERGEABLE_ONLY | STATUS_ONLY) if re.search(rf"\b{v}\b", text))
-    req(not strays, f"readiness_definition restates merge-state enum values: {strays}")
-    counts = re.findall(r"\b(\d+)\s+required\b", text)
-    req(not counts, f"readiness_definition restates a required-check count: {counts}")
-    req("merge.ready_when" in text,
-        "readiness_definition must point at the structured owner instead of restating it")
+    # --- (4) the human admin exception is NOT owned here ----------------------------------------
+    got, bypass = field(merge, "admin_bypass", as_obj, "admin_bypass")
+    if got:
+        field(merge["admin_bypass"], "allowed", as_exact_bool, "admin_bypass.allowed")
+        dok, decision = field(bypass, "decision", as_str, "admin_bypass.decision")
+        if dok:
+            req(decision == "human", "admin_bypass.decision must be 'human'")
+        eok, agent_exec = field(bypass, "agent_execution", as_exact_bool,
+                                "admin_bypass.agent_execution")
+        if eok:
+            req(agent_exec is False, "admin_bypass.agent_execution must be false")
+        sok, src = field(bypass, "authoritative_source", as_str, "admin_bypass.authoritative_source")
+        if sok:
+            req((ROOT / src).is_file(),
+                f"admin_bypass.authoritative_source does not exist: {src}")
+        for key in ("never_for", "eligibility_note", "fail_closed", "consumer_note"):
+            field(bypass, key, as_str, f"admin_bypass.{key}")
+        # A PARTIAL ELIGIBILITY REPLICA MUST NOT REAPPEAR. ADR-0016 requires five conditions; a
+        # structured `requires` here encoded only two, so a maintainer following it could believe a
+        # merge was permitted while the ADR said wait. The fix is ONE OWNER — not a fuller copy,
+        # which would rot the moment the ADR changed (icn#2658 review).
+        REPLICA_KEYS = {"condition", "conditions", "requires", "prerequisites", "criteria",
+                        "eligibility", "stalled_required_check", "merge_state_status_in",
+                        "mergeable", "required_check_conclusion_allowlist",
+                        "required_check_pending_allowlist", "review_decision_allowlist",
+                        "unresolved_review_threads", "is_draft"}
+        replicas = sorted(k for k in bypass if isinstance(k, str) and k in REPLICA_KEYS)
+        req(not replicas,
+            f"admin_bypass restates eligibility that ADR-0016 owns: {replicas} — this object is "
+            "non-authoritative; consult authoritative_source instead of duplicating it")
+
+    # --- (5) the owner must not duplicate its own values, nor spell commands --------------------
+    got, auto = field(merge, "auto_merge", as_obj, "auto_merge")
+    if got:
+        field(auto, "enabled", as_exact_bool, "auto_merge.enabled")
+        aok, sfrom = field(auto, "strategy_from", as_str, "auto_merge.strategy_from")
+        if aok:
+            req(sfrom == "default_strategy",
+                "auto_merge.strategy_from must point at default_strategy rather than naming one")
+        FLAG_KEYS = {"gh_flags", "flags", "args", "argv", "command", "cmd", "run", "exec"}
+        raw = sorted(k for k in auto if isinstance(k, str) and k in FLAG_KEYS)
+        req(not raw,
+            f"auto_merge holds raw CLI authority as data: {raw} — a contributor-controlled base "
+            "could spell --admin or --disable-auto; declare intent symbolically and let code map it")
+
+    # POLICY DATA MAY NOT SPELL COMMANDS. Applies to every operative string in the merge subtree;
+    # `*note` keys are documentation and are exempt by name.
+    def scan(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if isinstance(k, str) and k.endswith("note"):
+                    continue
+                scan(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                scan(v, f"{path}[{i}]")
+        elif isinstance(node, str) and COMMAND_SHAPED.search(node):
+            bad.append(f"{path}: operative field holds a command- or flag-shaped string "
+                       f"({node[:48]!r}) — policy declares intent, only code spells commands")
+
+    scan(merge, "merge")
+
+    # --- (6) prose carries no operative value, checked by ABSENCE -------------------------------
+    rdok, readiness = as_str_list(policy.get("readiness_definition"))
+    if req(rdok, "readiness_definition: missing or not a list of strings"):
+        req(len(readiness) > 0, "readiness_definition: empty")
+        text = " ".join(readiness)
+        strays = sorted(v for v in (MERGEABLE_ONLY | STATUS_ONLY) if re.search(rf"\b{v}\b", text))
+        req(not strays, f"readiness_definition restates merge-state enum values: {strays}")
+        counts = re.findall(r"\b(\d+)\s+required\b", text)
+        req(not counts, f"readiness_definition restates a required-check count: {counts}")
+        req("merge.ready_when" in text,
+            "readiness_definition must point at the structured owner instead of restating it")
     return bad
 
 

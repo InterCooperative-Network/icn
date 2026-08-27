@@ -58,6 +58,129 @@ def must_pass(desc, fn):
 print("the live policy is valid")
 check("the committed policy passes its own validator", not validate(BASE))
 
+# --- TOTALITY: validate() must never raise on JSON-shaped input --------------------------------
+# icn#2658 review (Copilot): set()/sorted()/`in <set>` over malformed arrays raised TypeError, and
+# a non-object top level raised AttributeError. A validator that crashes reports nothing, and
+# nothing reads as clean. This is checked as a CLASS over every collection field it consumes, not
+# as three patched lines.
+print("validate() is total over JSON-shaped input")
+
+JSON_VALUES = [None, True, False, 0, 1, -1, 1.5, "", "s", [], {}, [None], [{}], [[]],
+               [1, "a"], [None, "a"], {"k": None}, {"k": []}]
+
+
+def never_raises(desc, value):
+    try:
+        errs = validate(value)
+    except Exception as exc:                       # noqa: BLE001 - the point is that none escape
+        check(f"TOTAL: {desc} -> raised {type(exc).__name__}: {exc}", False)
+        return
+    check(f"TOTAL: {desc} -> {len(errs)} error(s), no raise", isinstance(errs, list))
+
+
+for _v in JSON_VALUES:
+    never_raises(f"top-level {_v!r}", _v)
+
+# Every collection field the validator consumes, fed every representative malformed member type.
+COLLECTION_FIELDS = [
+    ("merge.required_checks", lambda d, v: d["merge"].__setitem__("required_checks", v)),
+    ("merge.non_blocking_checks", lambda d, v: d["merge"].__setitem__("non_blocking_checks", v)),
+    ("ready_when.merge_state_status_in",
+     lambda d, v: d["merge"]["ready_when"].__setitem__("merge_state_status_in", v)),
+    ("ready_when.review_decision_allowlist",
+     lambda d, v: d["merge"]["ready_when"].__setitem__("review_decision_allowlist", v)),
+    ("ready_when.required_check_conclusion_allowlist",
+     lambda d, v: d["merge"]["ready_when"].__setitem__("required_check_conclusion_allowlist", v)),
+    ("readiness_definition", lambda d, v: d.__setitem__("readiness_definition", v)),
+]
+for _name, _set in COLLECTION_FIELDS:
+    for _v in (None, True, 3, "str", {}, [None], [{}], [[]], [1, "a"], [None, "a"], [{"a": 1}]):
+        never_raises(f"{_name} = {_v!r}", mutated(lambda d, _s=_set, _val=_v: _s(d, _val)))
+
+# Nested objects given the wrong type must be reported, not treated as objects.
+NESTED_OBJECTS = [
+    ("merge", lambda d, v: d.__setitem__("merge", v)),
+    ("merge.exception", lambda d, v: d["merge"].__setitem__("exception", v)),
+    ("merge.ready_when", lambda d, v: d["merge"].__setitem__("ready_when", v)),
+    ("merge.ready_when.not_deferred",
+     lambda d, v: d["merge"]["ready_when"].__setitem__("not_deferred", v)),
+    ("merge.admin_bypass", lambda d, v: d["merge"].__setitem__("admin_bypass", v)),
+    ("merge.auto_merge", lambda d, v: d["merge"].__setitem__("auto_merge", v)),
+]
+for _name, _set in NESTED_OBJECTS:
+    for _v in (None, True, 5, "str", [], [1]):
+        never_raises(f"{_name} = {_v!r}", mutated(lambda d, _s=_set, _val=_v: _s(d, _val)))
+        must_fail(f"{_name} = {_v!r} is rejected", lambda d, _s=_set, _val=_v: _s(d, _val))
+
+# --- EXACT JSON TYPES: bool is not an integer ---------------------------------------------------
+print("JSON types are exact")
+must_fail("unresolved_review_threads = false (bool is not an integer)",
+          lambda d: d["merge"]["ready_when"].update(unresolved_review_threads=False),
+          expect="unresolved_review_threads")
+must_fail("unresolved_review_threads = true",
+          lambda d: d["merge"]["ready_when"].update(unresolved_review_threads=True))
+must_fail("unresolved_review_threads = 0.0 (float is not an integer)",
+          lambda d: d["merge"]["ready_when"].update(unresolved_review_threads=0.0))
+must_fail("is_draft = 0 (int is not a bool)",
+          lambda d: d["merge"]["ready_when"].update(is_draft=0))
+must_fail("not_deferred.is_in_merge_queue = 0 (int is not a bool)",
+          lambda d: d["merge"]["ready_when"]["not_deferred"].update(is_in_merge_queue=0))
+must_fail("admin_bypass.agent_execution = 0 (int is not a bool)",
+          lambda d: d["merge"]["admin_bypass"].update(agent_execution=0))
+must_fail("default_strategy = true (bool is not a string)",
+          lambda d: d["merge"].update(default_strategy=True))
+
+# --- AUTHORITY AS DATA: policy may not spell commands or CLI flags -----------------------------
+print("policy data cannot spell commands or CLI flags")
+must_fail("auto_merge.gh_flags reappearing",
+          lambda d: d["merge"]["auto_merge"].update(gh_flags=["--auto"]), expect="raw CLI authority")
+must_fail("auto_merge.gh_flags = ['--admin']",
+          lambda d: d["merge"]["auto_merge"].update(gh_flags=["--admin"]))
+must_fail("auto_merge.gh_flags = ['--disable-auto']",
+          lambda d: d["merge"]["auto_merge"].update(gh_flags=["--disable-auto"]))
+must_fail("auto_merge.command reappearing",
+          lambda d: d["merge"]["auto_merge"].update(command="gh pr merge <N> --auto"))
+must_fail("auto_merge.args reappearing",
+          lambda d: d["merge"]["auto_merge"].update(args=["--admin"]))
+must_fail("a flag-shaped string in any operative field",
+          lambda d: d["merge"]["exception"].update(applies_to="use --admin here"))
+must_fail("a command-shaped string in any operative field",
+          lambda d: d["merge"].update(required_checks_live_source="gh api repos/x/branches/main"))
+must_fail("verify_required_checks carried forward as an executable string",
+          lambda d: d["merge"].update(
+              verify_required_checks="gh api repos/x/branches/main/protection --jq '.contexts'"))
+must_fail("required_checks_live_source outside the closed symbolic set",
+          lambda d: d["merge"].update(required_checks_live_source="scrape_the_web"))
+must_pass("the semantic auto-merge declaration remains expressible",
+          lambda d: d["merge"].update(auto_merge={
+              "enabled": True, "use_when": "pending", "strategy_from": "default_strategy",
+              "note": "semantic"}))
+must_pass("auto-merge can be declared disabled",
+          lambda d: d["merge"]["auto_merge"].update(enabled=False))
+
+# --- ONE OWNER: ADR-0016 owns admin-bypass eligibility ------------------------------------------
+print("ADR-0016 is the sole owner of admin-bypass eligibility")
+must_fail("a structured `requires` eligibility replica returning",
+          lambda d: d["merge"]["admin_bypass"].update(requires={"mergeable": "MERGEABLE"}),
+          expect="restates eligibility")
+must_fail("the prose `condition` returning",
+          lambda d: d["merge"]["admin_bypass"].update(
+              condition="green AND mergeStateStatus=MERGEABLE but stalled"))
+must_fail("a partial replica under another name",
+          lambda d: d["merge"]["admin_bypass"].update(prerequisites={"x": 1}))
+must_fail("individual eligibility fields hoisted onto the bypass object",
+          lambda d: d["merge"]["admin_bypass"].update(stalled_required_check={"m": 30}))
+must_fail("bypass claiming to be an agent execution route",
+          lambda d: d["merge"]["admin_bypass"].update(agent_execution=True))
+must_fail("bypass decision not human",
+          lambda d: d["merge"]["admin_bypass"].update(decision="agent"))
+must_fail("authoritative_source pointing at a file that does not exist",
+          lambda d: d["merge"]["admin_bypass"].update(authoritative_source="docs/adr/NOPE.md"))
+must_fail("authoritative_source removed",
+          lambda d: d["merge"]["admin_bypass"].pop("authoritative_source"))
+must_fail("the fail-closed statement removed",
+          lambda d: d["merge"]["admin_bypass"].pop("fail_closed"))
+
 # --- strategy is a closed set owned by CODE, not by the document ------------------------------
 print("strategy is a closed enum")
 must_fail("default_strategy 'admin' (would reconstruct --admin)",
@@ -84,12 +207,12 @@ for s in ("merge", "squash", "rebase"):
 
 # --- the original icn#2651 defects, reconstructed from main ------------------------------------
 print("the pre-#2651 shapes on main are rejected")
-must_fail("admin_bypass.condition prose (`mergeStateStatus=MERGEABLE`, unsatisfiable)",
+must_fail("the whole pre-#2651 admin_bypass object (prose `condition`, no owner pointer)",
           lambda d: d["merge"].__setitem__("admin_bypass", {
               "allowed": True,
               "condition": "Required checks green AND mergeStateStatus=MERGEABLE but stalled",
               "never_for": "Bypassing genuinely failing required checks"}))
-must_fail("auto_merge.command baking --squash",
+must_fail("the pre-#2651 auto_merge object (baked command string)",
           lambda d: d["merge"].__setitem__("auto_merge", {
               "command": "gh pr merge <N> --auto --squash",
               "use_when": "Required checks are still pending (not failed)"}))
@@ -104,16 +227,10 @@ must_fail("readiness prose restating the required-check count",
 print("no cross-enum leakage")
 must_fail("MergeableState value in ready_when.merge_state_status_in",
           lambda d: d["merge"]["ready_when"].update(merge_state_status_in=["MERGEABLE", "UNSTABLE"]))
-must_fail("MergeableState value in the bypass gate",
-          lambda d: d["merge"]["admin_bypass"]["requires"].update(
-              merge_state_status_in=["MERGEABLE"]))
 must_fail("a non-MergeableState `mergeable`",
           lambda d: d["merge"]["ready_when"].update(mergeable="CLEAN"))
 must_fail("ordinary gate without CLEAN (the state it exists for)",
           lambda d: d["merge"]["ready_when"].update(merge_state_status_in=["UNSTABLE"]))
-must_fail("bypass gate WITH CLEAN (a clean PR needs no bypass)",
-          lambda d: d["merge"]["admin_bypass"]["requires"].update(
-              merge_state_status_in=["CLEAN", "BLOCKED"]))
 
 # --- allowlists must be allowlists, and on the right axis --------------------------------------
 print("allowlists are fail-closed and on the right axis")
@@ -121,9 +238,6 @@ must_fail("a failing conclusion allowlisted",
           lambda d: d["merge"]["ready_when"]["required_check_conclusion_allowlist"].append("FAILURE"))
 must_fail("a PENDING value in the CONCLUSION allowlist",
           lambda d: d["merge"]["ready_when"]["required_check_conclusion_allowlist"].append("PENDING"))
-must_fail("IN_PROGRESS in the conclusion allowlist",
-          lambda d: d["merge"]["admin_bypass"]["requires"]
-                     ["required_check_conclusion_allowlist"].append("IN_PROGRESS"))
 must_fail("a review-decision DENYLIST",
           lambda d: d["merge"]["ready_when"].update(
               review_decision_not_in=["CHANGES_REQUESTED"],
@@ -162,28 +276,8 @@ must_fail("not_deferred removed entirely",
           lambda d: d["merge"]["ready_when"].pop("not_deferred"))
 
 # --- the queue-stall qualifier (ADR-0016) ------------------------------------------------------
-print("the queue-stall qualifier matches ADR-0016")
-must_fail("IN_PROGRESS in the bypass pending allowlist",
-          lambda d: d["merge"]["admin_bypass"]["requires"]
-                     ["required_check_pending_allowlist"].append("IN_PROGRESS"))
-must_fail("IN_PROGRESS qualifying as a stall",
-          lambda d: d["merge"]["admin_bypass"]["requires"]["stalled_required_check"]
-                     ["qualifying_states"].append("IN_PROGRESS"))
-must_fail("started states no longer excluded by name",
-          lambda d: d["merge"]["admin_bypass"]["requires"]["stalled_required_check"]
-                     .update(excluded_states=[]))
-must_fail("qualifying_states diverging from the pending allowlist",
-          lambda d: d["merge"]["admin_bypass"]["requires"]["stalled_required_check"]
-                     .update(qualifying_states=["QUEUED"]))
-must_fail("the stall threshold weakened",
-          lambda d: d["merge"]["admin_bypass"]["requires"]["stalled_required_check"]
-                     .update(min_pending_minutes=1))
-must_fail("the whole stall qualifier removed",
-          lambda d: d["merge"]["admin_bypass"]["requires"].pop("stalled_required_check"))
 must_fail("the bypass revocation switch removed",
           lambda d: d["merge"]["admin_bypass"].pop("allowed"))
-must_fail("the bypass losing its human-decision note",
-          lambda d: d["merge"]["admin_bypass"].pop("agent_execution"))
 
 # --- check sets --------------------------------------------------------------------------------
 print("required-check configuration")
