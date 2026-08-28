@@ -1,0 +1,394 @@
+{
+  "schema": "icn.delivery-lifecycle.v1",
+  "description": "Canonical semantics for the pull-request delivery lifecycle: when comprehensive review ends, what freezes, and how a late finding is classified. This file is the single owner of those semantics. Provider reviewer prompts and skills load it; they do not restate it.",
+  "principle": "Automated review is evidence, not unbounded veto authority.",
+  "why_this_exists": "A pull request that is correct, complete and green could still fail to converge: each push drew a fresh full review, each full review produced valid-but-non-blocking observations, and each observation reopened the whole PR. Nothing said when review ENDS, so every reviewer surface invented its own blocking rules. Recorded because the failure mode is invisible while it is happening \u2014 each individual round looks reasonable.",
+  "owner_boundary": {
+    "owns": [
+      "the delivery lifecycle states and their transitions",
+      "review generations, and what a FULL and a DELTA review may inspect",
+      "the disposition vocabulary for a review finding",
+      "the blocker predicate, including the higher threshold after freeze",
+      "freeze entry, freeze effect, and refreeze",
+      "the follow-up ledger convention",
+      "the delivery lanes",
+      "which lifecycle decisions are maintainer-only"
+    ],
+    "does_not_own": [
+      {
+        "fact": "merge requirements and merge-mutation semantics",
+        "owner": "ops/state/truth/policy.json#merge, executed by tools/icn-merge-pr"
+      },
+      {
+        "fact": "the five ICN invariants a review applies",
+        "owner": "AGENTS.md"
+      },
+      {
+        "fact": "how an agent resolves truth and loads context",
+        "owner": "docs/ai/WORKFLOW_ARCHITECTURE.md"
+      },
+      {
+        "fact": "current state of any specific pull request",
+        "owner": "github-api, queried live"
+      },
+      {
+        "fact": "skill and agent routing",
+        "owner": "ops/state/truth/skills.json, ops/state/truth/agents.json"
+      }
+    ],
+    "note": "Merge semantics are deliberately NOT here. policy.json#merge is a trusted input to a provenance-gated executable; widening it with review-process vocabulary would widen that trusted surface. A lifecycle that reaches MERGING hands off to the merge primitive and reimplements none of it."
+  },
+  "lifecycle": {
+    "states": [
+      {
+        "name": "IMPLEMENTING",
+        "means": "The acceptance contract is stated and the change is being built.",
+        "exits_to": [
+          "REVIEWING"
+        ]
+      },
+      {
+        "name": "REVIEWING",
+        "means": "The scheduled comprehensive review generation is open against the acceptance contract.",
+        "exits_to": [
+          "FIXING",
+          "VERIFYING"
+        ]
+      },
+      {
+        "name": "FIXING",
+        "means": "Known blockers from the closed generation are being corrected as one batch.",
+        "exits_to": [
+          "VERIFYING"
+        ]
+      },
+      {
+        "name": "VERIFYING",
+        "means": "Verification appropriate to the changed paths is running. After a blocker batch this is DELTA verification.",
+        "exits_to": [
+          "FROZEN",
+          "FIXING"
+        ]
+      },
+      {
+        "name": "FROZEN",
+        "means": "The acceptance contract is met, known blockers are resolved, verification is green, and the comprehensive review generation is CLOSED. An exact head is named.",
+        "exits_to": [
+          "MERGING",
+          "FIXING"
+        ],
+        "exit_to_fixing_requires": "a late finding that satisfies every blocker predicate condition"
+      },
+      {
+        "name": "MERGING",
+        "means": "Waiting only on live merge gates, then invoking the merge primitive.",
+        "exits_to": [
+          "DONE",
+          "FROZEN"
+        ]
+      },
+      {
+        "name": "DONE",
+        "means": "Merged, with any deferred observations recorded in the follow-up ledger.",
+        "exits_to": []
+      }
+    ],
+    "state_surface": {
+      "owner": "github-api",
+      "location": "the pull request body",
+      "begin_marker": "<!-- ICN-DELIVERY-LIFECYCLE:BEGIN -->",
+      "end_marker": "<!-- ICN-DELIVERY-LIFECYCLE:END -->",
+      "fields": [
+        "State",
+        "Lane",
+        "Acceptance contract",
+        "Review generation",
+        "Freeze head",
+        "Known blockers",
+        "Follow-up ledger"
+      ],
+      "rendered_by": [
+        ".github/pull_request_template.md",
+        ".agents/skills/pr-create/SKILL.md",
+        ".claude/skills/pr-create/SKILL.md",
+        ".agents/skills/ship-pr/SKILL.md",
+        ".claude/skills/ship-pr/SKILL.md"
+      ],
+      "rendered_by_why": "The owner names the fields; these surfaces render the block. Two of them rendered a different set and nothing noticed, so the list is data and the gate checks it.",
+      "not_owned_by": [
+        "repository files",
+        "handoffs",
+        "session summaries",
+        "model memory"
+      ],
+      "why": "Lifecycle state is volatile per-PR state. A repository file naming the current state of a PR is stale the moment another actor pushes, and AGENTS.md already forbids putting volatile facts in stable documents."
+    }
+  },
+  "review_generation": {
+    "definition": "One comprehensive (FULL) review of a bounded pull request against its acceptance contract.",
+    "comprehensive_review_is_bounded": true,
+    "generations_per_lane_source": "lanes",
+    "push_resets_generation": false,
+    "push_resets_generation_why": "If a push reopened discovery, a PR that fixes findings can never converge: fixing is the act that triggers the next unbounded search. The generation is a property of the review schedule, not of the commit graph.",
+    "blocker_fixes_are_batched": true,
+    "blocker_fixes_are_batched_why": "Handling known blockers together and verifying once beats push -> full re-review -> push -> full re-review, which multiplies rounds without improving the deliverable.",
+    "after_blocker_fix": "DELTA",
+    "review_kinds": {
+      "FULL": {
+        "may_inspect": "the bounded pull request against its acceptance contract and the invariants owned by AGENTS.md",
+        "when": "the scheduled comprehensive generation for the lane"
+      },
+      "DELTA": {
+        "may_inspect": "only the changes since the reviewed head, plus the consequences necessary to determine whether the known findings were actually fixed",
+        "may_not": "use a patch as permission to rediscover the whole pull request",
+        "when": "after a blocker-fix batch, and for any review of a FROZEN pull request"
+      }
+    },
+    "every_review_declares_its_kind": true
+  },
+  "finding_dispositions": [
+    {
+      "name": "BLOCKER",
+      "means": "Satisfies every condition in blocker_predicate.all_must_hold.",
+      "action": "Make the smallest local correction, add only directly necessary regression coverage, do not inspect sibling areas for more things to fix. Resolve the thread once the fix is verified, not when it is written.",
+      "resolve_thread": "after_the_fix_is_verified"
+    },
+    {
+      "name": "FOLLOW_UP",
+      "means": "Valid or potentially useful, but does not satisfy every blocker condition.",
+      "action": "Do not change the pull request for it. Append it to the follow-up ledger with a link back to the thread, reply saying it is valid but outside the delivery contract, link the ledger, and resolve the thread.",
+      "resolve_thread": "after_the_ledger_entry_exists"
+    },
+    {
+      "name": "NOT_A_FINDING",
+      "means": "Incorrect, duplicate, already fixed, obsolete, or outside the pull request's contract.",
+      "action": "Reply briefly with the evidence and resolve the thread.",
+      "resolve_thread": "after_the_reply"
+    },
+    {
+      "name": "QUESTION",
+      "means": "Intent genuinely cannot be determined from the registered owners and implementation evidence.",
+      "action": "Ask. Do not guess, and do not treat the ambiguity as a blocker. Leave the thread UNRESOLVED until it is answered and reclassified: merge readiness counts unresolved threads, so resolving an unanswered question manufactures readiness out of a question nobody answered.",
+      "resolve_thread": "after_it_is_answered_and_reclassified"
+    }
+  ],
+  "blocker_predicate": {
+    "all_must_hold": [
+      {
+        "id": "reproducible",
+        "condition": "It is concrete and reproducible.",
+        "why": "A finding that cannot be demonstrated cannot be verified as fixed either."
+      },
+      {
+        "id": "introduced_here",
+        "condition": "It is introduced by this pull request rather than merely adjacent or pre-existing.",
+        "why": "Adjacent debt is real work, but charging it to whichever PR happened to touch a nearby line makes delivery unbounded."
+      },
+      {
+        "id": "violates_stated_contract",
+        "condition": "It violates an explicit acceptance condition, an established repository invariant, or a behaviour this pull request claims to provide \u2014 or it regresses behaviour this pull request actually changes, whether or not the contract mentioned it.",
+        "why": "This is what makes the deliverable wrong rather than merely improvable. A regression counts even when the contract is silent about it: a pull request does not get to break what it touched by omitting it from the contract."
+      },
+      {
+        "id": "realistic_path",
+        "condition": "It occurs on a supported and realistic execution path relevant to the feature's intended operation, rather than existing only as generalised hardening speculation.",
+        "why": "Hypothetical inputs are an infinite set. A finding that requires an actor who already holds the capability being defended, or an upstream API to violate its own schema, describes a thought experiment rather than an operational failure."
+      },
+      {
+        "id": "materially_breaks_it",
+        "condition": "Leaving it unfixed would materially make the deliverable incorrect or unusable.",
+        "why": "A fail-closed abort on an impossible input is not the deliverable being unusable. This condition is what separates a defect from an improvement."
+      }
+    ],
+    "automated_severity_is_advisory": true,
+    "advisory_severity_labels": [
+      "P0",
+      "P1",
+      "P2",
+      "P3",
+      "critical",
+      "high",
+      "medium",
+      "low",
+      "blocking",
+      "must-fix"
+    ],
+    "severity_note": "A severity label assigned by an automated reviewer is evidence about that reviewer's confidence. It is not authority. No label alone satisfies the predicate, and no label alone breaks a freeze.",
+    "no_sibling_sweep": {
+      "rule": "A targeted fix or a DELTA review may not expand into a generalised search for similar problems elsewhere.",
+      "exception": "The maintainer explicitly reopens discovery.",
+      "why": "A sibling sweep converts one bounded fix into an unbounded audit inside a frozen PR."
+    },
+    "redesign_rule": {
+      "rule": "If a late observation would require a substantial design change to address, default to a follow-up issue and a maintainer decision rather than widening the frozen delivery scope.",
+      "why": "Architecture must not enter a frozen pull request by way of a review comment."
+    }
+  },
+  "freeze": {
+    "entry_conditions": [
+      "the stated acceptance contract is met",
+      "known blockers from the closed review generation are resolved",
+      "verification appropriate to the changed paths is green",
+      "the scheduled comprehensive review generation has closed"
+    ],
+    "names_an_exact_head": true,
+    "head_must_match_before_handoff": "Before handing over to the merge primitive, the live head must equal the recorded freeze head. A freeze names an exact head because that is the head that was reviewed and verified; content pushed after the freeze has been through neither. On a mismatch, run DELTA verification on the new content, update the freeze head, return to FROZEN, and only then hand over. The merge executable pins the head it mutates, but it does not know which head was reviewed \u2014 nothing downstream will catch this.",
+    "effect": [
+      "a new automated review comment does not reopen the pull request",
+      "review of a frozen pull request is DELTA, never FULL",
+      "a valid finding below the blocker threshold becomes follow-up work and its thread is resolved with a link"
+    ],
+    "late_finding_rule": "After freeze a finding breaks the freeze only when it satisfies every condition in blocker_predicate.all_must_hold.",
+    "refreeze": "On a qualifying late blocker: make one targeted correction, run targeted or delta verification, update the freeze head, and return immediately to FROZEN. Do not run another comprehensive review.",
+    "server_enforced_gates_still_apply": "Freeze is a repository workflow state, not a GitHub state. Server-side requirements such as conversation resolution still apply, so a frozen pull request may still need late threads dispositioned and resolved \u2014 dispositioning a thread is not reopening review."
+  },
+  "follow_up_ledger": {
+    "one_issue_per_pull_request": true,
+    "reuse_before_creating": true,
+    "entry_shape": "a checklist item stating the observation, why it was deferred, and the fix",
+    "provenance_link_required": true,
+    "why_not_one_issue_per_comment": "One issue per comment converts review noise into issue noise. A single ledger per pull request keeps the deferred set readable and closable.",
+    "not_a_mandate_to_re_audit": "A ledger records observations. Picking one up is a new bounded change with its own regression test, not permission to sweep the surrounding code."
+  },
+  "lanes": {
+    "default": "STANDARD",
+    "definitions": [
+      {
+        "name": "FAST",
+        "for": "tiny or low-risk changes",
+        "comprehensive_generations": 1,
+        "shape": "implement, focused verification, one bounded review, freeze"
+      },
+      {
+        "name": "STANDARD",
+        "for": "the default for substantive changes",
+        "comprehensive_generations": 1,
+        "shape": "one comprehensive review, one blocker-fix batch, one delta verification, freeze"
+      },
+      {
+        "name": "DEEP",
+        "for": "architecture, migration, or cross-cutting work",
+        "comprehensive_generations": 1,
+        "requires_maintainer_selection": true,
+        "shape": "multiple specialist reviews may be requested, but they are requested together as ONE planned generation rather than drip-fed after every push"
+      }
+    ]
+  },
+  "authority": {
+    "maintainer_only": [
+      "reopening a frozen pull request",
+      "requesting another comprehensive review generation",
+      "escalating a follow-up observation into a blocker",
+      "selecting the DEEP lane",
+      "reopening discovery for a sibling sweep"
+    ],
+    "agents_may_not": [
+      "silently reopen comprehensive review",
+      "treat an automated reviewer's severity label as authority",
+      "widen a frozen pull request's scope to accommodate a late observation",
+      "drop a valid observation instead of recording it in the ledger"
+    ],
+    "automated_reviewers_may_not": [
+      "break a freeze by assigning a severity label",
+      "convert a DELTA review into a FULL review"
+    ],
+    "mutation": {
+      "semantics_owner": "ops/state/truth/policy.json#merge",
+      "executable": "tools/icn-merge-pr",
+      "orchestrator": ".agents/skills/ship-pr/SKILL.md",
+      "primitive": ".agents/skills/merge-pr/SKILL.md",
+      "orchestrator_may_not_duplicate_primitive": true,
+      "why": "ship-pr decides WHEN a pull request is ready to be handed over. It never decides whether the merge is permitted, never evaluates merge requirements itself, and never issues a merge command. A second implementation of merge semantics is a second owner of them, and the copy is the one that rots."
+    }
+  },
+  "provider_bindings": {
+    "rule": "A provider reviewer surface adapts this lifecycle to a tool. It may not carry its own blocker, severity, or freeze semantics. Enforced by scripts/check-delivery-lifecycle.py.",
+    "body_mirrors": [
+      {
+        "canonical": ".claude/agents/icn-code-reviewer.md",
+        "mirror": ".github/agents/icn-code-reviewer.md",
+        "why": "Two reviewer prompts drifted into two independent definitions of what blocks a merge. Front matter differs because the providers differ; the body is one document with one owner, and the checker compares it byte for byte after the front matter."
+      }
+    ],
+    "surfaces": [
+      {
+        "path": ".claude/agents/icn-code-reviewer.md",
+        "role": "Claude provider reviewer adapter",
+        "must_reference": [
+          "ops/state/truth/delivery.json",
+          "BLOCKER",
+          "FOLLOW_UP",
+          "NOT_A_FINDING",
+          "QUESTION",
+          "FULL",
+          "DELTA"
+        ],
+        "must_not_match": [
+          {
+            "pattern": "(?i)^#+.*always\\s+flag",
+            "why": "an independent always-blocking list is a second owner of the blocker predicate"
+          },
+          {
+            "pattern": "(?i)\\b(blocking|blocker)\\b\\s*(issues|list)?\\s*:\\s*$",
+            "why": "declaring a local blocking category redefines what this file must load"
+          },
+          {
+            "pattern": "(?i)\\brequest_changes\\b",
+            "why": "a verdict vocabulary of its own competes with the canonical disposition set"
+          }
+        ]
+      },
+      {
+        "path": ".github/agents/icn-code-reviewer.md",
+        "role": "Copilot provider reviewer adapter",
+        "must_reference": [
+          "ops/state/truth/delivery.json",
+          "BLOCKER",
+          "FOLLOW_UP",
+          "NOT_A_FINDING",
+          "QUESTION",
+          "FULL",
+          "DELTA"
+        ],
+        "must_not_match": [
+          {
+            "pattern": "(?i)^#+.*always\\s+flag",
+            "why": "an independent always-blocking list is a second owner of the blocker predicate"
+          },
+          {
+            "pattern": "(?i)\\b(blocking|blocker)\\b\\s*(issues|list)?\\s*:\\s*$",
+            "why": "declaring a local blocking category redefines what this file must load"
+          },
+          {
+            "pattern": "(?i)\\brequest_changes\\b",
+            "why": "a verdict vocabulary of its own competes with the canonical disposition set"
+          }
+        ]
+      },
+      {
+        "path": ".github/copilot-instructions.md",
+        "role": "Copilot provider entry adapter",
+        "must_reference": [
+          "AGENTS.md",
+          "ops/state/truth/sources.json",
+          "ops/state/truth/delivery.json"
+        ],
+        "must_not_match": [
+          {
+            "pattern": "(?i)^#+\\s*current\\s+(status|working\\s+context)",
+            "why": "volatile project state in a provider entry file is stale by construction; AGENTS.md forbids it"
+          },
+          {
+            "pattern": "(?i)^#+\\s*(project\\s+overview|repository\\s+structure|architecture\\s+patterns)",
+            "why": "a second project handbook competes with the registered truth owners"
+          },
+          {
+            "pattern": "(?i)\\b(STATE|PHASE_PROGRESS)\\.md\\b.*canonical",
+            "why": "the retired canonical-state claim tracked by icn#2632"
+          }
+        ]
+      }
+    ],
+    "inventory_note": "The surfaces, the mirror pairs, and each surface's required references and forbidden patterns are a FLOOR pinned in scripts/check-delivery-lifecycle.py. This list may add to them; it may not shrink below them. Without that, an edit could keep three entries, point them all at one prompt, cut must_reference to a single string and replace every pattern with one that cannot match \u2014 detaching the Copilot adapters while the required check stayed green."
+  }
+}

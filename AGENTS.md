@@ -22,6 +22,8 @@ Use this rule:
 | What is being worked on right now? | The live issue/PR control surface via `gh`. Never a sprint file, a handoff, or a cached prompt |
 | Is a sprint cadence running, and what is the sprint board lineage? | `ops/state/sprint/current.json` |
 | What are the merge requirements? | `ops/state/truth/policy.json` plus live branch protection |
+| Is comprehensive review complete, and may this PR be frozen? | `ops/state/truth/delivery.json` plus the pull request's live lifecycle block. It owns review completion only, and disclaims merge requirements |
+| May this PR actually merge? | The merge-requirements row above — `ops/state/truth/policy.json` plus live branch protection and live PR state. A frozen PR can still be draft, conflicting, or missing a required check |
 | Which agent or skill owns a workflow? | `ops/state/truth/agents.json` and `ops/state/truth/skills.json` |
 | What is the current branch, PR, review, or CI state? | Live `git` and GitHub data. Never a handoff or cached prompt |
 | What happened previously? | Git history, issues/PRs, and handoffs as historical evidence |

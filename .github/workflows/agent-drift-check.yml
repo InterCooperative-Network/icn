@@ -23,6 +23,11 @@ on:
       - 'tools/icn-merge-pr/**'
       - 'scripts/tests/test_icn_merge_pr.py'
       - 'scripts/tests/test_icn_merge_pr_install.py'
+      # icn#2661: the delivery lifecycle owner, its gate, and the provider surfaces it binds.
+      - 'scripts/check-delivery-lifecycle.py'
+      - 'scripts/tests/test_delivery_lifecycle.py'
+      - '.github/copilot-instructions.md'
+      - '.github/pull_request_template.md'
       - 'ops/scripts/setup-skill-symlinks.sh'
       - 'ops/state/truth/**'
       - 'ops/scripts/drift-check.sh'
@@ -117,6 +122,15 @@ jobs:
       # default-branch tip, and the installed runtime must not import candidate-worktree code.
       - name: Ordinary-merge evaluator provenance gate (Refs icn#2651)
         run: python3 scripts/tests/test_icn_merge_pr_install.py
+
+      # icn#2661: one owner for the delivery lifecycle. This proves the provider reviewer
+      # surfaces still bind to it — a prompt that regains its own blocker or freeze semantics is
+      # a second owner of them, and the copy is the one that rots.
+      - name: Delivery lifecycle owner and provider bindings (Refs icn#2661)
+        run: python3 scripts/check-delivery-lifecycle.py --verbose
+
+      - name: Delivery lifecycle gate rejects its own violations (Refs icn#2661)
+        run: python3 scripts/tests/test_delivery_lifecycle.py
 
       - name: SessionStart hook runs and degrades honestly (Refs icn#2634)
         run: |

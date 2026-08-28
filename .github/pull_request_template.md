@@ -1,5 +1,28 @@
 # Pull Request
 
+## Delivery
+
+Two lines a human writes; the rest an agent keeps current. Semantics are owned by
+[`ops/state/truth/delivery.json`](../ops/state/truth/delivery.json) — lane definitions, what the
+states mean, and when comprehensive review ends.
+
+- **Delivery lane**: FAST | STANDARD | DEEP <!-- DEEP is the maintainer's call -->
+- **Acceptance contract**: what this PR claims to deliver.
+- **Explicit non-goals**: what it deliberately does not do.
+
+<!-- ICN-DELIVERY-LIFECYCLE:BEGIN -->
+```
+ICN DELIVERY LIFECYCLE
+State:                IMPLEMENTING
+Lane:                 <lane>
+Acceptance contract:  <one line, or a pointer into the Delivery section above>
+Review generation:    not yet requested
+Freeze head:          -
+Known blockers:       -
+Follow-up ledger:     -
+```
+<!-- ICN-DELIVERY-LIFECYCLE:END -->
+
 ## Summary
 What changed and why?
 

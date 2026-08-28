@@ -323,6 +323,12 @@
       "summary": ""
     },
     {
+      "name": "ship-pr",
+      "group": "icn_level",
+      "canonical_path": ".agents/skills/ship-pr/SKILL.md",
+      "summary": ""
+    },
+    {
       "name": "sync-docs",
       "group": "icn_level",
       "canonical_path": ".agents/skills/sync-docs/SKILL.md",
@@ -551,6 +557,10 @@
     {
       "domain": "merge_policy",
       "owner": "ops/state/truth/policy.json"
+    },
+    {
+      "domain": "pr_delivery_lifecycle",
+      "owner": "ops/state/truth/delivery.json"
     },
     {
       "domain": "repo_topology",
