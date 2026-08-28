@@ -30,7 +30,32 @@ class Decision:
         return self.outcome == codes.READY
 
 
-def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
+def _current_occurrence(occurrences):
+    """The occurrence that is CURRENT for one required check, or None if that cannot be told.
+
+    A check can fail and then be re-run green on the same commit — GitHub's ordinary recovery
+    path, which creates a new run rather than editing the old one. Taking the worst of every
+    occurrence forever turned that into a permanent false refusal: readiness could only be
+    recovered by changing the commit SHA. Taking the best would be worse, because an older green
+    would mask a newer red.
+
+    So the CURRENT run decides, and it is identified by documented check-run evidence for the same
+    name, producer and head: `startedAt`, with `databaseId` breaking a same-second tie. A single
+    occurrence needs no ordering at all. When several exist and any of them cannot be placed, or
+    the newest is not unique, the answer is that this program cannot tell which run is current —
+    which is missing evidence, not a licence to pick one.
+    """
+    if len(occurrences) == 1:
+        return occurrences[0]
+    placed = [(o.ordinal, o) for o in occurrences]
+    if any(ordinal is None for ordinal, _ in placed):
+        return None
+    newest = max(ordinal for ordinal, _ in placed)
+    winners = [o for ordinal, o in placed if ordinal == newest]
+    return winners[0] if len(winners) == 1 else None
+
+
+def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str], list[str]]:
     """(failed, pending, missing) over EVERY canonical required check.
 
     The canonical set is the union of the pinned policy list and the live protection contexts. It
@@ -39,6 +64,9 @@ def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
 
     A required check GitHub never reported is MISSING, not absent-so-fine. A green non-required
     check is not consulted at all, so it can never stand in for a missing required one.
+
+    Where a name has several runs, the CURRENT one decides — see `_current_occurrence`. Ambiguity
+    about which is current is unreadable evidence and fails closed.
 
     THE NAME IS NOT THE CHECK. Branch protection can pin a required check to one GitHub App, and
     this repository does exactly that. A check matching only by name would let a green result from
@@ -51,6 +79,7 @@ def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
     failed: list[str] = []
     pending: list[str] = []
     missing: list[str] = []
+    ambiguous: list[str] = []
     for name in canonical:
         reported = snap.checks.get(name, ())
         want = snap.protection.required_bindings.get(name)
@@ -60,13 +89,15 @@ def _check_verdicts(snap: Snapshot) -> tuple[list[str], list[str], list[str]]:
             missing.append(f"{name} (no run from the required producer, app {want})"
                            if want is not None and reported else name)
             continue
-        # Worst wins. A re-run that went green does not erase a red occurrence for this gate.
-        outcomes = [o.outcome for o in occurrences]
-        if any(o != PENDING and o not in allow for o in outcomes):
-            failed.append(f"{name} ({', '.join(outcomes)})")
-        elif any(o == PENDING for o in outcomes):
+        current = _current_occurrence(occurrences)
+        if current is None:
+            ambiguous.append(f"{name} ({len(occurrences)} runs, none identifiable as current)")
+            continue
+        if current.outcome == PENDING:
             pending.append(name)
-    return failed, pending, missing
+        elif current.outcome not in allow:
+            failed.append(f"{name} ({current.outcome})")
+    return failed, pending, missing, ambiguous
 
 
 def evaluate(snap: Snapshot, strategy: str) -> Decision:
@@ -206,7 +237,12 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
                f"{policy.max_unresolved_threads}")
 
     # --- required checks --------------------------------------------------------------------------
-    failed, pending, missing = _check_verdicts(snap)
+    failed, pending, missing, ambiguous = _check_verdicts(snap)
+    if ambiguous:
+        refuse(codes.REFUSED_UNAVAILABLE_EVIDENCE,
+               f"required check(s) reported several runs this program cannot order: {ambiguous}. "
+               "Without knowing which run is current it can neither trust a green nor discount a "
+               "red, and guessing would do one or the other.")
     if failed:
         refuse(codes.REFUSED_REQUIRED_CHECK_FAILED, f"required check(s) not accepted: {failed}")
     if pending:

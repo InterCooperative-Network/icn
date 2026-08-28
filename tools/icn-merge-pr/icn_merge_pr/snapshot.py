@@ -53,10 +53,28 @@ _MAX_PAGES = 100          # 100 pages x 100 nodes. A cursor that never advances 
 
 @dataclass(frozen=True)
 class CheckOccurrence:
-    """One reported run of a check: what it concluded, and which GitHub App produced it."""
+    """One reported run of a check: what it concluded, which App produced it, and when it ran.
+
+    GitHub really does return several runs of one name for a single commit — observed live on this
+    pull request, where `claude` appears twice with different `databaseId` and `startedAt`. Ordering
+    evidence is therefore part of the occurrence, so a re-run can be told from the run it replaced.
+    """
 
     outcome: str
     app_id: int | None
+    started_at: str | None = None
+    sequence: int | None = None
+
+    @property
+    def ordinal(self) -> tuple | None:
+        """A sortable position among runs of the same check, or None if it cannot be placed.
+
+        `startedAt` is an ISO-8601 UTC instant, so it orders lexicographically; `databaseId` is
+        monotonic and breaks ties between runs started in the same second.
+        """
+        if self.started_at is None:
+            return None
+        return (self.started_at, self.sequence if self.sequence is not None else -1)
 
 
 # Ruleset enforcement values. Only ACTIVE enforces; `disabled` and `evaluate` are report-only and
@@ -203,18 +221,24 @@ def _normalise_check(node) -> tuple[str, CheckOccurrence] | None:
         name = node.get("name")
         if not isinstance(name, str):
             return None
+        started = node.get("startedAt")
+        sequence = node.get("databaseId")
+        when = started if isinstance(started, str) and started else None
+        seq = sequence if type(sequence) is int else None
         status = node.get("status")
         if status in _RUNNING or status != "COMPLETED":
-            return (name, CheckOccurrence(PENDING, _app_id(node)))
+            return (name, CheckOccurrence(PENDING, _app_id(node), when, seq))
         conclusion = node.get("conclusion")
         return (name, CheckOccurrence(conclusion if isinstance(conclusion, str) else PENDING,
-                                      _app_id(node)))
+                                      _app_id(node), when, seq))
     if kind == "StatusContext":
         name = node.get("context")
         if not isinstance(name, str):
             return None
         # A commit status has no App behind it, so it can never satisfy a producer-bound check.
-        return (name, CheckOccurrence(_STATUS_CONTEXT.get(node.get("state"), PENDING), None))
+        created = node.get("createdAt")
+        return (name, CheckOccurrence(_STATUS_CONTEXT.get(node.get("state"), PENDING), None,
+                                      created if isinstance(created, str) and created else None))
     return None
 
 
@@ -383,7 +407,10 @@ def _collect_bypass(client, owner, name, branch, enforce_admins, classic_allowan
     for ruleset_id in sorted(applicable):
         detail = client.ruleset(owner, name, ruleset_id)
         enforcement = detail.get("enforcement")
-        if enforcement not in RULESET_ENFORCEMENT:
+        # A list or object is unhashable, and `x not in <frozenset>` raises TypeError on one —
+        # which escapes MergeToolError handling and crashes instead of refusing. Same rule as the
+        # pull-request enums: establish the type, then test membership.
+        if not isinstance(enforcement, str) or enforcement not in RULESET_ENFORCEMENT:
             raise EvidenceUnavailable(
                 f"ruleset {ruleset_id} reports enforcement {enforcement!r}, which is not a mode "
                 "this program knows; an unknown enforcement mode is not a safe one")

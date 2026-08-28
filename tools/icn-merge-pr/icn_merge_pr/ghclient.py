@@ -104,8 +104,9 @@ query($owner:String!,$name:String!,$number:Int!,$after:String){
           pageInfo{ hasNextPage endCursor }
           nodes{
             __typename
-            ... on CheckRun{ name status conclusion checkSuite{ app{ databaseId } } }
-            ... on StatusContext{ context state }
+            ... on CheckRun{ name status conclusion startedAt databaseId
+                             checkSuite{ app{ databaseId } } }
+            ... on StatusContext{ context state createdAt }
           }
         }
       } } } }
@@ -523,6 +524,13 @@ class GhCli:
     def pull_request_merge_state(self, owner: str, name: str, number: int) -> dict:
         repo = self._graphql(_PR_MERGE_STATE, {"owner": owner, "name": name, "number": number})
         pr = _dig(repo, "pullRequest")
+        if not isinstance(pr, dict):
+            # `_dig` proves a key exists and is not null; it does not prove the VALUE is an object.
+            # A syntactically valid response carrying `[]`, `"x"` or `7` here reached `.get` and
+            # raised AttributeError — after the mutation had been dispatched, which is exactly
+            # where a traceback destroys the MERGE_UNCONFIRMED contract.
+            raise EvidenceUnavailable(
+                f"GitHub returned a pull request that is not an object for #{number} ({pr!r})")
         commit = pr.get("mergeCommit") or {}
         merged = pr.get("merged")
         if type(merged) is not bool:

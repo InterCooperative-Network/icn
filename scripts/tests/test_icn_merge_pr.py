@@ -30,6 +30,7 @@ from icn_merge_pr.errors import (EvidenceUnavailable, GitHubRefused,         # n
                                  MergeToolError, StrategyInvalid,
                                  TransportIndeterminate)
 from icn_merge_pr.policy import POLICY_PATH                                  # noqa: E402
+from icn_merge_pr.ghclient import GhCli                                     # noqa: E402
 from icn_merge_pr.run import run                                             # noqa: E402
 from icn_merge_pr.strategy import api_merge_method                           # noqa: E402
 
@@ -184,6 +185,11 @@ class FakeGitHub:
     def pull_request_merge_state(self, owner, name, number):
         if self.w.get("post_merge_error"):
             raise EvidenceUnavailable(self.w["post_merge_error"])
+        if "post_merge_object" in self.w:
+            # Drive the REAL transport guard over a non-object `pullRequest`.
+            client = GhCli()
+            client._graphql = lambda q, v: {"pullRequest": self.w["post_merge_object"]}
+            return client.pull_request_merge_state(owner, name, number)
         return copy.deepcopy(self.w["post_merge"])
 
 
@@ -377,12 +383,45 @@ noise["check_pages"][0].append({"__typename": "CheckRun", "name": "Some Other Jo
                                 "checkSuite": {"app": {"databaseId": ACTIONS_APP}}})
 expect("a green NON-required check does not substitute for the missing required one", noise,
        codes.REFUSED_REQUIRED_CHECK_MISSING)
-rerun = world()
-rerun["check_pages"][0].append({"__typename": "CheckRun", "name": REQUIRED[0],
-                                "status": "COMPLETED", "conclusion": "FAILURE",
-                                "checkSuite": {"app": {"databaseId": ACTIONS_APP}}})
-expect("a re-run that went green does not erase a red occurrence", rerun,
-       codes.REFUSED_REQUIRED_CHECK_FAILED)
+# A check can fail and be re-run green on the SAME commit. The CURRENT run decides: an older
+# superseded failure must not poison readiness, and an older success must not mask a newer failure.
+def runs(name, *occurrences):
+    """A world where `name` has several runs, given as (conclusion, startedAt, databaseId)."""
+    w = world()
+    w["check_pages"][0] = [n for n in w["check_pages"][0] if n.get("name") != name]
+    for conclusion, started, seq in occurrences:
+        w["check_pages"][0].append({
+            "__typename": "CheckRun", "name": name,
+            "status": "IN_PROGRESS" if conclusion is None else "COMPLETED",
+            "conclusion": conclusion, "startedAt": started, "databaseId": seq,
+            "checkSuite": {"app": {"databaseId": ACTIONS_APP}}})
+    return w
+
+
+expect("a failure superseded by a later successful re-run",
+       runs(REQUIRED[0], ("FAILURE", "2026-08-27T10:00:00Z", 1),
+            ("SUCCESS", "2026-08-27T11:00:00Z", 2)), codes.READY)
+expect("a success superseded by a later failure is not masked",
+       runs(REQUIRED[0], ("SUCCESS", "2026-08-27T10:00:00Z", 1),
+            ("FAILURE", "2026-08-27T11:00:00Z", 2)), codes.REFUSED_REQUIRED_CHECK_FAILED)
+expect("a failure followed by a re-run still in progress is pending, not failed",
+       runs(REQUIRED[0], ("FAILURE", "2026-08-27T10:00:00Z", 1),
+            (None, "2026-08-27T11:00:00Z", 2)), codes.REFUSED_REQUIRED_CHECK_PENDING)
+expect("a same-second re-run is ordered by the monotonic run id",
+       runs(REQUIRED[0], ("FAILURE", "2026-08-27T10:00:00Z", 1),
+            ("SUCCESS", "2026-08-27T10:00:00Z", 2)), codes.READY)
+expect("several runs with no ordering evidence cannot be told apart",
+       runs(REQUIRED[0], ("FAILURE", None, None), ("SUCCESS", None, None)),
+       codes.REFUSED_UNAVAILABLE_EVIDENCE)
+expect("two runs sharing an identical position cannot be told apart",
+       runs(REQUIRED[0], ("FAILURE", "2026-08-27T10:00:00Z", 1),
+            ("SUCCESS", "2026-08-27T10:00:00Z", 1)), codes.REFUSED_UNAVAILABLE_EVIDENCE)
+_, ambiguous_result = evaluate_world(
+    runs(REQUIRED[0], ("FAILURE", None, None), ("SUCCESS", None, None)))
+check("the ambiguity refusal says it will not guess",
+      any("guessing would do one or the other" in r.detail for r in ambiguous_result.reasons))
+expect("a single run needs no ordering evidence at all",
+       runs(REQUIRED[0], ("SUCCESS", None, None)), codes.READY)
 neutral = checks_with(REQUIRED[5], conclusion="NEUTRAL")
 expect("a policy-allowlisted terminal conclusion is accepted", neutral, codes.READY)
 paged = world()
@@ -1073,6 +1112,24 @@ _, fallback = merge_world(world(post_merge={"state": "MERGED", "merged": True,
 check("a valid merge-response sha is accepted when the post-read omits one",
       fallback.outcome == codes.MERGED
       and fallback.merge["merge_commit_sha"] == MERGE_COMMIT, f"{fallback.merge}")
+
+print("a malformed post-read object cannot crash after dispatch")
+for shape in ([], "x", 7, 0.5):
+    fake, r = merge_world(world(post_merge_object=shape))
+    check(f"a post-read pull request of {shape!r} -> MERGE_UNCONFIRMED",
+          r.outcome == codes.MERGE_UNCONFIRMED, f"got {r.outcome}")
+    check(f"exactly one merge request preceded the bad post-read ({shape!r})",
+          len(fake.merge_calls) == 1, f"{fake.merge_calls}")
+
+print("ruleset enforcement is a string before it is a set member")
+for shape in ([], {"a": 1}, 7, True, None):
+    try:
+        _, r = evaluate_world(with_ruleset(shape, []))
+        got = r.outcome
+    except Exception as exc:                                  # noqa: BLE001 — that is the point
+        got = f"raised {type(exc).__name__}"
+    check(f"enforcement of {shape!r} refuses instead of raising",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
 
 print("a refusal is confirmed only by an exact merged=false")
 for label, value in (("null", None), ("missing", "__omit__"), ("the string 'false'", "false"),
