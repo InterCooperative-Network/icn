@@ -467,6 +467,43 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("the tool's own source layout still runs without a record", proc.returncode == 0,
           proc.stderr[:160])
 
+    print("nothing in the install tree is importable before the tree has been checked")
+    # Reproduced before the pre-seal existed: invoked without the launcher's `-I`, the interpreter
+    # put the package directory on `sys.path` ahead of the bootstrap's own `import json`, so an
+    # unrecorded `json.py` beside it executed before a single check ran. The marker is the
+    # evidence, and the symlink form matters because that entry is the RESOLVED directory and so
+    # cannot be derived from `__file__`.
+    marker = tmp / "shadow-marker"
+    shadow = lib / "icn_merge_pr" / "json.py"
+    shadow.write_text("import pathlib\n"
+                      f"pathlib.Path({str(marker)!r}).write_text('shadowed')\n"
+                      "def dumps(*a, **k):\n    return '{}'\n"
+                      "def loads(*a, **k):\n    return {}\n", encoding="utf-8")
+    installed_main = lib / "icn_merge_pr" / "__main__.py"
+    through_link = tmp / "direct-main.py"
+    through_link.symlink_to(installed_main)
+    # The two forms refuse for different reasons and that is the point: invoked directly the tree
+    # is found and the unrecorded file is named; invoked through the link `_LIB` resolves to the
+    # link's own directory, which holds no record at all. Neither runs the file.
+    for label, entry, names in (("directly", installed_main, "json.py"),
+                                ("through a symlink", through_link, "provenance.json is missing")):
+        proc = subprocess.run([sys.executable, str(entry), "provenance"], capture_output=True,
+                              text=True, env=no_gh)
+        check(f"an unrecorded module beside the bootstrap does not execute when invoked {label}",
+              not marker.exists(), f"{marker} was created")
+        check(f"an unrecorded module beside the bootstrap is refused when invoked {label}",
+              "REFUSED_NOT_INSTALLED" in proc.stdout and names in proc.stdout,
+              proc.stdout[:200] + proc.stderr[:200])
+    through_link.unlink()
+    shadow.unlink()
+    # The pre-seal cuts the path for every invocation form, so prove it did not cut off the
+    # installation itself: the same direct invocation still works on the tree as installed.
+    proc = subprocess.run([sys.executable, str(installed_main), "provenance"],
+                          capture_output=True, text=True, env=no_gh)
+    check("the installed tree still runs when invoked without the launcher",
+          proc.returncode == 0 and head in proc.stdout,
+          proc.stdout[:160] + proc.stderr[:160])
+
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"
     hostile = candidate / "icn_merge_pr"

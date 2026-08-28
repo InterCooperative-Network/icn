@@ -27,15 +27,34 @@ The generated launcher uses `python3 -I -B`. Verified on this repository's inter
 `import json` here resolves from the standard library even when the install tree holds a `json.py`;
 `-B` stops bytecode being written, which keeps the tree closed across runs instead of manufacturing
 `__pycache__` that a closure check would then have to forgive. Neither flag is assumed: the path is
-pruned and re-asserted below, and bytecode writing is disabled from inside as well, so the
-guarantee does not depend on how this file was invoked.
+cut by the pre-seal below BEFORE the first import that a file in the tree could answer, then
+re-asserted once the standard library is safely in hand, and bytecode writing is disabled from
+inside as well, so the guarantee does not depend on how this file was invoked.
 """
 
-import hashlib
-import json
-import os
-import stat
-import sys
+import sys                    # built in to the interpreter; no file in the tree can answer this
+
+# THE PRE-SEAL, and why it is not simply part of `_seal_import_path()`. Every import below this
+# block is satisfiable by a file sitting beside this one, so the path has to be cut here rather
+# than a few lines further down: an unrecorded `json.py` in the install tree ran during
+# `import json`, ahead of every check in this file, which is the whole guarantee inverted.
+# Verified on 3.12.3: unless the interpreter is isolated (`-I`, what the launcher uses) or
+# safe-path (`-P`), it prepends the directory holding the script to `sys.path` — RESOLVED through
+# symlinks, so that entry cannot be derived from `__file__` and is dropped by position instead.
+# Dropping more than strictly necessary is safe: the bootstrap needs nothing but the standard
+# library, and `_LIB` goes back on deliberately once the tree has been verified.
+if not (sys.flags.isolated or sys.flags.safe_path):
+    del sys.path[0:1]
+_SELF = __file__.replace("\\", "/")
+for _entry in ("", ".", _SELF.rsplit("/", 1)[0], _SELF.rsplit("/", 2)[0]):
+    while _entry in sys.path:
+        sys.path.remove(_entry)
+del _SELF, _entry
+
+import hashlib               # noqa: E402 — nothing importable may precede the pre-seal above
+import json                  # noqa: E402
+import os                    # noqa: E402
+import stat                  # noqa: E402
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _LIB = os.path.dirname(_HERE)
