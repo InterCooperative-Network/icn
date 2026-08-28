@@ -313,6 +313,23 @@ PY
   # Restore the checkout's real manifest so the cached tree records what the repository
   # declares, not the trimmed copy the install was driven from.
   cp "$MCP/package.json" "$tmp/package.json" || return 1
+
+  # PUBLISH ONLY WHAT WAS HASHED — the dependency-side counterpart of the same rule in
+  # build_dist. DEPS_FP is taken when the process starts, and this install can spend minutes
+  # queued behind another one. A manifest edit landing in that window would be installed and
+  # then marked complete under the OLD dependency fingerprint, so every lane still holding the
+  # old manifests would reuse a tree resolved from different inputs. The dist-side check does
+  # not cover this: it rejects the dist build while leaving the mis-keyed dependency entry and
+  # its .icn-deps-ok marker in place.
+  local staged_deps
+  staged_deps="$(fingerprint deps "$tmp")" || return 1
+  if [ "$staged_deps" != "$DEPS_FP" ]; then
+    printf 'icn-runtime-build: ops/mcp manifests changed while installing (%s -> %s); not publishing under a key that does not describe them\n' \
+      "$DEPS_FP" "$staged_deps" >&2
+    return 1
+  fi
+  printf '%s\n' "$DEPS_FP"  >"$tmp/.icn-deps-fp"
+  printf '%s\n' "$NODE_ABI" >"$tmp/.icn-runtime-abi"
   return 0
 }
 
