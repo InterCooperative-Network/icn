@@ -254,6 +254,78 @@ rejects("one ledger issue per comment is rejected",
 
 
 # ---------------------------------------------------------------------------------------------
+print("a thread is resolved when its disposition is final, not when it is written")
+
+# Merge readiness counts unresolved threads, so "reply and resolve" applied to a QUESTION would
+# convert an unanswered question into a readiness signal. When each disposition may resolve is
+# therefore owned by the checker, not by the document or by a skill.
+for d in DELIVERY["finding_dispositions"]:
+    check(f"{d['name']} resolves {gate.RESOLVE_WHEN[d['name']]}",
+          d.get("resolve_thread") == gate.RESOLVE_WHEN[d["name"]], repr(d.get("resolve_thread")))
+for i, d in enumerate(DELIVERY["finding_dispositions"]):
+    rejects(f"letting {d['name']} resolve at the wrong moment is rejected",
+            mutated(**{f"finding_dispositions__{i}__resolve_thread": "immediately"}),
+            "owned by code")
+    rejects(f"dropping {d['name']}'s resolve rule is rejected",
+            mutated(**{f"finding_dispositions__{i}__resolve_thread": None}), "resolve_thread")
+
+ship_skill = (ROOT / ".agents" / "skills" / "ship-pr" / "SKILL.md").read_text(encoding="utf-8")
+check("ship-pr defers to the owner's resolve rule", "resolve_thread" in ship_skill, "missing")
+check("ship-pr does not resolve every thread on reply",
+      "the evidence, then resolve it" not in ship_skill, "still unconditional")
+check("ship-pr says a QUESTION stays unresolved",
+      "QUESTION stays" in ship_skill and "unresolved" in ship_skill, "missing")
+
+
+# ---------------------------------------------------------------------------------------------
+print("the provider-binding inventory is a floor, not a self-description")
+
+# The inventory used to describe itself: three entries all naming one prompt, `must_reference`
+# cut to a single string and every pattern replaced with one that cannot match, passed every
+# check while the Copilot adapters were detached. An enforcement list the enforced party can
+# shorten is not enforcement.
+check("the committed surfaces are exactly the floor",
+      sorted(s["path"] for s in DELIVERY["provider_bindings"]["surfaces"])
+      == sorted(gate.PROVIDER_FLOOR),
+      str(sorted(s["path"] for s in DELIVERY["provider_bindings"]["surfaces"])))
+for surface in DELIVERY["provider_bindings"]["surfaces"]:
+    refs, patterns = gate.PROVIDER_FLOOR[surface["path"]]
+    check(f"{surface['path']} declares every required reference",
+          all(r in surface["must_reference"] for r in refs),
+          str([r for r in refs if r not in surface["must_reference"]]))
+    declared = [r["pattern"] for r in surface["must_not_match"]]
+    check(f"{surface['path']} declares every required pattern",
+          all(x in declared for x in patterns), str([x for x in patterns if x not in declared]))
+
+claude_prompt = ".claude/agents/icn-code-reviewer.md"
+degenerate = json.loads(json.dumps(DELIVERY))
+degenerate["provider_bindings"]["surfaces"] = [
+    {"path": claude_prompt, "role": f"r{i}", "must_reference": ["BLOCKER"],
+     "must_not_match": [{"pattern": "a^", "why": "defanged"}]} for i in range(3)]
+degenerate["provider_bindings"]["body_mirrors"] = [
+    {"canonical": claude_prompt, "mirror": claude_prompt, "why": "self"}]
+rejects("three entries all naming one prompt are rejected", degenerate, "must bind exactly")
+rejects("a self-referential body mirror is rejected", degenerate, "must pair exactly")
+
+dropped = json.loads(json.dumps(DELIVERY))
+dropped["provider_bindings"]["surfaces"] = [
+    s for s in dropped["provider_bindings"]["surfaces"]
+    if s["path"] != ".github/agents/icn-code-reviewer.md"]
+rejects("dropping a provider surface from the inventory is rejected", dropped, "must bind exactly")
+
+for i, surface in enumerate(DELIVERY["provider_bindings"]["surfaces"]):
+    thinned = json.loads(json.dumps(DELIVERY))
+    thinned["provider_bindings"]["surfaces"][i]["must_reference"] = ["BLOCKER"]
+    rejects(f"thinning must_reference on {surface['path']} is rejected", thinned,
+            "may not drop below the floor")
+    defanged = json.loads(json.dumps(DELIVERY))
+    defanged["provider_bindings"]["surfaces"][i]["must_not_match"] = [
+        {"pattern": "a^", "why": "cannot match"}]
+    rejects(f"defanging the patterns on {surface['path']} is rejected", defanged,
+            "defang the check silently")
+
+
+# ---------------------------------------------------------------------------------------------
 print("every lane is bounded, and DEEP is the maintainer's call")
 
 lanes = {x["name"]: x for x in DELIVERY["lanes"]["definitions"]}

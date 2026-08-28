@@ -78,9 +78,14 @@ is a blocker only when **every** condition in `blocker_predicate.all_must_hold` 
 A reviewer's own severity label is advisory evidence about that reviewer's confidence. It is not
 authority, and it never satisfies the predicate by itself.
 
-Reply to every thread with its disposition and the evidence, then resolve it. Server-side
-conversation resolution still applies to a frozen PR; dispositioning a thread is not reopening
-review.
+Reply to every thread with its disposition and the evidence. Resolve it when
+`finding_dispositions[].resolve_thread` says you may — which is not always now. A **QUESTION stays
+unresolved** until it is answered and reclassified: merge readiness counts unresolved threads, so
+resolving an unanswered question would manufacture readiness out of a question nobody answered. A
+BLOCKER's thread resolves once its fix is verified, not when it is written.
+
+Server-side conversation resolution still applies to a frozen PR; dispositioning a thread is not
+reopening review.
 
 ## 6. Handle blockers as one batch
 

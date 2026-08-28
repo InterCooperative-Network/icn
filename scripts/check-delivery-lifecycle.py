@@ -28,6 +28,13 @@ tweak rather than what it is. The same reasoning covers the state set, the dispo
 the review kinds and the lane names. A closed set owned by code cannot be widened, narrowed,
 renamed, or redefined by data.
 
+THE FLOORS
+`RESOLVE_WHEN`, `PROVIDER_FLOOR` and `BODY_MIRROR_FLOOR` work the same way as the predicate: the
+document may bind MORE than they require, never less. They exist because the binding inventory was
+self-describing — three entries pointing at one prompt, `must_reference` cut to a single string and
+every pattern replaced with one that cannot match, all passed, while the Copilot adapters were
+detached. An enforcement list that the enforced party can shorten is not enforcement.
+
 THE INVARIANT SWITCHES
 Four fields are pinned to one value each, because each of them is a way the treadmill comes back:
 
@@ -83,6 +90,37 @@ BLOCKER_CONDITIONS = {
     "materially_breaks_it":
         "Leaving it unfixed would materially make the deliverable incorrect or unusable.",
 }
+
+# When a thread may be resolved, per disposition. Pinned because the merge owner counts
+# unresolved threads: an instruction to resolve a QUESTION on asking it would let an agent
+# manufacture merge readiness out of a question nobody answered.
+RESOLVE_WHEN = {
+    "BLOCKER": "after_the_fix_is_verified",
+    "FOLLOW_UP": "after_the_ledger_entry_exists",
+    "NOT_A_FINDING": "after_the_reply",
+    "QUESTION": "after_it_is_answered_and_reclassified",
+}
+
+# The provider-binding FLOOR. The document may bind more than this; it may not bind less.
+# Without it the inventory was self-describing: three entries all pointing at one prompt, with
+# `must_reference` cut to a single string and every pattern replaced by one that cannot match,
+# passed every check while the Copilot adapters were detached entirely.
+_REVIEWER_REFS = ("ops/state/truth/delivery.json", "BLOCKER", "FOLLOW_UP", "NOT_A_FINDING",
+                  "QUESTION", "FULL", "DELTA")
+_REVIEWER_PATTERNS = (r"(?i)^#+.*always\s+flag",
+                      r"(?i)\b(blocking|blocker)\b\s*(issues|list)?\s*:\s*$",
+                      r"(?i)\brequest_changes\b")
+PROVIDER_FLOOR = {
+    ".claude/agents/icn-code-reviewer.md": (_REVIEWER_REFS, _REVIEWER_PATTERNS),
+    ".github/agents/icn-code-reviewer.md": (_REVIEWER_REFS, _REVIEWER_PATTERNS),
+    ".github/copilot-instructions.md": (
+        ("AGENTS.md", "ops/state/truth/sources.json", "ops/state/truth/delivery.json"),
+        (r"(?i)^#+\s*current\s+(status|working\s+context)",
+         r"(?i)^#+\s*(project\s+overview|repository\s+structure|architecture\s+patterns)",
+         r"(?i)\b(STATE|PHASE_PROGRESS)\.md\b.*canonical")),
+}
+BODY_MIRROR_FLOOR = ((".claude/agents/icn-code-reviewer.md",
+                      ".github/agents/icn-code-reviewer.md"),)
 
 # The merge side of the boundary. Named here so the lifecycle owner cannot quietly claim it.
 MERGE_SEMANTICS_OWNER = "ops/state/truth/policy.json#merge"
@@ -271,6 +309,11 @@ def _check_dispositions(doc, out) -> None:
             if not _str(d.get(field)):
                 out.append(f"finding_dispositions[{i}] ({name}).{field}: "
                            f"must be a non-empty string")
+        if d.get("resolve_thread") != RESOLVE_WHEN[name]:
+            out.append(f"finding_dispositions[{i}] ({name}).resolve_thread: must be "
+                       f"{RESOLVE_WHEN[name]!r}, got {d.get('resolve_thread')!r}. When a thread "
+                       f"may be resolved is owned by code, because merge readiness counts "
+                       f"unresolved threads")
     missing = [d for d in DISPOSITIONS if d not in names]
     if missing:
         out.append(f"finding_dispositions: every disposition must be defined; missing {missing}")
@@ -515,10 +558,24 @@ def _check_provider_bindings(doc, out) -> None:
                 if not _str(m.get(field)):
                     out.append(f"provider_bindings.body_mirrors[{i}].{field}: "
                                f"must be a non-empty string")
+    declared_mirrors = [(m.get("canonical"), m.get("mirror")) for m in mirrors
+                        if _obj(m)] if _list(mirrors) else []
+    if sorted(declared_mirrors) != sorted(BODY_MIRROR_FLOOR):
+        out.append(f"provider_bindings.body_mirrors: must pair exactly "
+                   f"{[list(x) for x in BODY_MIRROR_FLOOR]}, got "
+                   f"{[list(x) for x in declared_mirrors]}. The pairs are owned by code, so a "
+                   f"self-referential or dropped mirror cannot silently disable the comparison")
+
     surfaces = pb.get("surfaces")
     if not _list(surfaces) or surfaces == []:
         out.append("provider_bindings.surfaces: must be a non-empty array")
         return
+    declared_paths = [s.get("path") for s in surfaces if _obj(s)]
+    if sorted(p for p in declared_paths if _str(p)) != sorted(PROVIDER_FLOOR):
+        out.append(f"provider_bindings.surfaces: must bind exactly {sorted(PROVIDER_FLOOR)}, got "
+                   f"{sorted(str(p) for p in declared_paths)}. The inventory is owned by code: an "
+                   f"entry removed here would detach a provider adapter while this check stayed "
+                   f"green")
     for i, s in enumerate(surfaces):
         if not _obj(s):
             out.append(f"provider_bindings.surfaces[{i}]: not an object")
@@ -529,11 +586,25 @@ def _check_provider_bindings(doc, out) -> None:
         if not _strs(s.get("must_reference")):
             out.append(f"provider_bindings.surfaces[{i}].must_reference: must be a non-empty "
                        f"array of strings")
+        floor = PROVIDER_FLOOR.get(s.get("path")) if _str(s.get("path")) else None
+        if floor and _strs(s.get("must_reference")):
+            missing = [r for r in floor[0] if r not in s["must_reference"]]
+            if missing:
+                out.append(f"provider_bindings.surfaces[{i}] ({s['path']}).must_reference: "
+                           f"missing {missing}, which this checker requires. Data may add "
+                           f"references; it may not drop below the floor")
         rules = s.get("must_not_match")
         if not _list(rules) or rules == []:
             out.append(f"provider_bindings.surfaces[{i}].must_not_match: must be a non-empty "
                        f"array")
             continue
+        if floor:
+            declared = [r.get("pattern") for r in rules if _obj(r)]
+            missing = [x for x in floor[1] if x not in declared]
+            if missing:
+                out.append(f"provider_bindings.surfaces[{i}] ({s['path']}).must_not_match: "
+                           f"missing {missing}, which this checker requires. Replacing a pattern "
+                           f"with one that cannot match would defang the check silently")
         for j, rule in enumerate(rules):
             if not _obj(rule) or not _str(rule.get("pattern")) or not _str(rule.get("why")):
                 out.append(f"provider_bindings.surfaces[{i}].must_not_match[{j}]: needs a "

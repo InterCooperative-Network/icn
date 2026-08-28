@@ -150,22 +150,26 @@
     {
       "name": "BLOCKER",
       "means": "Satisfies every condition in blocker_predicate.all_must_hold.",
-      "action": "Make the smallest local correction, add only directly necessary regression coverage, do not inspect sibling areas for more things to fix."
+      "action": "Make the smallest local correction, add only directly necessary regression coverage, do not inspect sibling areas for more things to fix. Resolve the thread once the fix is verified, not when it is written.",
+      "resolve_thread": "after_the_fix_is_verified"
     },
     {
       "name": "FOLLOW_UP",
       "means": "Valid or potentially useful, but does not satisfy every blocker condition.",
-      "action": "Do not change the pull request for it. Append it to the follow-up ledger with a link back to the thread, reply saying it is valid but outside the delivery contract, link the ledger, and resolve the thread."
+      "action": "Do not change the pull request for it. Append it to the follow-up ledger with a link back to the thread, reply saying it is valid but outside the delivery contract, link the ledger, and resolve the thread.",
+      "resolve_thread": "after_the_ledger_entry_exists"
     },
     {
       "name": "NOT_A_FINDING",
       "means": "Incorrect, duplicate, already fixed, obsolete, or outside the pull request's contract.",
-      "action": "Reply briefly with the evidence and resolve the thread."
+      "action": "Reply briefly with the evidence and resolve the thread.",
+      "resolve_thread": "after_the_reply"
     },
     {
       "name": "QUESTION",
       "means": "Intent genuinely cannot be determined from the registered owners and implementation evidence.",
-      "action": "Ask. Do not guess, and do not treat the ambiguity as a blocker."
+      "action": "Ask. Do not guess, and do not treat the ambiguity as a blocker. Leave the thread UNRESOLVED until it is answered and reclassified: merge readiness counts unresolved threads, so resolving an unanswered question manufactures readiness out of a question nobody answered.",
+      "resolve_thread": "after_it_is_answered_and_reclassified"
     }
   ],
   "blocker_predicate": {
@@ -383,6 +387,7 @@
           }
         ]
       }
-    ]
+    ],
+    "inventory_note": "The surfaces, the mirror pairs, and each surface's required references and forbidden patterns are a FLOOR pinned in scripts/check-delivery-lifecycle.py. This list may add to them; it may not shrink below them. Without that, an edit could keep three entries, point them all at one prompt, cut must_reference to a single string and replace every pattern with one that cannot match \u2014 detaching the Copilot adapters while the required check stayed green."
   }
 }
