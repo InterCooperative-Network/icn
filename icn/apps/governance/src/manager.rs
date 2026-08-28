@@ -3788,7 +3788,7 @@ impl GovernanceManager {
                     .collect(),
                 None => raw_votes,
             };
-            let tally = VoteTally::from(proposal_votes.clone());
+            let tally = VoteTally::try_from_votes(&proposal_votes)?;
 
             let total_members = match &domain.config.membership.source {
                 MembershipSource::StaticList(members) => members.len(),
@@ -4584,7 +4584,7 @@ impl GovernanceManager {
             .read()
             .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
         let proposal_votes = votes.get(proposal_id).cloned().unwrap_or_default();
-        Ok(VoteTally::from(proposal_votes))
+        Ok(VoteTally::try_from_votes(&proposal_votes)?)
     }
 
     /// Get list of voter DIDs for a proposal
@@ -4768,13 +4768,11 @@ impl GovernanceManager {
 
         let proposal_votes = votes.entry(proposal_id.clone()).or_insert_with(Vec::new);
 
-        if proposal_votes.iter().any(|v| v.voter == voter) {
-            anyhow::bail!(
-                "Voter {} has already voted on proposal {}",
-                voter,
-                proposal_id.0
-            );
-        }
+        // INV-6 by cryptographic principal, not by DID spelling: re-spelling a
+        // voter DID in another multibase encoding must not buy a second vote
+        // (#2641). Also fails closed if this principal already has conflicting
+        // stored acts.
+        icn_governance::ensure_has_not_voted(proposal_votes, &voter)?;
 
         let mut vote = Vote::new(proposal_id, voter, choice);
         if let Some(c) = comment {
@@ -9135,6 +9133,151 @@ mod tests {
     }
 
     /// INV-6 TEST: Duplicate vote is rejected.
+    /// Re-spell a DID as multibase base16 (`f`) over the same identifier bytes.
+    fn alias_spelling(did: &Did) -> Did {
+        let bytes = did.identifier_bytes().expect("test DID must decode");
+        let alt = format!("did:icn:f{}", hex::encode(bytes));
+        Did::from_str(&alt).expect("base16 multibase spelling must parse")
+    }
+
+    async fn make_open_proposal(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        author: &Did,
+    ) -> ProposalId {
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                author.clone(),
+                "Test".to_string(),
+                "Test proposal".to_string(),
+                ProposalPayload::Text {
+                    body: "test".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        proposal_id
+    }
+
+    /// Domain whose membership gate admits any DID, so the recast guard is the
+    /// only thing standing between a re-spelled voter and a second vote. This
+    /// is the configuration under which #2641 was reachable end to end.
+    async fn make_manager_trust_threshold() -> (GovernanceManager, GovernanceDomainId, Did) {
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let member_did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop-trust");
+
+        let mgr = GovernanceManager::new();
+        mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                quorum_percentage: 1,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.5),
+            },
+        )
+        .await
+        .unwrap();
+
+        (mgr, domain_id, member_did)
+    }
+
+    /// #2641: the admission layer must reject a second vote from one
+    /// cryptographic voter even when it arrives under a different accepted
+    /// multibase spelling of the same DID.
+    #[tokio::test]
+    async fn inv6_holds_against_alias_spelled_did() {
+        let (mgr, domain_id, member_did) = make_manager_trust_threshold().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+
+        // Control: the two spellings really are distinct `Did` values today.
+        assert_ne!(
+            member_did, alias,
+            "control: spellings must differ under current Did equality"
+        );
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first vote must succeed");
+
+        let err = mgr
+            .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+            .await
+            .expect_err("re-spelled DID must not buy a second vote")
+            .to_string();
+        assert!(
+            err.contains("already voted"),
+            "must be refused as a duplicate vote, got: {err}"
+        );
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(
+            tally.total_votes(),
+            1,
+            "one cryptographic voter contributes one effective vote"
+        );
+        assert_eq!(tally.for_votes, 1, "the first act stands");
+    }
+
+    /// Counter-control: the guard must not have become "refuse everything".
+    #[tokio::test]
+    async fn distinct_voters_still_admitted_under_trust_threshold() {
+        let (mgr, domain_id, member_did) = make_manager_trust_threshold().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let other = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first voter must be admitted");
+        mgr.cast_vote(proposal_id.clone(), other, VoteChoice::For, None)
+            .await
+            .expect("a genuinely distinct voter must still be admitted");
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(tally.for_votes, 2, "two distinct principals, two votes");
+    }
+
+    /// Records the live boundary: under a static member list an alias spelling
+    /// is refused earlier, by the membership gate, because that list is still
+    /// compared by spelling. That comparison is deliberately left alone here --
+    /// re-keying membership is gated by IDENTITY_SEMANTICS.md §7.5 -- and its
+    /// effect is fail-closed, so #2641 is not reachable on this path either.
+    #[tokio::test]
+    async fn static_list_membership_refuses_alias_spelling_at_the_membership_gate() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first vote must succeed");
+
+        let err = mgr
+            .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+            .await
+            .expect_err("re-spelled DID must not buy a second vote")
+            .to_string();
+        assert!(
+            err.contains("not a member") || err.contains("already voted"),
+            "must be refused, got: {err}"
+        );
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(tally.total_votes(), 1, "still exactly one effective vote");
+    }
+
     #[tokio::test]
     async fn test_inv6_duplicate_vote_rejected() {
         let (mgr, domain_id, member_did) = make_manager_with_domain().await;

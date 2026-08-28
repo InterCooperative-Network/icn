@@ -2156,6 +2156,13 @@ impl GovernanceActor {
             } => {
                 info!("Casting vote on proposal: {} by {}", proposal_id.0, voter);
 
+                // INV-6 by cryptographic principal, not by DID spelling. This
+                // path previously had no duplicate-vote guard at all, so a
+                // voter re-spelling their DID in another multibase encoding
+                // wrote a second row that every tally counted (#2641).
+                let existing = self.load_votes(&proposal_id)?;
+                icn_governance::ensure_has_not_voted(&existing, &voter)?;
+
                 let mut vote = Vote::new(proposal_id.clone(), voter, choice);
                 if let Some(c) = comment {
                     vote = vote.with_comment(c);
@@ -3459,7 +3466,9 @@ impl GovernanceActor {
     /// Get vote tally for a proposal
     fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.load_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One effective vote per cryptographic principal; conflicting
+        // historical rows fail closed rather than double-counting (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     /// Get list of voter DIDs for a proposal
