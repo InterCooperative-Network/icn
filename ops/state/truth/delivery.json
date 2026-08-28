@@ -107,6 +107,14 @@
         "Known blockers",
         "Follow-up ledger"
       ],
+      "rendered_by": [
+        ".github/pull_request_template.md",
+        ".agents/skills/pr-create/SKILL.md",
+        ".claude/skills/pr-create/SKILL.md",
+        ".agents/skills/ship-pr/SKILL.md",
+        ".claude/skills/ship-pr/SKILL.md"
+      ],
+      "rendered_by_why": "The owner names the fields; these surfaces render the block. Two of them rendered a different set and nothing noticed, so the list is data and the gate checks it.",
       "not_owned_by": [
         "repository files",
         "handoffs",

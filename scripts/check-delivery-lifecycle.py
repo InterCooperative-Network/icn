@@ -19,12 +19,14 @@ use `type(v) is int`; the invariant switches below require real booleans, becaus
 must not be able to stand in for `true` on a field whose whole job is to be un-flippable.
 
 WHY THE PREDICATE LIVES IN CODE
-`BLOCKER_CONDITIONS` is hardcoded here and never read from the document under validation. The
-blocker predicate is the load-bearing part of the freeze: if the conditions were data, a PR could
-weaken its own freeze by deleting a condition from a JSON file, and the diff would look like a
-policy edit rather than what it is. The same reasoning covers the state set, the disposition
-vocabulary, the review kinds and the lane names. A closed set owned by code cannot be widened,
-narrowed, or renamed by data.
+`BLOCKER_CONDITIONS` is hardcoded here and never read from the document under validation, and it
+pins each condition's operative SENTENCE rather than only its identifier. The blocker predicate is
+the load-bearing part of the freeze: if the conditions were data, a PR could weaken its own freeze
+by deleting one from a JSON file — or, more quietly, by keeping all five ids and rewriting what
+they require, which reviewers would then read and apply. Either edit would look like a policy
+tweak rather than what it is. The same reasoning covers the state set, the disposition vocabulary,
+the review kinds and the lane names. A closed set owned by code cannot be widened, narrowed,
+renamed, or redefined by data.
 
 THE INVARIANT SWITCHES
 Four fields are pinned to one value each, because each of them is a way the treadmill comes back:
@@ -61,8 +63,26 @@ ENTRY_STATE = "IMPLEMENTING"
 DISPOSITIONS = ("BLOCKER", "FOLLOW_UP", "QUESTION", "NOT_A_FINDING")
 REVIEW_KINDS = ("FULL", "DELTA")
 LANES = ("FAST", "STANDARD", "DEEP")
-BLOCKER_CONDITIONS = ("reproducible", "introduced_here", "violates_stated_contract",
-                      "realistic_path", "materially_breaks_it")
+# Not just the identifiers: the OPERATIVE SENTENCE of each condition, byte for byte. Keeping the
+# five ids while rewriting what they say would leave `validate()` silent, and reviewers read the
+# prose — so "the predicate is fixed by code" was bypassable by an ordinary data edit. The policy
+# file still carries these sentences for a human reader; the checker requires them to be identical
+# to what is written here, which puts a change of meaning back where it belongs: in a reviewed
+# code diff. Only `why` stays free-form, because it is rationale rather than the rule.
+BLOCKER_CONDITIONS = {
+    "reproducible":
+        "It is concrete and reproducible.",
+    "introduced_here":
+        "It is introduced by this pull request rather than merely adjacent or pre-existing.",
+    "violates_stated_contract":
+        "It violates an explicit acceptance condition, an established repository invariant, or a "
+        "behaviour this pull request claims to provide.",
+    "realistic_path":
+        "It occurs on a supported and realistic execution path relevant to the feature's intended "
+        "operation, rather than existing only as generalised hardening speculation.",
+    "materially_breaks_it":
+        "Leaving it unfixed would materially make the deliverable incorrect or unusable.",
+}
 
 # The merge side of the boundary. Named here so the lifecycle owner cannot quietly claim it.
 MERGE_SEMANTICS_OWNER = "ops/state/truth/policy.json#merge"
@@ -174,6 +194,10 @@ def _check_lifecycle(doc, out) -> None:
             out.append(f"lifecycle.state_surface.{marker}: must be a non-empty string")
     if not _strs(surface.get("fields")):
         out.append("lifecycle.state_surface.fields: must be a non-empty array of strings")
+    rendered_by = surface.get("rendered_by")
+    if not _strs(rendered_by):
+        out.append("lifecycle.state_surface.rendered_by: must name the surfaces that render the "
+                   "block, or nothing checks that they render what this owner declares")
     not_owned = surface.get("not_owned_by")
     if not _strs(not_owned):
         out.append("lifecycle.state_surface.not_owned_by: must be a non-empty array of strings")
@@ -279,6 +303,12 @@ def _check_blocker_predicate(doc, out) -> None:
                 if not _str(c.get(field)):
                     out.append(f"blocker_predicate.all_must_hold[{i}] ({cid}).{field}: "
                                f"must be a non-empty string")
+            if c.get("condition") != BLOCKER_CONDITIONS[cid]:
+                out.append(f"blocker_predicate.all_must_hold[{i}] ({cid}).condition: does not "
+                           f"match the sentence this checker pins. The predicate's MEANING is "
+                           f"owned by code, not only its identifiers — otherwise a data edit "
+                           f"could keep the five ids and invert what each of them requires. "
+                           f"Expected: {BLOCKER_CONDITIONS[cid]!r}")
         missing = [c for c in BLOCKER_CONDITIONS if c not in ids]
         if missing:
             out.append(f"blocker_predicate.all_must_hold: the predicate is fixed by code; "
@@ -593,6 +623,62 @@ def enforce_body_mirrors(doc, root: pathlib.Path, verbose: bool) -> list[str]:
     return out
 
 
+BLOCK_HEADING = "ICN DELIVERY LIFECYCLE"
+BLOCK_LABEL = re.compile(r"^([A-Za-z][A-Za-z -]*?):")   # labels carry hyphens: "Follow-up ledger"
+
+
+def _rendered_labels(text: str) -> list[set[str]]:
+    """The field labels of every lifecycle block in `text`, one set per block."""
+    blocks, lines = [], text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() != BLOCK_HEADING:
+            continue
+        labels = set()
+        for following in lines[i + 1:]:
+            if following.startswith("```") or not following.strip():
+                break
+            match = BLOCK_LABEL.match(following.strip())
+            if match:
+                labels.add(match.group(1).strip())
+        blocks.append(labels)
+    return blocks
+
+
+def enforce_state_surface(doc, root: pathlib.Path, verbose: bool) -> list[str]:
+    """Every surface that renders the lifecycle block renders every field the owner declares.
+
+    The owner names the fields; three surfaces render the block. Two of them quietly rendered a
+    different set, and nothing noticed — which is the same class of drift this file exists to
+    stop, just inside the repository rather than in a provider prompt.
+    """
+    out: list[str] = []
+    surface = doc.get("lifecycle", {}).get("state_surface") if _obj(doc.get("lifecycle")) else None
+    if not _obj(surface) or not _strs(surface.get("fields")) or not _strs(
+            surface.get("rendered_by")):
+        return out
+    declared = set(surface["fields"])
+    for rel in surface["rendered_by"]:
+        path = root / rel
+        if not path.is_file():
+            out.append(f"{rel}: named in lifecycle.state_surface.rendered_by but does not exist")
+            continue
+        blocks = _rendered_labels(path.read_text(encoding="utf-8"))
+        if not blocks:
+            out.append(f"{rel}: renders no {BLOCK_HEADING!r} block, but is named as a surface "
+                       f"that does")
+            continue
+        for n, labels in enumerate(blocks, 1):
+            missing = sorted(declared - labels)
+            if missing:
+                where = f" (block {n})" if len(blocks) > 1 else ""
+                out.append(f"{rel}{where}: the lifecycle block omits {missing}, which "
+                           f"lifecycle.state_surface.fields declares")
+            elif verbose:
+                print(f"  ok   {rel}{f' (block {n})' if len(blocks) > 1 else ''}: "
+                      f"renders every declared field")
+    return out
+
+
 def enforce_registration(doc, root: pathlib.Path) -> list[str]:
     """The owner is registered in the truth map, and every path it names exists."""
     out: list[str] = []
@@ -636,6 +722,7 @@ def main() -> int:
     problems += enforce_registration(doc, ROOT)
     problems += enforce_surfaces(doc, ROOT, verbose)
     problems += enforce_body_mirrors(doc, ROOT, verbose)
+    problems += enforce_state_surface(doc, ROOT, verbose)
 
     if problems:
         print("check-delivery-lifecycle: FAIL")

@@ -85,7 +85,10 @@ for siblings of a finding you just reported.
 
 - Style and formatting — the formatter owns it.
 - Import ordering, trivial naming, "I would have done it differently".
-- Anything the pull request declared as an explicit non-goal.
+- Anything the pull request declared as an explicit non-goal — **unless** it is one of the
+  invariants `AGENTS.md` owns, or a regression in behaviour this diff actually changes. A
+  non-goal bounds what the pull request set out to build. It cannot waive a repository
+  invariant, and it cannot put a regression the diff introduced out of scope.
 - Anything already dispositioned in an earlier generation, unless it demonstrably regressed.
 
 ## Output format

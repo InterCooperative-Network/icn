@@ -149,6 +149,33 @@ rejects("dropping the redesign rule is rejected",
 
 
 # ---------------------------------------------------------------------------------------------
+print("the predicate's meaning is pinned, not just its labels")
+
+# Keeping the five ids while rewriting what each requires left the validator silent, and the
+# prose is what a reviewer actually applies. Each sentence is now owned by the checker.
+for i, condition in enumerate(DELIVERY["blocker_predicate"]["all_must_hold"]):
+    cid = condition["id"]
+    check(f"the committed {cid!r} condition is the sentence the checker pins",
+          condition["condition"] == gate.BLOCKER_CONDITIONS[cid], repr(condition["condition"]))
+    rejects(f"inverting the meaning of {cid!r} while keeping its id is rejected",
+            mutated(**{f"blocker_predicate__all_must_hold__{i}__condition":
+                       "Anything at all qualifies, however unreachable."}),
+            "owned by code")
+
+inverted = json.loads(json.dumps(DELIVERY))
+for condition in inverted["blocker_predicate"]["all_must_hold"]:
+    condition["condition"] = "Any observation whatsoever is a blocker."
+problems = gate.validate(inverted)
+check("a wholly inverted predicate produces one complaint per condition",
+      len([p for p in problems if "owned by code" in p]) == len(gate.BLOCKER_CONDITIONS),
+      str(problems[:2]))
+
+check("rationale stays free-form, so a `why` may be reworded without a code change",
+      gate.validate(mutated(blocker_predicate__all_must_hold__0__why="Reworded rationale.")) == [],
+      "a `why` edit was rejected")
+
+
+# ---------------------------------------------------------------------------------------------
 print("a qualifying late blocker can reopen, be fixed, and refreeze")
 
 states = {s["name"]: s for s in DELIVERY["lifecycle"]["states"]}
@@ -332,6 +359,23 @@ for m in DELIVERY["provider_bindings"]["body_mirrors"]:
 
 
 # ---------------------------------------------------------------------------------------------
+print("every surface that renders the block renders what the owner declares")
+
+state_surface = DELIVERY["lifecycle"]["state_surface"]
+check("the owner names the surfaces that render its block",
+      len(state_surface["rendered_by"]) >= 3, str(state_surface["rendered_by"]))
+for rel in state_surface["rendered_by"]:
+    blocks = gate._rendered_labels((ROOT / rel).read_text(encoding="utf-8"))
+    check(f"{rel} renders a lifecycle block", bool(blocks), "no block found")
+    for n, labels in enumerate(blocks, 1):
+        check(f"{rel} block {n} renders every declared field",
+              set(state_surface["fields"]) <= labels,
+              str(sorted(set(state_surface["fields"]) - labels)))
+rejects("a policy that names no rendering surface is rejected",
+        mutated(lifecycle__state_surface__rendered_by=[]), "rendered_by")
+
+
+# ---------------------------------------------------------------------------------------------
 print("the gate itself can still fail")
 
 
@@ -347,6 +391,10 @@ def gate_root(tmp: pathlib.Path, name: str) -> pathlib.Path:
         target = root / s["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / s["path"], target)
+    for rel in DELIVERY["lifecycle"]["state_surface"]["rendered_by"]:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel, target)
     mut = DELIVERY["authority"]["mutation"]
     for field in ("orchestrator", "primitive", "executable"):
         named = root / mut[field]
@@ -416,6 +464,27 @@ with tempfile.TemporaryDirectory() as raw:
     proc = run_gate(unregistered)
     check("an owner the truth map does not name fails the gate",
           proc.returncode == 1 and "not registered" in proc.stdout, proc.stdout[-300:])
+
+    # A rendering surface drops a field the owner declares.
+    short_block = gate_root(tmp, "short-block")
+    victim = short_block / ".github" / "pull_request_template.md"
+    victim.write_text("\n".join(line for line in
+                                victim.read_text(encoding="utf-8").splitlines()
+                                if not line.startswith("Follow-up ledger:")) + "\n",
+                      encoding="utf-8")
+    proc = run_gate(short_block)
+    check("a surface that stops rendering a declared field fails the gate",
+          proc.returncode == 1 and "Follow-up ledger" in proc.stdout, proc.stdout[-300:])
+
+    # The predicate keeps its ids but changes what they require.
+    redefined = gate_root(tmp, "redefined-predicate")
+    policy_path = redefined / "ops" / "state" / "truth" / "delivery.json"
+    policy_path.write_text(json.dumps(
+        mutated(blocker_predicate__all_must_hold__3__condition="Anything counts."), indent=2)
+        + "\n", encoding="utf-8")
+    proc = run_gate(redefined)
+    check("a predicate that keeps its ids but inverts their meaning fails the gate",
+          proc.returncode == 1 and "owned by code" in proc.stdout, proc.stdout[-300:])
 
     # The policy itself is weakened.
     weakened = gate_root(tmp, "weakened")

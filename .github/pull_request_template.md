@@ -15,6 +15,7 @@ states mean, and when comprehensive review ends.
 ICN DELIVERY LIFECYCLE
 State:                IMPLEMENTING
 Lane:                 <lane>
+Acceptance contract:  <one line, or a pointer into the Delivery section above>
 Review generation:    not yet requested
 Freeze head:          -
 Known blockers:       -
