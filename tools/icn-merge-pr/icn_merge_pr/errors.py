@@ -69,6 +69,18 @@ class GitHubRefused(MergeToolError):
     outcome = codes.REFUSED_GITHUB
 
 
+class ExpectedHeadMismatch(MergeToolError):
+    """Authorization named one head and the live pull request is on another.
+
+    Distinct from `REFUSED_HEAD_CHANGED`, which reports a head moving between this program's own
+    two reads. This one reports the head moving away from what the CALLER authorized, which is a
+    different fact: the review that justified the merge covered a commit that is no longer the
+    head, and nothing else in this program can notice that.
+    """
+
+    outcome = codes.REFUSED_EXPECTED_HEAD
+
+
 class UsageError(MergeToolError):
     outcome = codes.REFUSED_USAGE
 

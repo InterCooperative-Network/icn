@@ -274,6 +274,45 @@ rejects("narrowing the condition back to declared contract terms is rejected",
 
 
 # ---------------------------------------------------------------------------------------------
+print("the frozen head is the head the mutation is authorized for")
+
+# Comparing the head before handoff is not sufficient on its own: a push can land between that
+# comparison and the mutation, and the executable would pin whatever is on top by then. The freeze
+# head is therefore passed down with the authorization (icn#2666).
+ship_bind = (ROOT / ".agents" / "skills" / "ship-pr" / "SKILL.md").read_text(encoding="utf-8")
+merge_bind = (ROOT / ".agents" / "skills" / "merge-pr" / "SKILL.md").read_text(encoding="utf-8")
+check("the owner says the freeze head is passed down with the authorization",
+      "passed down with the authorization"
+      in DELIVERY["freeze"]["head_must_match_before_handoff"], "owner is silent")
+check("the owner no longer claims nothing downstream catches this",
+      "nothing downstream" not in DELIVERY["freeze"]["head_must_match_before_handoff"],
+      "the superseded claim is still there")
+# The same superseded claim was also written into the skill, and correcting only the owner left
+# the procedure telling an agent the opposite of what the executable now does.
+for _surface in (".agents/skills/ship-pr/SKILL.md", ".claude/skills/ship-pr/SKILL.md"):
+    _text = (ROOT / _surface).read_text(encoding="utf-8")
+    check(f"{_surface} does not carry the superseded claim either",
+          "nothing downstream" not in _text and "no idea which head was reviewed" not in _text,
+          "the skill still contradicts the executable")
+check("ship-pr hands the freeze head down", "hand the freeze head down" in ship_bind, "missing")
+check("ship-pr does not re-read the live head to produce it",
+      "do not re-read the live head to produce it" in ship_bind, "missing")
+check("merge-pr accepts an authorized head", "--expected-head" in merge_bind, "missing")
+# An optional contract nobody can discover is close to no contract, and this design rests on
+# callers choosing to pass it. The tool's README enumerates its invocations, so it must list this.
+_readme = (ROOT / "tools" / "icn-merge-pr" / "README.md").read_text(encoding="utf-8")
+check("the tool's README documents the authorized-head option",
+      "--expected-head" in _readme and "REFUSED_EXPECTED_HEAD" in _readme,
+      "the README enumerates the CLI without it")
+check("merge-pr forwards it verbatim",
+      "Forward it verbatim or not at all" in merge_bind, "missing")
+check("merge-pr does not derive the head itself",
+      "headRefOid" not in merge_bind, "the wrapper reads the live head")
+check("ship-pr still owns no mutation form",
+      not re.search(r"icn-merge-pr\s+merge", ship_bind), "a mutation path entered the orchestrator")
+
+
+# ---------------------------------------------------------------------------------------------
 print("readiness is decided in one place")
 
 # The skill told itself to read the merge owner and live protection to pick which gates to wait

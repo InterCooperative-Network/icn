@@ -1070,6 +1070,63 @@ fake, _ = expect_merge("the default-branch commit moves",
 check("no merge was attempted after a default-branch race", fake.merge_calls == [])
 
 
+# --- the head authorization named -----------------------------------------------------------------------
+print("a merge is bound to the head its authorization named (icn#2666)")
+
+# The race check above covers seconds: this program's own two reads. This covers the wait for a
+# human to say yes, which is where a push actually lands. Nothing else knows which head was
+# reviewed, so if this does not refuse, nothing does.
+fake, result = expect_merge("the live head is still the head that was authorized", world(),
+                            codes.MERGED, expected_head=HEAD)
+check("the authorized head is the head pinned in the merge request",
+      [c["sha"] for c in fake.merge_calls] == [HEAD], str(fake.merge_calls))
+check("the authorized head is reported back in the evidence",
+      result.evidence.get("expected_head") == HEAD, str(result.evidence.get("expected_head")))
+
+fake, _ = expect_merge("the head is not the head that was authorized", world(),
+                       codes.REFUSED_EXPECTED_HEAD, expected_head="a" * 40)
+check("no merge is attempted when the head is not the authorized one", fake.merge_calls == [])
+
+# Case matters nowhere else in git, and must not matter here either.
+fake, _ = expect_merge("the authorized head differs only in case", world(), codes.MERGED,
+                       expected_head=HEAD.upper())
+check("a merge still happened for a case-different authorized head",
+      [c["sha"] for c in fake.merge_calls] == [HEAD], str(fake.merge_calls))
+
+# No fallback to the newer head, stated two ways: authorizing the OLD head refuses, and so does
+# authorizing the NEW one — because a head that moved mid-flight was never evaluated at all.
+fake, _ = expect_merge("the head moves after authorization named the old one", racing(set_head),
+                       codes.REFUSED_HEAD_CHANGED, expected_head=HEAD)
+check("no merge was attempted when the authorized head was overtaken", fake.merge_calls == [])
+fake, _ = expect_merge("the head moves and authorization named the NEW one", racing(set_head),
+                       codes.REFUSED_HEAD_CHANGED, expected_head="9" * 40)
+check("naming the newer head does not authorize it either", fake.merge_calls == [])
+
+fake, _ = expect_merge("no authorized head is named at all", world(), codes.MERGED)
+check("an unbound merge still pins the live head",
+      [c["sha"] for c in fake.merge_calls] == [HEAD], str(fake.merge_calls))
+
+
+def parse_refusal(argv) -> str:
+    buffer = io.StringIO()
+    with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+        cli.main(argv)
+    return json.loads(buffer.getvalue())["outcome"]
+
+
+check("--expected-head is refused on check, which never mutates",
+      parse_refusal(["check", "1", "--expected-head", HEAD]) == codes.REFUSED_USAGE)
+for bad in (HEAD[:12], HEAD + "0", "z" * 40, "", "HEAD", "refs/heads/main"):
+    check(f"--expected-head {bad!r} is refused as a shape",
+          parse_refusal(["merge", "1", "--authorize", "--expected-head", bad])
+          == codes.REFUSED_USAGE, bad)
+check("--expected-head given twice is refused",
+      parse_refusal(["merge", "1", "--authorize", "--expected-head", HEAD,
+                     "--expected-head", HEAD]) == codes.REFUSED_USAGE)
+check("--expected-head with no value is refused",
+      parse_refusal(["merge", "1", "--authorize", "--expected-head"]) == codes.REFUSED_USAGE)
+
+
 def change_policy(w):
     document = json.loads(POLICY_TEXT)
     document["merge"]["race_note"] = "the document changed underneath the evaluation"

@@ -289,7 +289,9 @@
           "must_reference": [
             "ops/state/truth/policy.json",
             "icn-merge-pr",
-            "explicit, per-PR maintainer authorization"
+            "explicit, per-PR maintainer authorization",
+            "--expected-head",
+            "Forward it verbatim or not at all"
           ],
           "must_not_match": [
             {
@@ -319,6 +321,10 @@
             {
               "pattern": "REFUSED.*\\bdid not merge\\b|\\bthe (PR|pull request) (did not merge|is not merged|was not merged)\\b",
               "why": "an outcome describes this invocation, not about the pull request: a target may already have been merged or closed by another actor, in which case the evaluator refuses with the observed state and this wording would state the opposite of the evidence it was told to quote"
+            },
+            {
+              "pattern": "headRefOid|--jq\\s+\\.head",
+              "why": "reading the live head here would fabricate the value the caller is supposed to supply; an authorized head derived at merge time authorizes whatever just landed"
             }
           ]
         }
@@ -446,7 +452,8 @@
             "ops/state/truth/delivery.json",
             "icn-merge-pr",
             "ops/scripts/icn-wait",
-            "automated review is evidence, not unbounded veto authority"
+            "automated review is evidence, not unbounded veto authority",
+            "hand the freeze head down"
           ],
           "must_not_match": [
             {

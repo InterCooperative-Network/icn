@@ -143,11 +143,16 @@ mutation is never retried.
 
 **Compare the live head with the recorded freeze head before anything else.** A freeze names an
 exact head because that is the head that was reviewed and verified. Anything pushed since has been
-through neither, and nothing downstream will catch it: the merge executable pins the head it
-mutates, but it has no idea which head was reviewed.
+through neither.
 
 On a mismatch, the new content is unverified. Run DELTA verification on it, update the freeze head,
 return to FROZEN, and only then continue. `freeze.head_must_match_before_handoff` is the rule.
+
+Then **hand the freeze head down with the authorization**. Comparing here is not enough on its own:
+a push can land between this comparison and the mutation. Give `merge-pr` the exact frozen head, and
+the executable binds the mutation to it — refusing rather than merging a newer one. Pass the
+recorded value; do not re-read the live head to produce it, because that would authorize whatever
+just landed, which is the whole failure this is here to prevent.
 
 ```bash
 icn-merge-pr check "$PR"

@@ -64,8 +64,29 @@ has merely gained an unexpected importable file no longer gets to run it.
 icn-merge-pr check <PR>              # evaluate; mutates nothing
 icn-merge-pr merge <PR> --authorize  # re-read everything, then merge once, or refuse
                                      # (only an INSTALLED copy may mutate)
+icn-merge-pr merge <PR> --authorize --expected-head <full 40-hex sha>
+                                     # ...and refuse unless the live head is still
+                                     # exactly that commit
 icn-merge-pr provenance              # which commit is installed
 ```
+
+### `--expected-head`
+
+Names the commit the authorization was given **for**. Checked immediately before the mutation,
+against the same read the merge request pins, so the head that is proved is the head that is
+merged. A mismatch is `REFUSED_EXPECTED_HEAD` and attempts nothing; there is no fallback to the
+newer head, and naming the newer head does not authorize it either.
+
+It exists because review and authorization are separated by a human decision. Without it the
+program merges whatever is at the top of the branch by the time consent arrives, which may be code
+nobody reviewed.
+
+It is optional, and deliberately so: a caller that derives the value from the live head at call
+time gains nothing, because it would only re-assert what it just read. The value is meaningful
+only when it comes from whatever established that the head was fit to merge — which is why
+`ship-pr` passes its recorded freeze head down through `merge-pr`, and `merge-pr` forwards it
+verbatim rather than re-deriving one. An invocation that omits it is exactly as bound as this
+program was before the option existed: no weaker, and no stronger.
 
 Results are JSON on stdout with a stable `outcome` code (`icn_merge_pr/codes.py`); a summary goes
 to stderr.

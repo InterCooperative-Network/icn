@@ -2,7 +2,7 @@
 
 TWO FORMS, ONE OF WHICH MUTATES
     icn-merge-pr check <PR>
-    icn-merge-pr merge <PR> --authorize
+    icn-merge-pr merge <PR> --authorize [--expected-head <full sha>]
 
 Evaluation is always available without mutating anything. Mutation requires `--authorize` to be
 written out; there is no configuration, environment variable or implicit mode that supplies it.
@@ -17,6 +17,7 @@ too — the point of a closed grammar is that nothing arrives by accident.
 from __future__ import annotations
 
 import json
+import re
 import sys
 
 from . import codes, provenance
@@ -29,11 +30,20 @@ USAGE = """icn-merge-pr — the trusted ordinary-merge primitive for ICN (icn#26
 
   icn-merge-pr check <PR>  [--repo OWNER/NAME]
   icn-merge-pr merge <PR>  --authorize [--repo OWNER/NAME]
+                           [--expected-head <full 40-hex sha>]
                            [--strategy <policy exception> --reason "<why>"]
   icn-merge-pr provenance
 
 `check` evaluates and mutates nothing. `merge` re-reads every piece of evidence immediately
-before acting and performs at most one head-pinned ordinary merge. It has no privileged mode and
+before acting and performs at most one head-pinned ordinary merge.
+
+`--expected-head` names the commit the authorization was given FOR. The merge is refused unless
+the live head is still exactly that commit, and that same commit is the one pinned in the merge
+request. It exists because a caller reviews one head and authorizes minutes later: without it the
+program merges whatever is at the top of the branch by then, which may be code nobody reviewed.
+It is optional, because a caller who derives it from the live head at call time would gain
+nothing; the value is only meaningful when it comes from whatever established that the head was
+fit to merge. It has no privileged mode and
 cannot arm, enqueue or defer a merge. Results are JSON on stdout; a one-line summary goes to
 stderr.
 
@@ -62,7 +72,10 @@ FORBIDDEN_OPTIONS = {
 
 COMMANDS = ("check", "merge", "provenance")
 
-_VALUE_OPTIONS = {"--repo", "--strategy", "--reason"}
+# Full object ids only. Owned here, like every other shape this grammar accepts.
+_FULL_OID = re.compile(r"[0-9a-fA-F]{40}")
+
+_VALUE_OPTIONS = {"--repo", "--strategy", "--reason", "--expected-head"}
 _FLAG_OPTIONS = {"--authorize"}
 
 
@@ -75,6 +88,7 @@ class Invocation:
         self.authorize = False
         self.strategy: str | None = None
         self.reason: str | None = None
+        self.expected_head: str | None = None
 
 
 def parse(argv: list[str]) -> Invocation:
@@ -139,9 +153,20 @@ def parse(argv: list[str]) -> Invocation:
             inv.strategy = value
         elif option == "--reason":
             inv.reason = value
+        elif option == "--expected-head":
+            # A full object id, not a prefix. An abbreviation is ambiguous by construction, and
+            # this value decides whether a mutation happens — it is not a convenience argument.
+            if not _FULL_OID.fullmatch(value):
+                raise UsageError(
+                    f"--expected-head must be a full 40-character Git object id, got {value!r}")
+            inv.expected_head = value.lower()
 
     if inv.command == "check" and inv.authorize:
         raise UsageError("--authorize belongs to `merge`; `check` never mutates")
+    if inv.command == "check" and inv.expected_head is not None:
+        raise UsageError(
+            "--expected-head belongs to `merge`; `check` never mutates, so there is nothing for "
+            "it to bind")
     if inv.command == "merge" and not inv.authorize:
         raise UsageError(
             "`merge` mutates and requires --authorize to be stated explicitly. Run "
@@ -247,7 +272,7 @@ def main(argv: list[str]) -> int:
         installed_commit = record.get("source_commit")
     result = run(GhCli(), owner, name, inv.number, authorize=inv.authorize,
                  requested_strategy=inv.strategy, exception_reason=inv.reason,
-                 installed_commit=installed_commit)
+                 installed_commit=installed_commit, expected_head=inv.expected_head)
     print(json.dumps(result.as_dict(), indent=2, sort_keys=True))
     print(_summary(result), file=sys.stderr)
     return codes.exit_code(result.outcome)
