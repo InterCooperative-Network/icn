@@ -360,7 +360,15 @@
             "path": ".claude/skills/pr-create/SKILL.md",
             "policy": "exact_mirror"
           }
-        ]
+        ],
+        "canonical_assertions": {
+          "rationale": "icn#2661: every substantive PR states its acceptance contract and delivery lane up front, because the blocker predicate and the FULL review scope are both measured against it.",
+          "must_reference": [
+            "ops/state/truth/delivery.json",
+            "Acceptance contract",
+            "Delivery lane"
+          ]
+        }
       },
       {
         "name": "preflight",
@@ -421,6 +429,56 @@
             "policy": "exact_mirror"
           }
         ]
+      },
+      {
+        "name": "ship-pr",
+        "canonical_path": ".agents/skills/ship-pr/SKILL.md",
+        "provider_mirrors": [
+          {
+            "path": ".claude/skills/ship-pr/SKILL.md",
+            "policy": "exact_mirror"
+          }
+        ],
+        "authority_note": "icn#2661. ship-pr is the delivery ORCHESTRATOR: it decides when a pull request is ready to hand over. merge-pr remains the narrow merge primitive and tools/icn-merge-pr remains the owner of mutation semantics. These assertions keep the two apart \u2014 an orchestrator that can merge on its own is a second merge owner, and lifecycle rules restated here would drift from ops/state/truth/delivery.json.",
+        "canonical_assertions": {
+          "rationale": "icn#2661: the delivery lifecycle is owned by ops/state/truth/delivery.json and merge semantics by tools/icn-merge-pr. This skill loads both and reimplements neither.",
+          "must_reference": [
+            "ops/state/truth/delivery.json",
+            "icn-merge-pr",
+            "ops/scripts/icn-wait",
+            "automated review is evidence, not unbounded veto authority"
+          ],
+          "must_not_match": [
+            {
+              "pattern": "icn-merge-pr\\s+merge",
+              "why": "the mutation form belongs to the merge-pr skill under explicit per-PR authorization; an orchestrator that can reach it directly has taken the authorization decision away from the maintainer"
+            },
+            {
+              "pattern": "gh\\s+pr\\s+merge",
+              "why": "a raw merge command here bypasses every gate the executable owns"
+            },
+            {
+              "pattern": "--admin\\b",
+              "why": "there is no privileged path in this workflow; admin-merge eligibility is a human decision owned by the ADR named in policy.json#merge.admin_bypass"
+            },
+            {
+              "pattern": "--auto\\b|--disable-auto\\b",
+              "why": "shipping completes or refuses; it never arms a merge to happen later"
+            },
+            {
+              "pattern": "branches/[^/\\s]+/protection",
+              "why": "readiness is decided by the merge executable, which reads protection for the branch it is actually merging into; reading it here is a second readiness owner"
+            },
+            {
+              "pattern": "\\bBuild Release\\b",
+              "why": "a literal required-check name is a snapshot of policy.json#merge.required_checks"
+            },
+            {
+              "pattern": "\\b(all\\s+)?\\d+\\s+required\\s+(CI\\s+)?checks\\b",
+              "why": "a required-check count rots the moment branch protection changes"
+            }
+          ]
+        }
       },
       {
         "name": "sync-docs",

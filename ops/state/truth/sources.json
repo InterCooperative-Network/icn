@@ -29,6 +29,13 @@
       "stability": "slow-changing",
       "description": "Required CI checks, merge strategy, readiness definition, admin bypass rules"
     },
+    "pr_delivery_lifecycle": {
+      "owner": "ops/state/truth/delivery.json",
+      "stability": "slow-changing",
+      "description": "Pull-request delivery lifecycle: states, review generations, FULL vs DELTA review, the blocker predicate, freeze and refreeze, the follow-up ledger, delivery lanes, and which lifecycle decisions are maintainer-only",
+      "not_owned_here": "Merge requirements and merge-mutation semantics stay with merge_policy (ops/state/truth/policy.json#merge) and its executable, tools/icn-merge-pr",
+      "checker": "scripts/check-delivery-lifecycle.py"
+    },
     "agent_operating_contract": {
       "owner": "AGENTS.md",
       "sections": [
@@ -169,6 +176,7 @@
     "Do NOT duplicate registered domain semantics inside specialist/provider prompts \u2014 load the owner at runtime",
     "Do NOT use icn-ops/state paths \u2014 canonical is ops/state/ (inside monorepo)",
     "Do NOT use icn-website/ paths \u2014 canonical is website/ (inside monorepo)",
-    "Do NOT reference sync-from-icn.sh \u2014 the website reads docs directly"
+    "Do NOT reference sync-from-icn.sh \u2014 the website reads docs directly",
+    "Do NOT let a provider reviewer prompt define its own blocker, severity, or freeze semantics \u2014 those are owned by ops/state/truth/delivery.json and enforced by scripts/check-delivery-lifecycle.py"
   ]
 }

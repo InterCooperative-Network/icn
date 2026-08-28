@@ -7,6 +7,7 @@ allowed-tools: "Bash, Read, Grep, Glob"
 truth_contract:
   canonical_sources:
     - ops/state/truth/policy.json       # required checks, branch naming conventions
+    - ops/state/truth/delivery.json     # delivery lanes and the lifecycle block the PR must carry
     - ops/state/config/repo-map.json    # workspace root
   live_load_required:
     - "git branch --show-current"
@@ -44,6 +45,27 @@ Determine the scope from ICN scopes: `core`, `identity`, `trust`, `net`, `gossip
 Use `gh pr create` with this body structure:
 
 ```markdown
+## Delivery
+
+- **Delivery lane**: FAST | STANDARD | DEEP  (default from `lanes.default`; DEEP is the
+  maintainer's call, not yours)
+- **Acceptance contract**: what this PR claims to deliver, in one or two lines. A FULL review is
+  scoped against this, and the blocker predicate is measured against it, so an unstated contract
+  makes review unbounded.
+- **Explicit non-goals**: what this PR deliberately does not do.
+
+<!-- ICN-DELIVERY-LIFECYCLE:BEGIN -->
+```
+ICN DELIVERY LIFECYCLE
+State:                IMPLEMENTING
+Lane:                 <lane>
+Review generation:    not yet requested
+Freeze head:          -
+Known blockers:       -
+Follow-up ledger:     -
+```
+<!-- ICN-DELIVERY-LIFECYCLE:END -->
+
 ## Summary
 
 <1-2 sentence description>
@@ -88,6 +110,9 @@ Title: `<type>(<scope>): <description>` (under 70 chars)
 
 ### Important
 
+- The lifecycle block is the PR's control surface for delivery state, and `ops/state/truth/delivery.json`
+  owns what the states mean. Keep the state there, never in a repository file. The `ship-pr` skill
+  reads and advances it from here on.
 - Base branch defaults to `main` unless `$ARGUMENTS` specifies otherwise
 - Push the branch with `-u` flag before creating PR
 - Include a `Co-Authored-By:` trailer naming the assisting model actually used for the change.

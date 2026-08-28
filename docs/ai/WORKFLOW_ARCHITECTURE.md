@@ -2,7 +2,7 @@
 Status: normative
 Authority: agent workflow architecture
 Canonical: yes
-Last verified: 2026-08-19
+Last verified: 2026-08-28
 ---
 
 # ICN Agent Workflow Architecture
@@ -41,6 +41,7 @@ Answers **where a fact of this kind is owned**. The agent resolves the question 
 Supporting registries:
 
 - `ops/state/truth/policy.json` owns merge-policy data.
+- `ops/state/truth/delivery.json` owns the pull-request delivery lifecycle: when comprehensive review ends, what freezes, and how a late finding is classified.
 - `ops/state/truth/agents.json` owns agent routing.
 - `ops/state/truth/skills.json` owns skill routing/canonical paths.
 - `ops/state/config/repo-map.json` owns repository/worktree topology.
