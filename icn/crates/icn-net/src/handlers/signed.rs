@@ -77,7 +77,7 @@ impl ConnectionContext {
         };
 
         // Verify signature and age - resolve the sender's current PQ key for hybrid envelopes
-        let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
+        let sig_result = self.verify_with_current_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
             // Contradictory *local* evidence is not peer misbehaviour, exactly as a local
@@ -209,7 +209,7 @@ impl ConnectionContext {
         // Signature valid, now check for replay attack
         // Use check_replay_only since we already verified the signature above
         // This avoids redundant signature verification and ensures immediate PQ
-        // verification (via verify_with_cached_pq_key) is the only path used
+        // verification (via verify_with_current_pq_key) is the only path used
         match self
             .replay_guard
             .write()
@@ -393,7 +393,7 @@ impl ConnectionContext {
     /// per encrypted message.
     pub async fn handle_signed_inner(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
         // Verify signature and age - resolve the sender's current PQ key for hybrid envelopes
-        let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
+        let sig_result = self.verify_with_current_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
             // Same attribution rule as `handle_signed`: our own contradictory PQ evidence is
@@ -450,6 +450,13 @@ impl ConnectionContext {
 
     /// Verify a signed envelope, resolving the sender's *current* ML-DSA key for hybrid ones.
     ///
+    /// Named `current`, not `cached`, deliberately. The predecessor was
+    /// `verify_with_cached_pq_key` and it read a cache — which is the defect, not an incidental
+    /// detail — so a name that still said "cached" would read at the call site as licence to
+    /// consult historical state again. The metric names `hybrid_verification_cache_hit` and
+    /// `cache_miss` keep the old vocabulary on purpose: renaming a Prometheus series is a
+    /// breaking observability change, and their meaning is documented where they are read.
+    ///
     /// For classical envelopes this is exactly `envelope.verify()`.
     ///
     /// For hybrid envelopes (Ed25519 + ML-DSA) the key is resolved from
@@ -505,7 +512,7 @@ impl ConnectionContext {
     ///
     /// Whether the fallback should exist at all is a separate question about the
     /// deferred-verification contract, tracked as #2648 rather than widened into this fix.
-    async fn verify_with_cached_pq_key(
+    async fn verify_with_current_pq_key(
         &self,
         envelope: &SignedEnvelope,
         max_age_secs: u64,

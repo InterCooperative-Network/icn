@@ -1418,7 +1418,7 @@ mod binding_before_authentication {
     /// it, so a key that cannot parse cannot carry a valid proof and the *connection* is
     /// rejected. That is the earliest boundary available, and it is why the registry never
     /// holds unparseable bytes in production — the fail-closed branch in
-    /// `verify_with_cached_pq_key` is a backstop for a future ingestion path, not a live case.
+    /// `verify_with_current_pq_key` is a backstop for a future ingestion path, not a live case.
     #[tokio::test]
     #[cfg(feature = "post-quantum")]
     async fn malformed_ml_dsa_key_material_is_refused_at_the_hello_boundary() -> Result<()> {
