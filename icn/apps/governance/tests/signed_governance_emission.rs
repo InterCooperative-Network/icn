@@ -38,8 +38,9 @@ use std::sync::Arc;
 use icn_gossip::{GossipActor, GossipEntry};
 use icn_governance::replication::{GovernanceOpKind, SignedGovernanceOp, GOV_OP_MAGIC};
 use icn_governance::{
-    GovernanceDomainId, GovernanceMessage, GovernanceOps, GovernanceParams, MembershipConfig,
-    ProposalId, ProposalPayload, ProposalScope, Vote, VoteChoice,
+    Delegation, DelegationScope, GovernanceDomainId, GovernanceMessage, GovernanceOps,
+    GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    Vote, VoteChoice,
 };
 use icn_governance_actor::init::{init_governance_actor, GovernanceActorDeps};
 use icn_governance_actor::manager::GovernanceManager;
@@ -1039,4 +1040,156 @@ async fn alias_spelled_did_cannot_add_a_second_vote_on_the_actor_path() {
         tally.against_votes, 1,
         "the voter's later act stands, as vote changes are allowed here"
     );
+}
+
+/// #2641, close path: `CloseProposal` builds the tally that actually decides the
+/// outcome, and `apply_delegation_to_tally` expands delegations into it. Both
+/// keyed voters by DID *spelling*, so a member could delegate from one spelling
+/// of their own key to another and then vote as the delegate: the delegator
+/// looked like a non-voter, the self-delegation did not look like
+/// self-delegation, and their single vote was resolved back to them as a second
+/// one — on a fresh deployment, with no legacy rows involved.
+///
+/// Three members and a 50% quorum make the laundering outcome-visible: two
+/// laundered For votes reach quorum and Accept, one honest vote does not.
+#[tokio::test(flavor = "current_thread")]
+async fn alias_self_delegation_cannot_launder_a_second_vote_at_close() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-delegation".to_string());
+    let other_a = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let other_b = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias delegation".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![node.did.clone(), other_a.clone(), other_b.clone()]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias delegation".to_string(),
+            "Alias delegation".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    // Delegate from the canonical spelling to an alias of the very same key.
+    node.ops
+        .create_delegation(Delegation::new(
+            node.did.clone(),
+            alias.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("self-delegation across spellings is accepted today");
+
+    // Vote once, as the delegate spelling.
+    node.ops
+        .cast_vote(proposal_id.clone(), alias, VoteChoice::For, None)
+        .await
+        .expect("cast_vote");
+
+    node.ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect("close_proposal");
+
+    let closed = node
+        .ops
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+
+    assert!(
+        !matches!(closed.state, ProposalState::Accepted { .. }),
+        "one key produced one vote of three eligible members, which cannot reach a 50% \
+         quorum; Accepted means the delegation expansion counted it twice (got {:?})",
+        closed.state
+    );
+    assert!(
+        matches!(closed.state, ProposalState::NoQuorum { .. }),
+        "expected the honest single vote to fall short of quorum, got {:?}",
+        closed.state
+    );
+}
+
+/// #2641, close path: the tally that decides the outcome must fail closed on
+/// conflicting historical rows, not silently sum them. `get_vote_tally` refused
+/// such a pair while `CloseProposal` counted both, so the actor could report a
+/// tally that disagreed with the decision it committed to a receipt.
+///
+/// The rows are written the way a pre-fix binary wrote them — straight to the
+/// state store, keyed by spelling — since no post-fix path can create them.
+#[tokio::test(flavor = "current_thread")]
+async fn close_fails_closed_on_conflicting_alias_rows_rather_than_counting_both() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-close", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    // Two conflicting acts by one key, as a pre-#2641 binary would have left them.
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), node.did.clone(), VoteChoice::For),
+        )
+        .expect("legacy row");
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        )
+        .expect("legacy alias row");
+    assert_eq!(
+        node.state.list_votes(&proposal_id).unwrap().len(),
+        2,
+        "control: the legacy fixture must really contain two rows"
+    );
+
+    let err = node
+        .ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect_err("closing must not resolve conflicting historical acts by summing them");
+    assert!(
+        err.to_string().contains("conflicting"),
+        "must fail closed naming the conflict, got: {err}"
+    );
+
+    // The evidence survives for the §7.5-gated migration to resolve.
+    assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
 }

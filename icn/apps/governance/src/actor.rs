@@ -25,7 +25,7 @@ use icn_governance::{
     GovernanceParams, GovernanceProfile, GovernanceProfileId, MembershipAction, MembershipConfig,
     MembershipResolver, MembershipSource, PaginatedResult, ParameterChange, Proposal, ProposalId,
     ProposalOutcome, ProposalPayload, ProposalScope, ProposalState, ProtocolParameter,
-    ProtocolParameterStore, TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
+    ProtocolParameterStore, TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally, VotingPrincipal,
 };
 
 use icn_kernel_api::events::{EventEmitter, SystemEvent};
@@ -2251,10 +2251,11 @@ impl GovernanceActor {
                         .collect(),
                     None => all_votes,
                 };
-                let mut tally = VoteTally::empty();
-                for v in &votes {
-                    tally.add_vote(v);
-                }
+                // The tally that decides the outcome, so it must give one
+                // cryptographic principal one effective vote and fail closed on
+                // conflicting historical rows, exactly like the read-only
+                // `get_vote_tally` (#2641).
+                let mut tally = VoteTally::try_from_votes(&votes)?;
 
                 // Resolve eligible membership (list needed for delegation resolution).
                 // eligible_count uses the FULL member list as the quorum denominator —
@@ -2297,7 +2298,7 @@ impl GovernanceActor {
                     &proposal_id,
                     &mut tally,
                     excluded_delegators.as_ref(),
-                );
+                )?;
 
                 // Get proposal-type-specific thresholds (Issue #477)
                 // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
@@ -3875,16 +3876,26 @@ impl GovernanceActor {
         proposal_id: &ProposalId,
         tally: &mut VoteTally,
         excluded_delegators: Option<&std::collections::HashSet<Did>>,
-    ) {
-        // Build a fast lookup of who voted directly
-        let direct_voters: std::collections::HashSet<&Did> =
-            votes.iter().map(|v| &v.voter).collect();
-        let vote_by_did: std::collections::HashMap<&Did, &Vote> =
-            votes.iter().map(|v| (&v.voter, v)).collect();
+    ) -> Result<()> {
+        // Keyed by cryptographic principal, not DID spelling. Keying by
+        // spelling let a member delegate from one spelling of their key to
+        // another, then vote as the delegate: the delegator looked like a
+        // non-voter, the self-delegation did not look like self-delegation, and
+        // their own vote was resolved back to them as a second one (#2641).
+        let mut direct_voters: std::collections::HashSet<VotingPrincipal> =
+            std::collections::HashSet::new();
+        let mut vote_by_principal: std::collections::HashMap<VotingPrincipal, &Vote> =
+            std::collections::HashMap::new();
+        for v in votes {
+            let principal = VotingPrincipal::of(&v.voter)?;
+            direct_voters.insert(principal);
+            vote_by_principal.insert(principal, v);
+        }
 
         let mut delegated = 0usize;
         for member in eligible_members {
-            if direct_voters.contains(member) {
+            let member_principal = VotingPrincipal::of(member)?;
+            if direct_voters.contains(&member_principal) {
                 continue; // voted directly — no delegation needed
             }
 
@@ -3897,15 +3908,20 @@ impl GovernanceActor {
             }
 
             let delegate = self.resolve_delegate_from_store(member, domain_id, proposal_id);
-            if &delegate == member {
-                continue; // no active delegation
+            let delegate_principal = VotingPrincipal::of(&delegate)?;
+            if delegate_principal == member_principal {
+                continue; // no active delegation, whatever spelling names it
             }
 
-            if let Some(delegate_vote) = vote_by_did.get(&delegate) {
+            if let Some(delegate_vote) = vote_by_principal.get(&delegate_principal) {
                 // Create a synthetic vote for the delegating member using the delegate's choice.
                 let delegated_vote =
                     Vote::new(proposal_id.clone(), member.clone(), delegate_vote.choice);
                 tally.add_vote(&delegated_vote);
+                // Mark the delegator counted, as the `tally.rs` equivalent does, so
+                // a member list naming one principal under two spellings cannot
+                // have its delegation expanded twice (#2641).
+                direct_voters.insert(member_principal);
                 delegated += 1;
                 tracing::debug!(
                     member = %member,
@@ -3924,6 +3940,8 @@ impl GovernanceActor {
                 delegated
             );
         }
+
+        Ok(())
     }
 
     /// Revoke a delegation
