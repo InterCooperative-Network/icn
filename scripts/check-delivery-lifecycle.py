@@ -212,8 +212,16 @@ def _check_lifecycle(doc, out) -> None:
         if TERMINAL_STATE not in reached:
             out.append(f"lifecycle.states: {TERMINAL_STATE} is not reachable from {ENTRY_STATE}; "
                        f"a lifecycle with no path to completion cannot converge")
+        # Required, not merely validated-when-present. `freeze.refreeze` promises a qualifying
+        # late blocker can reopen, be corrected, and refreeze; a lifecycle without this edge
+        # contradicts the policy declaring it. Validating the condition only when the transition
+        # happened to exist made this a guard the guarded party could remove.
         frozen_exits = graph.get("FROZEN", [])
-        if "FIXING" in frozen_exits:
+        if "FIXING" not in frozen_exits:
+            out.append("lifecycle.states (FROZEN): must be able to exit to FIXING. Without it a "
+                       "qualifying late blocker has nowhere to go, and freeze.refreeze promises a "
+                       "path that the lifecycle does not have")
+        else:
             for s in states:
                 if _obj(s) and s.get("name") == "FROZEN" and not _str(
                         s.get("exit_to_fixing_requires")):
@@ -304,6 +312,11 @@ def _check_dispositions(doc, out) -> None:
         if not _str(name) or name not in DISPOSITIONS:
             out.append(f"finding_dispositions[{i}].name: {name!r} is not one of "
                        f"{list(DISPOSITIONS)}")
+            continue
+        if name in names:
+            out.append(f"finding_dispositions[{i}].name: {name!r} declared twice. A consumer "
+                       f"reading this array would get two sets of instructions for one "
+                       f"disposition, and which it applies would depend on how it iterates")
             continue
         names.append(name)
         for field in ("means", "action"):
