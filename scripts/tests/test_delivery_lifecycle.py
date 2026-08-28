@@ -287,6 +287,13 @@ check("the owner says the freeze head is passed down with the authorization",
 check("the owner no longer claims nothing downstream catches this",
       "nothing downstream" not in DELIVERY["freeze"]["head_must_match_before_handoff"],
       "the superseded claim is still there")
+# The same superseded claim was also written into the skill, and correcting only the owner left
+# the procedure telling an agent the opposite of what the executable now does.
+for _surface in (".agents/skills/ship-pr/SKILL.md", ".claude/skills/ship-pr/SKILL.md"):
+    _text = (ROOT / _surface).read_text(encoding="utf-8")
+    check(f"{_surface} does not carry the superseded claim either",
+          "nothing downstream" not in _text and "no idea which head was reviewed" not in _text,
+          "the skill still contradicts the executable")
 check("ship-pr hands the freeze head down", "hand the freeze head down" in ship_bind, "missing")
 check("ship-pr does not re-read the live head to produce it",
       "do not re-read the live head to produce it" in ship_bind, "missing")
