@@ -78,6 +78,11 @@ __pycache__/
 dist/
 build/
 
+# The agent runtime bootstrap (ops/scripts/icn-runtime-build) publishes its resolved build into
+# a fresh worktree as a SYMLINK at ops/mcp/dist. `dist/` above matches directories only, so
+# without this line every bootstrapped lane reported an untracked ops/mcp/dist.
+ops/mcp/dist
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints

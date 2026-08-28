@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+#: capability: agent-runtime-bootstrap
+#: summary: Resolve a runtime build for THIS checkout's ops/mcp sources, building it once into a shared content-addressed cache.
+#: safety: modifies_local
+#
+# icn-runtime-build — make a fresh worktree a working agent lane with no human preparation.
+#
+# THE DEFECT THIS CLOSES
+#   ops/scripts/icn-agent-session needs ops/mcp/dist/cli/session.js. `dist/` is gitignored, so a
+#   newly created worktree never has it, and neither `wt-new` nor Claude Code's nested-worktree
+#   creation builds it. Measured on the dev VM at the time of the fix: 44 of 50 worktrees could
+#   not register, the registry reported zero sessions while four Claude activations were live,
+#   and the previous readiness-audit lane was itself unregistered. `mcp-host` worked only because
+#   its build happened to exist.
+#
+# WHY A SHARED CACHE AND NOT A PER-WORKTREE BUILD
+#   node_modules for ops/mcp is ~157M and contains better-sqlite3, a NATIVE module with an
+#   `npm rebuild` postinstall. Installing that per worktree is unaffordable in both time and
+#   disk. The registry itself is already ONE database per repository (ops/mcp/src/state/db.ts),
+#   and the MCP server is already launched from a single absolute path outside every task
+#   worktree, so a shared runtime is the shape this system already had everywhere except here.
+#
+# THE ANTI-STALE GUARANTEE — PRESERVED, THEN STRENGTHENED
+#   The old rule was "THIS SCRIPT'S OWN LOCATION WINS": never exec a sibling checkout's build,
+#   because a stale sibling could classify with old logic. That rule is kept verbatim for an
+#   in-tree dist (icn-agent-session still prefers ops/mcp/dist when it exists).
+#
+#   What this script adds is strictly stronger than a location rule. A cache entry is keyed by a
+#   SHA-256 over the exact bytes of this checkout's runtime sources — every file under
+#   ops/mcp/src plus package.json, package-lock.json and tsconfig.json, hashed with
+#   repo-relative paths so the key is identical across worktrees and independent of where the
+#   worktree lives. Executing <cache>/build/<fingerprint>/dist therefore proves the running
+#   bytes were compiled from THESE sources. A location rule only proves the build sat next to
+#   them; it never noticed an in-tree dist that had gone stale against its own src.
+#
+#   Consequence, stated plainly: editing ops/mcp/src changes the fingerprint, so the next
+#   session rebuilds rather than silently reusing the previous runtime. That is the point.
+#
+# CONCURRENCY
+#   Many agents can start at once. Each cache entry is built into a private temp directory and
+#   moved into place with rename(2), which is atomic on one filesystem, so a partially built
+#   tree is never observable under its final name. A completion marker is written INSIDE the
+#   temp directory before the rename, so "directory exists" and "build finished" cannot come
+#   apart. flock keeps concurrent starters from duplicating the work; it is an optimisation,
+#   not the correctness argument — two racing builds of the same fingerprint produce the same
+#   bytes, and the loser simply discards its copy.
+#
+# FAILURE SEMANTICS
+#   Every failure prints a specific reason to stderr and exits non-zero. This script NEVER
+#   prints a dist path it has not verified, so a caller cannot mistake a failed bootstrap for a
+#   working runtime. icn-agent-session turns that into its existing visible DEGRADED banner and
+#   never fabricates registration.
+#
+# Usage:
+#   icn-runtime-build              # print the absolute path of a usable dist directory
+#   icn-runtime-build --fingerprint  # print the runtime fingerprint only; build nothing
+#   icn-runtime-build --verbose    # narrate what is happening on stderr
+#
+# Environment:
+#   ICN_RUNTIME_CACHE          cache root (default ${XDG_CACHE_HOME:-$HOME/.cache}/icn/agent-runtime)
+#   ICN_RUNTIME_BUILD_TIMEOUT  seconds for the dist build and its lock wait (default 300)
+#   ICN_RUNTIME_DEPS_TIMEOUT   seconds for the dependency install and its lock wait (default 1800)
+#   ICN_RUNTIME_NO_BUILD=1     resolve a cached build, never build one (used by tests)
+#   ICN_RUNTIME_ABI            override the detected Node ABI/platform/arch (used by tests)
+
+set -uo pipefail
+
+VERBOSE=0
+FINGERPRINT_ONLY=0
+FINGERPRINT_SRC_ONLY=0
+BACKGROUND_IF_COLD=0
+for arg in "$@"; do
+  case "$arg" in
+    --verbose) VERBOSE=1 ;;
+    --fingerprint) FINGERPRINT_ONLY=1 ;;
+    --fingerprint-src) FINGERPRINT_SRC_ONLY=1 ;;
+    --background-if-cold) BACKGROUND_IF_COLD=1 ;;
+    --help|-h)
+      printf '%s\n' \
+        'usage: icn-runtime-build [--fingerprint] [--background-if-cold] [--verbose]' \
+        '  (no args)             print the path of a usable dist directory, building if needed' \
+        '  --fingerprint         print the runtime fingerprint only; build nothing' \
+        '  --fingerprint-src     print the SOURCE fingerprint only; build nothing' \
+        '  --background-if-cold  build dist inline, but hand a cold dependency install to a' \
+        '                        detached background bootstrap instead of blocking the caller' \
+        '  --verbose             narrate progress on stderr'
+      exit 0 ;;
+    *) printf 'icn-runtime-build: unknown option: %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
+
+note() { [ "$VERBOSE" = 1 ] && printf 'icn-runtime-build: %s\n' "$1" >&2; return 0; }
+fail() { printf 'icn-runtime-build: %s\n' "$1" >&2; exit 1; }
+
+# Resolve the repo from THIS script's own location, following symlinks, exactly as
+# icn-agent-session does. A wrapper and the sources it fingerprints must be one checkout.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+done
+ROOT="$(cd "$(dirname "$self")/../.." 2>/dev/null && pwd || true)"
+[ -n "$ROOT" ] && [ -d "$ROOT/ops/mcp" ] || fail "could not resolve an ICN repo root from $self"
+
+MCP="$ROOT/ops/mcp"
+[ -f "$MCP/package.json" ] || fail "$MCP/package.json is missing; this is not an ops/mcp checkout"
+
+CACHE="${ICN_RUNTIME_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/icn/agent-runtime}"
+# Two budgets, because the two halves cost wildly different amounts and only one of them is on
+# the session-start critical path. Measured on the dev VM (Node 22, 8 vCPU):
+#   dist  (tsc over 52 files, warm deps) ...... ~10s
+#   deps  (npm ci; better-sqlite3 compiles from source — no Node 22 prebuild) ... ~3m30s
+# A session may wait for the first. It must never wait for the second.
+BUDGET="${ICN_RUNTIME_BUILD_TIMEOUT:-300}"
+DEPS_BUDGET="${ICN_RUNTIME_DEPS_TIMEOUT:-1800}"
+
+# --- fingerprints -------------------------------------------------------------------------
+# Hashed with repo-relative paths so two worktrees holding identical sources agree on the key.
+# Absolute paths here would defeat the entire cache and reintroduce the per-worktree build.
+fingerprint() {
+  python3 - "${2:-$MCP}" "$1" "$NODE_ABI" <<'PY'
+import hashlib, os, sys
+root, mode, abi = sys.argv[1], sys.argv[2], sys.argv[3]
+manifest = ["package.json", "package-lock.json", "tsconfig.json"]
+rels = []
+if mode == "src":
+    src = os.path.join(root, "src")
+    for dirpath, dirnames, filenames in os.walk(src):
+        dirnames.sort()
+        for f in sorted(filenames):
+            rels.append(os.path.relpath(os.path.join(dirpath, f), root))
+    rels.extend(m for m in manifest if os.path.exists(os.path.join(root, m)))
+else:
+    # Dependency identity is the manifest pair alone: src churn must not force a reinstall of
+    # a 157M native-module tree that did not change.
+    rels = [m for m in ("package.json", "package-lock.json") if os.path.exists(os.path.join(root, m))]
+h = hashlib.sha256()
+if mode != "src":
+    # The installed tree contains a NATIVE better-sqlite3 binding, so its identity is the
+    # lockfile AND the ABI it was compiled against. Without this, upgrading Node kept the old
+    # entry valid by name: the cache hit returned before deps_native_ok() could notice the
+    # binding no longer loads, so every lane failed at CLI load with no path to repair itself.
+    h.update(b"abi\0" + abi.encode("utf-8") + b"\0")
+for rel in sorted(rels):
+    h.update(rel.encode("utf-8") + b"\0")
+    with open(os.path.join(root, rel), "rb") as fh:
+        h.update(hashlib.sha256(fh.read()).digest())
+print(h.hexdigest()[:32])
+PY
+}
+
+# The ABI the native module must match. Node is a hard requirement of every useful path here,
+# so it is resolved before any fingerprint rather than after the fast path.
+command -v node >/dev/null 2>&1 || fail "node not found on PATH"
+NODE_ABI="${ICN_RUNTIME_ABI:-$(node -p 'process.versions.modules + "-" + process.platform + "-" + process.arch' 2>/dev/null)}"
+[ -n "$NODE_ABI" ] || fail "could not read the Node ABI from $(command -v node)"
+
+SRC_FP="$(fingerprint src)" || fail "could not fingerprint ops/mcp sources"
+[ -n "$SRC_FP" ] || fail "empty source fingerprint"
+DEPS_FP="$(fingerprint deps)" || fail "could not fingerprint ops/mcp dependencies"
+[ -n "$DEPS_FP" ] || fail "empty dependency fingerprint"
+
+# The build key covers BOTH halves. A finished build holds a node_modules symlink into a
+# dependency entry, so a build identified by sources alone would keep pointing at the old
+# dependency tree after the ABI changed — valid by name, unloadable in fact.
+BUILD_FP="$(printf '%s:%s' "$SRC_FP" "$DEPS_FP" | sha256sum | cut -c1-32)"
+
+if [ "$FINGERPRINT_SRC_ONLY" = 1 ]; then printf '%s\n' "$SRC_FP"; exit 0; fi
+if [ "$FINGERPRINT_ONLY" = 1 ]; then printf '%s\n' "$BUILD_FP"; exit 0; fi
+
+BUILD_DIR="$CACHE/build/$BUILD_FP"
+BUILD_OK="$BUILD_DIR/.icn-runtime-ok"
+ENTRY="$BUILD_DIR/dist/cli/session.js"
+
+# Fast path. This is the overwhelmingly common case: a worktree branched from main has not
+# touched ops/mcp, so its fingerprint already names a finished build and nothing is compiled.
+if [ -f "$BUILD_OK" ] && [ -f "$ENTRY" ]; then
+  note "cache hit $BUILD_FP"
+  printf '%s\n' "$BUILD_DIR/dist"
+  exit 0
+fi
+
+if [ "${ICN_RUNTIME_NO_BUILD:-0}" = 1 ]; then
+  fail "no cached runtime for fingerprint $BUILD_FP and ICN_RUNTIME_NO_BUILD is set"
+fi
+
+command -v npm  >/dev/null 2>&1 || fail "npm not found on PATH"
+
+DEPS_DIR="$CACHE/deps/$DEPS_FP"
+DEPS_OK="$DEPS_DIR/.icn-deps-ok"
+
+mkdir -p "$CACHE/build" "$CACHE/deps" "$CACHE/locks" "$CACHE/tmp" \
+  || fail "could not create the runtime cache under $CACHE"
+
+# Sweep staging directories abandoned by a SIGKILLed build. They are never load-bearing — a
+# finished entry only ever appears via rename(2) — but a hook killed at its timeout cannot run
+# its own cleanup, so without this the cache grows a new orphan on every such kill. Only
+# genuinely old ones go, so a concurrent build in progress is never touched.
+find "$CACHE/tmp" -mindepth 1 -maxdepth 1 -type d -mmin +120 -exec rm -rf {} + 2>/dev/null || true
+
+# Build inside the cache, never inside the worktree: a bootstrap that writes into the checkout
+# would dirty every lane it touched and show up in `git status` mid-review.
+stage() {
+  local kind="$1" fp="$2" target="$3" marker="$4"
+  local lock="$CACHE/locks/$kind-$fp.lock"
+  local tmp rc=0 wait_for
+  # Wait on the lock for as long as the HOLDER is allowed to take. Using the dist budget for
+  # both made a waiter give up after 300s while a concurrent dependency install was still
+  # legitimately running inside its 1800s budget — a spurious failure on the ordinary
+  # cold-start-together path.
+  case "$kind" in deps) wait_for="$DEPS_BUDGET" ;; *) wait_for="$BUDGET" ;; esac
+  tmp="$(mktemp -d "$CACHE/tmp/$kind-$fp.XXXXXX")" || fail "could not create a staging directory"
+
+  exec 9>"$lock" || { rm -rf "$tmp"; fail "could not open the $kind lock at $lock"; }
+  if ! flock -w "$wait_for" 9; then
+    rm -rf "$tmp"
+    fail "timed out after ${wait_for}s waiting for another agent's $kind build ($fp)"
+  fi
+
+  # Re-check under the lock: the process we queued behind has very likely just finished the
+  # exact build we were about to start.
+  if [ -f "$marker" ]; then
+    note "$kind $fp completed by a concurrent starter"
+    rm -rf "$tmp"
+    return 0
+  fi
+
+  if "build_$kind" "$tmp"; then
+    : > "$tmp/${marker##*/}"
+    # rename(2): the finished tree appears under its final name in one step, already marked
+    # complete, so no reader can observe a half-built cache entry.
+    # os.rename, not `mv -T`: -T is GNU-only, and plain `mv` moves INTO an existing directory
+    # rather than failing — the one behaviour that must not happen here. python3 is already a
+    # hard dependency of this script, and os.rename is the atomic primitive being relied on.
+    if python3 -c 'import os,sys; os.rename(sys.argv[1], sys.argv[2])' "$tmp" "$target" 2>/dev/null; then
+      if [ "$kind" = dist ]; then
+        # CACHE-POISONING GUARD. A bootstrapped lane's ops/mcp/dist is a SYMLINK into this
+        # directory, so `npm --prefix ops/mcp run build` there would compile that lane's sources
+        # straight into a shared cache entry. When the lane's sources have changed its
+        # fingerprint has changed too, so the write lands in the entry for the OLD fingerprint —
+        # silently handing every other lane at that fingerprint a build made from different
+        # sources, which is precisely the anti-stale property this cache exists to provide.
+        # Read-only turns that into a loud EACCES. A legitimate rebuild belongs in a new
+        # fingerprint's entry, which is where the bootstrap already puts it.
+        # To clear the cache by hand: chmod -R u+w on the entry first.
+        chmod -R a-w "$target" 2>/dev/null || true
+        # VERIFY the guard, do not assume it. On a filesystem that ignores or rejects the
+        # permission change, silently continuing would leave a writable shared entry that a
+        # lane's `npm run build` can overwrite — the exact poisoning this prevents, minus the
+        # protection. Say so; icn-agent-session then declines to publish the worktree symlink,
+        # which is the only path by which a lane can write here at all.
+        if [ -w "$target/dist" ]; then
+          printf 'icn-runtime-build: WARNING: %s could not be made read-only; the cache is unprotected against a lane rebuilding into it, so no ops/mcp/dist symlink will be published\n' \
+            "$target" >&2
+        fi
+      fi
+      note "$kind $fp built"
+    elif [ -f "$marker" ]; then
+      note "$kind $fp was completed concurrently; discarding this copy"
+    else
+      rc=1
+    fi
+  else
+    rc=1
+  fi
+
+  rm -rf "$tmp"
+  return "$rc"
+}
+
+deps_native_ok() { ( cd "$1" && node -e 'new (require("better-sqlite3"))(":memory:").close()' ) >/dev/null 2>&1; }
+
+build_deps() {
+  local tmp="$1"
+  # The staged package.json drops ops/mcp's own `postinstall: npm rebuild better-sqlite3`.
+  # MEASURED, not assumed: `npm ci` already builds better-sqlite3 from source (no Node 22
+  # prebuild exists for v9), so the postinstall compiles the identical binding a SECOND time —
+  # about 3m30s each on the dev VM. The lockfile is copied untouched, so dependency resolution
+  # is byte-identical; only the repo's own lifecycle script is deferred.
+  #
+  # Deferred, not dropped. The rebuild exists to repair a binding that does not match the
+  # running Node ABI, so it is run below as a REPAIR when the module actually fails to load.
+  # That ordering is strictly stricter than the original: always-rebuild never checked the
+  # result, and would happily cache a tree that still did not load.
+  python3 - "$MCP/package.json" "$tmp/package.json" <<'PY' || return 1
+import json, sys
+with open(sys.argv[1]) as fh:
+    pkg = json.load(fh)
+pkg.get("scripts", {}).pop("postinstall", None)
+with open(sys.argv[2], "w") as fh:
+    json.dump(pkg, fh, indent=2)
+PY
+  [ -f "$MCP/package-lock.json" ] && { cp "$MCP/package-lock.json" "$tmp/" || return 1; }
+  note "installing ops/mcp dependencies (better-sqlite3 compiles from source); once per lockfile"
+  # `npm ci` needs the lockfile; fall back to `npm install` only when the checkout has none.
+  local cmd=(npm ci --no-audit --no-fund --loglevel=error)
+  [ -f "$tmp/package-lock.json" ] || cmd=(npm install --no-audit --no-fund --loglevel=error)
+  ( cd "$tmp" && timeout "$DEPS_BUDGET" "${cmd[@]}" ) >&2 || return 1
+  [ -d "$tmp/node_modules" ] || return 1
+
+  # Prove the native module loads before this tree is marked usable. npm exits 0 having
+  # produced a binding that does not match the running Node ABI, and a cache entry that fails
+  # at every future session start is worse than no cache entry at all.
+  if ! deps_native_ok "$tmp"; then
+    note "better-sqlite3 did not load; running the rebuild repair"
+    ( cd "$tmp" && timeout "$DEPS_BUDGET" npm rebuild better-sqlite3 ) >&2 || return 1
+    deps_native_ok "$tmp" || {
+      printf 'icn-runtime-build: better-sqlite3 does not load under %s even after rebuild\n' \
+        "$(node -v)" >&2
+      return 1
+    }
+  fi
+  # Restore the checkout's real manifest so the cached tree records what the repository
+  # declares, not the trimmed copy the install was driven from.
+  cp "$MCP/package.json" "$tmp/package.json" || return 1
+
+  # PUBLISH ONLY WHAT WAS HASHED — the dependency-side counterpart of the same rule in
+  # build_dist. DEPS_FP is taken when the process starts, and this install can spend minutes
+  # queued behind another one. A manifest edit landing in that window would be installed and
+  # then marked complete under the OLD dependency fingerprint, so every lane still holding the
+  # old manifests would reuse a tree resolved from different inputs. The dist-side check does
+  # not cover this: it rejects the dist build while leaving the mis-keyed dependency entry and
+  # its .icn-deps-ok marker in place.
+  local staged_deps
+  staged_deps="$(fingerprint deps "$tmp")" || return 1
+  if [ "$staged_deps" != "$DEPS_FP" ]; then
+    printf 'icn-runtime-build: ops/mcp manifests changed while installing (%s -> %s); not publishing under a key that does not describe them\n' \
+      "$DEPS_FP" "$staged_deps" >&2
+    return 1
+  fi
+  printf '%s\n' "$DEPS_FP"  >"$tmp/.icn-deps-fp"
+  printf '%s\n' "$NODE_ABI" >"$tmp/.icn-runtime-abi"
+  return 0
+}
+
+build_dist() {
+  local tmp="$1" staged_fp
+  cp -a "$MCP/src" "$tmp/src" || return 1
+  cp "$MCP/package.json" "$tmp/" || return 1
+  cp "$MCP/tsconfig.json" "$tmp/" || return 1
+  # Copied so the staged tree is a faithful snapshot of everything the fingerprint covers.
+  [ -f "$MCP/package-lock.json" ] && { cp "$MCP/package-lock.json" "$tmp/" || return 1; }
+
+  # PUBLISH ONLY WHAT WAS HASHED. SRC_FP was taken when this process started; on the cold path
+  # that can be minutes earlier, because a dependency install runs first. An edit landing in
+  # that window would be compiled and then published under the OLD key, handing every lane at
+  # that key a runtime built from different sources — the exact anti-stale failure the
+  # content-addressed cache exists to prevent. Re-hash the snapshot actually staged and refuse
+  # rather than publish a mismatch; the next invocation simply builds the new fingerprint.
+  staged_fp="$(fingerprint src "$tmp")" || return 1
+  # Provenance, readable without re-deriving anything: which sources and which ABI this entry
+  # was compiled from. The build key is a hash of both, so it cannot be read back on its own.
+  printf '%s\n' "$SRC_FP"   >"$tmp/.icn-runtime-src"
+  printf '%s\n' "$NODE_ABI" >"$tmp/.icn-runtime-abi"
+  if [ "$staged_fp" != "$SRC_FP" ]; then
+    printf 'icn-runtime-build: ops/mcp sources changed while staging (%s -> %s); not publishing under a key that does not describe them\n' \
+      "$SRC_FP" "$staged_fp" >&2
+    return 1
+  fi
+  # The symlink is part of the FINISHED entry, not just the compile: at run time Node resolves
+  # better-sqlite3 by walking up from dist/cli/, and this is what it finds.
+  ln -s "$DEPS_DIR/node_modules" "$tmp/node_modules" || return 1
+  note "compiling the session runtime for fingerprint $BUILD_FP"
+  ( cd "$tmp" && timeout "$BUDGET" ./node_modules/.bin/tsc ) >&2 || return 1
+  [ -f "$tmp/dist/cli/session.js" ] || return 1
+  return 0
+}
+
+if [ ! -f "$DEPS_OK" ]; then
+  # The session-start caller takes this branch rather than stalling a human for minutes. The
+  # detached child runs the very same program with no flag, so there is one install path, and
+  # flock makes a second starter join the first rather than racing it.
+  if [ "$BACKGROUND_IF_COLD" = 1 ]; then
+    log="$CACHE/bootstrap.log"
+    pidfile="$CACHE/bootstrap.pid"
+    # A LIVE bootstrap is detected by its recorded pid, and the spawn itself is serialised.
+    # `flock -n <file> true` held the lock only while `true` ran, so it was already released
+    # before the child could take it: every hook arriving together passed the probe and
+    # launched its own detached multi-minute install.
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
+      fail "dependency cache is cold and a background bootstrap is already running (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
+    fi
+    exec 8>"$CACHE/locks/spawn.lock" || fail "could not open the spawn lock"
+    if flock -n 8; then
+      # The child's pid is RECORDED, not just spawned. A detached multi-minute native build
+      # that nothing can name is precisely the abandoned-process shape this repository keeps
+      # having to clean up by hand; a caller — a test tearing down, or a human wondering what
+      # is eating the CPU — must be able to find and wait on it.
+      ( setsid nohup "$self" --verbose >>"$log" 2>&1 & echo $! >"$pidfile" ) >/dev/null 2>&1
+      fail "dependency cache is cold; a background bootstrap was started (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
+    fi
+    fail "dependency cache is cold and a background bootstrap is already running (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
+  fi
+  stage deps "$DEPS_FP" "$DEPS_DIR" "$DEPS_OK" \
+    || fail "dependency install failed for $DEPS_FP (see the npm output above)"
+fi
+[ -f "$DEPS_OK" ] || fail "dependency cache $DEPS_DIR is still incomplete after installing"
+
+stage dist "$BUILD_FP" "$BUILD_DIR" "$BUILD_OK" \
+  || fail "runtime build failed for $BUILD_FP (see the tsc output above)"
+
+# Verify what we are about to hand out rather than trusting that the build said it worked.
+[ -f "$ENTRY" ] || fail "build completed but $ENTRY is missing"
+printf '%s\n' "$BUILD_DIR/dist"

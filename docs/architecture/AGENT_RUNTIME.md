@@ -239,6 +239,53 @@ exposes the same core through a CLI (`ops/mcp/dist/cli/session.js`). MCP tools a
 **one shared module** (`ops/mcp/src/runtime/session-runtime.ts`); there is no second
 implementation to drift.
 
+### 3.1 How a fresh worktree gets that CLI
+
+`dist/` is gitignored, and no worktree-creation path — not `wt-new`, not Claude Code's nested
+`.claude/worktrees/<name>` lane, not `git worktree add` by hand — builds it. Requiring an
+in-tree build therefore made a new lane **permanently** unregistered rather than briefly
+degraded. When this was found, 44 of 50 worktrees on the dev VM could not register, the
+registry reported zero sessions while four Claude activations were live, and the readiness
+audit that found it was itself running unregistered. `mcp-host` worked only because its build
+happened to exist.
+
+`ops/scripts/icn-runtime-build` closes that. It resolves a build of the session CLI from a
+shared cache under `${XDG_CACHE_HOME:-~/.cache}/icn/agent-runtime`, keyed by a SHA-256 over the
+exact bytes of the checkout's runtime sources (`ops/mcp/src/**` plus `package.json`,
+`package-lock.json`, `tsconfig.json`), hashed with repo-relative paths so lanes holding
+identical sources agree on one key.
+
+- **Anti-stale — strengthened, not traded away.** The old rule was *this checkout's location
+  wins*. The cache key is a content hash, so running `<cache>/build/<fingerprint>/dist` proves
+  the executing bytes were compiled from **these** sources. A location rule only ever proved
+  the build sat next to them; it never noticed an in-tree `dist` gone stale against its own
+  `src`. An in-tree build still wins when present, so a developer's `npm run build` is
+  unaffected.
+- **Cost.** Measured on the dev VM: a cache hit is free and is the normal case, because a lane
+  branched from `main` has not touched `ops/mcp`. A first-of-its-kind source state costs one
+  `tsc` (~10s). The dependency tree (~157M, `better-sqlite3` compiled from source) is
+  machine-level state keyed by the lockfile, installed once and shared by every lane.
+- **Which events pay it.** `register` fires once per session and re-resolves unconditionally,
+  so a session always starts on a runtime built from the sources currently in the lane.
+  `progress`/`interaction` fire after every tool call and take the resolved path as-is; they
+  record liveness into a shared registry rather than interpreting it, and re-fingerprinting 52
+  files per tool call would cost ~116ms to re-answer a question they do not ask.
+- **Never blocking on the expensive half.** A missing `dist` is worth ~10s of a human's time
+  and is built inline. A missing dependency tree is a multi-minute native compile: the session
+  hands it to a detached background bootstrap, says plainly that *this* session is unregistered
+  and the next one will not be, and never fabricates a registration to hide it.
+- **Concurrency.** Entries are staged in a private directory and published with `rename(2)`,
+  with the completion marker written before the move, so a half-built tree is never observable.
+  `flock` stops duplicate work; it is not the correctness argument, since two racing builds of
+  one fingerprint produce the same bytes.
+
+The bootstrap publishes its resolution into the lane as a symlink at `ops/mcp/dist` (ignored by
+`.gitignore`), which keeps later hooks on the zero-cost path and makes provenance readable —
+the link target names the fingerprint the runtime was compiled from.
+
+Proven by `scripts/test-agent-runtime-bootstrap.sh`, whose standing rule is that no case may
+start from a worktree that already has a `dist`.
+
 Idempotency: registration is keyed on the provider conversation id taken from the hook
 payload's `session_id` field (§2.3). Re-running `register` for the same live activation returns
 the existing row, so a hook that fires twice cannot double-register. Launchers with no provider

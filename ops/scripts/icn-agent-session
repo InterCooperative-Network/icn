@@ -73,11 +73,108 @@ degrade() {
 
 [ -n "$ROOT" ] && [ -d "$ROOT/ops/mcp" ] || degrade "could not resolve an ICN repo root"
 
-CLI="$ROOT/ops/mcp/dist/cli/session.js"
-if [ ! -f "$CLI" ]; then
-  degrade "session CLI not built ($CLI missing) — run: npm --prefix '$ROOT/ops/mcp' run build"
-fi
-
 command -v node >/dev/null 2>&1 || degrade "node not found on PATH"
+
+CLI="$ROOT/ops/mcp/dist/cli/session.js"
+BOOTSTRAP="$ROOT/ops/scripts/icn-runtime-build"
+
+# WHY THIS IS NOT JUST `[ -f "$CLI" ] || degrade`
+#   `dist/` is gitignored and nothing on any worktree-creation path builds it, so demanding an
+#   in-tree build meant every fresh worktree was permanently unregistered — 44 of 50 on the dev
+#   VM, including the lane of the audit that found it. icn-runtime-build resolves a build made
+#   from THIS checkout's runtime sources out of a shared content-addressed cache, so a new lane
+#   costs a ~10s compile at worst and nothing at all once some lane has presented these sources.
+#
+# WHEN WE RE-RESOLVE, AND WHY NOT ALWAYS
+#   `register` fires once per session from SessionStart: it re-resolves unconditionally, so a
+#   session always starts on a runtime built from the sources currently in the worktree.
+#   `progress`/`interaction` fire after every tool call; making them re-fingerprint 52 files
+#   would add ~116ms to each one to re-answer a question that cannot have changed in a way they
+#   care about — they record liveness into a shared registry, they do not interpret it. They
+#   therefore take the resolved path as-is and bootstrap only if it is missing entirely.
+#   A FAILED RE-RESOLUTION MUST NOT TAKE AWAY A RUNTIME THAT ALREADY WORKS. Before the
+#   bootstrap existed an in-tree dist was the only path, and it is still perfectly valid. An
+#   environment where the bootstrap cannot run — no npm, a partial checkout with no
+#   ops/mcp/package.json, a read-only cache — must therefore fall back to it rather than
+#   degrade. Without this, adding the bootstrap REGRESSED such environments from working to
+#   unregistered, which the adoption gate caught: its fixture carries a dist but no
+#   ops/mcp/package.json, so re-resolution failed and the session stopped registering.
+resolve_cli() {
+  local err dist reason
+  if [ ! -x "$BOOTSTRAP" ]; then
+    [ -f "$CLI" ] && return 0
+    degrade "session CLI not built and $BOOTSTRAP is missing or not executable"
+  fi
+  err="$(mktemp "${TMPDIR:-/tmp}/icn-runtime-resolve.XXXXXX")" || { [ -f "$CLI" ] && return 0; return 1; }
+  # --background-if-cold: a missing dist is a ~10s compile and worth waiting for; a missing
+  # dependency tree is a multi-minute native build that must never stall a human at a prompt.
+  if dist="$("$BOOTSTRAP" --background-if-cold 2>"$err")" && [ -n "$dist" ]; then
+    rm -f "$err"
+    CLI="$dist/cli/session.js"
+    # Publish the resolution into the worktree as a symlink. It is ignored by .gitignore, it
+    # keeps every later hook on the zero-cost path, and it makes provenance readable: the
+    # target path names the fingerprint the runtime was compiled from. Never clobber a real
+    # in-tree build — a developer running `npm run build` still wins in their own lane.
+    #
+    # ONLY when the cache entry is actually read-only. The symlink is the sole path by which a
+    # lane can write into shared cache storage (`npm run build` would compile straight through
+    # it), so if the bootstrap could not protect the entry — a filesystem that ignores chmod —
+    # the link is exactly the hazard and is not worth the saved milliseconds. Later hooks then
+    # re-resolve, which is slower and correct.
+    if [ ! -w "$dist" ] && { [ ! -e "$ROOT/ops/mcp/dist" ] || [ -L "$ROOT/ops/mcp/dist" ]; }; then
+      ln -sfn "$dist" "$ROOT/ops/mcp/dist" 2>/dev/null || true
+    fi
+    return 0
+  fi
+  # Hand the bootstrap's own specific reason through; it already explains what failed.
+  reason="$(tr '\n' ' ' <"$err" | sed -e 's/icn-runtime-build: //g' -e 's/  */ /g' -e 's/ *$//')"
+  rm -f "$err"
+  if [ -f "$CLI" ]; then
+    # Not degraded: this session has a working runtime. Say what could not be re-checked so a
+    # stale in-tree build is not mistaken for a verified one.
+    printf 'agent-runtime: using the in-tree build; could not re-resolve — %s\n' \
+      "${reason:-runtime bootstrap failed}" >&2
+    return 0
+  fi
+  degrade "${reason:-runtime bootstrap failed}"
+}
+
+if [ "$cmd" = "register" ] || [ ! -f "$CLI" ]; then
+  resolve_cli
+fi
+[ -f "$CLI" ] || degrade "session CLI still unavailable at $CLI after bootstrap"
+
+# PIN THE REGISTRY TO THIS REPOSITORY, EXPLICITLY.
+#
+# resolveDefaultDbPath() in ops/mcp/src/state/db.ts derives the shared registry by asking Git
+# for --git-common-dir relative to the CLI's own __dirname. That worked while the CLI could
+# only ever live at <worktree>/ops/mcp/dist/state/. A cached runtime lives OUTSIDE every
+# checkout, so the derivation found no repository and fell back to a per-installation database
+# — every bootstrapped lane would have registered into a registry that the MCP server and every
+# other worktree could not see, which is precisely the one-registry-per-repository invariant
+# that module exists to hold. Caught by dogfooding a genuinely fresh lane; fixtures could not
+# see it, because they never ran a cached runtime against a real repository.
+#
+# The wrapper is the right seam for this: it is the component that knows which checkout it is
+# serving, for the same reason it resolves ROOT from its own location. The value matches what
+# the TypeScript computes in-tree (git-common-dir, resolved, plus icn-ops.db), so in-tree and
+# cached runtimes address one identical file.
+# The Git call is SANITISED. Git honours GIT_DIR, GIT_COMMON_DIR and their relatives over
+# `-C`, so an inherited value would silently pin this session's lifecycle data to another
+# repository's registry. ops/mcp/src/runtime/worktree-identity.ts strips the same set for the
+# same reason; this is the shell-side counterpart, not a new rule.
+git_repo() { env -u GIT_DIR -u GIT_COMMON_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CEILING_DIRECTORIES \
+  git -C "$1" "${@:2}" 2>/dev/null; }
+
+if [ -z "${ICN_OPS_DB:-}" ]; then
+  COMMON="$(git_repo "$ROOT" rev-parse --git-common-dir)"
+  if [ -n "$COMMON" ]; then
+    case "$COMMON" in /*) ;; *) COMMON="$ROOT/$COMMON" ;; esac
+    if COMMON="$(cd "$COMMON" 2>/dev/null && pwd -P)"; then
+      export ICN_OPS_DB="$COMMON/icn-ops.db"
+    fi
+  fi
+fi
 
 exec node "$CLI" "$@"
