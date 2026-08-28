@@ -226,6 +226,7 @@ mod tests {
             peer_connections,
             capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
             durable_claim: std::sync::Mutex::new(None),
+            pq_key_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector: None,
             identity_bundle,
@@ -387,6 +388,7 @@ mod tests {
             peer_connections: Arc::new(RwLock::new(HashMap::new())), // Empty!
             capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
             durable_claim: std::sync::Mutex::new(None),
+            pq_key_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector: None,
             identity_bundle,

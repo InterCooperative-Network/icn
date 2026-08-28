@@ -1970,7 +1970,7 @@ impl ReplayGuard {
     /// Check if message is fresh (not replayed) without verifying signature
     ///
     /// Use this when signature has already been verified by the caller
-    /// (e.g., via `verify_with_cached_pq_key()` in the signed message handler).
+    /// (e.g., via `verify_with_current_pq_key()` in the signed message handler).
     ///
     /// This method performs all replay detection checks but skips signature
     /// verification to avoid redundant cryptographic operations.

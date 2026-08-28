@@ -53,6 +53,18 @@ pub struct ConnectionContext {
     /// Replaced, not accumulated, when a repeated Hello re-states the peer's capabilities: one
     /// connection makes one claim at a time, and the newest Hello is the current one.
     durable_claim: std::sync::Mutex<Option<crate::capability_evidence::LiveCapabilityClaim>>,
+    /// *This* connection's ML-DSA key advertisement, for as long as this connection is up
+    /// (#2646).
+    ///
+    /// The same lease held for the same reason one field up, about the other half of what a
+    /// Hello proves. `peer_connections` also records the key, and that row is what the hybrid
+    /// verification path used to read — but nothing removes it when the connection ends and
+    /// `restore_state` recreates it from a snapshot before any Hello, so it says what a peer
+    /// once advertised rather than what it is advertising now.
+    ///
+    /// Replaced, not accumulated, when a repeated Hello re-states or changes the key: one
+    /// connection advertises one key at a time, and the newest Hello is the current one.
+    pq_key_claim: std::sync::Mutex<Option<crate::capability_evidence::LivePqKeyClaim>>,
     pub blob_registry: Option<Arc<RwLock<BlobLocationRegistry>>>,
     pub misbehavior_detector: Option<Arc<RwLock<MisbehaviorDetector>>>,
     pub identity_bundle: IdentityBundle,
@@ -211,6 +223,7 @@ impl ConnectionContext {
             peer_connections,
             capability_registry,
             durable_claim: std::sync::Mutex::new(None),
+            pq_key_claim: std::sync::Mutex::new(None),
             blob_registry,
             misbehavior_detector,
             identity_bundle,
@@ -246,6 +259,33 @@ impl ConnectionContext {
     ) {
         let mut slot = self
             .durable_claim
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *slot = claim;
+    }
+
+    /// Replace this connection's ML-DSA key advertisement with `claim` (#2646).
+    ///
+    /// The previous claim is dropped here, which is its release, so a repeated Hello that
+    /// changes the key leaves no ghost claim behind for the old one — and one that re-states
+    /// the same key does not stack a second.
+    ///
+    /// Acquire-before-release, and the signature is what enforces it: the new claim is taken
+    /// by value, so it must already exist before this call can be made, and this call is what
+    /// drops the old one. A peer re-stating the same key therefore never opens a window in
+    /// which a concurrent envelope reads it as having none — the refcount goes 1 -> 2 -> 1
+    /// rather than 1 -> 0 -> 1. Releasing first would need a second, separate
+    /// `replace_pq_key_claim(None)`, which nothing does.
+    ///
+    /// Separate from the Hello path for the same reason as `replace_durable_claim`: the
+    /// registry's lock is a `std` one taken inside `Drop`, so it must never be held across an
+    /// await, and nothing here awaits.
+    pub(crate) fn replace_pq_key_claim(
+        &self,
+        claim: Option<crate::capability_evidence::LivePqKeyClaim>,
+    ) {
+        let mut slot = self
+            .pq_key_claim
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         *slot = claim;

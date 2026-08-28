@@ -581,6 +581,13 @@ pub enum HybridVerificationFailure {
     PqSignatureMismatch,
     /// Ed25519 (classical) signature verification failed
     ClassicalSignatureFailed,
+    /// Live authenticated connections for this sender advertise different ML-DSA keys, so
+    /// there is no single current key to verify against (#2646).
+    ///
+    /// Counted as a verification *failure* rather than as a cache miss on purpose: the message
+    /// was refused, and refusing is the point. A rising rate here means a peer is holding
+    /// simultaneous connections that disagree about its own key, not that a peer is unknown.
+    ConflictingPqKeys,
 }
 
 impl HybridVerificationFailure {
@@ -589,6 +596,7 @@ impl HybridVerificationFailure {
             Self::InvalidPqKey => "invalid_pq_key",
             Self::PqSignatureMismatch => "pq_signature_mismatch",
             Self::ClassicalSignatureFailed => "classical_signature_failed",
+            Self::ConflictingPqKeys => "conflicting_pq_keys",
         }
     }
 }

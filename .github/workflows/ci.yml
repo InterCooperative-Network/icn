@@ -465,6 +465,29 @@ jobs:
         run: cargo test -p icn-gateway --features sled-storage
         working-directory: ./icn
 
+      # The post-quantum verification path was *compiled* by required CI (the Clippy job
+      # passes --features "hsm,post-quantum" --all-targets) but never *executed* by it, so
+      # every assertion behind `#[cfg(feature = "post-quantum")]` was dead. #2646 — a PQ
+      # downgrade selected by the sender DID's textual representation — survived in that gap.
+      #
+      # Scoped to icn-net rather than the workspace: that is where the hybrid verification
+      # path and its evidence lifetime live, and a workspace-wide feature build costs the
+      # whole dependency graph for coverage nothing else needs yet. Widen it when a second
+      # crate grows post-quantum behaviour worth running.
+      #
+      # `--lib` is load-bearing, not a narrowing. Every `#[cfg(feature = "post-quantum")]`
+      # assertion in this crate is a unit test under `src/`; nothing in `icn-net/tests/`
+      # references the feature. Without `--lib` this step would additionally run all 23
+      # integration binaries with default (parallel) test threads, while the step above
+      # deliberately runs integration tests with `--test-threads=1` "to avoid port conflicts" —
+      # icn-net's test servers take ports from `portpicker`, which is bind-then-release and so
+      # races under parallelism. That would have added a flaky failure mode to a required
+      # check while buying no post-quantum coverage at all.
+      - name: Run post-quantum tests (icn-net)
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        run: cargo test -p icn-net --lib --features post-quantum
+        working-directory: ./icn
+
   backup-validation:
     name: Backup Validation
     needs: [changes]

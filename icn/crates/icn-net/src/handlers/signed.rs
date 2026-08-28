@@ -2,7 +2,7 @@
 //!
 //! Handles SignedEnvelope messages with:
 //! - Ed25519 signature verification
-//! - ML-DSA signature verification (for hybrid envelopes, when PQ key is cached)
+//! - ML-DSA signature verification (for hybrid envelopes, against the sender's current key)
 //! - Message age checking
 //! - Replay attack detection
 //! - Byzantine fault recording
@@ -16,7 +16,7 @@ impl ConnectionContext {
     /// Handle a Signed message envelope
     ///
     /// Performs:
-    /// 1. Signature verification (Ed25519, and ML-DSA for hybrid if PQ key cached)
+    /// 1. Signature verification (Ed25519, and ML-DSA for hybrid if a current PQ key exists)
     /// 2. Message age validation
     /// 3. Replay attack detection
     /// 4. Byzantine fault recording (on failure)
@@ -76,17 +76,39 @@ impl ConnectionContext {
             return;
         };
 
-        // Verify signature and age - use cached PQ key for hybrid envelopes
-        let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
+        // Verify signature and age - resolve the sender's current PQ key for hybrid envelopes
+        let sig_result = self.verify_with_current_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
-            warn!(
-                "Signature/age verification failed from {}: {}",
-                envelope.from, e
-            );
+            // Contradictory *local* evidence is not peer misbehaviour, exactly as a local
+            // replay-store fault is not (see the classifier below). The refused envelope's
+            // signatures may both be valid; we simply hold no unique answer to which ML-DSA
+            // key is current. Scoring it `InvalidSignature` — a `major` weight — quarantines a
+            // peer after three refusals for a state it can reach while behaving honestly,
+            // including a legitimate key rotation with a connection overlap. The refusal
+            // stands; only the attribution is dropped (#2646).
+            let contradictory_evidence = e
+                .downcast_ref::<crate::capability_evidence::ContradictoryPqEvidence>()
+                .is_some();
+
+            if contradictory_evidence {
+                warn!(
+                    "Refusing hybrid envelope from {}: {} (not scored as misbehaviour)",
+                    envelope.from, e
+                );
+            } else {
+                warn!(
+                    "Signature/age verification failed from {}: {}",
+                    envelope.from, e
+                );
+            }
 
             // Record InvalidSignature violation
-            if let Some(ref detector) = self.misbehavior_detector {
+            if let Some(detector) = self
+                .misbehavior_detector
+                .as_ref()
+                .filter(|_| !contradictory_evidence)
+            {
                 let message_hash = compute_message_hash(envelope);
 
                 let violation = icn_security::Violation::InvalidSignature {
@@ -187,7 +209,7 @@ impl ConnectionContext {
         // Signature valid, now check for replay attack
         // Use check_replay_only since we already verified the signature above
         // This avoids redundant signature verification and ensures immediate PQ
-        // verification (via verify_with_cached_pq_key) is the only path used
+        // verification (via verify_with_current_pq_key) is the only path used
         match self
             .replay_guard
             .write()
@@ -370,17 +392,34 @@ impl ConnectionContext {
     /// Using the same sequence for both avoids consuming two sequence numbers
     /// per encrypted message.
     pub async fn handle_signed_inner(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
-        // Verify signature and age - use cached PQ key for hybrid envelopes
-        let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
+        // Verify signature and age - resolve the sender's current PQ key for hybrid envelopes
+        let sig_result = self.verify_with_current_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
-            warn!(
-                "Inner envelope signature/age verification failed from {}: {}",
-                envelope.from, e
-            );
+            // Same attribution rule as `handle_signed`: our own contradictory PQ evidence is
+            // not the sender's misbehaviour (#2646).
+            let contradictory_evidence = e
+                .downcast_ref::<crate::capability_evidence::ContradictoryPqEvidence>()
+                .is_some();
+
+            if contradictory_evidence {
+                warn!(
+                    "Refusing inner hybrid envelope from {}: {} (not scored as misbehaviour)",
+                    envelope.from, e
+                );
+            } else {
+                warn!(
+                    "Inner envelope signature/age verification failed from {}: {}",
+                    envelope.from, e
+                );
+            }
 
             // Record InvalidSignature violation
-            if let Some(ref detector) = self.misbehavior_detector {
+            if let Some(detector) = self
+                .misbehavior_detector
+                .as_ref()
+                .filter(|_| !contradictory_evidence)
+            {
                 let message_hash = compute_message_hash(envelope);
 
                 let violation = icn_security::Violation::InvalidSignature {
@@ -409,38 +448,112 @@ impl ConnectionContext {
         self.forward_to_handler(message);
     }
 
-    /// Verify a signed envelope, using cached PQ public key for hybrid envelopes
+    /// Verify a signed envelope, resolving the sender's *current* ML-DSA key for hybrid ones.
     ///
-    /// For hybrid envelopes (Ed25519 + ML-DSA), this method:
-    /// 1. Looks up the sender's ML-DSA public key from peer_connections cache
-    /// 2. If found, performs full both-must-verify hybrid verification
-    /// 3. If not found, falls back to deferred verification (Ed25519 only, PQ format check)
+    /// Named `current`, not `cached`, deliberately. The predecessor was
+    /// `verify_with_cached_pq_key` and it read a cache — which is the defect, not an incidental
+    /// detail — so a name that still said "cached" would read at the call site as licence to
+    /// consult historical state again. The metric names `hybrid_verification_cache_hit` and
+    /// `cache_miss` keep the old vocabulary on purpose: renaming a Prometheus series is a
+    /// breaking observability change, and their meaning is documented where they are read.
     ///
-    /// For classical envelopes, this is equivalent to `envelope.verify()`.
-    async fn verify_with_cached_pq_key(
+    /// For classical envelopes this is exactly `envelope.verify()`.
+    ///
+    /// For hybrid envelopes (Ed25519 + ML-DSA) the key is resolved from
+    /// [`crate::capability_evidence::LiveCapabilityRegistry`], by the sender's decoded signing
+    /// key and restricted to what live authenticated connections are advertising right now
+    /// (#2646). The three outcomes are distinct because two of them must never share a branch:
+    ///
+    /// | resolution | what happens |
+    /// |---|---|
+    /// | [`CurrentPqKey::UniqueCurrentKey`] | full both-must-verify hybrid verification |
+    /// | [`CurrentPqKey::ConflictingCurrentKeys`] | refused; **never** classical-only |
+    /// | [`CurrentPqKey::NoCurrentKey`] | `envelope.verify()` — see the policy note below |
+    ///
+    /// # What this replaced, and why the shape changed
+    ///
+    /// This was `peer_connections.get(&envelope.from)` — the same textual primitive #2640
+    /// removed from `ReplayGuard` and PR #2644 removed from the sender-regime lookup a few
+    /// blocks above, left standing on the PQ path. It failed in both directions at once:
+    ///
+    /// - **The lookup missed on demand.** `Did` equality is string equality and `Did::from_str`
+    ///   accepts any multibase base, so one Ed25519 key has 23 spellings and that map holds
+    ///   whichever one the peer used in its Hello. Re-spelling a captured envelope's `from`
+    ///   made the lookup miss and dropped it into the branch below, which does not check the
+    ///   ML-DSA signature at all — a PQ downgrade selected by the sender field's *textual
+    ///   representation* rather than by policy. It costs no key material: `canonical_encoding`
+    ///   does not cover `from`, so both signatures stay byte-identical. All 22 alternates
+    ///   reproduced it.
+    /// - **A hit could be historical.** Nothing removes a row when a connection ends, and
+    ///   `restore_state` recreates rows from a snapshot at startup, so a key from a previous
+    ///   incarnation was read as current. That direction fails closed — a peer that rotated its
+    ///   ML-DSA key had its *valid* traffic refused against the abandoned bytes — but it is the
+    ///   same defect: one map asked both *which key* and *is it still true*, and it can only
+    ///   answer the second with "ever".
+    ///
+    /// # Genuine `NoCurrentKey` keeps the pre-existing fallback, deliberately and narrowly
+    ///
+    /// `envelope.verify()` on a hybrid envelope runs `verify_pq_deferred`, which checks the PQ
+    /// signature's *length* and logs a warning. Nothing verifies it later; "deferred" names no
+    /// second pass. So this branch does accept a hybrid envelope whose ML-DSA signature is
+    /// wrong.
+    ///
+    /// That is retained here because it is the migration path the hybrid rollout depends on: a
+    /// peer whose key was discarded for want of a `PqBindingProof`, or that has not yet said
+    /// Hello, is legitimately in this state, and refusing it would drop honest traffic.
+    ///
+    /// What #2646 changed about it is one specific thing, and the claim is deliberately no
+    /// wider: **this branch can no longer be selected by re-writing the sender's textual
+    /// representation.** Before, any of the 22 alternate spellings of a sender that *did* have
+    /// current PQ evidence landed here; now every accepted spelling of one signing key resolves
+    /// to the same outcome, pinned by the sweep in `pq_current_key_evidence`. Whether the
+    /// absence of evidence is reachable by other means — disrupting a peer's connections, say —
+    /// is not something this work examined or claims.
+    ///
+    /// Whether the fallback should exist at all is a separate question about the
+    /// deferred-verification contract, tracked as #2648 rather than widened into this fix.
+    async fn verify_with_current_pq_key(
         &self,
         envelope: &SignedEnvelope,
         max_age_secs: u64,
     ) -> anyhow::Result<()> {
-        // For hybrid envelopes, try to use cached PQ key for full verification
         #[cfg(feature = "post-quantum")]
         if envelope.is_hybrid() {
-            let connections = self.peer_connections.read().await;
-            if let Some(peer_info) = connections.get(&envelope.from) {
-                if let Some(ref ml_dsa_bytes) = peer_info.ml_dsa_public {
-                    // We have the sender's PQ key - perform full hybrid verification
-                    let pq_key = match icn_crypto_pq::MlDsaPublicKey::from_bytes(ml_dsa_bytes) {
+            use crate::capability_evidence::CurrentPqKey;
+
+            // Asked about the sender's *key*, not the spelling of `from` — the same
+            // equivalence class the signature check, the capability lookup and `ReplayGuard`
+            // all use, so no spelling of one key can select a different answer (#2640, #2644).
+            //
+            // A DID that names no Ed25519 key names no principal, and the fall-through is not
+            // a downgrade for it: `SenderPrincipal::from_did` and `verify_classical` both go
+            // through `Did::to_verifying_key`, so this failing means `envelope.verify()` below
+            // is *guaranteed* to fail on the classical signature. Refusing here as well would
+            // only duplicate that refusal under a less precise error.
+            let resolution = match crate::replay_guard::SenderPrincipal::from_did(&envelope.from) {
+                Ok(principal) => self.capability_registry.current_pq_key(&principal),
+                Err(_) => CurrentPqKey::NoCurrentKey,
+            };
+
+            match resolution {
+                CurrentPqKey::UniqueCurrentKey(ml_dsa_bytes) => {
+                    // Fail closed rather than fall through. Unreachable by construction — the
+                    // Hello path parses the key before claiming it, and `PqBindingProof::verify`
+                    // parses it before that — but the safe answer to "current evidence exists
+                    // and is unusable" is refusal, not classical acceptance, and a future
+                    // ingestion path must inherit that rather than the fallback.
+                    let pq_key = match icn_crypto_pq::MlDsaPublicKey::from_bytes(&ml_dsa_bytes) {
                         Ok(key) => key,
                         Err(e) => {
                             icn_obs::metrics::network::hybrid_verification_failed_inc(
                                 icn_obs::metrics::network::HybridVerificationFailure::InvalidPqKey,
                             );
-                            return Err(anyhow::anyhow!("Invalid cached ML-DSA key: {e}"));
+                            return Err(anyhow::anyhow!("Invalid current ML-DSA key: {e}"));
                         }
                     };
 
                     debug!(
-                        "Performing full hybrid verification for {} using cached PQ key",
+                        "Performing full hybrid verification for {} against its current ML-DSA key",
                         envelope.from
                     );
 
@@ -465,16 +578,51 @@ impl ConnectionContext {
                     }
                     return result;
                 }
+                CurrentPqKey::ConflictingCurrentKeys => {
+                    // Live connections for this principal advertise different keys, and the
+                    // protocol authenticates no ordering between them — no rotation counter, no
+                    // revocation, and `PqBindingProof`'s timestamp is a freshness bound the
+                    // peer chooses, not a sequence. Newest, oldest, lexical-minimum and
+                    // first-hash-entry are all a guess; the last is not even deterministic.
+                    //
+                    // So: refuse. Never the branch below — a disagreement about which key
+                    // protects this sender is not the same fact as this sender having no PQ
+                    // protection, and collapsing the two would let the strongest evidence state
+                    // produce the weakest check.
+                    //
+                    // Refusing is affordable because reaching this state requires the authority
+                    // to authenticate as the principal itself (a claim needs that principal's
+                    // Ed25519 key plus a `PqBindingProof` over the advertised key), and because
+                    // it is recoverable: closing one of the disagreeing connections restores a
+                    // unique current key.
+                    warn!(
+                        from = %envelope.from,
+                        "Refusing hybrid envelope: live connections disagree about this \
+                         sender's current ML-DSA key (#2646)"
+                    );
+                    icn_obs::metrics::network::hybrid_verification_failed_inc(
+                        icn_obs::metrics::network::HybridVerificationFailure::ConflictingPqKeys,
+                    );
+                    return Err(crate::capability_evidence::ContradictoryPqEvidence {
+                        principal: crate::replay_guard::SenderPrincipal::from_did(&envelope.from)
+                            .map(|p| p.canonical_did().to_string())
+                            .unwrap_or_else(|_| envelope.from.to_string()),
+                    }
+                    .into());
+                }
+                CurrentPqKey::NoCurrentKey => {
+                    // See the policy note on this function: retained migration behaviour,
+                    // and no longer reachable by choice of textual representation.
+                    debug!(
+                        "No current ML-DSA key for {} - using deferred hybrid verification",
+                        envelope.from
+                    );
+                    icn_obs::metrics::network::hybrid_verification_cache_miss_inc();
+                }
             }
-            // No cached PQ key - fall through to deferred verification
-            debug!(
-                "No cached PQ key for {} - using deferred hybrid verification",
-                envelope.from
-            );
-            icn_obs::metrics::network::hybrid_verification_cache_miss_inc();
         }
 
-        // Classical envelope or no cached PQ key - use standard verification
+        // Classical envelope, or a hybrid one with no current PQ key.
         envelope.verify(max_age_secs)
     }
 }
@@ -555,6 +703,7 @@ mod tests {
             peer_connections,
             capability_registry: Arc::new(crate::capability_evidence::LiveCapabilityRegistry::new()),
             durable_claim: std::sync::Mutex::new(None),
+            pq_key_claim: std::sync::Mutex::new(None),
             blob_registry: None,
             misbehavior_detector,
             identity_bundle,
@@ -881,106 +1030,60 @@ mod tests {
         assert_ne!(hash1, hash2);
     }
 
-    /// Test that hybrid envelopes are verified using cached PQ keys
+    /// A hybrid envelope is fully verified against the sender's *current* ML-DSA key.
+    ///
+    /// Rewritten for #2646. It used to seed only `peer_connections`, and after the evidence
+    /// move that row alone resolves to `NoCurrentKey` — so the test would have gone on passing
+    /// through the deferred branch, which accepts a hybrid envelope without checking its PQ
+    /// signature at all. The row is still seeded, because production writes it and a test that
+    /// stops writing it stops resembling production; the *claim* is what now decides.
     #[tokio::test]
     #[cfg(feature = "post-quantum")]
     async fn test_hybrid_verification_with_cached_pq_key() {
-        use crate::actor::PeerConnectionInfo;
-        use crate::version::CapabilityFlags;
-
         let (ctx, forward_count) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-
-        // Sender should have PQ keys (post-quantum feature enabled)
         assert!(sender.has_pq_keys(), "Sender should have PQ keys");
 
-        // Get sender's PQ public key
-        let ml_dsa_public = sender.pq_public_key().map(|pk| pk.as_bytes().to_vec());
+        let _claim = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
 
-        // Cache the sender's PQ key in peer_connections
-        {
-            let mut connections = ctx.peer_connections.write().await;
-            connections.insert(
-                sender.did().clone(),
-                PeerConnectionInfo {
-                    did: sender.did().clone(),
-                    negotiated_version: 1,
-                    peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
-                    peer_software: "test".to_string(),
-                    x25519_key: [0u8; 32],
-                    ml_dsa_public,
-                    ml_kem_public: None,
-                },
-            );
-        }
+        let envelope = pq::valid_hybrid(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
 
-        // Create a hybrid envelope
-        let envelope = SignedEnvelope::new_hybrid(
-            sender.did(),
-            &sender,
-            1,
-            PayloadType::Gossip,
-            b"test hybrid".to_vec(),
-        )
-        .expect("Failed to create hybrid envelope");
-
-        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
-
-        let message = NetworkMessage {
-            version: 1,
-            from: sender.did().clone(),
-            to: None,
-            trace_context: None,
-            payload: MessagePayload::Signed(envelope.clone()),
-        };
-
-        // Handle the signed message - should use cached PQ key for full verification
-        ctx.handle_signed(message, &envelope).await;
-
-        // Message should be forwarded (verification passed)
         assert_eq!(
             forward_count.load(Ordering::SeqCst),
             1,
             "Hybrid envelope should be forwarded after full verification"
         );
+
+        // DISCRIMINATION: the same context must reject an envelope whose ML-DSA signature is
+        // wrong. Without this the case above is satisfied by any path that accepts, including
+        // the deferred one it is meant to exclude.
+        let (ctx, forward_count) = create_test_context(None);
+        let _claim = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+        let forged = pq::hybrid_with_bad_pq_signature(&sender);
+        ctx.handle_signed(create_network_message(&forged), &forged)
+            .await;
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "an invalid ML-DSA signature must be refused when a current key exists"
+        );
     }
 
-    /// Test that hybrid envelopes fall back to deferred verification when PQ key not cached
+    /// Test that hybrid envelopes fall back to deferred verification when no key is current
     #[tokio::test]
     #[cfg(feature = "post-quantum")]
     async fn test_hybrid_verification_deferred_when_no_cached_key() {
         let (ctx, forward_count) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
-
-        // Sender should have PQ keys
         assert!(sender.has_pq_keys(), "Sender should have PQ keys");
 
-        // Do NOT cache the sender's PQ key (peer_connections empty)
+        // No claim, and no row either: nothing knows this sender's ML-DSA key.
+        let envelope = pq::valid_hybrid(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
 
-        // Create a hybrid envelope
-        let envelope = SignedEnvelope::new_hybrid(
-            sender.did(),
-            &sender,
-            1,
-            PayloadType::Gossip,
-            b"test deferred".to_vec(),
-        )
-        .expect("Failed to create hybrid envelope");
-
-        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
-
-        let message = NetworkMessage {
-            version: 1,
-            from: sender.did().clone(),
-            to: None,
-            trace_context: None,
-            payload: MessagePayload::Signed(envelope.clone()),
-        };
-
-        // Handle the signed message - should use deferred verification
-        ctx.handle_signed(message, &envelope).await;
-
-        // Message should still be forwarded (deferred verification accepts)
         assert_eq!(
             forward_count.load(Ordering::SeqCst),
             1,
@@ -988,153 +1091,56 @@ mod tests {
         );
     }
 
-    /// Test that hybrid envelopes fail verification when cached PQ key is invalid/corrupted
+    /// Malformed current ML-DSA key material fails closed rather than falling back.
     #[tokio::test]
     #[cfg(feature = "post-quantum")]
     async fn test_hybrid_verification_fails_with_invalid_cached_key() {
-        use crate::actor::PeerConnectionInfo;
-        use crate::version::CapabilityFlags;
-
-        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
-            MisbehaviorThresholds::default(),
-        )));
-        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
+        let (ctx, forward_count) = create_test_context(None);
         let sender = KeyPair::generate().unwrap();
 
-        // Sender should have PQ keys
-        assert!(sender.has_pq_keys(), "Sender should have PQ keys");
+        // ML-DSA-65 public keys are 1952 bytes; four bytes cannot parse.
+        let _claim = pq::install_live_pq(&ctx, sender.did(), &[0xDE, 0xAD, 0xBE, 0xEF]).await;
 
-        // Cache an INVALID/corrupted ML-DSA public key (wrong size/format)
-        // ML-DSA-65 public keys are 1952 bytes; this 4-byte value will fail from_bytes()
-        {
-            let mut connections = ctx.peer_connections.write().await;
-            connections.insert(
-                sender.did().clone(),
-                PeerConnectionInfo {
-                    did: sender.did().clone(),
-                    negotiated_version: 1,
-                    peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
-                    peer_software: "test".to_string(),
-                    x25519_key: [0u8; 32],
-                    ml_dsa_public: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]), // Invalid: 4 bytes vs required 1952
-                    ml_kem_public: None,
-                },
-            );
-        }
+        let envelope = pq::valid_hybrid(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
 
-        // Create a valid hybrid envelope
-        let envelope = SignedEnvelope::new_hybrid(
-            sender.did(),
-            &sender,
-            1,
-            PayloadType::Gossip,
-            b"test invalid key".to_vec(),
-        )
-        .expect("Failed to create hybrid envelope");
-
-        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
-
-        let message = NetworkMessage {
-            version: 1,
-            from: sender.did().clone(),
-            to: None,
-            trace_context: None,
-            payload: MessagePayload::Signed(envelope.clone()),
-        };
-
-        // Handle the signed message - should fail due to invalid cached key
-        ctx.handle_signed(message, &envelope).await;
-
-        // Message should NOT be forwarded (verification failed)
         assert_eq!(
             forward_count.load(Ordering::SeqCst),
             0,
-            "Hybrid envelope should NOT be forwarded when cached PQ key is invalid"
-        );
-
-        // Should record an InvalidSignature violation for Byzantine fault detection
-        let detector_guard = detector.read().await;
-        let violations = detector_guard.get_violations(sender.did());
-        assert!(
-            !violations.is_empty(),
-            "Should record a violation for invalid PQ key"
-        );
-        assert!(
-            matches!(
-                violations[0].violation,
-                icn_security::Violation::InvalidSignature { .. }
-            ),
-            "Violation should be InvalidSignature"
+            "Hybrid envelope should NOT be forwarded when the current PQ key is unusable: \
+             current-but-unusable evidence must refuse, not degrade to classical-only"
         );
     }
 
-    /// Test that hybrid envelopes fail verification when cached PQ key doesn't match sender
+    /// A current key that is not the sender's refuses the sender's own valid traffic.
     #[tokio::test]
     #[cfg(feature = "post-quantum")]
     async fn test_hybrid_verification_fails_with_wrong_cached_key() {
-        use crate::actor::PeerConnectionInfo;
-        use crate::version::CapabilityFlags;
-
         let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
             MisbehaviorThresholds::default(),
         )));
-        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
+        let (ctx, forward_count) = create_test_context(Some(Arc::clone(&detector)));
         let sender = KeyPair::generate().unwrap();
-        let other = KeyPair::generate().unwrap(); // Different keypair
+        let other = KeyPair::generate().unwrap();
+        assert_ne!(
+            pq::key_of(&sender),
+            pq::key_of(&other),
+            "CONTROL: two distinct ML-DSA keys"
+        );
 
-        // Sender should have PQ keys
-        assert!(sender.has_pq_keys(), "Sender should have PQ keys");
-        assert!(other.has_pq_keys(), "Other should have PQ keys");
+        let _claim = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&other)).await;
 
-        // Cache the WRONG peer's PQ key (other's key instead of sender's)
-        let wrong_ml_dsa_public = other.pq_public_key().map(|pk| pk.as_bytes().to_vec());
-        {
-            let mut connections = ctx.peer_connections.write().await;
-            connections.insert(
-                sender.did().clone(),
-                PeerConnectionInfo {
-                    did: sender.did().clone(),
-                    negotiated_version: 1,
-                    peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
-                    peer_software: "test".to_string(),
-                    x25519_key: [0u8; 32],
-                    ml_dsa_public: wrong_ml_dsa_public, // Wrong key!
-                    ml_kem_public: None,
-                },
-            );
-        }
+        let envelope = pq::valid_hybrid(&sender, 1);
+        ctx.handle_signed(create_network_message(&envelope), &envelope)
+            .await;
 
-        // Create a valid hybrid envelope signed by sender
-        let envelope = SignedEnvelope::new_hybrid(
-            sender.did(),
-            &sender,
-            1,
-            PayloadType::Gossip,
-            b"test wrong key".to_vec(),
-        )
-        .expect("Failed to create hybrid envelope");
-
-        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
-
-        let message = NetworkMessage {
-            version: 1,
-            from: sender.did().clone(),
-            to: None,
-            trace_context: None,
-            payload: MessagePayload::Signed(envelope.clone()),
-        };
-
-        // Handle the signed message - should fail because cached key is wrong
-        ctx.handle_signed(message, &envelope).await;
-
-        // Message should NOT be forwarded (ML-DSA signature won't verify with wrong key)
         assert_eq!(
             forward_count.load(Ordering::SeqCst),
             0,
-            "Hybrid envelope should NOT be forwarded when cached PQ key doesn't match"
+            "Hybrid envelope should NOT be forwarded when the current PQ key doesn't match"
         );
 
-        // Should record an InvalidSignature violation for Byzantine fault detection
         let detector_guard = detector.read().await;
         let violations = detector_guard.get_violations(sender.did());
         assert!(
@@ -1257,6 +1263,133 @@ mod tests {
                 .is_some(),
             "a durable-advertising peer must be on the durable establishment path: {state}"
         );
+    }
+
+    // ---------------------------------------------------------------------------------
+    // #2646 — hybrid verification runs on the sender's *current* key, not on a cache row
+    // ---------------------------------------------------------------------------------
+
+    /// Fixtures shared by the #2646 suites.
+    ///
+    /// Kept in one place because two properties have to hold across every case below and are
+    /// easy to lose one test at a time: production's `peer_connections` row is always written
+    /// alongside the claim, so no case can pass by the row having quietly gone away; and a
+    /// "bad hybrid" is always one whose *classical* signature is valid, so a refusal can only
+    /// be the PQ side refusing.
+    #[cfg(feature = "post-quantum")]
+    pub(super) mod pq {
+        use super::*;
+
+        /// A keypair's ML-DSA public key bytes.
+        pub(super) fn key_of(keypair: &KeyPair) -> Vec<u8> {
+            keypair
+                .pq_public_key()
+                .map(|pk| pk.as_bytes().to_vec())
+                .expect("the post-quantum feature gives every generated keypair an ML-DSA key")
+        }
+
+        /// An honestly signed hybrid envelope.
+        pub(super) fn valid_hybrid(sender: &KeyPair, sequence: u64) -> SignedEnvelope {
+            SignedEnvelope::new_hybrid(
+                sender.did(),
+                sender,
+                sequence,
+                PayloadType::Gossip,
+                b"honest payload".to_vec(),
+            )
+            .expect("hybrid signing")
+        }
+
+        /// A hybrid envelope whose Ed25519 signature is VALID and whose ML-DSA signature is not.
+        ///
+        /// This is the discriminator the whole suite rests on. Built by splicing one hybrid
+        /// envelope's PQ signature onto another from the same sender: `canonical_encoding`
+        /// covers `sequence || timestamp || payload_type || payload`, so the classical
+        /// signature still verifies over this envelope's own bytes while the ML-DSA signature
+        /// is over different ones. It needs no key material — the same reason the re-spelling
+        /// attack needs none.
+        ///
+        /// Both controls are asserted here rather than in each caller, because a discriminator
+        /// that stopped discriminating would turn every "must be refused" case below green for
+        /// the wrong reason.
+        pub(super) fn hybrid_with_bad_pq_signature(sender: &KeyPair) -> SignedEnvelope {
+            let decoy = valid_hybrid(sender, 1);
+            let mut forged = SignedEnvelope::new_hybrid(
+                sender.did(),
+                sender,
+                2,
+                PayloadType::Gossip,
+                b"different payload".to_vec(),
+            )
+            .expect("hybrid signing");
+            forged.pq_signature = decoy.pq_signature.clone();
+
+            assert!(forged.is_hybrid(), "CONTROL: still a hybrid envelope");
+            assert!(
+                forged.verify(3600).is_ok(),
+                "CONTROL: the classical signature must still verify and the deferred PQ format \
+                 check must still pass — otherwise a refusal below proves nothing about which \
+                 branch ran"
+            );
+            assert!(
+                icn_crypto_pq::MlDsaPublicKey::from_bytes(&key_of(sender))
+                    .map(|k| forged.verify_with_pq_key(3600, &k).is_err())
+                    .unwrap_or(false),
+                "CONTROL: full hybrid verification must reject it, or there is nothing to detect"
+            );
+            forged
+        }
+
+        /// Put a peer into the state a live authenticated connection leaves behind: the
+        /// `peer_connections` row `handle_hello` writes, *and* the lease it takes.
+        ///
+        /// Returns the lease. Holding it is what keeps the evidence current, so a caller that
+        /// drops it has modelled the connection closing — which several cases below do on
+        /// purpose.
+        #[must_use = "dropping the lease models the connection closing"]
+        pub(super) async fn install_live_pq(
+            ctx: &ConnectionContext,
+            spelling: &Did,
+            key: &[u8],
+        ) -> crate::capability_evidence::LivePqKeyClaim {
+            install_row_only(ctx, spelling, key).await;
+            ctx.capability_registry.claim_pq_key(
+                crate::replay_guard::SenderPrincipal::from_did(spelling)
+                    .expect("a key-derived DID decodes"),
+                std::sync::Arc::from(key),
+            )
+        }
+
+        /// The `peer_connections` row alone, with nothing live behind it.
+        ///
+        /// Both of the historical states `restore_state` and a closed connection leave: the row
+        /// survives, and after #2646 it must contribute nothing.
+        pub(super) async fn install_row_only(ctx: &ConnectionContext, spelling: &Did, key: &[u8]) {
+            ctx.peer_connections.write().await.insert(
+                spelling.clone(),
+                crate::actor::PeerConnectionInfo {
+                    did: spelling.clone(),
+                    negotiated_version: 1,
+                    peer_capabilities: crate::CapabilityFlags::HYBRID_SIGNATURES,
+                    peer_software: "seeded".to_string(),
+                    x25519_key: [0u8; 32],
+                    ml_dsa_public: Some(key.to_vec()),
+                    ml_kem_public: None,
+                },
+            );
+        }
+
+        /// Did the handler forward this envelope? The only externally visible difference
+        /// between "verified" and "refused".
+        pub(super) async fn forwards(
+            ctx: &ConnectionContext,
+            counter: &Arc<AtomicUsize>,
+            envelope: &SignedEnvelope,
+        ) -> bool {
+            ctx.handle_signed(create_network_message(envelope), envelope)
+                .await;
+            counter.load(Ordering::SeqCst) == 1
+        }
     }
     // ---------------------------------------------------------------------------------
     // #2644 — capability attribution runs on the sender's key, not on its spelling
@@ -2703,6 +2836,565 @@ mod tests {
                 "once the last connection is gone the key proves nothing, so this is the legacy \
                  steady state and the envelope is forwarded — the cache rows both connections \
                  wrote are still there and must not speak for them"
+            );
+        }
+    }
+
+    /// #2646 — which ML-DSA key a hybrid envelope is verified against.
+    ///
+    /// Two questions the predecessor answered with one `HashMap<Did, _>` lookup, and got wrong in
+    /// opposite directions:
+    ///
+    /// - **who is this sender** — answered by string, so any of the 22 other accepted spellings of
+    ///   one key missed the row and dropped the envelope into a branch that does not check the
+    ///   ML-DSA signature at all: a downgrade selected by textual representation, needing no
+    ///   key material.
+    /// - **is that key still what they are using** — answered "ever", because nothing removes a row
+    ///   on disconnect and `restore_state` recreates rows from a snapshot before any Hello.
+    ///
+    /// The suites below are organised by which of those two they pin, plus the branch the
+    /// predecessor had no need for at all: what to do when live connections disagree.
+    #[cfg(feature = "post-quantum")]
+    mod pq_current_key_evidence {
+        use super::*;
+
+        // -----------------------------------------------------------------------------
+        // WHO — spelling equivalence
+        // -----------------------------------------------------------------------------
+
+        /// THE #2646 REGRESSION TEST.
+        ///
+        /// One principal, one live claim, one envelope whose ML-DSA signature is invalid. Every
+        /// accepted spelling of that principal must reach the same refusal. Before the fix, the
+        /// canonical spelling refused and all 22 alternates were forwarded — the same signature
+        /// bytes, the same key, a different `from` string.
+        ///
+        /// Driven with the claim installed under the *canonical* spelling and the envelope sent
+        /// under an alias — the shape that matters, because the peer authenticated honestly and
+        /// only the captured envelope's representation of `from` was rewritten.
+        #[tokio::test]
+        async fn no_spelling_can_select_the_classical_fallback_for_a_key_with_live_evidence() {
+            assert_eq!(
+                ALTERNATE_SPELLINGS.len(),
+                22,
+                "the accepted spelling class is 22 alternates plus canonical; a smaller list here \
+                 would narrow this sweep silently"
+            );
+
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let key = pq::key_of(&sender);
+            let forged = pq::hybrid_with_bad_pq_signature(&sender);
+
+            // CONTROL: the stored spelling refuses it. If this ever forwards, every case below is
+            // vacuous — they would all be asserting a refusal the PQ path is not making.
+            let (ctx, forwarded) = create_test_context(None);
+            let _claim = pq::install_live_pq(&ctx, &canonical, &key).await;
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &forged).await,
+                "CONTROL: the canonical spelling must reach full hybrid verification and refuse"
+            );
+
+            for (label, base) in ALTERNATE_SPELLINGS {
+                let alias = alias_in(base, label, &canonical);
+                let mut respelled = forged.clone();
+                respelled.from = alias.clone();
+                assert_eq!(
+                    respelled.signature, forged.signature,
+                    "CONTROL {label}: only the representation may differ; the classical \
+                     signature bytes must be identical"
+                );
+                assert_eq!(
+                    respelled.pq_signature, forged.pq_signature,
+                    "CONTROL {label}: nor the PQ signature bytes"
+                );
+
+                let (ctx, forwarded) = create_test_context(None);
+                let _claim = pq::install_live_pq(&ctx, &canonical, &key).await;
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &respelled).await,
+                    "{label}: re-spelling `from` selected the classical-only branch for a sender \
+                     whose current ML-DSA key is known — a representation-selected PQ \
+                     downgrade (#2646)"
+                );
+            }
+        }
+
+        /// The other direction: no spelling may cost a legitimate peer its traffic either.
+        ///
+        /// A fix that refused every alternate spelling would pass the sweep above and be useless.
+        #[tokio::test]
+        async fn every_spelling_accepts_a_genuinely_valid_hybrid_envelope() {
+            let sender = KeyPair::generate().unwrap();
+            let canonical = sender.did().clone();
+            let key = pq::key_of(&sender);
+
+            for (label, base) in ALTERNATE_SPELLINGS {
+                let alias = alias_in(base, label, &canonical);
+                let mut envelope = pq::valid_hybrid(&sender, 3);
+                envelope.from = alias.clone();
+
+                let (ctx, forwarded) = create_test_context(None);
+                let _claim = pq::install_live_pq(&ctx, &canonical, &key).await;
+                assert!(
+                    pq::forwards(&ctx, &forwarded, &envelope).await,
+                    "{label}: an honest hybrid envelope must be accepted under every accepted \
+                     spelling of its own key"
+                );
+            }
+        }
+
+        /// A different Ed25519 principal cannot inherit this one's PQ evidence.
+        ///
+        /// The equivalence class has to be exactly the key: wider and one peer's evidence answers
+        /// for another.
+        #[tokio::test]
+        async fn a_different_principal_inherits_nothing() {
+            let claiming = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+
+            let (ctx, forwarded) = create_test_context(None);
+            let _claim = pq::install_live_pq(&ctx, claiming.did(), &pq::key_of(&claiming)).await;
+
+            // `other` has no evidence of its own, so it takes the documented no-key path...
+            assert!(
+                pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&other, 5)).await,
+                "a principal with no evidence of its own takes the no-current-key path"
+            );
+
+            // ...and specifically is NOT verified against `claiming`'s key, which would refuse it.
+            let (ctx, forwarded) = create_test_context(None);
+            let _claim = pq::install_live_pq(&ctx, claiming.did(), &pq::key_of(&claiming)).await;
+            assert!(
+                !pq::forwards(
+                    &ctx,
+                    &forwarded,
+                    &pq::hybrid_with_bad_pq_signature(&claiming)
+                )
+                .await,
+                "CONTROL: the claim really is installed and really does refuse a bad signature"
+            );
+        }
+
+        /// The principal derivation cannot be replaced by a `==` on the canonical spelling.
+        ///
+        /// Mutation I: `principal == SenderPrincipal::from_did(canonical)` compared textually would
+        /// pass every canonical-spelling case and fail this one.
+        #[tokio::test]
+        async fn a_claim_made_under_an_alias_answers_for_the_canonical_spelling() {
+            let sender = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", sender.did());
+
+            let (ctx, forwarded) = create_test_context(None);
+            let _claim = pq::install_live_pq(&ctx, &alias, &pq::key_of(&sender)).await;
+
+            let forged = pq::hybrid_with_bad_pq_signature(&sender);
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &forged).await,
+                "a claim installed under one spelling must answer for the canonical one too"
+            );
+        }
+
+        // -----------------------------------------------------------------------------
+        // WHETHER — evidence lifetime
+        // -----------------------------------------------------------------------------
+
+        /// A closed connection's key stops being current.
+        ///
+        /// The `peer_connections` row it wrote survives — production never removes it — so this
+        /// also pins that the row alone does not speak for the peer.
+        #[tokio::test]
+        async fn a_closed_connections_key_is_no_longer_current() {
+            let sender = KeyPair::generate().unwrap();
+            let key = pq::key_of(&sender);
+            let forged = pq::hybrid_with_bad_pq_signature(&sender);
+
+            let (ctx, forwarded) = create_test_context(None);
+            let claim = pq::install_live_pq(&ctx, sender.did(), &key).await;
+            drop(claim); // the connection ends
+
+            assert!(
+                ctx.peer_connections.read().await.contains_key(sender.did()),
+                "CONTROL: production leaves the row behind, and this test depends on that"
+            );
+            assert!(
+                pq::forwards(&ctx, &forwarded, &forged).await,
+                "an abandoned row must contribute no current evidence; this is the documented \
+                 no-current-key path, not a verification against stale bytes"
+            );
+        }
+
+        /// A snapshot-restored row is not current evidence.
+        ///
+        /// `NetworkHandle::restore_state` writes exactly this at startup, before any Hello has
+        /// happened in this process — so nothing about it was authenticated by this node.
+        ///
+        /// The observable is a peer that has rotated its ML-DSA key: under the old reading its
+        /// *valid* traffic was refused against the abandoned bytes.
+        #[tokio::test]
+        async fn a_snapshot_row_alone_is_not_current_evidence() {
+            let sender = KeyPair::generate().unwrap();
+            let previous_incarnation = KeyPair::generate().unwrap();
+
+            let (ctx, forwarded) = create_test_context(None);
+            pq::install_row_only(&ctx, sender.did(), &pq::key_of(&previous_incarnation)).await;
+
+            assert!(
+                pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 9)).await,
+                "a snapshot row must not verify a live peer against a previous incarnation's key"
+            );
+        }
+
+        /// Two live connections advertising the SAME key compose to one answer.
+        #[tokio::test]
+        async fn two_connections_advertising_one_key_agree() {
+            let sender = KeyPair::generate().unwrap();
+            let key = pq::key_of(&sender);
+            let alias = alias_in(multibase::Base::Base64, "base64", sender.did());
+
+            let (ctx, forwarded) = create_test_context(None);
+            let _first = pq::install_live_pq(&ctx, sender.did(), &key).await;
+            let _second = pq::install_live_pq(&ctx, &alias, &key).await;
+
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &pq::hybrid_with_bad_pq_signature(&sender)).await,
+                "two connections saying the same thing is agreement, not conflict"
+            );
+
+            let (ctx, forwarded) = create_test_context(None);
+            let _first = pq::install_live_pq(&ctx, sender.did(), &key).await;
+            let _second = pq::install_live_pq(&ctx, &alias, &key).await;
+            assert!(
+                pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 6)).await,
+                "and honest traffic still passes"
+            );
+        }
+
+        /// Closing one of two connections that agree does not retract the other's claim.
+        ///
+        /// Mutation F: releasing the principal's entry on the first drop rather than
+        /// reference-counting per key would let a peer cancel its own live evidence.
+        #[tokio::test]
+        async fn closing_one_of_two_agreeing_connections_keeps_the_key_current() {
+            let sender = KeyPair::generate().unwrap();
+            let key = pq::key_of(&sender);
+            let alias = alias_in(multibase::Base::Base36Lower, "base36-lower", sender.did());
+
+            let (ctx, forwarded) = create_test_context(None);
+            let first = pq::install_live_pq(&ctx, sender.did(), &key).await;
+            let _second = pq::install_live_pq(&ctx, &alias, &key).await;
+            drop(first);
+
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &pq::hybrid_with_bad_pq_signature(&sender)).await,
+                "the second connection is still advertising this key"
+            );
+        }
+
+        // -----------------------------------------------------------------------------
+        // DISAGREEMENT — the branch the predecessor never had
+        // -----------------------------------------------------------------------------
+
+        /// Live connections disagreeing about the key refuses the envelope — it never falls back.
+        ///
+        /// This is the case #2646 left open. Refusal rather than a guess, because the protocol
+        /// authenticates no ordering between two advertisements: `PqBindingProof` carries a
+        /// peer-chosen timestamp bounded for freshness, not a rotation sequence, and there is no
+        /// revocation. And refusal rather than the classical branch, because "we cannot tell which
+        /// key protects this sender" is not the same fact as "this sender has no PQ protection".
+        #[tokio::test]
+        async fn conflicting_live_keys_refuse_rather_than_verify_classically() {
+            let sender = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base16Lower, "base16-lower", sender.did());
+
+            // The envelope is honestly and fully valid under the sender's own key. Under a
+            // "fall back to classical" reading it would be forwarded; under "pick one" it would be
+            // forwarded half the time. Only refusal makes this assertion hold every run.
+            let honest = pq::valid_hybrid(&sender, 8);
+            let (ctx, forwarded) = create_test_context(None);
+            let _a = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+            let _b = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &honest).await,
+                "while live connections disagree about this sender's ML-DSA key, a hybrid envelope \
+                 must be refused — never accepted through the classical-only branch"
+            );
+        }
+
+        /// A conflict refusal is not scored against the sender.
+        ///
+        /// `ConflictingCurrentKeys` is a statement about *our* evidence, not the peer's conduct:
+        /// the refused envelope's classical and ML-DSA signatures may both be valid, and the
+        /// state is reachable while behaving honestly — a peer rotating its ML-DSA key with a
+        /// connection overlap transiently holds two live claims. Recording
+        /// `Violation::InvalidSignature` (a `major` weight) would quarantine such a peer after
+        /// three refusals, and quarantine does not lift when the conflict does, which would have
+        /// contradicted the recoverability this fail-closed design rests on.
+        ///
+        /// The CONTROL matters: an envelope that genuinely fails verification against a unique
+        /// current key must still be scored, or this test would pass on a build that simply
+        /// stopped recording violations.
+        #[tokio::test]
+        async fn a_conflict_refusal_is_not_scored_as_peer_misbehaviour() {
+            use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
+
+            let sender = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", sender.did());
+
+            // CONFLICT: two live claims disagreeing about this sender's key.
+            {
+                let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+                    MisbehaviorThresholds::default(),
+                )));
+                let (ctx, forwarded) = create_test_context(Some(Arc::clone(&detector)));
+                let _a = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                let _b = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+
+                let honest = pq::valid_hybrid(&sender, 21);
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &honest).await,
+                    "CONTROL: the conflict must still refuse the envelope"
+                );
+                for did in [sender.did(), &alias] {
+                    assert!(
+                        detector.read().await.get_violations(did).is_empty(),
+                        "a refusal caused by our own contradictory evidence is not peer \
+                         misbehaviour ({did})"
+                    );
+                }
+            }
+
+            // CONTROL: a genuine PQ signature failure against a unique current key IS scored.
+            {
+                let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+                    MisbehaviorThresholds::default(),
+                )));
+                let (ctx, forwarded) = create_test_context(Some(Arc::clone(&detector)));
+                let _a = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+
+                let forged = pq::hybrid_with_bad_pq_signature(&sender);
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &forged).await,
+                    "CONTROL: an invalid ML-DSA signature must be refused"
+                );
+                assert!(
+                    !detector
+                        .read()
+                        .await
+                        .get_violations(sender.did())
+                        .is_empty(),
+                    "CONTROL: a real signature failure must still be recorded, or this suite \
+                     would pass on a build that scored nothing at all"
+                );
+            }
+        }
+
+        /// A conflict is not a permanent state: closing the disagreeing connection restores a
+        /// unique answer, in either close order.
+        ///
+        /// This is what makes fail-closed affordable — the peer can resolve it, and only the peer
+        /// could have caused it. It also pins that `Drop` removes the *key* rather than the
+        /// principal's whole entry, which is what lets a two-key entry become a one-key entry
+        /// instead of an empty one.
+        #[tokio::test]
+        async fn closing_the_disagreeing_connection_restores_a_unique_key() {
+            let sender = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base64Url, "base64-url", sender.did());
+
+            // The disagreeing connection was installed SECOND and closes first.
+            {
+                let (ctx, forwarded) = create_test_context(None);
+                let _own = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                let disagreeing = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+                drop(disagreeing);
+                assert!(
+                    pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 20)).await,
+                    "with the disagreement gone, the surviving connection's key is unique again"
+                );
+            }
+
+            // The disagreeing connection was installed FIRST and closes first. Same outcome, so
+            // the answer does not depend on insertion order — which a first-wins or last-wins
+            // resolution would make it depend on.
+            {
+                let (ctx, forwarded) = create_test_context(None);
+                let disagreeing = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+                let _own = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                drop(disagreeing);
+                assert!(
+                    pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 20)).await,
+                    "resolution must not depend on which claim was installed first"
+                );
+            }
+
+            // And the reverse survivor: the sender's own claim closes, leaving only the key it
+            // disagreed with. That is still current evidence, so honest traffic is refused rather
+            // than falling through — the peer is now advertising a key it is not signing with.
+            {
+                let (ctx, forwarded) = create_test_context(None);
+                let own = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                let _disagreeing = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+                drop(own);
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 20)).await,
+                    "the surviving claim is current evidence and it refuses this envelope; \
+                 closing a connection must not open the classical fallback"
+                );
+            }
+
+            // Both gone: the documented no-current-key path.
+            {
+                let (ctx, forwarded) = create_test_context(None);
+                let own = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                let disagreeing = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+                drop(own);
+                drop(disagreeing);
+                assert!(
+                    pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 21)).await,
+                    "with every connection gone this is no-current-key, not a lingering conflict"
+                );
+                assert_eq!(
+                    ctx.capability_registry.pq_claimed_principals(),
+                    0,
+                    "and the conflicting entry is removed rather than kept at zero"
+                );
+            }
+        }
+
+        // -----------------------------------------------------------------------------
+        // FAIL-CLOSED ON UNUSABLE CURRENT EVIDENCE
+        // -----------------------------------------------------------------------------
+
+        /// Malformed current key bytes refuse; they do not become "no current key".
+        ///
+        /// Mutation J: silently dropping an unparseable claim would convert current-but-bad
+        /// evidence into the classical fallback.
+        #[tokio::test]
+        async fn malformed_current_key_bytes_refuse_rather_than_fall_back() {
+            let sender = KeyPair::generate().unwrap();
+
+            let (ctx, forwarded) = create_test_context(None);
+            let _claim = pq::install_live_pq(&ctx, sender.did(), b"not an ml-dsa key").await;
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 13)).await,
+                "unusable current evidence must refuse, not degrade to classical-only"
+            );
+        }
+
+        /// A malformed claim and a valid one for the same principal are a conflict, and the
+        /// survivor decides once the other closes — in both directions.
+        #[tokio::test]
+        async fn a_malformed_claim_alongside_a_valid_one_resolves_on_close() {
+            let sender = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base32Upper, "base32-upper", sender.did());
+            let good = pq::key_of(&sender);
+
+            // Both present: two distinct key values, so a conflict — refused.
+            let (ctx, forwarded) = create_test_context(None);
+            let bad_claim = pq::install_live_pq(&ctx, &alias, b"garbage").await;
+            let good_claim = pq::install_live_pq(&ctx, sender.did(), &good).await;
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 14)).await,
+                "a malformed advertisement still counts as a disagreeing claim"
+            );
+            drop(good_claim);
+            drop(bad_claim);
+
+            // Malformed one closes, valid one survives: honest traffic flows again.
+            let (ctx, forwarded) = create_test_context(None);
+            let bad_claim = pq::install_live_pq(&ctx, &alias, b"garbage").await;
+            let _good_claim = pq::install_live_pq(&ctx, sender.did(), &good).await;
+            drop(bad_claim);
+            assert!(
+                pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 15)).await,
+                "with only the usable claim left, the sender's own key decides"
+            );
+
+            // Valid one closes, malformed one survives: refuse, do not fall back.
+            let (ctx, forwarded) = create_test_context(None);
+            let _bad_claim = pq::install_live_pq(&ctx, &alias, b"garbage").await;
+            let good_claim = pq::install_live_pq(&ctx, sender.did(), &good).await;
+            drop(good_claim);
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 16)).await,
+                "with only the unusable claim left, this is current-but-bad evidence: refuse"
+            );
+        }
+
+        // -----------------------------------------------------------------------------
+        // NO-CURRENT-KEY POLICY, stated so a change to it is a test change
+        // -----------------------------------------------------------------------------
+
+        /// The documented behaviour when a sender genuinely has no live PQ evidence.
+        ///
+        /// `envelope.verify()` runs `verify_pq_deferred`, which checks the PQ signature's length
+        /// and warns; nothing verifies it afterwards. So this branch accepts a hybrid envelope
+        /// whose ML-DSA signature is wrong, and that is *retained* migration behaviour rather than
+        /// a consequence of #2646 — pinned here so it cannot change unnoticed, and so the fact that
+        /// it can no longer be selected by rewriting the sender's textual representation is
+        /// what #2646 actually fixed. The contract itself is #2648.
+        #[tokio::test]
+        async fn with_no_current_key_a_hybrid_envelope_still_takes_the_deferred_path() {
+            let sender = KeyPair::generate().unwrap();
+
+            let (ctx, forwarded) = create_test_context(None);
+            assert!(
+                pq::forwards(&ctx, &forwarded, &pq::hybrid_with_bad_pq_signature(&sender)).await,
+                "documented policy: with no current key the deferred path accepts. If this ever \
+                 changes, it is a deliberate change to the deferred-verification contract"
+            );
+        }
+
+        /// A sender DID that decodes to no Ed25519 key is refused, not fallen back to.
+        ///
+        /// The resolution treats it as `NoCurrentKey` and lets `envelope.verify()` refuse it, which
+        /// is sound only because both go through `Did::to_verifying_key`. Pinned because that is a
+        /// non-local argument.
+        #[tokio::test]
+        async fn a_sender_naming_no_signing_key_is_refused() {
+            let sender = KeyPair::generate().unwrap();
+            let mut envelope = pq::valid_hybrid(&sender, 17);
+            envelope.from = Did::from_anchor_id(&[7u8; 32]);
+
+            let (ctx, forwarded) = create_test_context(None);
+            assert!(
+                !pq::forwards(&ctx, &forwarded, &envelope).await,
+                "a `from` that names no Ed25519 key cannot carry a valid classical signature either"
+            );
+        }
+
+        // -----------------------------------------------------------------------------
+        // HOT PATH
+        // -----------------------------------------------------------------------------
+
+        /// Resolution cost does not grow with the peer population.
+        ///
+        /// The predecessor could only answer by key by walking `peer_connections`, which nothing
+        /// prunes — so a peer reconnecting under one-off DIDs made every other peer's traffic
+        /// slower, permanently. This asserts the structural property behind that: a thousand
+        /// historical rows leave the registry empty, so there is nothing to walk.
+        #[tokio::test]
+        async fn historical_rows_do_not_accumulate_in_the_evidence_index() {
+            let (ctx, _forwarded) = create_test_context(None);
+            for _ in 0..1_000 {
+                let peer = KeyPair::generate().unwrap();
+                let claim = pq::install_live_pq(&ctx, peer.did(), &pq::key_of(&peer)).await;
+                drop(claim);
+            }
+            assert_eq!(
+                ctx.peer_connections.read().await.len(),
+                1_000,
+                "CONTROL: production really does keep every row, which is why the index cannot be \
+                 that map"
+            );
+            assert_eq!(
+                ctx.capability_registry.pq_claimed_principals(),
+                0,
+                "a thousand departed peers must leave nothing for the hot path to inspect"
             );
         }
     }

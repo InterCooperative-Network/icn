@@ -231,6 +231,12 @@ impl ConnectionContext {
             validated_ml_dsa
         };
 
+        // Taken before the row below consumes it. This is the *only* value in this function
+        // that has passed every check making it this principal's key — see the claim
+        // installation further down for what those are.
+        let current_pq_key: Option<std::sync::Arc<[u8]>> =
+            validated_ml_dsa.as_deref().map(std::sync::Arc::from);
+
         {
             let has_pq_keys = validated_ml_dsa.is_some() || validated_ml_kem.is_some();
             let connection_info = PeerConnectionInfo {
@@ -282,6 +288,47 @@ impl ConnectionContext {
                 .flatten()
                 .map(|principal| self.capability_registry.claim_durable(principal));
             self.replace_durable_claim(claim);
+        }
+
+        // And what this connection proves about its peer's ML-DSA key, on the same lease
+        // (#2646).
+        //
+        // The row written above cannot carry this either, for the same two reasons and with a
+        // worse consequence. It is keyed by the *spelling* of `from`, and `Did` equality is
+        // string equality, so a captured hybrid envelope re-spelled into any of the 22 other
+        // accepted multibase bases missed the lookup entirely and was verified classically — a
+        // PQ downgrade selected by the sender field's textual representation rather than by
+        // policy, costing no key material because `SignedEnvelope`'s signed bytes do not
+        // include `from`. And
+        // nothing removes the row when the connection ends, so a key from a previous
+        // incarnation — including one `restore_state` wrote from a snapshot before any Hello —
+        // was read as though the peer were still using it.
+        //
+        // `current_pq_key` is `Some` only where all of the following already hold, which is
+        // what makes this claim safe to key by the principal rather than by the connection:
+        //
+        //   1. the three #2520 DID-TLS facts, or this function returned above;
+        //   2. `verify_pq_binding` accepted a `PqBindingProof` — an ML-DSA signature over
+        //      `DID-PQ-BINDING-V1:<did>:<ts>` — so the advertised key's *own* holder named this
+        //      DID, and an invalid proof rejected the connection rather than dropping the key;
+        //   3. `HYBRID_SIGNATURES` was negotiated;
+        //   4. the bytes parse as an ML-DSA public key;
+        //   5. `pq_binding_verified`, so a legacy peer that sent a key with no proof at all
+        //      contributes nothing.
+        //
+        // Together with (1) that is the trust rule: the ML-DSA key has no binding to the
+        // Ed25519 principal beyond *this authenticated connection asserting it*, plus the PQ
+        // side signing for the DID. Nothing off-connection — no DID document, no registry —
+        // attests it. Which is exactly why the claim's lifetime must be the connection's.
+        {
+            let claim = current_pq_key
+                .and_then(|key| {
+                    crate::replay_guard::SenderPrincipal::from_did(from)
+                        .ok()
+                        .map(|principal| (principal, key))
+                })
+                .map(|(principal, key)| self.capability_registry.claim_pq_key(principal, key));
+            self.replace_pq_key_claim(claim);
         }
 
         // Store the incoming QUIC connection in session_manager
@@ -766,6 +813,42 @@ mod binding_before_authentication {
         fn slots_held(&self) -> usize {
             self.admission.live_for(self.source)
         }
+
+        /// Deliver a Hello that advertises an ML-DSA key, with the binding proof supplied
+        /// independently of the key (#2646).
+        ///
+        /// Independent on purpose: the proof is what makes the key *this DID's*, and a case
+        /// that can only ever pass a matching pair cannot show that.
+        #[cfg(feature = "post-quantum")]
+        async fn hello_with_pq(
+            &self,
+            from: &Did,
+            binding: &BindingInfo,
+            ml_dsa_public: Option<Vec<u8>>,
+            proof: Option<PqBindingProof>,
+        ) -> Result<()> {
+            self.ctx
+                .handle_hello(
+                    &self.connection,
+                    from,
+                    binding,
+                    &Some(VersionInfo::new("icnd-test".to_string())),
+                    &None,
+                    &[0x2eu8; 32],
+                    ml_dsa_public,
+                    None,
+                    proof,
+                )
+                .await
+        }
+
+        /// What live connections currently prove about `did`'s ML-DSA key (#2646).
+        #[cfg(feature = "post-quantum")]
+        fn current_pq(&self, did: &Did) -> crate::capability_evidence::CurrentPqKey {
+            let principal = crate::replay_guard::SenderPrincipal::from_did(did)
+                .expect("a generated DID decodes to a key");
+            self.capability_registry.current_pq_key(&principal)
+        }
     }
 
     /// The invariant, stated once.
@@ -1205,6 +1288,382 @@ mod binding_before_authentication {
         assert!(
             !harness.proves_durable(peer.did()),
             "the peer's current Hello does not advertise it, so it is no longer proved"
+        );
+        Ok(())
+    }
+    // -----------------------------------------------------------------------------------
+    // #2646 — ML-DSA key evidence: installed only after authentication, released with the
+    // connection, and never accumulated.
+    // -----------------------------------------------------------------------------------
+
+    /// A Hello that fails DID-TLS verification installs no PQ evidence for the DID it named.
+    ///
+    /// The consequence if it did: a connection could name a principal it cannot authenticate
+    /// as and choose the ML-DSA key that principal's hybrid envelopes are verified against,
+    /// without ever holding that principal's Ed25519 key. Every rejection mode is driven,
+    /// because the invariant is a property of where `handle_hello` returns, not of any one
+    /// check.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn a_hello_that_fails_authentication_installs_no_pq_evidence() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let connecting = IdentityBundle::generate()?;
+        let named = IdentityBundle::generate()?;
+        let connecting_key = connecting
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec());
+        assert!(
+            connecting_key.is_some(),
+            "CONTROL: the connecting identity has a PQ key"
+        );
+
+        // (1) The binding names a DID other than the connecting identity's.
+        {
+            let harness = Harness::accept(&node, Some(&connecting)).await?;
+            let proof = PqBindingProof::create(named.did(), &connecting.keypair()?);
+            let outcome = harness
+                .hello_with_pq(
+                    named.did(),
+                    &connecting.binding_info(),
+                    connecting_key.clone(),
+                    proof,
+                )
+                .await;
+            assert!(outcome.is_err(), "CONTROL: this Hello must be rejected");
+            assert_eq!(
+                harness.current_pq(named.did()),
+                crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+                "a connection that never proved the named DID's Ed25519 key installed PQ \
+                 evidence against that principal"
+            );
+        }
+
+        // (2) A replayed binding: internally valid, but for another certificate.
+        {
+            let harness = Harness::accept(&node, Some(&connecting)).await?;
+            let proof = PqBindingProof::create(named.did(), &connecting.keypair()?);
+            let outcome = harness
+                .hello_with_pq(
+                    named.did(),
+                    &named.binding_info(),
+                    connecting_key.clone(),
+                    proof,
+                )
+                .await;
+            assert!(outcome.is_err(), "CONTROL: this Hello must be rejected");
+            assert_eq!(
+                harness.current_pq(named.did()),
+                crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+                "a replayed binding installed PQ evidence for the DID it named"
+            );
+        }
+
+        // (3) The connection presents no certificate at all.
+        {
+            let harness = Harness::accept(&node, None).await?;
+            let proof = PqBindingProof::create(named.did(), &connecting.keypair()?);
+            let outcome = harness
+                .hello_with_pq(named.did(), &named.binding_info(), connecting_key, proof)
+                .await;
+            assert!(outcome.is_err(), "CONTROL: this Hello must be rejected");
+            assert_eq!(
+                harness.current_pq(named.did()),
+                crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+                "an anonymous connection installed PQ evidence"
+            );
+        }
+        Ok(())
+    }
+
+    /// An authenticated peer whose ML-DSA key carries no binding proof installs no evidence.
+    ///
+    /// This is the legacy-node path: `verify_pq_binding` returns `Ok(false)` rather than an
+    /// error, the connection is allowed, and the key is discarded. The discard has to reach the
+    /// evidence index too — a key nobody proved control of must not decide how that peer's
+    /// hybrid envelopes are verified.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn an_unproven_ml_dsa_key_installs_no_evidence() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let key = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec());
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        harness
+            .hello_with_pq(peer.did(), &peer.binding_info(), key, None)
+            .await?;
+
+        assert_eq!(
+            harness.authenticated().await.as_ref(),
+            Some(peer.did()),
+            "CONTROL: the connection did authenticate; only the PQ key was unproven"
+        );
+        assert_eq!(
+            harness.current_pq(peer.did()),
+            crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+            "an ML-DSA key advertised without a binding proof must not become current evidence"
+        );
+        Ok(())
+    }
+
+    /// Malformed ML-DSA key material is refused at the ingestion boundary, not carried inward.
+    ///
+    /// `PqBindingProof::verify` parses the advertised key before checking the signature over
+    /// it, so a key that cannot parse cannot carry a valid proof and the *connection* is
+    /// rejected. That is the earliest boundary available, and it is why the registry never
+    /// holds unparseable bytes in production — the fail-closed branch in
+    /// `verify_with_current_pq_key` is a backstop for a future ingestion path, not a live case.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn malformed_ml_dsa_key_material_is_refused_at_the_hello_boundary() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        let proof = PqBindingProof::create(peer.did(), &peer.keypair()?);
+        assert!(proof.is_some(), "CONTROL: the peer can make a proof");
+        let outcome = harness
+            .hello_with_pq(
+                peer.did(),
+                &peer.binding_info(),
+                Some(vec![0xDEu8, 0xAD, 0xBE, 0xEF]),
+                proof,
+            )
+            .await;
+
+        assert!(
+            outcome.is_err(),
+            "a Hello advertising unparseable ML-DSA key material must be rejected"
+        );
+        assert_eq!(
+            harness.current_pq(peer.did()),
+            crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+            "and nothing may be left behind for it"
+        );
+        Ok(())
+    }
+
+    /// A properly proven key becomes current, and stays current for one connection's lifetime.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn a_proven_ml_dsa_key_becomes_the_current_key() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let key = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        harness
+            .hello_with_pq(
+                peer.did(),
+                &peer.binding_info(),
+                Some(key.clone()),
+                PqBindingProof::create(peer.did(), &peer.keypair()?),
+            )
+            .await?;
+
+        assert_eq!(
+            harness.current_pq(peer.did()),
+            crate::capability_evidence::CurrentPqKey::UniqueCurrentKey(key.as_slice().into()),
+            "a Hello that proved control of its ML-DSA key makes that key current"
+        );
+        Ok(())
+    }
+
+    /// A repeated Hello re-stating the same key does not stack a second claim.
+    ///
+    /// Stacking would make the claim outlive the connection by one release per extra Hello,
+    /// which a peer controls the number of — evidence that never expires, at the peer's
+    /// discretion.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn a_repeated_hello_does_not_stack_pq_claims() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let key = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+        let registry = {
+            let harness = Harness::accept(&node, Some(&peer)).await?;
+            for _ in 0..5 {
+                harness
+                    .hello_with_pq(
+                        peer.did(),
+                        &peer.binding_info(),
+                        Some(key.clone()),
+                        PqBindingProof::create(peer.did(), &peer.keypair()?),
+                    )
+                    .await?;
+            }
+            assert_eq!(
+                harness.current_pq(peer.did()),
+                crate::capability_evidence::CurrentPqKey::UniqueCurrentKey(key.as_slice().into()),
+                "five Hellos advertising one key are still one key, not a conflict"
+            );
+            Arc::clone(&harness.capability_registry)
+        };
+
+        // The context is gone, so the connection is gone.
+        let principal = crate::replay_guard::SenderPrincipal::from_did(peer.did())
+            .expect("a generated DID decodes");
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+            "one connection holds one claim however many Hellos it sends, so dropping it \
+             releases everything it was claiming"
+        );
+        Ok(())
+    }
+
+    /// A Hello that changes the key leaves no ghost claim for the old one.
+    ///
+    /// A stale claim surviving here would present as a *conflict* between the peer's old and
+    /// new key, which fails closed — so a peer rotating its ML-DSA key would silence itself.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn a_hello_that_changes_the_key_leaves_no_ghost() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let rotated = IdentityBundle::generate()?;
+        let first = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+        let second = rotated
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+        assert_ne!(first, second, "CONTROL: two distinct ML-DSA keys");
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        harness
+            .hello_with_pq(
+                peer.did(),
+                &peer.binding_info(),
+                Some(first),
+                PqBindingProof::create(peer.did(), &peer.keypair()?),
+            )
+            .await?;
+
+        // The same connection now advertises a different key, proven by that key's own holder.
+        harness
+            .hello_with_pq(
+                peer.did(),
+                &peer.binding_info(),
+                Some(second.clone()),
+                PqBindingProof::create(peer.did(), &rotated.keypair()?),
+            )
+            .await?;
+
+        assert_eq!(
+            harness.current_pq(peer.did()),
+            crate::capability_evidence::CurrentPqKey::UniqueCurrentKey(second.as_slice().into()),
+            "the newest Hello on this connection is the current one, and the previous key \
+             must not linger as a second, conflicting claim"
+        );
+        Ok(())
+    }
+
+    /// A peer that stops advertising a key stops having a current one.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn withdrawing_the_key_returns_the_peer_to_no_current_key() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let key = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+
+        let harness = Harness::accept(&node, Some(&peer)).await?;
+        harness
+            .hello_with_pq(
+                peer.did(),
+                &peer.binding_info(),
+                Some(key),
+                PqBindingProof::create(peer.did(), &peer.keypair()?),
+            )
+            .await?;
+        assert!(
+            matches!(
+                harness.current_pq(peer.did()),
+                crate::capability_evidence::CurrentPqKey::UniqueCurrentKey(_)
+            ),
+            "precondition: claimed"
+        );
+
+        harness.hello(peer.did(), &peer.binding_info()).await?;
+
+        assert_eq!(
+            harness.current_pq(peer.did()),
+            crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+            "the peer's current Hello advertises no ML-DSA key, so it has no current one"
+        );
+        Ok(())
+    }
+
+    /// The claim is released when the connection's context is dropped — every exit path.
+    ///
+    /// `ConnectionContext` is owned by the connection handler's own stack frame, so this is the
+    /// destructor that runs on normal close, remote close, stream EOF, transport error, handler
+    /// error and task cancellation alike. There is no release call for a future exit path to
+    /// forget.
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn the_claim_is_released_when_the_connection_ends() -> Result<()> {
+        init();
+        let node = IdentityBundle::generate()?;
+        let peer = IdentityBundle::generate()?;
+        let key = peer
+            .keypair()?
+            .pq_public_key()
+            .map(|pk| pk.as_bytes().to_vec())
+            .expect("a PQ key");
+        let principal = crate::replay_guard::SenderPrincipal::from_did(peer.did())
+            .expect("a generated DID decodes");
+
+        let registry = {
+            let harness = Harness::accept(&node, Some(&peer)).await?;
+            harness
+                .hello_with_pq(
+                    peer.did(),
+                    &peer.binding_info(),
+                    Some(key.clone()),
+                    PqBindingProof::create(peer.did(), &peer.keypair()?),
+                )
+                .await?;
+            let registry = Arc::clone(&harness.capability_registry);
+            assert_eq!(
+                registry.current_pq_key(&principal),
+                crate::capability_evidence::CurrentPqKey::UniqueCurrentKey(key.as_slice().into()),
+                "precondition: claimed while the connection is up"
+            );
+            registry
+        };
+
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            crate::capability_evidence::CurrentPqKey::NoCurrentKey,
+            "the key must stop being current the moment the connection holding it goes"
         );
         Ok(())
     }

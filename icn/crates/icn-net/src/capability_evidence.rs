@@ -1,4 +1,4 @@
-//! Live sender-capability evidence, indexed by signing key (#2644).
+//! Live sender evidence, indexed by signing key (#2644, #2646).
 //!
 //! # Why this is not a view over `peer_connections`
 //!
@@ -55,6 +55,48 @@
 //! moment a connection authenticates, so it limits how many connections a source may hold
 //! *while anonymous*, and says nothing about how many authenticated ones it may hold.
 
+//! # Two kinds of evidence, one lifetime rule
+//!
+//! Everything above is about a **boolean capability**, and its join across several live
+//! connections is `any`. [`LiveCapabilityRegistry::current_pq_key`] answers a different shape
+//! of question about the same principal — *which ML-DSA public key*, a **value** — and a value
+//! has no join that is both non-suppressible and sound (#2646).
+//!
+//! `any-that-verifies` is not suppressible, but it means "any key this principal has vouched
+//! for on a live connection", which quietly picks the permissive reading of a rotation the
+//! protocol does not authenticate: a peer that opened a new connection to move off a
+//! compromised key would still be verified against the old one. First-wins, last-wins and
+//! lexical-minimum all pick an answer out of a set the protocol never ordered.
+//!
+//! So this half does not join. It **reports the disagreement** —
+//! [`CurrentPqKey::ConflictingCurrentKeys`] — and the caller fails closed.
+//!
+//! What makes fail-closed affordable here, in a way it would not be for the capability bit, is
+//! the authority required to reach the state at all: installing a claim for a principal
+//! requires authenticating a connection with that principal's Ed25519 key (the three #2520
+//! DID-TLS checks) *and* a `PqBindingProof` signed by the advertised ML-DSA key. Both are
+//! pinned by `handlers::hello`'s authentication-ordering suite. So a principal's evidence can
+//! only be contradicted by a party already able to authenticate as that principal, and the
+//! state is recoverable — closing one of the disagreeing connections restores a unique answer.
+//!
+//! This is a statement about who can install *contradictory* evidence, not a claim that the
+//! absence of evidence is unreachable by other means; see [`CurrentPqKey::NoCurrentKey`].
+//!
+//! # Why not the key advertised on *this* connection
+//!
+//! A signed envelope's sender is not necessarily the peer at the other end of the connection it
+//! arrived on: `handlers::signed` never compares `envelope.from` to the connection's
+//! authenticated peer, so any connected peer can present an envelope signed by a third party.
+//! Resolving against the receiving connection's own Hello would then verify that envelope
+//! against the *presenting* peer's key. The index has to be node-global and keyed by the
+//! sender's principal, which is what makes the lease, rather than the connection object, the
+//! thing that carries currency.
+//!
+//! Stated this way deliberately. An earlier draft justified it with "gossip relays", which is
+//! the wrong mechanism for this workspace — `icn-gossip` re-signs at every hop, so
+//! `envelope.from` is the immediate peer in benign operation. The conclusion survives because
+//! it does not depend on relaying: it depends on `from` being unconstrained by the transport.
+
 use crate::replay_guard::SenderPrincipal;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -70,6 +112,53 @@ pub struct LiveCapabilityRegistry {
     /// synchronous destructor and cannot await. Nothing awaits while holding it — every
     /// critical section here is a hash lookup — so it cannot be held across a yield point.
     durable_claims: RwLock<HashMap<SenderPrincipal, usize>>,
+
+    /// Which ML-DSA public keys live authenticated connections are currently advertising for
+    /// each signing key.
+    ///
+    /// Same lifetime rule as `durable_claims` and the same reason for it, but the inner value
+    /// is a *set* rather than a count, because the question is which key rather than whether.
+    /// Reference-counted per distinct key so several connections advertising the same bytes
+    /// compose to one answer, and so closing one of them does not retract what the others are
+    /// still saying.
+    pq_keys: RwLock<HashMap<SenderPrincipal, PqKeyClaims>>,
+}
+
+/// The distinct ML-DSA keys currently advertised for one principal, each with a live-claim
+/// count.
+///
+/// Aggregated here, at claim time, rather than recomputed per envelope: the hot path must not
+/// pay for however many connections a peer happens to be holding.
+#[derive(Debug, Default)]
+struct PqKeyClaims {
+    /// Distinct key bytes -> how many live connections are advertising exactly those bytes.
+    /// An empty map cannot exist; the principal's entry is removed instead.
+    by_key: HashMap<Arc<[u8]>, usize>,
+}
+
+/// What live connections currently prove about one principal's ML-DSA public key.
+///
+/// Deliberately three outcomes rather than `Option<Key>`. Collapsing the third into `None`
+/// would turn "live connections disagree about this key" into "this peer has no PQ key", which
+/// is precisely the classical-only fallback a disagreement must never reach (#2646).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CurrentPqKey {
+    /// No live authenticated connection is advertising an ML-DSA key for this principal.
+    ///
+    /// A peer that has gone away, a peer that never advertised one, and a legacy peer whose key
+    /// was discarded for want of a `PqBindingProof` are all this, and are indistinguishable
+    /// from here on purpose.
+    ///
+    /// What #2646 established about this state is narrow and worth stating exactly: it can no
+    /// longer be *selected by textual representation* — every accepted spelling of one signing
+    /// key resolves identically. It is not a claim that no party can bring about the absence of
+    /// evidence by other means (disrupting the peer's connections, for instance), which this
+    /// work did not examine.
+    NoCurrentKey,
+    /// Exactly one distinct key, advertised by one or more live connections.
+    UniqueCurrentKey(Arc<[u8]>),
+    /// Live connections disagree about the bytes. Never a licence to verify classically.
+    ConflictingCurrentKeys,
 }
 
 impl LiveCapabilityRegistry {
@@ -99,6 +188,70 @@ impl LiveCapabilityRegistry {
         }
     }
 
+    /// Which ML-DSA public key, if any, live connections currently agree this principal is
+    /// using (#2646).
+    ///
+    /// Principal-local: one hash lookup for the principal, then at most two steps into a map
+    /// whose size is the number of *distinct keys its own live connections* are advertising —
+    /// one, for every peer that is not disagreeing with itself. Nothing here is proportional to
+    /// how many peers this node has ever seen, which is the property the spelling-keyed
+    /// `peer_connections` lookup this replaced could not offer once it had to answer by key.
+    pub fn current_pq_key(&self, principal: &SenderPrincipal) -> CurrentPqKey {
+        let claims = self.read_pq();
+        let Some(claims) = claims.get(principal) else {
+            return CurrentPqKey::NoCurrentKey;
+        };
+        let mut keys = claims.by_key.keys();
+        match (keys.next(), keys.next()) {
+            // Unreachable by construction — an entry with no keys is removed rather than kept —
+            // but written as the safe answer rather than as an `unreachable!`, because a panic
+            // on a protocol path is not an option and "no key" is what an empty set means.
+            (None, _) => CurrentPqKey::NoCurrentKey,
+            (Some(only), None) => CurrentPqKey::UniqueCurrentKey(Arc::clone(only)),
+            (Some(_), Some(_)) => CurrentPqKey::ConflictingCurrentKeys,
+        }
+    }
+
+    /// Record that one live authenticated connection advertises `key` for `principal`.
+    ///
+    /// Call this only from the Hello path and only after the advertised key has passed every
+    /// check that makes it *this principal's* key: the three #2520 DID-TLS facts, and a
+    /// `PqBindingProof` signed by the advertised key over this DID. Installing a claim before
+    /// those hold would let a connection name a principal it cannot authenticate as, and choose
+    /// the key that principal's traffic is verified against.
+    ///
+    /// The claim stands until the returned lease is dropped. The registry does not validate the
+    /// bytes; the ingestion boundary already refuses a key that does not parse, and this type's
+    /// job is lifetime, not format.
+    #[must_use = "the claim lasts exactly as long as this lease is held"]
+    pub fn claim_pq_key(
+        self: &Arc<Self>,
+        principal: SenderPrincipal,
+        key: Arc<[u8]>,
+    ) -> LivePqKeyClaim {
+        *self
+            .write_pq()
+            .entry(principal)
+            .or_default()
+            .by_key
+            .entry(Arc::clone(&key))
+            .or_insert(0) += 1;
+        LivePqKeyClaim {
+            registry: Arc::clone(self),
+            principal,
+            key,
+        }
+    }
+
+    /// How many principals currently have any ML-DSA claim — the PQ map's cardinality.
+    ///
+    /// Same purpose as [`Self::claimed_keys`]: lets tests assert the bound, that connections
+    /// which have gone away leave nothing behind. Not a production signal.
+    #[cfg(test)]
+    pub(crate) fn pq_claimed_principals(&self) -> usize {
+        self.read_pq().len()
+    }
+
     /// How many distinct keys are currently claimed — the map's cardinality.
     ///
     /// Exists so tests can assert the bound this type is for: that the structure does not grow
@@ -120,6 +273,20 @@ impl LiveCapabilityRegistry {
 
     fn write(&self) -> std::sync::RwLockWriteGuard<'_, HashMap<SenderPrincipal, usize>> {
         self.durable_claims
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Poisoning recovered from for the same reason as `read`: a panic elsewhere must not turn
+    /// every subsequent hybrid envelope into a panic on a protocol path.
+    fn read_pq(&self) -> std::sync::RwLockReadGuard<'_, HashMap<SenderPrincipal, PqKeyClaims>> {
+        self.pq_keys
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn write_pq(&self) -> std::sync::RwLockWriteGuard<'_, HashMap<SenderPrincipal, PqKeyClaims>> {
+        self.pq_keys
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
@@ -159,6 +326,72 @@ impl Drop for LiveCapabilityClaim {
             }
         }
     }
+}
+
+/// One connection's live claim that its authenticated principal is using this ML-DSA key.
+///
+/// Released on `Drop`, exactly like [`LiveCapabilityClaim`] and for the same reason: the
+/// connection handler owns it through its [`crate::handlers::ConnectionContext`], so normal
+/// close, remote close, stream EOF, transport error, handler error, authentication failure and
+/// task cancellation all release it without any exit path having to remember to.
+#[derive(Debug)]
+pub struct LivePqKeyClaim {
+    registry: Arc<LiveCapabilityRegistry>,
+    principal: SenderPrincipal,
+    key: Arc<[u8]>,
+}
+
+impl Drop for LivePqKeyClaim {
+    fn drop(&mut self) {
+        use std::collections::hash_map::Entry;
+
+        let mut all = self.registry.write_pq();
+        let Entry::Occupied(mut principal_entry) = all.entry(self.principal) else {
+            return;
+        };
+        if let Entry::Occupied(mut key_entry) = principal_entry
+            .get_mut()
+            .by_key
+            .entry(Arc::clone(&self.key))
+        {
+            let count = key_entry.get_mut();
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                // Removing the *key* rather than the principal is what makes a conflict
+                // resolve back to a unique answer when one of two disagreeing connections
+                // closes, instead of the principal keeping a phantom second key forever.
+                key_entry.remove();
+            }
+        }
+        if principal_entry.get().by_key.is_empty() {
+            // And removing the principal is what bounds the map by live claims, so a peer that
+            // has gone away leaves nothing to be read as current.
+            principal_entry.remove();
+        }
+    }
+}
+
+/// This node holds contradictory current evidence about one principal's ML-DSA key, so it
+/// refused a hybrid envelope rather than guessing which key to verify against (#2646).
+///
+/// Typed, and distinguished from a signature failure at the call site, because it is a
+/// statement about **our** evidence rather than about the sender's conduct. The classical and
+/// ML-DSA signatures on the refused envelope may both be perfectly valid; what is missing is a
+/// unique answer to which key is current. Scoring it as `Violation::InvalidSignature` — a
+/// `major` weight — quarantines a peer after three refusals for a state it can be in while
+/// behaving honestly, most obviously while rotating its ML-DSA key with a connection overlap.
+/// That is the same false-positive class the local-fault classifier in `handlers::signed`
+/// exists to prevent, and this joins it rather than inventing a second rule.
+///
+/// Refusing is still correct; only the attribution was wrong.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "live connections disagree about the current ML-DSA key for {principal}; refusing this \
+     hybrid envelope rather than verifying it classically"
+)]
+pub struct ContradictoryPqEvidence {
+    /// The signing principal whose current key could not be resolved, canonically spelled.
+    pub principal: String,
 }
 
 #[cfg(test)]
@@ -289,5 +522,222 @@ mod tests {
             0,
             "a thousand one-off authenticated DIDs must cost nothing once they are gone"
         );
+    }
+    // -----------------------------------------------------------------------------------
+    // #2646 — ML-DSA key claims. A value, not a bit, so the resolution has a third outcome.
+    // -----------------------------------------------------------------------------------
+
+    fn key(byte: u8) -> Arc<[u8]> {
+        Arc::from(vec![byte; 32].as_slice())
+    }
+
+    #[test]
+    fn an_unclaimed_principal_has_no_current_pq_key() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        assert_eq!(
+            registry.current_pq_key(&principal_of(&peer)),
+            CurrentPqKey::NoCurrentKey
+        );
+        assert_eq!(registry.pq_claimed_principals(), 0);
+    }
+
+    #[test]
+    fn a_held_pq_claim_is_the_current_key_and_a_dropped_one_is_not() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        let claim = registry.claim_pq_key(principal, key(1));
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::UniqueCurrentKey(key(1))
+        );
+
+        drop(claim);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::NoCurrentKey,
+            "a key outliving the connection advertising it is the second half of #2646"
+        );
+        assert_eq!(
+            registry.pq_claimed_principals(),
+            0,
+            "and the entry must go, or the index grows with every peer ever seen"
+        );
+    }
+
+    /// Two connections advertising the same bytes are one answer, and the last one out
+    /// releases it.
+    #[test]
+    fn same_key_claims_reference_count() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        let first = registry.claim_pq_key(principal, key(1));
+        let second = registry.claim_pq_key(principal, key(1));
+        assert_eq!(
+            registry.pq_claimed_principals(),
+            1,
+            "one principal, not one entry per claim"
+        );
+
+        drop(first);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::UniqueCurrentKey(key(1)),
+            "the second connection is still advertising it; dropping on the first would let a \
+             peer cancel its own live evidence by closing an unrelated connection"
+        );
+        drop(second);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::NoCurrentKey
+        );
+    }
+
+    /// Different bytes are a disagreement, and a disagreement is its own answer.
+    ///
+    /// Never `NoCurrentKey`: the caller's fallback for that is classical-only verification, and
+    /// "we cannot tell which key protects this sender" must not select the weakest check.
+    #[test]
+    fn different_keys_for_one_principal_are_a_conflict() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        let _a = registry.claim_pq_key(principal, key(1));
+        let _b = registry.claim_pq_key(principal, key(2));
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::ConflictingCurrentKeys
+        );
+    }
+
+    /// A conflict resolves when the disagreeing claim goes, whichever it was.
+    ///
+    /// Pins that `Drop` removes the *key* rather than the principal's entry: removing the
+    /// entry would take the survivor with it, and keeping the key would make the conflict
+    /// permanent.
+    #[test]
+    fn a_conflict_resolves_to_whichever_claim_survives() {
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        for (survivor, dropped) in [(1u8, 2u8), (2u8, 1u8)] {
+            let registry = Arc::new(LiveCapabilityRegistry::new());
+            let kept = registry.claim_pq_key(principal, key(survivor));
+            let going = registry.claim_pq_key(principal, key(dropped));
+            assert_eq!(
+                registry.current_pq_key(&principal),
+                CurrentPqKey::ConflictingCurrentKeys
+            );
+
+            drop(going);
+            assert_eq!(
+                registry.current_pq_key(&principal),
+                CurrentPqKey::UniqueCurrentKey(key(survivor)),
+                "closing the disagreeing connection must leave the survivor's key unique"
+            );
+            drop(kept);
+            assert_eq!(registry.pq_claimed_principals(), 0);
+        }
+    }
+
+    /// Three-way: two of one key and one of another is still a conflict until the odd one out
+    /// goes, and dropping only one of the pair does not resolve it.
+    #[test]
+    fn a_conflict_needs_every_disagreeing_claim_gone() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        let a1 = registry.claim_pq_key(principal, key(1));
+        let _a2 = registry.claim_pq_key(principal, key(1));
+        let b = registry.claim_pq_key(principal, key(2));
+
+        drop(a1);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::ConflictingCurrentKeys,
+            "one of the two agreeing claims going does not end the disagreement"
+        );
+        drop(b);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::UniqueCurrentKey(key(1))
+        );
+    }
+
+    /// Claims made under different spellings of one key are claims about one principal.
+    #[test]
+    fn pq_claims_are_indexed_by_key_not_by_spelling() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let canonical = principal_of(&peer);
+        let aliased = SenderPrincipal::from_did(&alias_of(peer.did())).expect("alias decodes");
+        assert_eq!(canonical, aliased, "CONTROL: one principal, two spellings");
+
+        let _under_alias = registry.claim_pq_key(aliased, key(3));
+        assert_eq!(
+            registry.current_pq_key(&canonical),
+            CurrentPqKey::UniqueCurrentKey(key(3)),
+            "a claim made under one spelling answers for the key, not for the string — this is \
+             the lookup #2646 is about"
+        );
+    }
+
+    /// One principal's key says nothing about another's.
+    #[test]
+    fn a_pq_claim_does_not_bleed_to_another_principal() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let claiming = KeyPair::generate().unwrap();
+        let other = KeyPair::generate().unwrap();
+
+        let _claim = registry.claim_pq_key(principal_of(&claiming), key(4));
+        assert_eq!(
+            registry.current_pq_key(&principal_of(&other)),
+            CurrentPqKey::NoCurrentKey
+        );
+    }
+
+    /// The two evidence kinds are independent: one does not imply or suppress the other.
+    #[test]
+    fn durable_and_pq_evidence_are_independent() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        let peer = KeyPair::generate().unwrap();
+        let principal = principal_of(&peer);
+
+        let durable = registry.claim_durable(principal);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::NoCurrentKey,
+            "claiming a durable sequence says nothing about an ML-DSA key"
+        );
+
+        let pq = registry.claim_pq_key(principal, key(5));
+        assert!(registry.proves_durable_signing_sequence(&principal));
+        drop(durable);
+        assert_eq!(
+            registry.current_pq_key(&principal),
+            CurrentPqKey::UniqueCurrentKey(key(5)),
+            "and releasing one must not release the other"
+        );
+        drop(pq);
+        assert!(!registry.proves_durable_signing_sequence(&principal));
+    }
+
+    /// The bound: peers that have gone away leave nothing for the hot path to walk.
+    #[test]
+    fn churning_peers_leave_no_pq_residue() {
+        let registry = Arc::new(LiveCapabilityRegistry::new());
+        for _ in 0..1_000 {
+            let peer = KeyPair::generate().unwrap();
+            let claim = registry.claim_pq_key(principal_of(&peer), key(6));
+            assert_eq!(registry.pq_claimed_principals(), 1);
+            drop(claim);
+        }
+        assert_eq!(registry.pq_claimed_principals(), 0);
     }
 }
