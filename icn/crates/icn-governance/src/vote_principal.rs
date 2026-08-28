@@ -114,8 +114,13 @@ pub fn effective_votes(votes: &[Vote]) -> Result<Vec<&Vote>, GovernanceError> {
 /// stored rows for that principal conflict with one another, so neither
 /// admission nor lookup silently picks one of two conflicting historical acts.
 ///
-/// Only rows for this principal are inspected: a conflicting pair belonging to
-/// some *other* voter must not block this voter from acting.
+/// A conflicting pair belonging to some *other* voter does not block this voter
+/// from acting: conflicts are only ever reported within one principal.
+///
+/// Every row is still decoded, because a row's principal cannot be compared
+/// without decoding it. A row whose voter DID does not decode therefore fails
+/// this lookup closed whoever it belongs to — an unidentifiable voter cannot be
+/// ruled out as being this principal, so it cannot be safely skipped.
 pub fn prior_act_for<'a>(
     votes: &'a [Vote],
     voter: &Did,

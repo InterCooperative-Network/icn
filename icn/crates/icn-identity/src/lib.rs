@@ -265,10 +265,15 @@ impl Did {
     /// This is an accessor only: it does not canonicalize the DID and does not
     /// change how `Did` compares or hashes.
     pub fn identifier_bytes(&self) -> Result<[u8; 32]> {
+        // Validate the prefix rather than assuming it. Every `Did` reaching here
+        // through `from_str` or `Deserialize` has been checked, but
+        // `new_unchecked` bypasses that, and decoding whatever follows the first
+        // eight characters of some other scheme would hand back bytes that name
+        // no ICN principal.
         let encoded_part = self
             .0
-            .get(8..)
-            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: too short"))?;
+            .strip_prefix("did:icn:")
+            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: must start with 'did:icn:'"))?;
 
         if encoded_part.is_empty() {
             anyhow::bail!("Invalid DID format: empty identifier after prefix");
@@ -660,6 +665,21 @@ mod tests {
             anchor.identifier_bytes().unwrap(),
             [2u8; 32],
             "identifier bytes must still resolve"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_reject_a_did_of_another_method() {
+        // `new_unchecked` bypasses prefix validation. Slicing a fixed eight
+        // characters off some other scheme would decode bytes that name no ICN
+        // principal, so the accessor must refuse rather than invent one.
+        let kp = KeyPair::generate().unwrap();
+        let suffix = kp.did().as_str().strip_prefix("did:icn:").unwrap();
+        let foreign = Did::new_unchecked(format!("did:key:{suffix}"));
+
+        assert!(
+            foreign.identifier_bytes().is_err(),
+            "a non-icn DID method must not resolve to an ICN principal"
         );
     }
 
