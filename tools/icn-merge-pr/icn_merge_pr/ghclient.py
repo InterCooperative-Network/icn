@@ -297,13 +297,21 @@ class GhCli:
     def review_threads_page(self, owner: str, name: str, number: int, after: str | None) -> dict:
         repo = self._graphql(_THREADS, {"owner": owner, "name": name, "number": number,
                                         "after": after})
-        return _dig(repo, "pullRequest", "reviewThreads")
+        return self._page(_dig(repo, "pullRequest", "reviewThreads"), "review threads")
+
+    @staticmethod
+    def _page(value, label: str) -> dict:
+        """One connection page, established as an object. `_dig` does not type-check its result."""
+        if not isinstance(value, dict):
+            raise EvidenceUnavailable(f"{label} returned a page that is not an object ({value!r})")
+        return value
 
     def opinionated_reviews_page(self, owner: str, name: str, number: int,
                                  after: str | None) -> dict:
         repo = self._graphql(_REVIEWS, {"owner": owner, "name": name, "number": number,
                                         "after": after})
-        return _dig(repo, "pullRequest", "latestOpinionatedReviews")
+        return self._page(_dig(repo, "pullRequest", "latestOpinionatedReviews"),
+                          "opinionated reviews")
 
     def check_contexts_page(self, owner: str, name: str, number: int, after: str | None) -> dict:
         repo = self._graphql(_CHECKS, {"owner": owner, "name": name, "number": number,
@@ -320,7 +328,8 @@ class GhCli:
             # No rollup at all. Not "no required checks" — it is no evidence about them.
             raise EvidenceUnavailable(
                 f"head commit {commit.get('oid')} has no status check rollup")
-        return {"head_oid": commit.get("oid"), **_dig(rollup, "contexts")}
+        return {"head_oid": commit.get("oid"),
+                **self._page(_dig(rollup, "contexts"), "the status check rollup")}
 
     def branch_protection(self, owner: str, name: str, branch: str) -> dict:
         """Live required-check configuration for the branch actually being merged into.
@@ -380,7 +389,10 @@ class GhCli:
                 # null and -1 are GitHub's documented "any producer". Everything else must be a
                 # real app id: mapping an unreadable value like "15368" to None would silently
                 # UNBIND the check, and an unbound check accepts a green run from any source.
-                if app is None or app == -1:
+                # `-1.0 == -1` is True, so a float would have satisfied the unbound sentinel and
+                # silently removed a producer binding. The sentinel is an integer or it is not the
+                # sentinel.
+                if app is None or (type(app) is int and app == -1):
                     binding = None
                 elif type(app) is int and app > 0:
                     binding = app

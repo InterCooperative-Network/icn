@@ -1493,6 +1493,38 @@ check("readable merge-method metadata is carried through exactly",
       not isinstance(good, str) and good["merge_allowed"] is False
       and good["squash_allowed"] is True and good["rebase_allowed"] is True, f"{good}")
 
+print("the unbound-producer sentinel is an integer, and pages are objects")
+for bad in (-1.0, "-1", True):
+    got = read_protection({"checks": [{"context": "Build Release", "app_id": bad}],
+                           "strict": True})
+    check(f"an unbound sentinel of {bad!r} is unreadable, not unbound", isinstance(got, str),
+          f"got {got}")
+sentinel = read_protection({"checks": [{"context": "Build Release", "app_id": -1}],
+                            "strict": True})
+check("an integer -1 still means any producer",
+      not isinstance(sentinel, str)
+      and sentinel["required_bindings"] == {"Build Release": None}, f"{sentinel}")
+
+_pg = GhCli()
+for label, method, envelope in (
+    ("review threads", "review_threads_page", lambda s: {"pullRequest": {"reviewThreads": s}}),
+    ("opinionated reviews", "opinionated_reviews_page",
+     lambda s: {"pullRequest": {"latestOpinionatedReviews": s}}),
+    ("the check rollup", "check_contexts_page",
+     lambda s: {"pullRequest": {"commits": {"nodes": [
+         {"commit": {"oid": "a" * 40, "statusCheckRollup": {"contexts": s}}}]}}}),
+):
+    for shape in ([], "page", 7):
+        _pg._graphql = lambda q, v, s=shape, f=envelope: f(s)
+        try:
+            getattr(_pg, method)("o", "n", 1, None)
+            got = "UNREACHED"
+        except EvidenceUnavailable:
+            got = "refused"
+        except Exception as exc:                              # noqa: BLE001 — that is the point
+            got = f"raised {type(exc).__name__}"
+        check(f"a {label} page of {shape!r} refuses instead of raising", got == "refused", got)
+
 print("a server error is not a decision")
 from icn_merge_pr.ghclient import definitive_http_failure          # noqa: E402
 for detail, definitive in (("gh: Method Not Allowed (HTTP 405)", True),
