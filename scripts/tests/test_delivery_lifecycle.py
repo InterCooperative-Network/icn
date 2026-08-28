@@ -14,6 +14,7 @@ exit status of the real gate — a prose check has grammar to get wrong, and thi
 already shipped one that did (icn#2651).
 """
 
+import ast
 import json
 import pathlib
 import re
@@ -23,7 +24,6 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts"))
 
 import importlib.util
 
@@ -620,6 +620,49 @@ with tempfile.TemporaryDirectory() as raw:
     proc = run_gate(weakened)
     check("a policy edited to let a push reset review fails the gate",
           proc.returncode == 1 and "push_resets_generation" in proc.stdout, proc.stdout[-300:])
+
+
+# ---------------------------------------------------------------------------------------------
+print("the mechanical follow-ups from icn#2663 stay fixed")
+
+# The template told authors how many lines they write. It said two, above three bullets. Counted
+# rather than read, so the sentence cannot drift from the section again.
+NUMBER_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five"}
+template = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+delivery_section = template.split("## Delivery", 1)[1].split("\n## ", 1)[0]
+human_bullets = [ln for ln in delivery_section.splitlines() if ln.startswith("- **")]
+check("the template's stated human-line count matches its bullets",
+      f"{NUMBER_WORDS[len(human_bullets)]} lines a human writes" in delivery_section,
+      f"{len(human_bullets)} bullets, section says otherwise")
+
+# The gate is loaded through importlib, so putting scripts/ on sys.path did nothing except add a
+# global side effect to the test process.
+# Detected as code, not as text: a substring search matches this control's own source.
+own_tree = ast.parse(pathlib.Path(__file__).read_text(encoding="utf-8"))
+path_writes = [n for n in ast.walk(own_tree)
+               if isinstance(n, ast.Attribute) and n.attr in ("insert", "append", "extend")
+               and isinstance(n.value, ast.Attribute) and n.value.attr == "path"
+               and isinstance(n.value.value, ast.Name) and n.value.value.id == "sys"]
+check("this test does not mutate the interpreter's import path", not path_writes,
+      f"{len(path_writes)} sys.path write(s) remain")
+
+# A guard the guarded party can remove is not a guard: validating exit_to_fixing_requires only
+# when the transition existed meant deleting the transition passed silently.
+no_way_back = json.loads(json.dumps(DELIVERY))
+for st in no_way_back["lifecycle"]["states"]:
+    if st["name"] == "FROZEN":
+        st["exits_to"] = ["MERGING"]
+        st.pop("exit_to_fixing_requires", None)
+rejects("a FROZEN state with no way back to FIXING is rejected", no_way_back,
+        "must be able to exit to FIXING")
+
+# Two entries for one disposition give a consumer two sets of instructions, and which it applies
+# depends on how it iterates.
+doubled = json.loads(json.dumps(DELIVERY))
+first = json.loads(json.dumps(doubled["finding_dispositions"][0]))
+first["action"] = "Something else entirely."
+doubled["finding_dispositions"].append(first)
+rejects("a duplicate finding disposition is rejected", doubled, "declared twice")
 
 
 # ---------------------------------------------------------------------------------------------

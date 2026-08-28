@@ -2,7 +2,7 @@
 
 ## Delivery
 
-Two lines a human writes; the rest an agent keeps current. Semantics are owned by
+Three lines a human writes; the rest an agent keeps current. Semantics are owned by
 [`ops/state/truth/delivery.json`](../ops/state/truth/delivery.json) — lane definitions, what the
 states mean, and when comprehensive review ends.
 
