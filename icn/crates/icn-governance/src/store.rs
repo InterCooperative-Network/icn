@@ -6,6 +6,7 @@
 //! Poisoned locks indicate a prior panic and possibly corrupt state.
 //! Silent recovery would risk data integrity issues.
 
+use crate::vote_principal::{prior_act_for, VotingPrincipal};
 use crate::{
     Delegation, DelegationId, DelegationScope, GovernanceDomain, GovernanceDomainId, Proposal,
     ProposalId, Timestamp, Vote, VoteTally,
@@ -270,9 +271,23 @@ impl GovernanceStore for InMemoryGovernanceStore {
         })?;
         let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_default();
 
-        // Replace existing vote from same voter (allow vote changes)
-        proposal_votes.retain(|v| v.voter != vote.voter);
-        proposal_votes.push(vote.clone());
+        // A voter is a cryptographic principal, not a DID spelling (#2641).
+        // Fail closed if this principal already has conflicting stored acts:
+        // superseding them would destroy the evidence of a duplicate-vote
+        // breach and silently pick a winner.
+        prior_act_for(proposal_votes, &vote.voter)?;
+
+        // Replace any existing vote from the same principal (allow vote
+        // changes), including rows written under a different DID spelling.
+        let principal = VotingPrincipal::of(&vote.voter)?;
+        let mut kept = Vec::with_capacity(proposal_votes.len() + 1);
+        for existing in proposal_votes.iter() {
+            if VotingPrincipal::of(&existing.voter)? != principal {
+                kept.push(existing.clone());
+            }
+        }
+        kept.push(vote.clone());
+        *proposal_votes = kept;
 
         Ok(())
     }
@@ -282,9 +297,12 @@ impl GovernanceStore for InMemoryGovernanceStore {
             error!("Votes lock poisoned in get_vote: {e}");
             anyhow::anyhow!("Lock poisoned in get_vote - store may contain corrupt state")
         })?;
-        Ok(votes
-            .get(&proposal_id.0)
-            .and_then(|v| v.iter().find(|vote| vote.voter == *voter).cloned()))
+        // Look up by cryptographic principal so any accepted spelling of the
+        // voter's DID finds the row (#2641).
+        match votes.get(&proposal_id.0) {
+            Some(rows) => Ok(prior_act_for(rows, voter)?.cloned()),
+            None => Ok(None),
+        }
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
@@ -297,7 +315,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
 
     fn compute_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.list_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One cryptographic voter contributes at most one effective vote,
+        // whatever spelling named it; conflicting historical rows fail
+        // closed rather than being resolved by storage order (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     // === Delegation Methods ===
@@ -400,6 +421,18 @@ impl SledGovernanceStore {
     /// Create a new Sled-based governance store
     pub fn new(db: sled::Db) -> Self {
         Self { db }
+    }
+
+    /// Read the row stored under exactly this DID spelling.
+    ///
+    /// Spelling-exact by design: it is the raw row accessor `list_votes` walks
+    /// the index with. Principal-level resolution belongs to `get_vote`.
+    fn read_vote_row(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
+        let key = Self::vote_key(proposal_id, voter);
+        match self.db.get(&key)? {
+            Some(data) => Ok(Some(serde_json::from_slice(&data)?)),
+            None => Ok(None),
+        }
     }
 
     fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
@@ -597,34 +630,61 @@ impl GovernanceStore for SledGovernanceStore {
     }
 
     fn store_vote(&self, vote: &Vote) -> Result<()> {
-        let key = Self::vote_key(&vote.proposal_id, &vote.voter);
-        let value = serde_json::to_vec(vote)?;
-        self.db.insert(&key, value)?;
+        // A voter is a cryptographic principal, not a DID spelling (#2641).
+        let principal = VotingPrincipal::of(&vote.voter)?;
 
-        // Update index
+        // Fail closed if this principal already has conflicting stored acts:
+        // superseding them would destroy the evidence of a duplicate-vote
+        // breach and silently pick which historical act won.
+        let existing = self.list_votes(&vote.proposal_id)?;
+        prior_act_for(&existing, &vote.voter)?;
+
         let index_key = Self::vote_index_key(&vote.proposal_id);
-        let mut voter_dids: Vec<String> = self
+        let voter_dids: Vec<String> = self
             .db
             .get(&index_key)?
             .map(|v| serde_json::from_slice(&v).unwrap_or_default())
             .unwrap_or_default();
 
         let voter_str = vote.voter.to_string();
-        if !voter_dids.contains(&voter_str) {
-            voter_dids.push(voter_str);
-            self.db
-                .insert(&index_key, serde_json::to_vec(&voter_dids)?)?;
+
+        // Drop any row this same principal previously wrote under a different
+        // DID spelling, so one principal never retains more than one act.
+        let mut retained: Vec<String> = Vec::with_capacity(voter_dids.len() + 1);
+        for spelling in voter_dids {
+            if spelling == voter_str {
+                continue; // re-added below, keeping index entries unique
+            }
+            let alias = match spelling.parse::<Did>() {
+                Ok(did) => match VotingPrincipal::of(&did) {
+                    Ok(other) if other == principal => Some(did),
+                    _ => None,
+                },
+                Err(_) => None,
+            };
+            match alias {
+                Some(did) => {
+                    self.db.remove(Self::vote_key(&vote.proposal_id, &did))?;
+                }
+                None => retained.push(spelling),
+            }
         }
+        retained.push(voter_str);
+
+        self.db.insert(
+            &Self::vote_key(&vote.proposal_id, &vote.voter),
+            serde_json::to_vec(vote)?,
+        )?;
+        self.db.insert(&index_key, serde_json::to_vec(&retained)?)?;
 
         Ok(())
     }
 
     fn get_vote(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
-        let key = Self::vote_key(proposal_id, voter);
-        match self.db.get(&key)? {
-            Some(data) => Ok(Some(serde_json::from_slice(&data)?)),
-            None => Ok(None),
-        }
+        // Look up by cryptographic principal so any accepted spelling of the
+        // voter's DID finds the row, and conflicting rows fail closed (#2641).
+        let votes = self.list_votes(proposal_id)?;
+        Ok(prior_act_for(&votes, voter)?.cloned())
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
@@ -637,8 +697,8 @@ impl GovernanceStore for SledGovernanceStore {
 
         let mut votes = Vec::new();
         for voter_str in voter_dids {
-            if let Ok(voter_did) = voter_str.parse() {
-                if let Some(vote) = self.get_vote(proposal_id, &voter_did)? {
+            if let Ok(voter_did) = voter_str.parse::<Did>() {
+                if let Some(vote) = self.read_vote_row(proposal_id, &voter_did)? {
                     votes.push(vote);
                 }
             }
@@ -649,7 +709,10 @@ impl GovernanceStore for SledGovernanceStore {
 
     fn compute_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.list_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One cryptographic voter contributes at most one effective vote,
+        // whatever spelling named it; conflicting historical rows fail
+        // closed rather than being resolved by storage order (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     // === Delegation Methods ===

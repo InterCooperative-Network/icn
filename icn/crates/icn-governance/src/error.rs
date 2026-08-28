@@ -32,6 +32,14 @@ pub enum GovernanceError {
     #[error("already voted on proposal: {0}")]
     AlreadyVoted(String),
 
+    /// Voter DID does not decode to a cryptographic principal
+    #[error("invalid voter: {0}")]
+    InvalidVoter(String),
+
+    /// One voting principal has conflicting stored acts on a proposal
+    #[error("conflicting vote records: {0}")]
+    ConflictingVoteRecords(String),
+
     /// Proposal not open for voting
     #[error("proposal not open for voting: {0}")]
     ProposalNotOpen(String),

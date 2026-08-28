@@ -250,6 +250,39 @@ impl Did {
         &self.0
     }
 
+    /// Decode the 32 identifier bytes this DID names.
+    ///
+    /// A `did:icn:` identifier is a multibase encoding of 32 bytes, and the
+    /// same bytes have many accepted spellings (base58btc, base16, base32,
+    /// ...). This returns the bytes themselves, so callers that must treat one
+    /// principal as one principal can compare identity rather than spelling
+    /// (see #2641).
+    ///
+    /// Unlike [`Did::to_verifying_key`] this does not require the bytes to be a
+    /// valid Ed25519 point, so it also resolves anchor-derived DIDs built by
+    /// [`Did::from_anchor_id`].
+    ///
+    /// This is an accessor only: it does not canonicalize the DID and does not
+    /// change how `Did` compares or hashes.
+    pub fn identifier_bytes(&self) -> Result<[u8; 32]> {
+        let encoded_part = self
+            .0
+            .get(8..)
+            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: too short"))?;
+
+        if encoded_part.is_empty() {
+            anyhow::bail!("Invalid DID format: empty identifier after prefix");
+        }
+
+        let (_base, decoded_bytes) = multibase::decode(encoded_part)
+            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
+
+        decoded_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid DID: identifier is not 32 bytes"))
+    }
+
     /// Extract the Ed25519 verifying key from this DID
     ///
     /// This decodes the DID's multibase-encoded public key and returns

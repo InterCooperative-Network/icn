@@ -81,6 +81,7 @@ pub mod store;
 pub mod tally;
 pub mod verify;
 pub mod vote;
+pub mod vote_principal;
 
 // Action items for meeting/task tracking
 pub mod action_item;
@@ -177,6 +178,7 @@ pub use tally::{
     VoteTally,
 };
 pub use vote::{Vote, VoteChoice};
+pub use vote_principal::{effective_votes, ensure_has_not_voted, prior_act_for, VotingPrincipal};
 
 // Protocol governance types (Phase 20)
 pub use protocol::{
