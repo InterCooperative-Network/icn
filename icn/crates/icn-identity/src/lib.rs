@@ -619,6 +619,60 @@ mod tests {
     }
 
     #[test]
+    fn identifier_bytes_are_equal_across_multibase_spellings() {
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let bytes = canonical.identifier_bytes().unwrap();
+
+        // Same key, spelled base16 instead of base58btc.
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+
+        assert_ne!(
+            canonical.as_str(),
+            alias.as_str(),
+            "the two spellings must differ, or this proves nothing"
+        );
+        assert_eq!(
+            canonical.identifier_bytes().unwrap(),
+            alias.identifier_bytes().unwrap(),
+            "one key must have one identifier whatever spelling names it"
+        );
+        assert_eq!(
+            bytes,
+            kp.verifying_key().to_bytes(),
+            "for a validated DID the identifier bytes are the public key"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_resolve_anchor_derived_dids_that_are_not_ed25519_points() {
+        // `from_anchor_id` bypasses validation, so its 32 bytes need not
+        // decompress to an Edwards point. Callers keying on identity must still
+        // be able to resolve it.
+        // Roughly half of arbitrary 32-byte values decompress; [2u8; 32] does not.
+        let anchor = Did::from_anchor_id(&[2u8; 32]);
+
+        assert!(
+            anchor.to_verifying_key().is_err(),
+            "control: this anchor id is not a valid Ed25519 point"
+        );
+        assert_eq!(
+            anchor.identifier_bytes().unwrap(),
+            [2u8; 32],
+            "identifier bytes must still resolve"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_reject_a_non_32_byte_identifier() {
+        let short = Did::new_unchecked(format!(
+            "did:icn:{}",
+            multibase::encode(multibase::Base::Base58Btc, [7u8; 16])
+        ));
+        assert!(short.identifier_bytes().is_err());
+    }
+
+    #[test]
     fn test_did_from_str_invalid_prefix() {
         let result = Did::from_str("invalid:prefix:abc123");
         assert!(result.is_err());
