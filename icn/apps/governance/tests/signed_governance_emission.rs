@@ -974,3 +974,69 @@ async fn a_compressed_signed_frame_is_still_recognised_by_magic() {
         other => panic!("expected VoteCast, got {}", other.message_type()),
     }
 }
+
+/// #2641, actor path: the production `CastVote` handler persists through
+/// `save_vote`, which overwrites by key, and that key is built from the voter's
+/// DID *spelling*. Re-spelling one key in another accepted multibase encoding
+/// therefore used to write a second row that every tally counted.
+///
+/// The actor still allows a voter to change their vote — that is this path's
+/// existing behaviour, exercised by
+/// `a_second_operation_in_one_domain_advances_its_sequence` — so the property
+/// asserted here is not refusal but that one cryptographic voter keeps exactly
+/// one row and one effective vote, whichever spelling arrives.
+#[tokio::test(flavor = "current_thread")]
+async fn alias_spelled_did_cannot_add_a_second_vote_on_the_actor_path() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("seq-alias", ProposalScope::Local)
+        .await;
+
+    // Re-spell the node's DID as multibase base16 over the same identifier bytes.
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+
+    // Control: this is a genuinely different textual DID today, so the test
+    // cannot pass vacuously. If `Did` becomes key-equal (N2-A / #2627) this
+    // assertion fails and the proof must be re-derived rather than assumed.
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    node.ops
+        .cast_vote(proposal_id.clone(), node.did.clone(), VoteChoice::For, None)
+        .await
+        .expect("first vote must succeed");
+    node.ops
+        .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+        .await
+        .expect("a re-spelled vote by the same principal updates, it does not stack");
+
+    let votes = node.state.list_votes(&proposal_id).expect("votes readable");
+    assert_eq!(
+        votes.len(),
+        1,
+        "one cryptographic voter must keep exactly one stored row, got: {:?}",
+        votes
+            .iter()
+            .map(|v| v.voter.to_string())
+            .collect::<Vec<_>>()
+    );
+
+    let tally = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("tally must compute");
+    assert_eq!(
+        tally.total_votes(),
+        1,
+        "one cryptographic voter contributes at most one effective vote"
+    );
+    assert_eq!(
+        tally.against_votes, 1,
+        "the voter's later act stands, as vote changes are allowed here"
+    );
+}

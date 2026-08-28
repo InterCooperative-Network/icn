@@ -2156,12 +2156,21 @@ impl GovernanceActor {
             } => {
                 info!("Casting vote on proposal: {} by {}", proposal_id.0, voter);
 
-                // INV-6 by cryptographic principal, not by DID spelling. This
-                // path previously had no duplicate-vote guard at all, so a
-                // voter re-spelling their DID in another multibase encoding
-                // wrote a second row that every tally counted (#2641).
+                // One stored row per cryptographic principal (#2641). This path
+                // has no duplicate-vote guard, so a voter re-spelling their DID
+                // in another accepted multibase encoding used to write a second
+                // row under the second spelling, which every tally counted.
+                //
+                // Changing a vote stays allowed -- that is this path's existing
+                // semantics, and `save_vote` overwrites by key -- so instead of
+                // refusing, the update is written onto the row this principal
+                // already owns, under whatever spelling first recorded it. Fails
+                // closed if that history is already ambiguous.
                 let existing = self.load_votes(&proposal_id)?;
-                icn_governance::ensure_has_not_voted(&existing, &voter)?;
+                let voter = match icn_governance::prior_act_for(&existing, &voter)? {
+                    Some(prior) => prior.voter.clone(),
+                    None => voter,
+                };
 
                 let mut vote = Vote::new(proposal_id.clone(), voter, choice);
                 if let Some(c) = comment {

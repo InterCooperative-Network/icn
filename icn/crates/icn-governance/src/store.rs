@@ -672,7 +672,7 @@ impl GovernanceStore for SledGovernanceStore {
         retained.push(voter_str);
 
         self.db.insert(
-            &Self::vote_key(&vote.proposal_id, &vote.voter),
+            Self::vote_key(&vote.proposal_id, &vote.voter),
             serde_json::to_vec(vote)?,
         )?;
         self.db.insert(&index_key, serde_json::to_vec(&retained)?)?;
@@ -1373,6 +1373,69 @@ mod did_spelling_vote_integrity {
             msg.contains("conflicting"),
             "fail-closed error must name the conflict, got: {msg}"
         );
+    }
+
+    #[test]
+    fn lookup_finds_the_row_under_any_spelling_of_the_voter() {
+        let store = InMemoryGovernanceStore::new();
+        let (db, _tmp) = open_test_sled_db();
+        let sled_store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        for target in [
+            &store as &dyn GovernanceStore,
+            &sled_store as &dyn GovernanceStore,
+        ] {
+            target
+                .store_vote(&Vote::new(
+                    proposal_id.clone(),
+                    canonical.clone(),
+                    VoteChoice::For,
+                ))
+                .unwrap();
+
+            let found = target
+                .get_vote(&proposal_id, &alias)
+                .unwrap()
+                .expect("an alias spelling must resolve to the same voter's row");
+            assert_eq!(found.choice, VoteChoice::For);
+        }
+    }
+
+    /// Admission must not paper over an integrity breach that already happened:
+    /// superseding two conflicting historical acts would destroy the evidence
+    /// and silently pick a winner.
+    #[test]
+    fn storing_over_conflicting_historical_alias_rows_fails_closed() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical.clone(), VoteChoice::For),
+        );
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        );
+
+        let err = store
+            .store_vote(&Vote::new(
+                proposal_id.clone(),
+                canonical,
+                VoteChoice::Abstain,
+            ))
+            .expect_err("must not silently supersede conflicting historical acts");
+        assert!(err.to_string().contains("conflicting"), "got: {err}");
+
+        // The evidence is still there to be migrated.
+        assert_eq!(store.list_votes(&proposal_id).unwrap().len(), 2);
     }
 
     /// Counter-control: the fix must not be "refuse everything".
