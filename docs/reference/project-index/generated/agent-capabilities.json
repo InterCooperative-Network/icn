@@ -466,6 +466,13 @@
       "safety": "modifies_local"
     },
     {
+      "name": "icn-runtime-build",
+      "path": "ops/scripts/icn-runtime-build",
+      "capability": "agent-runtime-bootstrap",
+      "summary": "Resolve a runtime build for THIS checkout's ops/mcp sources, building it once into a shared content-addressed cache.",
+      "safety": "modifies_local"
+    },
+    {
       "name": "icn-wait",
       "path": "ops/scripts/icn-wait",
       "capability": "safe-waiting",
