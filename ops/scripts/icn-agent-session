@@ -138,4 +138,29 @@ if [ "$cmd" = "register" ] || [ ! -f "$CLI" ]; then
 fi
 [ -f "$CLI" ] || degrade "session CLI still unavailable at $CLI after bootstrap"
 
+# PIN THE REGISTRY TO THIS REPOSITORY, EXPLICITLY.
+#
+# resolveDefaultDbPath() in ops/mcp/src/state/db.ts derives the shared registry by asking Git
+# for --git-common-dir relative to the CLI's own __dirname. That worked while the CLI could
+# only ever live at <worktree>/ops/mcp/dist/state/. A cached runtime lives OUTSIDE every
+# checkout, so the derivation found no repository and fell back to a per-installation database
+# — every bootstrapped lane would have registered into a registry that the MCP server and every
+# other worktree could not see, which is precisely the one-registry-per-repository invariant
+# that module exists to hold. Caught by dogfooding a genuinely fresh lane; fixtures could not
+# see it, because they never ran a cached runtime against a real repository.
+#
+# The wrapper is the right seam for this: it is the component that knows which checkout it is
+# serving, for the same reason it resolves ROOT from its own location. The value matches what
+# the TypeScript computes in-tree (git-common-dir, resolved, plus icn-ops.db), so in-tree and
+# cached runtimes address one identical file.
+if [ -z "${ICN_OPS_DB:-}" ]; then
+  COMMON="$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null)"
+  if [ -n "$COMMON" ]; then
+    case "$COMMON" in /*) ;; *) COMMON="$ROOT/$COMMON" ;; esac
+    if COMMON="$(cd "$COMMON" 2>/dev/null && pwd -P)"; then
+      export ICN_OPS_DB="$COMMON/icn-ops.db"
+    fi
+  fi
+fi
+
 exec node "$CLI" "$@"

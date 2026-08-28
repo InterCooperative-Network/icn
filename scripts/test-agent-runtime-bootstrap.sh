@@ -264,7 +264,31 @@ if [ "$DEPS_AVAILABLE" = 1 ]; then
   fi
 fi
 
-# --- case 7: the bootstrap never dirties the worktree ----------------------------------------
+# --- case 7: a cached runtime still registers into the REPOSITORY's registry -----------------
+# Regression, and the reason every other case here pins ICN_OPS_DB is also the reason this one
+# must not. db.ts derives the shared registry from the CLI's own __dirname; a cached runtime
+# lives outside every checkout, so the derivation found no repository and silently fell back to
+# a per-installation database. Every bootstrapped lane would have registered somewhere the MCP
+# server and every other worktree could not see — the one-registry-per-repository invariant,
+# broken by the fix meant to make registration work at all.
+if [ "$DEPS_AVAILABLE" = 1 ]; then
+  COMMON="$(cd "$(git -C "$LANE1" rev-parse --git-common-dir)" && pwd -P)"
+  ( cd "$LANE1" && env -u ICN_OPS_DB "$LANE1/ops/scripts/icn-agent-session" register \
+      --harness-key registry-derivation-1 --cwd "$LANE1" --provider test ) \
+      >"$TMP/c7.out" 2>"$TMP/c7.err"
+  if grep -q 'could not derive the shared registry' "$TMP/c7.err"; then
+    bad "a cached runtime fell back to a per-installation registry" "$(head -2 "$TMP/c7.err")"
+  else
+    ok "a cached runtime does not fall back to a per-installation registry"
+  fi
+  if [ -f "$COMMON/icn-ops.db" ] && grep -q '"session_id"' "$TMP/c7.out"; then
+    ok "the session lands in the repository's shared registry ($COMMON/icn-ops.db)"
+  else
+    bad "session did not land in the repository registry" "expected $COMMON/icn-ops.db"
+  fi
+fi
+
+# --- case 8: the bootstrap never dirties the worktree ----------------------------------------
 # A bootstrap that showed up in `git status` would put build output into every review.
 if [ "$DEPS_AVAILABLE" = 1 ]; then
   dirty="$(git -C "$LANE1" status --porcelain 2>/dev/null)"
