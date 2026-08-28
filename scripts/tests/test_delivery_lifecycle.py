@@ -274,6 +274,25 @@ rejects("narrowing the condition back to declared contract terms is rejected",
 
 
 # ---------------------------------------------------------------------------------------------
+print("readiness is decided in one place")
+
+# The skill told itself to read the merge owner and live protection to pick which gates to wait
+# on, while its own Boundaries forbade exactly that. A document that contradicts itself on its
+# central boundary cannot be followed consistently, and the registry pattern against a protection
+# path was decorative next to prose that said to do it.
+ship_wait = (ROOT / ".agents" / "skills" / "ship-pr" / "SKILL.md").read_text(encoding="utf-8")
+check("ship-pr does not decide which gates matter",
+      "Do not work out which gates matter" in ship_wait, "still deciding")
+check("ship-pr waits only on a gate the evaluator named",
+      "never wait on a check the evaluator did not name" in ship_wait, "missing")
+check("ship-pr still forbids reading protection for readiness",
+      "Do not read branch protection to decide readiness" in ship_wait, "boundary lost")
+check("the two statements no longer contradict each other",
+      "which gates actually matter from the merge owner and live branch protection"
+      not in ship_wait, "contradiction remains")
+
+
+# ---------------------------------------------------------------------------------------------
 print("a freeze names the head that ships")
 
 check("the owner requires the live head to match the freeze head before handoff",

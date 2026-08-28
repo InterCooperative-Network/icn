@@ -128,9 +128,16 @@ maintainer decision, not a widening of the frozen scope.
 
 ## 10. Wait only on live merge gates
 
-Use the repository's bounded wait primitive, `ops/scripts/icn-wait`. Never an ad-hoc polling loop.
-Read which gates actually matter from the merge owner and live branch protection — this skill does
-not know them and must not learn them.
+Do not work out which gates matter. `icn-merge-pr check` already reads the merge owner and live
+protection and returns the answer as structured reasons; deciding it here would make this skill a
+second owner of readiness, which its Boundaries forbid — and a policy or protection change would
+then leave it waiting on the wrong set, or on checks that never block.
+
+So: run `check`, and if it refuses only because a required gate is still pending, wait for the
+gate it named using the repository's bounded wait primitive, `ops/scripts/icn-wait`, then run
+`check` again. Never an ad-hoc polling loop, and never wait on a check the evaluator did not name.
+`check` mutates nothing, so re-running it after a wait is not retrying a refusal — the one
+mutation is never retried.
 
 ## 11. Check the freeze head, then hand over
 
