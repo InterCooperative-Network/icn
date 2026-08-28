@@ -85,10 +85,17 @@
 //! # Why not the key advertised on *this* connection
 //!
 //! A signed envelope's sender is not necessarily the peer at the other end of the connection it
-//! arrived on — gossip relays. Resolving against the receiving connection's own Hello would
-//! verify relayed traffic against the relay's key. The index has to be node-global and keyed by
-//! the sender's principal, which is what makes the lease, rather than the connection object,
-//! the thing that carries currency.
+//! arrived on: `handlers::signed` never compares `envelope.from` to the connection's
+//! authenticated peer, so any connected peer can present an envelope signed by a third party.
+//! Resolving against the receiving connection's own Hello would then verify that envelope
+//! against the *presenting* peer's key. The index has to be node-global and keyed by the
+//! sender's principal, which is what makes the lease, rather than the connection object, the
+//! thing that carries currency.
+//!
+//! Stated this way deliberately. An earlier draft justified it with "gossip relays", which is
+//! the wrong mechanism for this workspace — `icn-gossip` re-signs at every hop, so
+//! `envelope.from` is the immediate peer in benign operation. The conclusion survives because
+//! it does not depend on relaying: it depends on `from` being unconstrained by the transport.
 
 use crate::replay_guard::SenderPrincipal;
 use std::collections::HashMap;
@@ -362,6 +369,29 @@ impl Drop for LivePqKeyClaim {
             principal_entry.remove();
         }
     }
+}
+
+/// This node holds contradictory current evidence about one principal's ML-DSA key, so it
+/// refused a hybrid envelope rather than guessing which key to verify against (#2646).
+///
+/// Typed, and distinguished from a signature failure at the call site, because it is a
+/// statement about **our** evidence rather than about the sender's conduct. The classical and
+/// ML-DSA signatures on the refused envelope may both be perfectly valid; what is missing is a
+/// unique answer to which key is current. Scoring it as `Violation::InvalidSignature` — a
+/// `major` weight — quarantines a peer after three refusals for a state it can be in while
+/// behaving honestly, most obviously while rotating its ML-DSA key with a connection overlap.
+/// That is the same false-positive class the local-fault classifier in `handlers::signed`
+/// exists to prevent, and this joins it rather than inventing a second rule.
+///
+/// Refusing is still correct; only the attribution was wrong.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "live connections disagree about the current ML-DSA key for {principal}; refusing this \
+     hybrid envelope rather than verifying it classically"
+)]
+pub struct ContradictoryPqEvidence {
+    /// The signing principal whose current key could not be resolved, canonically spelled.
+    pub principal: String,
 }
 
 #[cfg(test)]

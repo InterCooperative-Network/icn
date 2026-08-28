@@ -80,13 +80,35 @@ impl ConnectionContext {
         let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
-            warn!(
-                "Signature/age verification failed from {}: {}",
-                envelope.from, e
-            );
+            // Contradictory *local* evidence is not peer misbehaviour, exactly as a local
+            // replay-store fault is not (see the classifier below). The refused envelope's
+            // signatures may both be valid; we simply hold no unique answer to which ML-DSA
+            // key is current. Scoring it `InvalidSignature` — a `major` weight — quarantines a
+            // peer after three refusals for a state it can reach while behaving honestly,
+            // including a legitimate key rotation with a connection overlap. The refusal
+            // stands; only the attribution is dropped (#2646).
+            let contradictory_evidence = e
+                .downcast_ref::<crate::capability_evidence::ContradictoryPqEvidence>()
+                .is_some();
+
+            if contradictory_evidence {
+                warn!(
+                    "Refusing hybrid envelope from {}: {} (not scored as misbehaviour)",
+                    envelope.from, e
+                );
+            } else {
+                warn!(
+                    "Signature/age verification failed from {}: {}",
+                    envelope.from, e
+                );
+            }
 
             // Record InvalidSignature violation
-            if let Some(ref detector) = self.misbehavior_detector {
+            if let Some(detector) = self
+                .misbehavior_detector
+                .as_ref()
+                .filter(|_| !contradictory_evidence)
+            {
                 let message_hash = compute_message_hash(envelope);
 
                 let violation = icn_security::Violation::InvalidSignature {
@@ -374,13 +396,23 @@ impl ConnectionContext {
         let sig_result = self.verify_with_cached_pq_key(envelope, 300).await;
 
         if let Err(e) = sig_result {
+            // Same attribution rule as `handle_signed`: our own contradictory PQ evidence is
+            // not the sender's misbehaviour (#2646).
+            let contradictory_evidence = e
+                .downcast_ref::<crate::capability_evidence::ContradictoryPqEvidence>()
+                .is_some();
+
             warn!(
                 "Inner envelope signature/age verification failed from {}: {}",
                 envelope.from, e
             );
 
             // Record InvalidSignature violation
-            if let Some(ref detector) = self.misbehavior_detector {
+            if let Some(detector) = self
+                .misbehavior_detector
+                .as_ref()
+                .filter(|_| !contradictory_evidence)
+            {
                 let message_hash = compute_message_hash(envelope);
 
                 let violation = icn_security::Violation::InvalidSignature {
@@ -557,10 +589,12 @@ impl ConnectionContext {
                     icn_obs::metrics::network::hybrid_verification_failed_inc(
                         icn_obs::metrics::network::HybridVerificationFailure::ConflictingPqKeys,
                     );
-                    return Err(anyhow::anyhow!(
-                        "conflicting current ML-DSA keys for this sender; refusing rather \
-                         than verifying classically"
-                    ));
+                    return Err(crate::capability_evidence::ContradictoryPqEvidence {
+                        principal: crate::replay_guard::SenderPrincipal::from_did(&envelope.from)
+                            .map(|p| p.canonical_did().to_string())
+                            .unwrap_or_else(|_| envelope.from.to_string()),
+                    }
+                    .into());
                 }
                 CurrentPqKey::NoCurrentKey => {
                     // See the policy note on this function: retained migration behaviour,
@@ -3075,6 +3109,75 @@ mod tests {
             );
         }
 
+        /// A conflict refusal is not scored against the sender.
+        ///
+        /// `ConflictingCurrentKeys` is a statement about *our* evidence, not the peer's conduct:
+        /// the refused envelope's classical and ML-DSA signatures may both be valid, and the
+        /// state is reachable while behaving honestly — a peer rotating its ML-DSA key with a
+        /// connection overlap transiently holds two live claims. Recording
+        /// `Violation::InvalidSignature` (a `major` weight) would quarantine such a peer after
+        /// three refusals, and quarantine does not lift when the conflict does, which would have
+        /// contradicted the recoverability this fail-closed design rests on.
+        ///
+        /// The CONTROL matters: an envelope that genuinely fails verification against a unique
+        /// current key must still be scored, or this test would pass on a build that simply
+        /// stopped recording violations.
+        #[tokio::test]
+        async fn a_conflict_refusal_is_not_scored_as_peer_misbehaviour() {
+            use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
+
+            let sender = KeyPair::generate().unwrap();
+            let other = KeyPair::generate().unwrap();
+            let alias = alias_in(multibase::Base::Base32Lower, "base32-lower", sender.did());
+
+            // CONFLICT: two live claims disagreeing about this sender's key.
+            {
+                let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+                    MisbehaviorThresholds::default(),
+                )));
+                let (ctx, forwarded) = create_test_context(Some(Arc::clone(&detector)));
+                let _a = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+                let _b = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
+
+                let honest = pq::valid_hybrid(&sender, 21);
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &honest).await,
+                    "CONTROL: the conflict must still refuse the envelope"
+                );
+                for did in [sender.did(), &alias] {
+                    assert!(
+                        detector.read().await.get_violations(did).is_empty(),
+                        "a refusal caused by our own contradictory evidence is not peer \
+                         misbehaviour ({did})"
+                    );
+                }
+            }
+
+            // CONTROL: a genuine PQ signature failure against a unique current key IS scored.
+            {
+                let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+                    MisbehaviorThresholds::default(),
+                )));
+                let (ctx, forwarded) = create_test_context(Some(Arc::clone(&detector)));
+                let _a = pq::install_live_pq(&ctx, sender.did(), &pq::key_of(&sender)).await;
+
+                let forged = pq::hybrid_with_bad_pq_signature(&sender);
+                assert!(
+                    !pq::forwards(&ctx, &forwarded, &forged).await,
+                    "CONTROL: an invalid ML-DSA signature must be refused"
+                );
+                assert!(
+                    !detector
+                        .read()
+                        .await
+                        .get_violations(sender.did())
+                        .is_empty(),
+                    "CONTROL: a real signature failure must still be recorded, or this suite \
+                     would pass on a build that scored nothing at all"
+                );
+            }
+        }
+
         /// A conflict is not a permanent state: closing the disagreeing connection restores a
         /// unique answer, in either close order.
         ///
@@ -3123,9 +3226,10 @@ mod tests {
                 let _disagreeing = pq::install_live_pq(&ctx, &alias, &pq::key_of(&other)).await;
                 drop(own);
                 assert!(
-                !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 20)).await,
-                "the surviving claim is current evidence and it refuses this envelope;                  closing a connection must not open the classical fallback"
-            );
+                    !pq::forwards(&ctx, &forwarded, &pq::valid_hybrid(&sender, 20)).await,
+                    "the surviving claim is current evidence and it refuses this envelope; \
+                 closing a connection must not open the classical fallback"
+                );
             }
 
             // Both gone: the documented no-current-key path.
