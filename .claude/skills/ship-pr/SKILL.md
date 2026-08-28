@@ -149,6 +149,13 @@ mutates, but it has no idea which head was reviewed.
 On a mismatch, the new content is unverified. Run DELTA verification on it, update the freeze head,
 return to FROZEN, and only then continue. `freeze.head_must_match_before_handoff` is the rule.
 
+Then **hand the freeze head down with the authorization**. Comparing here is not enough on its own:
+a push can land between this comparison and the mutation, and the executable would pin whatever is
+at the top of the branch by then. Give `merge-pr` the exact frozen head so the mutation is bound to
+the commit that was actually reviewed, and it refuses rather than merging a newer one. Pass the
+recorded value; do not re-read the live head to produce it, because that would authorize whatever
+just landed.
+
 ```bash
 icn-merge-pr check "$PR"
 ```

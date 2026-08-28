@@ -149,7 +149,7 @@ def stale_evaluator(client, owner: str, name: str, installed: str, live: str) ->
 
 def run(client, owner: str, name: str, number: int, *, authorize: bool,
         requested_strategy: str | None = None, exception_reason: str | None = None,
-        installed_commit: str | None = None) -> Result:
+        installed_commit: str | None = None, expected_head: str | None = None) -> Result:
     """`check` when `authorize` is false; the full evaluate-refresh-merge path when it is true."""
     command = "merge" if authorize else "check"
     result = Result(command=command, owner=owner, name=name, number=number,
@@ -185,10 +185,28 @@ def run(client, owner: str, name: str, number: int, *, authorize: bool,
         return result
 
     result.evidence = _evidence(fresh)
+    if expected_head is not None:
+        result.evidence["expected_head"] = expected_head
     race = detect_race(snap, fresh)
     if race is not None:
         result.outcome = race.code
         result.reasons = [race]
+        return result
+
+    # The head the caller AUTHORIZED, against the head that is live now. This is not the race
+    # check above: that one asks whether the head moved between this program's own two reads,
+    # which is a window of seconds. This asks whether the head is still the commit whose review
+    # justified the merge — a window that spans the wait for a human to say yes. Nothing else in
+    # this program knows which head was reviewed, so if this does not refuse, nothing will.
+    if expected_head is not None and fresh.head_oid.lower() != expected_head.lower():
+        result.outcome = codes.REFUSED_EXPECTED_HEAD
+        result.reasons = [Reason(
+            codes.REFUSED_EXPECTED_HEAD,
+            f"authorization named head {expected_head[:12]}, and #{number} is now at "
+            f"{fresh.head_oid[:12]}. The commit that was reviewed is not the commit that would "
+            f"be merged. This program does not fall back to the newer head: re-establish that "
+            f"the current head is fit to merge, then authorize that head.")]
+        result.merge = {"attempted": False, "confirmed_merged": False, "merge_commit_sha": None}
         return result
 
     if installed_commit:

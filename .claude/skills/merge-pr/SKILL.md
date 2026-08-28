@@ -50,9 +50,20 @@ silently rots (icn#2651).
    ```bash
    icn-merge-pr merge "$PR" --authorize
    ```
+   If the caller supplied the exact head the authorization was given for, pass it through
+   unchanged:
+   ```bash
+   icn-merge-pr merge "$PR" --authorize --expected-head "$AUTHORIZED_HEAD"
+   ```
+   **Forward it verbatim or not at all.** Do not read the live head to fill it in: a value derived
+   here is a statement about now, and the whole point of the option is that it comes from whatever
+   established the head was fit to merge. Do not substitute, shorten, or re-derive it, and do not
+   drop it and merge anyway when it does not match — the program owns that decision.
+
    The program re-reads every signal immediately before acting, so a `READY` from step 1 is a
    report, not a promise. A refusal here means the state genuinely changed; it is not a glitch to
-   retry.
+   retry. `REFUSED_EXPECTED_HEAD` means the pull request moved off the head that was authorized:
+   whatever justified the merge covered a commit that is no longer the head.
 
 6. **Report** the final outcome, quoting the code. Each one describes **this invocation**, not
    the pull request's history.

@@ -53,6 +53,7 @@ REFUSED_STRATEGY_INVALID = "REFUSED_STRATEGY_INVALID"        # outside the close
 REFUSED_STRATEGY_UNAVAILABLE = "REFUSED_STRATEGY_UNAVAILABLE"  # repository does not allow it
 
 # --- races ------------------------------------------------------------------------------------
+REFUSED_EXPECTED_HEAD = "REFUSED_EXPECTED_HEAD"    # live head != the head authorization named
 REFUSED_HEAD_CHANGED = "REFUSED_HEAD_CHANGED"
 REFUSED_BASE_CHANGED = "REFUSED_BASE_CHANGED"
 REFUSED_DEFAULT_BRANCH_CHANGED = "REFUSED_DEFAULT_BRANCH_CHANGED"

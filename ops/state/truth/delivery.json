@@ -232,7 +232,7 @@
       "the scheduled comprehensive review generation has closed"
     ],
     "names_an_exact_head": true,
-    "head_must_match_before_handoff": "Before handing over to the merge primitive, the live head must equal the recorded freeze head. A freeze names an exact head because that is the head that was reviewed and verified; content pushed after the freeze has been through neither. On a mismatch, run DELTA verification on the new content, update the freeze head, return to FROZEN, and only then hand over. The merge executable pins the head it mutates, but it does not know which head was reviewed \u2014 nothing downstream will catch this.",
+    "head_must_match_before_handoff": "Before handing over to the merge primitive, the live head must equal the recorded freeze head. A freeze names an exact head because that is the head that was reviewed and verified; content pushed after the freeze has been through neither. On a mismatch, run DELTA verification on the new content, update the freeze head, return to FROZEN, and only then hand over. Comparing is not sufficient on its own, because a push can land between the comparison and the mutation: the freeze head is therefore also passed down with the authorization, and the merge executable refuses rather than merging a head the authorization did not name (icn#2666).",
     "effect": [
       "a new automated review comment does not reopen the pull request",
       "review of a frozen pull request is DELTA, never FULL",
