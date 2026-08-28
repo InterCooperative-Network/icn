@@ -627,13 +627,22 @@ print("the mechanical follow-ups from icn#2663 stay fixed")
 
 # The template told authors how many lines they write. It said two, above three bullets. Counted
 # rather than read, so the sentence cannot drift from the section again.
+# Total, like every other checker here: a control that raises aborts the run and reports nothing,
+# and it would raise in exactly the situation it exists to catch — the section gaining a bullet.
 NUMBER_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five"}
 template = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
-delivery_section = template.split("## Delivery", 1)[1].split("\n## ", 1)[0]
-human_bullets = [ln for ln in delivery_section.splitlines() if ln.startswith("- **")]
-check("the template's stated human-line count matches its bullets",
-      f"{NUMBER_WORDS[len(human_bullets)]} lines a human writes" in delivery_section,
-      f"{len(human_bullets)} bullets, section says otherwise")
+sections = template.split("## Delivery", 1)
+if len(sections) != 2:
+    check("the template still has a Delivery section", False, "'## Delivery' is gone")
+else:
+    delivery_section = sections[1].split("\n## ", 1)[0]
+    bullets = len([ln for ln in delivery_section.splitlines() if ln.startswith("- **")])
+    word = NUMBER_WORDS.get(bullets)
+    check("the template's human-line count is a number this control can name",
+          word is not None, f"{bullets} bullets is outside {sorted(NUMBER_WORDS)}")
+    check("the template's stated human-line count matches its bullets",
+          word is not None and f"{word} lines a human writes" in delivery_section,
+          f"{bullets} bullets, section says otherwise")
 
 # The gate is loaded through importlib, so putting scripts/ on sys.path did nothing except add a
 # global side effect to the test process.
