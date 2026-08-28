@@ -298,6 +298,12 @@ check("ship-pr hands the freeze head down", "hand the freeze head down" in ship_
 check("ship-pr does not re-read the live head to produce it",
       "do not re-read the live head to produce it" in ship_bind, "missing")
 check("merge-pr accepts an authorized head", "--expected-head" in merge_bind, "missing")
+# An optional contract nobody can discover is close to no contract, and this design rests on
+# callers choosing to pass it. The tool's README enumerates its invocations, so it must list this.
+_readme = (ROOT / "tools" / "icn-merge-pr" / "README.md").read_text(encoding="utf-8")
+check("the tool's README documents the authorized-head option",
+      "--expected-head" in _readme and "REFUSED_EXPECTED_HEAD" in _readme,
+      "the README enumerates the CLI without it")
 check("merge-pr forwards it verbatim",
       "Forward it verbatim or not at all" in merge_bind, "missing")
 check("merge-pr does not derive the head itself",
