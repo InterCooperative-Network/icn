@@ -153,8 +153,16 @@ fi
 # serving, for the same reason it resolves ROOT from its own location. The value matches what
 # the TypeScript computes in-tree (git-common-dir, resolved, plus icn-ops.db), so in-tree and
 # cached runtimes address one identical file.
+# The Git call is SANITISED. Git honours GIT_DIR, GIT_COMMON_DIR and their relatives over
+# `-C`, so an inherited value would silently pin this session's lifecycle data to another
+# repository's registry. ops/mcp/src/runtime/worktree-identity.ts strips the same set for the
+# same reason; this is the shell-side counterpart, not a new rule.
+git_repo() { env -u GIT_DIR -u GIT_COMMON_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+  -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CEILING_DIRECTORIES \
+  git -C "$1" "${@:2}" 2>/dev/null; }
+
 if [ -z "${ICN_OPS_DB:-}" ]; then
-  COMMON="$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null)"
+  COMMON="$(git_repo "$ROOT" rev-parse --git-common-dir)"
   if [ -n "$COMMON" ]; then
     case "$COMMON" in /*) ;; *) COMMON="$ROOT/$COMMON" ;; esac
     if COMMON="$(cd "$COMMON" 2>/dev/null && pwd -P)"; then

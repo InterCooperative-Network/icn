@@ -60,22 +60,26 @@
 #   ICN_RUNTIME_CACHE          cache root (default ${XDG_CACHE_HOME:-$HOME/.cache}/icn/agent-runtime)
 #   ICN_RUNTIME_BUILD_TIMEOUT  seconds for the whole bootstrap (default 300)
 #   ICN_RUNTIME_NO_BUILD=1     resolve a cached build, never build one (used by tests)
+#   ICN_RUNTIME_ABI            override the detected Node ABI/platform/arch (used by tests)
 
 set -uo pipefail
 
 VERBOSE=0
 FINGERPRINT_ONLY=0
+FINGERPRINT_SRC_ONLY=0
 BACKGROUND_IF_COLD=0
 for arg in "$@"; do
   case "$arg" in
     --verbose) VERBOSE=1 ;;
     --fingerprint) FINGERPRINT_ONLY=1 ;;
+    --fingerprint-src) FINGERPRINT_SRC_ONLY=1 ;;
     --background-if-cold) BACKGROUND_IF_COLD=1 ;;
     --help|-h)
       printf '%s\n' \
         'usage: icn-runtime-build [--fingerprint] [--background-if-cold] [--verbose]' \
         '  (no args)             print the path of a usable dist directory, building if needed' \
         '  --fingerprint         print the runtime fingerprint only; build nothing' \
+        '  --fingerprint-src     print the SOURCE fingerprint only; build nothing' \
         '  --background-if-cold  build dist inline, but hand a cold dependency install to a' \
         '                        detached background bootstrap instead of blocking the caller' \
         '  --verbose             narrate progress on stderr'
@@ -113,9 +117,9 @@ DEPS_BUDGET="${ICN_RUNTIME_DEPS_TIMEOUT:-1800}"
 # Hashed with repo-relative paths so two worktrees holding identical sources agree on the key.
 # Absolute paths here would defeat the entire cache and reintroduce the per-worktree build.
 fingerprint() {
-  python3 - "$MCP" "$1" <<'PY'
+  python3 - "${2:-$MCP}" "$1" "$NODE_ABI" <<'PY'
 import hashlib, os, sys
-root, mode = sys.argv[1], sys.argv[2]
+root, mode, abi = sys.argv[1], sys.argv[2], sys.argv[3]
 manifest = ["package.json", "package-lock.json", "tsconfig.json"]
 rels = []
 if mode == "src":
@@ -130,6 +134,12 @@ else:
     # a 157M native-module tree that did not change.
     rels = [m for m in ("package.json", "package-lock.json") if os.path.exists(os.path.join(root, m))]
 h = hashlib.sha256()
+if mode != "src":
+    # The installed tree contains a NATIVE better-sqlite3 binding, so its identity is the
+    # lockfile AND the ABI it was compiled against. Without this, upgrading Node kept the old
+    # entry valid by name: the cache hit returned before deps_native_ok() could notice the
+    # binding no longer loads, so every lane failed at CLI load with no path to repair itself.
+    h.update(b"abi\0" + abi.encode("utf-8") + b"\0")
 for rel in sorted(rels):
     h.update(rel.encode("utf-8") + b"\0")
     with open(os.path.join(root, rel), "rb") as fh:
@@ -138,31 +148,43 @@ print(h.hexdigest()[:32])
 PY
 }
 
+# The ABI the native module must match. Node is a hard requirement of every useful path here,
+# so it is resolved before any fingerprint rather than after the fast path.
+command -v node >/dev/null 2>&1 || fail "node not found on PATH"
+NODE_ABI="${ICN_RUNTIME_ABI:-$(node -p 'process.versions.modules + "-" + process.platform + "-" + process.arch' 2>/dev/null)}"
+[ -n "$NODE_ABI" ] || fail "could not read the Node ABI from $(command -v node)"
+
 SRC_FP="$(fingerprint src)" || fail "could not fingerprint ops/mcp sources"
 [ -n "$SRC_FP" ] || fail "empty source fingerprint"
+DEPS_FP="$(fingerprint deps)" || fail "could not fingerprint ops/mcp dependencies"
+[ -n "$DEPS_FP" ] || fail "empty dependency fingerprint"
 
-if [ "$FINGERPRINT_ONLY" = 1 ]; then printf '%s\n' "$SRC_FP"; exit 0; fi
+# The build key covers BOTH halves. A finished build holds a node_modules symlink into a
+# dependency entry, so a build identified by sources alone would keep pointing at the old
+# dependency tree after the ABI changed — valid by name, unloadable in fact.
+BUILD_FP="$(printf '%s:%s' "$SRC_FP" "$DEPS_FP" | sha256sum | cut -c1-32)"
 
-BUILD_DIR="$CACHE/build/$SRC_FP"
+if [ "$FINGERPRINT_SRC_ONLY" = 1 ]; then printf '%s\n' "$SRC_FP"; exit 0; fi
+if [ "$FINGERPRINT_ONLY" = 1 ]; then printf '%s\n' "$BUILD_FP"; exit 0; fi
+
+BUILD_DIR="$CACHE/build/$BUILD_FP"
 BUILD_OK="$BUILD_DIR/.icn-runtime-ok"
 ENTRY="$BUILD_DIR/dist/cli/session.js"
 
 # Fast path. This is the overwhelmingly common case: a worktree branched from main has not
 # touched ops/mcp, so its fingerprint already names a finished build and nothing is compiled.
 if [ -f "$BUILD_OK" ] && [ -f "$ENTRY" ]; then
-  note "cache hit $SRC_FP"
+  note "cache hit $BUILD_FP"
   printf '%s\n' "$BUILD_DIR/dist"
   exit 0
 fi
 
 if [ "${ICN_RUNTIME_NO_BUILD:-0}" = 1 ]; then
-  fail "no cached runtime for fingerprint $SRC_FP and ICN_RUNTIME_NO_BUILD is set"
+  fail "no cached runtime for fingerprint $BUILD_FP and ICN_RUNTIME_NO_BUILD is set"
 fi
 
-command -v node >/dev/null 2>&1 || fail "node not found on PATH"
 command -v npm  >/dev/null 2>&1 || fail "npm not found on PATH"
 
-DEPS_FP="$(fingerprint deps)" || fail "could not fingerprint ops/mcp dependencies"
 DEPS_DIR="$CACHE/deps/$DEPS_FP"
 DEPS_OK="$DEPS_DIR/.icn-deps-ok"
 
@@ -277,14 +299,33 @@ PY
 }
 
 build_dist() {
-  local tmp="$1"
+  local tmp="$1" staged_fp
   cp -a "$MCP/src" "$tmp/src" || return 1
   cp "$MCP/package.json" "$tmp/" || return 1
   cp "$MCP/tsconfig.json" "$tmp/" || return 1
+  # Copied so the staged tree is a faithful snapshot of everything the fingerprint covers.
+  [ -f "$MCP/package-lock.json" ] && { cp "$MCP/package-lock.json" "$tmp/" || return 1; }
+
+  # PUBLISH ONLY WHAT WAS HASHED. SRC_FP was taken when this process started; on the cold path
+  # that can be minutes earlier, because a dependency install runs first. An edit landing in
+  # that window would be compiled and then published under the OLD key, handing every lane at
+  # that key a runtime built from different sources — the exact anti-stale failure the
+  # content-addressed cache exists to prevent. Re-hash the snapshot actually staged and refuse
+  # rather than publish a mismatch; the next invocation simply builds the new fingerprint.
+  staged_fp="$(fingerprint src "$tmp")" || return 1
+  # Provenance, readable without re-deriving anything: which sources and which ABI this entry
+  # was compiled from. The build key is a hash of both, so it cannot be read back on its own.
+  printf '%s\n' "$SRC_FP"   >"$tmp/.icn-runtime-src"
+  printf '%s\n' "$NODE_ABI" >"$tmp/.icn-runtime-abi"
+  if [ "$staged_fp" != "$SRC_FP" ]; then
+    printf 'icn-runtime-build: ops/mcp sources changed while staging (%s -> %s); not publishing under a key that does not describe them\n' \
+      "$SRC_FP" "$staged_fp" >&2
+    return 1
+  fi
   # The symlink is part of the FINISHED entry, not just the compile: at run time Node resolves
   # better-sqlite3 by walking up from dist/cli/, and this is what it finds.
   ln -s "$DEPS_DIR/node_modules" "$tmp/node_modules" || return 1
-  note "compiling the session runtime for fingerprint $SRC_FP"
+  note "compiling the session runtime for fingerprint $BUILD_FP"
   ( cd "$tmp" && timeout "$BUDGET" ./node_modules/.bin/tsc ) >&2 || return 1
   [ -f "$tmp/dist/cli/session.js" ] || return 1
   return 0
@@ -296,19 +337,24 @@ if [ ! -f "$DEPS_OK" ]; then
   # flock makes a second starter join the first rather than racing it.
   if [ "$BACKGROUND_IF_COLD" = 1 ]; then
     log="$CACHE/bootstrap.log"
+    pidfile="$CACHE/bootstrap.pid"
     if flock -n "$CACHE/locks/deps-$DEPS_FP.lock" true 2>/dev/null; then
-      ( setsid nohup "$self" --verbose >>"$log" 2>&1 & ) >/dev/null 2>&1
-      fail "dependency cache is cold; a background bootstrap was started (log: $log). This session is unregistered; the next one will not be."
+      # The child's pid is RECORDED, not just spawned. A detached multi-minute native build
+      # that nothing can name is precisely the abandoned-process shape this repository keeps
+      # having to clean up by hand; a caller — a test tearing down, or a human wondering what
+      # is eating the CPU — must be able to find and wait on it.
+      ( setsid nohup "$self" --verbose >>"$log" 2>&1 & echo $! >"$pidfile" ) >/dev/null 2>&1
+      fail "dependency cache is cold; a background bootstrap was started (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
     fi
-    fail "dependency cache is cold and a background bootstrap is already running (log: $log). This session is unregistered; the next one will not be."
+    fail "dependency cache is cold and a background bootstrap is already running (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
   fi
   stage deps "$DEPS_FP" "$DEPS_DIR" "$DEPS_OK" \
     || fail "dependency install failed for $DEPS_FP (see the npm output above)"
 fi
 [ -f "$DEPS_OK" ] || fail "dependency cache $DEPS_DIR is still incomplete after installing"
 
-stage dist "$SRC_FP" "$BUILD_DIR" "$BUILD_OK" \
-  || fail "runtime build failed for $SRC_FP (see the tsc output above)"
+stage dist "$BUILD_FP" "$BUILD_DIR" "$BUILD_OK" \
+  || fail "runtime build failed for $BUILD_FP (see the tsc output above)"
 
 # Verify what we are about to hand out rather than trusting that the build said it worked.
 [ -f "$ENTRY" ] || fail "build completed but $ENTRY is missing"

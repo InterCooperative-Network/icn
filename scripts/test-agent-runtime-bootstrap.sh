@@ -196,6 +196,43 @@ if [ "$DEPS_AVAILABLE" = 1 ]; then
   fi
 fi
 
+# --- case 4a: the native ABI is part of the cache identity -----------------------------------
+# The installed tree holds a NATIVE better-sqlite3 binding. Keyed on the lockfile alone, an
+# entry stayed valid by name across a Node upgrade: the fast path returned the hit before
+# deps_native_ok() could notice the binding no longer loads, so every lane failed at CLI load
+# with no path to repair itself.
+if [ "$DEPS_AVAILABLE" = 1 ]; then
+  a="$(ICN_RUNTIME_ABI=abi-aaa "$LANE1/ops/scripts/icn-runtime-build" --fingerprint)"
+  b="$(ICN_RUNTIME_ABI=abi-bbb "$LANE1/ops/scripts/icn-runtime-build" --fingerprint)"
+  src_a="$(ICN_RUNTIME_ABI=abi-aaa "$LANE1/ops/scripts/icn-runtime-build" --fingerprint-src)"
+  src_b="$(ICN_RUNTIME_ABI=abi-bbb "$LANE1/ops/scripts/icn-runtime-build" --fingerprint-src)"
+  if [ "$a" != "$b" ]; then
+    ok "a different native ABI yields a different build identity"
+  else
+    bad "build identity ignored the ABI" "$a"
+  fi
+  if [ "$src_a" = "$src_b" ]; then
+    ok "the ABI does not disturb the SOURCE fingerprint"
+  else
+    bad "ABI leaked into the source fingerprint" "$src_a vs $src_b"
+  fi
+fi
+
+# --- case 4c: an entry records the sources it was compiled from ------------------------------
+# The build key is a hash of sources AND ABI, so it cannot be read back. Recording the source
+# fingerprint makes an entry self-describing, and lets this assert the property the staging
+# re-hash protects: what was published matches what was hashed.
+if [ "$DEPS_AVAILABLE" = 1 ]; then
+  entry="$("$LANE1/ops/scripts/icn-runtime-build")"
+  recorded="$(cat "$(dirname "$entry")/.icn-runtime-src" 2>/dev/null)"
+  current="$("$LANE1/ops/scripts/icn-runtime-build" --fingerprint-src)"
+  if [ -n "$recorded" ] && [ "$recorded" = "$current" ]; then
+    ok "a published entry records the source fingerprint it was compiled from"
+  else
+    bad "entry provenance missing or does not match its sources" "recorded=$recorded current=$current"
+  fi
+fi
+
 # --- case 4b: a published cache entry cannot be written into ---------------------------------
 # A bootstrapped lane's ops/mcp/dist is a symlink into the shared cache, so `npm run build` in
 # that lane would compile its sources into a cache entry other lanes are using. If the lane's
@@ -244,12 +281,26 @@ fi
 
 # cold deps: asserted, not waited on. A cold dependency tree must hand off to a detached
 # bootstrap rather than stalling a human at a prompt for minutes.
-err="$(ICN_RUNTIME_CACHE="$TMP/cache-nodeps" \
+NODEPS="$TMP/cache-nodeps"
+err="$(ICN_RUNTIME_CACHE="$NODEPS" \
        "$LANE1/ops/scripts/icn-runtime-build" --background-if-cold 2>&1 >/dev/null)"
 if printf '%s' "$err" | grep -q 'background bootstrap'; then
   ok "a cold dependency cache hands off to a background bootstrap instead of blocking"
 else
   bad "cold dependency cache did not defer to a background bootstrap" "$err"
+fi
+# REAP IT. This case starts a REAL detached bootstrap, which would otherwise keep running npm ci
+# and a native compile for minutes after the suite exits — racing the teardown that deletes the
+# directory it is installing into, and leaving exactly the kind of abandoned build this
+# repository keeps having to clean up by hand.
+BOOT_PID="$(cat "$NODEPS/bootstrap.pid" 2>/dev/null)"
+if [ -n "$BOOT_PID" ]; then
+  ok "the background bootstrap records its pid so it can be found and reaped"
+  kill -TERM -- "-$BOOT_PID" 2>/dev/null || kill -TERM "$BOOT_PID" 2>/dev/null
+  sleep 1
+  kill -KILL -- "-$BOOT_PID" 2>/dev/null || kill -KILL "$BOOT_PID" 2>/dev/null
+else
+  bad "the background bootstrap left no pid file; it cannot be reaped" "$NODEPS/bootstrap.pid"
 fi
 
 # --- case 6: a failed re-resolution must not take away a working runtime ---------------------
