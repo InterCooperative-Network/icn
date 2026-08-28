@@ -27,7 +27,9 @@
 set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+# chmod first: published cache entries are deliberately read-only (the poisoning guard), and
+# plain `rm -rf` cannot remove them. Same escape hatch a human clearing the real cache needs.
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 ok()  { printf '  ok    %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  FAIL  %s\n     %s\n' "$1" "${2:-}"; FAIL=$((FAIL+1)); }
@@ -191,6 +193,21 @@ if [ "$DEPS_AVAILABLE" = 1 ]; then
     ok "two lanes with identical sources share one fingerprint"
   else
     bad "identical sources produced different fingerprints" "$fp1 vs $fp2"
+  fi
+fi
+
+# --- case 4b: a published cache entry cannot be written into ---------------------------------
+# A bootstrapped lane's ops/mcp/dist is a symlink into the shared cache, so `npm run build` in
+# that lane would compile its sources into a cache entry other lanes are using. If the lane's
+# sources changed, the fingerprint changed too, and the write lands in the OLD fingerprint's
+# entry — handing every lane at that fingerprint a build made from different sources.
+if [ "$DEPS_AVAILABLE" = 1 ]; then
+  entry="$("$LANE1/ops/scripts/icn-runtime-build")"
+  if touch "$entry/poison.js" 2>/dev/null; then
+    bad "a published cache entry is writable — npm run build in a lane could poison it" "$entry"
+    rm -f "$entry/poison.js"
+  else
+    ok "a published cache entry rejects writes instead of being poisoned"
   fi
 fi
 

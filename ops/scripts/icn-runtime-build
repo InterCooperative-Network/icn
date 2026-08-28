@@ -202,6 +202,18 @@ stage() {
     # rename(2): the finished tree appears under its final name in one step, already marked
     # complete, so no reader can observe a half-built cache entry.
     if mv -T "$tmp" "$target" 2>/dev/null; then
+      if [ "$kind" = dist ]; then
+        # CACHE-POISONING GUARD. A bootstrapped lane's ops/mcp/dist is a SYMLINK into this
+        # directory, so `npm --prefix ops/mcp run build` there would compile that lane's sources
+        # straight into a shared cache entry. When the lane's sources have changed its
+        # fingerprint has changed too, so the write lands in the entry for the OLD fingerprint —
+        # silently handing every other lane at that fingerprint a build made from different
+        # sources, which is precisely the anti-stale property this cache exists to provide.
+        # Read-only turns that into a loud EACCES. A legitimate rebuild belongs in a new
+        # fingerprint's entry, which is where the bootstrap already puts it.
+        # To clear the cache by hand: chmod -R u+w on the entry first.
+        chmod -R a-w "$target" 2>/dev/null || true
+      fi
       note "$kind $fp built"
     elif [ -f "$marker" ]; then
       note "$kind $fp was completed concurrently; discarding this copy"
