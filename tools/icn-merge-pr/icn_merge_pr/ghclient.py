@@ -312,6 +312,9 @@ class GhCli:
         if not isinstance(nodes, list) or not nodes:
             raise EvidenceUnavailable("pull request reports no head commit")
         commit = _dig(nodes[0], "commit")
+        if not isinstance(commit, dict):
+            raise EvidenceUnavailable(
+                f"GitHub returned a head commit that is not an object ({commit!r})")
         rollup = commit.get("statusCheckRollup")
         if rollup is None:
             # No rollup at all. Not "no required checks" — it is no evidence about them.
@@ -500,6 +503,9 @@ class GhCli:
         blob = repo.get("object")
         if blob is None:
             return None
+        if not isinstance(blob, dict):
+            raise EvidenceUnavailable(
+                f"GitHub returned an object at {oid}:{path} that is not a blob ({blob!r})")
         if blob.get("isTruncated"):
             raise EvidenceUnavailable(f"{path} at {oid} was truncated by the API")
         text = blob.get("text")

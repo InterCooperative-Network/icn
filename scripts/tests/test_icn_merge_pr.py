@@ -576,6 +576,26 @@ no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
 no_claim["protection"]["required_approving_review_count"] = 0
 expect("a policy that makes no approval claim has no approval drift to report", no_claim,
        codes.READY)
+print("policy blob and rollup commit must be objects before they are read")
+_probe = GhCli()
+for label, setup in (
+    ("policy blob", lambda s: {"object": s}),
+    ("rollup commit", lambda s: {"pullRequest": {"commits": {"nodes": [{"commit": s}]}}}),
+):
+    for shape in ([], "invalid", 7):
+        _probe._graphql = lambda q, v, s=shape, f=setup: f(s)
+        try:
+            if label == "policy blob":
+                _probe.blob_text("o", "n", "a" * 40, "p")
+            else:
+                _probe.check_contexts_page("o", "n", 1, None)
+            got = "UNREACHED"
+        except EvidenceUnavailable:
+            got = "refused"
+        except Exception as exc:                              # noqa: BLE001 — that is the point
+            got = f"raised {type(exc).__name__}"
+        check(f"a {label} of {shape!r} refuses instead of raising", got == "refused", got)
+
 print("pagination metadata is an object before it is read")
 
 
