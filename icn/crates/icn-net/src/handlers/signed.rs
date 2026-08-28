@@ -402,10 +402,17 @@ impl ConnectionContext {
                 .downcast_ref::<crate::capability_evidence::ContradictoryPqEvidence>()
                 .is_some();
 
-            warn!(
-                "Inner envelope signature/age verification failed from {}: {}",
-                envelope.from, e
-            );
+            if contradictory_evidence {
+                warn!(
+                    "Refusing inner hybrid envelope from {}: {} (not scored as misbehaviour)",
+                    envelope.from, e
+                );
+            } else {
+                warn!(
+                    "Inner envelope signature/age verification failed from {}: {}",
+                    envelope.from, e
+                );
+            }
 
             // Record InvalidSignature violation
             if let Some(detector) = self
