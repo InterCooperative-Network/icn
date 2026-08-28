@@ -135,6 +135,7 @@ class Protection:
     strict: bool
     enforce_admins: bool
     conversation_resolution: bool
+    review_protection: bool
 
 
 @dataclass(frozen=True)
@@ -242,8 +243,13 @@ def _normalise_check(node) -> tuple[str, CheckOccurrence] | None:
         if not isinstance(name, str):
             return None
         # A commit status has no App behind it, so it can never satisfy a producer-bound check.
+        state = node.get("state")
+        if not isinstance(state, str):
+            # `_STATUS_CONTEXT.get(...)` hashes its key, and a list or object is unhashable.
+            raise EvidenceUnavailable(
+                f"commit status {name!r} reported an unreadable state ({state!r})")
         created = node.get("createdAt")
-        return (name, CheckOccurrence(_STATUS_CONTEXT.get(node.get("state"), PENDING), None,
+        return (name, CheckOccurrence(_STATUS_CONTEXT.get(state, PENDING), None,
                                       created if isinstance(created, str) and created else None))
     return None
 
@@ -494,6 +500,11 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         raise EvidenceUnavailable(
             f"branch protection did not report a readable enforce_admins setting "
             f"({enforce_admins!r}); unreadable is not enforced")
+    review_protection = protection_raw.get("review_protection")
+    if type(review_protection) is not bool:
+        raise EvidenceUnavailable(
+            f"branch protection did not report a readable review-protection state "
+            f"({review_protection!r}); unreadable is not enforced")
     resolution = protection_raw.get("required_conversation_resolution")
     if type(resolution) is not bool:
         raise EvidenceUnavailable(
@@ -519,6 +530,7 @@ def load_snapshot(client, owner: str, name: str, number: int) -> Snapshot:
         strict=strict,
         enforce_admins=enforce_admins,
         conversation_resolution=resolution,
+        review_protection=review_protection,
     )
 
     review_decision = pr.get("reviewDecision")

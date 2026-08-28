@@ -85,7 +85,7 @@ def world(**overrides) -> dict:
                        "required_bindings": {name: ACTIONS_APP for name in REQUIRED},
                        "required_approving_review_count": 0, "strict": True,
                        "enforce_admins": True, "bypass_allowances": [],
-                       "required_conversation_resolution": True},
+                       "required_conversation_resolution": True, "review_protection": True},
         "branch_rules": [],
         "rulesets_listing": [],
         "rulesets": {},
@@ -107,6 +107,14 @@ class FakeGitHub:
 
     def repository_metadata(self, owner, name):
         self.loads += 1
+        if "default_branch_oid_raw" in self.w:
+            client = GhCli()
+            client._graphql = lambda q, v: {
+                "defaultBranchRef": {"name": self.w["default_branch"],
+                                     "target": {"oid": self.w["default_branch_oid_raw"]}},
+                "mergeCommitAllowed": False, "squashMergeAllowed": True,
+                "rebaseMergeAllowed": True}
+            return client.repository_metadata(owner, name)
         hook = self.w.get("on_refresh")
         if hook and self.loads == 2:          # the refresh immediately before mutation
             hook(self.w)
@@ -629,6 +637,59 @@ non_enforcing_later["rulesets"][LATER] = dict(later_page_bypass["rulesets"][LATE
                                               enforcement="disabled")
 expect("a later-page DISABLED ruleset keeps its established non-active semantics",
        non_enforcing_later, codes.READY)
+
+print("a policy rejecting CHANGES_REQUESTED requires SERVER review protection")
+unprotected_reviews = world()
+unprotected_reviews["protection"]["review_protection"] = False
+expect("policy rejecting change requests while no review protection is configured",
+       unprotected_reviews, codes.REFUSED_POLICY_DRIFT)
+_, review_result = evaluate_world(unprotected_reviews)
+check("the refusal explains the head pin cannot bind review state",
+      any("does not change the head SHA" in r.detail and "change request" in r.detail
+          for r in review_result.reasons))
+for bad in (None, "true", 1, [], {}):
+    broken = world()
+    broken["protection"]["review_protection"] = bad
+    _, r = evaluate_world(broken)
+    check(f"a review-protection state of {bad!r} is unreadable, not enforced",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+
+
+def drop_review_protection(w):
+    w["protection"]["review_protection"] = False
+
+
+fake, review_race = merge_world(world(on_refresh=drop_review_protection))
+check("review protection disappearing on the refresh refuses",
+      review_race.outcome == codes.REFUSED_POLICY_DRIFT, f"got {review_race.outcome}")
+check("no mutation once server review protection is gone", fake.merge_calls == [])
+expect("the client-side review gate still refuses an existing change request",
+       world(review_pages=[[{"state": "CHANGES_REQUESTED"}]]), codes.REFUSED_REVIEW)
+
+print("the trust pin must be a full Git object id")
+for bad in ("refs/pull/7/head", "main", "HEAD", "abc1234", "z" * 40, DEFAULT_OID + " ", "", 7,
+            None, []):
+    _, r = evaluate_world(world(default_branch_oid_raw=bad))
+    check(f"a default-branch tip of {bad!r} is not a usable trust pin",
+          r.outcome == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {r.outcome}")
+_, valid_pin = evaluate_world(world())
+check("a full 40-hex object id is accepted as the pin",
+      valid_pin.evidence["policy"]["loaded_from_oid"] == DEFAULT_OID)
+
+print("a malformed commit-status state refuses instead of crashing")
+for shape in ([], {"a": 1}, 7, True, None):
+    bad_state = world()
+    bad_state["check_pages"][0] = [{"__typename": "StatusContext", "context": REQUIRED[0],
+                                    "state": shape}] + bad_state["check_pages"][0][1:]
+    try:
+        _, r = evaluate_world(bad_state)
+        got = r.outcome
+    except Exception as exc:                                  # noqa: BLE001 — that is the point
+        got = f"raised {type(exc).__name__}"
+    check(f"a commit-status state of {shape!r} -> REFUSED_UNAVAILABLE_EVIDENCE",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+    fake, _ = merge_world(bad_state)
+    check(f"no mutation from a commit-status state of {shape!r}", fake.merge_calls == [])
 
 print("a zero-thread policy requires the SERVER to enforce conversation resolution")
 unenforced = world()

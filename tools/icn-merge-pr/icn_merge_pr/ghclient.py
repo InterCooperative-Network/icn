@@ -23,6 +23,10 @@ _TIMEOUT = 120
 # `gh` renders an HTTP status when GitHub actually answered. Its absence means the
 # request may never have been answered at all, which is a different fact entirely.
 _HTTP_STATUS = re.compile(r"\bHTTP\s+([1-5]\d\d)\b")
+# The default-branch tip is THE trust root: policy is loaded from it and the evaluator's whole
+# authority chain hangs off it. A revision expression such as `refs/pull/7/head` is not an object
+# id and must never stand in for one.
+_GIT_OID = re.compile(r"\A[0-9a-fA-F]{40}\Z")
 
 
 def definitive_http_failure(detail: str) -> bool:
@@ -259,9 +263,14 @@ class GhCli:
                     f"GitHub did not report a readable {field} ({value!r}); which merge methods "
                     "the repository permits is not something this program will assume")
             allowed[key] = value
+        default_oid = _dig(ref, "target", "oid")
+        if not isinstance(default_oid, str) or not _GIT_OID.match(default_oid):
+            raise EvidenceUnavailable(
+                f"GitHub reported {default_oid!r} as the default-branch tip, which is not a full "
+                "Git object id; this program will not pin policy to a revision it cannot name")
         return {
             "default_branch": _dig(ref, "name"),
-            "default_branch_oid": _dig(ref, "target", "oid"),
+            "default_branch_oid": default_oid,
             **allowed,
         }
 
@@ -403,6 +412,11 @@ class GhCli:
         # unreadable protection response retire the approval gate, and policy admits a null
         # review decision, so nothing downstream would notice.
         reviews = doc.get("required_pull_request_reviews")
+        # Its PRESENCE is the server-side review gate: with pull-request review protection
+        # configured, GitHub refuses a merge while a review requests changes, whatever the
+        # approving-review count. Absent, nothing server-side preserves that requirement once
+        # this program has looked away.
+        review_protection = reviews is not None
         if reviews is None:
             count = 0
         elif not isinstance(reviews, dict):
@@ -451,6 +465,7 @@ class GhCli:
             "strict": strict,
             "enforce_admins": enabled,
             "required_conversation_resolution": resolution_enabled,
+            "review_protection": review_protection,
             "configured": "required_status_checks" in doc,
         }
 

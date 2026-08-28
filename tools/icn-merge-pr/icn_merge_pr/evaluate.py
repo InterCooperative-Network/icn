@@ -169,6 +169,20 @@ def evaluate(snap: Snapshot, strategy: str) -> Decision:
                f"or opening a thread does not change the head SHA, so nothing this program pins "
                f"can stop a thread appearing between its final check and the merge; the server "
                f"has to be the one enforcing it.")
+    # DERIVED, like the conversation-resolution requirement and for the same reason. Policy's
+    # allowlist rejects CHANGES_REQUESTED, but submitting a review does not change the head SHA,
+    # so the head pin cannot bind review state to the mutation and the client-side check only
+    # describes a moment that has passed. GitHub's pull-request review protection is what refuses
+    # a merge while a review requests changes; without it configured, nothing server-side holds
+    # the requirement during the final interval.
+    if "CHANGES_REQUESTED" not in policy.review_decision_allowlist \
+            and not snap.protection.review_protection:
+        refuse(codes.REFUSED_POLICY_DRIFT,
+               f"pinned policy at {policy.oid[:12]} rejects CHANGES_REQUESTED, but live "
+               f"protection on {snap.default_branch!r} configures no pull-request review "
+               f"protection. Submitting a review does not change the head SHA, so nothing this "
+               f"program pins can stop a change request arriving between its final check and the "
+               f"merge; the server has to be the one enforcing it.")
     want_admins = snap.policy.require_enforce_admins
     if want_admins is not None and snap.protection.enforce_admins != want_admins:
         refuse(codes.REFUSED_POLICY_DRIFT,
