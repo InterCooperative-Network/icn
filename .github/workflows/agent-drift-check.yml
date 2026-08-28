@@ -19,6 +19,10 @@ on:
       - 'scripts/tests/test_skill_registry_invariants.py'
       - 'scripts/check-merge-policy-schema.py'
       - 'scripts/tests/test_merge_policy_schema.py'
+      # icn#2651 stage B: the executable that owns ordinary-merge semantics, and its controls.
+      - 'tools/icn-merge-pr/**'
+      - 'scripts/tests/test_icn_merge_pr.py'
+      - 'scripts/tests/test_icn_merge_pr_install.py'
       - 'ops/scripts/setup-skill-symlinks.sh'
       - 'ops/state/truth/**'
       - 'ops/scripts/drift-check.sh'
@@ -103,6 +107,16 @@ jobs:
 
       - name: Merge-policy schema rejects its own violations (Refs icn#2651)
         run: python3 scripts/tests/test_merge_policy_schema.py
+
+      # icn#2651 stage B: merge semantics are code now, so they are tested as code. These run the
+      # real decision path against a fake GitHub — no network, no PR is merged to prove a gate.
+      - name: Ordinary-merge evaluator behaviour (Refs icn#2651)
+        run: python3 scripts/tests/test_icn_merge_pr.py
+
+      # The installer is the trust boundary: it must refuse any source that is not the live
+      # default-branch tip, and the installed runtime must not import candidate-worktree code.
+      - name: Ordinary-merge evaluator provenance gate (Refs icn#2651)
+        run: python3 scripts/tests/test_icn_merge_pr_install.py
 
       - name: SessionStart hook runs and degrades honestly (Refs icn#2634)
         run: |

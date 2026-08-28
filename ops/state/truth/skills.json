@@ -282,7 +282,46 @@
             "path": ".claude/skills/merge-pr/SKILL.md",
             "policy": "exact_mirror"
           }
-        ]
+        ],
+        "authority_note": "icn#2651 stage B moved ordinary-merge semantics out of this file and into the trusted executable at tools/icn-merge-pr/. The skill is a wrapper: it resolves a PR number, calls the program, shows the structured outcome, and takes authorization. These assertions keep it thin \u2014 a merge path this skill could execute on its own would be a second owner of the rules, and the copy is the one that rots.",
+        "canonical_assertions": {
+          "rationale": "icn#2651: merge semantics are owned by tools/icn-merge-pr/, not by this document. The skill must call the executable and must carry no independent merge path.",
+          "must_reference": [
+            "ops/state/truth/policy.json",
+            "icn-merge-pr",
+            "explicit, per-PR maintainer authorization"
+          ],
+          "must_not_match": [
+            {
+              "pattern": "gh\\s+pr\\s+merge",
+              "why": "a raw merge command in this skill is a merge path that bypasses every gate the executable owns \u2014 including the head-pinned mutation and the post-merge proof"
+            },
+            {
+              "pattern": "--admin\\b",
+              "why": "the ordinary primitive has no privileged path; admin-merge eligibility is a human decision owned by the ADR named in policy.json#merge.admin_bypass"
+            },
+            {
+              "pattern": "--auto\\b|--disable-auto\\b",
+              "why": "an ordinary merge completes or refuses; it never arms a merge to happen later, and it never disarms another actor's request"
+            },
+            {
+              "pattern": "branches/[^/\\s]+/protection",
+              "why": "branch protection is read by the executable for the branch it is actually merging into; a baked path is wrong for any non-default base"
+            },
+            {
+              "pattern": "\\bBuild Release\\b",
+              "why": "a literal required-check name is a snapshot of policy.json#merge.required_checks"
+            },
+            {
+              "pattern": "\\b(all\\s+)?\\d+\\s+required\\s+(CI\\s+)?checks\\b",
+              "why": "a required-check count rots the moment branch protection changes"
+            },
+            {
+              "pattern": "REFUSED.*\\bdid not merge\\b|\\bthe (PR|pull request) (did not merge|is not merged|was not merged)\\b",
+              "why": "an outcome describes this invocation, not about the pull request: a target may already have been merged or closed by another actor, in which case the evaluator refuses with the observed state and this wording would state the opposite of the evidence it was told to quote"
+            }
+          ]
+        }
       },
       {
         "name": "merge-prs",
