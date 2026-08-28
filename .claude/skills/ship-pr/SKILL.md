@@ -132,7 +132,15 @@ Use the repository's bounded wait primitive, `ops/scripts/icn-wait`. Never an ad
 Read which gates actually matter from the merge owner and live branch protection — this skill does
 not know them and must not learn them.
 
-## 11. Hand over
+## 11. Check the freeze head, then hand over
+
+**Compare the live head with the recorded freeze head before anything else.** A freeze names an
+exact head because that is the head that was reviewed and verified. Anything pushed since has been
+through neither, and nothing downstream will catch it: the merge executable pins the head it
+mutates, but it has no idea which head was reviewed.
+
+On a mismatch, the new content is unverified. Run DELTA verification on it, update the freeze head,
+return to FROZEN, and only then continue. `freeze.head_must_match_before_handoff` is the rule.
 
 ```bash
 icn-merge-pr check "$PR"

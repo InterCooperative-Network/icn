@@ -186,8 +186,8 @@
       },
       {
         "id": "violates_stated_contract",
-        "condition": "It violates an explicit acceptance condition, an established repository invariant, or a behaviour this pull request claims to provide.",
-        "why": "This is what makes the deliverable wrong rather than merely improvable."
+        "condition": "It violates an explicit acceptance condition, an established repository invariant, or a behaviour this pull request claims to provide \u2014 or it regresses behaviour this pull request actually changes, whether or not the contract mentioned it.",
+        "why": "This is what makes the deliverable wrong rather than merely improvable. A regression counts even when the contract is silent about it: a pull request does not get to break what it touched by omitting it from the contract."
       },
       {
         "id": "realistic_path",
@@ -232,6 +232,7 @@
       "the scheduled comprehensive review generation has closed"
     ],
     "names_an_exact_head": true,
+    "head_must_match_before_handoff": "Before handing over to the merge primitive, the live head must equal the recorded freeze head. A freeze names an exact head because that is the head that was reviewed and verified; content pushed after the freeze has been through neither. On a mismatch, run DELTA verification on the new content, update the freeze head, return to FROZEN, and only then hand over. The merge executable pins the head it mutates, but it does not know which head was reviewed \u2014 nothing downstream will catch this.",
     "effect": [
       "a new automated review comment does not reopen the pull request",
       "review of a frozen pull request is DELTA, never FULL",

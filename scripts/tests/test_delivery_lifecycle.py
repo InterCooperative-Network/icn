@@ -254,6 +254,40 @@ rejects("one ledger issue per comment is rejected",
 
 
 # ---------------------------------------------------------------------------------------------
+print("a regression counts even when the contract is silent about it")
+
+# A pull request does not get to break what it touched by omitting it from the contract. Without
+# this, a reproducible, introduced, realistic, materially breaking regression failed the
+# stated-contract condition and had to be dispositioned FOLLOW_UP — resolved without a fix.
+contract_condition = next(c for c in DELIVERY["blocker_predicate"]["all_must_hold"]
+                          if c["id"] == "violates_stated_contract")
+check("the stated-contract condition covers regressions in behaviour the diff changes",
+      "regresses behaviour this pull request actually changes" in contract_condition["condition"],
+      contract_condition["condition"][:90])
+check("the reviewer adapter and the owner name the same category",
+      "regression in behaviour this diff actually changes"
+      in (ROOT / ".claude" / "agents" / "icn-code-reviewer.md").read_text(encoding="utf-8"),
+      "adapter and owner disagree")
+rejects("narrowing the condition back to declared contract terms is rejected",
+        mutated(**{"blocker_predicate__all_must_hold__2__condition":
+                   "It violates an explicit acceptance condition."}), "owned by code")
+
+
+# ---------------------------------------------------------------------------------------------
+print("a freeze names the head that ships")
+
+check("the owner requires the live head to match the freeze head before handoff",
+      bool(DELIVERY["freeze"].get("head_must_match_before_handoff")), "no rule")
+rejects("dropping the head-match rule is rejected",
+        mutated(freeze__head_must_match_before_handoff=None), "head_must_match_before_handoff")
+ship_hand = (ROOT / ".agents" / "skills" / "ship-pr" / "SKILL.md").read_text(encoding="utf-8")
+check("ship-pr compares the freeze head before handing over",
+      "head_must_match_before_handoff" in ship_hand and "freeze head" in ship_hand, "missing")
+check("ship-pr refreezes rather than shipping unverified content",
+      "return to FROZEN" in ship_hand, "no refreeze instruction")
+
+
+# ---------------------------------------------------------------------------------------------
 print("a thread is resolved when its disposition is final, not when it is written")
 
 # Merge readiness counts unresolved threads, so "reply and resolve" applied to a QUESTION would

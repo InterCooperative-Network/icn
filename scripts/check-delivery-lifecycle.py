@@ -83,7 +83,8 @@ BLOCKER_CONDITIONS = {
         "It is introduced by this pull request rather than merely adjacent or pre-existing.",
     "violates_stated_contract":
         "It violates an explicit acceptance condition, an established repository invariant, or a "
-        "behaviour this pull request claims to provide.",
+        "behaviour this pull request claims to provide \u2014 or it regresses behaviour this pull "
+        "request actually changes, whether or not the contract mentioned it.",
     "realistic_path":
         "It occurs on a supported and realistic execution path relevant to the feature's intended "
         "operation, rather than existing only as generalised hardening speculation.",
@@ -396,7 +397,8 @@ def _check_freeze(doc, out) -> None:
                    "freezes nothing")
     if not _strs(fz.get("effect")):
         out.append("freeze.effect: must be a non-empty array of strings")
-    for field in ("late_finding_rule", "refreeze", "server_enforced_gates_still_apply"):
+    for field in ("late_finding_rule", "refreeze", "server_enforced_gates_still_apply",
+                  "head_must_match_before_handoff"):
         if not _str(fz.get(field)):
             out.append(f"freeze.{field}: must be a non-empty string")
 
