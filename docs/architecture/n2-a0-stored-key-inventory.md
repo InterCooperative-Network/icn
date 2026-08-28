@@ -736,6 +736,21 @@ fix it (the rows are `Display`-keyed). **Disposition:** no issue owned it (§7.5
 not materialised; #2623/#2626/#2627 disclaim governance storage). **Filed by this review as
 #2641.**
 
+**Resolved 2026-08-28 (#2641).** The measurement above stands as taken at `798c8d54`. Governance
+now resolves a voter to the bytes its `did:icn:` identifier decodes to (`icn-governance`'s
+`VotingPrincipal`): `AlreadyVoted` has a constructor (`ensure_has_not_voted`), both
+`GovernanceStore` implementations supersede a principal's prior row across spellings, and every
+production tally path uses `VoteTally::try_from_votes`, which collapses agreeing alias rows and
+**fails closed** on conflicting ones rather than electing a survivor. Two corrections to the note
+above, found while fixing it: the live exploit is not only #23 via `manager.rs`'s guard —
+`GovernanceManager::cast_vote` delegates to `governance_handle` as its *first* statement, so in
+actor-backed deployments the membership gate and that guard never ran, and the actor's `CastVote`
+handler had **no** duplicate-vote guard at all; and the identity used for the fix is the decoded
+identifier bytes rather than a `VerifyingKey`, because anchor-derived DIDs (`Did::from_anchor_id`)
+need not decompress to an Edwards point. Nothing was re-keyed: vote rows remain `Display`-keyed and
+membership lists remain spelling-compared, so §7.5's re-key gate is untouched and this row stays
+`NEEDS MIGRATION` for N2-A.
+
 ### 10.4 `grantee_canonical_bytes` canonicalizes the *layout*, not the spelling
 `receipt_store.rs:1071` is named `*_canonical_bytes` and emits a tag byte followed by
 `did.as_str()` — the raw spelling. A lookup with a differently-spelled DID misses the grant (fails

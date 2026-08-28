@@ -465,12 +465,26 @@ now, and no downstream design may violate it while remaining conformant.
 
 ### 7.5 Hard migration gate — membership and vote re-keying
 
-Vote storage is keyed by voter identity and the re-cast guard is declared but
-never constructed, so dual-keying would let the same historical person create two
-counted rows. **Before any live membership or vote re-key**, four things must be
-designed: migration ordering · alias/transition recognition · duplicate-act
-prevention · final cutover. N2 does not solve governance storage; it states the
-gate.
+Vote storage is keyed by voter identity, so dual-keying would let the same
+historical person create two counted rows. **Before any live membership or vote
+re-key**, four things must be designed: migration ordering · alias/transition
+recognition · duplicate-act prevention · final cutover. N2 does not solve
+governance storage; it states the gate.
+
+**Duplicate-act prevention is delivered** (#2641). Governance admission and
+tallying resolve a voter to the bytes its `did:icn:` identifier decodes to, via
+`icn-governance`'s `VotingPrincipal`, so one cryptographic voter contributes at
+most one effective vote whatever multibase spelling names it. `AlreadyVoted` is
+now constructed, by `ensure_has_not_voted`, on both apps/governance admission
+paths. Rows for one principal that express conflicting acts fail closed rather
+than electing a survivor, because choosing between two conflicting historical
+acts is this gate's business, not the duplicate-act guard's.
+
+The other three prerequisites — migration ordering, alias/transition
+recognition, final cutover — remain undesigned, and **no persisted vote or
+membership key has been re-keyed**. Membership lists are still compared by DID
+spelling; under a static list an alias spelling is refused at the membership
+gate, which is fail-closed but is not yet alias recognition.
 
 ---
 
