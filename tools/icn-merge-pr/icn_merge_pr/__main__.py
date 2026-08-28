@@ -95,6 +95,18 @@ def _recorded_files(record):
     return expected
 
 
+def _is_source_checkout():
+    """Is this the tool's own source directory in a repository checkout?
+
+    Identified by shape, not by what is absent: `<repo>/tools/icn-merge-pr/` holding `install.py`
+    beside the package. Running from source is legitimate and has no manifest to be closed
+    against; mutation is refused separately for exactly that reason.
+    """
+    return (os.path.basename(_LIB) == "icn-merge-pr"
+            and os.path.basename(os.path.dirname(_LIB)) == "tools"
+            and os.path.isfile(os.path.join(_LIB, "install.py")))
+
+
 def _listdir(path, label):
     try:
         return set(os.listdir(path))
@@ -111,7 +123,15 @@ def _verify_closed_tree():
     """
     record_path = os.path.join(_LIB, _RECORD_NAME)
     if not os.path.exists(record_path):
-        return False
+        # A MISSING record is not evidence of a source checkout — it is also what an installed
+        # tree looks like once someone has removed the file. Inferring "nothing to verify" from
+        # the absence let the closed-tree check be skipped entirely, and the package imported
+        # unverified. The source layout is therefore identified positively instead.
+        if _is_source_checkout():
+            return False
+        _refuse(f"{record_path} is missing, and {_LIB} is not this tool's source layout. An "
+                "installed tree without its provenance record cannot be verified, so nothing "
+                "will be imported from it; reinstall.")
     if os.path.islink(record_path):
         _refuse(f"{record_path} is a symlink; an installed provenance record is a regular file")
     try:

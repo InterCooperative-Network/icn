@@ -576,6 +576,31 @@ no_claim = policy_with(lambda d: d["branch"].pop("required_approvals"))
 no_claim["protection"]["required_approving_review_count"] = 0
 expect("a policy that makes no approval claim has no approval drift to report", no_claim,
        codes.READY)
+print("pagination metadata is an object before it is read")
+
+
+class BadPageInfo(FakeGitHub):
+    def _page(self, pages, after, extra=None):
+        page = super()._page(pages, after, extra)
+        page["pageInfo"] = self.w["bad_page_info"]
+        return page
+
+
+for shape in ("more", ["x"], 7, {"hasNextPage": "yes"}, {"hasNextPage": None}):
+    fake = BadPageInfo(world(bad_page_info=shape))
+    try:
+        got = run(fake, "example", "icn", 1, authorize=False).outcome
+    except Exception as exc:                                  # noqa: BLE001 — that is the point
+        got = f"raised {type(exc).__name__}"
+    check(f"pagination metadata of {shape!r} -> REFUSED_UNAVAILABLE_EVIDENCE",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+    mutating = BadPageInfo(world(bad_page_info=shape))
+    try:
+        run(mutating, "example", "icn", 1, authorize=True)
+    except Exception:                                         # noqa: BLE001
+        pass
+    check(f"no mutation from pagination metadata of {shape!r}", mutating.merge_calls == [])
+
 print("bypass evidence is enumerated across EVERY page")
 from icn_merge_pr.ghclient import GhCli                            # noqa: E402
 

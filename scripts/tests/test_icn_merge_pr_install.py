@@ -445,6 +445,28 @@ with tempfile.TemporaryDirectory(prefix="icn-merge-pr-install-") as raw:
     check("the installer's own record is accepted", proc.returncode == 0 and head in proc.stdout,
           proc.stdout[:160])
 
+    print("an installed tree without its provenance record imports nothing")
+    kept_record = record_file.read_bytes()
+    record_file.unlink()
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("a removed provenance record refuses before importing the package",
+          proc.returncode != 0 and "REFUSED_NOT_INSTALLED" in proc.stdout
+          and "not this tool's source layout" in proc.stdout, proc.stdout[:220])
+    record_file.symlink_to(tmp / "nowhere.json")
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("a provenance record replaced by a broken symlink also refuses",
+          proc.returncode != 0 and "REFUSED_NOT_INSTALLED" in proc.stdout, proc.stdout[:220])
+    record_file.unlink()
+    record_file.write_bytes(kept_record)
+    proc = subprocess.run([str(binary), "provenance"], capture_output=True, text=True, env=no_gh)
+    check("restoring the record restores the installation", proc.returncode == 0,
+          proc.stdout[:160])
+    source_main = source / "tools" / "icn-merge-pr" / "icn_merge_pr" / "__main__.py"
+    proc = subprocess.run([sys.executable, str(source_main), "--help"], capture_output=True,
+                          text=True, env=no_gh)
+    check("the tool's own source layout still runs without a record", proc.returncode == 0,
+          proc.stderr[:160])
+
     print("the installed runtime does not execute candidate-worktree code")
     candidate = tmp / "candidate-worktree"
     hostile = candidate / "icn_merge_pr"

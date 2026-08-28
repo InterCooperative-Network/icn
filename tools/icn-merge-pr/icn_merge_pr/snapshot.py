@@ -176,6 +176,26 @@ class Snapshot:
         return self.policy.text_sha256
 
 
+def _page_info(page, label):
+    """The pagination metadata of one page, established as an object before it is read.
+
+    A truthy non-object `pageInfo` — a string or a list — survives `or {}` and raises
+    AttributeError on the next `.get`, crashing rather than refusing. `hasNextPage` must be a real
+    boolean too: "there may be more pages" is not something to guess at when the whole point of
+    the loop is to see every one of them.
+    """
+    info = page.get("pageInfo")
+    if info is None:
+        return False, None
+    if not isinstance(info, dict):
+        raise EvidenceUnavailable(f"{label} returned unreadable pagination metadata ({info!r})")
+    has_next = info.get("hasNextPage")
+    if type(has_next) is not bool:
+        raise EvidenceUnavailable(
+            f"{label} did not say whether more pages follow ({has_next!r})")
+    return has_next, info.get("endCursor")
+
+
 def _enum(value, allowed, label):
     """Membership in a pinned vocabulary — after establishing the value can be tested at all.
 
@@ -283,15 +303,15 @@ def _collect_threads(client, owner, name, number) -> tuple[int, int]:
             seen += 1
             if not node["isResolved"]:
                 unresolved += 1
-        info = page.get("pageInfo") or {}
+        has_next, next_cursor = _page_info(page, "review threads")
         pages += 1
-        if not info.get("hasNextPage"):
+        if not has_next:
             if seen != total:
                 raise EvidenceUnavailable(
                     f"GitHub reports {total} review thread(s) but only {seen} could be read; the "
                     "unread ones cannot be shown to be resolved")
             return total, unresolved
-        cursor = info.get("endCursor")
+        cursor = next_cursor
         if not cursor or pages >= _MAX_PAGES:
             raise EvidenceUnavailable("review thread pagination did not terminate")
 
@@ -319,15 +339,15 @@ def _collect_reviews(client, owner, name, number) -> tuple[str, ...]:
             if not isinstance(node, dict) or not isinstance(node.get("state"), str):
                 raise EvidenceUnavailable("a review did not report a state")
             states.append(_enum(node["state"], REVIEW_STATES, "an opinionated review state"))
-        info = page.get("pageInfo") or {}
+        has_next, next_cursor = _page_info(page, "opinionated reviews")
         pages += 1
-        if not info.get("hasNextPage"):
+        if not has_next:
             if len(states) != total:
                 raise EvidenceUnavailable(
                     f"GitHub reports {total} opinionated review(s) but only {len(states)} could "
                     "be read; the unread ones cannot be shown not to object")
             return tuple(states)
-        cursor = info.get("endCursor")
+        cursor = next_cursor
         if not cursor or pages >= _MAX_PAGES:
             raise EvidenceUnavailable("opinionated review pagination did not terminate")
 
@@ -371,15 +391,15 @@ def _collect_checks(client, owner, name, number,
                 raise EvidenceUnavailable("a status check rollup entry was unreadable")
             found.setdefault(entry[0], []).append(entry[1])
             seen += 1
-        info = page.get("pageInfo") or {}
+        has_next, next_cursor = _page_info(page, "the status check rollup")
         pages += 1
-        if not info.get("hasNextPage"):
+        if not has_next:
             if seen != total:
                 raise EvidenceUnavailable(
                     f"GitHub reports {total} status check result(s) but only {seen} could be "
                     "read; an occurrence that went unread cannot be shown to be green")
             return {k: tuple(v) for k, v in found.items()}
-        cursor = info.get("endCursor")
+        cursor = next_cursor
         if not cursor or pages >= _MAX_PAGES:
             raise EvidenceUnavailable("status check pagination did not terminate")
 
