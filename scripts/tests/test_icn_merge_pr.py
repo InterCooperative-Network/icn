@@ -124,6 +124,11 @@ class FakeGitHub:
         return bool(self.w["merge_queue"])
 
     def pull_request_core(self, owner, name, number):
+        if "pr_object" in self.w:
+            # Drive the REAL transport guard over a non-object `pullRequest`.
+            client = GhCli()
+            client._graphql = lambda q, v: {"pullRequest": self.w["pr_object"]}
+            return client.pull_request_core(owner, name, number)
         return copy.deepcopy(self.w["pr"])
 
     def _page(self, pages, after, extra=None):
@@ -1112,6 +1117,32 @@ _, fallback = merge_world(world(post_merge={"state": "MERGED", "merged": True,
 check("a valid merge-response sha is accepted when the post-read omits one",
       fallback.outcome == codes.MERGED
       and fallback.merge["merge_commit_sha"] == MERGE_COMMIT, f"{fallback.merge}")
+
+print("a malformed pull request object refuses instead of crashing")
+for shape in ([], "x", 7, 0.5):
+    try:
+        _, r = evaluate_world(world(pr_object=shape))
+        got = r.outcome
+    except Exception as exc:                                  # noqa: BLE001 — that is the point
+        got = f"raised {type(exc).__name__}"
+    check(f"an initial pull request of {shape!r} -> REFUSED_UNAVAILABLE_EVIDENCE",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+    fake, _ = merge_world(world(pr_object=shape))
+    check(f"no mutation from an initial pull request of {shape!r}", fake.merge_calls == [])
+
+print("a malformed check-run status refuses instead of crashing")
+for shape in ([], {"a": 1}, 7, True, None):
+    bad_status = world()
+    bad_status["check_pages"][0][0] = dict(bad_status["check_pages"][0][0], status=shape)
+    try:
+        _, r = evaluate_world(bad_status)
+        got = r.outcome
+    except Exception as exc:                                  # noqa: BLE001
+        got = f"raised {type(exc).__name__}"
+    check(f"a check-run status of {shape!r} -> REFUSED_UNAVAILABLE_EVIDENCE",
+          got == codes.REFUSED_UNAVAILABLE_EVIDENCE, f"got {got}")
+    fake, _ = merge_world(bad_status)
+    check(f"no mutation from a check-run status of {shape!r}", fake.merge_calls == [])
 
 print("a malformed post-read object cannot crash after dispatch")
 for shape in ([], "x", 7, 0.5):

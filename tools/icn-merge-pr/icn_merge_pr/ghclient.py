@@ -277,7 +277,13 @@ class GhCli:
 
     def pull_request_core(self, owner: str, name: str, number: int) -> dict:
         repo = self._graphql(_PR_CORE, {"owner": owner, "name": name, "number": number})
-        return _dig(repo, "pullRequest")
+        pr = _dig(repo, "pullRequest")
+        # Same rule as the post-read: `_dig` proves the key exists and is not null, not that the
+        # value is an object, and every caller goes straight to `.get`.
+        if not isinstance(pr, dict):
+            raise EvidenceUnavailable(
+                f"GitHub returned a pull request that is not an object for #{number} ({pr!r})")
+        return pr
 
     def review_threads_page(self, owner: str, name: str, number: int, after: str | None) -> dict:
         repo = self._graphql(_THREADS, {"owner": owner, "name": name, "number": number,

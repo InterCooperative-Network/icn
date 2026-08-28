@@ -226,6 +226,12 @@ def _normalise_check(node) -> tuple[str, CheckOccurrence] | None:
         when = started if isinstance(started, str) and started else None
         seq = sequence if type(sequence) is int else None
         status = node.get("status")
+        # A list or object is unhashable, so `status in _RUNNING` raises TypeError and escapes the
+        # MergeToolError handling. Establish the type, then test membership; recognised statuses
+        # keep exactly the meaning they had.
+        if not isinstance(status, str):
+            raise EvidenceUnavailable(
+                f"check run {name!r} reported an unreadable status ({status!r})")
         if status in _RUNNING or status != "COMPLETED":
             return (name, CheckOccurrence(PENDING, _app_id(node), when, seq))
         conclusion = node.get("conclusion")
