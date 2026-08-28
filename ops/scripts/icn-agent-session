@@ -113,9 +113,15 @@ resolve_cli() {
     CLI="$dist/cli/session.js"
     # Publish the resolution into the worktree as a symlink. It is ignored by .gitignore, it
     # keeps every later hook on the zero-cost path, and it makes provenance readable: the
-    # target path names the source fingerprint the runtime was compiled from. Never clobber a
-    # real in-tree build — a developer running `npm run build` still wins in their own lane.
-    if [ ! -e "$ROOT/ops/mcp/dist" ] || [ -L "$ROOT/ops/mcp/dist" ]; then
+    # target path names the fingerprint the runtime was compiled from. Never clobber a real
+    # in-tree build — a developer running `npm run build` still wins in their own lane.
+    #
+    # ONLY when the cache entry is actually read-only. The symlink is the sole path by which a
+    # lane can write into shared cache storage (`npm run build` would compile straight through
+    # it), so if the bootstrap could not protect the entry — a filesystem that ignores chmod —
+    # the link is exactly the hazard and is not worth the saved milliseconds. Later hooks then
+    # re-resolve, which is slower and correct.
+    if [ ! -w "$dist" ] && { [ ! -e "$ROOT/ops/mcp/dist" ] || [ -L "$ROOT/ops/mcp/dist" ]; }; then
       ln -sfn "$dist" "$ROOT/ops/mcp/dist" 2>/dev/null || true
     fi
     return 0

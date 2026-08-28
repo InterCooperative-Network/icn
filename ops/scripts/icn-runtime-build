@@ -58,7 +58,8 @@
 #
 # Environment:
 #   ICN_RUNTIME_CACHE          cache root (default ${XDG_CACHE_HOME:-$HOME/.cache}/icn/agent-runtime)
-#   ICN_RUNTIME_BUILD_TIMEOUT  seconds for the whole bootstrap (default 300)
+#   ICN_RUNTIME_BUILD_TIMEOUT  seconds for the dist build and its lock wait (default 300)
+#   ICN_RUNTIME_DEPS_TIMEOUT   seconds for the dependency install and its lock wait (default 1800)
 #   ICN_RUNTIME_NO_BUILD=1     resolve a cached build, never build one (used by tests)
 #   ICN_RUNTIME_ABI            override the detected Node ABI/platform/arch (used by tests)
 
@@ -202,13 +203,18 @@ find "$CACHE/tmp" -mindepth 1 -maxdepth 1 -type d -mmin +120 -exec rm -rf {} + 2
 stage() {
   local kind="$1" fp="$2" target="$3" marker="$4"
   local lock="$CACHE/locks/$kind-$fp.lock"
-  local tmp rc=0
+  local tmp rc=0 wait_for
+  # Wait on the lock for as long as the HOLDER is allowed to take. Using the dist budget for
+  # both made a waiter give up after 300s while a concurrent dependency install was still
+  # legitimately running inside its 1800s budget — a spurious failure on the ordinary
+  # cold-start-together path.
+  case "$kind" in deps) wait_for="$DEPS_BUDGET" ;; *) wait_for="$BUDGET" ;; esac
   tmp="$(mktemp -d "$CACHE/tmp/$kind-$fp.XXXXXX")" || fail "could not create a staging directory"
 
   exec 9>"$lock" || { rm -rf "$tmp"; fail "could not open the $kind lock at $lock"; }
-  if ! flock -w "$BUDGET" 9; then
+  if ! flock -w "$wait_for" 9; then
     rm -rf "$tmp"
-    fail "timed out after ${BUDGET}s waiting for another agent's $kind build ($fp)"
+    fail "timed out after ${wait_for}s waiting for another agent's $kind build ($fp)"
   fi
 
   # Re-check under the lock: the process we queued behind has very likely just finished the
@@ -223,7 +229,10 @@ stage() {
     : > "$tmp/${marker##*/}"
     # rename(2): the finished tree appears under its final name in one step, already marked
     # complete, so no reader can observe a half-built cache entry.
-    if mv -T "$tmp" "$target" 2>/dev/null; then
+    # os.rename, not `mv -T`: -T is GNU-only, and plain `mv` moves INTO an existing directory
+    # rather than failing — the one behaviour that must not happen here. python3 is already a
+    # hard dependency of this script, and os.rename is the atomic primitive being relied on.
+    if python3 -c 'import os,sys; os.rename(sys.argv[1], sys.argv[2])' "$tmp" "$target" 2>/dev/null; then
       if [ "$kind" = dist ]; then
         # CACHE-POISONING GUARD. A bootstrapped lane's ops/mcp/dist is a SYMLINK into this
         # directory, so `npm --prefix ops/mcp run build` there would compile that lane's sources
@@ -235,6 +244,15 @@ stage() {
         # fingerprint's entry, which is where the bootstrap already puts it.
         # To clear the cache by hand: chmod -R u+w on the entry first.
         chmod -R a-w "$target" 2>/dev/null || true
+        # VERIFY the guard, do not assume it. On a filesystem that ignores or rejects the
+        # permission change, silently continuing would leave a writable shared entry that a
+        # lane's `npm run build` can overwrite — the exact poisoning this prevents, minus the
+        # protection. Say so; icn-agent-session then declines to publish the worktree symlink,
+        # which is the only path by which a lane can write here at all.
+        if [ -w "$target/dist" ]; then
+          printf 'icn-runtime-build: WARNING: %s could not be made read-only; the cache is unprotected against a lane rebuilding into it, so no ops/mcp/dist symlink will be published\n' \
+            "$target" >&2
+        fi
       fi
       note "$kind $fp built"
     elif [ -f "$marker" ]; then
@@ -338,7 +356,15 @@ if [ ! -f "$DEPS_OK" ]; then
   if [ "$BACKGROUND_IF_COLD" = 1 ]; then
     log="$CACHE/bootstrap.log"
     pidfile="$CACHE/bootstrap.pid"
-    if flock -n "$CACHE/locks/deps-$DEPS_FP.lock" true 2>/dev/null; then
+    # A LIVE bootstrap is detected by its recorded pid, and the spawn itself is serialised.
+    # `flock -n <file> true` held the lock only while `true` ran, so it was already released
+    # before the child could take it: every hook arriving together passed the probe and
+    # launched its own detached multi-minute install.
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
+      fail "dependency cache is cold and a background bootstrap is already running (log: $log, pid: $(cat "$pidfile" 2>/dev/null)). This session is unregistered; the next one will not be."
+    fi
+    exec 8>"$CACHE/locks/spawn.lock" || fail "could not open the spawn lock"
+    if flock -n 8; then
       # The child's pid is RECORDED, not just spawned. A detached multi-minute native build
       # that nothing can name is precisely the abandoned-process shape this repository keeps
       # having to clean up by hand; a caller — a test tearing down, or a human wondering what

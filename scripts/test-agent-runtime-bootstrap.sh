@@ -143,20 +143,20 @@ if [ "$DEPS_AVAILABLE" = 1 ]; then
   wait
   paths="$(cat "$TMP"/conc.1 "$TMP"/conc.2 "$TMP"/conc.3 "$TMP"/conc.4 2>/dev/null | sort -u)"
   count="$(printf '%s\n' "$paths" | grep -c . )"
-  if [ "$count" = 1 ] && [ -f "$(printf '%s' "$paths")/cli/session.js" ]; then
+  if [ "$count" -eq 1 ] && [ -f "$(printf '%s' "$paths")/cli/session.js" ]; then
     ok "four concurrent cold starts agree on one usable build"
   else
     bad "concurrent starts disagreed or failed" "$(printf '%s' "$paths" | head -4)"
   fi
   entries="$(ls -1 "$CONC/build" 2>/dev/null | wc -l)"
-  if [ "$entries" = 1 ]; then
+  if [ "$entries" -eq 1 ]; then
     ok "concurrent starts leave exactly one cache entry"
   else
     bad "expected one build cache entry, found $entries" "$(ls -1 "$CONC/build" 2>/dev/null)"
   fi
   # A staging directory left behind would mean a partially built tree could be observed.
   leftovers="$(ls -1 "$CONC/tmp" 2>/dev/null | wc -l)"
-  if [ "$leftovers" = 0 ]; then
+  if [ "$leftovers" -eq 0 ]; then
     ok "no staging directories survive a concurrent build"
   else
     bad "staging directories leaked" "$(ls -1 "$CONC/tmp")"
@@ -281,13 +281,28 @@ fi
 
 # cold deps: asserted, not waited on. A cold dependency tree must hand off to a detached
 # bootstrap rather than stalling a human at a prompt for minutes.
+# Four at once, because that is how SessionStart hooks actually arrive on a cold machine. Each
+# must defer, and between them they must start EXACTLY ONE installer: `flock -n <file> true`
+# released the lock before the child could take it, so every arrival passed the probe and
+# launched its own detached multi-minute native build.
 NODEPS="$TMP/cache-nodeps"
-err="$(ICN_RUNTIME_CACHE="$NODEPS" \
-       "$LANE1/ops/scripts/icn-runtime-build" --background-if-cold 2>&1 >/dev/null)"
-if printf '%s' "$err" | grep -q 'background bootstrap'; then
-  ok "a cold dependency cache hands off to a background bootstrap instead of blocking"
+for i in 1 2 3 4; do
+  ( ICN_RUNTIME_CACHE="$NODEPS" "$LANE1/ops/scripts/icn-runtime-build" \
+      --background-if-cold >/dev/null 2>"$TMP/cold.$i.err" ) &
+done
+wait
+err="$(cat "$TMP"/cold.*.err 2>/dev/null)"
+deferred="$(grep -lc 'background bootstrap' "$TMP"/cold.*.err 2>/dev/null | wc -l)"
+if [ "$deferred" -eq 4 ]; then
+  ok "every concurrent cold start defers instead of blocking"
 else
-  bad "cold dependency cache did not defer to a background bootstrap" "$err"
+  bad "not all cold starts deferred ($deferred/4)" "$(printf '%s' "$err" | head -2)"
+fi
+started="$(grep -h 'background bootstrap was started' "$TMP"/cold.*.err 2>/dev/null | wc -l)"
+if [ "$started" -eq 1 ]; then
+  ok "a burst of concurrent cold starts launches exactly one installer"
+else
+  bad "expected exactly one launched installer, got $started" "$(printf '%s' "$err" | head -3)"
 fi
 # REAP IT. This case starts a REAL detached bootstrap, which would otherwise keep running npm ci
 # and a native compile for minutes after the suite exits — racing the teardown that deletes the
