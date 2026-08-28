@@ -689,7 +689,7 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         uses: ./.github/actions/free-disk-space
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         with:
           node-version: '20'
@@ -732,7 +732,7 @@ jobs:
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -759,7 +759,7 @@ jobs:
         if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
         run: echo "Confirmed docs-only (no frontend files); skipping accessibility tests."
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         with:
           node-version: '20'
@@ -814,7 +814,7 @@ jobs:
         if: needs.changes.outputs.member_shell_relevant != 'true'
         run: echo "No member-shell-relevant paths changed; passing as a no-op."
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: needs.changes.outputs.member_shell_relevant == 'true'
         with:
           node-version: '20'
