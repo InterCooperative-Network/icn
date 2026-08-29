@@ -509,6 +509,75 @@ fn fields_outside_name_and_participants_do_not_affect_identity() {
 // algorithm — so this guard searches for the algorithm.
 // ---------------------------------------------------------------------------
 
+/// Files allowed to contain the rule, relative to the cargo root.
+///
+/// `code_hash.rs` is the rule. This test file holds deliberate mutant replicas
+/// of it — that is how the discrimination tests above work — so it exempts
+/// itself. Nothing else may.
+const EXEMPT: &[&str] = &[
+    "crates/icn-ccl/src/code_hash.rs",
+    "crates/icn-ccl/tests/contract_code_hash_golden.rs",
+];
+
+/// Does this source file re-implement the contract code-hash rule?
+///
+/// Matching one source spelling is not enough: `uninlined_format_args` is
+/// `allow`ed workspace-wide (`icn/Cargo.toml`), so `format!("{:?}", participant)`
+/// is idiomatic here and a guard keyed to `format!("{participant:?}")` alone
+/// would wave it through. Whitespace is stripped first so formatting cannot
+/// evade the match, and two independent signals are used.
+/// Signals must be *adjacent*, not merely co-present in the same file. A
+/// file-scoped conjunction flags any large file that happens to contain all the
+/// tokens somewhere — `icnctl`'s 12k-line `main.rs` and `icn-steward`'s ceremony
+/// hashes both tripped an earlier version of this check while implementing
+/// nothing of the kind.
+fn re_implements_the_rule(source: &str) -> bool {
+    /// Byte-length-bounded prefix that never splits a UTF-8 character.
+    ///
+    /// Slicing `&s[..n]` directly panics when `n` lands inside a multi-byte
+    /// character, and this scans every `.rs` file in the workspace — several of
+    /// which contain non-ASCII in comments and string literals.
+    fn prefix(s: &str, max: usize) -> &str {
+        let mut end = max.min(s.len());
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        &s[..end]
+    }
+
+    let norm: String = source.chars().filter(|c| !c.is_whitespace()).collect();
+
+    // Signal A — the rule's distinctive first step, matched contiguously. Every
+    // re-implementation feeds the contract name, whatever it then does with the
+    // participants.
+    if norm.contains("update(contract.name.as_bytes())") {
+        return true;
+    }
+
+    // Signal B — a Debug format handed straight to a hasher. Contiguous, so it
+    // catches `{participant:?}`, `{p:?}` and the non-inlined `{:?}, participant`
+    // alike, and is not satisfied by a `{:?}` elsewhere in the file.
+    if norm.contains(".participants") {
+        for (i, _) in norm.match_indices(".update(format!(\"{") {
+            let window = prefix(&norm[i..], 60);
+            if window.contains(":?}") {
+                return true;
+            }
+        }
+    }
+
+    // Signal C — the same feed written through a local binding, caught by
+    // proximity to the participant iteration rather than by adjacency.
+    for (i, _) in norm.match_indices("contract.participants") {
+        let window = prefix(&norm[i..], 320);
+        if window.contains(":?}") && window.contains("format!(") && window.contains(".update(") {
+            return true;
+        }
+    }
+
+    false
+}
+
 #[test]
 fn the_rule_is_implemented_exactly_once_in_the_workspace() {
     let rust_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -517,44 +586,111 @@ fn the_rule_is_implemented_exactly_once_in_the_workspace() {
         .expect("crates/icn-ccl sits two levels below the cargo root")
         .to_path_buf();
 
-    let canonical = rust_root.join("crates/icn-ccl/src/code_hash.rs");
-    assert!(
-        canonical.is_file(),
-        "canonical module not found at {canonical:?}"
-    );
+    let exempt: Vec<std::path::PathBuf> = EXEMPT.iter().map(|p| rust_root.join(p)).collect();
+    for path in &exempt {
+        assert!(
+            path.is_file(),
+            "exempt path not found at {path:?} — the scan root is wrong, which \
+             would make this guard pass vacuously"
+        );
+    }
+
+    // Every workspace member directory, not just the two that happened to hold
+    // copies. `apps/` contains seven members, three of which already depend on
+    // `icn-ccl` and are therefore the likeliest place for a copy to reappear.
+    let mut stack = Vec::new();
+    for root in ["crates", "bins", "apps"] {
+        let dir = rust_root.join(root);
+        assert!(
+            dir.is_dir(),
+            "expected workspace member root {dir:?} to exist; a renamed or \
+             missing root must fail loudly rather than silently shrink the scan"
+        );
+        stack.push(dir);
+    }
+    // Optional roots — absent in some checkouts, scanned when present.
+    for root in ["examples", "benches"] {
+        let dir = rust_root.join(root);
+        if dir.is_dir() {
+            stack.push(dir);
+        }
+    }
 
     let mut offenders: Vec<String> = Vec::new();
-    let mut stack = vec![rust_root.join("crates"), rust_root.join("bins")];
+    let mut scanned = 0usize;
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
+        // A directory we cannot read must not be silently skipped: that is a
+        // green pass over exactly the code this guard exists to police.
+        let entries =
+            std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("cannot scan {dir:?}: {e}"));
+        for entry in entries {
+            let path = entry
+                .unwrap_or_else(|e| panic!("cannot read entry in {dir:?}: {e}"))
+                .path();
             if path.is_dir() {
                 if path.file_name().is_some_and(|n| n == "target") {
                     continue;
                 }
                 stack.push(path);
-            } else if path.extension().is_some_and(|e| e == "rs") && path != canonical {
-                let Ok(text) = std::fs::read_to_string(&path) else {
-                    continue;
-                };
-                // The algorithm's fingerprint: a participant fed through Debug
-                // into a hasher. Matching on behaviour, not on a name.
-                if text.contains("hasher.update(format!(\"{participant:?}\")") {
-                    offenders.push(path.display().to_string());
+            } else if path.extension().is_some_and(|e| e == "rs") && !exempt.contains(&path) {
+                let text = std::fs::read_to_string(&path)
+                    .unwrap_or_else(|e| panic!("cannot read {path:?}: {e}"));
+                scanned += 1;
+                if re_implements_the_rule(&text) {
+                    offenders.push(
+                        path.strip_prefix(&rust_root)
+                            .unwrap_or(&path)
+                            .display()
+                            .to_string(),
+                    );
                 }
             }
         }
     }
 
     assert!(
+        scanned > 500,
+        "only {scanned} files scanned — the walk is not reaching the workspace"
+    );
+    assert!(
         offenders.is_empty(),
         "the contract code-hash rule was re-implemented outside \
          icn-ccl/src/code_hash.rs. Call `icn_ccl::compute_contract_code_hash` \
-         instead — this rule is signed, gossiped and accepted from remote \
-         peers, and a copy that drifts breaks verification for every peer. \
-         Offending files: {offenders:?}"
+         instead — this rule is signed, gossiped and accepted verbatim from \
+         remote peers, and a copy that drifts breaks verification for every \
+         peer. Offending files: {offenders:?}"
     );
+}
+
+#[test]
+fn the_drift_guard_recognises_re_spellings_of_the_rule() {
+    // The guard is only worth having if it survives the obvious rewrites. Each
+    // of these is a real re-implementation and must be caught.
+    let variants = [
+        r#"hasher.update(contract.name.as_bytes()); for participant in &contract.participants { hasher.update(format!("{participant:?}").as_bytes()); }"#,
+        r#"hasher.update(contract.name.as_bytes()); for participant in &contract.participants { hasher.update(format!("{:?}", participant).as_bytes()); }"#,
+        r#"hasher.update(contract.name.as_bytes()); for p in &contract.participants { hasher.update(format!("{p:?}").as_bytes()); }"#,
+        r#"h.update(contract.name.as_bytes()); for p in &contract.participants { h.update(format!("{p:?}").as_bytes()); }"#,
+        r#"for p in &contract.participants { let d = format!("{p:?}"); hasher.update(d.as_bytes()); }"#,
+    ];
+    for (i, v) in variants.iter().enumerate() {
+        assert!(
+            re_implements_the_rule(v),
+            "variant {i} slipped past the drift guard: {v}"
+        );
+    }
+
+    // ...and must not fire on unrelated code that merely hashes something, or
+    // merely Debug-formats something.
+    let innocuous = [
+        r#"let mut hasher = Sha256::new(); hasher.update(payload); hasher.finalize()"#,
+        r#"tracing::debug!("participants: {:?}", contract.participants);"#,
+        r#"let code_hash = icn_ccl::compute_contract_code_hash(&contract);"#,
+    ];
+    for (i, v) in innocuous.iter().enumerate() {
+        assert!(
+            !re_implements_the_rule(v),
+            "innocuous snippet {i} was falsely flagged: {v}"
+        );
+    }
 }
