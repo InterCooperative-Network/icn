@@ -32,7 +32,8 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use icn_store::did_collision_scan::{
-    n2a_keyspaces, scan_store, store_overview, CollisionReport, StoreOverview,
+    n2a_keyspaces, scan_store, store_overview, uncovered_did_key_shapes, CollisionReport,
+    StoreOverview,
 };
 use icn_store::{SledStore, Store};
 
@@ -49,11 +50,18 @@ struct ScanOutcome {
     trees: Vec<(String, usize)>,
     /// Rows per tree whose key embeds a `did:icn:` spelling.
     did_rows: Vec<(String, usize)>,
+    /// Principal-bearing rows no registered keyspace covers, by masked shape.
+    uncovered: std::collections::BTreeMap<String, usize>,
 }
 
 impl ScanOutcome {
     /// Principal-keyed rows living in a named tree, which `Store::scan` cannot
     /// reach and this scan therefore did not examine.
+    /// Principal-bearing rows sitting outside every registered keyspace.
+    fn uncovered_did_rows(&self) -> usize {
+        self.uncovered.values().sum()
+    }
+
     fn unreachable_did_rows(&self) -> usize {
         self.did_rows
             .iter()
@@ -144,11 +152,13 @@ fn scan_copy_of(
         // zero result cannot be a named tree the scan never looked in.
         let trees = store.tree_row_counts()?;
         let did_rows = store.did_bearing_rows_per_tree()?;
+        let uncovered = uncovered_did_key_shapes(&store as &dyn Store, descriptors)?;
         Ok(ScanOutcome {
             report,
             overview,
             trees,
             did_rows,
+            uncovered,
         })
     })();
 
@@ -194,6 +204,7 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         overview,
         trees,
         did_rows,
+        uncovered,
     } = outcome;
     println!("\n=== {} ===", path.display());
     // Printed first, and always: it is what makes a row of zeros below mean
@@ -271,6 +282,16 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         }
     }
 
+    if !uncovered.is_empty() {
+        println!(
+            "  uncovered: {} principal-bearing row(s) under no registered keyspace -",
+            outcome.uncovered_did_rows()
+        );
+        for (shape, n) in uncovered {
+            println!("    {n:>5}  {shape}");
+        }
+    }
+
     println!(
         "\n  totals: {} rows, {} collision groups, {} rows in collisions, {} unreadable",
         report.total_rows_scanned(),
@@ -315,12 +336,13 @@ fn print_json(path: &Path, outcome: &ScanOutcome) {
         .collect();
 
     println!(
-        r#"{{"store":"{}","clear":{},"store_total_rows":{},"store_rows_with_did":{},"unreachable_did_rows":{},"keyspaces":[{}]}}"#,
+        r#"{{"store":"{}","clear":{},"store_total_rows":{},"store_rows_with_did":{},"unreachable_did_rows":{},"uncovered_did_rows":{},"keyspaces":[{}]}}"#,
         path.display(),
         outcome.is_clear(),
         overview.total_rows,
         overview.rows_with_embedded_did,
         outcome.unreachable_did_rows(),
+        outcome.uncovered_did_rows(),
         keyspaces.join(",")
     );
 }

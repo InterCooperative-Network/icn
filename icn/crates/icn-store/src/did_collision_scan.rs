@@ -498,6 +498,71 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
     })
 }
 
+/// Principal-bearing rows that no registered keyspace covers, grouped by the
+/// *shape* of their key.
+///
+/// A per-keyspace report of zero collisions only ever speaks for the rows those
+/// keyspaces matched. A store can hold principal-keyed rows under a prefix the
+/// registry does not name — and those rows collapse on the same first start of a
+/// key-equality binary, unexamined. Reporting "clean" without accounting for
+/// them would be exactly the false all-clear this tool exists to prevent.
+///
+/// The returned map is keyed by a **masked shape**: the key with every
+/// `did:icn:` spelling replaced by `<did>` and every non-printable byte by `.`,
+/// truncated. That reveals the namespace structure a reviewer needs in order to
+/// decide whether the prefix belongs in the registry, and reveals no identifier
+/// and no payload.
+pub fn uncovered_did_key_shapes(
+    store: &dyn Store,
+    descriptors: &[KeyspaceDescriptor],
+) -> anyhow::Result<BTreeMap<String, usize>> {
+    let mut shapes: BTreeMap<String, usize> = BTreeMap::new();
+
+    for (key, _) in store.scan(b"")? {
+        let embedded = find_embedded_dids(&key);
+        if embedded.is_empty() {
+            continue;
+        }
+        if descriptors.iter().any(|d| key.starts_with(d.prefix)) {
+            continue;
+        }
+        *shapes.entry(mask_key(&key, &embedded)).or_insert(0) += 1;
+    }
+
+    Ok(shapes)
+}
+
+/// Render a key as a structural shape: DID spellings become `<did>`,
+/// non-printable bytes become `.`, and the result is truncated.
+fn mask_key(key: &[u8], embedded: &[EmbeddedDid]) -> String {
+    const MAX: usize = 72;
+
+    let mut out = String::new();
+    let mut cursor = 0usize;
+
+    for did in embedded {
+        push_printable(&mut out, &key[cursor..did.offset]);
+        out.push_str("<did>");
+        cursor = did.offset + did.spelling.len();
+    }
+    push_printable(&mut out, &key[cursor..]);
+
+    if out.chars().count() > MAX {
+        out = out.chars().take(MAX).collect::<String>() + "…";
+    }
+    out
+}
+
+fn push_printable(out: &mut String, bytes: &[u8]) {
+    for b in bytes {
+        if b.is_ascii_graphic() || *b == b' ' {
+            out.push(*b as char);
+        } else {
+            out.push('.');
+        }
+    }
+}
+
 /// Scan one keyspace. Read-only.
 pub fn scan_keyspace(
     store: &dyn Store,
@@ -528,7 +593,14 @@ pub fn scan_store(
 /// The non-security-sensitive durable keyspaces N2-A must clear before `Did`
 /// equality becomes key equality.
 ///
-/// Sourced from the N2-A0 inventory §12 *Concrete list*. Two inventory rows are
+/// Sourced from the N2-A0 inventory's §12 *Concrete list* (`NEEDS MIGRATION`)
+/// **and** the `SILENT-MERGE RISK` durable rows of §5. Scoping the registry to
+/// the `NEEDS MIGRATION` list alone was a mistake found by scanning real
+/// deployment data: `SILENT-MERGE RISK` is precisely the class that merges
+/// without announcing itself, and live rows were found in two such keyspaces
+/// (§5 rows #71 and #36) that the first registry did not cover.
+///
+/// Two inventory rows are
 /// deliberately absent and are **not** cleared by this scan:
 ///
 /// * the misbehavior keyspace (rows #5–#8/#38) and the auth-challenge keyspace
@@ -615,6 +687,34 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Equivalent,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
+        },
+        KeyspaceDescriptor {
+            name: "trust-app/sequences_receiver",
+            prefix: b"trust/sequences/receiver/",
+            inventory_rows: &[71],
+            disposition: MergeDisposition::MaxMonotonic,
+            rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
+                        survivor accepts stale attestations, so the merge keeps the maximum, \
+                        matching the established replay_max_seq precedent.",
+        },
+        KeyspaceDescriptor {
+            name: "trust-app/sequences_issuer",
+            prefix: b"trust/sequences/issuer/",
+            inventory_rows: &[71],
+            disposition: MergeDisposition::MaxMonotonic,
+            rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
+                        a sequence number already used, which the uniqueness invariant forbids, \
+                        so the merge keeps the maximum.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-coop/member",
+            prefix: b"member:",
+            inventory_rows: &[36],
+            disposition: MergeDisposition::FailClosed,
+            rationale: "Cooperative membership. Merging two rows decides who is a member of an \
+                        institution, which is an institutional judgement no identity-layer rule \
+                        authorizes; it is also adjacent to the separate §7.5 membership gate. \
+                        Fail closed pending a governance-domain decision.",
         },
     ]
 }
@@ -977,6 +1077,63 @@ mod tests {
         assert_eq!(overview.total_rows, 0);
         assert_eq!(overview.rows_with_embedded_did, 0);
         assert!(overview.namespaces.is_empty());
+    }
+
+    #[test]
+    fn uncovered_principal_rows_are_reported_by_shape_not_hidden() {
+        // The decisive case: a store whose registered keyspaces are clean but
+        // which also holds principal-keyed rows under an unregistered prefix.
+        // Reporting only the clean keyspaces would be a false all-clear.
+        let (a, b) = two_spellings(81);
+        let store = store_with(&[
+            (&format!("test:{a}"), b"v"),
+            (&format!("unregistered/members/{a}/role"), b"v"),
+            (&format!("unregistered/members/{b}/role"), b"v"),
+            ("unregistered/housekeeping", b"v"),
+        ]);
+
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+        let report = scan_keyspace(&store, &descriptors[0]).unwrap();
+        assert!(
+            report.collision_groups.is_empty(),
+            "registered keyspace is clean"
+        );
+
+        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        assert_eq!(
+            shapes.get("unregistered/members/<did>/role"),
+            Some(&2),
+            "both uncovered principal rows must surface, masked, under one shape"
+        );
+        // The row with no DID is not principal-bearing and must not appear.
+        assert_eq!(shapes.len(), 1);
+    }
+
+    #[test]
+    fn covered_rows_are_not_reported_as_uncovered() {
+        let one = spell(&principal(83), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("test:{one}"), b"v")]);
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+
+        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "a registered row is covered, not uncovered"
+        );
+    }
+
+    #[test]
+    fn masked_shapes_carry_no_identifier_or_payload() {
+        let one = spell(&principal(87), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("elsewhere/{one}"), b"SECRET-VALUE")]);
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+
+        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        let rendered = format!("{shapes:?}");
+
+        assert!(rendered.contains("<did>"));
+        assert!(!rendered.contains(&one), "the spelling must be masked out");
+        assert!(!rendered.contains("SECRET-VALUE"));
     }
 
     #[test]

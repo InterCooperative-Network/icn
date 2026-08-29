@@ -151,38 +151,105 @@ Exit status: `0` clear, `1` at least one keyspace must fail closed, `2` tool err
 
 ## 3. Scan coverage actually achieved (evidence)
 
-**This section records only what was run. It does not clear the gate.**
+**This section records only what was measured.**
 
-| Deployment / store | Rows | Result |
+### 3.1 Deployments scanned
+
+Extracted read-only with `kubectl cp` from the running pod and scanned from the copy; the live
+volumes were never opened. Extraction date 2026-08-29.
+
+| Deployment | Extracted | sled DBs scanned | Result |
+|---|---|---|---|
+| `icn-coop-beta` | yes | 32 | scanned |
+| `icn-coop-gamma` | yes | 31 | scanned |
+| `icn-coop-delta` | yes | 31 | scanned |
+| `icn-coop-alpha` | **no** | — | container `CrashLoopBackOff`, not attachable |
+| `icn` / `icn-daemon` | **no** | — | container `CrashLoopBackOff`, not attachable |
+
+94 sled databases scanned in total. Workloads were **not** restarted to obtain evidence.
+
+A store topology finding worth recording: a deployment does not keep one shared store. It keeps
+**one sled database per domain** under `/data/store/` (`ledger`, `network`, `trust`, `governance`,
+`security`, `cooperative`, `gossip`, …) plus `gateway_store`, `commons.sled`, `federation_store`,
+`identity_store`, and `state.snapshot*` files. Encrypted keystore material (`identity.age*`) is
+present and was **not** read.
+
+### 3.2 Aggregate result
+
+| Measure | Value |
+|---|---|
+| Rows matched by registered N2-A keyspaces | **24** |
+| **Collision groups** | **0** |
+| Rows participating in collisions | 0 |
+| Unreadable / malformed DID keys | 0 |
+| Named-tree coverage gaps | 0 |
+| Keyspaces requiring manual disposition | 0 |
+
+| Keyspace | Rows | Collisions |
 |---|---|---|
-| `~/.icn/icnd-dev/{gateway,oracle,identity,entity_audit}_store` | 0 | Empty across all trees |
-| `~/.local/share/icn/{gateway,oracle,identity,entity_audit}_store` | 0 | Empty across all trees |
-| `~/agent-runs/nycn-organizer-gate-dryrun-2026-07-12/icnd-data/*` | 0 | Empty across all trees |
+| `icn-trust/edges` | 12 | 0 |
+| `icn-net/outgoing_seq` | 4 | 0 |
+| `icn-coop/member` | 3 | 0 |
+| `icn-net/replay_max_seq` | 2 | 0 |
+| `icn-net/replay_sender_regime` | 2 | 0 |
+| `trust-app/sequences_issuer` | 1 | 0 |
 
-Every locally reachable store is **genuinely empty** — 0 rows in the default tree and 0 in every
-named tree. These are dev scaffolding directories. They demonstrate the tool runs; they are
-**not evidence about collisions**, and must not be cited as such.
+Every other registered keyspace matched zero rows, and those are **real absences**: each store's
+total row count and per-tree count were reported alongside, and the raw sled files of the empty
+local stores were independently checked for `did:icn:` byte occurrences (zero) to distinguish an
+empty store from a failed read.
 
-### 3.1 Evidence that remains unavailable
+### 3.3 Principal-bearing rows outside registered coverage — 63
 
-The populated stores are the K3s cooperative deployments:
+A per-keyspace zero only speaks for the rows that keyspace matched. Reconciling *all* DID-bearing
+rows against the registry found 63 rows the registry does not cover, all deliberately out of N2-A
+scope:
 
-| Deployment | Volume | Status |
+| Family | Rows | Why out of scope |
 |---|---|---|
-| `icn-coop-alpha` | PVC `icn-alpha-data` | **NOT SCANNED** |
-| `icn-coop-beta` | PVC `icn-beta-data` | **NOT SCANNED** |
-| `icn-coop-gamma` | PVC `icn-gamma-data` | **NOT SCANNED** |
-| `icn-coop-delta` | PVC `icn-delta-data` | **NOT SCANNED** |
-| `icn` (`icn-daemon`) | PVC `icn-data` | **NOT SCANNED** |
+| `gov:vote:<uuid>:<did>` | 32 | inventory row #23 — **§7.5 gate**, not N2-A |
+| `security:reputation:<did>` | 10 | security namespace — deferred to the dedicated security workflow |
+| `security:violation:<did>` | 10 | as above |
+| `security:banned:<did>` | 7 | as above |
+| `security:quarantine:<did>` | 4 | as above |
 
-Volumes are NFS-backed (`nfs.csi.k8s.io`, `atlas.faherty.network:/mnt/ssd_pool/icn-vols/…`).
-Both access routes attempted from this environment — `kubectl exec` / `kubectl cp`, and mounting
-the NFS export — were refused by the session's permission envelope. No result was inferred,
-substituted or estimated.
+These 63 rows are **deferred, not cleared**. Their existence and their migration dependency are
+recorded; their contents were not inspected.
 
-**The collision gate is therefore closed on absence of evidence, not on adverse evidence.**
+### 3.4 A registry scope error the scan caught
 
----
+The first registry was built from the inventory's §12 *Concrete list* — the `NEEDS MIGRATION` rows
+only. Scanning real data found live rows in two keyspaces classified **`SILENT-MERGE RISK`** in §5
+and therefore absent from that list:
+
+* `trust/sequences/issuer/<did>` and `.../receiver/<did>` — inventory row **#71**;
+* `member:<coop>:<did>` — inventory row **#36**.
+
+`SILENT-MERGE RISK` is precisely the class that merges without announcing itself, so scoping the
+scanner to `NEEDS MIGRATION` alone was wrong. The registry now covers both classes, and the three
+keyspaces are included in the §3.2 figures above.
+
+This is the concrete value of reporting uncovered principal-bearing rows by masked key shape
+rather than reporting per-keyspace zeros: the gap was found from data, not from re-reading source.
+
+### 3.5 What this evidence does and does not establish
+
+**Does:** no aliased principal rows exist today in any registered N2-A keyspace of the three
+scanned deployments, and no malformed or unreachable principal rows exist there either.
+
+**Does not:**
+
+1. **Two deployments are unscanned** (`alpha`, `icn-daemon`).
+2. **The sample is small.** 24 principal-bearing rows across a handful of principals is a pilot
+   cluster, not a populated production deployment. Absence of collisions here is weak evidence
+   about a large store.
+3. **The result is point-in-time.** Aliasing is attacker-chosen (§2.2) and `from` is unsigned, so a
+   peer can write an alternate-spelled row at any time. A clean scan today does not imply a clean
+   store at migration time.
+
+Consequence for the migration design: the scan must be re-run **immediately before** the flip, and
+the fail-closed check belongs *in the binary* — a key-equality build should refuse to start against
+a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.
 
 ## 4. Keyspace dispositions (decisions)
 
@@ -193,26 +260,35 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 
 | # | Keyspace | Key encoding | Collisions observed | Merge rule | Rule already established by domain semantics? | Lossless? | Alias/dual-read window? | Order | Rollback | Tranche | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | `icn-net` `replay_max_seq:` | `Display` | **unmeasured** | max floor | **yes** — implemented in `replay_guard` (#2644) | yes | no | 4 | safe (no byte moves) | N2-A | rule live in-tree |
-| 2 | `icn-net` `replay_finalized:` | `Display` | **unmeasured** | union | yes (#2644) | yes | no | 4 | safe | N2-A | rule live in-tree |
-| 3 | `icn-net` `replay_sender_regime:` | `Display` | **unmeasured** | **fail closed** | yes — loader already declines to collapse | n/a | no | 4 | safe | N2-A | fail-closed by design |
-| 4 | `icn-net` `outgoing_seq:` | `as_str` ×2 | **unmeasured** | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
-| 5 | `icn-ledger` `ledger:balance:` | JSON-quoted | **unmeasured** | sum | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs economics sign-off** |
-| 6 | `icn-ledger` `ledger:cleared_volume:` | `Display` + currency | **unmeasured** | sum | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs economics sign-off** |
-| 7 | `icn-ledger` `ledger:frozen:` | `Display` | **unmeasured** | union | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
-| 8 | `icn-trust` `trust/edges/` | `as_str` ×2 | **unmeasured** | union | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
-| 9 | `icn-ledger` `ledger:journal:` | content hash | **unmeasured** | equivalent | yes — key carries no spelling | yes | no | — | safe | N2-A | scanned to confirm |
+| 1 | `icn-net` `replay_max_seq:` | `Display` | **0 in 3 scanned** | max floor | **yes** — implemented in `replay_guard` (#2644) | yes | no | 4 | safe (no byte moves) | N2-A | rule live in-tree |
+| 2 | `icn-net` `replay_finalized:` | `Display` | **0 in 3 scanned** | union | yes (#2644) | yes | no | 4 | safe | N2-A | rule live in-tree |
+| 3 | `icn-net` `replay_sender_regime:` | `Display` | **0 in 3 scanned** | **fail closed** | yes — loader already declines to collapse | n/a | no | 4 | safe | N2-A | fail-closed by design |
+| 4 | `icn-net` `outgoing_seq:` | `as_str` ×2 | **0 in 3 scanned** | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
+| 5 | `icn-ledger` `ledger:balance:` | JSON-quoted | **0 in 3 scanned** | sum | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs economics sign-off** |
+| 6 | `icn-ledger` `ledger:cleared_volume:` | `Display` + currency | **0 in 3 scanned** | sum | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs economics sign-off** |
+| 7 | `icn-ledger` `ledger:frozen:` | `Display` | **0 in 3 scanned** | union | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
+| 8 | `icn-trust` `trust/edges/` | `as_str` ×2 | **0 in 3 scanned** | union | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs review** |
+| 9 | `icn-ledger` `ledger:journal:` | content hash | **0 in 3 scanned** | equivalent | yes — key carries no spelling | yes | no | — | safe | N2-A | scanned to confirm |
 | 10 | `icn-security` misbehavior | `Display` | **not inspected** | — | — | — | — | — | — | **security workflow** | deferred; migration dependency preserved |
 | 11 | `icn-rpc` auth challenges | `Display` | **not inspected** | — | — | — | — | — | — | **security workflow** | deferred; TTL-bounded |
-| 12 | `apps/governance` votes (#23) | `Display` | **unmeasured** | §7.5 re-key | n/a | n/a | **required** | after N2-A | n/a | **§7.5 gate** | not N2-A |
+| 12 | `apps/governance` votes (#23) | `Display` | **0 in 3 scanned** | §7.5 re-key | n/a | n/a | **required** | after N2-A | n/a | **§7.5 gate** | not N2-A |
 | 13 | `icn-commons` weak-holder id (#65) | SHA-256 of spelling | I7 *creates* the split | — | no | **no** | — | before 6 | n/a | N2-A | **namespace decision — see §5** |
-| 14 | `VectorClock` (#45), snapshot `vector_clock` (#54) | serialized map | **unmeasured** | max | yes — `VectorClockProjection::from_entries` | yes | no | 4 | safe | N2-A | rule established |
-| 15 | snapshot `peer_connections` (#57) | serialized map | **unmeasured** | **fail closed** | no | no | — | 4 | safe | N2-A | **no authorized rule** |
+| 14 | `VectorClock` (#45), snapshot `vector_clock` (#54) | serialized map | **0 in 3 scanned** | max | yes — `VectorClockProjection::from_entries` | yes | no | 4 | safe | N2-A | rule established |
+| 15 | snapshot `peer_connections` (#57) | serialized map | **0 in 3 scanned** | **fail closed** | no | no | — | 4 | safe | N2-A | **no authorized rule** |
+| 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **yes** — same replay-floor family as `replay_max_seq` | yes | no | 4 | safe | N2-A | rule established by precedent |
+| 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
+| 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
 preserved here**; their contents were not inspected and their disposition belongs to the dedicated
 security workflow, not to this tranche.
+
+Row 18 (`icn-coop` cooperative membership) is new to this table. Merging two membership rows
+decides **who is a member of an institution**, which no identity-layer rule authorizes, and it sits
+next to the §7.5 membership gate without the inventory having placed it there. It is therefore
+**fail closed** pending an explicit governance-domain decision about which side of the §7.5
+boundary it falls on. N2-A must not resolve that by default.
 
 Rows 14–15 hold DIDs inside serialized *values*, not keys, so they are not prefix-scannable and
 are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
@@ -368,19 +444,23 @@ not a follow-up).
 
 ## 9. Remaining implementation blockers
 
-Implementation may begin only when **all** of the following hold. None is currently satisfied in
-full.
+Implementation may begin only when **all** of the following hold.
 
-| # | Blocker | State |
-|---|---|---|
-| 1 | Collision scans actually run against live deployment data | **OPEN** — tool ready, cluster access refused in this environment (§3.1) |
-| 2 | Every observed collision group has an authorized non-lossy or fail-closed disposition | **OPEN** — no group has been observed yet; four merge rules (§4 rows 4–8) are asserted, not domain-established |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** — §8 exists; step 4 cannot be specified without §3.1 |
-| 4 | Unresolved namespace identity domains settled | **CLOSED for classification** (§5), **OPEN for implementation** — the `icn-commons` weak-holder id decision is stated but unimplemented |
-| 5 | `PeerId` ordering disposition settled | **CLOSED for design** (§6.1), unimplemented |
-| 6 | CCL `Value::Did` hash/equality compatibility settled | **CLOSED for design** (§6.2), unimplemented |
-| 7 | Mixed `String`/`Did` peer-map semantics settled | **CLOSED for design** (§6.3), unimplemented |
-| 8 | No §7.5-gated membership/vote migration smuggled into N2-A | **HELD** — §4 rows 12 and `Community.members` in §5 are explicitly excluded |
+| # | Blocker | State | Evidence |
+|---|---|---|---|
+| 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
+| 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed |
+| 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented |
+| 5 | `PeerId` ordering | **OPEN** | design complete (§6.1), unimplemented |
+| 6 | CCL `Value::Did` `Hash`/`Eq` | **OPEN** | design complete (§6.2), unimplemented — a violated std contract post-flip |
+| 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented |
+| 8 | No §7.5 migration smuggled in | **HELD** | 32 `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated |
+| 9 | Broad discriminating tests for the flip | **OPEN** | the scanner has them; the equality change has none, because it does not exist |
 
-The single hard blocker is **#1**. Blockers #5–#7 are design-complete and could land as
-independent PRs that reduce the atomic surface without touching `Did` equality.
+Blockers **4–7 and 9 are independent of collision evidence** and would each block the flip even if
+every deployment scanned clean. They are the shortest path forward.
+
+The evidence gate (#1) has moved from *no evidence* to *no collisions in three deployments*, which
+is real but bounded: it does not license the flip on its own, and §3.5 explains why a
+point-in-time clean scan cannot.
