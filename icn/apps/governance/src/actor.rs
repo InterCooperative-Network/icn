@@ -2293,7 +2293,17 @@ impl GovernanceActor {
                 // standing revalidation filters whose votes count but does not shrink
                 // the community for quorum purposes.
                 let eligible_members = self.resolver.resolve_members(&domain)?;
-                let eligible_count = eligible_members.len();
+
+                // The quorum denominator counts distinct voting principals, not
+                // DID spellings. The numerator is principal-reduced (#2641), so
+                // a membership list naming one key under two spellings would
+                // otherwise claim two electorate slots for one voter and read
+                // that voter's single vote as half turnout instead of full.
+                let mut eligible_principals = std::collections::HashSet::new();
+                for member in &eligible_members {
+                    eligible_principals.insert(VotingPrincipal::of(member)?);
+                }
+                let eligible_count = eligible_principals.len();
 
                 // Edge case: cannot evaluate proposal with zero eligible voters
                 // This prevents division issues and ensures meaningful quorum calculation
@@ -3923,6 +3933,11 @@ impl GovernanceActor {
             vote_by_principal.insert(principal, v);
         }
 
+        // Delegate chosen for each principal, so several spellings of one member
+        // cannot each expand, and cannot disagree without being noticed.
+        let mut resolved_delegate: std::collections::HashMap<VotingPrincipal, VotingPrincipal> =
+            std::collections::HashMap::new();
+
         let mut delegated = 0usize;
         for member in eligible_members {
             let member_principal = VotingPrincipal::of(member)?;
@@ -3944,15 +3959,33 @@ impl GovernanceActor {
                 continue; // no active delegation, whatever spelling names it
             }
 
+            // One principal delegates once. Where a membership list names it under
+            // several spellings, those spellings must resolve to the same
+            // delegate: otherwise the first entry in the resolver's list would
+            // decide which delegated act counts, making list order the authority
+            // over a vote. Fail closed instead, and expand at most once (#2641).
+            match resolved_delegate.get(&member_principal) {
+                Some(&already) if already != delegate_principal => {
+                    return Err(anyhow::anyhow!(
+                        "proposal {}: one voting principal holds competing delegations under \
+                         different DID spellings ('{}' resolves elsewhere than a previous \
+                         spelling of the same key); refusing to let membership-list order \
+                         choose which delegated act counts",
+                        proposal_id.0,
+                        member,
+                    ));
+                }
+                Some(_) => continue, // same delegate, already expanded
+                None => {
+                    resolved_delegate.insert(member_principal, delegate_principal);
+                }
+            }
+
             if let Some(delegate_vote) = vote_by_principal.get(&delegate_principal) {
                 // Create a synthetic vote for the delegating member using the delegate's choice.
                 let delegated_vote =
                     Vote::new(proposal_id.clone(), member.clone(), delegate_vote.choice);
                 tally.add_vote(&delegated_vote);
-                // Mark the delegator counted, as the `tally.rs` equivalent does, so
-                // a member list naming one principal under two spellings cannot
-                // have its delegation expanded twice (#2641).
-                direct_voters.insert(member_principal);
                 delegated += 1;
                 tracing::debug!(
                     member = %member,

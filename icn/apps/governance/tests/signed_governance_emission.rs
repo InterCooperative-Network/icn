@@ -1307,3 +1307,167 @@ async fn filtered_close_fails_closed_on_conflicts_the_standing_filter_would_hide
     // Both acts survive for the §7.5-gated migration to resolve.
     assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
 }
+
+/// #2641, quorum denominator: the tally numerator is reduced to one vote per
+/// cryptographic principal, so the electorate it is measured against must be
+/// counted the same way. A membership list naming one key under two spellings
+/// otherwise claims two electorate slots for one voter, and that voter voting
+/// reads as half turnout instead of full.
+#[tokio::test(flavor = "current_thread")]
+async fn quorum_denominator_counts_principals_not_did_spellings() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-quorum".to_string());
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    // One member, named twice. Quorum 100% makes the difference decisive:
+    // 1/1 of the electorate reaches it, 1/2 does not.
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias quorum".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(100, 50, 3600),
+            MembershipConfig::static_list(vec![node.did.clone(), alias]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias quorum".to_string(),
+            "Alias quorum".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    node.ops
+        .cast_vote(proposal_id.clone(), node.did.clone(), VoteChoice::For, None)
+        .await
+        .expect("cast_vote");
+
+    node.ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect("close_proposal");
+
+    let closed = node
+        .ops
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+
+    assert!(
+        matches!(closed.state, ProposalState::Accepted { .. }),
+        "the sole member voted, so turnout is 1/1 and the 100% quorum is met; \
+         NoQuorum means the denominator counted two spellings as two voters (got {:?})",
+        closed.state
+    );
+}
+
+/// #2641, competing delegations: where a membership list names one principal
+/// under several spellings and those spellings hold delegations to different
+/// voters, expanding whichever entry the resolver happens to list first would
+/// make list order the authority over a vote. Fail closed instead.
+#[tokio::test(flavor = "current_thread")]
+async fn competing_delegations_across_spellings_fail_closed_at_close() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-delegation-conflict".to_string());
+    let delegate_a = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let delegate_b = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias delegation conflict".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![
+                node.did.clone(),
+                alias.clone(),
+                delegate_a.clone(),
+                delegate_b.clone(),
+            ]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias delegation conflict".to_string(),
+            "Alias delegation conflict".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    // One key, two spellings, two different delegates.
+    node.ops
+        .create_delegation(Delegation::new(
+            node.did.clone(),
+            delegate_a.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("delegation from the canonical spelling");
+    node.ops
+        .create_delegation(Delegation::new(
+            alias,
+            delegate_b.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("delegation from the alias spelling");
+
+    // Both delegates vote, and they disagree.
+    node.ops
+        .cast_vote(proposal_id.clone(), delegate_a, VoteChoice::For, None)
+        .await
+        .expect("delegate a votes");
+    node.ops
+        .cast_vote(proposal_id.clone(), delegate_b, VoteChoice::Against, None)
+        .await
+        .expect("delegate b votes");
+
+    let err = node
+        .ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect_err("membership-list order must not choose which delegated act counts");
+    assert!(
+        err.to_string().contains("competing delegations"),
+        "must name the competing delegations, got: {err}"
+    );
+}
