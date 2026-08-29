@@ -650,6 +650,14 @@ impl GovernanceStore for SledGovernanceStore {
 
         // Drop any row this same principal previously wrote under a different
         // DID spelling, so one principal never retains more than one act.
+        //
+        // Removals, the replacement row and the rewritten index go in one
+        // `sled::Batch`: applied together or not at all. Doing them as separate
+        // operations would open a window where an interrupted write leaves the
+        // index naming a row that has already been deleted, losing a recorded
+        // vote — a write path that supersedes rows must not be able to destroy
+        // one and fail to replace it.
+        let mut batch = sled::Batch::default();
         let mut retained: Vec<String> = Vec::with_capacity(voter_dids.len() + 1);
         for spelling in voter_dids {
             if spelling == voter_str {
@@ -663,19 +671,18 @@ impl GovernanceStore for SledGovernanceStore {
                 Err(_) => None,
             };
             match alias {
-                Some(did) => {
-                    self.db.remove(Self::vote_key(&vote.proposal_id, &did))?;
-                }
+                Some(did) => batch.remove(Self::vote_key(&vote.proposal_id, &did)),
                 None => retained.push(spelling),
             }
         }
         retained.push(voter_str);
 
-        self.db.insert(
+        batch.insert(
             Self::vote_key(&vote.proposal_id, &vote.voter),
             serde_json::to_vec(vote)?,
-        )?;
-        self.db.insert(&index_key, serde_json::to_vec(&retained)?)?;
+        );
+        batch.insert(index_key, serde_json::to_vec(&retained)?);
+        self.db.apply_batch(batch)?;
 
         Ok(())
     }

@@ -125,15 +125,25 @@ pub fn prior_act_for<'a>(
     votes: &'a [Vote],
     voter: &Did,
 ) -> Result<Option<&'a Vote>, GovernanceError> {
+    Ok(acts_for(votes, voter)?.first().copied())
+}
+
+/// Every stored row naming the principal `voter` names, in encounter order.
+///
+/// Fails closed on the same terms as [`prior_act_for`]. More than one row means
+/// the rows were written before duplicate-act prevention existed: they agree, or
+/// this would have returned an error, but they are still several rows for one
+/// voter and callers that must write must take that into account.
+pub fn acts_for<'a>(votes: &'a [Vote], voter: &Did) -> Result<Vec<&'a Vote>, GovernanceError> {
     let principal = VotingPrincipal::of(voter)?;
-    let mut found: Option<&'a Vote> = None;
+    let mut found: Vec<&'a Vote> = Vec::new();
 
     for vote in votes {
         if VotingPrincipal::of(&vote.voter)? != principal {
             continue;
         }
-        match found {
-            None => found = Some(vote),
+        match found.first() {
+            None => found.push(vote),
             Some(kept) => {
                 if !same_effective_act(kept, vote) {
                     return Err(GovernanceError::ConflictingVoteRecords(format!(
@@ -150,6 +160,7 @@ pub fn prior_act_for<'a>(
                         vote.voter,
                     )));
                 }
+                found.push(vote);
             }
         }
     }

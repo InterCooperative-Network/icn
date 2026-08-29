@@ -1193,3 +1193,117 @@ async fn close_fails_closed_on_conflicting_alias_rows_rather_than_counting_both(
     // The evidence survives for the §7.5-gated migration to resolve.
     assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
 }
+
+/// #2641, actor admission over legacy duplicates: this store overwrites by
+/// spelling-keyed row, so when a principal already owns several pre-fix rows the
+/// actor cannot supersede them all at once. Writing onto one and leaving the
+/// others would turn an agreeing, reducible duplicate into a conflicting pair
+/// and fail every later tally. It must refuse without mutating instead.
+#[tokio::test(flavor = "current_thread")]
+async fn vote_change_over_legacy_duplicate_rows_refuses_without_mutating() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-dup", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    // Two *agreeing* rows for one principal, as a pre-#2641 binary left them.
+    for voter in [node.did.clone(), alias] {
+        node.state
+            .save_vote(
+                &proposal_id,
+                &Vote::new(proposal_id.clone(), voter, VoteChoice::For),
+            )
+            .expect("legacy row");
+    }
+
+    // Agreeing duplicates still reduce, so the proposal tallies correctly.
+    let before = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("agreeing duplicates must still tally");
+    assert_eq!(before.total_votes(), 1, "one principal, one effective vote");
+
+    let err = node
+        .ops
+        .cast_vote(
+            proposal_id.clone(),
+            node.did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .expect_err("must not write a change it cannot apply to every row");
+    assert!(
+        err.to_string().contains("different DID spellings"),
+        "must name the duplicate rows, got: {err}"
+    );
+
+    // Nothing was mutated, so the proposal is still tallyable.
+    let rows = node.state.list_votes(&proposal_id).unwrap();
+    assert_eq!(rows.len(), 2, "the refusal must not have written a row");
+    assert!(
+        rows.iter().all(|v| v.choice == VoteChoice::For),
+        "the refusal must not have changed an existing act"
+    );
+    let after = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("still tallyable after the refusal");
+    assert_eq!(after.total_votes(), 1, "still one effective vote");
+}
+
+/// #2641, filtered close: standing revalidation is still spelling-keyed, so a
+/// standing set naming one spelling of a conflicting pre-fix pair would drop the
+/// other and leave the reduction nothing to notice — finalising whichever act
+/// happened to be spelled the way the standing set names it. Conflicts must be
+/// detected across every stored row, before eligibility narrows the set.
+#[tokio::test(flavor = "current_thread")]
+async fn filtered_close_fails_closed_on_conflicts_the_standing_filter_would_hide() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-filtered", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), node.did.clone(), VoteChoice::For),
+        )
+        .expect("legacy row");
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        )
+        .expect("legacy alias row");
+
+    // A standing set that recognises only the canonical spelling: the filter
+    // would keep the For row and silently discard the conflicting Against one.
+    let mut standing = std::collections::HashSet::new();
+    standing.insert(node.did.clone());
+
+    let err = node
+        .ops
+        .close_proposal_filtered(proposal_id.clone(), &standing)
+        .await
+        .expect_err("a conflict a spelling-keyed filter would hide must still fail closed");
+    assert!(
+        err.to_string().contains("conflicting"),
+        "must fail closed naming the conflict, got: {err}"
+    );
+
+    // Both acts survive for the §7.5-gated migration to resolve.
+    assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
+}

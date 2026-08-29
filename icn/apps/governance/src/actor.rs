@@ -2167,7 +2167,25 @@ impl GovernanceActor {
                 // already owns, under whatever spelling first recorded it. Fails
                 // closed if that history is already ambiguous.
                 let existing = self.load_votes(&proposal_id)?;
-                let voter = match icn_governance::prior_act_for(&existing, &voter)? {
+                let prior = icn_governance::acts_for(&existing, &voter)?;
+                if prior.len() > 1 {
+                    // Several pre-#2641 rows already name this principal. They
+                    // agree, or `acts_for` would have refused, but this store
+                    // overwrites by spelling-keyed row and cannot supersede all
+                    // of them at once. Writing would leave the others behind and
+                    // turn a reducible duplicate into a conflicting pair, which
+                    // fails every later tally. Refuse without mutating instead.
+                    anyhow::bail!(
+                        "{} has {} vote rows on proposal {} under different DID spellings; \
+                         the §7.5-gated vote migration must reduce them before this voter \
+                         can act again. The existing rows agree, so the proposal still \
+                         tallies correctly.",
+                        voter,
+                        prior.len(),
+                        proposal_id.0,
+                    );
+                }
+                let voter = match prior.first() {
                     Some(prior) => prior.voter.clone(),
                     None => voter,
                 };
@@ -2244,6 +2262,19 @@ impl GovernanceActor {
                 // votes from members who lost commons standing after casting are excluded.
                 // The proof records only the votes that counted in the final decision.
                 let all_votes = self.load_votes(&proposal_id)?;
+
+                // Detect principal-level conflicts across *every* stored row,
+                // before eligibility narrows the set. The standing filter is
+                // still spelling-keyed, so where a principal has conflicting
+                // pre-#2641 rows it can admit one spelling and drop the other,
+                // leaving nothing for the reduction below to notice — and the
+                // close would then finalise whichever act happened to be spelled
+                // the way the standing set names it. A conflicting pair must
+                // fail closed on the filtered path exactly as it does on the
+                // unfiltered one; which of two conflicting acts is authoritative
+                // is the §7.5 migration's decision, not a spelling's (#2641).
+                icn_governance::effective_votes(&all_votes)?;
+
                 let votes: Vec<Vote> = match &eligible_voters {
                     Some(filter) => all_votes
                         .into_iter()
