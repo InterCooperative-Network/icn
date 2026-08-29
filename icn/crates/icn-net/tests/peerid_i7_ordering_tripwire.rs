@@ -39,9 +39,22 @@
 //! [`peerid_eq_and_ord_must_agree_in_whatever_regime_production_is_in`] asserts the
 //! biconditional itself rather than either side's current value. It therefore passes on today's
 //! `main`, passes again after a *correct* I7 patch that moves `Did::Eq` and `PeerId::Ord`
-//! together, and fails **only** in the half-completed state. A test that instead asserted
+//! together, and fails **only** in a half-completed state. A test that instead asserted
 //! "these are unequal today" would go red on a correct future patch, which would train the next
 //! implementer to delete it.
+//!
+//! That property is easy to lose by accident, so it is measured rather than assumed. Every
+//! test here except [`pre_i7_regime_record_every_spelling_is_its_own_peer`] — which is
+//! deliberately regime-dependent and says so — was run against a simulated correct I7 patch
+//! (`Did` equality and hash over `identifier_bytes`, `PeerId::Ord` over the same, both with a
+//! defined order for identifiers that do not decode) and stayed green. Anything added here
+//! should be checked the same way: a guard that fires on the *correct* patch is worse than no
+//! guard, because it argues for its own deletion at exactly the wrong moment.
+//!
+//! One trap worth naming for whoever re-runs that check: restoring a mutated file with a tool
+//! that preserves mtime (`cp -p`, `shutil.copy2`) sets the timestamp backwards, so cargo
+//! considers the crate fresh and silently keeps the mutated rlib. Confirm `Compiling
+//! icn-identity` and `Compiling icn-net` actually appear before believing a result.
 //!
 //! # The identity source
 //!
@@ -286,19 +299,24 @@ fn peerid_eq_and_ord_must_agree_in_whatever_regime_production_is_in() {
                  silently drops peers from ordered collections today. Revert it."
             );
 
-            if !eq_says_same && same_principal_after_i7(a, b) {
+            // Counted on properties that do not move with the regime: two *different
+            // spellings* of *one principal*. Counting "currently unequal but one principal
+            // after I7" instead would reach zero once `Did::Eq` adopts I7 — the non-vacuity
+            // guard would then fire on the correct patch and tell its implementer, wrongly,
+            // that the coherence assertion above proved nothing.
+            if a.0.as_str() != b.0.as_str() && same_principal_after_i7(a, b) {
                 transition_relevant_pairs += 1;
             }
         }
     }
 
-    // Non-vacuity: the assertion above is only load-bearing if the population contains pairs
-    // that I7 will actually move. If a future edit removes the alias generation, this fails
-    // rather than letting the suite pass on trivial pairs.
+    // Non-vacuity: the assertion above is only load-bearing if the population contains more
+    // than one spelling of some principal. If a future edit removes the alias generation, this
+    // fails rather than letting the suite pass on trivially-distinct pairs.
     assert!(
         transition_relevant_pairs > 0,
-        "no pair in the population is unequal today but one principal after I7, so the \
-         coherence assertion above proved nothing about the transition"
+        "no two members of the population are different spellings of one principal, so the \
+         coherence assertion above was only exercised on pairs no regime change can move"
     );
 }
 
@@ -398,17 +416,16 @@ fn neighbour_sets_ordered_and_hashed_views_report_the_same_peers() {
          `BTreeSet<PeerId>` fields key on `PeerId::Ord` and `metadata: HashMap<PeerId, _>` \
          keys on the derived `Hash`/`Eq`. After I7 (#2627) the map follows `Did` into \
          principal identity and the sets do not, unless `PeerId::Ord` changes in the same \
-         patch — at which point `total_count()`, the neighbour-class limits enforced from \
-         `handlers/hello.rs` and `handlers/handshake.rs`, and `remove_neighbor` all disagree \
-         with each other.",
+         patch — at which point `enforce_limit`, which counts a class with `set_ref.len()` \
+         (`topology.rs`), and `remove_neighbor` disagree with the metadata map.",
         ordered.len(),
         metadata.len()
     );
     assert_eq!(
         sets.total_count(),
         metadata.len(),
-        "`total_count()` is summed from the ordered sets and is what neighbour limits are \
-         checked against; it must agree with the metadata map for the same reason"
+        "`total_count()` sums the four ordered sets, so it must agree with the metadata map \
+         for the same reason"
     );
 }
 
@@ -421,6 +438,12 @@ fn no_neighbour_is_left_without_metadata_and_no_metadata_is_orphaned() {
     for (_, peer) in &spellings {
         sets.add_neighbor(peer.clone(), topology("eu", "c1"), None, 0.1, &limits);
     }
+
+    // A second, unrelated principal that survives the removal below. Without it, a correct I7
+    // patch would collapse the 23 spellings to one peer, the removal would empty the struct,
+    // and the final assertion would compare two empty sets — green, and proving nothing.
+    let bystander = a_peer();
+    sets.add_neighbor(bystander.clone(), topology("eu", "c1"), None, 0.1, &limits);
 
     // Remove under one spelling. `remove_neighbor` deletes from the ordered sets by `Ord` and
     // from `metadata` by `Hash`/`Eq`; if those stop agreeing, one of the two deletions misses.
@@ -440,7 +463,7 @@ fn no_neighbour_is_left_without_metadata_and_no_metadata_is_orphaned() {
 }
 
 #[test]
-fn a_peer_lands_in_at_most_one_neighbour_class() {
+fn the_promotion_path_leaves_ordered_and_hashed_views_agreeing() {
     // `add_neighbor` starts by calling `remove_neighbor`, precisely so re-adding a peer under
     // new topology moves it rather than duplicating it. That step removes from the ordered
     // sets by `Ord` and from `metadata` by `Hash`/`Eq`. When those disagree, the ordered
@@ -465,32 +488,35 @@ fn a_peer_lands_in_at_most_one_neighbour_class() {
         &limits,
     );
 
-    let classes: [(&str, &BTreeSet<PeerId>); 4] = [
-        ("local_cluster", &sets.local_cluster),
-        ("regional", &sets.regional),
-        ("backbone", &sets.backbone),
-        ("trusted", &sets.trusted),
-    ];
+    // Regime-agnostic control: the second `add_neighbor` used a different region, so it must
+    // have placed its peer in `backbone` whether or not that peer was recognised as the same
+    // one already in `local_cluster`. Asserting the *number* of occupied classes instead would
+    // be regime-dependent — two today, one after a correct I7 patch.
+    assert!(
+        !sets.backbone.is_empty(),
+        "CONTROL: the re-add under a different region must have exercised the promotion path, \
+         or the assertion below proves nothing about it"
+    );
 
-    for (_, peer) in spellings.iter().take(2) {
-        let occupied: Vec<&str> = classes
-            .iter()
-            .filter(|(_, set)| set.contains(peer))
-            .map(|(name, _)| *name)
-            .collect();
-        assert!(
-            occupied.len() <= 1,
-            "one peer occupies {occupied:?} simultaneously. `add_neighbor` removes from every \
-             class before inserting, so this can only happen when the ordered removal fails to \
-             match a peer the hashed side considers the same — the I7 half-completion this \
-             file guards (#2627)."
-        );
-    }
-
+    // What is *not* asserted here, because getting it wrong is easy in both directions:
+    //
+    // "one principal occupies at most one class" is a **post-I7** invariant, not a current one.
+    // Today two spellings are two peers, so one principal legitimately sits in `local_cluster`
+    // and `backbone` at once; asserting otherwise is red on `main`. The mirror-image phrasing,
+    // "one `PeerId` occupies at most one class", is regime-agnostic but can never fail:
+    // `remove_neighbor` and the insert both dispatch on `Ord`, so `BTreeSet::contains` answers
+    // "one" in every regime, including the broken one.
+    //
+    // What is regime-agnostic *and* can fail is the disagreement the duplication comes from.
+    // Under a half-completed I7 patch the ordered removal misses a peer the hashed side has
+    // already merged, so the ordered rows outnumber the metadata rows — the observable form of
+    // "this principal now sits in two classes with one metadata row between them".
     assert_eq!(
         ordered_rows(&sets).len(),
         metadata_rows(&sets).len(),
-        "the promotion path must leave the ordered and hashed views agreeing too"
+        "the promotion path left {} ordered entries against {} metadata rows",
+        ordered_rows(&sets).len(),
+        metadata_rows(&sets).len()
     );
 }
 
