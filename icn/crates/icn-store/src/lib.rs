@@ -320,6 +320,19 @@ pub trait Store: Send + Sync {
     /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
+    /// Scan the keys with the given prefix, without materializing values.
+    ///
+    /// An audit that only needs keys should not pull every stored value into
+    /// memory alongside them — on a large ledger or application store that is
+    /// the difference between a report and an exhausted process, and it also
+    /// means a key-only pass never holds payloads it has no business holding.
+    ///
+    /// The default is correct but not cheaper; backends that can iterate keys
+    /// alone should override it.
+    fn scan_keys(&self, prefix: &[u8]) -> Result<Vec<Vec<u8>>> {
+        Ok(self.scan(prefix)?.into_iter().map(|(k, _)| k).collect())
+    }
+
     /// Count entries with a given prefix without loading values
     ///
     /// More efficient than `scan().len()` as it doesn't deserialize values.
@@ -916,6 +929,14 @@ impl Store for SledStore {
         }
 
         Ok(results)
+    }
+
+    fn scan_keys(&self, prefix: &[u8]) -> Result<Vec<Vec<u8>>> {
+        let mut keys = Vec::new();
+        for item in self.db.scan_prefix(prefix).keys() {
+            keys.push(item?.to_vec());
+        }
+        Ok(keys)
     }
 
     fn scan_count(&self, prefix: &[u8]) -> Result<usize> {

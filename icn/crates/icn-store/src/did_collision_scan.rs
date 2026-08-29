@@ -48,9 +48,19 @@
 
 use std::collections::BTreeMap;
 
+/// The identity of a principal-canonical shape.
+///
+/// The substituted byte ranges travel with the shape rather than being implied
+/// by it, because the shape alone is ambiguous: a key holding a literal 32-byte
+/// sequence canonicalises to the same bytes as one holding an *encoded* DID in
+/// that position. Grouping those together compared rows that are not the same
+/// key at all — and, when the arities differed, indexed one row's spellings by
+/// another's arity and aborted the gate.
+type ShapeKey = (Vec<usize>, Vec<u8>);
+
 /// Rows sharing one principal-canonical shape, with the identifiers that shape
-/// decodes to. Keyed by the shape itself.
-type ShapeGroups = BTreeMap<Vec<u8>, Vec<(RowRef, Vec<[u8; 32]>)>>;
+/// decodes to.
+type ShapeGroups = BTreeMap<ShapeKey, Vec<(RowRef, Vec<[u8; 32]>)>>;
 
 use crate::Store;
 use icn_identity::identifier_bytes_of_spelling;
@@ -490,16 +500,18 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
         let mut shape = Vec::with_capacity(key.len());
         let mut cursor = 0usize;
         let mut spellings = Vec::with_capacity(embedded.len());
+        let mut substitutions = Vec::with_capacity(embedded.len());
 
         for (did, bytes) in embedded.iter().zip(&identifiers) {
             shape.extend_from_slice(&key[cursor..did.offset]);
+            substitutions.push(shape.len());
             shape.extend_from_slice(bytes);
             cursor = did.end;
             spellings.push(did.spelling.clone());
         }
         shape.extend_from_slice(&key[cursor..]);
 
-        groups.entry(shape).or_default().push((
+        groups.entry((substitutions, shape)).or_default().push((
             RowRef {
                 scan_ordinal,
                 spellings,
@@ -588,11 +600,12 @@ pub struct StoreOverview {
 
 /// Read a store's shape. Read-only.
 pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
-    let pairs = store.scan(b"")?;
+    // Keys only: this pass counts and classifies, and never needs a payload.
+    let keys = store.scan_keys(b"")?;
     let mut namespaces: BTreeMap<String, usize> = BTreeMap::new();
     let mut rows_with_embedded_did = 0usize;
 
-    for (key, _) in &pairs {
+    for key in &keys {
         let cut = key
             .iter()
             .position(|b| *b == b':' || *b == b'/')
@@ -607,7 +620,7 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
     }
 
     Ok(StoreOverview {
-        total_rows: pairs.len(),
+        total_rows: keys.len(),
         namespaces,
         rows_with_embedded_did,
     })
@@ -672,9 +685,9 @@ pub fn deferred_did_row_counts(
     let mut out = Vec::with_capacity(deferrals.len());
     for d in deferrals {
         let n = store
-            .scan(d.prefix)?
+            .scan_keys(d.prefix)?
             .into_iter()
-            .filter(|(key, _)| !find_embedded_dids(key).is_empty())
+            .filter(|key| !find_embedded_dids(key).is_empty())
             .count();
         out.push((d.name.to_string(), n));
     }
@@ -702,7 +715,7 @@ pub fn uncovered_did_key_shapes(
 ) -> anyhow::Result<BTreeMap<String, usize>> {
     let mut shapes: BTreeMap<String, usize> = BTreeMap::new();
 
-    for (key, _) in store.scan(b"")? {
+    for key in store.scan_keys(b"")? {
         let embedded = find_embedded_dids(&key);
         if embedded.is_empty() {
             continue;
@@ -1872,6 +1885,106 @@ mod tests {
 
         let embedded = find_embedded_dids(&key);
         assert_eq!(mask_key(&key, &embedded), "ns/<did>/tail");
+    }
+
+    #[test]
+    fn rows_with_different_did_arity_do_not_group_or_panic() {
+        // A key holding a literal 32-byte sequence canonicalises to the same
+        // bytes as one holding an encoded DID in that position. Grouping them
+        // compared rows that are not the same key, and indexing the shorter
+        // row's spellings by the longer row's arity aborted the gate — a panic
+        // reachable from ordinary sled keys, which are arbitrary bytes.
+        let a = principal(151);
+        // Raw bytes chosen to sort *after* `did:icn:`, so the two-DID row is
+        // first in scan order — the ordering that triggered the abort.
+        let c = [0xf0u8; 32];
+
+        let sa = spell(&a, multibase::Base::Base58Btc);
+        let sc = spell(&c, multibase::Base::Base58Btc);
+
+        let store = SledStore::temporary().unwrap();
+        let mut two = format!("test:{sa}:").into_bytes();
+        two.extend_from_slice(sc.as_bytes());
+        store.put(&two, b"v").unwrap();
+
+        let mut one = format!("test:{sa}:").into_bytes();
+        one.extend_from_slice(&c);
+        store.put(&one, b"v").unwrap();
+
+        let report = scan_keyspace(&store, &descriptor(MergeDisposition::Sum)).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "different DID arity is a different key, not one principal"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "structurally different rows must not be reported as a collision"
+        );
+    }
+
+    #[test]
+    fn identical_shapes_with_different_did_positions_do_not_group() {
+        // Same arity, same canonical bytes, different substitution boundaries:
+        // `<did-A><raw-B>` and `<raw-A><did-B>` are not the same key.
+        let a = [0xf1u8; 32];
+        let b = [0xf2u8; 32];
+        let sa = spell(&a, multibase::Base::Base58Btc);
+        let sb = spell(&b, multibase::Base::Base58Btc);
+
+        let store = SledStore::temporary().unwrap();
+        let mut left = b"test:".to_vec();
+        left.extend_from_slice(sa.as_bytes());
+        left.extend_from_slice(&b);
+        store.put(&left, b"v").unwrap();
+
+        let mut right = b"test:".to_vec();
+        right.extend_from_slice(&a);
+        right.extend_from_slice(sb.as_bytes());
+        store.put(&right, b"v").unwrap();
+
+        let report = scan_keyspace(&store, &descriptor(MergeDisposition::Sum)).unwrap();
+
+        // Whichever way each row resolves — `<did-A>` followed by raw bytes is
+        // unreadable, since the raw bytes are absorbed as multi-byte body bytes
+        // and leave an unexplained remainder — the two must never be reported as
+        // one principal seen twice.
+        assert!(
+            report.collision_groups.is_empty(),
+            "different substitution boundaries are different keys"
+        );
+        assert_eq!(
+            report.rows_with_readable_did + report.rows_unreadable,
+            2,
+            "both rows are accounted for, none silently dropped"
+        );
+        assert!(report.must_fail_closed(), "an unreadable row blocks");
+    }
+
+    #[test]
+    fn the_audit_passes_never_materialize_stored_values() {
+        // A store whose values are large: the key-only passes must not pull
+        // them in. Asserted through `scan_keys` agreeing with `scan` on keys
+        // while the overview still reports correctly, so a backend override
+        // cannot silently diverge from the default.
+        let one = spell(&principal(161), multibase::Base::Base58Btc);
+        let big = vec![b'x'; 64 * 1024];
+        let store = SledStore::temporary().unwrap();
+        store.put(format!("test:{one}").as_bytes(), &big).unwrap();
+        store.put(b"other:plain", &big).unwrap();
+
+        let keys = store.scan_keys(b"").unwrap();
+        let pairs = store.scan(b"").unwrap();
+        assert_eq!(keys.len(), pairs.len());
+        assert!(
+            keys.iter().zip(&pairs).all(|(k, (pk, _))| k == pk),
+            "scan_keys must agree with scan on keys and order"
+        );
+
+        let overview = store_overview(&store).unwrap();
+        assert_eq!(overview.total_rows, 2);
+        assert_eq!(overview.rows_with_embedded_did, 1);
     }
 
     #[test]

@@ -221,10 +221,14 @@ fn scan_copy_of(
     let scratch = tempdir()?;
     let working = scratch.join("store");
 
-    copy_dir(source, &working)
-        .with_context(|| format!("copying {} to scratch", source.display()))?;
-
+    // The copy is inside the guarded closure too. Returning `?` straight out of
+    // it used to skip the cleanup below, so a copy that failed partway — on a
+    // symlink, a permission error, a full disk — left stored payloads in `/tmp`
+    // indefinitely, and each retry added another partial copy.
     let result = (|| -> Result<ScanOutcome> {
+        copy_dir(source, &working)
+            .with_context(|| format!("copying {} to scratch", source.display()))?;
+
         let store = SledStore::open(&working)
             .with_context(|| format!("opening copy of {}", source.display()))?;
         // `Store::scan` reads only sled's default tree. Read every tree so a

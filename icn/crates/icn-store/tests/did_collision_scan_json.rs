@@ -224,6 +224,52 @@ fn non_utf8_store_paths_remain_distinguishable_in_json() {
     assert_ne!(a, b, "the two sources must remain distinguishable");
 }
 
+/// A failed copy must not leave stored payloads in the scratch directory.
+///
+/// The copy used to return before the cleanup, so a store that failed partway —
+/// here a symlink, which is refused — left a partial copy in `/tmp` for good,
+/// and every retry added another.
+#[test]
+fn a_failed_copy_leaves_no_scratch_behind() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let real = base.path().join("real");
+    std::fs::create_dir_all(&real).expect("create");
+    make_store(&real);
+
+    // A database whose artifacts are links: passes the `conf` check, fails
+    // partway through the copy.
+    let farm = base.path().join("farm");
+    std::fs::create_dir_all(&farm).expect("create");
+    for entry in std::fs::read_dir(&real).expect("read") {
+        let entry = entry.expect("entry");
+        if entry.file_type().expect("ft").is_file() {
+            std::os::unix::fs::symlink(entry.path(), farm.join(entry.file_name()))
+                .expect("symlink");
+        }
+    }
+
+    let scratch_root = base.path().join("scratch");
+    std::fs::create_dir_all(&scratch_root).expect("create");
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .arg(&farm)
+        .env("TMPDIR", &scratch_root)
+        .output()
+        .expect("run");
+
+    assert!(!out.status.success(), "the scan must fail");
+
+    let leftovers: Vec<_> = std::fs::read_dir(&scratch_root)
+        .expect("read scratch")
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name())
+        .collect();
+    assert!(
+        leftovers.is_empty(),
+        "a failed copy must clean up after itself, found {leftovers:?}"
+    );
+}
+
 #[test]
 fn json_verdict_agrees_with_the_process_exit_status() {
     // The human text, the JSON verdict and the exit code are three renderings
