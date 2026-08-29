@@ -67,10 +67,12 @@ fn a_principal() -> Did {
 fn project_to_one_spelling(value: &Value) -> Value {
     match value {
         Value::Did(did) => match did.identifier_bytes() {
-            Ok(bytes) => Value::Did(
-                Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
-                    .expect("32 bytes always spell a valid did:icn:"),
-            ),
+            // `from_anchor_id` re-encodes any 32 bytes without parsing them, so
+            // the projection is total. Routing through `from_str` instead would
+            // reject an identifier that is not an Ed25519 point — an
+            // anchor-derived DID, for one — and this helper has no business
+            // panicking on a principal the type accepts.
+            Ok(bytes) => Value::Did(Did::from_anchor_id(&bytes)),
             Err(_) => Value::Did(did.clone()),
         },
         Value::List(items) => Value::List(items.iter().map(project_to_one_spelling).collect()),
