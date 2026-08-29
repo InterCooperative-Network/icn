@@ -213,15 +213,22 @@ vacuously.
 
 ```bash
 cd icn && cargo build -p icn-store --bin did-collision-scan
-./target/debug/did-collision-scan <store-path> [<store-path> ...] [--json]
+./target/debug/did-collision-scan <sled-db-path> [<sled-db-path> ...] [--json]
 ```
+
+Each path must be a **sled database root**, not a directory above one. A
+deployment keeps one database per domain, so `/data` is the wrong level and
+`/data/store/ledger` is the right one. The tool refuses a wrong-level path and
+names the databases beneath it, because `sled::open` on a non-database directory
+*creates* one — which would otherwise mean zero rows and a false CLEAR.
 
 Against a Kubernetes deployment, extract the volume first — the tool must be given a directory it
 can copy:
 
 ```bash
 kubectl cp <namespace>/<pod>:/data ./deployment-data
-./target/debug/did-collision-scan ./deployment-data/<store_dir>
+# one database per domain — scan each, not the parent
+find ./deployment-data -name conf -printf '%h\n' | xargs ./target/debug/did-collision-scan
 ```
 
 Exit status: `0` clear, `1` at least one keyspace must fail closed, `2` tool error.

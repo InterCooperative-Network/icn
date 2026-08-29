@@ -96,6 +96,54 @@ fn multi_store_json_is_one_valid_document() {
     assert!(doc["clear"].is_boolean(), "run-level verdict present");
 }
 
+/// A path one level above the databases must fail, not report CLEAR.
+///
+/// `sled::open` creates a database when the directory is not one, so pointing
+/// the scan at `/data` — which is exactly what the documented `kubectl cp`
+/// produces — would otherwise yield an empty database in the scratch copy, zero
+/// rows, and exit 0 without ever looking at the stores underneath.
+#[test]
+fn a_path_above_the_databases_is_rejected_not_reported_clear() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let parent = base.path().join("data");
+    let nested = parent.join("store").join("ledger");
+    std::fs::create_dir_all(&nested).expect("create");
+    make_store(&nested);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .arg(&parent)
+        .output()
+        .expect("run");
+
+    assert!(!out.status.success(), "a wrong-level path must not exit 0");
+    let err = String::from_utf8(out.stderr).expect("utf-8");
+    assert!(
+        err.contains("not a sled database"),
+        "the error must say why: {err}"
+    );
+    assert!(
+        err.contains("ledger"),
+        "the error must name the database to scan instead: {err}"
+    );
+}
+
+/// An empty directory with no database anywhere beneath it is also refused.
+#[test]
+fn a_directory_with_no_database_is_rejected() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let empty = base.path().join("empty");
+    std::fs::create_dir_all(&empty).expect("create");
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .arg(&empty)
+        .output()
+        .expect("run");
+
+    assert!(!out.status.success());
+    let err = String::from_utf8(out.stderr).expect("utf-8");
+    assert!(err.contains("no database was found"), "{err}");
+}
+
 #[test]
 fn json_verdict_agrees_with_the_process_exit_status() {
     // The human text, the JSON verdict and the exit code are three renderings

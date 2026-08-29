@@ -372,6 +372,20 @@ fn resolve_spelling(key: &[u8], start: usize, limit: usize) -> (usize, Option<[u
         // and misreport where the spelling ends.
         if let Ok(candidate) = std::str::from_utf8(&key[start..end]) {
             if let Ok(bytes) = identifier_bytes_of_spelling(candidate) {
+                // A shorter-than-maximal match means bytes were left over, and
+                // those bytes need an explanation. `/` is the only separator any
+                // live keyspace uses that is also a multibase body character, so
+                // it is the only remainder that can be attributed to key
+                // structure rather than to a malformed spelling.
+                //
+                // Anything else — `…<valid-did>junk` — is ambiguous: the
+                // keyspace's own parser would consume the whole suffix as the
+                // identifier and reject it, so calling the prefix readable would
+                // report a principal for a row the real loader cannot read, and
+                // quietly lower the unreadable count that exists to fail closed.
+                if end < limit && key.get(end) != Some(&b'/') {
+                    return (limit, None);
+                }
                 return (end, Some(bytes));
             }
         }
@@ -1693,6 +1707,46 @@ mod tests {
         assert_eq!(a.uncovered_did_rows(), 0);
         assert_eq!(a.deferred_did_rows(), 1);
         assert!(a.is_clear());
+    }
+
+    #[test]
+    fn trailing_junk_after_a_valid_spelling_stays_unreadable() {
+        // `replay_max_seq:<valid-did>junk` must not be reported as a readable
+        // principal with `junk` as residual key material: the keyspace's own
+        // parser consumes the whole suffix as the identifier and rejects it, so
+        // treating the prefix as readable would report a principal for a row the
+        // real loader cannot read — and lower the unreadable count that exists
+        // to fail closed.
+        let one = spell(&principal(121), multibase::Base::Base58Btc);
+        let key = format!("test:{one}junk").into_bytes();
+
+        let found = find_embedded_dids(&key);
+        assert_eq!(found.len(), 1);
+        assert!(
+            found[0].identifier.is_none(),
+            "an unexplained suffix makes the token ambiguous, not readable"
+        );
+
+        // And it must reach the report as an unreadable row, which blocks.
+        let store = store_with(&[(&format!("test:{one}junk"), b"v")]);
+        let report = scan_keyspace(&store, &descriptor(MergeDisposition::Sum)).unwrap();
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn a_slash_remainder_is_still_attributed_to_key_structure() {
+        // The one remainder that is explainable: `/` is the only separator a
+        // live keyspace uses that is also a multibase body character. This must
+        // keep working, or `trust/sequences/issuer/<did>`-shaped keys with a
+        // trailing field would all become unreadable.
+        let one = spell(&principal(123), multibase::Base::Base58Btc);
+        let key = format!("ns/{one}/role").into_bytes();
+
+        let found = find_embedded_dids(&key);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].spelling, one);
+        assert_eq!(found[0].identifier, Some(principal(123)));
     }
 
     #[test]

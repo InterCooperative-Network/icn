@@ -110,6 +110,7 @@ fn run() -> Result<bool> {
         if !path.exists() {
             anyhow::bail!("store path does not exist: {}", path.display());
         }
+        ensure_sled_root(path)?;
 
         let outcome = scan_copy_of(path, &descriptors)
             .with_context(|| format!("scanning {}", path.display()))?;
@@ -138,6 +139,74 @@ fn run() -> Result<bool> {
     }
 
     Ok(all_clear)
+}
+
+/// Refuse a path that is not itself a sled database root.
+///
+/// `sled::open` on a directory that is not a database *creates* one, so a path
+/// one level too high — `/data` rather than `/data/store/ledger`, which is
+/// exactly what the documented `kubectl cp` produces — yields a freshly
+/// initialised empty database in the scratch copy. The scan would then report
+/// zero rows and exit CLEAR while never having looked at the real stores
+/// underneath. An operator's wrong path must not become a passing gate.
+///
+/// Nested databases are discovered and named rather than merely rejected, so
+/// the error tells the caller what to run instead.
+fn ensure_sled_root(path: &Path) -> Result<()> {
+    if !path.is_dir() {
+        anyhow::bail!("not a directory: {}", path.display());
+    }
+    // `conf` is written by sled when a database is created and is present for
+    // every database, empty or not.
+    if path.join("conf").is_file() {
+        return Ok(());
+    }
+
+    let mut nested = Vec::new();
+    find_sled_roots(path, 0, &mut nested);
+
+    if nested.is_empty() {
+        anyhow::bail!(
+            "{} is not a sled database (no `conf`), and no database was found beneath it. \
+             Point the scan at a store directory.",
+            path.display()
+        );
+    }
+
+    let listed: Vec<String> = nested.iter().map(|p| p.display().to_string()).collect();
+    anyhow::bail!(
+        "{} is not a sled database itself, but contains {}. Opening it would create an \
+         empty database and report a false CLEAR. Scan these instead:\n  {}",
+        path.display(),
+        if nested.len() == 1 {
+            "one".to_string()
+        } else {
+            format!("{} databases", nested.len())
+        },
+        listed.join("\n  ")
+    );
+}
+
+/// Collect sled database roots beneath `dir`, bounded in depth.
+fn find_sled_roots(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
+    const MAX_DEPTH: usize = 4;
+    if depth > MAX_DEPTH {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let child = entry.path();
+        if !child.is_dir() {
+            continue;
+        }
+        if child.join("conf").is_file() {
+            out.push(child);
+        } else {
+            find_sled_roots(&child, depth + 1, out);
+        }
+    }
 }
 
 /// Copy the store to scratch, scan the copy, remove it. The source is never
