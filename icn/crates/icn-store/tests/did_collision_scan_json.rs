@@ -144,6 +144,46 @@ fn a_directory_with_no_database_is_rejected() {
     assert!(err.contains("no database was found"), "{err}");
 }
 
+/// A symlinked store must be refused, not silently copied as an empty one.
+///
+/// `ensure_sled_root` follows links when it checks for `conf`, so a source
+/// represented as a symlink farm — a backup, a restored snapshot — passed
+/// validation while the copy skipped every linked artifact. `SledStore::open`
+/// then initialised a fresh empty database and the gate reported CLEAR having
+/// scanned nothing.
+#[test]
+fn a_symlinked_store_artifact_is_refused_not_skipped() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let real = base.path().join("real");
+    std::fs::create_dir_all(&real).expect("create");
+    make_store(&real);
+
+    let farm = base.path().join("farm");
+    std::fs::create_dir_all(&farm).expect("create");
+    for entry in std::fs::read_dir(&real).expect("read real") {
+        let entry = entry.expect("entry");
+        if entry.file_type().expect("ft").is_file() {
+            std::os::unix::fs::symlink(entry.path(), farm.join(entry.file_name()))
+                .expect("symlink");
+        }
+    }
+
+    // The farm looks like a database: `conf` resolves through the link.
+    assert!(farm.join("conf").is_file());
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .arg(&farm)
+        .output()
+        .expect("run");
+
+    assert!(
+        !out.status.success(),
+        "a symlinked store must not produce a CLEAR verdict"
+    );
+    let err = String::from_utf8(out.stderr).expect("utf-8");
+    assert!(err.contains("symlink"), "the error must say why: {err}");
+}
+
 #[test]
 fn json_verdict_agrees_with_the_process_exit_status() {
     // The human text, the JSON verdict and the exit code are three renderings

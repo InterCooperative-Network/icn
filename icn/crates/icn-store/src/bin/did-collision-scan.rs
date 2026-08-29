@@ -90,11 +90,14 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<bool> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // `args_os`, not `args`: a store path on unix may hold bytes that are not
+    // UTF-8, and `std::env::args()` panics while decoding one — exiting 101
+    // past this function's `Result` handling, with no gate report at all.
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let json = args.iter().any(|a| a == "--json");
     let paths: Vec<PathBuf> = args
         .iter()
-        .filter(|a| !a.starts_with("--"))
+        .filter(|a| !a.as_encoded_bytes().starts_with(b"--"))
         .map(PathBuf::from)
         .collect();
 
@@ -285,14 +288,38 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
     for entry in std::fs::read_dir(from)? {
         let entry = entry?;
         let target = to.join(entry.file_name());
+        // `file_type` on a `DirEntry` does not follow links, so this sees the
+        // link itself rather than what it points at.
         let kind = entry.file_type()?;
+
+        if kind.is_symlink() {
+            // Skipping was wrong. A source represented as a symlink farm — a
+            // backup, a restored snapshot — passes the `conf` check because
+            // that check follows links, and then copies to an empty directory.
+            // `SledStore::open` would initialise a fresh database there and the
+            // gate would report CLEAR having scanned nothing. Refusing is the
+            // only safe reading: following the link could also read outside the
+            // store we were asked to scan.
+            anyhow::bail!(
+                "refusing to scan {}: it contains a symlink ({}). Resolve the store to real \
+                 files first — copying past a link would scan an empty database and report a \
+                 false CLEAR.",
+                from.display(),
+                entry.file_name().to_string_lossy()
+            );
+        }
+
         if kind.is_dir() {
             copy_dir(&entry.path(), &target)?;
         } else if kind.is_file() {
             std::fs::copy(entry.path(), &target)?;
+        } else {
+            anyhow::bail!(
+                "refusing to scan {}: unexpected non-regular entry ({})",
+                from.display(),
+                entry.file_name().to_string_lossy()
+            );
         }
-        // Symlinks and devices are skipped: a sled directory holds neither, and
-        // following one would read outside the store we were asked to scan.
     }
     Ok(())
 }
