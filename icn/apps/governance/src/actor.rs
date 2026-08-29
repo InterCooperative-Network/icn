@@ -2299,11 +2299,7 @@ impl GovernanceActor {
                 // a membership list naming one key under two spellings would
                 // otherwise claim two electorate slots for one voter and read
                 // that voter's single vote as half turnout instead of full.
-                let mut eligible_principals = std::collections::HashSet::new();
-                for member in &eligible_members {
-                    eligible_principals.insert(VotingPrincipal::of(member)?);
-                }
-                let eligible_count = eligible_principals.len();
+                let eligible_count = icn_governance::distinct_principals(&eligible_members)?;
 
                 // Edge case: cannot evaluate proposal with zero eligible voters
                 // This prevents division issues and ensures meaningful quorum calculation
@@ -3934,9 +3930,9 @@ impl GovernanceActor {
         }
 
         // Delegate chosen for each principal, so several spellings of one member
-        // cannot each expand, and cannot disagree without being noticed.
-        let mut resolved_delegate: std::collections::HashMap<VotingPrincipal, VotingPrincipal> =
-            std::collections::HashMap::new();
+        // cannot each expand, and cannot disagree without being noticed. Shared
+        // with the library tallies so the two cannot drift apart.
+        let mut resolution = icn_governance::DelegationResolution::new();
 
         let mut delegated = 0usize;
         for member in eligible_members {
@@ -3964,21 +3960,10 @@ impl GovernanceActor {
             // delegate: otherwise the first entry in the resolver's list would
             // decide which delegated act counts, making list order the authority
             // over a vote. Fail closed instead, and expand at most once (#2641).
-            match resolved_delegate.get(&member_principal) {
-                Some(&already) if already != delegate_principal => {
-                    return Err(anyhow::anyhow!(
-                        "proposal {}: one voting principal holds competing delegations under \
-                         different DID spellings ('{}' resolves elsewhere than a previous \
-                         spelling of the same key); refusing to let membership-list order \
-                         choose which delegated act counts",
-                        proposal_id.0,
-                        member,
-                    ));
-                }
-                Some(_) => continue, // same delegate, already expanded
-                None => {
-                    resolved_delegate.insert(member_principal, delegate_principal);
-                }
+            if resolution.record(member, member_principal, delegate_principal)?
+                == icn_governance::DelegationStep::AlreadyExpanded
+            {
+                continue;
             }
 
             if let Some(delegate_vote) = vote_by_principal.get(&delegate_principal) {

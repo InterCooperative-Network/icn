@@ -5,7 +5,9 @@ use crate::domain::GovernanceDomainId;
 use crate::error::GovernanceError;
 use crate::proposal::ProposalId;
 use crate::vote::{Vote, VoteChoice};
-use crate::vote_principal::{effective_votes, VotingPrincipal};
+use crate::vote_principal::{
+    effective_votes, DelegationResolution, DelegationStep, VotingPrincipal,
+};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -138,8 +140,12 @@ pub fn compute_tally_with_delegations(
         vote_map.insert(VotingPrincipal::of(&vote.voter)?, vote);
     }
 
-    // Track which principals have already been counted to avoid double-counting
+    // Principals that voted *directly*. Delegation de-duplication belongs to
+    // `resolution`, not here: marking a delegator counted would short-circuit
+    // the next spelling of that principal before its delegate could be
+    // compared, and a disagreement would pass unnoticed (#2641).
     let mut counted: HashSet<VotingPrincipal> = HashSet::new();
+    let mut resolution = DelegationResolution::new();
     let mut tally = VoteTally::empty();
 
     // First pass: count direct votes
@@ -164,13 +170,19 @@ pub fn compute_tally_with_delegations(
         // delegator. Comparing principals stops a self-delegation from being
         // laundered into a second vote by re-spelling the delegate DID.
         if delegate_principal != voter_principal {
+            // Several spellings of one delegator must agree on the delegate, or
+            // `eligible_voters` order would choose the delegated act (#2641).
+            if resolution.record(voter, voter_principal, delegate_principal)?
+                == DelegationStep::AlreadyExpanded
+            {
+                continue;
+            }
             if let Some(delegate_vote) = vote_map.get(&delegate_principal) {
                 // Create a vote for the delegator based on the delegate's choice and weight
                 let delegated_vote =
                     Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice)
                         .with_weight(delegate_vote.weight);
                 tally.add_vote(&delegated_vote);
-                counted.insert(voter_principal);
             }
         }
     }
@@ -204,7 +216,12 @@ pub fn compute_detailed_tally_with_delegations(
     for &vote in &direct {
         vote_map.insert(VotingPrincipal::of(&vote.voter)?, vote);
     }
+    // Principals that voted *directly*. Delegation de-duplication belongs to
+    // `resolution`, not here: marking a delegator counted would short-circuit
+    // the next spelling of that principal before its delegate could be
+    // compared, and a disagreement would pass unnoticed (#2641).
     let mut counted: HashSet<VotingPrincipal> = HashSet::new();
+    let mut resolution = DelegationResolution::new();
     let mut tally = VoteTally::empty();
     let mut delegated_count = 0;
     let direct_count = direct.len();
@@ -226,13 +243,20 @@ pub fn compute_detailed_tally_with_delegations(
         let delegate_principal = VotingPrincipal::of(&delegate)?;
 
         if delegate_principal != voter_principal {
+            // Same rule as the ordinary tally: one principal delegates once, and
+            // disagreeing spellings fail closed rather than letting list order
+            // pick the act (#2641).
+            if resolution.record(voter, voter_principal, delegate_principal)?
+                == DelegationStep::AlreadyExpanded
+            {
+                continue;
+            }
             if let Some(delegate_vote) = vote_map.get(&delegate_principal) {
                 // Preserve the delegate's vote weight
                 let delegated_vote =
                     Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice)
                         .with_weight(delegate_vote.weight);
                 tally.add_vote(&delegated_vote);
-                counted.insert(voter_principal);
                 delegated_count += 1;
             }
         }
@@ -339,6 +363,76 @@ mod tests {
     // Helper to create deterministic test DIDs
     fn test_did(seed: u8) -> Did {
         Did::from_anchor_id(&[seed; 32])
+    }
+
+    /// Re-spell a DID as multibase base16 over the same identifier bytes.
+    fn alias_spelling(did: &Did) -> Did {
+        let bytes = did.identifier_bytes().expect("test DID must decode");
+        Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+            .expect("base16 multibase spelling must parse")
+    }
+
+    /// #2641: where `eligible_voters` names one principal under several
+    /// spellings and those spellings delegate to voters who disagree, counting
+    /// the first one encountered would make list order the authority over a
+    /// vote. Fail closed instead.
+    #[test]
+    fn competing_alias_delegations_fail_closed() {
+        use crate::delegation::{Delegation, DelegationManager, DelegationScope};
+
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let delegator = kp.did().clone();
+        let alias = alias_spelling(&delegator);
+        assert_ne!(delegator, alias, "control: the spellings must differ");
+
+        let delegate_a = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let delegate_b = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+        let proposal_id = ProposalId::generate();
+
+        // One key, two spellings, two different delegates.
+        let mut manager = DelegationManager::new();
+        manager
+            .add_delegation(Delegation::new(
+                delegator.clone(),
+                delegate_a.clone(),
+                DelegationScope::Blanket,
+            ))
+            .unwrap();
+        manager
+            .add_delegation(Delegation::new(
+                alias.clone(),
+                delegate_b.clone(),
+                DelegationScope::Blanket,
+            ))
+            .unwrap();
+
+        // Both delegates vote, and they disagree.
+        let votes = vec![
+            Vote::new(proposal_id.clone(), delegate_a, VoteChoice::For),
+            Vote::new(proposal_id.clone(), delegate_b, VoteChoice::Against),
+        ];
+        let eligible = vec![delegator, alias];
+
+        let err =
+            compute_tally_with_delegations(&votes, &eligible, &manager, &domain_id, &proposal_id)
+                .expect_err("eligible-list order must not choose which delegated act counts");
+        assert!(
+            err.to_string().contains("competing delegations"),
+            "must name the competing delegations, got: {err}"
+        );
+
+        let detailed = compute_detailed_tally_with_delegations(
+            &votes,
+            &eligible,
+            &manager,
+            &domain_id,
+            &proposal_id,
+        );
+        assert!(
+            detailed.is_err(),
+            "the detailed twin must fail closed on the same evidence"
+        );
     }
 
     #[test]

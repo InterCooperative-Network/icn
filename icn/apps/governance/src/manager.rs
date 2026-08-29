@@ -3779,6 +3779,15 @@ impl GovernanceManager {
             })?;
 
             let raw_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
+
+            // Detect principal-level conflicts across every stored row before
+            // eligibility narrows the set. The standing filter compares DID
+            // spellings, so it can retain one spelling of a conflicting pre-#2641
+            // pair and discard the other, leaving the reduction below nothing to
+            // notice — and this close would then finalise whichever act happened
+            // to be spelled the way the standing set names it (#2641).
+            icn_governance::effective_votes(&raw_votes)?;
+
             // If an eligibility filter was provided (close-time standing revalidation),
             // exclude votes from members who no longer hold active commons standing.
             let proposal_votes: Vec<_> = match eligible_voters {
@@ -3791,7 +3800,12 @@ impl GovernanceManager {
             let tally = VoteTally::try_from_votes(&proposal_votes)?;
 
             let total_members = match &domain.config.membership.source {
-                MembershipSource::StaticList(members) => members.len(),
+                // Distinct voting principals, not DID spellings: the numerator
+                // above gives one principal one vote, so the denominator must
+                // count that principal once however many spellings name it.
+                MembershipSource::StaticList(members) => {
+                    icn_governance::distinct_principals(members)?
+                }
                 MembershipSource::TrustThreshold(_) => tally.total_votes().max(1),
             };
 
@@ -9191,6 +9205,97 @@ mod tests {
         .unwrap();
 
         (mgr, domain_id, member_did)
+    }
+
+    /// #2641, standalone quorum denominator: the tally numerator gives one
+    /// principal one vote, so the electorate it is measured against must count
+    /// that principal once however many spellings name it. Otherwise a static
+    /// list naming one key twice claims two electorate slots for one voter and
+    /// reads their vote as half turnout.
+    #[tokio::test]
+    async fn standalone_quorum_denominator_counts_principals_not_spellings() {
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let member = kp.did().clone();
+        let alias = alias_spelling(&member);
+        assert_ne!(member, alias, "control: the spellings must differ");
+
+        let domain_id = GovernanceDomainId::new("quorum-alias");
+        let mgr = GovernanceManager::new();
+        mgr.create_domain(
+            domain_id.clone(),
+            "Quorum alias".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                // 100% quorum makes the difference decisive: 1/1 reaches it, 1/2 does not.
+                quorum_percentage: 100,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member.clone(), alias]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member).await;
+        mgr.cast_vote(proposal_id.clone(), member, VoteChoice::For, None)
+            .await
+            .expect("the member votes");
+        mgr.close_proposal(proposal_id.clone())
+            .await
+            .expect("close_proposal");
+
+        let closed = mgr
+            .get_proposal(&proposal_id)
+            .await
+            .unwrap()
+            .expect("proposal exists");
+        assert!(
+            matches!(closed.state, ProposalState::Accepted { .. }),
+            "the sole member voted, so turnout is 1/1 and the 100% quorum is met; \
+             NoQuorum means the denominator counted two spellings as two voters (got {:?})",
+            closed.state
+        );
+    }
+
+    /// #2641, standalone filtered close: standing revalidation compares DID
+    /// spellings, so it can retain one spelling of a conflicting pre-fix pair and
+    /// discard the other, leaving the reduction nothing to notice. Conflicts must
+    /// be detected across every stored row before eligibility narrows the set.
+    #[tokio::test]
+    async fn standalone_filtered_close_fails_closed_on_hidden_conflicts() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+        assert_ne!(member_did, alias, "control: the spellings must differ");
+
+        // Two conflicting acts by one key, as a pre-#2641 binary left them.
+        {
+            let mut votes = mgr.votes.write().unwrap();
+            let rows = votes.entry(proposal_id.clone()).or_default();
+            rows.push(Vote::new(
+                proposal_id.clone(),
+                member_did.clone(),
+                VoteChoice::For,
+            ));
+            rows.push(Vote::new(proposal_id.clone(), alias, VoteChoice::Against));
+        }
+
+        // A standing set naming only the canonical spelling would drop the other.
+        let mut standing = HashSet::new();
+        standing.insert(member_did);
+
+        let err = mgr
+            .close_proposal_filtered(proposal_id.clone(), &standing)
+            .await
+            .expect_err("a conflict the standing filter would hide must still fail closed");
+        assert!(
+            err.to_string().contains("conflicting"),
+            "must fail closed naming the conflict, got: {err}"
+        );
     }
 
     /// #2641: the admission layer must reject a second vote from one

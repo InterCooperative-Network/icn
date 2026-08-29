@@ -108,6 +108,72 @@ pub fn effective_votes(votes: &[Vote]) -> Result<Vec<&Vote>, GovernanceError> {
     Ok(order)
 }
 
+/// How many distinct voting principals a member list names.
+///
+/// Quorum denominators must count voters rather than DID spellings. The tally
+/// numerator gives one principal one vote (#2641), so a list naming one key
+/// under several spellings would otherwise claim several electorate slots for a
+/// single voter and read their vote as partial turnout.
+pub fn distinct_principals(members: &[Did]) -> Result<usize, GovernanceError> {
+    let mut seen = std::collections::HashSet::new();
+    for member in members {
+        seen.insert(VotingPrincipal::of(member)?);
+    }
+    Ok(seen.len())
+}
+
+/// Tracks which delegate each principal resolved to while a delegated tally is
+/// being expanded.
+///
+/// One principal delegates once. Where an eligible-voter list names it under
+/// several spellings, those spellings must resolve to the same delegate — else
+/// the order of that list would decide which delegated act counts, which is a
+/// hidden selector over a vote rather than a democratic outcome.
+#[derive(Debug, Default)]
+pub struct DelegationResolution {
+    seen: HashMap<VotingPrincipal, VotingPrincipal>,
+}
+
+/// What [`DelegationResolution::record`] found for a principal.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DelegationStep {
+    /// First spelling of this principal: expand its delegation.
+    Expand,
+    /// A previous spelling already resolved to the same delegate: skip.
+    AlreadyExpanded,
+}
+
+impl DelegationResolution {
+    /// Create an empty resolution tracker.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record the delegate this principal resolved to, failing closed if an
+    /// earlier spelling of the same principal resolved to a different one.
+    pub fn record(
+        &mut self,
+        delegator: &Did,
+        delegator_principal: VotingPrincipal,
+        delegate_principal: VotingPrincipal,
+    ) -> Result<DelegationStep, GovernanceError> {
+        match self.seen.get(&delegator_principal) {
+            Some(&already) if already != delegate_principal => {
+                Err(GovernanceError::CompetingDelegations(format!(
+                    "one voting principal holds competing delegations under different DID \
+                     spellings ('{delegator}' resolves elsewhere than a previous spelling of \
+                     the same key); refusing to let list order choose which delegated act counts"
+                )))
+            }
+            Some(_) => Ok(DelegationStep::AlreadyExpanded),
+            None => {
+                self.seen.insert(delegator_principal, delegate_principal);
+                Ok(DelegationStep::Expand)
+            }
+        }
+    }
+}
+
 /// The single effective act already recorded for the principal `voter` names.
 ///
 /// Returns `Ok(None)` when that principal has not voted. Fails closed when the

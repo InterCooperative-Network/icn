@@ -179,7 +179,8 @@ pub use tally::{
 };
 pub use vote::{Vote, VoteChoice};
 pub use vote_principal::{
-    acts_for, effective_votes, ensure_has_not_voted, prior_act_for, VotingPrincipal,
+    acts_for, distinct_principals, effective_votes, ensure_has_not_voted, prior_act_for,
+    DelegationResolution, DelegationStep, VotingPrincipal,
 };
 
 // Protocol governance types (Phase 20)

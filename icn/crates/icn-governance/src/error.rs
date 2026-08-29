@@ -40,6 +40,10 @@ pub enum GovernanceError {
     #[error("conflicting vote records: {0}")]
     ConflictingVoteRecords(String),
 
+    /// One voting principal holds competing delegations under different DID spellings
+    #[error("competing delegations: {0}")]
+    CompetingDelegations(String),
+
     /// Proposal not open for voting
     #[error("proposal not open for voting: {0}")]
     ProposalNotOpen(String),
