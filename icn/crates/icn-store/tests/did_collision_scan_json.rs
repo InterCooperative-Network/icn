@@ -54,14 +54,46 @@ fn json_output_is_valid_for_paths_containing_json_special_characters() {
 
         // Parsed successfully; now confirm the path round-tripped intact
         // rather than being mangled into something that merely parses.
+        let store = &doc["stores"][0];
         assert_eq!(
-            doc["store"].as_str().expect("store is a string"),
+            store["store"].as_str().expect("store is a string"),
             dir.display().to_string(),
             "path must survive encoding for {name:?}"
         );
         assert!(doc["clear"].is_boolean());
-        assert!(doc["keyspaces"].is_array());
+        assert!(store["keyspaces"].is_array());
     }
+}
+
+/// Multiple stores must produce ONE document, not one per path.
+///
+/// Each per-store object parsed on its own before this, so the whole stdout
+/// looked fine line by line while being invalid JSON as a whole — exactly the
+/// shape of defect a single-path test cannot see.
+#[test]
+fn multi_store_json_is_one_valid_document() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let mut dirs = Vec::new();
+    for name in ["one", "two", "three"] {
+        let dir = base.path().join(name);
+        std::fs::create_dir_all(&dir).expect("create");
+        make_store(&dir);
+        dirs.push(dir);
+    }
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .args(&dirs)
+        .arg("--json")
+        .output()
+        .expect("run");
+
+    let stdout = String::from_utf8(out.stdout).expect("utf-8");
+    let doc: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("multi-store --json must be one document: {e}\n{stdout}"));
+
+    let stores = doc["stores"].as_array().expect("stores is an array");
+    assert_eq!(stores.len(), 3, "every scanned store must appear once");
+    assert!(doc["clear"].is_boolean(), "run-level verdict present");
 }
 
 #[test]

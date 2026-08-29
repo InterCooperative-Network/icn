@@ -114,7 +114,41 @@ exclusion does not.
 A deferred namespace is **never inspected**. Only its existence, its owning
 gate, and its principal-bearing row count are recorded.
 
-### 2.4 Fail-closed reads
+### 2.4 A plausible merge rule is not an authorized one
+
+The disposition table below distinguishes rules that are *established* from
+rules this document merely *asserts*. That distinction is now encoded, not just
+written down: `KeyspaceDescriptor::basis` carries `RuleBasis::Established` or
+`RuleBasis::AwaitingDomainSignOff`, and a collision under an unsigned-off rule is
+**not automatable** regardless of its disposition.
+
+This closes a real contradiction found in review. §4 row 5 said summing ledger
+balances still needed economics sign-off, while the code marked that keyspace
+`Sum` — so a generic storage crate would have authorized a merge of monetary
+state on nothing but its own say-so. Six keyspaces are currently
+`AwaitingDomainSignOff`: `icn-ledger/{balance,cleared_volume,frozen}`,
+`icn-net/outgoing_seq`, `icn-trust/edges`, `trust-app/sequences_issuer`. A test
+pins that list against this document so the two cannot drift.
+
+The basis only bites when there is something to merge; a keyspace with no
+collisions stays automatable whatever its basis.
+
+### 2.5 What a CLEAR verdict is conditional on
+
+A recursive file copy of a **live** store is not a point-in-time snapshot. Writes
+can land between one file being copied and the next, so sled may recover the copy
+successfully while omitting a row that existed in the source — including an
+aliasing row. A CLEAR verdict therefore describes a state the source may never
+have held at any single instant.
+
+This is a limit of the evidence, not a defect to code around: quiescing a store
+means stopping a workload, which this tranche must not do. It is printed with
+every report and carried in the JSON. For a verdict that is binding rather than
+indicative, scan a quiesced store or a coherent volume snapshot with writes held
+until the flip — and note that this is a further reason the fail-closed check
+belongs *inside* the key-equality binary (§3.5).
+
+### 2.6 Fail-closed reads
 
 Two paths could previously turn missing evidence into apparent absence, and both
 now propagate:
@@ -135,7 +169,7 @@ now propagate:
   spelling. Nothing that fails to decode is silently dropped: the whole run is
   reported as one unreadable token, which itself blocks.
 
-### 2.5 Grouping rule
+### 2.7 Grouping rule
 
 Rows are grouped by their **principal-canonical shape**: the raw key with every embedded
 `did:icn:` spelling replaced by the 32 identifier bytes it decodes to. Non-DID key material stays
@@ -151,7 +185,7 @@ that order decides the survivor of every last-writer rebuild. `Base256Emoji` spe
 non-ASCII and therefore sort after every ASCII spelling, so **the survivor is
 attacker-selectable**. The scan surfaces the survivor explicitly rather than leaving it implicit.
 
-### 2.6 Coverage limit found while building it
+### 2.8 Coverage limit found while building it
 
 `Store::scan` reads only sled's **default tree**. `icn-gateway`'s service discovery uses a
 *named* tree, which a `Store`-trait scan can never reach. A scan reporting zeros on such a store
@@ -161,7 +195,7 @@ The runner therefore also reports per-tree row counts and per-tree DID-bearing r
 (`SledStore::tree_row_counts`, `SledStore::did_bearing_rows_per_tree`), and **treats
 principal-keyed rows in a named tree as blocking**, not as a clean result.
 
-### 2.7 Fixture tests
+### 2.9 Fixture tests
 
 17 tests in `did_collision_scan::tests`, run against a real `SledStore` rather than a hand-rolled
 double — the ordering claim is a claim about the actual backend, and a simulated store would only
@@ -175,7 +209,7 @@ raw key instead of canonical shape) fails **9 of 15** collision tests and leaves
 6 that should not depend on grouping. The suite therefore discriminates rather than passing
 vacuously.
 
-### 2.8 How to run it
+### 2.10 How to run it
 
 ```bash
 cd icn && cargo build -p icn-store --bin did-collision-scan
@@ -257,6 +291,11 @@ rows against the registry found 63 the registry does not cover. Each is now acco
 | `security:violation:<did>` | 10 | as above |
 | `security:banned:<did>` | 7 | as above |
 | `security:quarantine:<did>` | 4 | as above |
+
+The `icn-rpc` auth-challenge namespace (`auth:challenge:<did>`, inventory row
+#29) is also a registered deferral. No live challenge existed in the scanned
+deployments — they are TTL-bounded — but without the entry an ordinary challenge
+row would have been classified uncovered and blocked the gate.
 
 These 63 rows are **deferred, not cleared**. Their existence and their migration dependency are
 recorded; their contents were not inspected.

@@ -106,6 +106,23 @@ impl MergeDisposition {
     }
 }
 
+/// Whether a keyspace's merge rule carries authority yet.
+///
+/// A rule can be written down long before anyone with standing has approved it,
+/// and the two must not look alike to the gate. Recording the difference is what
+/// stops this crate — a generic storage layer — from authorizing a merge of
+/// economic or institutional state on nothing but its own say-so.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleBasis {
+    /// The rule is established: implemented in live code, fixed by a canonical
+    /// contract, or forced by an invariant. The rationale names which.
+    Established,
+    /// The rule is proposed and reads plausibly, but the domain that owns the
+    /// state has not signed off. A collision here **fails closed** regardless of
+    /// the disposition: a plausible rule is not an authorized one.
+    AwaitingDomainSignOff,
+}
+
 /// One durable keyspace to scan.
 ///
 /// A descriptor names the prefix to read and the disposition that applies to a
@@ -123,6 +140,8 @@ pub struct KeyspaceDescriptor {
     pub inventory_rows: &'static [u32],
     /// The merge rule that applies to a collision here.
     pub disposition: MergeDisposition,
+    /// Whether that rule has been authorized by the domain that owns the state.
+    pub basis: RuleBasis,
     /// Why that rule, in one line — so a report explains itself.
     pub rationale: &'static str,
 }
@@ -183,6 +202,8 @@ pub struct KeyspaceReport {
     pub keyspace: String,
     pub inventory_rows: Vec<u32>,
     pub disposition: MergeDisposition,
+    /// Whether the merge rule has been authorized by its owning domain.
+    pub basis: RuleBasis,
     pub rationale: String,
     /// Rows read under the prefix.
     pub rows_scanned: usize,
@@ -212,14 +233,25 @@ impl KeyspaceReport {
     ///
     /// A keyspace with no collisions is automatable whatever its disposition —
     /// there is nothing to merge. A keyspace with collisions is automatable only
-    /// when its disposition authorizes a merge, and only when every row it holds
-    /// was readable: a key that does not decode cannot be classified, so it
-    /// cannot be migrated on its own recognizance.
+    /// when three things hold at once:
+    ///
+    /// * every row it holds was readable — a key that does not decode cannot be
+    ///   classified, so it cannot be migrated on its own recognizance;
+    /// * its disposition authorizes a merge at all;
+    /// * that rule has been **authorized by the domain that owns the state**.
+    ///
+    /// The last condition is why [`RuleBasis`] exists. A merge rule that reads
+    /// plausibly is not the same as one someone with standing has approved, and
+    /// summing two balances because addition is the obvious arithmetic would be
+    /// this crate deciding an economic question it has no authority over.
     pub fn is_automatable(&self) -> bool {
         if self.rows_unreadable > 0 {
             return false;
         }
-        self.collision_groups.is_empty() || self.disposition.is_automatable()
+        if self.collision_groups.is_empty() {
+            return true;
+        }
+        self.disposition.is_automatable() && self.basis == RuleBasis::Established
     }
 
     /// Whether this keyspace must stop a migration for manual disposition.
@@ -463,6 +495,7 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
         keyspace: descriptor.name.to_string(),
         inventory_rows: descriptor.inventory_rows.to_vec(),
         disposition: descriptor.disposition,
+        basis: descriptor.basis,
         rationale: descriptor.rationale.to_string(),
         rows_scanned,
         rows_with_readable_did,
@@ -567,6 +600,12 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
             prefix: b"gov:vote:",
             gate: "IDENTITY_SEMANTICS §7.5 membership/vote migration gate",
             inventory_rows: &[23],
+        },
+        DeferredNamespace {
+            name: "rpc/auth-challenges",
+            prefix: b"auth:challenge:",
+            gate: "dedicated security workflow (TTL-bounded; contents not inspected)",
+            inventory_rows: &[29],
         },
         DeferredNamespace {
             name: "security/misbehavior",
@@ -792,6 +831,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"replay_max_seq:",
             inventory_rows: &[1, 37],
             disposition: MergeDisposition::MaxMonotonic,
+            basis: RuleBasis::Established,
             rationale: "Replay floor. A lower survivor weakens the guard, so the merge keeps the \
                         maximum, which can only reject more than any single row did.",
         },
@@ -800,6 +840,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"replay_finalized:",
             inventory_rows: &[2, 37],
             disposition: MergeDisposition::Union,
+            basis: RuleBasis::Established,
             rationale: "Finalized-sequence set. Dropping a spelling's rows would re-open replay \
                         for the sequences it recorded, so the merge is a union.",
         },
@@ -808,6 +849,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"replay_sender_regime:",
             inventory_rows: &[3, 37],
             disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
             rationale: "Two rows can assert different regimes for one sender, which is a \
                         contradiction no domain rule resolves. The live loader already declines \
                         to collapse these (#2644); a migration must not decide it either.",
@@ -817,6 +859,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"outgoing_seq:",
             inventory_rows: &[4],
             disposition: MergeDisposition::MaxMonotonic,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "Outgoing sequence high-water for a (sender, recipient) pair. A lower \
                         survivor is a nonce regression, so the merge keeps the maximum.",
         },
@@ -825,6 +868,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"ledger:balance:",
             inventory_rows: &[9, 39, 40],
             disposition: MergeDisposition::Sum,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "Accumulated balances. Overwriting drops a spelling's recorded position \
                         entirely, so the merge sums rather than elects a survivor.",
         },
@@ -833,6 +877,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"ledger:cleared_volume:",
             inventory_rows: &[69],
             disposition: MergeDisposition::Sum,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "Accumulated cleared volume per (account, currency). Currency stays in the \
                         canonical shape, so only same-currency rows merge, and they sum.",
         },
@@ -841,6 +886,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"ledger:frozen:",
             inventory_rows: &[42, 68],
             disposition: MergeDisposition::Union,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "Freeze records. Unfreeze deletes one spelling only, so electing a \
                         survivor can fail open; the merge is a union of the freezes.",
         },
@@ -849,6 +895,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/edges/",
             inventory_rows: &[30],
             disposition: MergeDisposition::Union,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "Trust edges keyed by (source, target). A dropped spelling takes its edges \
                         with it, so the merge unions the edge sets.",
         },
@@ -857,6 +904,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"ledger:journal:",
             inventory_rows: &[39, 40],
             disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
         },
@@ -865,6 +913,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/sequences/receiver/",
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
+            basis: RuleBasis::Established,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
                         survivor accepts stale attestations, so the merge keeps the maximum, \
                         matching the established replay_max_seq precedent.",
@@ -874,6 +923,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/sequences/issuer/",
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
+            basis: RuleBasis::AwaitingDomainSignOff,
             rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
                         a sequence number already used, which the uniqueness invariant forbids, \
                         so the merge keeps the maximum.",
@@ -883,6 +933,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"member:",
             inventory_rows: &[36],
             disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
             rationale: "Cooperative membership. Merging two rows decides who is a member of an \
                         institution, which is an institutional judgement no identity-layer rule \
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
@@ -915,11 +966,16 @@ mod tests {
     }
 
     fn descriptor(disposition: MergeDisposition) -> KeyspaceDescriptor {
+        descriptor_with(disposition, RuleBasis::Established)
+    }
+
+    fn descriptor_with(disposition: MergeDisposition, basis: RuleBasis) -> KeyspaceDescriptor {
         KeyspaceDescriptor {
             name: "test/keyspace",
             prefix: b"test:",
             inventory_rows: &[0],
             disposition,
+            basis,
             rationale: "test fixture",
         }
     }
@@ -1536,6 +1592,107 @@ mod tests {
                 "{bad:?} must not resolve to a principal"
             );
         }
+    }
+
+    // ---- a plausible merge rule is not an authorized one ----
+
+    #[test]
+    fn a_collision_under_an_unsigned_off_rule_is_not_automatable() {
+        // The rule reads fine and the disposition permits a merge, but the
+        // domain that owns the state has not approved it. Summing two balances
+        // because addition is the obvious arithmetic would be this crate
+        // deciding an economic question it has no standing to decide.
+        let (x, y) = two_spellings(111);
+        let store = store_with(&[(&format!("test:{x}"), b"v"), (&format!("test:{y}"), b"v")]);
+
+        let signed_off = descriptor_with(MergeDisposition::Sum, RuleBasis::Established);
+        let pending = descriptor_with(MergeDisposition::Sum, RuleBasis::AwaitingDomainSignOff);
+
+        assert!(scan_keyspace(&store, &signed_off).unwrap().is_automatable());
+        assert!(
+            !scan_keyspace(&store, &pending).unwrap().is_automatable(),
+            "an unapproved rule must fail closed even though Sum permits a merge"
+        );
+    }
+
+    #[test]
+    fn an_unsigned_off_rule_without_collisions_still_does_not_block() {
+        // The basis is a statement about merging. With nothing to merge it must
+        // not bite, or every clean store would block forever.
+        let one = spell(&principal(113), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("test:{one}"), b"v")]);
+        let pending = descriptor_with(MergeDisposition::Sum, RuleBasis::AwaitingDomainSignOff);
+
+        assert!(scan_keyspace(&store, &pending).unwrap().is_automatable());
+    }
+
+    #[test]
+    fn economic_keyspaces_do_not_claim_authority_they_have_not_been_given() {
+        // Pins the registry against the migration document: every rule the doc
+        // records as "asserted here, needs domain sign-off" must be marked as
+        // such in code, so the two cannot drift into disagreeing about what has
+        // been authorized.
+        let pending: Vec<&str> = n2a_keyspaces()
+            .iter()
+            .filter(|d| d.basis == RuleBasis::AwaitingDomainSignOff)
+            .map(|d| d.name)
+            .collect();
+
+        for expected in [
+            "icn-ledger/balance",
+            "icn-ledger/cleared_volume",
+            "icn-ledger/frozen",
+            "icn-net/outgoing_seq",
+            "icn-trust/edges",
+            "trust-app/sequences_issuer",
+        ] {
+            assert!(
+                pending.contains(&expected),
+                "{expected} has no domain sign-off and must not be automatable"
+            );
+        }
+    }
+
+    #[test]
+    fn the_deferral_registry_covers_every_namespace_the_docs_defer() {
+        let names: Vec<&str> = n2a_deferred_namespaces().iter().map(|d| d.name).collect();
+        // Inventory rows 23 (§7.5), 5-8/38 and 29 are all documented as owned
+        // by another gate; a documented deferral with no entry here would make
+        // ordinary live rows block the gate instead.
+        assert!(names.contains(&"governance/votes"));
+        assert!(names.contains(&"security/misbehavior"));
+        assert!(names.contains(&"rpc/auth-challenges"));
+
+        // Every deferral must name the gate that owns it, so the exclusion is
+        // auditable rather than merely convenient.
+        for d in n2a_deferred_namespaces() {
+            assert!(!d.gate.is_empty(), "{} must name its gate", d.name);
+            assert!(
+                !d.inventory_rows.is_empty(),
+                "{} must cite inventory",
+                d.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_live_auth_challenge_row_is_deferred_rather_than_blocking() {
+        // Regression for the exact reported case: an ordinary TTL-lived RPC
+        // challenge must not make the documented gate unusable.
+        let one = spell(&principal(117), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("auth:challenge:{one}"), b"v")]);
+
+        let a = audit_store(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+            0,
+        )
+        .unwrap();
+
+        assert_eq!(a.uncovered_did_rows(), 0);
+        assert_eq!(a.deferred_did_rows(), 1);
+        assert!(a.is_clear());
     }
 
     #[test]

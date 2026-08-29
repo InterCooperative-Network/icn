@@ -17,6 +17,22 @@
 //! only ever read byte-for-byte. That also means the tool can be pointed at a
 //! backup or a `kubectl cp` of a running pod's volume with the same semantics.
 //!
+//! # What a CLEAR verdict is conditional on
+//!
+//! A recursive file copy of a **live** store is not a point-in-time snapshot.
+//! Writes can land between one file being copied and the next, so sled may
+//! recover the copy successfully while omitting a row that existed in the
+//! source — including an aliasing row. A CLEAR verdict therefore describes a
+//! state the source may never have held at any single instant.
+//!
+//! That is a limit of the evidence, not a bug to code around: quiescing a store
+//! means stopping a workload, which this tool must not do. It is stated here,
+//! printed with every report, and it is why the migration design puts the
+//! fail-closed check *inside* the key-equality binary rather than trusting a
+//! scan run earlier. For a verdict that is binding rather than indicative, scan
+//! a quiesced store or a coherent volume snapshot, with writes held until the
+//! flip.
+//!
 //! # Usage
 //!
 //! ```text
@@ -88,6 +104,7 @@ fn run() -> Result<bool> {
 
     let descriptors = n2a_keyspaces();
     let mut all_clear = true;
+    let mut documents = Vec::with_capacity(paths.len());
 
     for path in &paths {
         if !path.exists() {
@@ -100,10 +117,24 @@ fn run() -> Result<bool> {
         all_clear &= outcome.is_clear();
 
         if json {
-            print_json(path, &outcome);
+            documents.push(json_document(path, &outcome));
         } else {
             print_human(path, &outcome);
         }
+    }
+
+    // One document for the whole run, not one per store. Printing a top-level
+    // object per path leaves stdout that is not valid JSON as a whole, so `jq`
+    // and `serde_json::from_str` fail on the documented multi-store form even
+    // though each line parses on its own.
+    if json {
+        let doc = serde_json::json!({
+            "clear": all_clear,
+            "quiescence": "A copy of a live store is not a point-in-time snapshot; \
+                           a clear verdict is conditional on the source being quiesced.",
+            "stores": documents,
+        });
+        println!("{doc}");
     }
 
     Ok(all_clear)
@@ -160,7 +191,23 @@ fn tempdir() -> Result<PathBuf> {
         .unwrap_or_default()
         .as_nanos();
     let dir = base.join(format!("icn-did-scan-{}-{}", std::process::id(), ts));
+
+    // Created 0700 rather than at the caller's umask. The scratch copy holds
+    // complete stored payloads — for a deployment volume that includes keystore
+    // material — and cleanup is best-effort, so a `022` umask on a shared host
+    // would leave that readable to every local user.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt as _;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&dir)
+            .context("creating scratch directory")?;
+    }
+    #[cfg(not(unix))]
     std::fs::create_dir_all(&dir).context("creating scratch directory")?;
+
     Ok(dir)
 }
 
@@ -299,6 +346,10 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         report.total_rows_unreadable(),
     );
     println!(
+        "  note: a copy of a live store is not a point-in-time snapshot; a CLEAR \
+         verdict is conditional on the source being quiesced"
+    );
+    println!(
         "  verdict: {}",
         if outcome.is_clear() {
             "CLEAR - no keyspace requires manual disposition"
@@ -308,7 +359,7 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
     );
 }
 
-fn print_json(path: &Path, outcome: &ScanOutcome) {
+fn json_document(path: &Path, outcome: &ScanOutcome) -> serde_json::Value {
     // Built field by field through a real encoder rather than formatted by
     // hand. Hand-formatting produced invalid JSON for any path containing a
     // quote, a backslash or a newline, and the fix is not more escaping: it is
@@ -353,7 +404,7 @@ fn print_json(path: &Path, outcome: &ScanOutcome) {
         .map(|(shape, n)| serde_json::json!({ "shape": shape, "rows": n }))
         .collect();
 
-    let doc = serde_json::json!({
+    serde_json::json!({
         "store": path.display().to_string(),
         "clear": outcome.is_clear(),
         "store_total_rows": outcome.audit.overview.total_rows,
@@ -363,7 +414,5 @@ fn print_json(path: &Path, outcome: &ScanOutcome) {
         "deferred_namespaces": deferred,
         "uncovered_shapes": uncovered,
         "keyspaces": keyspaces,
-    });
-
-    println!("{doc}");
+    })
 }
