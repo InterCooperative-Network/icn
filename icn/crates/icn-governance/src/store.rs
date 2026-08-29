@@ -6,6 +6,7 @@
 //! Poisoned locks indicate a prior panic and possibly corrupt state.
 //! Silent recovery would risk data integrity issues.
 
+use crate::vote_principal::{prior_act_for, VotingPrincipal};
 use crate::{
     Delegation, DelegationId, DelegationScope, GovernanceDomain, GovernanceDomainId, Proposal,
     ProposalId, Timestamp, Vote, VoteTally,
@@ -270,9 +271,23 @@ impl GovernanceStore for InMemoryGovernanceStore {
         })?;
         let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_default();
 
-        // Replace existing vote from same voter (allow vote changes)
-        proposal_votes.retain(|v| v.voter != vote.voter);
-        proposal_votes.push(vote.clone());
+        // A voter is a cryptographic principal, not a DID spelling (#2641).
+        // Fail closed if this principal already has conflicting stored acts:
+        // superseding them would destroy the evidence of a duplicate-vote
+        // breach and silently pick a winner.
+        prior_act_for(proposal_votes, &vote.voter)?;
+
+        // Replace any existing vote from the same principal (allow vote
+        // changes), including rows written under a different DID spelling.
+        let principal = VotingPrincipal::of(&vote.voter)?;
+        let mut kept = Vec::with_capacity(proposal_votes.len() + 1);
+        for existing in proposal_votes.iter() {
+            if VotingPrincipal::of(&existing.voter)? != principal {
+                kept.push(existing.clone());
+            }
+        }
+        kept.push(vote.clone());
+        *proposal_votes = kept;
 
         Ok(())
     }
@@ -282,9 +297,12 @@ impl GovernanceStore for InMemoryGovernanceStore {
             error!("Votes lock poisoned in get_vote: {e}");
             anyhow::anyhow!("Lock poisoned in get_vote - store may contain corrupt state")
         })?;
-        Ok(votes
-            .get(&proposal_id.0)
-            .and_then(|v| v.iter().find(|vote| vote.voter == *voter).cloned()))
+        // Look up by cryptographic principal so any accepted spelling of the
+        // voter's DID finds the row (#2641).
+        match votes.get(&proposal_id.0) {
+            Some(rows) => Ok(prior_act_for(rows, voter)?.cloned()),
+            None => Ok(None),
+        }
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
@@ -297,7 +315,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
 
     fn compute_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.list_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One cryptographic voter contributes at most one effective vote,
+        // whatever spelling named it; conflicting historical rows fail
+        // closed rather than being resolved by storage order (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     // === Delegation Methods ===
@@ -400,6 +421,18 @@ impl SledGovernanceStore {
     /// Create a new Sled-based governance store
     pub fn new(db: sled::Db) -> Self {
         Self { db }
+    }
+
+    /// Read the row stored under exactly this DID spelling.
+    ///
+    /// Spelling-exact by design: it is the raw row accessor `list_votes` walks
+    /// the index with. Principal-level resolution belongs to `get_vote`.
+    fn read_vote_row(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
+        let key = Self::vote_key(proposal_id, voter);
+        match self.db.get(&key)? {
+            Some(data) => Ok(Some(serde_json::from_slice(&data)?)),
+            None => Ok(None),
+        }
     }
 
     fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
@@ -597,34 +630,68 @@ impl GovernanceStore for SledGovernanceStore {
     }
 
     fn store_vote(&self, vote: &Vote) -> Result<()> {
-        let key = Self::vote_key(&vote.proposal_id, &vote.voter);
-        let value = serde_json::to_vec(vote)?;
-        self.db.insert(&key, value)?;
+        // A voter is a cryptographic principal, not a DID spelling (#2641).
+        let principal = VotingPrincipal::of(&vote.voter)?;
 
-        // Update index
+        // Fail closed if this principal already has conflicting stored acts:
+        // superseding them would destroy the evidence of a duplicate-vote
+        // breach and silently pick which historical act won.
+        let existing = self.list_votes(&vote.proposal_id)?;
+        prior_act_for(&existing, &vote.voter)?;
+
         let index_key = Self::vote_index_key(&vote.proposal_id);
-        let mut voter_dids: Vec<String> = self
+        let voter_dids: Vec<String> = self
             .db
             .get(&index_key)?
             .map(|v| serde_json::from_slice(&v).unwrap_or_default())
             .unwrap_or_default();
 
         let voter_str = vote.voter.to_string();
-        if !voter_dids.contains(&voter_str) {
-            voter_dids.push(voter_str);
-            self.db
-                .insert(&index_key, serde_json::to_vec(&voter_dids)?)?;
+
+        // Drop any row this same principal previously wrote under a different
+        // DID spelling, so one principal never retains more than one act.
+        //
+        // Removals, the replacement row and the rewritten index go in one
+        // `sled::Batch`: applied together or not at all. Doing them as separate
+        // operations would open a window where an interrupted write leaves the
+        // index naming a row that has already been deleted, losing a recorded
+        // vote — a write path that supersedes rows must not be able to destroy
+        // one and fail to replace it.
+        let mut batch = sled::Batch::default();
+        let mut retained: Vec<String> = Vec::with_capacity(voter_dids.len() + 1);
+        for spelling in voter_dids {
+            if spelling == voter_str {
+                continue; // re-added below, keeping index entries unique
+            }
+            let alias = match spelling.parse::<Did>() {
+                Ok(did) => match VotingPrincipal::of(&did) {
+                    Ok(other) if other == principal => Some(did),
+                    _ => None,
+                },
+                Err(_) => None,
+            };
+            match alias {
+                Some(did) => batch.remove(Self::vote_key(&vote.proposal_id, &did)),
+                None => retained.push(spelling),
+            }
         }
+        retained.push(voter_str);
+
+        batch.insert(
+            Self::vote_key(&vote.proposal_id, &vote.voter),
+            serde_json::to_vec(vote)?,
+        );
+        batch.insert(index_key, serde_json::to_vec(&retained)?);
+        self.db.apply_batch(batch)?;
 
         Ok(())
     }
 
     fn get_vote(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
-        let key = Self::vote_key(proposal_id, voter);
-        match self.db.get(&key)? {
-            Some(data) => Ok(Some(serde_json::from_slice(&data)?)),
-            None => Ok(None),
-        }
+        // Look up by cryptographic principal so any accepted spelling of the
+        // voter's DID finds the row, and conflicting rows fail closed (#2641).
+        let votes = self.list_votes(proposal_id)?;
+        Ok(prior_act_for(&votes, voter)?.cloned())
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
@@ -637,8 +704,8 @@ impl GovernanceStore for SledGovernanceStore {
 
         let mut votes = Vec::new();
         for voter_str in voter_dids {
-            if let Ok(voter_did) = voter_str.parse() {
-                if let Some(vote) = self.get_vote(proposal_id, &voter_did)? {
+            if let Ok(voter_did) = voter_str.parse::<Did>() {
+                if let Some(vote) = self.read_vote_row(proposal_id, &voter_did)? {
                     votes.push(vote);
                 }
             }
@@ -649,7 +716,10 @@ impl GovernanceStore for SledGovernanceStore {
 
     fn compute_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.list_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One cryptographic voter contributes at most one effective vote,
+        // whatever spelling named it; conflicting historical rows fail
+        // closed rather than being resolved by storage order (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     // === Delegation Methods ===
@@ -1059,5 +1129,379 @@ mod tests {
             result.is_err(),
             "list_domains should fail with poisoned lock"
         );
+    }
+}
+
+#[cfg(test)]
+mod did_spelling_vote_integrity {
+    //! Adversarial proof for #2641.
+    //!
+    //! `Did::from_str` accepts any multibase encoding of a 32-byte Ed25519 key and
+    //! retains the submitted spelling, while `Did` equality/hashing is string
+    //! equality. Vote storage and tallying must nevertheless treat one decoded
+    //! cryptographic principal as one voter.
+
+    use super::*;
+    use crate::VoteChoice;
+    use icn_identity::KeyPair;
+
+    /// Re-spell `did` as multibase base16 (`f` prefix) of the same public key.
+    fn alias_spelling(did: &Did) -> Did {
+        let key = did.to_verifying_key().expect("test DID must decode");
+        let alt = format!("did:icn:f{}", hex::encode(key.as_bytes()));
+        Did::from_str(&alt).expect("base16 multibase spelling must parse")
+    }
+
+    fn open_test_sled_db() -> (sled::Db, tempfile::TempDir) {
+        let base = std::env::var_os("ICN_TEST_TMPDIR")
+            .or_else(|| std::env::var_os("TMPDIR"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let tempdir = tempfile::Builder::new()
+            .prefix("icn-governance-vote-spelling-")
+            .tempdir_in(base)
+            .expect("temp db directory");
+        let db = sled::Config::new()
+            .path(tempdir.path().join("sled"))
+            .temporary(true)
+            .open()
+            .expect("temp db");
+        (db, tempdir)
+    }
+
+    /// Write a vote the way a pre-#2641 binary did: keyed purely by spelling,
+    /// with no principal-level de-duplication. Used to synthesise historical rows.
+    fn insert_legacy_row_mem(store: &InMemoryGovernanceStore, vote: &Vote) {
+        let mut votes = store.votes.write().expect("votes lock");
+        votes
+            .entry(vote.proposal_id.0.clone())
+            .or_default()
+            .push(vote.clone());
+    }
+
+    fn insert_legacy_row_sled(store: &SledGovernanceStore, vote: &Vote) {
+        let key = SledGovernanceStore::vote_key(&vote.proposal_id, &vote.voter);
+        store
+            .db
+            .insert(&key, serde_json::to_vec(vote).expect("serialize vote"))
+            .expect("insert vote row");
+        let index_key = SledGovernanceStore::vote_index_key(&vote.proposal_id);
+        let mut voter_dids: Vec<String> = store
+            .db
+            .get(&index_key)
+            .expect("read index")
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+        let spelling = vote.voter.to_string();
+        if !voter_dids.contains(&spelling) {
+            voter_dids.push(spelling);
+        }
+        store
+            .db
+            .insert(
+                &index_key,
+                serde_json::to_vec(&voter_dids).expect("serialize index"),
+            )
+            .expect("insert index");
+    }
+
+    /// Anti-vacuity control. If this ever fails, `Did` gained key equality
+    /// (N2-A / #2627) and every proof below must be re-derived rather than
+    /// assumed still adversarial.
+    #[test]
+    fn control_alias_spellings_are_distinct_dids_over_one_key() {
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        assert_ne!(
+            canonical.as_str(),
+            alias.as_str(),
+            "control requires two different textual spellings"
+        );
+        assert_eq!(
+            canonical.to_verifying_key().unwrap().as_bytes(),
+            alias.to_verifying_key().unwrap().as_bytes(),
+            "control requires both spellings to decode to one key"
+        );
+        assert_ne!(
+            canonical, alias,
+            "control requires the spellings to be distinct under today's Did equality; \
+             if this fails, Did is already key-equal and #2641's premise changed"
+        );
+    }
+
+    #[test]
+    fn in_memory_alias_spelled_second_vote_does_not_add_voting_weight() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), canonical, VoteChoice::For))
+            .unwrap();
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), alias, VoteChoice::For))
+            .unwrap();
+
+        let tally = store.compute_tally(&proposal_id).unwrap();
+        assert_eq!(
+            tally.total_votes(),
+            1,
+            "one cryptographic voter must contribute at most one effective vote"
+        );
+    }
+
+    #[test]
+    fn sled_alias_spelled_second_vote_does_not_add_voting_weight() {
+        let (db, _tmp) = open_test_sled_db();
+        let store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), canonical, VoteChoice::For))
+            .unwrap();
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), alias, VoteChoice::For))
+            .unwrap();
+
+        let tally = store.compute_tally(&proposal_id).unwrap();
+        assert_eq!(
+            tally.total_votes(),
+            1,
+            "one cryptographic voter must contribute at most one effective vote"
+        );
+    }
+
+    #[test]
+    fn in_memory_agreeing_historical_alias_rows_do_not_double_count() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical, VoteChoice::For),
+        );
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::For),
+        );
+
+        let tally = store.compute_tally(&proposal_id).unwrap();
+        assert_eq!(
+            tally.for_votes, 1,
+            "agreeing historical alias rows collapse to one effective vote"
+        );
+    }
+
+    #[test]
+    fn in_memory_conflicting_historical_alias_rows_fail_closed() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical, VoteChoice::For),
+        );
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        );
+
+        let err = store
+            .compute_tally(&proposal_id)
+            .expect_err("conflicting historical acts must not be silently resolved");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("conflicting"),
+            "fail-closed error must name the conflict, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn sled_agreeing_historical_alias_rows_do_not_double_count() {
+        let (db, _tmp) = open_test_sled_db();
+        let store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_sled(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical, VoteChoice::For),
+        );
+        insert_legacy_row_sled(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::For),
+        );
+
+        let tally = store.compute_tally(&proposal_id).unwrap();
+        assert_eq!(
+            tally.for_votes, 1,
+            "agreeing historical alias rows collapse to one effective vote"
+        );
+    }
+
+    #[test]
+    fn sled_conflicting_historical_alias_rows_fail_closed() {
+        let (db, _tmp) = open_test_sled_db();
+        let store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_sled(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical, VoteChoice::For),
+        );
+        insert_legacy_row_sled(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        );
+
+        let err = store
+            .compute_tally(&proposal_id)
+            .expect_err("conflicting historical acts must not be silently resolved");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("conflicting"),
+            "fail-closed error must name the conflict, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn lookup_finds_the_row_under_any_spelling_of_the_voter() {
+        let store = InMemoryGovernanceStore::new();
+        let (db, _tmp) = open_test_sled_db();
+        let sled_store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        for target in [
+            &store as &dyn GovernanceStore,
+            &sled_store as &dyn GovernanceStore,
+        ] {
+            target
+                .store_vote(&Vote::new(
+                    proposal_id.clone(),
+                    canonical.clone(),
+                    VoteChoice::For,
+                ))
+                .unwrap();
+
+            let found = target
+                .get_vote(&proposal_id, &alias)
+                .unwrap()
+                .expect("an alias spelling must resolve to the same voter's row");
+            assert_eq!(found.choice, VoteChoice::For);
+        }
+    }
+
+    /// Admission must not paper over an integrity breach that already happened:
+    /// superseding two conflicting historical acts would destroy the evidence
+    /// and silently pick a winner.
+    #[test]
+    fn storing_over_conflicting_historical_alias_rows_fails_closed() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), canonical.clone(), VoteChoice::For),
+        );
+        insert_legacy_row_mem(
+            &store,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        );
+
+        let err = store
+            .store_vote(&Vote::new(
+                proposal_id.clone(),
+                canonical,
+                VoteChoice::Abstain,
+            ))
+            .expect_err("must not silently supersede conflicting historical acts");
+        assert!(err.to_string().contains("conflicting"), "got: {err}");
+
+        // The evidence is still there to be migrated.
+        assert_eq!(store.list_votes(&proposal_id).unwrap().len(), 2);
+    }
+
+    /// Counter-control: the fix must not be "refuse everything".
+    #[test]
+    fn distinct_principals_still_each_contribute_one_vote() {
+        let store = InMemoryGovernanceStore::new();
+        let (db, _tmp) = open_test_sled_db();
+        let sled_store = SledGovernanceStore::new(db);
+        let proposal_id = ProposalId::generate();
+        let kp1 = KeyPair::generate().unwrap();
+        let kp2 = KeyPair::generate().unwrap();
+
+        for target in [
+            &store as &dyn GovernanceStore,
+            &sled_store as &dyn GovernanceStore,
+        ] {
+            target
+                .store_vote(&Vote::new(
+                    proposal_id.clone(),
+                    kp1.did().clone(),
+                    VoteChoice::For,
+                ))
+                .unwrap();
+            target
+                .store_vote(&Vote::new(
+                    proposal_id.clone(),
+                    kp2.did().clone(),
+                    VoteChoice::Against,
+                ))
+                .unwrap();
+
+            let tally = target.compute_tally(&proposal_id).unwrap();
+            assert_eq!(tally.for_votes, 1, "distinct principals must still count");
+            assert_eq!(
+                tally.against_votes, 1,
+                "distinct principals must still count"
+            );
+        }
+    }
+
+    /// Counter-control: the existing store-layer "allow vote changes" contract
+    /// (`test_vote_replacement`) must survive, including across spellings.
+    #[test]
+    fn alias_spelled_revote_replaces_rather_than_accumulating() {
+        let store = InMemoryGovernanceStore::new();
+        let proposal_id = ProposalId::generate();
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let alias = alias_spelling(&canonical);
+
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), canonical, VoteChoice::For))
+            .unwrap();
+        store
+            .store_vote(&Vote::new(proposal_id.clone(), alias, VoteChoice::Against))
+            .unwrap();
+
+        let votes = store.list_votes(&proposal_id).unwrap();
+        assert_eq!(votes.len(), 1, "one principal keeps exactly one stored row");
+        assert_eq!(votes[0].choice, VoteChoice::Against, "later act supersedes");
     }
 }

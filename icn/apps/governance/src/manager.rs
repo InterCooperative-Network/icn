@@ -3779,6 +3779,15 @@ impl GovernanceManager {
             })?;
 
             let raw_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
+
+            // Detect principal-level conflicts across every stored row before
+            // eligibility narrows the set. The standing filter compares DID
+            // spellings, so it can retain one spelling of a conflicting pre-#2641
+            // pair and discard the other, leaving the reduction below nothing to
+            // notice — and this close would then finalise whichever act happened
+            // to be spelled the way the standing set names it (#2641).
+            icn_governance::effective_votes(&raw_votes)?;
+
             // If an eligibility filter was provided (close-time standing revalidation),
             // exclude votes from members who no longer hold active commons standing.
             let proposal_votes: Vec<_> = match eligible_voters {
@@ -3788,10 +3797,15 @@ impl GovernanceManager {
                     .collect(),
                 None => raw_votes,
             };
-            let tally = VoteTally::from(proposal_votes.clone());
+            let tally = VoteTally::try_from_votes(&proposal_votes)?;
 
             let total_members = match &domain.config.membership.source {
-                MembershipSource::StaticList(members) => members.len(),
+                // Distinct voting principals, not DID spellings: the numerator
+                // above gives one principal one vote, so the denominator must
+                // count that principal once however many spellings name it.
+                MembershipSource::StaticList(members) => {
+                    icn_governance::distinct_principals(members)?
+                }
                 MembershipSource::TrustThreshold(_) => tally.total_votes().max(1),
             };
 
@@ -4584,7 +4598,7 @@ impl GovernanceManager {
             .read()
             .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
         let proposal_votes = votes.get(proposal_id).cloned().unwrap_or_default();
-        Ok(VoteTally::from(proposal_votes))
+        Ok(VoteTally::try_from_votes(&proposal_votes)?)
     }
 
     /// Get list of voter DIDs for a proposal
@@ -4768,13 +4782,11 @@ impl GovernanceManager {
 
         let proposal_votes = votes.entry(proposal_id.clone()).or_insert_with(Vec::new);
 
-        if proposal_votes.iter().any(|v| v.voter == voter) {
-            anyhow::bail!(
-                "Voter {} has already voted on proposal {}",
-                voter,
-                proposal_id.0
-            );
-        }
+        // INV-6 by cryptographic principal, not by DID spelling: re-spelling a
+        // voter DID in another multibase encoding must not buy a second vote
+        // (#2641). Also fails closed if this principal already has conflicting
+        // stored acts.
+        icn_governance::ensure_has_not_voted(proposal_votes, &voter)?;
 
         let mut vote = Vote::new(proposal_id, voter, choice);
         if let Some(c) = comment {
@@ -9135,6 +9147,242 @@ mod tests {
     }
 
     /// INV-6 TEST: Duplicate vote is rejected.
+    /// Re-spell a DID as multibase base16 (`f`) over the same identifier bytes.
+    fn alias_spelling(did: &Did) -> Did {
+        let bytes = did.identifier_bytes().expect("test DID must decode");
+        let alt = format!("did:icn:f{}", hex::encode(bytes));
+        Did::from_str(&alt).expect("base16 multibase spelling must parse")
+    }
+
+    async fn make_open_proposal(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        author: &Did,
+    ) -> ProposalId {
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                author.clone(),
+                "Test".to_string(),
+                "Test proposal".to_string(),
+                ProposalPayload::Text {
+                    body: "test".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        proposal_id
+    }
+
+    /// Domain whose membership gate admits any DID, so the recast guard is the
+    /// only thing standing between a re-spelled voter and a second vote. This
+    /// is the configuration under which #2641 was reachable end to end.
+    async fn make_manager_trust_threshold() -> (GovernanceManager, GovernanceDomainId, Did) {
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let member_did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop-trust");
+
+        let mgr = GovernanceManager::new();
+        mgr.create_domain(
+            domain_id.clone(),
+            "Test Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                quorum_percentage: 1,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.5),
+            },
+        )
+        .await
+        .unwrap();
+
+        (mgr, domain_id, member_did)
+    }
+
+    /// #2641, standalone quorum denominator: the tally numerator gives one
+    /// principal one vote, so the electorate it is measured against must count
+    /// that principal once however many spellings name it. Otherwise a static
+    /// list naming one key twice claims two electorate slots for one voter and
+    /// reads their vote as half turnout.
+    #[tokio::test]
+    async fn standalone_quorum_denominator_counts_principals_not_spellings() {
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let member = kp.did().clone();
+        let alias = alias_spelling(&member);
+        assert_ne!(member, alias, "control: the spellings must differ");
+
+        let domain_id = GovernanceDomainId::new("quorum-alias");
+        let mgr = GovernanceManager::new();
+        mgr.create_domain(
+            domain_id.clone(),
+            "Quorum alias".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                // 100% quorum makes the difference decisive: 1/1 reaches it, 1/2 does not.
+                quorum_percentage: 100,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member.clone(), alias]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member).await;
+        mgr.cast_vote(proposal_id.clone(), member, VoteChoice::For, None)
+            .await
+            .expect("the member votes");
+        mgr.close_proposal(proposal_id.clone())
+            .await
+            .expect("close_proposal");
+
+        let closed = mgr
+            .get_proposal(&proposal_id)
+            .await
+            .unwrap()
+            .expect("proposal exists");
+        assert!(
+            matches!(closed.state, ProposalState::Accepted { .. }),
+            "the sole member voted, so turnout is 1/1 and the 100% quorum is met; \
+             NoQuorum means the denominator counted two spellings as two voters (got {:?})",
+            closed.state
+        );
+    }
+
+    /// #2641, standalone filtered close: standing revalidation compares DID
+    /// spellings, so it can retain one spelling of a conflicting pre-fix pair and
+    /// discard the other, leaving the reduction nothing to notice. Conflicts must
+    /// be detected across every stored row before eligibility narrows the set.
+    #[tokio::test]
+    async fn standalone_filtered_close_fails_closed_on_hidden_conflicts() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+        assert_ne!(member_did, alias, "control: the spellings must differ");
+
+        // Two conflicting acts by one key, as a pre-#2641 binary left them.
+        {
+            let mut votes = mgr.votes.write().unwrap();
+            let rows = votes.entry(proposal_id.clone()).or_default();
+            rows.push(Vote::new(
+                proposal_id.clone(),
+                member_did.clone(),
+                VoteChoice::For,
+            ));
+            rows.push(Vote::new(proposal_id.clone(), alias, VoteChoice::Against));
+        }
+
+        // A standing set naming only the canonical spelling would drop the other.
+        let mut standing = HashSet::new();
+        standing.insert(member_did);
+
+        let err = mgr
+            .close_proposal_filtered(proposal_id.clone(), &standing)
+            .await
+            .expect_err("a conflict the standing filter would hide must still fail closed");
+        assert!(
+            err.to_string().contains("conflicting"),
+            "must fail closed naming the conflict, got: {err}"
+        );
+    }
+
+    /// #2641: the admission layer must reject a second vote from one
+    /// cryptographic voter even when it arrives under a different accepted
+    /// multibase spelling of the same DID.
+    #[tokio::test]
+    async fn inv6_holds_against_alias_spelled_did() {
+        let (mgr, domain_id, member_did) = make_manager_trust_threshold().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+
+        // Control: the two spellings really are distinct `Did` values today.
+        assert_ne!(
+            member_did, alias,
+            "control: spellings must differ under current Did equality"
+        );
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first vote must succeed");
+
+        let err = mgr
+            .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+            .await
+            .expect_err("re-spelled DID must not buy a second vote")
+            .to_string();
+        assert!(
+            err.contains("already voted"),
+            "must be refused as a duplicate vote, got: {err}"
+        );
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(
+            tally.total_votes(),
+            1,
+            "one cryptographic voter contributes one effective vote"
+        );
+        assert_eq!(tally.for_votes, 1, "the first act stands");
+    }
+
+    /// Counter-control: the guard must not have become "refuse everything".
+    #[tokio::test]
+    async fn distinct_voters_still_admitted_under_trust_threshold() {
+        let (mgr, domain_id, member_did) = make_manager_trust_threshold().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let other = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first voter must be admitted");
+        mgr.cast_vote(proposal_id.clone(), other, VoteChoice::For, None)
+            .await
+            .expect("a genuinely distinct voter must still be admitted");
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(tally.for_votes, 2, "two distinct principals, two votes");
+    }
+
+    /// Records the live boundary: under a static member list an alias spelling
+    /// is refused earlier, by the membership gate, because that list is still
+    /// compared by spelling. That comparison is deliberately left alone here --
+    /// re-keying membership is gated by IDENTITY_SEMANTICS.md §7.5 -- and its
+    /// effect is fail-closed, so #2641 is not reachable on this path either.
+    #[tokio::test]
+    async fn static_list_membership_refuses_alias_spelling_at_the_membership_gate() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
+        let alias = alias_spelling(&member_did);
+
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .expect("first vote must succeed");
+
+        let err = mgr
+            .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+            .await
+            .expect_err("re-spelled DID must not buy a second vote")
+            .to_string();
+        assert!(
+            err.contains("not a member") || err.contains("already voted"),
+            "must be refused, got: {err}"
+        );
+
+        let tally = mgr.get_vote_tally(&proposal_id).await.unwrap();
+        assert_eq!(tally.total_votes(), 1, "still exactly one effective vote");
+    }
+
     #[tokio::test]
     async fn test_inv6_duplicate_vote_rejected() {
         let (mgr, domain_id, member_did) = make_manager_with_domain().await;

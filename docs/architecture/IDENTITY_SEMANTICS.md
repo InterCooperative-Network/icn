@@ -465,12 +465,43 @@ now, and no downstream design may violate it while remaining conformant.
 
 ### 7.5 Hard migration gate — membership and vote re-keying
 
-Vote storage is keyed by voter identity and the re-cast guard is declared but
-never constructed, so dual-keying would let the same historical person create two
-counted rows. **Before any live membership or vote re-key**, four things must be
-designed: migration ordering · alias/transition recognition · duplicate-act
-prevention · final cutover. N2 does not solve governance storage; it states the
-gate.
+Vote storage is keyed by voter identity, so dual-keying would let the same
+historical person create two counted rows. **Before any live membership or vote
+re-key**, four things must be designed: migration ordering · alias/transition
+recognition · duplicate-act prevention · final cutover. N2 does not solve
+governance storage; it states the gate.
+
+**Duplicate-act prevention is delivered** (#2641). Governance admission and
+tallying resolve a voter to the bytes its `did:icn:` identifier decodes to, via
+`icn-governance`'s `VotingPrincipal`, so one cryptographic voter contributes at
+most one effective vote whatever multibase spelling names it. Rows for one
+principal that express conflicting acts fail closed rather than electing a
+survivor, because choosing between two conflicting historical acts is this
+gate's business, not the duplicate-act guard's.
+
+The two apps/governance admission paths reach that one-vote result under
+**different recast policies**, and a consumer must not assume either from the
+other:
+
+* the in-process `GovernanceManager` **refuses** a repeat vote, constructing
+  `GovernanceError::AlreadyVoted` via `ensure_has_not_voted`. Ballots are
+  immutable on this path;
+* the actor backend **permits a vote change**, which is its pre-existing
+  behaviour, and supersedes the principal's existing row rather than adding one.
+  A ballot is mutable on this path until the proposal closes.
+
+Both keep exactly one stored row and one effective vote per principal, which is
+what duplicate-act prevention requires; they differ on whether the voter may
+change their mind, which is a governance-policy question this gate does not
+settle. Where a principal already holds several pre-#2641 rows the actor refuses
+without mutating, since it overwrites by spelling-keyed row and cannot supersede
+them all at once.
+
+The other three prerequisites — migration ordering, alias/transition
+recognition, final cutover — remain undesigned, and **no persisted vote or
+membership key has been re-keyed**. Membership lists are still compared by DID
+spelling; under a static list an alias spelling is refused at the membership
+gate, which is fail-closed but is not yet alias recognition.
 
 ---
 

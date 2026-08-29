@@ -25,7 +25,7 @@ use icn_governance::{
     GovernanceParams, GovernanceProfile, GovernanceProfileId, MembershipAction, MembershipConfig,
     MembershipResolver, MembershipSource, PaginatedResult, ParameterChange, Proposal, ProposalId,
     ProposalOutcome, ProposalPayload, ProposalScope, ProposalState, ProtocolParameter,
-    ProtocolParameterStore, TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
+    ProtocolParameterStore, TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally, VotingPrincipal,
 };
 
 use icn_kernel_api::events::{EventEmitter, SystemEvent};
@@ -2156,6 +2156,40 @@ impl GovernanceActor {
             } => {
                 info!("Casting vote on proposal: {} by {}", proposal_id.0, voter);
 
+                // One stored row per cryptographic principal (#2641). This path
+                // has no duplicate-vote guard, so a voter re-spelling their DID
+                // in another accepted multibase encoding used to write a second
+                // row under the second spelling, which every tally counted.
+                //
+                // Changing a vote stays allowed -- that is this path's existing
+                // semantics, and `save_vote` overwrites by key -- so instead of
+                // refusing, the update is written onto the row this principal
+                // already owns, under whatever spelling first recorded it. Fails
+                // closed if that history is already ambiguous.
+                let existing = self.load_votes(&proposal_id)?;
+                let prior = icn_governance::acts_for(&existing, &voter)?;
+                if prior.len() > 1 {
+                    // Several pre-#2641 rows already name this principal. They
+                    // agree, or `acts_for` would have refused, but this store
+                    // overwrites by spelling-keyed row and cannot supersede all
+                    // of them at once. Writing would leave the others behind and
+                    // turn a reducible duplicate into a conflicting pair, which
+                    // fails every later tally. Refuse without mutating instead.
+                    anyhow::bail!(
+                        "{} has {} vote rows on proposal {} under different DID spellings; \
+                         the §7.5-gated vote migration must reduce them before this voter \
+                         can act again. The existing rows agree, so the proposal still \
+                         tallies correctly.",
+                        voter,
+                        prior.len(),
+                        proposal_id.0,
+                    );
+                }
+                let voter = match prior.first() {
+                    Some(prior) => prior.voter.clone(),
+                    None => voter,
+                };
+
                 let mut vote = Vote::new(proposal_id.clone(), voter, choice);
                 if let Some(c) = comment {
                     vote = vote.with_comment(c);
@@ -2228,6 +2262,19 @@ impl GovernanceActor {
                 // votes from members who lost commons standing after casting are excluded.
                 // The proof records only the votes that counted in the final decision.
                 let all_votes = self.load_votes(&proposal_id)?;
+
+                // Detect principal-level conflicts across *every* stored row,
+                // before eligibility narrows the set. The standing filter is
+                // still spelling-keyed, so where a principal has conflicting
+                // pre-#2641 rows it can admit one spelling and drop the other,
+                // leaving nothing for the reduction below to notice — and the
+                // close would then finalise whichever act happened to be spelled
+                // the way the standing set names it. A conflicting pair must
+                // fail closed on the filtered path exactly as it does on the
+                // unfiltered one; which of two conflicting acts is authoritative
+                // is the §7.5 migration's decision, not a spelling's (#2641).
+                icn_governance::effective_votes(&all_votes)?;
+
                 let votes: Vec<Vote> = match &eligible_voters {
                     Some(filter) => all_votes
                         .into_iter()
@@ -2235,17 +2282,24 @@ impl GovernanceActor {
                         .collect(),
                     None => all_votes,
                 };
-                let mut tally = VoteTally::empty();
-                for v in &votes {
-                    tally.add_vote(v);
-                }
+                // The tally that decides the outcome, so it must give one
+                // cryptographic principal one effective vote and fail closed on
+                // conflicting historical rows, exactly like the read-only
+                // `get_vote_tally` (#2641).
+                let mut tally = VoteTally::try_from_votes(&votes)?;
 
                 // Resolve eligible membership (list needed for delegation resolution).
                 // eligible_count uses the FULL member list as the quorum denominator —
                 // standing revalidation filters whose votes count but does not shrink
                 // the community for quorum purposes.
                 let eligible_members = self.resolver.resolve_members(&domain)?;
-                let eligible_count = eligible_members.len();
+
+                // The quorum denominator counts distinct voting principals, not
+                // DID spellings. The numerator is principal-reduced (#2641), so
+                // a membership list naming one key under two spellings would
+                // otherwise claim two electorate slots for one voter and read
+                // that voter's single vote as half turnout instead of full.
+                let eligible_count = icn_governance::distinct_principals(&eligible_members)?;
 
                 // Edge case: cannot evaluate proposal with zero eligible voters
                 // This prevents division issues and ensures meaningful quorum calculation
@@ -2281,7 +2335,7 @@ impl GovernanceActor {
                     &proposal_id,
                     &mut tally,
                     excluded_delegators.as_ref(),
-                );
+                )?;
 
                 // Get proposal-type-specific thresholds (Issue #477)
                 // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
@@ -3459,7 +3513,9 @@ impl GovernanceActor {
     /// Get vote tally for a proposal
     fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         let votes = self.load_votes(proposal_id)?;
-        Ok(VoteTally::from(votes))
+        // One effective vote per cryptographic principal; conflicting
+        // historical rows fail closed rather than double-counting (#2641).
+        Ok(VoteTally::try_from_votes(&votes)?)
     }
 
     /// Get list of voter DIDs for a proposal
@@ -3857,16 +3913,31 @@ impl GovernanceActor {
         proposal_id: &ProposalId,
         tally: &mut VoteTally,
         excluded_delegators: Option<&std::collections::HashSet<Did>>,
-    ) {
-        // Build a fast lookup of who voted directly
-        let direct_voters: std::collections::HashSet<&Did> =
-            votes.iter().map(|v| &v.voter).collect();
-        let vote_by_did: std::collections::HashMap<&Did, &Vote> =
-            votes.iter().map(|v| (&v.voter, v)).collect();
+    ) -> Result<()> {
+        // Keyed by cryptographic principal, not DID spelling. Keying by
+        // spelling let a member delegate from one spelling of their key to
+        // another, then vote as the delegate: the delegator looked like a
+        // non-voter, the self-delegation did not look like self-delegation, and
+        // their own vote was resolved back to them as a second one (#2641).
+        let mut direct_voters: std::collections::HashSet<VotingPrincipal> =
+            std::collections::HashSet::new();
+        let mut vote_by_principal: std::collections::HashMap<VotingPrincipal, &Vote> =
+            std::collections::HashMap::new();
+        for v in votes {
+            let principal = VotingPrincipal::of(&v.voter)?;
+            direct_voters.insert(principal);
+            vote_by_principal.insert(principal, v);
+        }
+
+        // Delegate chosen for each principal, so several spellings of one member
+        // cannot each expand, and cannot disagree without being noticed. Shared
+        // with the library tallies so the two cannot drift apart.
+        let mut resolution = icn_governance::DelegationResolution::new();
 
         let mut delegated = 0usize;
         for member in eligible_members {
-            if direct_voters.contains(member) {
+            let member_principal = VotingPrincipal::of(member)?;
+            if direct_voters.contains(&member_principal) {
                 continue; // voted directly — no delegation needed
             }
 
@@ -3879,11 +3950,23 @@ impl GovernanceActor {
             }
 
             let delegate = self.resolve_delegate_from_store(member, domain_id, proposal_id);
-            if &delegate == member {
-                continue; // no active delegation
+            let delegate_principal = VotingPrincipal::of(&delegate)?;
+            if delegate_principal == member_principal {
+                continue; // no active delegation, whatever spelling names it
             }
 
-            if let Some(delegate_vote) = vote_by_did.get(&delegate) {
+            // One principal delegates once. Where a membership list names it under
+            // several spellings, those spellings must resolve to the same
+            // delegate: otherwise the first entry in the resolver's list would
+            // decide which delegated act counts, making list order the authority
+            // over a vote. Fail closed instead, and expand at most once (#2641).
+            if resolution.record(member, member_principal, delegate_principal)?
+                == icn_governance::DelegationStep::AlreadyExpanded
+            {
+                continue;
+            }
+
+            if let Some(delegate_vote) = vote_by_principal.get(&delegate_principal) {
                 // Create a synthetic vote for the delegating member using the delegate's choice.
                 let delegated_vote =
                     Vote::new(proposal_id.clone(), member.clone(), delegate_vote.choice);
@@ -3906,6 +3989,8 @@ impl GovernanceActor {
                 delegated
             );
         }
+
+        Ok(())
     }
 
     /// Revoke a delegation

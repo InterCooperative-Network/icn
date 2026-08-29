@@ -38,8 +38,9 @@ use std::sync::Arc;
 use icn_gossip::{GossipActor, GossipEntry};
 use icn_governance::replication::{GovernanceOpKind, SignedGovernanceOp, GOV_OP_MAGIC};
 use icn_governance::{
-    GovernanceDomainId, GovernanceMessage, GovernanceOps, GovernanceParams, MembershipConfig,
-    ProposalId, ProposalPayload, ProposalScope, Vote, VoteChoice,
+    Delegation, DelegationScope, GovernanceDomainId, GovernanceMessage, GovernanceOps,
+    GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    Vote, VoteChoice,
 };
 use icn_governance_actor::init::{init_governance_actor, GovernanceActorDeps};
 use icn_governance_actor::manager::GovernanceManager;
@@ -973,4 +974,500 @@ async fn a_compressed_signed_frame_is_still_recognised_by_magic() {
         }
         other => panic!("expected VoteCast, got {}", other.message_type()),
     }
+}
+
+/// #2641, actor path: the production `CastVote` handler persists through
+/// `save_vote`, which overwrites by key, and that key is built from the voter's
+/// DID *spelling*. Re-spelling one key in another accepted multibase encoding
+/// therefore used to write a second row that every tally counted.
+///
+/// The actor still allows a voter to change their vote — that is this path's
+/// existing behaviour, exercised by
+/// `a_second_operation_in_one_domain_advances_its_sequence` — so the property
+/// asserted here is not refusal but that one cryptographic voter keeps exactly
+/// one row and one effective vote, whichever spelling arrives.
+#[tokio::test(flavor = "current_thread")]
+async fn alias_spelled_did_cannot_add_a_second_vote_on_the_actor_path() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("seq-alias", ProposalScope::Local)
+        .await;
+
+    // Re-spell the node's DID as multibase base16 over the same identifier bytes.
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+
+    // Control: this is a genuinely different textual DID today, so the test
+    // cannot pass vacuously. If `Did` becomes key-equal (N2-A / #2627) this
+    // assertion fails and the proof must be re-derived rather than assumed.
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    node.ops
+        .cast_vote(proposal_id.clone(), node.did.clone(), VoteChoice::For, None)
+        .await
+        .expect("first vote must succeed");
+    node.ops
+        .cast_vote(proposal_id.clone(), alias, VoteChoice::Against, None)
+        .await
+        .expect("a re-spelled vote by the same principal updates, it does not stack");
+
+    let votes = node.state.list_votes(&proposal_id).expect("votes readable");
+    assert_eq!(
+        votes.len(),
+        1,
+        "one cryptographic voter must keep exactly one stored row, got: {:?}",
+        votes
+            .iter()
+            .map(|v| v.voter.to_string())
+            .collect::<Vec<_>>()
+    );
+
+    let tally = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("tally must compute");
+    assert_eq!(
+        tally.total_votes(),
+        1,
+        "one cryptographic voter contributes at most one effective vote"
+    );
+    assert_eq!(
+        tally.against_votes, 1,
+        "the voter's later act stands, as vote changes are allowed here"
+    );
+}
+
+/// #2641, close path: `CloseProposal` builds the tally that actually decides the
+/// outcome, and `apply_delegation_to_tally` expands delegations into it. Both
+/// keyed voters by DID *spelling*, so a member could delegate from one spelling
+/// of their own key to another and then vote as the delegate: the delegator
+/// looked like a non-voter, the self-delegation did not look like
+/// self-delegation, and their single vote was resolved back to them as a second
+/// one — on a fresh deployment, with no legacy rows involved.
+///
+/// Three members and a 50% quorum make the laundering outcome-visible: two
+/// laundered For votes reach quorum and Accept, one honest vote does not.
+#[tokio::test(flavor = "current_thread")]
+async fn alias_self_delegation_cannot_launder_a_second_vote_at_close() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-delegation".to_string());
+    let other_a = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let other_b = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias delegation".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![node.did.clone(), other_a.clone(), other_b.clone()]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias delegation".to_string(),
+            "Alias delegation".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    // Delegate from the canonical spelling to an alias of the very same key.
+    node.ops
+        .create_delegation(Delegation::new(
+            node.did.clone(),
+            alias.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("self-delegation across spellings is accepted today");
+
+    // Vote once, as the delegate spelling.
+    node.ops
+        .cast_vote(proposal_id.clone(), alias, VoteChoice::For, None)
+        .await
+        .expect("cast_vote");
+
+    node.ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect("close_proposal");
+
+    let closed = node
+        .ops
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+
+    assert!(
+        !matches!(closed.state, ProposalState::Accepted { .. }),
+        "one key produced one vote of three eligible members, which cannot reach a 50% \
+         quorum; Accepted means the delegation expansion counted it twice (got {:?})",
+        closed.state
+    );
+    assert!(
+        matches!(closed.state, ProposalState::NoQuorum { .. }),
+        "expected the honest single vote to fall short of quorum, got {:?}",
+        closed.state
+    );
+}
+
+/// #2641, close path: the tally that decides the outcome must fail closed on
+/// conflicting historical rows, not silently sum them. `get_vote_tally` refused
+/// such a pair while `CloseProposal` counted both, so the actor could report a
+/// tally that disagreed with the decision it committed to a receipt.
+///
+/// The rows are written the way a pre-fix binary wrote them — straight to the
+/// state store, keyed by spelling — since no post-fix path can create them.
+#[tokio::test(flavor = "current_thread")]
+async fn close_fails_closed_on_conflicting_alias_rows_rather_than_counting_both() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-close", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(
+        node.did, alias,
+        "control: the two spellings must differ under current Did equality"
+    );
+
+    // Two conflicting acts by one key, as a pre-#2641 binary would have left them.
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), node.did.clone(), VoteChoice::For),
+        )
+        .expect("legacy row");
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        )
+        .expect("legacy alias row");
+    assert_eq!(
+        node.state.list_votes(&proposal_id).unwrap().len(),
+        2,
+        "control: the legacy fixture must really contain two rows"
+    );
+
+    let err = node
+        .ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect_err("closing must not resolve conflicting historical acts by summing them");
+    assert!(
+        err.to_string().contains("conflicting"),
+        "must fail closed naming the conflict, got: {err}"
+    );
+
+    // The evidence survives for the §7.5-gated migration to resolve.
+    assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
+}
+
+/// #2641, actor admission over legacy duplicates: this store overwrites by
+/// spelling-keyed row, so when a principal already owns several pre-fix rows the
+/// actor cannot supersede them all at once. Writing onto one and leaving the
+/// others would turn an agreeing, reducible duplicate into a conflicting pair
+/// and fail every later tally. It must refuse without mutating instead.
+#[tokio::test(flavor = "current_thread")]
+async fn vote_change_over_legacy_duplicate_rows_refuses_without_mutating() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-dup", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    // Two *agreeing* rows for one principal, as a pre-#2641 binary left them.
+    for voter in [node.did.clone(), alias] {
+        node.state
+            .save_vote(
+                &proposal_id,
+                &Vote::new(proposal_id.clone(), voter, VoteChoice::For),
+            )
+            .expect("legacy row");
+    }
+
+    // Agreeing duplicates still reduce, so the proposal tallies correctly.
+    let before = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("agreeing duplicates must still tally");
+    assert_eq!(before.total_votes(), 1, "one principal, one effective vote");
+
+    let err = node
+        .ops
+        .cast_vote(
+            proposal_id.clone(),
+            node.did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .expect_err("must not write a change it cannot apply to every row");
+    assert!(
+        err.to_string().contains("different DID spellings"),
+        "must name the duplicate rows, got: {err}"
+    );
+
+    // Nothing was mutated, so the proposal is still tallyable.
+    let rows = node.state.list_votes(&proposal_id).unwrap();
+    assert_eq!(rows.len(), 2, "the refusal must not have written a row");
+    assert!(
+        rows.iter().all(|v| v.choice == VoteChoice::For),
+        "the refusal must not have changed an existing act"
+    );
+    let after = node
+        .ops
+        .get_vote_tally(&proposal_id)
+        .await
+        .expect("still tallyable after the refusal");
+    assert_eq!(after.total_votes(), 1, "still one effective vote");
+}
+
+/// #2641, filtered close: standing revalidation is still spelling-keyed, so a
+/// standing set naming one spelling of a conflicting pre-fix pair would drop the
+/// other and leave the reduction nothing to notice — finalising whichever act
+/// happened to be spelled the way the standing set names it. Conflicts must be
+/// detected across every stored row, before eligibility narrows the set.
+#[tokio::test(flavor = "current_thread")]
+async fn filtered_close_fails_closed_on_conflicts_the_standing_filter_would_hide() {
+    let node = Node::spawn(true).await;
+    let proposal_id = node
+        .seed_static_domain("alias-filtered", ProposalScope::Local)
+        .await;
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), node.did.clone(), VoteChoice::For),
+        )
+        .expect("legacy row");
+    node.state
+        .save_vote(
+            &proposal_id,
+            &Vote::new(proposal_id.clone(), alias, VoteChoice::Against),
+        )
+        .expect("legacy alias row");
+
+    // A standing set that recognises only the canonical spelling: the filter
+    // would keep the For row and silently discard the conflicting Against one.
+    let mut standing = std::collections::HashSet::new();
+    standing.insert(node.did.clone());
+
+    let err = node
+        .ops
+        .close_proposal_filtered(proposal_id.clone(), &standing)
+        .await
+        .expect_err("a conflict a spelling-keyed filter would hide must still fail closed");
+    assert!(
+        err.to_string().contains("conflicting"),
+        "must fail closed naming the conflict, got: {err}"
+    );
+
+    // Both acts survive for the §7.5-gated migration to resolve.
+    assert_eq!(node.state.list_votes(&proposal_id).unwrap().len(), 2);
+}
+
+/// #2641, quorum denominator: the tally numerator is reduced to one vote per
+/// cryptographic principal, so the electorate it is measured against must be
+/// counted the same way. A membership list naming one key under two spellings
+/// otherwise claims two electorate slots for one voter, and that voter voting
+/// reads as half turnout instead of full.
+#[tokio::test(flavor = "current_thread")]
+async fn quorum_denominator_counts_principals_not_did_spellings() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-quorum".to_string());
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    // One member, named twice. Quorum 100% makes the difference decisive:
+    // 1/1 of the electorate reaches it, 1/2 does not.
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias quorum".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(100, 50, 3600),
+            MembershipConfig::static_list(vec![node.did.clone(), alias]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias quorum".to_string(),
+            "Alias quorum".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    node.ops
+        .cast_vote(proposal_id.clone(), node.did.clone(), VoteChoice::For, None)
+        .await
+        .expect("cast_vote");
+
+    node.ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect("close_proposal");
+
+    let closed = node
+        .ops
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+
+    assert!(
+        matches!(closed.state, ProposalState::Accepted { .. }),
+        "the sole member voted, so turnout is 1/1 and the 100% quorum is met; \
+         NoQuorum means the denominator counted two spellings as two voters (got {:?})",
+        closed.state
+    );
+}
+
+/// #2641, competing delegations: where a membership list names one principal
+/// under several spellings and those spellings hold delegations to different
+/// voters, expanding whichever entry the resolver happens to list first would
+/// make list order the authority over a vote. Fail closed instead.
+#[tokio::test(flavor = "current_thread")]
+async fn competing_delegations_across_spellings_fail_closed_at_close() {
+    let node = Node::spawn(true).await;
+    let domain_id = GovernanceDomainId("alias-delegation-conflict".to_string());
+    let delegate_a = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let delegate_b = icn_identity::KeyPair::generate().unwrap().did().clone();
+
+    let bytes = node.did.identifier_bytes().expect("node DID must decode");
+    let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+        .expect("base16 multibase spelling must parse");
+    assert_ne!(node.did, alias, "control: the spellings must differ");
+
+    node.ops
+        .create_domain(
+            domain_id.clone(),
+            "Alias delegation conflict".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![
+                node.did.clone(),
+                alias.clone(),
+                delegate_a.clone(),
+                delegate_b.clone(),
+            ]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = node
+        .ops
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            node.did.clone(),
+            "Alias delegation conflict".to_string(),
+            "Alias delegation conflict".to_string(),
+            ProposalPayload::Text {
+                body: "alias".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+    node.ops
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    // One key, two spellings, two different delegates.
+    node.ops
+        .create_delegation(Delegation::new(
+            node.did.clone(),
+            delegate_a.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("delegation from the canonical spelling");
+    node.ops
+        .create_delegation(Delegation::new(
+            alias,
+            delegate_b.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .expect("delegation from the alias spelling");
+
+    // Both delegates vote, and they disagree.
+    node.ops
+        .cast_vote(proposal_id.clone(), delegate_a, VoteChoice::For, None)
+        .await
+        .expect("delegate a votes");
+    node.ops
+        .cast_vote(proposal_id.clone(), delegate_b, VoteChoice::Against, None)
+        .await
+        .expect("delegate b votes");
+
+    let err = node
+        .ops
+        .close_proposal(proposal_id.clone())
+        .await
+        .expect_err("membership-list order must not choose which delegated act counts");
+    assert!(
+        err.to_string().contains("competing delegations"),
+        "must name the competing delegations, got: {err}"
+    );
 }

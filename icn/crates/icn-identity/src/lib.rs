@@ -250,6 +250,44 @@ impl Did {
         &self.0
     }
 
+    /// Decode the 32 identifier bytes this DID names.
+    ///
+    /// A `did:icn:` identifier is a multibase encoding of 32 bytes, and the
+    /// same bytes have many accepted spellings (base58btc, base16, base32,
+    /// ...). This returns the bytes themselves, so callers that must treat one
+    /// principal as one principal can compare identity rather than spelling
+    /// (see #2641).
+    ///
+    /// Unlike [`Did::to_verifying_key`] this does not require the bytes to be a
+    /// valid Ed25519 point, so it also resolves anchor-derived DIDs built by
+    /// [`Did::from_anchor_id`].
+    ///
+    /// This is an accessor only: it does not canonicalize the DID and does not
+    /// change how `Did` compares or hashes.
+    pub fn identifier_bytes(&self) -> Result<[u8; 32]> {
+        // Validate the prefix rather than assuming it. Every `Did` reaching here
+        // through `from_str` or `Deserialize` has been checked, but
+        // `new_unchecked` bypasses that, and decoding whatever follows the first
+        // eight characters of some other scheme would hand back bytes that name
+        // no ICN principal.
+        let encoded_part = self
+            .0
+            .strip_prefix("did:icn:")
+            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: must start with 'did:icn:'"))?;
+
+        if encoded_part.is_empty() {
+            anyhow::bail!("Invalid DID format: empty identifier after prefix");
+        }
+
+        let (_base, decoded_bytes) = multibase::decode(encoded_part)
+            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
+
+        decoded_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid DID: identifier is not 32 bytes"))
+    }
+
     /// Extract the Ed25519 verifying key from this DID
     ///
     /// This decodes the DID's multibase-encoded public key and returns
@@ -583,6 +621,75 @@ mod tests {
         // Should parse successfully
         let parsed_did = Did::from_str(did_str).unwrap();
         assert_eq!(parsed_did.as_str(), did_str);
+    }
+
+    #[test]
+    fn identifier_bytes_are_equal_across_multibase_spellings() {
+        let kp = KeyPair::generate().unwrap();
+        let canonical = kp.did().clone();
+        let bytes = canonical.identifier_bytes().unwrap();
+
+        // Same key, spelled base16 instead of base58btc.
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+
+        assert_ne!(
+            canonical.as_str(),
+            alias.as_str(),
+            "the two spellings must differ, or this proves nothing"
+        );
+        assert_eq!(
+            canonical.identifier_bytes().unwrap(),
+            alias.identifier_bytes().unwrap(),
+            "one key must have one identifier whatever spelling names it"
+        );
+        assert_eq!(
+            bytes,
+            kp.verifying_key().to_bytes(),
+            "for a validated DID the identifier bytes are the public key"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_resolve_anchor_derived_dids_that_are_not_ed25519_points() {
+        // `from_anchor_id` bypasses validation, so its 32 bytes need not
+        // decompress to an Edwards point. Callers keying on identity must still
+        // be able to resolve it.
+        // Roughly half of arbitrary 32-byte values decompress; [2u8; 32] does not.
+        let anchor = Did::from_anchor_id(&[2u8; 32]);
+
+        assert!(
+            anchor.to_verifying_key().is_err(),
+            "control: this anchor id is not a valid Ed25519 point"
+        );
+        assert_eq!(
+            anchor.identifier_bytes().unwrap(),
+            [2u8; 32],
+            "identifier bytes must still resolve"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_reject_a_did_of_another_method() {
+        // `new_unchecked` bypasses prefix validation. Slicing a fixed eight
+        // characters off some other scheme would decode bytes that name no ICN
+        // principal, so the accessor must refuse rather than invent one.
+        let kp = KeyPair::generate().unwrap();
+        let suffix = kp.did().as_str().strip_prefix("did:icn:").unwrap();
+        let foreign = Did::new_unchecked(format!("did:key:{suffix}"));
+
+        assert!(
+            foreign.identifier_bytes().is_err(),
+            "a non-icn DID method must not resolve to an ICN principal"
+        );
+    }
+
+    #[test]
+    fn identifier_bytes_reject_a_non_32_byte_identifier() {
+        let short = Did::new_unchecked(format!(
+            "did:icn:{}",
+            multibase::encode(multibase::Base::Base58Btc, [7u8; 16])
+        ));
+        assert!(short.identifier_bytes().is_err());
     }
 
     #[test]
