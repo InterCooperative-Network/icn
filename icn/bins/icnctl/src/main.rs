@@ -5504,16 +5504,10 @@ async fn handle_contract_command(
 
             println!("Signing deployment as {deployer_did}");
 
-            // Compute code hash (must match ContractActor::compute_code_hash)
-            let code_hash = {
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(contract.name.as_bytes());
-                for participant in &contract.participants {
-                    hasher.update(format!("{participant:?}").as_bytes());
-                }
-                icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
-            };
+            // The one authoritative definition of the rule. These bytes are
+            // signed below, so a local re-implementation that drifts from
+            // icn-ccl produces a deployment no peer can verify.
+            let code_hash = icn_ccl::compute_contract_code_hash(&contract);
 
             // Create installation record
             let installed_at = std::time::SystemTime::now()
@@ -5702,16 +5696,10 @@ fn handle_contract_prepare(contract_file: &Path, output: &Path, data_dir: &Path)
         contract.participants.len()
     );
 
-    // Compute code hash
-    let code_hash = {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        icn_ledger::ContentHash::from_bytes(hasher.finalize().into())
-    };
+    // The one authoritative definition of the rule. These bytes are signed
+    // below, so a local re-implementation that drifts from icn-ccl produces a
+    // co-signature no peer can verify.
+    let code_hash = icn_ccl::compute_contract_code_hash(&contract);
 
     // Create installation record
     let installed_at = std::time::SystemTime::now()

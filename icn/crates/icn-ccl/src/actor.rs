@@ -302,17 +302,13 @@ impl ContractActor {
     }
 
     /// Compute deterministic hash for contract code
+    ///
+    /// Delegates to [`crate::code_hash::compute_contract_code_hash`], the one
+    /// authoritative definition of the rule. Do not re-implement it here: the
+    /// result is signed, gossiped and accepted verbatim from remote peers, so a
+    /// local copy that drifts produces deployments no peer can verify.
     fn compute_code_hash(&self, contract: &Contract) -> ContentHash {
-        // In a real implementation, this would hash the contract bytecode
-        // For now, use a simple hash based on contract name + participants
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let hash_bytes = hasher.finalize();
-        ContentHash::from_bytes(hash_bytes.into())
+        crate::code_hash::compute_contract_code_hash(contract)
     }
 
     /// List all installed contracts
@@ -347,15 +343,13 @@ mod tests {
         (actor, runtime)
     }
 
-    /// Helper to compute code hash (same algorithm as ContractActor)
+    /// Helper to compute code hash.
+    ///
+    /// Calls the canonical rule rather than re-implementing it, so these tests
+    /// exercise the behaviour production uses instead of a private replica that
+    /// can agree with a bug.
     fn compute_code_hash(contract: &Contract) -> ContentHash {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        ContentHash::from_bytes(hasher.finalize().into())
+        crate::code_hash::compute_contract_code_hash(contract)
     }
 
     /// Helper to create valid signatures for contract deployment
