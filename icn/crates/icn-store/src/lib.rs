@@ -8,6 +8,7 @@
 
 /// Hybrid blob store: sled metadata + filesystem blobs
 pub mod blob_store;
+pub mod did_collision_scan;
 /// Storage maintenance tasks
 pub mod maintenance;
 /// Peer cache for persisting discovered peers
@@ -641,6 +642,69 @@ impl SledStore {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let db = sled::open(path)?;
         Ok(SledStore { db })
+    }
+
+    /// Enumerate every tree in the database with its row count, read-only.
+    ///
+    /// [`Store::scan`] reads only sled's **default** tree, so a caller that
+    /// audits a store through the `Store` trait alone cannot tell an empty
+    /// database from one whose rows all live in a named tree (as
+    /// `icn-gateway`'s service discovery does). An audit that reported "no
+    /// rows" on that basis would be a false negative, so the fact is made
+    /// available rather than left implicit.
+    ///
+    /// The returned name for sled's default tree is `__sled__default`.
+    pub fn tree_row_counts(&self) -> Result<Vec<(String, usize)>> {
+        let mut out = vec![("__sled__default".to_string(), self.db.iter().count())];
+
+        for raw in self.db.tree_names() {
+            let name = String::from_utf8_lossy(&raw).into_owned();
+            if name == "__sled__default" {
+                continue;
+            }
+            let tree = self.db.open_tree(&raw)?;
+            out.push((name, tree.iter().count()));
+        }
+
+        Ok(out)
+    }
+
+    /// Count rows in every tree whose key embeds `did:icn:`, read-only.
+    ///
+    /// Complements [`SledStore::tree_row_counts`]: it answers whether a named
+    /// tree this store's `Store` impl cannot reach holds principal-keyed rows
+    /// that a collision scan would therefore miss.
+    pub fn did_bearing_rows_per_tree(&self) -> Result<Vec<(String, usize)>> {
+        let needle = b"did:icn:";
+        let has_did = |k: &[u8]| k.windows(needle.len()).any(|w| w == needle);
+
+        let mut out = vec![(
+            "__sled__default".to_string(),
+            self.db
+                .iter()
+                .keys()
+                .filter_map(|k| k.ok())
+                .filter(|k| has_did(k))
+                .count(),
+        )];
+
+        for raw in self.db.tree_names() {
+            let name = String::from_utf8_lossy(&raw).into_owned();
+            if name == "__sled__default" {
+                continue;
+            }
+            let tree = self.db.open_tree(&raw)?;
+            out.push((
+                name,
+                tree.iter()
+                    .keys()
+                    .filter_map(|k| k.ok())
+                    .filter(|k| has_did(k))
+                    .count(),
+            ));
+        }
+
+        Ok(out)
     }
 
     /// Create a temporary on-disk Sled database for tests.
