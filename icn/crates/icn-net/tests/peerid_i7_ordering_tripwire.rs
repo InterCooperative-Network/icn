@@ -463,7 +463,7 @@ fn no_neighbour_is_left_without_metadata_and_no_metadata_is_orphaned() {
 }
 
 #[test]
-fn the_promotion_path_leaves_ordered_and_hashed_views_agreeing() {
+fn a_peer_lands_in_at_most_one_neighbour_class() {
     // `add_neighbor` starts by calling `remove_neighbor`, precisely so re-adding a peer under
     // new topology moves it rather than duplicating it. That step removes from the ordered
     // sets by `Ord` and from `metadata` by `Hash`/`Eq`. When those disagree, the ordered
@@ -498,19 +498,49 @@ fn the_promotion_path_leaves_ordered_and_hashed_views_agreeing() {
          or the assertion below proves nothing about it"
     );
 
-    // What is *not* asserted here, because getting it wrong is easy in both directions:
+    // The invariant, phrased so it is both regime-agnostic and able to fail.
     //
-    // "one principal occupies at most one class" is a **post-I7** invariant, not a current one.
-    // Today two spellings are two peers, so one principal legitimately sits in `local_cluster`
-    // and `backbone` at once; asserting otherwise is red on `main`. The mirror-image phrasing,
-    // "one `PeerId` occupies at most one class", is regime-agnostic but can never fail:
-    // `remove_neighbor` and the insert both dispatch on `Ord`, so `BTreeSet::contains` answers
-    // "one" in every regime, including the broken one.
+    // Two phrasings do not work. "One *principal* occupies at most one class" is a post-I7
+    // invariant: today two spellings are two peers, so one principal legitimately sits in
+    // `local_cluster` and `backbone` at once, and asserting otherwise is red on `main`. "One
+    // `PeerId` occupies at most one class", tested with `BTreeSet::contains`, can never fail —
+    // `contains` dispatches on `Ord`, and `remove_neighbor` and the insert use `Ord` too, so it
+    // answers "one" in every regime including the broken one.
     //
-    // What is regime-agnostic *and* can fail is the disagreement the duplication comes from.
-    // Under a half-completed I7 patch the ordered removal misses a peer the hashed side has
-    // already merged, so the ordered rows outnumber the metadata rows — the observable form of
-    // "this principal now sits in two classes with one metadata row between them".
+    // What works is comparing entries *across* classes with `Eq`. Today the two spellings are
+    // `!=`, so no cross-class pair is equal. After a correct I7 patch there is only one entry,
+    // so there is no cross-class pair at all. In the half-completed state the ordered removal
+    // misses — `Ord` still separates the spellings — while `Eq` has already merged them, so two
+    // entries in two classes compare equal. That is precisely "one peer in two classes".
+    let classes: [(&str, &BTreeSet<PeerId>); 4] = [
+        ("local_cluster", &sets.local_cluster),
+        ("regional", &sets.regional),
+        ("backbone", &sets.backbone),
+        ("trusted", &sets.trusted),
+    ];
+    for (name_a, set_a) in &classes {
+        for (name_b, set_b) in &classes {
+            if name_a == name_b {
+                continue;
+            }
+            for peer_a in set_a.iter() {
+                for peer_b in set_b.iter() {
+                    assert_ne!(
+                        peer_a, peer_b,
+                        "the same peer is in `{name_a}` and `{name_b}` at once. \
+                         `add_neighbor` removes from every class before inserting, so this can \
+                         only happen when the ordered removal fails to match a peer the hashed \
+                         side already considers the same — `Did` equality has adopted I7 \
+                         (#2627) while `PeerId::Ord` still compares `self.0.to_string()`. Move \
+                         `PeerId::Ord` to `Did::identifier_bytes()` in the same patch."
+                    );
+                }
+            }
+        }
+    }
+
+    // The same divergence seen from the other side: the ordered rows outnumber the metadata
+    // rows, because the missed ordered removal left an entry the hashed side had merged away.
     assert_eq!(
         ordered_rows(&sets).len(),
         metadata_rows(&sets).len(),
