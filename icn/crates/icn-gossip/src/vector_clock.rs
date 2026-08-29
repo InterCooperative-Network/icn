@@ -53,7 +53,67 @@ pub struct VectorClock {
 /// Serialization wrapper that only includes count (not last_seen)
 #[derive(Serialize, Deserialize)]
 struct SerializedClock {
+    #[serde(deserialize_with = "deserialize_clock_merged_by_max")]
     clock: HashMap<Did, u64>,
+}
+
+/// Decode a clock map, merging entries that name the same principal by **max**.
+///
+/// I7 (#2627) makes `Did` equality principal equality, so two accepted multibase
+/// spellings of one node are one key here. `HashMap`'s derived `Deserialize`
+/// resolves that collapse by plain insertion — the last entry in the input wins
+/// — and postcard preserves whatever order the sender wrote. A clock carrying
+/// `{spelling_a: 9, spelling_b: 5}` would therefore decode to 5 and move a
+/// counter *backwards*, which for a vector clock means re-requesting entries
+/// already seen and, where a clock gates delivery, re-accepting them.
+///
+/// Vector clocks merge by maximum — that is what [`VectorClock::merge`] does —
+/// and this applies the same rule at the decode boundary, which is the only
+/// place a duplicate key can appear.
+///
+/// This is correct in both regimes and is not conditional on I7: before I7 no
+/// two keys collapse, so the fold is an identity over the derived behaviour;
+/// after I7 max is the only answer consistent with `merge`. It reads exactly the
+/// map shape the derive read and serialization is untouched, so **no wire byte
+/// changes**. `VectorClockProjection::from_entries` in `icn-kernel-api` already
+/// picks max for the same reason, and the N2-A0 inventory names it as the
+/// precedent (`docs/architecture/n2-a0-stored-key-inventory.md` §12.1, ordering
+/// constraint (ii)).
+fn deserialize_clock_merged_by_max<'de, D>(deserializer: D) -> Result<HashMap<Did, u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct MergeByMax;
+
+    impl<'de> serde::de::Visitor<'de> for MergeByMax {
+        type Value = HashMap<Did, u64>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a map of node DID to sequence count")
+        }
+
+        fn visit_map<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            // Cap only the *pre-allocation*, so a declared length cannot size
+            // an allocation on its own. This is not an entry-count limit: the
+            // map still grows past `MAX_ENTRIES` if that many real entries
+            // arrive, exactly as the derived `HashMap` decoder did. `MAX_ENTRIES`
+            // is enforced by `maybe_evict` on increment/merge, not on decode —
+            // rejecting oversized clocks here would change what the wire
+            // accepts, which is a separate decision from I7.
+            let mut clock =
+                HashMap::with_capacity(access.size_hint().unwrap_or(0).min(MAX_ENTRIES));
+            while let Some((node, count)) = access.next_entry::<Did, u64>()? {
+                let entry = clock.entry(node).or_insert(0u64);
+                *entry = (*entry).max(count);
+            }
+            Ok(clock)
+        }
+    }
+
+    deserializer.deserialize_map(MergeByMax)
 }
 
 impl VectorClock {
@@ -233,6 +293,29 @@ impl VectorClock {
         self.entries.insert(node, ClockEntry::new(count));
     }
 
+    /// Record an observed count for a node, keeping whichever is greater.
+    ///
+    /// This is [`VectorClock::merge`]'s rule applied to a single entry, for
+    /// callers that rebuild a clock from a spelling-keyed source. Since I7
+    /// (#2627) two accepted spellings of one principal are one key here, so a
+    /// rebuild that used [`VectorClock::insert`] would let the last spelling it
+    /// happened to visit overwrite the first — and where the source is a
+    /// `HashMap<String, _>` that order is unspecified, so the survivor could be
+    /// the *lower* count and the clock would move backwards.
+    ///
+    /// Prefer this over `insert` whenever more than one source entry can name
+    /// the same principal. `insert` keeps its overwrite semantics for callers
+    /// that genuinely mean "set this node to exactly this count".
+    pub fn observe(&mut self, node: Did, count: u64) {
+        self.maybe_evict();
+        let entry = self
+            .entries
+            .entry(node)
+            .or_insert_with(|| ClockEntry::new(0));
+        entry.count = entry.count.max(count);
+        entry.touch();
+    }
+
     /// Clear all entries from the clock
     pub fn clear(&mut self) {
         self.entries.clear();
@@ -297,6 +380,209 @@ impl<'de> Deserialize<'de> for VectorClock {
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+
+    // -----------------------------------------------------------------------
+    // I7 (#2627): a clock whose entries alias one principal must merge by max.
+    // -----------------------------------------------------------------------
+
+    /// A second accepted spelling of the same principal.
+    ///
+    /// `did:icn:` identifiers are multibase, so the same 32 bytes have a
+    /// base58btc spelling and a base16 spelling (`f` + lowercase hex). Both
+    /// parse; both decode to one identifier; under I7 both are one `Did` key.
+    fn alternate_spelling(did: &Did) -> Did {
+        let bytes = did
+            .identifier_bytes()
+            .expect("a validated DID decodes to 32 identifier bytes");
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
+            .expect("a base16 multibase spelling of 32 bytes is a valid did:icn:");
+        assert_ne!(
+            did.as_str(),
+            alias.as_str(),
+            "CONTROL: the two spellings must differ, or the test proves nothing"
+        );
+        assert_eq!(
+            alias.identifier_bytes().expect("alias decodes"),
+            bytes,
+            "CONTROL: the alias must name the same principal"
+        );
+        alias
+    }
+
+    /// Serialize `(spelling, count)` pairs as a map, in exactly the given order.
+    ///
+    /// A `VectorClock` cannot produce an aliased encoding itself — post-I7 its
+    /// own `HashMap` has already merged the spellings — so the adversarial input
+    /// has to be built at the wire level. This writes the same postcard map
+    /// shape `SerializedClock` reads, with the entry order under test control,
+    /// which is the whole point: the surviving count must not depend on it.
+    struct OrderedClock<'a>(&'a [(String, u64)]);
+
+    impl serde::Serialize for OrderedClock<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            use serde::ser::SerializeMap;
+            let mut map = serializer.serialize_map(Some(self.0.len()))?;
+            for (spelling, count) in self.0 {
+                map.serialize_entry(spelling, count)?;
+            }
+            map.end()
+        }
+    }
+
+    #[derive(serde::Serialize)]
+    struct WireClock<'a> {
+        clock: OrderedClock<'a>,
+    }
+
+    fn decode_clock(entries: &[(String, u64)]) -> VectorClock {
+        let bytes = icn_encoding::encode(&WireClock {
+            clock: OrderedClock(entries),
+        })
+        .expect("encoding a clock map is infallible");
+        icn_encoding::decode(&bytes).expect("a well-formed clock map decodes")
+    }
+
+    #[test]
+    fn an_aliased_clock_merges_to_the_maximum_count_in_either_order() {
+        let node = KeyPair::generate().unwrap().did().clone();
+        let alias = alternate_spelling(&node);
+
+        // The high count written first, so plain last-writer-wins insertion
+        // would keep 5 and move the counter *backwards*.
+        let high_first = decode_clock(&[
+            (node.as_str().to_string(), 9),
+            (alias.as_str().to_string(), 5),
+        ]);
+        assert_eq!(
+            high_first.get(&node),
+            9,
+            "two spellings of one principal must merge to the maximum, not to \
+             whichever entry happened to deserialize last"
+        );
+
+        // And the other order, where last-writer-wins would coincidentally be
+        // right — so a green result here is not order luck.
+        let low_first = decode_clock(&[
+            (alias.as_str().to_string(), 5),
+            (node.as_str().to_string(), 9),
+        ]);
+        assert_eq!(
+            low_first.get(&node),
+            9,
+            "the merge must not depend on order"
+        );
+
+        assert_eq!(
+            high_first, low_first,
+            "the same aliased clock in two input orders is the same clock"
+        );
+
+        // One principal, so one entry — not two.
+        assert_eq!(high_first.len(), 1, "aliases are one entry, not two");
+
+        // Looking it up under the other spelling finds the same count.
+        assert_eq!(
+            high_first.get(&alias),
+            9,
+            "either spelling must read the principal's count"
+        );
+    }
+
+    #[test]
+    fn observe_keeps_the_high_water_mark_whatever_order_spellings_arrive_in() {
+        // The snapshot restore path (`GossipActor::restore_state`) rebuilds this
+        // clock from a `HashMap<String, u64>` whose iteration order is
+        // unspecified. Since I7 two spellings of one principal are one key, so
+        // the rebuild must not let arrival order decide the count.
+        let node = KeyPair::generate().unwrap().did().clone();
+        let alias = alternate_spelling(&node);
+
+        // High count first: a plain `insert` would leave 5 behind.
+        let mut high_first = VectorClock::new();
+        high_first.observe(node.clone(), 9);
+        high_first.observe(alias.clone(), 5);
+        assert_eq!(
+            high_first.get(&node),
+            9,
+            "a lower count arriving later must not lower the clock"
+        );
+
+        let mut low_first = VectorClock::new();
+        low_first.observe(alias.clone(), 5);
+        low_first.observe(node.clone(), 9);
+        assert_eq!(
+            low_first.get(&node),
+            9,
+            "and the result is order-independent"
+        );
+
+        assert_eq!(high_first, low_first);
+        assert_eq!(high_first.len(), 1, "one principal is one entry");
+
+        // Contrast with `insert`, which deliberately keeps overwrite semantics
+        // for callers that mean "set this node to exactly this count".
+        let mut overwritten = VectorClock::new();
+        overwritten.insert(node.clone(), 9);
+        overwritten.insert(alias, 5);
+        assert_eq!(
+            overwritten.get(&node),
+            5,
+            "control: `insert` still overwrites, which is why the restore path \
+             must not use it"
+        );
+    }
+
+    #[test]
+    fn merging_by_max_does_not_disturb_a_clock_without_aliases() {
+        // The fold must be an identity on ordinary input: distinct principals
+        // keep their own counts, and nothing is merged that should not be.
+        let a = KeyPair::generate().unwrap().did().clone();
+        let b = KeyPair::generate().unwrap().did().clone();
+        assert_ne!(
+            a.identifier_bytes().unwrap(),
+            b.identifier_bytes().unwrap(),
+            "CONTROL: two generated keypairs must differ"
+        );
+
+        let decoded = decode_clock(&[(a.as_str().to_string(), 3), (b.as_str().to_string(), 7)]);
+
+        assert_eq!(decoded.len(), 2, "two principals stay two entries");
+        assert_eq!(decoded.get(&a), 3);
+        assert_eq!(decoded.get(&b), 7);
+    }
+
+    #[test]
+    fn a_round_tripped_clock_is_unchanged_and_the_wire_shape_is_a_plain_map() {
+        // Serialization is untouched by the merge: a clock encodes as the same
+        // map it always did, and decoding it returns the same clock. This is the
+        // "no wire byte changes" half of I7 for this type.
+        let a = KeyPair::generate().unwrap().did().clone();
+        let b = KeyPair::generate().unwrap().did().clone();
+
+        let mut clock = VectorClock::new();
+        clock.increment(&a);
+        clock.increment(&a);
+        clock.increment(&b);
+
+        let bytes = icn_encoding::encode(&clock).expect("encode");
+        let back: VectorClock = icn_encoding::decode(&bytes).expect("decode");
+        assert_eq!(back, clock, "a round trip must not change the clock");
+
+        // The encoding is byte-identical to the equivalent plain map, so the
+        // custom decoder reads exactly what the derive wrote.
+        let equivalent = icn_encoding::encode(&WireClock {
+            clock: OrderedClock(&[(a.as_str().to_string(), 2), (b.as_str().to_string(), 1)]),
+        })
+        .expect("encode");
+        let from_map: VectorClock = icn_encoding::decode(&equivalent).expect("decode");
+        assert_eq!(
+            from_map, clock,
+            "the wire shape is a plain DID -> count map, unchanged by I7"
+        );
+    }
 
     #[test]
     fn test_new_clock() {

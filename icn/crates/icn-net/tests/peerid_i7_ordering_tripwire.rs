@@ -44,7 +44,7 @@
 //! implementer to delete it.
 //!
 //! That property is easy to lose by accident, so it is measured rather than assumed. Every
-//! test here except [`pre_i7_regime_record_every_spelling_is_its_own_peer`] — which is
+//! test here except [`post_i7_regime_record_every_spelling_is_one_peer`] — which is
 //! deliberately regime-dependent and says so — was run against a simulated correct I7 patch
 //! (`Did` equality and hash over `identifier_bytes`, `PeerId::Ord` over the same, both with a
 //! defined order for identifiers that do not decode) and stayed green. Anything added here
@@ -229,13 +229,17 @@ fn ordered_and_hashed_agree_on_one_respelled_principal() {
     );
 }
 
-/// A record of which regime production is in. **Expected to be edited by the I7 patch.**
+/// A record of which regime production is in. **Edited by the I7 patch, as designed.**
 ///
 /// Unlike every other test here this one is deliberately regime-*dependent*, so that the count
-/// change is visible in the I7 diff rather than implicit. It is not a requirement that the
-/// count stay 23.
+/// change is visible in the I7 diff rather than implicit. It read 23 — one peer per accepted
+/// spelling — until `Did` equality became principal equality (#2627); it now reads 1.
+///
+/// The flip was made only after every regime-agnostic test in this file was green under the
+/// new implementation, which is the order the pre-I7 version of this test demanded. It is the
+/// single expectation in this suite that I7 was permitted to move.
 #[test]
-fn pre_i7_regime_record_every_spelling_is_its_own_peer() {
+fn post_i7_regime_record_every_spelling_is_one_peer() {
     let spellings = one_principal_every_spelling();
     assert_eq!(spellings.len(), 23, "canonical plus 22 aliases");
 
@@ -246,15 +250,14 @@ fn pre_i7_regime_record_every_spelling_is_its_own_peer() {
 
     assert_eq!(
         ordered.len(),
-        23,
-        "one principal spelled 23 ways currently counts as {} peers, not 23.\n\
+        1,
+        "one principal spelled 23 ways counts as {} peers, not 1.\n\
          \n\
-         If it is 1, `Did` equality has adopted I7 (#2627) — that is the intended destination, \
-         not a bug. Confirm that \
-         `peerid_eq_and_ord_must_agree_in_whatever_regime_production_is_in` and the \
-         `NeighborSets` tests in this file are green, then change this expectation to 1. Do \
-         not change it while any of those is red: that would be recording the half-completed \
-         state as if it were the goal.",
+         If it is 23, `Did` equality has reverted to comparing spellings and I7 (#2627) has \
+         been undone — the 23 accepted multibase spellings of one identifier are one \
+         cryptographic principal, and `PeerId` must hold one peer for them. Any other value \
+         means `PeerId::Ord` and the derived `Eq`/`Hash` disagree; see \
+         `peerid_eq_and_ord_must_agree_in_whatever_regime_production_is_in`.",
         ordered.len()
     );
 }

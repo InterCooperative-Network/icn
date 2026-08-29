@@ -209,7 +209,7 @@ pub fn identifier_bytes_of_spelling(spelling: &str) -> Result<[u8; 32]> {
 /// - They start with "did:icn:" prefix
 /// - The identifier part is valid multibase (base58btc)
 /// - The decoded bytes are exactly 32 bytes (Ed25519 public key size)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "utoipa", schema(value_type = String, example = "did:icn:z6MkhaXMJznR4sC15gTfA7b6jJ4i7b6jJ4i7b6jJ4i7b"))]
 pub struct Did(String);
@@ -339,6 +339,78 @@ impl Did {
     /// (e.g., anchor module creating DIDs from anchor IDs).
     pub(crate) fn new_unchecked(s: String) -> Self {
         Did(s)
+    }
+}
+
+// I7 (#2627) — `Did` equality and hashing name the **principal**, not the spelling.
+//
+// A `did:icn:` identifier is a multibase encoding of 32 bytes, and multibase has
+// 23 spellings of those same bytes that `Did::from_str` accepts. Deriving
+// `PartialEq`/`Hash` over the inner `String` therefore made one cryptographic
+// principal into up to 23 distinct `HashMap` keys, `HashSet` members and
+// eligible voters. `docs/architecture/IDENTITY_SEMANTICS.md` §11 I7 requires the
+// opposite: equality is *key* equality.
+//
+// **This changes comparison, never representation.** `Debug`, `Display`,
+// `as_str`, `Serialize` and `Deserialize` are untouched, so every durable key,
+// wire byte and signing input a `Did` reaches is byte-for-byte what it was. That
+// is what makes the change rollback-safe — a binary reverted to spelling
+// equality reads exactly the same stored rows
+// (`docs/architecture/n2-a0-stored-key-inventory.md` §12.1 item 5). The other
+// mechanism §11 permits, pinning one encoding at parse time, would instead
+// change what `from_str` *accepts* and strand every alternate-spelled row
+// already on disk, so it is deliberately not what this does.
+//
+// Values that name no principal stay discriminated rather than merged into the
+// decoded population. In production that arm is unreachable: `from_public_key`
+// and `from_str` both validate, `from_anchor_id` encodes exactly 32 bytes, and
+// `new_unchecked` is `pub(crate)` with `from_anchor_id` as its only non-test
+// caller. It exists so that a value naming no principal can never test equal to
+// one that does, however the bytes happen to line up.
+impl PartialEq for Did {
+    fn eq(&self, other: &Self) -> bool {
+        // Identical spellings are the same principal without decoding anything:
+        // `identifier_bytes` is a pure function of the string, so equal strings
+        // take the same arm below and produce the same answer. This keeps the
+        // overwhelmingly common case — one canonical spelling compared with
+        // itself — as cheap as the derive it replaces.
+        if self.0 == other.0 {
+            return true;
+        }
+
+        match (self.identifier_bytes(), other.identifier_bytes()) {
+            // The principals the two spellings name.
+            (Ok(a), Ok(b)) => a == b,
+            // Neither names a principal, so spelling is the only relation left.
+            // Stated rather than folded into the fast path above so this arm
+            // remains correct on its own.
+            (Err(_), Err(_)) => self.0 == other.0,
+            // One names a principal and the other names none: never the same
+            // identity, whatever the bytes look like.
+            (Ok(_), Err(_)) | (Err(_), Ok(_)) => false,
+        }
+    }
+}
+
+impl Eq for Did {}
+
+impl std::hash::Hash for Did {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self.identifier_bytes() {
+            // Every accepted spelling of one principal hashes alike, which is
+            // what collapses them to a single entry in a `HashMap`/`HashSet`.
+            Ok(identifier) => {
+                0u8.hash(state);
+                identifier.hash(state);
+            }
+            // A value naming no principal can only be keyed by its spelling.
+            // The discriminant keeps that population from colliding with a
+            // decoded identifier.
+            Err(_) => {
+                1u8.hash(state);
+                self.0.hash(state);
+            }
+        }
     }
 }
 
@@ -611,6 +683,14 @@ impl DidSigner for KeyPair {
 mod tests {
     use super::*;
 
+    /// Hash one value with a fixed-seed hasher so two values can be compared.
+    fn hash_of<T: std::hash::Hash>(value: &T) -> u64 {
+        use std::hash::Hasher as _;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
     #[test]
     fn test_generate_keypair() {
         let kp = KeyPair::generate().unwrap();
@@ -682,6 +762,119 @@ mod tests {
             [2u8; 32],
             "identifier bytes must still resolve"
         );
+    }
+
+    // ---------------------------------------------------------------------
+    // I7 (#2627): the discriminated fallback for values that name no principal.
+    //
+    // These live here rather than in `tests/did_principal_equality.rs` because
+    // `new_unchecked` is `pub(crate)` — the non-decoding population is
+    // deliberately unconstructible from outside the crate, and unreachable in
+    // production (see the note on the `PartialEq` impl). It still needs its own
+    // coverage: the whole point of discriminating it is that it can never be
+    // confused with a decoded principal.
+    // ---------------------------------------------------------------------
+
+    /// Two values that name no principal are compared by spelling, not merged.
+    #[test]
+    fn non_decoding_dids_fall_back_to_spelling_equality() {
+        let a = Did::new_unchecked("did:key:not-an-icn-did".to_string());
+        let b = Did::new_unchecked("did:key:not-an-icn-did".to_string());
+        let c = Did::new_unchecked("did:key:a-different-non-did".to_string());
+
+        assert!(
+            a.identifier_bytes().is_err(),
+            "control: `a` decodes to nothing"
+        );
+        assert!(
+            c.identifier_bytes().is_err(),
+            "control: `c` decodes to nothing"
+        );
+
+        assert_eq!(a, b, "one spelling that names no principal equals itself");
+        assert_eq!(
+            hash_of(&a),
+            hash_of(&b),
+            "equal values must hash equally, whichever arm they take"
+        );
+        assert_ne!(
+            a, c,
+            "two different non-decoding spellings are not one value"
+        );
+    }
+
+    /// A value naming no principal can never equal one that does.
+    ///
+    /// This is what the discriminant in `Hash` buys: without it, a spelling
+    /// whose bytes happened to line up with a decoded identifier could collide
+    /// with a real principal, and `HashMap` would then have to rely on `Eq`
+    /// alone to keep them apart.
+    #[test]
+    fn a_non_decoding_did_never_equals_a_decoded_principal() {
+        let real = KeyPair::generate().unwrap().did().clone();
+        let bytes = real.identifier_bytes().expect("a validated DID decodes");
+
+        // A non-decoding value built from the *same* bytes, so the only thing
+        // keeping them apart is the discrimination itself.
+        let impostor = Did::new_unchecked(format!("did:key:{}", hex::encode(bytes)));
+        assert!(
+            impostor.identifier_bytes().is_err(),
+            "control: the impostor must take the fallback arm"
+        );
+
+        assert_ne!(real, impostor, "a decoded principal is not a spelling");
+        assert_ne!(impostor, real, "and the inequality is symmetric");
+        assert_ne!(
+            hash_of(&real),
+            hash_of(&impostor),
+            "the discriminant must keep the two populations from colliding"
+        );
+
+        let mut set = std::collections::HashSet::new();
+        set.insert(real);
+        set.insert(impostor);
+        assert_eq!(set.len(), 2, "they must occupy two entries, not one");
+    }
+
+    /// `Did` equality is an equivalence relation across both populations.
+    #[test]
+    fn did_equality_is_reflexive_symmetric_and_transitive() {
+        let principal = KeyPair::generate().unwrap().did().clone();
+        let bytes = principal.identifier_bytes().unwrap();
+        let corpus = [
+            principal.clone(),
+            // Two more spellings of that same principal.
+            Did::from_str(&format!(
+                "did:icn:{}",
+                multibase::encode(multibase::Base::Base16Lower, bytes)
+            ))
+            .unwrap(),
+            Did::from_anchor_id(&bytes),
+            // A different principal.
+            KeyPair::generate().unwrap().did().clone(),
+            // Two values naming no principal.
+            Did::new_unchecked("did:key:x".to_string()),
+            Did::new_unchecked("did:key:y".to_string()),
+        ];
+
+        for a in &corpus {
+            assert_eq!(a, a, "reflexive");
+            for b in &corpus {
+                assert_eq!(a == b, b == a, "symmetric: {a:?} vs {b:?}");
+                if a == b {
+                    assert_eq!(
+                        hash_of(a),
+                        hash_of(b),
+                        "equal values must hash equally: {a:?} vs {b:?}"
+                    );
+                }
+                for c in &corpus {
+                    if a == b && b == c {
+                        assert_eq!(a, c, "transitive: {a:?} == {b:?} == {c:?}");
+                    }
+                }
+            }
+        }
     }
 
     #[test]

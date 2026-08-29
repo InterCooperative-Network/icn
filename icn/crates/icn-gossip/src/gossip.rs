@@ -1374,11 +1374,20 @@ impl GossipActor {
             state.topics.len()
         );
 
-        // Restore vector clock
+        // Restore vector clock.
+        //
+        // The snapshot keys this map by DID *spelling* (`HashMap<String, u64>`),
+        // while the clock is keyed by principal since I7 (#2627). A pre-I7
+        // snapshot can therefore hold two spellings of one principal, and
+        // `HashMap` iteration order is unspecified — so `insert` would let an
+        // arbitrary one of them win, including the lower count, moving the
+        // local high-water mark backwards across a restart. `observe` applies
+        // the vector-clock merge rule (take the maximum) instead, which is the
+        // same rule the wire decoder uses and is correct in both regimes.
         self.clock.clear();
         for (did_str, count) in state.vector_clock {
             let did = Did::from_str(&did_str).context("Failed to parse DID from vector clock")?;
-            self.clock.insert(did, count);
+            self.clock.observe(did, count);
         }
 
         // Restore topic metadata (must happen before restoring subscriptions)

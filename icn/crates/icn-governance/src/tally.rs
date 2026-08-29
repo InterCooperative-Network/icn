@@ -375,15 +375,27 @@ mod tests {
     /// #2641: where `eligible_voters` names one principal under several
     /// spellings and those spellings delegate to voters who disagree, counting
     /// the first one encountered would make list order the authority over a
-    /// vote. Fail closed instead.
+    /// vote.
+    ///
+    /// **Renamed and re-scoped by the I7 patch (#2627).** It read
+    /// `competing_alias_delegations_fail_closed` and asserted that the *tally*
+    /// refused such a pair. Once `Did` equality became principal equality,
+    /// `add_delegation` stopped accepting the second delegation at all, so the
+    /// conflicting state can no longer be built and there is nothing left for
+    /// the tally to fail on. The guarantee moved earlier and got stronger; the
+    /// close-time guard stays as defence in depth (see the closing comment).
     #[test]
-    fn competing_alias_delegations_fail_closed() {
+    fn competing_alias_delegations_are_refused_before_they_can_conflict() {
         use crate::delegation::{Delegation, DelegationManager, DelegationScope};
 
         let kp = icn_identity::KeyPair::generate().unwrap();
         let delegator = kp.did().clone();
         let alias = alias_spelling(&delegator);
-        assert_ne!(delegator, alias, "control: the spellings must differ");
+        assert_ne!(
+            delegator.as_str(),
+            alias.as_str(),
+            "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+        );
 
         let delegate_a = icn_identity::KeyPair::generate().unwrap().did().clone();
         let delegate_b = icn_identity::KeyPair::generate().unwrap().did().clone();
@@ -391,6 +403,14 @@ mod tests {
         let proposal_id = ProposalId::generate();
 
         // One key, two spellings, two different delegates.
+        //
+        // **Updated by the I7 patch (#2627).** Both `add_delegation` calls used
+        // to succeed, because the two spellings were different `Did` values, and
+        // the resulting conflict had to be caught here in the tally. I7 makes
+        // them one principal, so the duplicate guard in `add_delegation` refuses
+        // the second one and the conflicting state can no longer be built
+        // through the public API. The hazard is now prevented rather than
+        // detected, which is strictly the better place for it.
         let mut manager = DelegationManager::new();
         manager
             .add_delegation(Delegation::new(
@@ -399,40 +419,57 @@ mod tests {
                 DelegationScope::Blanket,
             ))
             .unwrap();
-        manager
+        let refused = manager
             .add_delegation(Delegation::new(
                 alias.clone(),
                 delegate_b.clone(),
                 DelegationScope::Blanket,
             ))
-            .unwrap();
+            .expect_err(
+                "a second delegation for the same principal, spelled differently, must be \
+                 refused rather than stored alongside the first",
+            );
+        assert!(
+            refused
+                .to_string()
+                .to_lowercase()
+                .contains("already exists"),
+            "the refusal must name the existing delegation, got: {refused}"
+        );
 
-        // Both delegates vote, and they disagree.
+        // Only the first delegation survives, so one principal has exactly one
+        // delegate however the eligible list spells it — the property the
+        // close-time guard existed to protect.
+        assert_eq!(
+            manager.resolve_delegate(&delegator, &domain_id, &proposal_id),
+            manager.resolve_delegate(&alias, &domain_id, &proposal_id),
+            "both spellings of one principal must resolve to the same delegate"
+        );
+
+        // The tally therefore completes instead of failing closed: there is no
+        // longer a disagreement for eligible-list order to arbitrate.
         let votes = vec![
             Vote::new(proposal_id.clone(), delegate_a, VoteChoice::For),
             Vote::new(proposal_id.clone(), delegate_b, VoteChoice::Against),
         ];
         let eligible = vec![delegator, alias];
 
-        let err =
-            compute_tally_with_delegations(&votes, &eligible, &manager, &domain_id, &proposal_id)
-                .expect_err("eligible-list order must not choose which delegated act counts");
-        assert!(
-            err.to_string().contains("competing delegations"),
-            "must name the competing delegations, got: {err}"
-        );
-
-        let detailed = compute_detailed_tally_with_delegations(
+        compute_tally_with_delegations(&votes, &eligible, &manager, &domain_id, &proposal_id)
+            .expect("with no competing delegation, the tally has no conflict to fail on");
+        compute_detailed_tally_with_delegations(
             &votes,
             &eligible,
             &manager,
             &domain_id,
             &proposal_id,
-        );
-        assert!(
-            detailed.is_err(),
-            "the detailed twin must fail closed on the same evidence"
-        );
+        )
+        .expect("the detailed twin must agree with its counterpart");
+
+        // The close-time guard in `compute_tally_with_delegations` is left in
+        // place on purpose. `DelegationManager` has no load-from-store path
+        // today, so this state is unreachable through the public API — but the
+        // tally takes a manager from its caller, and the guard is what keeps a
+        // future construction path from reintroducing the hazard silently.
     }
 
     #[test]

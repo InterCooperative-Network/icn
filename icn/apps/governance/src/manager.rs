@@ -9217,7 +9217,11 @@ mod tests {
         let kp = icn_identity::KeyPair::generate().unwrap();
         let member = kp.did().clone();
         let alias = alias_spelling(&member);
-        assert_ne!(member, alias, "control: the spellings must differ");
+        assert_ne!(
+            member.as_str(),
+            alias.as_str(),
+            "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+        );
 
         let domain_id = GovernanceDomainId::new("quorum-alias");
         let mgr = GovernanceManager::new();
@@ -9270,7 +9274,11 @@ mod tests {
         let (mgr, domain_id, member_did) = make_manager_with_domain().await;
         let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
         let alias = alias_spelling(&member_did);
-        assert_ne!(member_did, alias, "control: the spellings must differ");
+        assert_ne!(
+            member_did.as_str(),
+            alias.as_str(),
+            "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+        );
 
         // Two conflicting acts by one key, as a pre-#2641 binary left them.
         {
@@ -9307,10 +9315,13 @@ mod tests {
         let proposal_id = make_open_proposal(&mgr, &domain_id, &member_did).await;
         let alias = alias_spelling(&member_did);
 
-        // Control: the two spellings really are distinct `Did` values today.
+        // Control: the two spellings really are distinct *strings*. They are
+        // no longer distinct `Did` values — I7 (#2627) made them one
+        // principal, which is exactly what this test exercises.
         assert_ne!(
-            member_did, alias,
-            "control: spellings must differ under current Did equality"
+            member_did.as_str(),
+            alias.as_str(),
+            "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
         );
 
         mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
