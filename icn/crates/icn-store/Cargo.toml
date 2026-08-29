@@ -23,8 +23,13 @@ rand.workspace = true
 ed25519-dalek.workspace = true
 
 
+[[bin]]
+name = "did-collision-scan"
+path = "src/bin/did-collision-scan.rs"
+
 [dev-dependencies]
 tempfile = "3.24"
+multibase = "0.9"
 
 [lints]
 workspace = true

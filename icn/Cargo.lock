@@ -3838,6 +3838,7 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
+ "multibase",
  "rand 0.9.4",
  "serde",
  "serde_json",

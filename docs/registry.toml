@@ -1135,6 +1135,28 @@ depends_on = [
   "icn/crates/icn-store/src/lib.rs",
 ]
 
+[docs."docs/architecture/n2-a-migration-gate.md"]
+category = "architecture"
+status = "living"
+title = "N2-A Migration Gate: Collision Scan, Dispositions and Partner Invariants"
+description = "Design surface for the N2-A tranche (#2627), which would make Did equality and hashing key equality rather than string equality (IDENTITY_SEMANTICS I7). Records the reproducible read-only collision scanner added in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, 17 fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the 63 principal-bearing rows deliberately left outside N2-A scope, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, re-verified partner-invariant designs for PeerId ordering, the CCL Value::Did Hash/Eq contract and the split String/Did peer maps, the nine-axis site taxonomy carried in from #2641, and the ordered migration sequence. DESIGN AND EVIDENCE ONLY: changes no Did semantics, migrates nothing, and does not discharge the separate section 7.5 membership/vote gate. States the tranche gate as IMPLEMENTATION STILL BLOCKED pending collision scans against live deployment data."
+last_updated = "2026-08-29"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "no"
+freshness = "current"
+domain_tags = ["architecture", "identity", "storage"]
+recommended_action = "keep"
+last_reviewed = "2026-08-29"
+depends_on = [
+  "docs/architecture/IDENTITY_SEMANTICS.md",
+  "docs/architecture/n2-a0-stored-key-inventory.md",
+  "icn/crates/icn-store/src/did_collision_scan.rs",
+  "icn/crates/icn-identity/src/lib.rs",
+]
+
 [docs."docs/architecture/AUTHORITY_SPINE.md"]
 category = "architecture"
 status = "living"
