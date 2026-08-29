@@ -474,11 +474,28 @@ governance storage; it states the gate.
 **Duplicate-act prevention is delivered** (#2641). Governance admission and
 tallying resolve a voter to the bytes its `did:icn:` identifier decodes to, via
 `icn-governance`'s `VotingPrincipal`, so one cryptographic voter contributes at
-most one effective vote whatever multibase spelling names it. `AlreadyVoted` is
-now constructed, by `ensure_has_not_voted`, on both apps/governance admission
-paths. Rows for one principal that express conflicting acts fail closed rather
-than electing a survivor, because choosing between two conflicting historical
-acts is this gate's business, not the duplicate-act guard's.
+most one effective vote whatever multibase spelling names it. Rows for one
+principal that express conflicting acts fail closed rather than electing a
+survivor, because choosing between two conflicting historical acts is this
+gate's business, not the duplicate-act guard's.
+
+The two apps/governance admission paths reach that one-vote result under
+**different recast policies**, and a consumer must not assume either from the
+other:
+
+* the in-process `GovernanceManager` **refuses** a repeat vote, constructing
+  `GovernanceError::AlreadyVoted` via `ensure_has_not_voted`. Ballots are
+  immutable on this path;
+* the actor backend **permits a vote change**, which is its pre-existing
+  behaviour, and supersedes the principal's existing row rather than adding one.
+  A ballot is mutable on this path until the proposal closes.
+
+Both keep exactly one stored row and one effective vote per principal, which is
+what duplicate-act prevention requires; they differ on whether the voter may
+change their mind, which is a governance-policy question this gate does not
+settle. Where a principal already holds several pre-#2641 rows the actor refuses
+without mutating, since it overwrites by spelling-keyed row and cannot supersede
+them all at once.
 
 The other three prerequisites — migration ordering, alias/transition
 recognition, final cutover — remain undesigned, and **no persisted vote or
