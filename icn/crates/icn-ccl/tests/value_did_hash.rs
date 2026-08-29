@@ -309,8 +309,12 @@ fn the_hash_eq_contract_holds_under_simulated_principal_equality() {
     // equality is untouched. Every value in the corpus is well-formed after
     // I7 — no set holds two spellings of one principal, because such a set
     // cannot be built once insertion collapses them.
-    let p = a_principal();
-    let q = a_principal();
+    // Pinned, not drawn freely: the corpus's aggregate members only expose a
+    // spelling-derived member order when re-spelling flips it, and with two
+    // unpinned principals that happens on about half the draws. Taking the
+    // canonically-lesser one as `p` makes `{p, q}` order `[p, q]` against
+    // `{p, q_alias}`'s `[q_alias, p]` on every run.
+    let (q, p) = two_principals_in_pinned_canonical_order();
     let p_alias = alternate_spelling(&p);
     let q_alias = alternate_spelling(&q);
 
