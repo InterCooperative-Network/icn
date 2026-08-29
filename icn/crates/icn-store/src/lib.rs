@@ -633,6 +633,44 @@ pub struct StorageStats {
 }
 
 /// Sled-based storage implementation
+/// Count the items an iterator yields, propagating the first read error.
+///
+/// Split out from its callers so the fail-closed behaviour is testable without
+/// a corrupt sled database: the property under test is "an `Err` item becomes
+/// an `Err` result", and that is a property of this function.
+pub(crate) fn count_rows_failing_closed<T, E>(
+    iter: impl Iterator<Item = std::result::Result<T, E>>,
+) -> Result<usize>
+where
+    E: Into<anyhow::Error>,
+{
+    let mut n = 0usize;
+    for item in iter {
+        item.map_err(Into::into)?;
+        n += 1;
+    }
+    Ok(n)
+}
+
+/// Count items whose key embeds `did:icn:`, propagating the first read error.
+pub(crate) fn count_did_bearing_failing_closed<K, V, E>(
+    iter: impl Iterator<Item = std::result::Result<(K, V), E>>,
+) -> Result<usize>
+where
+    K: AsRef<[u8]>,
+    E: Into<anyhow::Error>,
+{
+    const NEEDLE: &[u8] = b"did:icn:";
+    let mut n = 0usize;
+    for item in iter {
+        let (key, _) = item.map_err(Into::into)?;
+        if key.as_ref().windows(NEEDLE.len()).any(|w| w == NEEDLE) {
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
 pub struct SledStore {
     db: sled::Db,
 }
@@ -653,9 +691,16 @@ impl SledStore {
     /// rows" on that basis would be a false negative, so the fact is made
     /// available rather than left implicit.
     ///
+    /// Iterator errors propagate. For a migration gate, a tree that could not
+    /// be read completely must not be reported as a tree that contained
+    /// nothing: corruption and an incomplete copy are evidence, not absence.
+    ///
     /// The returned name for sled's default tree is `__sled__default`.
     pub fn tree_row_counts(&self) -> Result<Vec<(String, usize)>> {
-        let mut out = vec![("__sled__default".to_string(), self.db.iter().count())];
+        let mut out = vec![(
+            "__sled__default".to_string(),
+            count_rows_failing_closed(self.db.iter())?,
+        )];
 
         for raw in self.db.tree_names() {
             let name = String::from_utf8_lossy(&raw).into_owned();
@@ -663,7 +708,7 @@ impl SledStore {
                 continue;
             }
             let tree = self.db.open_tree(&raw)?;
-            out.push((name, tree.iter().count()));
+            out.push((name, count_rows_failing_closed(tree.iter())?));
         }
 
         Ok(out)
@@ -674,18 +719,15 @@ impl SledStore {
     /// Complements [`SledStore::tree_row_counts`]: it answers whether a named
     /// tree this store's `Store` impl cannot reach holds principal-keyed rows
     /// that a collision scan would therefore miss.
+    ///
+    /// Iterator errors propagate, for the same reason. Discarding an unreadable
+    /// key here would be the worst case of all: if that key were the only
+    /// principal-bearing row in a named tree, the count would fall to zero and
+    /// the gate would pass a store it never finished reading.
     pub fn did_bearing_rows_per_tree(&self) -> Result<Vec<(String, usize)>> {
-        let needle = b"did:icn:";
-        let has_did = |k: &[u8]| k.windows(needle.len()).any(|w| w == needle);
-
         let mut out = vec![(
             "__sled__default".to_string(),
-            self.db
-                .iter()
-                .keys()
-                .filter_map(|k| k.ok())
-                .filter(|k| has_did(k))
-                .count(),
+            count_did_bearing_failing_closed(self.db.iter())?,
         )];
 
         for raw in self.db.tree_names() {
@@ -694,14 +736,7 @@ impl SledStore {
                 continue;
             }
             let tree = self.db.open_tree(&raw)?;
-            out.push((
-                name,
-                tree.iter()
-                    .keys()
-                    .filter_map(|k| k.ok())
-                    .filter(|k| has_did(k))
-                    .count(),
-            ));
+            out.push((name, count_did_bearing_failing_closed(tree.iter())?));
         }
 
         Ok(out)
@@ -1077,6 +1112,74 @@ impl SledStore {
 
 #[cfg(test)]
 mod tests {
+
+    /// One sled-shaped iterator item: a key/value pair, or a read error.
+    type Row = std::result::Result<(Vec<u8>, Vec<u8>), std::io::Error>;
+
+    /// A read error mid-iteration must become an error, never a smaller count.
+    ///
+    /// Exercised at the helper rather than by corrupting a sled database: the
+    /// property is "an `Err` item propagates", which belongs to these functions,
+    /// and faking a torn page would test sled instead.
+    #[test]
+    fn tree_row_count_propagates_an_iterator_error() {
+        let ok: Vec<Row> = vec![
+            Ok((b"a".to_vec(), b"v".to_vec())),
+            Ok((b"b".to_vec(), b"v".to_vec())),
+        ];
+        assert_eq!(crate::count_rows_failing_closed(ok.into_iter()).unwrap(), 2);
+
+        let torn: Vec<Row> = vec![
+            Ok((b"a".to_vec(), b"v".to_vec())),
+            Err(std::io::Error::other("torn page")),
+            Ok((b"c".to_vec(), b"v".to_vec())),
+        ];
+        assert!(
+            crate::count_rows_failing_closed(torn.into_iter()).is_err(),
+            "an unreadable row must fail the scan, not shrink the count"
+        );
+    }
+
+    #[test]
+    fn did_bearing_count_propagates_an_iterator_error() {
+        let did = b"did:icn:z6Mkabc".to_vec();
+
+        let ok: Vec<Row> = vec![
+            Ok((did.clone(), b"v".to_vec())),
+            Ok((b"plain".to_vec(), b"v".to_vec())),
+        ];
+        assert_eq!(
+            crate::count_did_bearing_failing_closed(ok.into_iter()).unwrap(),
+            1
+        );
+
+        // The worst case the propagation exists for: the unreadable row is the
+        // only principal-bearing one, so discarding it would report zero and
+        // let the gate pass a store it never finished reading.
+        let torn: Vec<Row> = vec![
+            Ok((b"plain".to_vec(), b"v".to_vec())),
+            Err(std::io::Error::other("torn page")),
+        ];
+        assert!(
+            crate::count_did_bearing_failing_closed(torn.into_iter()).is_err(),
+            "an unreadable key must not become an absence of principals"
+        );
+    }
+
+    #[test]
+    fn an_empty_tree_is_legitimately_empty_not_an_error() {
+        let rows: Vec<Row> = vec![];
+        assert_eq!(
+            crate::count_rows_failing_closed(rows.into_iter()).unwrap(),
+            0
+        );
+
+        let dids: Vec<Row> = vec![];
+        assert_eq!(
+            crate::count_did_bearing_failing_closed(dids.into_iter()).unwrap(),
+            0
+        );
+    }
     use super::*;
 
     fn test_hash() -> ContentHash {

@@ -88,9 +88,54 @@ It is not a one-off script and it is not a migration. It answers one question pe
 | Payload-free | Values are reduced to their length at the scan boundary; principals appear as an 8-hex-character fingerprint | The report is an operational artifact that will be pasted into issues |
 | Layout-independent | DID spellings are located by scanning for the `did:icn:` scheme, not by parsing each keyspace's separators | A keyspace that changes its separator cannot silently fall out of scan coverage |
 | Falsifiable | Always reports total store rows, namespace counts, and per-tree row counts alongside the per-keyspace zeros | "0 rows" from a broken scanner and "0 rows" from an empty store are otherwise indistinguishable |
-| Gate-shaped | Exit status `0` only when every keyspace is automatable **and** nothing principal-keyed lies outside scan reach | Makes the tool usable as the migration gate, not merely as a report |
+| Gate-shaped | Exit status `0` only when every principal-bearing row is accounted for **and** every keyspace accounting for one is automatable | Makes the tool usable as the migration gate, not merely as a report. The verdict lives in `CoverageAudit::is_clear`, and the runner renders it rather than recomputing it, so exit status and report cannot disagree |
 
-### 2.3 Grouping rule
+### 2.3 The three-state accounting — and why there is no fourth
+
+Every principal-bearing row in a scanned store is in exactly one of three
+states, and the verdict follows from that partition:
+
+1. **Covered** — a registered keyspace interpreted it, so the collision result
+   speaks for it.
+2. **Deferred** — a *named gate* owns it: `n2a_deferred_namespaces` records the
+   governance vote keyspace (§7.5) and the security namespace (dedicated
+   workflow). Deferred is neither scanned nor cleared; it is a reviewed
+   exclusion, reported separately and never folded into the scanned counts.
+3. **Uncovered** — nothing accounted for it, which **blocks**.
+
+State 3 is the point. A keyspace added after this tool was written, or simply
+left out of the registry, is indistinguishable from a clean store unless
+unaccounted rows block — and that has already happened once: §5 rows #71 and #36
+were live and unregistered (§3.4). Without the deferral registry the only safe
+verdict on any uncovered row would be "blocked", which would make the gate
+unusable; with it, an accidental omission still blocks while a reviewed
+exclusion does not.
+
+A deferred namespace is **never inspected**. Only its existence, its owning
+gate, and its principal-bearing row count are recorded.
+
+### 2.4 Fail-closed reads
+
+Two paths could previously turn missing evidence into apparent absence, and both
+now propagate:
+
+* **Tree iteration.** `tree_row_counts` and `did_bearing_rows_per_tree`
+  propagate a sled iterator error instead of discarding the unreadable item. The
+  case that matters: if the unreadable key were the only principal-bearing row
+  in a named tree, discarding it would drop the count to zero and pass a store
+  that was never finished. Corruption and an incomplete copy are evidence, not
+  absence.
+* **Spelling extraction.** The tokenizer takes the longest candidate run, then
+  shortens it from the right until it decodes to a 32-byte identifier. The
+  alphabet must include `+` and `/` — the production parser accepts all 23
+  `multibase::Base` encodings and `Base64` spellings contain both — but `/` is
+  also a live key separator (`trust/edges/<did>`), so the alphabet alone cannot
+  say where a spelling ends. Deciding by decoding rather than by alphabet
+  captures a base64 spelling whole *and* still terminates `<did>/suffix` at the
+  spelling. Nothing that fails to decode is silently dropped: the whole run is
+  reported as one unreadable token, which itself blocks.
+
+### 2.5 Grouping rule
 
 Rows are grouped by their **principal-canonical shape**: the raw key with every embedded
 `did:icn:` spelling replaced by the 32 identifier bytes it decodes to. Non-DID key material stays
@@ -106,7 +151,7 @@ that order decides the survivor of every last-writer rebuild. `Base256Emoji` spe
 non-ASCII and therefore sort after every ASCII spelling, so **the survivor is
 attacker-selectable**. The scan surfaces the survivor explicitly rather than leaving it implicit.
 
-### 2.4 Coverage limit found while building it
+### 2.6 Coverage limit found while building it
 
 `Store::scan` reads only sled's **default tree**. `icn-gateway`'s service discovery uses a
 *named* tree, which a `Store`-trait scan can never reach. A scan reporting zeros on such a store
@@ -116,7 +161,7 @@ The runner therefore also reports per-tree row counts and per-tree DID-bearing r
 (`SledStore::tree_row_counts`, `SledStore::did_bearing_rows_per_tree`), and **treats
 principal-keyed rows in a named tree as blocking**, not as a clean result.
 
-### 2.5 Fixture tests
+### 2.7 Fixture tests
 
 17 tests in `did_collision_scan::tests`, run against a real `SledStore` rather than a hand-rolled
 double — the ordering claim is a claim about the actual backend, and a simulated store would only
@@ -130,7 +175,7 @@ raw key instead of canonical shape) fails **9 of 15** collision tests and leaves
 6 that should not depend on grouping. The suite therefore discriminates rather than passing
 vacuously.
 
-### 2.6 How to run it
+### 2.8 How to run it
 
 ```bash
 cd icn && cargo build -p icn-store --bin did-collision-scan
@@ -199,11 +244,11 @@ total row count and per-tree count were reported alongside, and the raw sled fil
 local stores were independently checked for `did:icn:` byte occurrences (zero) to distinguish an
 empty store from a failed read.
 
-### 3.3 Principal-bearing rows outside registered coverage — 63
+### 3.3 Principal-bearing rows behind a named gate — 63
 
 A per-keyspace zero only speaks for the rows that keyspace matched. Reconciling *all* DID-bearing
-rows against the registry found 63 rows the registry does not cover, all deliberately out of N2-A
-scope:
+rows against the registry found 63 the registry does not cover. Each is now accounted for by a
+**named gate** (§2.3 state 2) rather than left as an unexplained remainder:
 
 | Family | Rows | Why out of scope |
 |---|---|---|
@@ -215,6 +260,10 @@ scope:
 
 These 63 rows are **deferred, not cleared**. Their existence and their migration dependency are
 recorded; their contents were not inspected.
+
+Re-running the scan after the deferral registry landed reconciles exactly: **24 covered + 63
+deferred = 87** principal-bearing rows, **0 uncovered**, 0 blocked, across all 94 databases. The
+three-state partition holds on real data, which is the property the verdict depends on.
 
 ### 3.4 A registry scope error the scan caught
 

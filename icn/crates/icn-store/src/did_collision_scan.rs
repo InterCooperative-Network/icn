@@ -292,16 +292,29 @@ pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
         }
 
         let start = i;
-        let mut end = i + needle.len();
-        while end < key.len() && is_multibase_body_byte(key[end]) {
-            end += 1;
+        let mut limit = i + needle.len();
+        while limit < key.len() && is_multibase_body_byte(key[limit]) {
+            limit += 1;
         }
 
-        // A prefix with nothing after it names no principal, but it is still a
-        // DID-shaped token: report it as unreadable rather than skipping it,
-        // so an empty identifier cannot hide from the scan.
+        // Maximal munch, then validate and back off.
+        //
+        // The candidate alphabet has to include `+` and `/`, because the
+        // production parser accepts `Base64`/`Base64Pad` spellings and those
+        // contain both. But `/` is also a key separator in live keyspaces
+        // (`trust/edges/<did>`, `.../<did>/suffix`), so an alphabet alone
+        // cannot say where a spelling ends: the same byte is inside the token
+        // in one keyspace and after it in another.
+        //
+        // So the longest candidate run is tried first and shortened from the
+        // right until it decodes to a 32-byte identifier. Longest-match-wins
+        // means a real spelling is never cut short by a character it legally
+        // contains, while a spelling followed by `/suffix` still terminates at
+        // the spelling. Only if nothing decodes is the whole run reported as
+        // one unreadable token — a fact the scan must surface, never skip.
+        let (end, identifier) = resolve_spelling(key, start, limit);
+
         let spelling = String::from_utf8_lossy(&key[start..end]).into_owned();
-        let identifier = identifier_bytes_of_spelling(&spelling).ok();
         found.push(EmbeddedDid {
             offset: start,
             spelling,
@@ -314,13 +327,34 @@ pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
     found
 }
 
+/// Find the longest prefix of `key[start..limit]` that decodes to a 32-byte
+/// identifier, returning its end offset and the bytes.
+///
+/// When nothing decodes, the full run is returned with `None` so the caller
+/// reports one unreadable token rather than silently dropping the row.
+fn resolve_spelling(key: &[u8], start: usize, limit: usize) -> (usize, Option<[u8; 32]>) {
+    let mut end = limit;
+    while end > start {
+        // Only attempt at a UTF-8 boundary: `Base256Emoji` spellings are
+        // multi-byte, and slicing one mid-character would both fail to decode
+        // and misreport where the spelling ends.
+        if let Ok(candidate) = std::str::from_utf8(&key[start..end]) {
+            if let Ok(bytes) = identifier_bytes_of_spelling(candidate) {
+                return (end, Some(bytes));
+            }
+        }
+        end -= 1;
+    }
+    (limit, None)
+}
+
 /// Whether a byte may continue a multibase identifier body.
 ///
-/// Deliberately permissive across multibase alphabets — base16 through
-/// base256emoji — because the scan must not truncate a spelling it does not
-/// recognise and then decode a fragment. Anything permissive enough to over-read
-/// a separator would break grouping, so the set stops short of every separator
-/// these keyspaces use.
+/// Covers every alphabet the production parser accepts — verified against
+/// `Did::from_str` for all 23 `multibase::Base` variants, which includes
+/// `Base64` (`+`, `/`), `Base64Url` (`-`, `_`) and their padded forms (`=`).
+/// Being permissive here is safe because [`resolve_spelling`] decides where the
+/// spelling actually ends by decoding, not by the alphabet alone.
 fn is_multibase_body_byte(b: u8) -> bool {
     // Non-ASCII bytes continue the token: `Base256Emoji` spellings are
     // multi-byte UTF-8, and truncating one at its first continuation byte would
@@ -328,7 +362,7 @@ fn is_multibase_body_byte(b: u8) -> bool {
     if b >= 0x80 {
         return true;
     }
-    b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'='
+    b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'=' | b'+' | b'/')
 }
 
 /// Group rows by principal-canonical shape and report the collisions.
@@ -498,6 +532,68 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
     })
 }
 
+/// A namespace deliberately left outside this tranche, behind a named gate.
+///
+/// Deferral is not coverage and it is not a clean result. It is a recorded
+/// decision that some *other* gate owns the namespace, and it exists so that an
+/// intentionally excluded keyspace is distinguishable from one nobody noticed.
+/// Without that distinction the only safe verdict on any uncovered row would be
+/// "blocked", and the gate would be unusable; with it, an accidental omission
+/// still blocks while a reviewed exclusion does not.
+///
+/// A deferred namespace is **never inspected**: only the fact that it exists,
+/// how many principal-bearing rows it holds, and which gate owns it.
+#[derive(Debug, Clone)]
+pub struct DeferredNamespace {
+    /// Stable identifier used in reports.
+    pub name: &'static str,
+    /// Key prefix whose rows this deferral accounts for.
+    pub prefix: &'static [u8],
+    /// The gate that owns the namespace — named, so the deferral is auditable.
+    pub gate: &'static str,
+    /// Inventory rows this namespace corresponds to.
+    pub inventory_rows: &'static [u32],
+}
+
+/// The namespaces N2-A deliberately does not scan, each behind a named gate.
+///
+/// Both entries are decisions recorded elsewhere, not judgements made here:
+/// governance votes are behind the §7.5 membership/vote migration gate, and the
+/// security namespace belongs to its own dedicated workflow.
+pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
+    vec![
+        DeferredNamespace {
+            name: "governance/votes",
+            prefix: b"gov:vote:",
+            gate: "IDENTITY_SEMANTICS §7.5 membership/vote migration gate",
+            inventory_rows: &[23],
+        },
+        DeferredNamespace {
+            name: "security/misbehavior",
+            prefix: b"security:",
+            gate: "dedicated security workflow (contents not inspected)",
+            inventory_rows: &[5, 6, 7, 8, 38],
+        },
+    ]
+}
+
+/// Principal-bearing rows per deferred namespace. Counts only.
+pub fn deferred_did_row_counts(
+    store: &dyn Store,
+    deferrals: &[DeferredNamespace],
+) -> anyhow::Result<Vec<(String, usize)>> {
+    let mut out = Vec::with_capacity(deferrals.len());
+    for d in deferrals {
+        let n = store
+            .scan(d.prefix)?
+            .into_iter()
+            .filter(|(key, _)| !find_embedded_dids(key).is_empty())
+            .count();
+        out.push((d.name.to_string(), n));
+    }
+    Ok(out)
+}
+
 /// Principal-bearing rows that no registered keyspace covers, grouped by the
 /// *shape* of their key.
 ///
@@ -515,6 +611,7 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
 pub fn uncovered_did_key_shapes(
     store: &dyn Store,
     descriptors: &[KeyspaceDescriptor],
+    deferrals: &[DeferredNamespace],
 ) -> anyhow::Result<BTreeMap<String, usize>> {
     let mut shapes: BTreeMap<String, usize> = BTreeMap::new();
 
@@ -523,7 +620,9 @@ pub fn uncovered_did_key_shapes(
         if embedded.is_empty() {
             continue;
         }
-        if descriptors.iter().any(|d| key.starts_with(d.prefix)) {
+        let covered = descriptors.iter().any(|d| key.starts_with(d.prefix));
+        let deferred = deferrals.iter().any(|d| key.starts_with(d.prefix));
+        if covered || deferred {
             continue;
         }
         *shapes.entry(mask_key(&key, &embedded)).or_insert(0) += 1;
@@ -588,6 +687,79 @@ pub fn scan_store(
         keyspaces.push(scan_keyspace(store, descriptor)?);
     }
     Ok(CollisionReport { keyspaces })
+}
+
+/// Everything one store's scan established, and the verdict that follows.
+///
+/// The verdict lives here rather than in the runner because it *is* the gate:
+/// a binary that rendered a report and decided separately what it meant could
+/// drift from the library, and the first symptom would be an exit status that
+/// disagreed with the text above it.
+#[derive(Debug, Clone)]
+pub struct CoverageAudit {
+    pub report: CollisionReport,
+    pub overview: StoreOverview,
+    /// Principal-bearing rows per deliberately deferred namespace.
+    pub deferred: Vec<(String, usize)>,
+    /// Principal-bearing rows under no registered keyspace and no named gate.
+    pub uncovered: BTreeMap<String, usize>,
+    /// Principal-bearing rows in named trees `Store::scan` cannot reach.
+    pub unreachable_did_rows: usize,
+}
+
+impl CoverageAudit {
+    /// Rows accounted for by no registered keyspace and no named gate.
+    pub fn uncovered_did_rows(&self) -> usize {
+        self.uncovered.values().sum()
+    }
+
+    /// Rows a named gate defers. Deferred is neither scanned nor cleared.
+    pub fn deferred_did_rows(&self) -> usize {
+        self.deferred.iter().map(|(_, n)| *n).sum()
+    }
+
+    /// The store is clear only when every principal-bearing row it holds was
+    /// accounted for, and every keyspace that accounted for one can be migrated
+    /// without a human deciding an outcome.
+    ///
+    /// A principal-bearing row is accounted for in exactly one of three ways,
+    /// and there is deliberately no fourth:
+    ///
+    /// 1. a registered keyspace interpreted it, so the collision result speaks
+    ///    for it;
+    /// 2. a named gate defers it — [`n2a_deferred_namespaces`] says which, and
+    ///    that exclusion was reviewed;
+    /// 3. nothing did, which **blocks** — a row nobody has classified is
+    ///    precisely the row that collapses unexamined on the first start of a
+    ///    key-equality binary.
+    ///
+    /// Case 3 is why uncovered rows are consulted here. Without them a keyspace
+    /// added after this tool was written, or simply left out of the registry,
+    /// would pass the migration gate in silence — the exact failure this tool
+    /// exists to prevent, and one that already happened once (§5 rows #71 and
+    /// #36 were live and unregistered).
+    pub fn is_clear(&self) -> bool {
+        self.report.is_clear() && self.unreachable_did_rows == 0 && self.uncovered_did_rows() == 0
+    }
+}
+
+/// Audit one store: collisions, coverage, deferrals and uncovered rows.
+///
+/// `unreachable_did_rows` is supplied by the caller because reaching named
+/// trees requires the concrete backend, not the [`Store`] trait.
+pub fn audit_store(
+    store: &dyn Store,
+    descriptors: &[KeyspaceDescriptor],
+    deferrals: &[DeferredNamespace],
+    unreachable_did_rows: usize,
+) -> anyhow::Result<CoverageAudit> {
+    Ok(CoverageAudit {
+        report: scan_store(store, descriptors)?,
+        overview: store_overview(store)?,
+        deferred: deferred_did_row_counts(store, deferrals)?,
+        uncovered: uncovered_did_key_shapes(store, descriptors, deferrals)?,
+        unreachable_did_rows,
+    })
 }
 
 /// The non-security-sensitive durable keyspaces N2-A must clear before `Did`
@@ -1099,7 +1271,7 @@ mod tests {
             "registered keyspace is clean"
         );
 
-        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        let shapes = uncovered_did_key_shapes(&store, &descriptors, &[]).unwrap();
         assert_eq!(
             shapes.get("unregistered/members/<did>/role"),
             Some(&2),
@@ -1115,7 +1287,7 @@ mod tests {
         let store = store_with(&[(&format!("test:{one}"), b"v")]);
         let descriptors = [descriptor(MergeDisposition::Sum)];
 
-        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        let shapes = uncovered_did_key_shapes(&store, &descriptors, &[]).unwrap();
         assert!(
             shapes.is_empty(),
             "a registered row is covered, not uncovered"
@@ -1128,12 +1300,242 @@ mod tests {
         let store = store_with(&[(&format!("elsewhere/{one}"), b"SECRET-VALUE")]);
         let descriptors = [descriptor(MergeDisposition::Sum)];
 
-        let shapes = uncovered_did_key_shapes(&store, &descriptors).unwrap();
+        let shapes = uncovered_did_key_shapes(&store, &descriptors, &[]).unwrap();
         let rendered = format!("{shapes:?}");
 
         assert!(rendered.contains("<did>"));
         assert!(!rendered.contains(&one), "the spelling must be masked out");
         assert!(!rendered.contains("SECRET-VALUE"));
+    }
+
+    // ---- verdict: the three accounted-for states, and no fourth ----
+
+    fn audit(
+        store: &SledStore,
+        d: &[KeyspaceDescriptor],
+        f: &[DeferredNamespace],
+    ) -> CoverageAudit {
+        audit_store(store, d, f, 0).unwrap()
+    }
+
+    #[test]
+    fn an_uncovered_principal_row_blocks_even_with_no_collisions() {
+        // The regression this exists for: registered keyspaces are clean, but
+        // the store holds a principal-bearing row under a prefix nobody
+        // registered. Reporting CLEAR here would pass the migration gate on a
+        // row that was never collision-scanned.
+        let one = spell(&principal(91), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("test:{one}"), b"v"),
+            (&format!("nobody_registered_this:{one}"), b"v"),
+        ]);
+
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+        let a = audit(&store, &descriptors, &[]);
+
+        assert!(a.report.is_clear(), "registered keyspaces are clean");
+        assert_eq!(a.uncovered_did_rows(), 1);
+        assert!(!a.is_clear(), "an unclassified principal row must block");
+    }
+
+    #[test]
+    fn a_deferred_namespace_is_classified_not_cleared_and_does_not_block() {
+        // A reviewed exclusion must be distinguishable from an accidental
+        // omission: it does not block, but it is reported as deferred rather
+        // than folded into the scanned/clear count.
+        let one = spell(&principal(93), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("test:{one}"), b"v"),
+            (&format!("gov:vote:abc:{one}"), b"v"),
+        ]);
+
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+        let deferrals = n2a_deferred_namespaces();
+        let a = audit(&store, &descriptors, &deferrals);
+
+        assert_eq!(a.deferred_did_rows(), 1, "the vote row is deferred");
+        assert_eq!(a.uncovered_did_rows(), 0, "deferred is not uncovered");
+        assert!(a.is_clear(), "a reviewed exclusion must not block");
+
+        // And it is not counted as scanned by any registered keyspace.
+        let scanned: usize = a.report.keyspaces.iter().map(|k| k.rows_scanned).sum();
+        assert_eq!(scanned, 1, "only the registered row was scanned");
+    }
+
+    #[test]
+    fn every_principal_row_lands_in_exactly_one_of_three_states() {
+        // covered | deferred | uncovered — and nothing may fall through.
+        let p = spell(&principal(95), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("test:{p}"), b"v"),            // covered
+            (&format!("gov:vote:x:{p}"), b"v"),      // deferred
+            (&format!("security:banned:{p}"), b"v"), // deferred
+            (&format!("stray/{p}"), b"v"),           // uncovered
+            ("test:no-did-here", b"v"),              // not principal-bearing
+        ]);
+
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+        let deferrals = n2a_deferred_namespaces();
+        let a = audit(&store, &descriptors, &deferrals);
+
+        let covered: usize = a
+            .report
+            .keyspaces
+            .iter()
+            .map(|k| k.rows_with_readable_did)
+            .sum();
+        assert_eq!(covered, 1);
+        assert_eq!(a.deferred_did_rows(), 2);
+        assert_eq!(a.uncovered_did_rows(), 1);
+        assert_eq!(
+            covered + a.deferred_did_rows() + a.uncovered_did_rows(),
+            a.overview.rows_with_embedded_did,
+            "no principal-bearing row may fall outside the three states"
+        );
+        assert!(!a.is_clear());
+    }
+
+    #[test]
+    fn full_coverage_with_no_collisions_is_clear() {
+        let one = spell(&principal(97), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("test:{one}"), b"v")]);
+        let a = audit(&store, &[descriptor(MergeDisposition::Sum)], &[]);
+        assert!(a.is_clear());
+    }
+
+    #[test]
+    fn a_collision_needing_manual_disposition_is_not_clear() {
+        let (x, y) = two_spellings(99);
+        let store = store_with(&[(&format!("test:{x}"), b"v"), (&format!("test:{y}"), b"v")]);
+        let a = audit(&store, &[descriptor(MergeDisposition::FailClosed)], &[]);
+        assert!(!a.is_clear());
+    }
+
+    #[test]
+    fn unreachable_named_tree_rows_block() {
+        let one = spell(&principal(101), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("test:{one}"), b"v")]);
+        let descriptors = [descriptor(MergeDisposition::Sum)];
+
+        assert!(audit_store(&store, &descriptors, &[], 0)
+            .unwrap()
+            .is_clear());
+        assert!(
+            !audit_store(&store, &descriptors, &[], 1)
+                .unwrap()
+                .is_clear(),
+            "a principal row in an unreachable tree must block"
+        );
+    }
+
+    // ---- tokenizer: every encoding the production parser accepts ----
+
+    #[test]
+    fn every_accepted_multibase_encoding_is_captured_whole_and_decodes() {
+        use multibase::Base::*;
+
+        // An identifier chosen so its Base64 spelling actually contains `+`
+        // and its Base64Url spelling contains `-`; an all-equal identifier
+        // exercises neither, and this test would pass vacuously with the old
+        // tokenizer if it did not.
+        let mut id = [0u8; 32];
+        for (i, b) in id.iter_mut().enumerate() {
+            *b = (i as u8).wrapping_mul(37).wrapping_add(251);
+        }
+
+        let bases = [
+            Base2,
+            Base8,
+            Base10,
+            Base16Lower,
+            Base16Upper,
+            Base32Lower,
+            Base32Upper,
+            Base32PadLower,
+            Base32PadUpper,
+            Base32HexLower,
+            Base32HexUpper,
+            Base32HexPadLower,
+            Base32HexPadUpper,
+            Base32Z,
+            Base36Lower,
+            Base36Upper,
+            Base58Flickr,
+            Base58Btc,
+            Base64,
+            Base64Pad,
+            Base64Url,
+            Base64UrlPad,
+            Base256Emoji,
+        ];
+
+        let mut saw_plus = false;
+        for base in bases {
+            let spelling = spell(&id, base);
+
+            // The corpus is only meaningful if production actually accepts it.
+            assert!(
+                icn_identity::Did::from_str(&spelling).is_ok(),
+                "fixture assumes the production parser accepts {spelling:?}"
+            );
+            if spelling.contains('+') {
+                saw_plus = true;
+            }
+
+            let key = format!("test:{spelling}").into_bytes();
+            let found = find_embedded_dids(&key);
+
+            assert_eq!(found.len(), 1, "one spelling in {spelling:?}");
+            assert_eq!(
+                found[0].spelling, spelling,
+                "the whole spelling must be captured, not truncated"
+            );
+            assert_eq!(
+                found[0].identifier,
+                Some(id),
+                "{spelling:?} must decode to the fixture identifier"
+            );
+        }
+
+        assert!(
+            saw_plus,
+            "corpus must include a spelling containing '+', or it does not \
+             discriminate the tokenizer fix"
+        );
+    }
+
+    #[test]
+    fn a_spelling_followed_by_a_slash_separator_still_terminates() {
+        // `/` is both a Base64 character and a live key separator, so the
+        // alphabet alone cannot decide where a spelling ends. Longest-match
+        // with decode validation must stop at the spelling.
+        let one = spell(&principal(103), multibase::Base::Base58Btc);
+        let key = format!("ns/{one}/role").into_bytes();
+
+        let found = find_embedded_dids(&key);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].spelling, one, "must not swallow '/role'");
+        assert_eq!(found[0].identifier, Some(principal(103)));
+    }
+
+    #[test]
+    fn a_malformed_did_shaped_token_stays_unreadable() {
+        // The tokenizer became more permissive; it must not have become
+        // "accept anything and call it a principal".
+        for bad in [
+            "test:did:icn:z6Mkh", // valid multibase, wrong length
+            "test:did:icn:!!!!",  // not multibase
+            "test:did:icn:",      // empty identifier
+            "test:did:icn:++++",  // newly-allowed chars, still junk
+            "test:did:icn:////",  // ditto
+        ] {
+            let found = find_embedded_dids(bad.as_bytes());
+            assert_eq!(found.len(), 1, "{bad:?} yields one DID-shaped token");
+            assert!(
+                found[0].identifier.is_none(),
+                "{bad:?} must not resolve to a principal"
+            );
+        }
     }
 
     #[test]

@@ -32,48 +32,27 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use icn_store::did_collision_scan::{
-    n2a_keyspaces, scan_store, store_overview, uncovered_did_key_shapes, CollisionReport,
-    StoreOverview,
+    audit_store, n2a_deferred_namespaces, n2a_keyspaces, CoverageAudit,
 };
 use icn_store::{SledStore, Store};
 
-/// Everything one store's scan produced.
+/// One store's audit plus the per-tree coverage facts that produced it.
 ///
-/// A named struct rather than a tuple because the coverage facts travel with
-/// the report by necessity: a `CollisionReport` alone cannot say whether the
-/// store had rows the scan could not reach, and reporting one without the other
-/// is how a scan comes to claim an all-clear it did not establish.
+/// The verdict is **not** recomputed here. `CoverageAudit::is_clear` is the
+/// gate, and this binary renders it — a runner that decided separately what its
+/// own report meant is how an exit status comes to disagree with the text above
+/// it.
 struct ScanOutcome {
-    report: CollisionReport,
-    overview: StoreOverview,
+    audit: CoverageAudit,
     /// Row count per sled tree, including the default tree.
     trees: Vec<(String, usize)>,
     /// Rows per tree whose key embeds a `did:icn:` spelling.
     did_rows: Vec<(String, usize)>,
-    /// Principal-bearing rows no registered keyspace covers, by masked shape.
-    uncovered: std::collections::BTreeMap<String, usize>,
 }
 
 impl ScanOutcome {
-    /// Principal-keyed rows living in a named tree, which `Store::scan` cannot
-    /// reach and this scan therefore did not examine.
-    /// Principal-bearing rows sitting outside every registered keyspace.
-    fn uncovered_did_rows(&self) -> usize {
-        self.uncovered.values().sum()
-    }
-
-    fn unreachable_did_rows(&self) -> usize {
-        self.did_rows
-            .iter()
-            .filter(|(name, _)| name != "__sled__default")
-            .map(|(_, n)| *n)
-            .sum()
-    }
-
-    /// The store is clear only when every scanned keyspace is automatable *and*
-    /// nothing principal-keyed sits outside what was scanned.
     fn is_clear(&self) -> bool {
-        self.report.is_clear() && self.unreachable_did_rows() == 0
+        self.audit.is_clear()
     }
 }
 
@@ -145,20 +124,24 @@ fn scan_copy_of(
     let result = (|| -> Result<ScanOutcome> {
         let store = SledStore::open(&working)
             .with_context(|| format!("opening copy of {}", source.display()))?;
-        let report = scan_store(&store as &dyn Store, descriptors)?;
-        let overview = store_overview(&store as &dyn Store)?;
-
-        // `Store::scan` reads only sled's default tree. Report every tree so a
-        // zero result cannot be a named tree the scan never looked in.
+        // `Store::scan` reads only sled's default tree. Read every tree so a
+        // zero result cannot be a named tree the scan never looked in — and so
+        // an unreadable row becomes an error rather than an absence.
         let trees = store.tree_row_counts()?;
         let did_rows = store.did_bearing_rows_per_tree()?;
-        let uncovered = uncovered_did_key_shapes(&store as &dyn Store, descriptors)?;
+        let unreachable: usize = did_rows
+            .iter()
+            .filter(|(name, _)| name != "__sled__default")
+            .map(|(_, n)| *n)
+            .sum();
+
+        let deferrals = n2a_deferred_namespaces();
+        let audit = audit_store(&store as &dyn Store, descriptors, &deferrals, unreachable)?;
+
         Ok(ScanOutcome {
-            report,
-            overview,
+            audit,
             trees,
             did_rows,
-            uncovered,
         })
     })();
 
@@ -200,12 +183,17 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
 
 fn print_human(path: &Path, outcome: &ScanOutcome) {
     let ScanOutcome {
-        report,
-        overview,
+        audit,
         trees,
         did_rows,
-        uncovered,
     } = outcome;
+    let CoverageAudit {
+        report,
+        overview,
+        deferred,
+        uncovered,
+        unreachable_did_rows,
+    } = audit;
     println!("\n=== {} ===", path.display());
     // Printed first, and always: it is what makes a row of zeros below mean
     // "this store holds none of these rows" rather than "the scan read nothing".
@@ -233,7 +221,7 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         })
         .collect();
     println!("  trees: {}", tree_line.join(" "));
-    let unreachable = outcome.unreachable_did_rows();
+    let unreachable = *unreachable_did_rows;
     if unreachable > 0 {
         println!(
             "  WARNING: {unreachable} principal-keyed row(s) live in a named tree that \
@@ -282,10 +270,21 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         }
     }
 
+    if !deferred.is_empty() {
+        let listed: Vec<String> = deferred
+            .iter()
+            .map(|(name, n)| format!("{name}={n}"))
+            .collect();
+        println!(
+            "  deferred: {} (behind a named gate; not scanned, not cleared)",
+            listed.join(" ")
+        );
+    }
     if !uncovered.is_empty() {
         println!(
-            "  uncovered: {} principal-bearing row(s) under no registered keyspace -",
-            outcome.uncovered_did_rows()
+            "  UNCOVERED: {} principal-bearing row(s) under no registered keyspace and no \
+             named gate - this store is NOT cleared:",
+            audit.uncovered_did_rows()
         );
         for (shape, n) in uncovered {
             println!("    {n:>5}  {shape}");
@@ -310,39 +309,61 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
 }
 
 fn print_json(path: &Path, outcome: &ScanOutcome) {
-    let ScanOutcome {
-        report, overview, ..
-    } = outcome;
-    // Hand-rolled so the report type needs no serde derive and cannot grow a
-    // field that leaks a payload without this function being edited too.
-    let keyspaces: Vec<String> = report
+    // Built field by field through a real encoder rather than formatted by
+    // hand. Hand-formatting produced invalid JSON for any path containing a
+    // quote, a backslash or a newline, and the fix is not more escaping: it is
+    // not writing the escaping. Fields are still listed explicitly instead of
+    // deriving `Serialize` on the report types, so a field added to a report
+    // later cannot reach this output — and therefore cannot leak a stored
+    // value — without someone editing this function.
+    let keyspaces: Vec<serde_json::Value> = outcome
+        .audit
+        .report
         .keyspaces
         .iter()
         .map(|k| {
-            format!(
-                r#"{{"keyspace":"{}","inventory_rows":{:?},"disposition":"{}","rows_scanned":{},"distinct_principals":{},"collision_groups":{},"rows_in_collisions":{},"rows_unreadable":{},"rows_without_did":{},"must_fail_closed":{}}}"#,
-                k.keyspace,
-                k.inventory_rows,
-                k.disposition.label(),
-                k.rows_scanned,
-                k.distinct_principals,
-                k.collision_groups.len(),
-                k.rows_in_collisions(),
-                k.rows_unreadable,
-                k.rows_without_did,
-                k.must_fail_closed(),
-            )
+            serde_json::json!({
+                "keyspace": k.keyspace,
+                "inventory_rows": k.inventory_rows,
+                "disposition": k.disposition.label(),
+                "rows_scanned": k.rows_scanned,
+                "distinct_principals": k.distinct_principals,
+                "collision_groups": k.collision_groups.len(),
+                "rows_in_collisions": k.rows_in_collisions(),
+                "rows_unreadable": k.rows_unreadable,
+                "rows_without_did": k.rows_without_did,
+                "must_fail_closed": k.must_fail_closed(),
+            })
         })
         .collect();
 
-    println!(
-        r#"{{"store":"{}","clear":{},"store_total_rows":{},"store_rows_with_did":{},"unreachable_did_rows":{},"uncovered_did_rows":{},"keyspaces":[{}]}}"#,
-        path.display(),
-        outcome.is_clear(),
-        overview.total_rows,
-        overview.rows_with_embedded_did,
-        outcome.unreachable_did_rows(),
-        outcome.uncovered_did_rows(),
-        keyspaces.join(",")
-    );
+    let deferred: Vec<serde_json::Value> = outcome
+        .audit
+        .deferred
+        .iter()
+        .map(|(name, n)| serde_json::json!({ "namespace": name, "did_bearing_rows": n }))
+        .collect();
+
+    // Masked shapes only: `did:icn:…` is already `<did>` and non-printables are
+    // `.`, so this carries key structure and no identifier or payload.
+    let uncovered: Vec<serde_json::Value> = outcome
+        .audit
+        .uncovered
+        .iter()
+        .map(|(shape, n)| serde_json::json!({ "shape": shape, "rows": n }))
+        .collect();
+
+    let doc = serde_json::json!({
+        "store": path.display().to_string(),
+        "clear": outcome.is_clear(),
+        "store_total_rows": outcome.audit.overview.total_rows,
+        "store_rows_with_did": outcome.audit.overview.rows_with_embedded_did,
+        "unreachable_did_rows": outcome.audit.unreachable_did_rows,
+        "uncovered_did_rows": outcome.audit.uncovered_did_rows(),
+        "deferred_namespaces": deferred,
+        "uncovered_shapes": uncovered,
+        "keyspaces": keyspaces,
+    });
+
+    println!("{doc}");
 }
