@@ -313,14 +313,11 @@ impl TestNode {
         other_participants: Vec<&TestNode>, // Other participant nodes to collect signatures from
         announce_to: Vec<&icn_identity::Did>,
     ) -> anyhow::Result<ContentHash> {
-        // Compute code hash (must match ContractActor::compute_code_hash)
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        // The one authoritative definition of the rule, reached across the
+        // crate boundary rather than re-encoded here. This test signs and
+        // gossips the result, so a local replica could pass while disagreeing
+        // with what production actually deploys.
+        let code_hash = icn_ccl::compute_contract_code_hash(&contract);
 
         let installed_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?

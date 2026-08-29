@@ -219,14 +219,7 @@ mod tests {
         let kp = KeyPair::generate().unwrap();
         let contract = create_test_contract(&kp);
 
-        // Compute code hash
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        let code_hash = crate::code_hash::compute_contract_code_hash(&contract);
 
         let installed_at = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -287,13 +280,7 @@ mod tests {
 
         let contract = create_test_contract(&kp_alice);
 
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        let code_hash = crate::code_hash::compute_contract_code_hash(&contract);
 
         let installed_at = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -371,13 +358,7 @@ mod tests {
 
         let contract = create_test_contract(&kp_alice);
 
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        let code_hash = crate::code_hash::compute_contract_code_hash(&contract);
 
         let installed_at = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -427,13 +408,7 @@ mod tests {
             .add_participant(kp_alice.did().clone())
             .add_participant(kp_bob.did().clone());
 
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        let code_hash = crate::code_hash::compute_contract_code_hash(&contract);
 
         let installed_at = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -500,13 +475,7 @@ mod tests {
         let kp = KeyPair::generate().unwrap();
         let contract = create_test_contract(&kp);
 
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(contract.name.as_bytes());
-        for participant in &contract.participants {
-            hasher.update(format!("{participant:?}").as_bytes());
-        }
-        let code_hash = ContentHash::from_bytes(hasher.finalize().into());
+        let code_hash = crate::code_hash::compute_contract_code_hash(&contract);
 
         let installed_at = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)

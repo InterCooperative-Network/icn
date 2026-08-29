@@ -48,6 +48,7 @@ pub mod actor;
 pub mod ast;
 pub mod charter_rules;
 pub mod charter_validator;
+pub mod code_hash;
 pub mod disputes;
 pub mod error;
 pub mod fuel_estimator;
@@ -64,6 +65,7 @@ pub use actor::{ContractActor, GossipCallback, CONTRACTS_DEPLOY_TOPIC};
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
 pub use charter_rules::{CharterRule, CharterRuleSet, ValidationResult};
 pub use charter_validator::CharterValidator;
+pub use code_hash::compute_contract_code_hash;
 pub use disputes::{
     Dispute, DisputeActor, DisputeActorHandle, DisputeConfig, DisputeEvidence,
     DisputeGossipCallback, DisputeId, DisputeMessage, DisputeOutcome, DisputeReason,
