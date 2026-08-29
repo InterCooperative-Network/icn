@@ -142,6 +142,16 @@ pub struct KeyspaceDescriptor {
     pub disposition: MergeDisposition,
     /// Whether that rule has been authorized by the domain that owns the state.
     pub basis: RuleBasis,
+    /// Whether this keyspace's own parser treats `/` as ending a DID.
+    ///
+    /// `/` is the only separator that is also a multibase body character, so
+    /// where a spelling may be followed by one is a property of the individual
+    /// key layout — not something the scanner can infer. No registered keyspace
+    /// currently puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses
+    /// `:`; `trust/sequences/issuer/<did>` ends there), so every descriptor sets
+    /// this `false` and `<did>/junk` is correctly unreadable rather than a
+    /// readable principal with residual bytes the real loader would reject.
+    pub slash_ends_did: bool,
     /// Why that rule, in one line — so a report explains itself.
     pub rationale: &'static str,
 }
@@ -322,6 +332,15 @@ impl CollisionReport {
 /// Non-UTF-8 keys are handled: the search runs over the bytes and only the
 /// matched token is required to be valid UTF-8.
 pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
+    // Permissive by default. Callers without a descriptor — the store overview
+    // and the uncovered-shape reporter — cannot know a key's layout, and a row
+    // they identify is reported or blocked either way. A descriptor-driven scan
+    // uses the keyspace's own rule instead.
+    find_embedded_dids_with(key, true)
+}
+
+/// As [`find_embedded_dids`], with the keyspace's `/` policy.
+pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<EmbeddedDid> {
     let needle = DID_PREFIX.as_bytes();
     let mut found = Vec::new();
     let mut i = 0usize;
@@ -353,7 +372,7 @@ pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
         // contains, while a spelling followed by `/suffix` still terminates at
         // the spelling. Only if nothing decodes is the whole run reported as
         // one unreadable token — a fact the scan must surface, never skip.
-        let (end, identifier) = resolve_spelling(key, start, limit);
+        let (end, identifier) = resolve_spelling(key, start, limit, slash_ends_did);
 
         let spelling = String::from_utf8_lossy(&key[start..end]).into_owned();
         found.push(EmbeddedDid {
@@ -374,7 +393,12 @@ pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
 ///
 /// When nothing decodes, the full run is returned with `None` so the caller
 /// reports one unreadable token rather than silently dropping the row.
-fn resolve_spelling(key: &[u8], start: usize, limit: usize) -> (usize, Option<[u8; 32]>) {
+fn resolve_spelling(
+    key: &[u8],
+    start: usize,
+    limit: usize,
+    slash_ends_did: bool,
+) -> (usize, Option<[u8; 32]>) {
     let mut end = limit;
     while end > start {
         // Only attempt at a UTF-8 boundary: `Base256Emoji` spellings are
@@ -393,7 +417,7 @@ fn resolve_spelling(key: &[u8], start: usize, limit: usize) -> (usize, Option<[u
                 // identifier and reject it, so calling the prefix readable would
                 // report a principal for a row the real loader cannot read, and
                 // quietly lower the unreadable count that exists to fail closed.
-                if end < limit && key.get(end) != Some(&b'/') {
+                if end < limit && !(slash_ends_did && key.get(end) == Some(&b'/')) {
                     return (limit, None);
                 }
                 return (end, Some(bytes));
@@ -437,7 +461,7 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
     let rows_scanned = rows.len();
 
     for (scan_ordinal, (key, value_len)) in rows.into_iter().enumerate() {
-        let embedded = find_embedded_dids(&key);
+        let embedded = find_embedded_dids_with(&key, descriptor.slash_ends_did);
 
         if embedded.is_empty() {
             rows_without_did += 1;
@@ -856,6 +880,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[1, 37],
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Replay floor. A lower survivor weakens the guard, so the merge keeps the \
                         maximum, which can only reject more than any single row did.",
         },
@@ -865,6 +890,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[2, 37],
             disposition: MergeDisposition::Union,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Finalized-sequence set. Dropping a spelling's rows would re-open replay \
                         for the sequences it recorded, so the merge is a union.",
         },
@@ -874,6 +900,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[3, 37],
             disposition: MergeDisposition::FailClosed,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Two rows can assert different regimes for one sender, which is a \
                         contradiction no domain rule resolves. The live loader already declines \
                         to collapse these (#2644); a migration must not decide it either.",
@@ -884,6 +911,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[4],
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "Outgoing sequence high-water for a (sender, recipient) pair. A lower \
                         survivor is a nonce regression, so the merge keeps the maximum.",
         },
@@ -893,6 +921,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[9, 39, 40],
             disposition: MergeDisposition::Sum,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "Accumulated balances. Overwriting drops a spelling's recorded position \
                         entirely, so the merge sums rather than elects a survivor.",
         },
@@ -902,6 +931,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[69],
             disposition: MergeDisposition::Sum,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "Accumulated cleared volume per (account, currency). Currency stays in the \
                         canonical shape, so only same-currency rows merge, and they sum.",
         },
@@ -911,6 +941,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[42, 68],
             disposition: MergeDisposition::Union,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "Freeze records. Unfreeze deletes one spelling only, so electing a \
                         survivor can fail open; the merge is a union of the freezes.",
         },
@@ -920,6 +951,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[30],
             disposition: MergeDisposition::Union,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "Trust edges keyed by (source, target). A dropped spelling takes its edges \
                         with it, so the merge unions the edge sets.",
         },
@@ -929,6 +961,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[39, 40],
             disposition: MergeDisposition::Equivalent,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
         },
@@ -938,6 +971,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
                         survivor accepts stale attestations, so the merge keeps the maximum, \
                         matching the established replay_max_seq precedent.",
@@ -948,6 +982,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::AwaitingDomainSignOff,
+            slash_ends_did: false,
             rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
                         a sequence number already used, which the uniqueness invariant forbids, \
                         so the merge keeps the maximum.",
@@ -958,6 +993,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[36],
             disposition: MergeDisposition::FailClosed,
             basis: RuleBasis::Established,
+            slash_ends_did: false,
             rationale: "Cooperative membership. Merging two rows decides who is a member of an \
                         institution, which is an institutional judgement no identity-layer rule \
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
@@ -1000,6 +1036,7 @@ mod tests {
             inventory_rows: &[0],
             disposition,
             basis,
+            slash_ends_did: false,
             rationale: "test fixture",
         }
     }
@@ -1745,6 +1782,35 @@ mod tests {
     }
 
     #[test]
+    fn a_registered_keyspace_rejects_a_slash_suffix_it_does_not_use() {
+        // `replay_max_seq:<did>/junk`: the keyspace's own parser consumes the
+        // whole suffix as the identifier and rejects it, so the scanner must
+        // not report a readable principal with `/junk` as residual bytes. No
+        // registered keyspace puts `/` after a DID, so none permits this.
+        let one = spell(&principal(141), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("test:{one}/junk"), b"v")]);
+
+        let report = scan_keyspace(&store, &descriptor(MergeDisposition::Sum)).unwrap();
+        assert_eq!(report.rows_unreadable, 1, "the row is uninterpretable");
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed(), "and it must block");
+    }
+
+    #[test]
+    fn no_registered_keyspace_claims_a_slash_terminated_did() {
+        // Pins the registry: if a future keyspace does put `/` after a DID it
+        // must say so deliberately, rather than inheriting a permissive default
+        // that would make `<did>/junk` look readable.
+        for d in n2a_keyspaces() {
+            assert!(
+                !d.slash_ends_did,
+                "{} claims `/` ends a DID; confirm its parser really does",
+                d.name
+            );
+        }
+    }
+
+    #[test]
     fn a_slash_remainder_is_still_attributed_to_key_structure() {
         // The one remainder that is explainable: `/` is the only separator a
         // live keyspace uses that is also a multibase body character. This must
@@ -1753,10 +1819,18 @@ mod tests {
         let one = spell(&principal(123), multibase::Base::Base58Btc);
         let key = format!("ns/{one}/role").into_bytes();
 
+        // The descriptor-free reader is permissive, because a caller with no
+        // descriptor cannot know the layout — and such rows block as uncovered
+        // regardless.
         let found = find_embedded_dids(&key);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].spelling, one);
         assert_eq!(found[0].identifier, Some(principal(123)));
+
+        // Under a keyspace that does not use `/` after a DID, the same key is
+        // uninterpretable rather than readable.
+        let strict = find_embedded_dids_with(&key, false);
+        assert!(strict[0].identifier.is_none());
     }
 
     #[test]
