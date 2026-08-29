@@ -197,6 +197,22 @@ impl Value {
 }
 
 // Implement Hash for Value to use in Sets
+//
+// One rule governs the DID-bearing arms below: a `Value` hashes by the
+// *principal* a DID names, never by the spelling that named it.
+//
+// `did:icn:` identifiers are multibase, so one 32-byte identifier has more than
+// one accepted textual encoding. `Did` equality is still spelling-sensitive
+// today; N2-A (#2627) intends to make it principal-sensitive (I7,
+// `docs/architecture/IDENTITY_SEMANTICS.md` §11). Rust requires only
+// `a == b => hash(a) == hash(b)`, never the converse, so a hash may be coarser
+// than equality. Hashing by principal therefore satisfies both regimes: today
+// two spellings merely collide, which `HashSet` resolves by comparing; after I7
+// they are equal and must hash equally, which they already will.
+//
+// This is a keying rule only. It does not canonicalize a `Value`, change how
+// one displays or serializes, or touch `Did` equality — `Value`'s derived
+// `PartialEq` still follows `Did`, unchanged.
 impl std::hash::Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -214,8 +230,26 @@ impl std::hash::Hash for Value {
             }
             Value::Did(did) => {
                 3u8.hash(state);
-                // Hash the DID's string representation
-                format!("{did:?}").hash(state);
+                match did.identifier_bytes() {
+                    // The identifier the spelling decodes to, read by exactly
+                    // the rule `icn-identity` owns. CCL does not parse DIDs.
+                    Ok(identifier) => {
+                        0u8.hash(state);
+                        identifier.hash(state);
+                    }
+                    // A DID that names no ICN principal cannot be keyed by one.
+                    // Every public constructor yields a decodable 32-byte
+                    // identifier — `from_anchor_id` skips parsing but still
+                    // encodes 32 bytes — so this is defensive. Falling back to
+                    // the spelling keeps the contract either way: equality
+                    // between two DIDs that decode to nothing can only ever be
+                    // spelling equality. The discriminant keeps that population
+                    // from colliding with decoded identifiers.
+                    Err(_) => {
+                        1u8.hash(state);
+                        did.as_str().hash(state);
+                    }
+                }
             }
             Value::List(list) => {
                 4u8.hash(state);
@@ -225,11 +259,39 @@ impl std::hash::Hash for Value {
             }
             Value::Set(set) => {
                 5u8.hash(state);
-                let mut items: Vec<_> = set.iter().collect();
-                items.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
-                for item in items {
-                    item.hash(state);
+                // A set has no order, so one has to be imposed to hash its
+                // members in sequence — and the previous key, `format!("{a:?}")`,
+                // put DID spelling back into the aggregate that the arm above
+                // just took it out of. Two sets naming the same principals could
+                // sort differently and hash differently while being equal.
+                //
+                // Combine per-member hashes commutatively instead, so no order
+                // is imposed at all. Addition over a set of distinct members is
+                // the standard multiset digest; `len` separates sets that happen
+                // to share a sum. `DefaultHasher` is fixed-seed, which is what
+                // makes members comparable to each other.
+                //
+                // What this does NOT mean is that the hash is invisible. No
+                // `Hash` output is persisted or transmitted, but `HashSet`
+                // *iteration order* is a function of it, `interpreter.rs` reads
+                // that order, `icn-compute`'s executor serializes the resulting
+                // value, and `result_quorum.rs` blake3-hashes those bytes for
+                // multi-executor agreement. So set iteration order does reach a
+                // consensus-compared payload. That order was already
+                // `RandomState`-seeded and already varied per process before
+                // this rule existed: changing the hash changes *which*
+                // nondeterministic order results, not whether one is
+                // deterministic. The underlying determinism hazard is
+                // pre-existing and tracked separately (#2682); do not read this
+                // arm as having made set iteration canonical.
+                let mut combined = 0u64;
+                for item in set {
+                    let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
+                    item.hash(&mut item_hasher);
+                    combined = combined.wrapping_add(std::hash::Hasher::finish(&item_hasher));
                 }
+                set.len().hash(state);
+                combined.hash(state);
             }
             Value::Map(map) => {
                 6u8.hash(state);
