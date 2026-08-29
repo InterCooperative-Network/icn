@@ -500,8 +500,29 @@ fn json_document(path: &Path, outcome: &ScanOutcome) -> serde_json::Value {
         .map(|(shape, n)| serde_json::json!({ "shape": shape, "rows": n }))
         .collect();
 
+    // `display()` is lossy, so two distinct non-UTF-8 paths — both legal on
+    // unix, and both scannable since argv is parsed as `OsString` — would
+    // serialize to the same string and a multi-store report could not say which
+    // verdict belonged to which source. The lossy rendering stays because it is
+    // what a human reads; when it is not faithful, the raw bytes travel beside
+    // it so a consumer can still tell the two apart.
+    let lossy = path.display().to_string();
+    let exact_bytes: Option<Vec<u8>> = {
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt as _;
+            let raw = path.as_os_str().as_bytes();
+            (path.to_str().is_none()).then(|| raw.to_vec())
+        }
+        #[cfg(not(unix))]
+        {
+            None
+        }
+    };
+
     serde_json::json!({
-        "store": path.display().to_string(),
+        "store": lossy,
+        "store_path_bytes": exact_bytes,
         "clear": outcome.is_clear(),
         "store_total_rows": outcome.audit.overview.total_rows,
         "store_rows_with_did": outcome.audit.overview.rows_with_embedded_did,

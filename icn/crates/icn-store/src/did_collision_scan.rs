@@ -151,7 +151,16 @@ pub struct KeyspaceDescriptor {
 pub struct EmbeddedDid {
     /// Byte offset of the spelling within the raw key.
     pub offset: usize,
-    /// The spelling exactly as stored.
+    /// Byte offset one past the spelling within the raw key.
+    ///
+    /// Carried explicitly rather than derived as `offset + spelling.len()`,
+    /// because `spelling` is lossy: a key holding invalid UTF-8 after
+    /// `did:icn:` expands each bad byte into a three-byte replacement
+    /// character, so the rendered length is not the length consumed from the
+    /// key. Slicing with it walked off the end and panicked — turning an
+    /// untrusted malformed row into a crashed gate rather than a blocked one.
+    pub end: usize,
+    /// The spelling exactly as stored, lossily rendered for display.
     pub spelling: String,
     /// The identifier bytes it decodes to, or `None` when it does not decode.
     pub identifier: Option<[u8; 32]>,
@@ -349,6 +358,7 @@ pub fn find_embedded_dids(key: &[u8]) -> Vec<EmbeddedDid> {
         let spelling = String::from_utf8_lossy(&key[start..end]).into_owned();
         found.push(EmbeddedDid {
             offset: start,
+            end,
             spelling,
             identifier,
         });
@@ -460,7 +470,7 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
         for (did, bytes) in embedded.iter().zip(&identifiers) {
             shape.extend_from_slice(&key[cursor..did.offset]);
             shape.extend_from_slice(bytes);
-            cursor = did.offset + did.spelling.len();
+            cursor = did.end;
             spellings.push(did.spelling.clone());
         }
         shape.extend_from_slice(&key[cursor..]);
@@ -695,7 +705,7 @@ fn mask_key(key: &[u8], embedded: &[EmbeddedDid]) -> String {
     for did in embedded {
         push_printable(&mut out, &key[cursor..did.offset]);
         out.push_str("<did>");
-        cursor = did.offset + did.spelling.len();
+        cursor = did.end;
     }
     push_printable(&mut out, &key[cursor..]);
 
@@ -1747,6 +1757,47 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].spelling, one);
         assert_eq!(found[0].identifier, Some(principal(123)));
+    }
+
+    #[test]
+    fn a_non_utf8_key_is_reported_as_blocking_not_a_panic() {
+        // A sled key is arbitrary bytes. One holding invalid UTF-8 after
+        // `did:icn:` used to expand into replacement characters whose rendered
+        // length exceeded the bytes consumed, so masking it sliced past the end
+        // of the key and crashed the process — the one outcome a gate must not
+        // have on untrusted input, because a caller sees a non-zero exit without
+        // knowing whether anything was scanned.
+        let key = b"stray:did:icn:\xff".to_vec();
+
+        let embedded = find_embedded_dids(&key);
+        assert_eq!(embedded.len(), 1);
+        assert!(
+            embedded[0].identifier.is_none(),
+            "it decodes to no principal"
+        );
+
+        // Must not panic, and must render something a reviewer can act on.
+        let shape = mask_key(&key, &embedded);
+        assert!(shape.starts_with("stray:"), "shape was {shape:?}");
+
+        // And it must reach a store scan as an unreadable row, which blocks.
+        let store = SledStore::temporary().unwrap();
+        store.put(b"test:did:icn:\xff", b"v").unwrap();
+        let report = scan_keyspace(&store, &descriptor(MergeDisposition::Sum)).unwrap();
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn masking_is_offset_correct_for_multi_byte_spellings() {
+        // `Base256Emoji` spellings are multi-byte, so a masker that confused
+        // rendered length with consumed bytes would also mis-slice here.
+        let bytes = principal(131);
+        let emoji = spell(&bytes, multibase::Base::Base256Emoji);
+        let key = format!("ns/{emoji}/tail").into_bytes();
+
+        let embedded = find_embedded_dids(&key);
+        assert_eq!(mask_key(&key, &embedded), "ns/<did>/tail");
     }
 
     #[test]

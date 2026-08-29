@@ -184,6 +184,46 @@ fn a_symlinked_store_artifact_is_refused_not_skipped() {
     assert!(err.contains("symlink"), "the error must say why: {err}");
 }
 
+/// Two distinct non-UTF-8 paths must stay distinguishable in one report.
+///
+/// `Path::display()` is lossy, so both would render to the same replacement
+/// characters and a consumer could not tell which verdict belonged to which
+/// source. The raw bytes travel beside the lossy rendering when it is not
+/// faithful.
+#[test]
+fn non_utf8_store_paths_remain_distinguishable_in_json() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt as _;
+
+    let base = tempfile::tempdir().expect("tempdir");
+    let mut dirs = Vec::new();
+    for raw in [b"bad\xff\x01".to_vec(), b"bad\xff\x02".to_vec()] {
+        let dir = base.path().join(OsString::from_vec(raw));
+        std::fs::create_dir_all(&dir).expect("create");
+        make_store(&dir);
+        dirs.push(dir);
+    }
+
+    let out = Command::new(env!("CARGO_BIN_EXE_did-collision-scan"))
+        .args(&dirs)
+        .arg("--json")
+        .output()
+        .expect("run");
+
+    let stdout = String::from_utf8(out.stdout).expect("utf-8");
+    let doc: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+    let stores = doc["stores"].as_array().expect("stores array");
+    assert_eq!(stores.len(), 2);
+
+    let a = &stores[0]["store_path_bytes"];
+    let b = &stores[1]["store_path_bytes"];
+    assert!(
+        a.is_array() && b.is_array(),
+        "raw bytes present for lossy paths"
+    );
+    assert_ne!(a, b, "the two sources must remain distinguishable");
+}
+
 #[test]
 fn json_verdict_agrees_with_the_process_exit_status() {
     // The human text, the JSON verdict and the exit code are three renderings
