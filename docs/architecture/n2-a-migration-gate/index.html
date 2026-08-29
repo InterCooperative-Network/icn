@@ -1,0 +1,1097 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design surface for the N2-A tranche (#2627), which would make Did equality and hashing key equality rather than string equality (IDENTITY_SEMANTICS I7). Records the reproducible read-only collision scanner added in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, 17 fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the 63 principal-bearing rows deliberately left outside N2-A scope, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, re-verified partner-invariant designs for PeerId ordering, the CCL Value::Did Hash/Eq contract and the split String/Did peer maps, the nine-axis site taxonomy carried in from #2641, and the ordered migration sequence. DESIGN AND EVIDENCE ONLY: changes no Did semantics, migrates nothing, and does not discharge the separate section 7.5 membership/vote gate. States the tranche gate as IMPLEMENTATION STILL BLOCKED pending collision scans against live deployment data."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A — migration gate: collision scan, dispositions and partner invariants (#2627) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BSTokPqO.css">
+<style>.doc-banner[data-astro-cid-w3hnbhco]{margin-top:0;margin-bottom:var(--space-xl)}.doc-banner-meta[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);margin:var(--space-md) 0}.doc-banner-meta[data-astro-cid-w3hnbhco] dt[data-astro-cid-w3hnbhco]{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}.doc-banner-meta[data-astro-cid-w3hnbhco] dd[data-astro-cid-w3hnbhco]{font-size:var(--text-sm);color:var(--text-secondary);overflow-wrap:anywhere}.doc-banner-actions[data-astro-cid-w3hnbhco]{margin-bottom:0}.doc-status[data-astro-cid-w3hnbhco]{display:flex;flex-wrap:wrap;gap:var(--space-lg);padding-bottom:var(--space-md);margin-bottom:var(--space-xl);border-bottom:1px solid var(--border-subtle)}.doc-status-item[data-astro-cid-w3hnbhco]{display:flex;gap:var(--space-xs);align-items:baseline;min-width:0;font-size:var(--text-xs);font-family:var(--font-mono)}.doc-status-key[data-astro-cid-w3hnbhco]{color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.doc-status-value[data-astro-cid-w3hnbhco]{color:var(--text-secondary)}.docs-page[data-astro-cid-uadgga6g]{padding-top:calc(64px + var(--space-2xl))}.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:var(--text-xs);margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle);display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;justify-content:space-between}.source-link[data-astro-cid-uadgga6g]{font-size:var(--text-xs);color:var(--text-muted);font-family:var(--font-mono);min-height:var(--target-min);display:inline-flex;align-items:center}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li> <a href="/what-is-icn">What is ICN</a> </li><li> <a href="/how-it-works">How it works</a> </li><li> <a href="/see-it-work">See it work</a> </li><li> <a href="/whats-real-now">What&#39;s real now</a> </li><li> <a href="/get-involved">Get involved</a> </li><li> <a href="/docs" class="active" aria-current="page">Docs</a> </li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>n2 a migration gate</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-29</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n2-a--migration-gate-collision-scan-dispositions-and-partner-invariants-2627">N2-A — migration gate: collision scan, dispositions and partner invariants (#2627)</h1>
+<p><strong>Status:</strong> living — design and evidence record for the N2-A tranche
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — <code>docs/architecture/IDENTITY_SEMANTICS.md</code> owns the semantic contract and
+<code>docs/architecture/n2-a0-stored-key-inventory.md</code> owns the measured stored-key surface; this
+document owns only N2-A&#39;s <em>dispositions and design</em>
+<strong>Last reviewed:</strong> 2026-08-29
+<strong>Source basis:</strong> live <code>main</code> at <code>836825632ebb5b7b9d8d16354974503a7c576569</code>
+<strong>Gates:</strong> N2-A / #2627 (<code>Did</code> canonicalization, I7)
+<strong>Contract:</strong> IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (<code>N2-A</code>)</p>
+<hr>
+<p><strong>Tranche gate: IMPLEMENTATION STILL BLOCKED.</strong> <code>Did</code> <code>Eq</code>/<code>Hash</code> is unchanged and must stay
+unchanged until the gate below clears.</p>
+<p>This document is the design surface for N2-A. It does not change <code>Did</code>, migrate any store, or
+discharge the §7.5 membership/vote gate. It records what was measured, what was decided, and
+what is still missing — deliberately in separate sections, so a decision is never mistaken for
+evidence.</p>
+<p>Companion documents:</p>
+<ul>
+<li><code>docs/architecture/IDENTITY_SEMANTICS.md</code> — §11 I7, §14 DAG node N2-A. Owns the contract.</li>
+<li><code>docs/architecture/n2-a0-stored-key-inventory.md</code> — the N2-A0 inventory (#2623). Owns the
+keyspace list this document dispositions.</li>
+</ul>
+<hr>
+<h2 id="1-baseline">1. Baseline</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Merged <code>main</code> at entry</td>
+<td><code>836825632ebb5b7b9d8d16354974503a7c576569</code></td>
+</tr>
+<tr>
+<td>Inventory measured at</td>
+<td><code>798c8d54</code></td>
+</tr>
+<tr>
+<td><code>Did</code> <code>Eq</code>/<code>Hash</code></td>
+<td><strong>unchanged</strong> — still derived over the inner <code>String</code> (<code>icn/crates/icn-identity/src/lib.rs</code>)</td>
+</tr>
+<tr>
+<td>Governance #2641 / PR #2677</td>
+<td>merged; runtime vote interpretation is principal-safe, no persisted byte moved</td>
+</tr>
+</tbody></table>
+<h3 id="11-drift-from-the-prior-evidence-pass">1.1 Drift from the prior evidence pass</h3>
+<p>The prior pass listed inventory row #1 (<code>icn-net</code> replay state) as <em>&quot;migrate in tranche, merge
+rule = max floor&quot;</em>. That is now <strong>partly discharged in-tree</strong> and the row&#39;s hazard has changed
+shape rather than disappearing.</p>
+<p>PRs #2644, #2647 and #2649 re-keyed <code>icn-net</code> replay protection onto a <code>SenderPrincipal</code>
+(<code>icn/crates/icn-net/src/replay_guard.rs</code>), and the load path already:</p>
+<ul>
+<li>folds several spelling-distinct rows for one sender into one window, taking the <strong>maximum</strong>
+floor, so a lower floor cannot win;</li>
+<li><strong>declines to collapse</strong> rows whose readable interpretations disagree, preserving each
+interpretation for the load pass rather than electing a survivor;</li>
+<li>rewrites survivors onto a canonical key only where a single interpretation is established.</li>
+</ul>
+<p>Two consequences for N2-A:</p>
+<ol>
+<li>Rows #1–#3 no longer need N2-A to invent a merge rule — the live loader already implements
+one, and its <code>replay_sender_regime</code> behaviour is <em>fail closed</em>, matching §12.1 item 7.</li>
+<li><code>SenderPrincipal</code> keys on <code>VerifyingKey</code>, <strong>not</strong> on decoded identifier bytes. Roughly half of
+anchor-derived DIDs do not decompress to an Edwards point (inventory §2.3), so a DID that
+<code>Did::identifier_bytes</code> resolves may be one <code>SenderPrincipal</code> rejects. The two principal
+notions are therefore not interchangeable, and N2-A must not assume replay-guard coverage
+extends to anchor-derived principals.</li>
+</ol>
+<p>Row #2 (<code>icn-net</code> outgoing sequence tracker) is <strong>unchanged</strong>: its key is still built from
+<code>sender.as_str()</code> / <code>recipient.as_str()</code> (<code>icn/crates/icn-net/src/sequence_tracker.rs</code>).</p>
+<p>No other merged PR since <code>83682563</code> touched an N2-A migration surface.</p>
+<hr>
+<h2 id="2-the-collision-scanner-evidence-tool">2. The collision scanner (evidence tool)</h2>
+<h3 id="21-what-it-is">2.1 What it is</h3>
+<p><code>icn/crates/icn-store/src/did_collision_scan.rs</code> — a reusable, read-only scan engine, plus a
+runner binary <code>icn/crates/icn-store/src/bin/did-collision-scan.rs</code>.</p>
+<p>It is not a one-off script and it is not a migration. It answers one question per keyspace:
+<em>do two stored rows name one principal, and what happens when they merge?</em></p>
+<h3 id="22-design-properties-and-why-each-is-load-bearing">2.2 Design properties, and why each is load-bearing</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Mechanism</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decode-faithful</td>
+<td>Groups by <code>icn_identity::identifier_bytes_of_spelling</code>, the function <code>Did::identifier_bytes</code> itself delegates to</td>
+<td>A scan that grouped by a <em>reimplementation</em> of the decode would prove nothing about the equality it gates</td>
+</tr>
+<tr>
+<td>Read-only</td>
+<td>Copies the store directory to scratch and opens the <strong>copy</strong>; the source is never opened</td>
+<td><code>sled::open</code> takes an exclusive lock and runs recovery <em>writes</em> on an unclean directory. A tool that opened a live store directly would violate its own guarantee</td>
+</tr>
+<tr>
+<td>Payload-free</td>
+<td>Values are reduced to their length at the scan boundary; principals appear as an 8-hex-character fingerprint</td>
+<td>The report is an operational artifact that will be pasted into issues</td>
+</tr>
+<tr>
+<td>Layout-independent</td>
+<td>DID spellings are located by scanning for the <code>did:icn:</code> scheme, not by parsing each keyspace&#39;s separators</td>
+<td>A keyspace that changes its separator cannot silently fall out of scan coverage</td>
+</tr>
+<tr>
+<td>Falsifiable</td>
+<td>Always reports total store rows, namespace counts, and per-tree row counts alongside the per-keyspace zeros</td>
+<td>&quot;0 rows&quot; from a broken scanner and &quot;0 rows&quot; from an empty store are otherwise indistinguishable</td>
+</tr>
+<tr>
+<td>Gate-shaped</td>
+<td>Exit status <code>0</code> only when every principal-bearing row is accounted for <strong>and</strong> every keyspace accounting for one is automatable</td>
+<td>Makes the tool usable as the migration gate, not merely as a report. The verdict lives in <code>CoverageAudit::is_clear</code>, and the runner renders it rather than recomputing it, so exit status and report cannot disagree</td>
+</tr>
+</tbody></table>
+<h3 id="23-the-three-state-accounting--and-why-there-is-no-fourth">2.3 The three-state accounting — and why there is no fourth</h3>
+<p>Every principal-bearing row in a scanned store is in exactly one of three
+states, and the verdict follows from that partition:</p>
+<ol>
+<li><strong>Covered</strong> — a registered keyspace interpreted it, so the collision result
+speaks for it.</li>
+<li><strong>Deferred</strong> — a <em>named gate</em> owns it: <code>n2a_deferred_namespaces</code> records the
+governance vote keyspace (§7.5) and the security namespace (dedicated
+workflow). Deferred is neither scanned nor cleared; it is a reviewed
+exclusion, reported separately and never folded into the scanned counts.</li>
+<li><strong>Uncovered</strong> — nothing accounted for it, which <strong>blocks</strong>.</li>
+</ol>
+<p>State 3 is the point. A keyspace added after this tool was written, or simply
+left out of the registry, is indistinguishable from a clean store unless
+unaccounted rows block — and that has already happened once: §5 rows #71 and #36
+were live and unregistered (§3.4). Without the deferral registry the only safe
+verdict on any uncovered row would be &quot;blocked&quot;, which would make the gate
+unusable; with it, an accidental omission still blocks while a reviewed
+exclusion does not.</p>
+<p>A deferred namespace is <strong>never inspected</strong>. Only its existence, its owning
+gate, and its principal-bearing row count are recorded.</p>
+<h3 id="24-a-plausible-merge-rule-is-not-an-authorized-one">2.4 A plausible merge rule is not an authorized one</h3>
+<p>The disposition table below distinguishes rules that are <em>established</em> from
+rules this document merely <em>asserts</em>. That distinction is now encoded, not just
+written down: <code>KeyspaceDescriptor::basis</code> carries <code>RuleBasis::Established</code> or
+<code>RuleBasis::AwaitingDomainSignOff</code>, and a collision under an unsigned-off rule is
+<strong>not automatable</strong> regardless of its disposition.</p>
+<p>This closes a real contradiction found in review. §4 row 5 said summing ledger
+balances still needed economics sign-off, while the code marked that keyspace
+<code>Sum</code> — so a generic storage crate would have authorized a merge of monetary
+state on nothing but its own say-so. Six keyspaces are currently
+<code>AwaitingDomainSignOff</code>: <code>icn-ledger/{balance,cleared_volume,frozen}</code>,
+<code>icn-net/outgoing_seq</code>, <code>icn-trust/edges</code>, <code>trust-app/sequences_issuer</code>. A test
+pins that list against this document so the two cannot drift.</p>
+<p>The basis only bites when there is something to merge; a keyspace with no
+collisions stays automatable whatever its basis.</p>
+<h3 id="25-what-a-clear-verdict-is-conditional-on">2.5 What a CLEAR verdict is conditional on</h3>
+<p>A recursive file copy of a <strong>live</strong> store is not a point-in-time snapshot. Writes
+can land between one file being copied and the next, so sled may recover the copy
+successfully while omitting a row that existed in the source — including an
+aliasing row. A CLEAR verdict therefore describes a state the source may never
+have held at any single instant.</p>
+<p>This is a limit of the evidence, not a defect to code around: quiescing a store
+means stopping a workload, which this tranche must not do. It is printed with
+every report and carried in the JSON. For a verdict that is binding rather than
+indicative, scan a quiesced store or a coherent volume snapshot with writes held
+until the flip — and note that this is a further reason the fail-closed check
+belongs <em>inside</em> the key-equality binary (§3.5).</p>
+<h3 id="26-fail-closed-reads">2.6 Fail-closed reads</h3>
+<p>Two paths could previously turn missing evidence into apparent absence, and both
+now propagate:</p>
+<ul>
+<li><strong>Tree iteration.</strong> <code>tree_row_counts</code> and <code>did_bearing_rows_per_tree</code>
+propagate a sled iterator error instead of discarding the unreadable item. The
+case that matters: if the unreadable key were the only principal-bearing row
+in a named tree, discarding it would drop the count to zero and pass a store
+that was never finished. Corruption and an incomplete copy are evidence, not
+absence.</li>
+<li><strong>Spelling extraction.</strong> The tokenizer takes the longest candidate run, then
+shortens it from the right until it decodes to a 32-byte identifier. The
+alphabet must include <code>+</code> and <code>/</code> — the production parser accepts all 23
+<code>multibase::Base</code> encodings and <code>Base64</code> spellings contain both — but <code>/</code> is
+also a live key separator (<code>trust/edges/&lt;did&gt;</code>), so the alphabet alone cannot
+say where a spelling ends. Deciding by decoding rather than by alphabet
+captures a base64 spelling whole <em>and</em> still terminates <code>&lt;did&gt;/suffix</code> at the
+spelling. Nothing that fails to decode is silently dropped: the whole run is
+reported as one unreadable token, which itself blocks.</li>
+</ul>
+<h3 id="27-grouping-rule">2.7 Grouping rule</h3>
+<p>Rows are grouped by their <strong>principal-canonical shape</strong>: the raw key with every embedded
+<code>did:icn:</code> spelling replaced by the 32 identifier bytes it decodes to. Non-DID key material stays
+in the shape, so:</p>
+<ul>
+<li><code>ledger:cleared_volume:&lt;did&gt;:USD</code> and <code>…:EUR</code> stay apart, while two spellings of that account
+under <code>USD</code> come together;</li>
+<li>tuple keys such as <code>outgoing_seq:&lt;sender&gt;||&lt;recipient&gt;</code> collide only when <strong>both</strong> ends resolve
+to the same pair, and the per-position representation counts say which end was re-spelled.</li>
+</ul>
+<p>Rows within a group are reported in <code>Store::scan</code> order — lexicographic by key bytes — because
+that order decides the survivor of every last-writer rebuild. <code>Base256Emoji</code> spellings are
+non-ASCII and therefore sort after every ASCII spelling, so <strong>the survivor is
+attacker-selectable</strong>. The scan surfaces the survivor explicitly rather than leaving it implicit.</p>
+<h3 id="28-coverage-limit-found-while-building-it">2.8 Coverage limit found while building it</h3>
+<p><code>Store::scan</code> reads only sled&#39;s <strong>default tree</strong>. <code>icn-gateway</code>&#39;s service discovery uses a
+<em>named</em> tree, which a <code>Store</code>-trait scan can never reach. A scan reporting zeros on such a store
+would be a false negative.</p>
+<p>The runner therefore also reports per-tree row counts and per-tree DID-bearing row counts
+(<code>SledStore::tree_row_counts</code>, <code>SledStore::did_bearing_rows_per_tree</code>), and <strong>treats
+principal-keyed rows in a named tree as blocking</strong>, not as a clean result.</p>
+<h3 id="29-fixture-tests">2.9 Fixture tests</h3>
+<p>17 tests in <code>did_collision_scan::tests</code>, run against a real <code>SledStore</code> rather than a hand-rolled
+double — the ordering claim is a claim about the actual backend, and a simulated store would only
+restate the test&#39;s own sort. They cover: no-collision data; two representations of one principal;
+several representations; malformed/unreadable keys; a group with a known merge rule; a group with
+no authorized merge rule; residual key fields; tuple keys; scan-order survivor; the non-ASCII
+survivor case; read-only-ness; payload absence; and registry scope.</p>
+<p><strong>Discrimination evidence.</strong> Mutating the grouping to today&#39;s spelling-keyed behaviour (group by
+raw key instead of canonical shape) fails <strong>9 of 15</strong> collision tests and leaves green exactly the
+6 that should not depend on grouping. The suite therefore discriminates rather than passing
+vacuously.</p>
+<h3 id="210-how-to-run-it">2.10 How to run it</h3>
+<pre><code class="language-bash">cd icn &amp;&amp; cargo build -p icn-store --bin did-collision-scan
+./target/debug/did-collision-scan &lt;sled-db-path&gt; [&lt;sled-db-path&gt; ...] [--json]
+</code></pre>
+<p>Each path must be a <strong>sled database root</strong>, not a directory above one. A
+deployment keeps one database per domain, so <code>/data</code> is the wrong level and
+<code>/data/store/ledger</code> is the right one. The tool refuses a wrong-level path and
+names the databases beneath it, because <code>sled::open</code> on a non-database directory
+<em>creates</em> one — which would otherwise mean zero rows and a false CLEAR.</p>
+<p>Against a Kubernetes deployment, extract the volume first — the tool must be given a directory it
+can copy:</p>
+<pre><code class="language-bash">kubectl cp &lt;namespace&gt;/&lt;pod&gt;:/data ./deployment-data
+# one database per domain — scan each, not the parent
+find ./deployment-data -name conf -printf &#39;%h\n&#39; | xargs ./target/debug/did-collision-scan
+</code></pre>
+<p>Exit status: <code>0</code> clear, <code>1</code> at least one keyspace must fail closed, <code>2</code> tool error.</p>
+<hr>
+<h2 id="3-scan-coverage-actually-achieved-evidence">3. Scan coverage actually achieved (evidence)</h2>
+<p><strong>This section records only what was measured.</strong></p>
+<h3 id="31-deployments-scanned">3.1 Deployments scanned</h3>
+<p>Extracted read-only with <code>kubectl cp</code> from the running pod and scanned from the copy; the live
+volumes were never opened. Extraction date 2026-08-29.</p>
+<table>
+<thead>
+<tr>
+<th>Deployment</th>
+<th>Extracted</th>
+<th>sled DBs scanned</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-coop-beta</code></td>
+<td>yes</td>
+<td>32</td>
+<td>scanned</td>
+</tr>
+<tr>
+<td><code>icn-coop-gamma</code></td>
+<td>yes</td>
+<td>31</td>
+<td>scanned</td>
+</tr>
+<tr>
+<td><code>icn-coop-delta</code></td>
+<td>yes</td>
+<td>31</td>
+<td>scanned</td>
+</tr>
+<tr>
+<td><code>icn-coop-alpha</code></td>
+<td><strong>no</strong></td>
+<td>—</td>
+<td>container <code>CrashLoopBackOff</code>, not attachable</td>
+</tr>
+<tr>
+<td><code>icn</code> / <code>icn-daemon</code></td>
+<td><strong>no</strong></td>
+<td>—</td>
+<td>container <code>CrashLoopBackOff</code>, not attachable</td>
+</tr>
+</tbody></table>
+<p>94 sled databases scanned in total. Workloads were <strong>not</strong> restarted to obtain evidence.</p>
+<p>A store topology finding worth recording: a deployment does not keep one shared store. It keeps
+<strong>one sled database per domain</strong> under <code>/data/store/</code> (<code>ledger</code>, <code>network</code>, <code>trust</code>, <code>governance</code>,
+<code>security</code>, <code>cooperative</code>, <code>gossip</code>, …) plus <code>gateway_store</code>, <code>commons.sled</code>, <code>federation_store</code>,
+<code>identity_store</code>, and <code>state.snapshot*</code> files. Encrypted keystore material (<code>identity.age*</code>) is
+present and was <strong>not</strong> read.</p>
+<h3 id="32-aggregate-result">3.2 Aggregate result</h3>
+<table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rows matched by registered N2-A keyspaces</td>
+<td><strong>24</strong></td>
+</tr>
+<tr>
+<td><strong>Collision groups</strong></td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>Rows participating in collisions</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Unreadable / malformed DID keys</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Named-tree coverage gaps</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Keyspaces requiring manual disposition</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>Keyspace</th>
+<th>Rows</th>
+<th>Collisions</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-trust/edges</code></td>
+<td>12</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-net/outgoing_seq</code></td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-coop/member</code></td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-net/replay_max_seq</code></td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>icn-net/replay_sender_regime</code></td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>trust-app/sequences_issuer</code></td>
+<td>1</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<p>Every other registered keyspace matched zero rows, and those are <strong>real absences</strong>: each store&#39;s
+total row count and per-tree count were reported alongside, and the raw sled files of the empty
+local stores were independently checked for <code>did:icn:</code> byte occurrences (zero) to distinguish an
+empty store from a failed read.</p>
+<h3 id="33-principal-bearing-rows-behind-a-named-gate--63">3.3 Principal-bearing rows behind a named gate — 63</h3>
+<p>A per-keyspace zero only speaks for the rows that keyspace matched. Reconciling <em>all</em> DID-bearing
+rows against the registry found 63 the registry does not cover. Each is now accounted for by a
+<strong>named gate</strong> (§2.3 state 2) rather than left as an unexplained remainder:</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Rows</th>
+<th>Why out of scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>gov:vote:&lt;uuid&gt;:&lt;did&gt;</code></td>
+<td>32</td>
+<td>inventory row #23 — <strong>§7.5 gate</strong>, not N2-A</td>
+</tr>
+<tr>
+<td><code>security:reputation:&lt;did&gt;</code></td>
+<td>10</td>
+<td>security namespace — deferred to the dedicated security workflow</td>
+</tr>
+<tr>
+<td><code>security:violation:&lt;did&gt;</code></td>
+<td>10</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>security:banned:&lt;did&gt;</code></td>
+<td>7</td>
+<td>as above</td>
+</tr>
+<tr>
+<td><code>security:quarantine:&lt;did&gt;</code></td>
+<td>4</td>
+<td>as above</td>
+</tr>
+</tbody></table>
+<p>The <code>icn-rpc</code> auth-challenge namespace (<code>auth:challenge:&lt;did&gt;</code>, inventory row
+#29) is also a registered deferral. No live challenge existed in the scanned
+deployments — they are TTL-bounded — but without the entry an ordinary challenge
+row would have been classified uncovered and blocked the gate.</p>
+<p>These 63 rows are <strong>deferred, not cleared</strong>. Their existence and their migration dependency are
+recorded; their contents were not inspected.</p>
+<p>Re-running the scan after the deferral registry landed reconciles exactly: <strong>24 covered + 63
+deferred = 87</strong> principal-bearing rows, <strong>0 uncovered</strong>, 0 blocked, across all 94 databases. The
+three-state partition holds on real data, which is the property the verdict depends on.</p>
+<h3 id="34-a-registry-scope-error-the-scan-caught">3.4 A registry scope error the scan caught</h3>
+<p>The first registry was built from the inventory&#39;s §12 <em>Concrete list</em> — the <code>NEEDS MIGRATION</code> rows
+only. Scanning real data found live rows in two keyspaces classified <strong><code>SILENT-MERGE RISK</code></strong> in §5
+and therefore absent from that list:</p>
+<ul>
+<li><code>trust/sequences/issuer/&lt;did&gt;</code> and <code>.../receiver/&lt;did&gt;</code> — inventory row <strong>#71</strong>;</li>
+<li><code>member:&lt;coop&gt;:&lt;did&gt;</code> — inventory row <strong>#36</strong>.</li>
+</ul>
+<p><code>SILENT-MERGE RISK</code> is precisely the class that merges without announcing itself, so scoping the
+scanner to <code>NEEDS MIGRATION</code> alone was wrong. The registry now covers both classes, and the three
+keyspaces are included in the §3.2 figures above.</p>
+<p>This is the concrete value of reporting uncovered principal-bearing rows by masked key shape
+rather than reporting per-keyspace zeros: the gap was found from data, not from re-reading source.</p>
+<h3 id="35-what-this-evidence-does-and-does-not-establish">3.5 What this evidence does and does not establish</h3>
+<p><strong>Does:</strong> no aliased principal rows exist today in any registered N2-A keyspace of the three
+scanned deployments, and no malformed or unreachable principal rows exist there either.</p>
+<p><strong>Does not:</strong></p>
+<ol>
+<li><strong>Two deployments are unscanned</strong> (<code>alpha</code>, <code>icn-daemon</code>).</li>
+<li><strong>The sample is small.</strong> 24 principal-bearing rows across a handful of principals is a pilot
+cluster, not a populated production deployment. Absence of collisions here is weak evidence
+about a large store.</li>
+<li><strong>The result is point-in-time.</strong> Aliasing is attacker-chosen (§2.2) and <code>from</code> is unsigned, so a
+peer can write an alternate-spelled row at any time. A clean scan today does not imply a clean
+store at migration time.</li>
+</ol>
+<p>Consequence for the migration design: the scan must be re-run <strong>immediately before</strong> the flip, and
+the fail-closed check belongs <em>in the binary</em> — a key-equality build should refuse to start against
+a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.</p>
+<h2 id="4-keyspace-dispositions-decisions">4. Keyspace dispositions (decisions)</h2>
+<p>Merge rules are stated per keyspace and encoded in the scanner registry
+(<code>did_collision_scan::n2a_keyspaces</code>), so a scan reports the rule alongside the collision. No rule
+was invented to unblock the tranche: where two rows may encode contradictory state and no domain
+rule authorizes choosing or combining them, the disposition is <strong>fail closed</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Keyspace</th>
+<th>Key encoding</th>
+<th>Collisions observed</th>
+<th>Merge rule</th>
+<th>Rule already established by domain semantics?</th>
+<th>Lossless?</th>
+<th>Alias/dual-read window?</th>
+<th>Order</th>
+<th>Rollback</th>
+<th>Tranche</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>icn-net</code> <code>replay_max_seq:</code></td>
+<td><code>Display</code></td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>max floor</td>
+<td><strong>yes</strong> — implemented in <code>replay_guard</code> (#2644)</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe (no byte moves)</td>
+<td>N2-A</td>
+<td>rule live in-tree</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>icn-net</code> <code>replay_finalized:</code></td>
+<td><code>Display</code></td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>union</td>
+<td>yes (#2644)</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>rule live in-tree</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>icn-net</code> <code>replay_sender_regime:</code></td>
+<td><code>Display</code></td>
+<td><strong>0 in 3 scanned</strong></td>
+<td><strong>fail closed</strong></td>
+<td>yes — loader already declines to collapse</td>
+<td>n/a</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>fail-closed by design</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>icn-net</code> <code>outgoing_seq:</code></td>
+<td><code>as_str</code> ×2</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>max</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs review</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>icn-ledger</code> <code>ledger:balance:</code></td>
+<td>JSON-quoted</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>sum</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs economics sign-off</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>icn-ledger</code> <code>ledger:cleared_volume:</code></td>
+<td><code>Display</code> + currency</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>sum</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs economics sign-off</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>icn-ledger</code> <code>ledger:frozen:</code></td>
+<td><code>Display</code></td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>union</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs review</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>icn-trust</code> <code>trust/edges/</code></td>
+<td><code>as_str</code> ×2</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>union</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs review</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>icn-ledger</code> <code>ledger:journal:</code></td>
+<td>content hash</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>equivalent</td>
+<td>yes — key carries no spelling</td>
+<td>yes</td>
+<td>no</td>
+<td>—</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>scanned to confirm</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>icn-security</code> misbehavior</td>
+<td><code>Display</code></td>
+<td><strong>not inspected</strong></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><strong>security workflow</strong></td>
+<td>deferred; migration dependency preserved</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>icn-rpc</code> auth challenges</td>
+<td><code>Display</code></td>
+<td><strong>not inspected</strong></td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td><strong>security workflow</strong></td>
+<td>deferred; TTL-bounded</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>apps/governance</code> votes (#23)</td>
+<td><code>Display</code></td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>§7.5 re-key</td>
+<td>n/a</td>
+<td>n/a</td>
+<td><strong>required</strong></td>
+<td>after N2-A</td>
+<td>n/a</td>
+<td><strong>§7.5 gate</strong></td>
+<td>not N2-A</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>icn-commons</code> weak-holder id (#65)</td>
+<td>SHA-256 of spelling</td>
+<td>I7 <em>creates</em> the split</td>
+<td>—</td>
+<td>no</td>
+<td><strong>no</strong></td>
+<td>—</td>
+<td>before 6</td>
+<td>n/a</td>
+<td>N2-A</td>
+<td><strong>namespace decision — see §5</strong></td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>VectorClock</code> (#45), snapshot <code>vector_clock</code> (#54)</td>
+<td>serialized map</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td>max</td>
+<td>yes — <code>VectorClockProjection::from_entries</code></td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>rule established</td>
+</tr>
+<tr>
+<td>15</td>
+<td>snapshot <code>peer_connections</code> (#57)</td>
+<td>serialized map</td>
+<td><strong>0 in 3 scanned</strong></td>
+<td><strong>fail closed</strong></td>
+<td>no</td>
+<td>no</td>
+<td>—</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>no authorized rule</strong></td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>trust-app</code> <code>trust/sequences/receiver/</code> (#71)</td>
+<td><code>Display</code></td>
+<td>0 in 3 scanned</td>
+<td>max</td>
+<td><strong>yes</strong> — same replay-floor family as <code>replay_max_seq</code></td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>rule established by precedent</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>trust-app</code> <code>trust/sequences/issuer/</code> (#71)</td>
+<td><code>Display</code></td>
+<td>0 in 3 scanned</td>
+<td>max</td>
+<td>no — asserted here</td>
+<td>yes</td>
+<td>no</td>
+<td>4</td>
+<td>safe</td>
+<td>N2-A</td>
+<td><strong>rule needs trust-domain confirmation</strong></td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>icn-coop</code> <code>member:</code> (#36)</td>
+<td><code>Display</code></td>
+<td>0 in 3 scanned</td>
+<td><strong>fail closed</strong></td>
+<td>no</td>
+<td>n/a</td>
+<td>—</td>
+<td>—</td>
+<td>safe</td>
+<td>N2-A / §7.5 boundary</td>
+<td><strong>institutional decision required</strong></td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>CompressedVectorClock</code> (#46)</td>
+<td>dormant</td>
+<td>n/a</td>
+<td>derive-shape fix</td>
+<td>n/a</td>
+<td>yes</td>
+<td>no</td>
+<td>3</td>
+<td>safe</td>
+<td>N2-A</td>
+<td>no data step</td>
+</tr>
+</tbody></table>
+<p>Rows 10 and 11 are security-specific namespaces. Their <strong>existence and migration dependency are
+preserved here</strong>; their contents were not inspected and their disposition belongs to the dedicated
+security workflow, not to this tranche.</p>
+<p>Row 18 (<code>icn-coop</code> cooperative membership) is new to this table. Merging two membership rows
+decides <strong>who is a member of an institution</strong>, which no identity-layer rule authorizes, and it sits
+next to the §7.5 membership gate without the inventory having placed it there. It is therefore
+<strong>fail closed</strong> pending an explicit governance-domain decision about which side of the §7.5
+boundary it falls on. N2-A must not resolve that by default.</p>
+<p>Rows 14–15 hold DIDs inside serialized <em>values</em>, not keys, so they are not prefix-scannable and
+are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
+them (§12.1 item 4-ii).</p>
+<p>Every &quot;unmeasured&quot; cell is a direct consequence of §3.1 and is the substance of the open gate.</p>
+<hr>
+<h2 id="5-namespace-decisions-phase-5">5. Namespace decisions (Phase 5)</h2>
+<p>I7 moves <code>Did</code> equality. It does <strong>not</strong> move any namespace that derives or stores identity in
+another representation. Each is decided explicitly below; none is left implicit.</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Site</th>
+<th>Decision</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EntityId::from_did</code></td>
+<td><code>icn-entity/src/entity.rs:51</code></td>
+<td><strong>A — follows principal identity</strong></td>
+<td>An entity derived from a principal must not fork when the principal is re-spelled. Must canonicalize at construction and de-duplicate rows.</td>
+</tr>
+<tr>
+<td><code>StewardId::from_did</code></td>
+<td><code>icn-steward</code></td>
+<td><strong>A — follows principal identity</strong></td>
+<td>Same argument; a steward is a principal in a role.</td>
+</tr>
+<tr>
+<td><code>icn-commons</code> weak-holder id</td>
+<td><code>icn-commons/src/inner.rs:357</code>, <code>Sha256::digest(did_str)</code></td>
+<td><strong>A — follows principal identity</strong>, and is a <strong>blocking prerequisite</strong></td>
+<td>Hashing the <em>spelling</em> means one principal under two spellings mints two holder records. I7 makes the <code>Did</code>-equality gate treat them as one principal while the derived id still says two — a split I7 actively <strong>creates</strong>. Must be resolved before the equality flip.</td>
+</tr>
+<tr>
+<td>Kernel <code>Did = String</code> alias</td>
+<td>N2-H (#2629)</td>
+<td><strong>B — remains representation-sensitive for now</strong></td>
+<td>Out of N2-A scope by the tranche contract; N2-H owns it. Recorded so the mixed domain is not accidental.</td>
+</tr>
+<tr>
+<td><code>Community.members</code></td>
+<td><code>icn-community/src/types.rs:6</code>, <code>MemberId = String</code> (<em>&quot;Can be DID or CooperativeId&quot;</em>)</td>
+<td><strong>B — remains representation-sensitive</strong>, and is <strong>§7.5-adjacent</strong></td>
+<td>The type deliberately holds two identifier domains. Principalizing it is a membership change, which §7.5 gates. Must not be smuggled into N2-A.</td>
+</tr>
+<tr>
+<td><code>ReplicaMetadata</code></td>
+<td><code>icn-store</code></td>
+<td><strong>B — remains representation-sensitive</strong></td>
+<td>Replica placement is a storage-locality concern, not a principal-identity one. Documented rather than changed.</td>
+</tr>
+<tr>
+<td><code>SenderPrincipal</code> (<code>icn-net</code>)</td>
+<td><code>replay_guard.rs:78</code></td>
+<td><strong>B — intentionally key-based, not byte-based</strong></td>
+<td>Keys on <code>VerifyingKey</code> because the replay guard and the signature check must agree. It is <em>narrower</em> than <code>Did::identifier_bytes</code> (anchor DIDs may not decompress). Divergence is deliberate and must be documented, not &quot;fixed&quot;.</td>
+</tr>
+</tbody></table>
+<p>Decision <strong>A</strong> namespaces gate the equality flip. Decision <strong>B</strong> namespaces do not, but each is now
+a stated choice rather than an omission.</p>
+<hr>
+<h2 id="6-partner-invariants-re-verified-against-83682563">6. Partner invariants (re-verified against <code>83682563</code>)</h2>
+<p>These must change <strong>with or before</strong> the <code>Eq</code>/<code>Hash</code> flip. All three were re-verified live; none
+has moved since the prior pass.</p>
+<h3 id="61-peerid-ordering--icncratesicn-netsrctopologyrs51">6.1 <code>PeerId</code> ordering — <code>icn/crates/icn-net/src/topology.rs:51</code></h3>
+<pre><code class="language-rust">impl Ord for PeerId {
+    fn cmp(&amp;self, other: &amp;Self) -&gt; std::cmp::Ordering {
+        self.0.to_string().cmp(&amp;other.0.to_string())   // spelling
+    }
+}
+</code></pre>
+<p><code>PeerId(pub Did)</code> derives <code>PartialEq</code>/<code>Eq</code>/<code>Hash</code>. Post-I7 equality becomes byte-based while
+ordering stays spelling-based, so two <code>PeerId</code>s can be <code>==</code> yet <code>cmp</code> to <code>Ordering::Less</code> —
+breaking the standard-library requirement that <code>Ord</code> be consistent with <code>Eq</code>, and letting a
+<code>BTreeMap&lt;PeerId, _&gt;</code> hold two entries that compare equal.</p>
+<p><strong>Design:</strong> order by decoded identifier bytes, with a total, deterministic tie-break for spellings
+that do not decode (they must still order, and must not order equal to a decodable peer).
+Landable <strong>before</strong> the flip; doing so shrinks the atomic surface.</p>
+<h3 id="62-ccl-valuedid--icncratesicn-cclsrctypesrs110-and-218">6.2 CCL <code>Value::Did</code> — <code>icn/crates/icn-ccl/src/types.rs:110</code> and <code>:218</code></h3>
+<p><code>Value</code> derives <code>PartialEq</code>/<code>Eq</code> (so <code>Value::Did</code> equality follows <code>Did</code>), but <code>Hash</code> is
+hand-written and hashes <code>format!(&quot;{did:?}&quot;)</code> — the <code>Debug</code> of <code>Did(String)</code>, i.e. the spelling.</p>
+<p>Post-I7 two <code>Value::Did</code> values can be equal with different hashes. That is not a behaviour
+difference; it is a <strong>violated <code>Hash</code>/<code>Eq</code> contract</strong>, and it is silent. <code>HashSet&lt;Value&gt;</code> backs
+<code>Value::Set</code>, <code>participants</code> and <code>in</code> checks, so membership tests would begin to return wrong
+answers with no error anywhere.</p>
+<p><strong>Design:</strong> hash <code>Value::Did</code> over <code>identifier_bytes</code>, falling back to the spelling only where the
+DID does not decode (so equal values hash equally in both populations). The same applies to the
+<code>Value::Set</code> hash at <code>:229</code>, which sorts members by <code>format!(&quot;{a:?}&quot;)</code> — also spelling-derived.
+This is the sharpest of the three and <strong>must be atomic with the flip</strong>.</p>
+<p>Required regression tests: a <code>HashSet&lt;Value&gt;</code> and a <code>HashMap&lt;Value, _&gt;</code> holding two alternate
+representations of one principal must observe exactly one member.</p>
+<h3 id="63-networking-peer-maps">6.3 Networking peer maps</h3>
+<ul>
+<li><code>SessionManager.connections: HashMap&lt;String, quinn::Connection&gt;</code> — <code>icn-net/src/session.rs:58</code>,
+keyed by the remote peer DID <em>spelling</em>.</li>
+<li><code>NetworkActor.peer_connections: HashMap&lt;Did, PeerConnectionInfo&gt;</code> — <code>icn-net/src/actor/mod.rs:178</code>.</li>
+</ul>
+<p>Both hold remote-peer connection state: <strong>the same identity domain, two keying regimes</strong>. Post-I7
+the <code>Did</code>-keyed map becomes principal-keyed while the <code>String</code>-keyed map stays spelling-keyed, and
+they disagree.</p>
+<p><strong>Design:</strong> converge on one principal identity. Per the #2641 lesson, converting a single lookup
+call is not sufficient — the audit must cover <strong>cardinality</strong> (<code>.len()</code> used as a peer count),
+<strong>iteration</strong>, <strong>deletion</strong>, <strong>replacement</strong> and <strong>lifecycle</strong> (insert on connect, remove on
+disconnect), because a disconnect that removes one spelling&#39;s entry while the other map keeps its
+principal entry leaks connection state in exactly the direction that is hard to observe.</p>
+<h3 id="64-string-versus-did-comparison-classification">6.4 String-versus-<code>Did</code> comparison classification</h3>
+<table>
+<thead>
+<tr>
+<th>Site</th>
+<th>Classification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-gateway/src/api/commons/mod.rs:242,278,358</code> — <code>claims.sub != did.to_string()</code></td>
+<td><strong>should become principal-aware</strong> — an authorization comparison that a re-spelling defeats</td>
+</tr>
+<tr>
+<td><code>icn-trust/src/lib.rs:1180</code></td>
+<td><strong>should become principal-aware</strong> — trust identity</td>
+</tr>
+<tr>
+<td><code>icn-gossip/.../storage_challenge.rs:58</code></td>
+<td><strong>should become principal-aware</strong> — challenge attribution</td>
+</tr>
+<tr>
+<td><code>icn-compute/src/receipt.rs:691</code></td>
+<td><strong>should become principal-aware</strong> — receipt attribution</td>
+</tr>
+<tr>
+<td><code>icn-store</code> pos, <code>icnctl</code> display/CLI paths</td>
+<td><strong>intentionally representation-sensitive</strong> — echoing what the operator typed</td>
+</tr>
+<tr>
+<td>kernel <code>Did = String</code> alias sites</td>
+<td><strong>belongs to another tranche</strong> — N2-H (#2629)</td>
+</tr>
+</tbody></table>
+<p>Not mass-rewritten: each needs its semantic classification confirmed at the site before change.</p>
+<hr>
+<h2 id="7-site-taxonomy-carried-in-from-2641">7. Site taxonomy carried in from #2641</h2>
+<p>#2641 produced six defects across four review rounds; only two were equality comparisons. Any
+N2-A audit restricted to <code>Did == Did</code> would have missed the other four. Every site N2-A touches is
+therefore classified across nine axes: <strong>equality/comparison; hash/map/set keying; persisted key
+representation; cardinality/counting; iteration-order semantics; paired computations/joins;
+collision/migration behaviour; twin implementations; guard reachability.</strong></p>
+<p>Three questions are asked explicitly at each site:</p>
+<ul>
+<li><strong>Partial principalization</strong> — if one half of a computation becomes principal-aware, does its
+counterpart still count, filter, order or join by spelling? (#2641: a <code>.len()</code> quorum
+denominator over a DID-keyed collection whose numerator had become principal-reduced.)</li>
+<li><strong>Twins</strong> — does the same rule exist separately in actor, manager, library, persisted store,
+query/read model and restore/snapshot paths? (#2641 fixed one side of a pair twice in a row.)
+Prefer a shared primitive over per-site fixes.</li>
+<li><strong>Guard reachability</strong> — can an earlier filter, map lookup, de-duplication, early <code>continue</code>,
+first-match lookup or restore/rebuild step discard contradictory alias evidence <em>before</em> a
+fail-closed guard observes it? Having a conflict check is not enough if the bad input cannot
+reach it.</li>
+</ul>
+<p>The §6.3 peer-map work and the §5 weak-holder decision are both twin-shaped, and the
+<code>replay_sender_regime</code> fail-closed path is a guard-reachability case that #2644 already got right.</p>
+<hr>
+<h2 id="8-migration-sequence">8. Migration sequence</h2>
+<p>Unchanged in structure from the prior pass; step 4&#39;s content is narrowed by §1.1 (replay rows
+already carry their rule in-tree) and widened by §5 (the weak-holder id is a blocking prerequisite,
+not a follow-up).</p>
+<ol>
+<li><strong>Run the collision scan</strong> read-only on every live deployment. <em>Blocker for everything below.</em></li>
+<li><strong>Settle the namespace decisions</strong> — §5 decision-<strong>A</strong> namespaces, above all the <code>icn-commons</code>
+weak-holder id, whose split I7 actively creates.</li>
+<li><strong>Fix the partner invariants that can land independently</strong> — <code>PeerId</code> <code>Ord</code> (§6.1), the
+<code>String</code>/<code>Did</code> peer-map pair (§6.3), and the dormant <code>CompressedVectorClock</code> derive shape. These
+reduce the atomic surface.</li>
+<li><strong>De-duplicate durable collision-bearing rows</strong> <em>before</em> the first start of a key-equality
+binary: that first start performs the lossy rebuild and its write-back orphans the losers.
+Choose the class-C merge rules (§4 rows 14–15) before decode collapses them.</li>
+<li><strong>Validate rollback/compatibility.</strong> Equality-over-bytes moves no durable byte and changes no
+acceptance, so a binary rolled back to string equality reads the de-duplicated rows unchanged.</li>
+<li><strong>Flip <code>Did</code> <code>Eq</code>/<code>Hash</code></strong> to decoded identifier bytes, <strong>atomically with</strong> the CCL
+<code>Value::Did</code> hash correction (§6.2).</li>
+<li><strong>Run broad discriminating tests</strong>, including the mutation check that the new tests fail under
+the old equality.</li>
+<li><strong>Membership and vote migration stay behind §7.5</strong> and are not part of N2-A.</li>
+</ol>
+<hr>
+<h2 id="9-remaining-implementation-blockers">9. Remaining implementation blockers</h2>
+<p>Implementation may begin only when <strong>all</strong> of the following hold.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Blocker</th>
+<th>State</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Collision scans run against live deployment data</td>
+<td><strong>PARTIAL</strong></td>
+<td>3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, <strong>0 collisions</strong>. <code>alpha</code> and <code>icn-daemon</code> unscanned (<code>CrashLoopBackOff</code>); sample is small and point-in-time (§3.5)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Every observed collision group has an authorized disposition</td>
+<td><strong>CLEARED (vacuously)</strong></td>
+<td>zero collision groups observed. Vacuous truth — it does not validate any merge rule</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Every required keyspace migration has a safe sequence</td>
+<td><strong>PARTIAL</strong></td>
+<td>with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Namespace splits created by principal equality resolved</td>
+<td><strong>OPEN</strong></td>
+<td><code>icn-commons</code> weak-holder id decision stated (§5) but unimplemented</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>PeerId</code> ordering</td>
+<td><strong>OPEN</strong></td>
+<td>design complete (§6.1), unimplemented</td>
+</tr>
+<tr>
+<td>6</td>
+<td>CCL <code>Value::Did</code> <code>Hash</code>/<code>Eq</code></td>
+<td><strong>OPEN</strong></td>
+<td>design complete (§6.2), unimplemented — a violated std contract post-flip</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>String</code>/<code>Did</code> peer-map semantics</td>
+<td><strong>OPEN</strong></td>
+<td>design complete (§6.3), unimplemented</td>
+</tr>
+<tr>
+<td>8</td>
+<td>No §7.5 migration smuggled in</td>
+<td><strong>HELD</strong></td>
+<td>32 <code>gov:vote:</code> rows and the <code>icn-coop</code> membership row are excluded, not migrated</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Broad discriminating tests for the flip</td>
+<td><strong>OPEN</strong></td>
+<td>the scanner has them; the equality change has none, because it does not exist</td>
+</tr>
+</tbody></table>
+<p>Blockers <strong>4–7 and 9 are independent of collision evidence</strong> and would each block the flip even if
+every deployment scanned clean. They are the shortest path forward.</p>
+<p>The evidence gate (#1) has moved from <em>no evidence</em> to <em>no collisions in three deployments</em>, which
+is real but bounded: it does not license the flip on its own, and §3.5 explains why a
+point-in-time clean scan cannot.</p>
+</article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/n2-a-migration-gate.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub ↗
+</a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
+← Back to docs </a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <nav class="footer-col" aria-labelledby="footer-understand"> <h2 id="footer-understand">Understand ICN</h2> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How it works</a></li> <li><a href="/see-it-work">See it work</a></li> <li><a href="/cooperative-economy">The cooperative economy</a></li> <li><a href="/docs/glossary">Glossary</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-state"> <h2 id="footer-state">Project state</h2> <ul> <li><a href="/whats-real-now">What's real now</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/docs/archive">Documentation archive</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/about">About the project</a></li> <li><a href="/blog">Blog</a></li> </ul> </nav> <nav class="footer-col" aria-labelledby="footer-take-part"> <h2 id="footer-take-part">Take part</h2> <ul> <li><a href="/get-involved">Get involved</a></li> <li><a href="/for-cooperatives">For cooperatives and institutions</a></li> <li><a href="/for-developers">For developers</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> </ul> </nav> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
