@@ -333,6 +333,20 @@ pub trait Store: Send + Sync {
         Ok(self.scan(prefix)?.into_iter().map(|(k, _)| k).collect())
     }
 
+    /// Scan keys with the size of each value, without retaining the values.
+    ///
+    /// An audit that reports how much data a row holds does not need the data.
+    /// The default is correct but still materializes everything at once;
+    /// backends that can measure a value and drop it should override this so
+    /// peak memory is one value rather than all of them.
+    fn scan_key_sizes(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, usize)>> {
+        Ok(self
+            .scan(prefix)?
+            .into_iter()
+            .map(|(k, v)| (k, v.len()))
+            .collect())
+    }
+
     /// Count entries with a given prefix without loading values
     ///
     /// More efficient than `scan().len()` as it doesn't deserialize values.
@@ -937,6 +951,17 @@ impl Store for SledStore {
             keys.push(item?.to_vec());
         }
         Ok(keys)
+    }
+
+    fn scan_key_sizes(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, usize)>> {
+        let mut out = Vec::new();
+        for item in self.db.scan_prefix(prefix) {
+            // `v` is dropped at the end of each iteration, so peak memory holds
+            // one value rather than every value in the keyspace.
+            let (k, v) = item?;
+            out.push((k.to_vec(), v.len()));
+        }
+        Ok(out)
     }
 
     fn scan_count(&self, prefix: &[u8]) -> Result<usize> {

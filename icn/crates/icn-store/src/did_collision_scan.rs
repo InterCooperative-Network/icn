@@ -152,6 +152,16 @@ pub struct KeyspaceDescriptor {
     pub disposition: MergeDisposition,
     /// Whether that rule has been authorized by the domain that owns the state.
     pub basis: RuleBasis,
+    /// Whether this keyspace's keys end with the DID.
+    ///
+    /// Where they do, the keyspace's own parser hands everything after the
+    /// prefix to `Did::from_str`, so a key with anything trailing the spelling
+    /// is one the real loader rejects. The generic scan cannot see that: its
+    /// candidate run stops at the first non-body byte, so
+    /// `replay_max_seq:<did>:junk` looked like a clean spelling plus residual
+    /// key material. Stating it per keyspace keeps the scanner from having to
+    /// reimplement each grammar while still catching the case.
+    pub did_ends_key: bool,
     /// Whether this keyspace's own parser treats `/` as ending a DID.
     ///
     /// `/` is the only separator that is also a multibase body character, so
@@ -363,7 +373,15 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
 
         let start = i;
         let mut limit = i + needle.len();
-        while limit < key.len() && is_multibase_body_byte(key[limit]) {
+        // Bounded, because backtracking retries the decode once per byte
+        // removed. A 32-byte identifier is longest in `Base2` — one character
+        // per bit, 256 plus a sigil — so nothing beyond this can decode to one,
+        // and without the bound a single key carrying tens of thousands of
+        // base58 characters would make the audit quadratic in a length the
+        // writer of that row chose.
+        const MAX_IDENTIFIER_CHARS: usize = 300;
+        let ceiling = key.len().min(limit + MAX_IDENTIFIER_CHARS);
+        while limit < ceiling && is_multibase_body_byte(key[limit]) {
             limit += 1;
         }
 
@@ -494,6 +512,17 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
             rows_unreadable += 1;
             continue;
         };
+
+        // The keyspace says its keys end with the DID, so anything after the
+        // last spelling is material its own parser would refuse.
+        if descriptor.did_ends_key {
+            if let Some(last) = embedded.last() {
+                if last.end != key.len() {
+                    rows_unreadable += 1;
+                    continue;
+                }
+            }
+        }
 
         rows_with_readable_did += 1;
 
@@ -767,13 +796,11 @@ pub fn scan_keyspace(
     store: &dyn Store,
     descriptor: &KeyspaceDescriptor,
 ) -> anyhow::Result<KeyspaceReport> {
-    let pairs = store.scan(descriptor.prefix)?;
-    // Values are reduced to their length at the boundary: nothing downstream of
-    // this line can read a stored payload even by mistake.
-    let rows = pairs
-        .into_iter()
-        .map(|(key, value)| (key, value.len()))
-        .collect();
+    // Key plus value *size*: the report needs how big a row is, never what is
+    // in it, so nothing downstream of this line can read a stored payload even
+    // by mistake — and on a large keyspace the values are never all held at
+    // once.
+    let rows = store.scan_key_sizes(descriptor.prefix)?;
     Ok(build_report(descriptor, rows))
 }
 
@@ -894,6 +921,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "Replay floor. A lower survivor weakens the guard, so the merge keeps the \
                         maximum, which can only reject more than any single row did.",
         },
@@ -904,6 +932,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Union,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Finalized-sequence set. Dropping a spelling's rows would re-open replay \
                         for the sequences it recorded, so the merge is a union.",
         },
@@ -914,6 +943,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::FailClosed,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "Two rows can assert different regimes for one sender, which is a \
                         contradiction no domain rule resolves. The live loader already declines \
                         to collapse these (#2644); a migration must not decide it either.",
@@ -925,6 +955,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Outgoing sequence high-water for a (sender, recipient) pair. A lower \
                         survivor is a nonce regression, so the merge keeps the maximum.",
         },
@@ -935,6 +966,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Sum,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Accumulated balances. Overwriting drops a spelling's recorded position \
                         entirely, so the merge sums rather than elects a survivor.",
         },
@@ -945,6 +977,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Sum,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Accumulated cleared volume per (account, currency). Currency stays in the \
                         canonical shape, so only same-currency rows merge, and they sum.",
         },
@@ -955,6 +988,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Union,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "Freeze records. Unfreeze deletes one spelling only, so electing a \
                         survivor can fail open; the merge is a union of the freezes.",
         },
@@ -965,6 +999,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Union,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Trust edges keyed by (source, target). A dropped spelling takes its edges \
                         with it, so the merge unions the edge sets.",
         },
@@ -975,6 +1010,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::Equivalent,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
         },
@@ -985,6 +1021,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
                         survivor accepts stale attestations, so the merge keeps the maximum, \
                         matching the established replay_max_seq precedent.",
@@ -996,6 +1033,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::MaxMonotonic,
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
                         a sequence number already used, which the uniqueness invariant forbids, \
                         so the merge keeps the maximum.",
@@ -1007,6 +1045,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             disposition: MergeDisposition::FailClosed,
             basis: RuleBasis::Established,
             slash_ends_did: false,
+            did_ends_key: true,
             rationale: "Cooperative membership. Merging two rows decides who is a member of an \
                         institution, which is an institutional judgement no identity-layer rule \
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
@@ -1050,6 +1089,7 @@ mod tests {
             disposition,
             basis,
             slash_ends_did: false,
+            did_ends_key: false,
             rationale: "test fixture",
         }
     }
@@ -1985,6 +2025,91 @@ mod tests {
         let overview = store_overview(&store).unwrap();
         assert_eq!(overview.total_rows, 2);
         assert_eq!(overview.rows_with_embedded_did, 1);
+    }
+
+    #[test]
+    fn trailing_material_in_a_did_terminated_keyspace_is_unreadable() {
+        // `replay_max_seq:<did>:junk`. The candidate run stops at `:` because it
+        // is not a body byte, so the generic scan saw a clean spelling plus
+        // residual key material — but that keyspace hands everything after the
+        // prefix to `Did::from_str`, which rejects it.
+        let one = spell(&principal(171), multibase::Base::Base58Btc);
+        let strict = KeyspaceDescriptor {
+            did_ends_key: true,
+            ..descriptor(MergeDisposition::Sum)
+        };
+
+        let store = store_with(&[(&format!("test:{one}:junk"), b"v")]);
+        let report = scan_keyspace(&store, &strict).unwrap();
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+
+        // The well-formed row in the same keyspace stays readable.
+        let clean = store_with(&[(&format!("test:{one}"), b"v")]);
+        let ok = scan_keyspace(&clean, &strict).unwrap();
+        assert_eq!(ok.rows_with_readable_did, 1);
+        assert_eq!(ok.rows_unreadable, 0);
+    }
+
+    #[test]
+    fn structured_keyspaces_still_accept_their_trailing_fields() {
+        // The flag must be per keyspace: `cleared_volume:<did>:<currency>` has
+        // legitimate material after the DID and must not become unreadable.
+        let one = spell(&principal(173), multibase::Base::Base58Btc);
+        let structured = descriptor(MergeDisposition::Sum); // did_ends_key: false
+        let store = store_with(&[(&format!("test:{one}:USD"), b"v")]);
+
+        let report = scan_keyspace(&store, &structured).unwrap();
+        assert_eq!(report.rows_with_readable_did, 1);
+        assert_eq!(report.rows_unreadable, 0);
+    }
+
+    #[test]
+    fn the_registry_marks_did_terminated_keyspaces_accurately() {
+        // Checked against the live key builders, not assumed: these end with
+        // the DID, and the structured ones do not.
+        let ks = n2a_keyspaces();
+        let ends = |n: &str| ks.iter().find(|d| d.name == n).map(|d| d.did_ends_key);
+
+        for n in [
+            "icn-net/replay_max_seq",
+            "icn-net/replay_sender_regime",
+            "icn-ledger/frozen",
+            "trust-app/sequences_issuer",
+            "trust-app/sequences_receiver",
+            "icn-coop/member",
+        ] {
+            assert_eq!(ends(n), Some(true), "{n} keys end with the DID");
+        }
+        for n in [
+            "icn-net/replay_finalized",  // `<did>:<sequence>`
+            "icn-net/outgoing_seq",      // `<sender>||<recipient>`
+            "icn-ledger/cleared_volume", // `<did>:<currency>`
+            "icn-ledger/balance",        // JSON-quoted, so a `"` follows
+            "icn-trust/edges",           // `<source>:<target>`
+        ] {
+            assert_eq!(ends(n), Some(false), "{n} has material after the DID");
+        }
+    }
+
+    #[test]
+    fn a_pathologically_long_did_token_is_rejected_promptly() {
+        // Backtracking retries the decode once per byte removed, so an
+        // unbounded candidate made the audit quadratic in a length chosen by
+        // whoever wrote the row. Nothing longer than a `Base2` spelling can
+        // decode to 32 bytes, so the run is capped there.
+        let mut key = b"test:did:icn:z".to_vec();
+        key.extend(std::iter::repeat_n(b'A', 50_000));
+
+        let found = find_embedded_dids(&key);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].identifier.is_none(), "it decodes to nothing");
+        assert!(
+            found[0].spelling.len() < 400,
+            "the candidate must be bounded, was {}",
+            found[0].spelling.len()
+        );
     }
 
     #[test]
