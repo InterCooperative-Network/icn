@@ -644,12 +644,40 @@ that object must contain to establish FACT B is a membership-evidence question
 owned downstream (N2-E2, and see §13). The <em>authority separation</em> is normative
 now, and no downstream design may violate it while remaining conformant.</p>
 <h3 id="75-hard-migration-gate--membership-and-vote-re-keying">7.5 Hard migration gate — membership and vote re-keying</h3>
-<p>Vote storage is keyed by voter identity and the re-cast guard is declared but
-never constructed, so dual-keying would let the same historical person create two
-counted rows. <strong>Before any live membership or vote re-key</strong>, four things must be
-designed: migration ordering · alias/transition recognition · duplicate-act
-prevention · final cutover. N2 does not solve governance storage; it states the
-gate.</p>
+<p>Vote storage is keyed by voter identity, so dual-keying would let the same
+historical person create two counted rows. <strong>Before any live membership or vote
+re-key</strong>, four things must be designed: migration ordering · alias/transition
+recognition · duplicate-act prevention · final cutover. N2 does not solve
+governance storage; it states the gate.</p>
+<p><strong>Duplicate-act prevention is delivered</strong> (#2641). Governance admission and
+tallying resolve a voter to the bytes its <code>did:icn:</code> identifier decodes to, via
+<code>icn-governance</code>&#39;s <code>VotingPrincipal</code>, so one cryptographic voter contributes at
+most one effective vote whatever multibase spelling names it. Rows for one
+principal that express conflicting acts fail closed rather than electing a
+survivor, because choosing between two conflicting historical acts is this
+gate&#39;s business, not the duplicate-act guard&#39;s.</p>
+<p>The two apps/governance admission paths reach that one-vote result under
+<strong>different recast policies</strong>, and a consumer must not assume either from the
+other:</p>
+<ul>
+<li>the in-process <code>GovernanceManager</code> <strong>refuses</strong> a repeat vote, constructing
+<code>GovernanceError::AlreadyVoted</code> via <code>ensure_has_not_voted</code>. Ballots are
+immutable on this path;</li>
+<li>the actor backend <strong>permits a vote change</strong>, which is its pre-existing
+behaviour, and supersedes the principal&#39;s existing row rather than adding one.
+A ballot is mutable on this path until the proposal closes.</li>
+</ul>
+<p>Both keep exactly one stored row and one effective vote per principal, which is
+what duplicate-act prevention requires; they differ on whether the voter may
+change their mind, which is a governance-policy question this gate does not
+settle. Where a principal already holds several pre-#2641 rows the actor refuses
+without mutating, since it overwrites by spelling-keyed row and cannot supersede
+them all at once.</p>
+<p>The other three prerequisites — migration ordering, alias/transition
+recognition, final cutover — remain undesigned, and <strong>no persisted vote or
+membership key has been re-keyed</strong>. Membership lists are still compared by DID
+spelling; under a static list an alias spelling is refused at the membership
+gate, which is fail-closed but is not yet alias recognition.</p>
 <hr>
 <h2 id="8-institution-semantics">8. Institution semantics</h2>
 <p><strong>Institution legitimacy is governance-derived.</strong> Institution identity must not

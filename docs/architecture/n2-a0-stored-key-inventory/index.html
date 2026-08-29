@@ -1842,6 +1842,28 @@ second row too. Because <code>icn-governance</code>&#39;s sled store is dormant 
 fix it (the rows are <code>Display</code>-keyed). <strong>Disposition:</strong> no issue owned it (§7.5 is stated as a gate,
 not materialised; #2623/#2626/#2627 disclaim governance storage). <strong>Filed by this review as
 #2641.</strong></p>
+<p><strong>Resolved 2026-08-28 (#2641).</strong> The measurement above stands as taken at <code>798c8d54</code>. Governance
+now resolves a voter to the bytes its <code>did:icn:</code> identifier decodes to (<code>icn-governance</code>&#39;s
+<code>VotingPrincipal</code>): <code>AlreadyVoted</code> has a constructor (<code>ensure_has_not_voted</code>), both
+<code>GovernanceStore</code> implementations supersede a principal&#39;s prior row across spellings, and every
+tally path in the workspace uses <code>VoteTally::try_from_votes</code>, which collapses agreeing alias rows
+and <strong>fails closed</strong> on conflicting ones rather than electing a survivor. That covers the live
+actor paths — the read-only <code>get_vote_tally</code> <em>and</em> the decision-producing tally inside
+<code>CloseProposal</code>, including its close-time delegation expansion — and the <code>GovernanceStore</code> library
+surface, whose only in-workspace consumer is <code>ProposalCleanupTask::archive_proposal</code>. Three
+corrections to the note above, found while fixing it: the live exploit is not only #23 via
+<code>manager.rs</code>&#39;s guard —
+<code>GovernanceManager::cast_vote</code> delegates to <code>governance_handle</code> as its <em>first</em> statement, so in
+actor-backed deployments the membership gate and that guard never ran, and the actor&#39;s <code>CastVote</code>
+handler had <strong>no</strong> duplicate-vote guard at all; and the identity used for the fix is the decoded
+identifier bytes rather than a <code>VerifyingKey</code>, because anchor-derived DIDs (<code>Did::from_anchor_id</code>)
+need not decompress to an Edwards point. Third, the delegation hazard is not confined to
+<code>compute_tally_with_delegations</code> (which has no production caller): its production twin,
+<code>apply_delegation_to_tally</code>, was spelling-keyed, so a member could delegate from one spelling of
+their key to another, vote as the delegate, and have that single vote resolved back to them as a
+second one at close — reachable on a fresh deployment with no legacy rows. Nothing was re-keyed: vote rows remain <code>Display</code>-keyed and
+membership lists remain spelling-compared, so §7.5&#39;s re-key gate is untouched and this row stays
+<code>NEEDS MIGRATION</code> for N2-A.</p>
 <h3 id="104-grantee_canonical_bytes-canonicalizes-the-layout-not-the-spelling">10.4 <code>grantee_canonical_bytes</code> canonicalizes the <em>layout</em>, not the spelling</h3>
 <p><code>receipt_store.rs:1071</code> is named <code>*_canonical_bytes</code> and emits a tag byte followed by
 <code>did.as_str()</code> — the raw spelling. A lookup with a differently-spelled DID misses the grant (fails
