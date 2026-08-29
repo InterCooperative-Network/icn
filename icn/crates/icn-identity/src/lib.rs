@@ -167,6 +167,42 @@ impl HybridSignatureOrClassical {
     }
 }
 
+/// Decode the 32 identifier bytes a `did:icn:` spelling names, without
+/// requiring a constructed [`Did`].
+///
+/// [`Did::identifier_bytes`] delegates here, so a caller holding a raw spelling
+/// — a persisted store key, a serialized map key, an audit tool reading rows it
+/// must not construct — decodes it by exactly the rule `Did` itself uses. That
+/// shared implementation is the point: a pre-migration collision scan that
+/// grouped rows by a *reimplementation* of this decode would prove nothing
+/// about the equality it gates (N2-A, #2627).
+///
+/// This performs no validation beyond what decoding requires and canonicalizes
+/// nothing. An `Err` means the spelling names no ICN principal, which is a
+/// reportable fact rather than a reason to panic.
+pub fn identifier_bytes_of_spelling(spelling: &str) -> Result<[u8; 32]> {
+    // Validate the prefix rather than assuming it. Every `Did` reaching here
+    // through `from_str` or `Deserialize` has been checked, but
+    // `new_unchecked` bypasses that, and decoding whatever follows the first
+    // eight characters of some other scheme would hand back bytes that name
+    // no ICN principal.
+    let encoded_part = spelling
+        .strip_prefix("did:icn:")
+        .ok_or_else(|| anyhow::anyhow!("Invalid DID format: must start with 'did:icn:'"))?;
+
+    if encoded_part.is_empty() {
+        anyhow::bail!("Invalid DID format: empty identifier after prefix");
+    }
+
+    let (_base, decoded_bytes) = multibase::decode(encoded_part)
+        .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
+
+    decoded_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid DID: identifier is not 32 bytes"))
+}
+
 /// A decentralized identifier for an ICN node
 ///
 /// DIDs are validated on construction/deserialization to ensure:
@@ -265,27 +301,7 @@ impl Did {
     /// This is an accessor only: it does not canonicalize the DID and does not
     /// change how `Did` compares or hashes.
     pub fn identifier_bytes(&self) -> Result<[u8; 32]> {
-        // Validate the prefix rather than assuming it. Every `Did` reaching here
-        // through `from_str` or `Deserialize` has been checked, but
-        // `new_unchecked` bypasses that, and decoding whatever follows the first
-        // eight characters of some other scheme would hand back bytes that name
-        // no ICN principal.
-        let encoded_part = self
-            .0
-            .strip_prefix("did:icn:")
-            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: must start with 'did:icn:'"))?;
-
-        if encoded_part.is_empty() {
-            anyhow::bail!("Invalid DID format: empty identifier after prefix");
-        }
-
-        let (_base, decoded_bytes) = multibase::decode(encoded_part)
-            .map_err(|e| anyhow::anyhow!("Invalid DID multibase encoding: {e}"))?;
-
-        decoded_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Invalid DID: identifier is not 32 bytes"))
+        identifier_bytes_of_spelling(&self.0)
     }
 
     /// Extract the Ed25519 verifying key from this DID
