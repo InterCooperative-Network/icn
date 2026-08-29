@@ -269,9 +269,21 @@ impl std::hash::Hash for Value {
                 // is imposed at all. Addition over a set of distinct members is
                 // the standard multiset digest; `len` separates sets that happen
                 // to share a sum. `DefaultHasher` is fixed-seed, which is what
-                // makes members comparable to each other — `Hash` output is
-                // already process-local (std collections seed `RandomState`),
-                // so nothing here is persisted, transmitted or consensus-visible.
+                // makes members comparable to each other.
+                //
+                // What this does NOT mean is that the hash is invisible. No
+                // `Hash` output is persisted or transmitted, but `HashSet`
+                // *iteration order* is a function of it, `interpreter.rs` reads
+                // that order, `icn-compute`'s executor serializes the resulting
+                // value, and `result_quorum.rs` blake3-hashes those bytes for
+                // multi-executor agreement. So set iteration order does reach a
+                // consensus-compared payload. That order was already
+                // `RandomState`-seeded and already varied per process before
+                // this rule existed: changing the hash changes *which*
+                // nondeterministic order results, not whether one is
+                // deterministic. The underlying determinism hazard is
+                // pre-existing and tracked separately (#2682); do not read this
+                // arm as having made set iteration canonical.
                 let mut combined = 0u64;
                 for item in set {
                     let mut item_hasher = std::collections::hash_map::DefaultHasher::new();
