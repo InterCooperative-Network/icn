@@ -39,7 +39,13 @@ def check(desc, cond):
 
 
 def json_heredoc_body(text):
-    """Return (delimiter, body) for the --json payload heredoc, or (None, None)."""
+    """Return (quote, body) for the --json payload heredoc, or (None, None).
+
+    `quote` is the character quoting the heredoc *delimiter* -- "'", '"', or ""
+    when the delimiter is unquoted. It is what decides whether the shell expands
+    the body, which is the property under test; the delimiter word itself is not
+    returned because nothing here needs its name.
+    """
     m = re.search(r"python3 - <<(['\"]?)([A-Z_][A-Z0-9_]*)\1\n(.*?)\n\2\n", text, re.S)
     if not m:
         return None, None
@@ -60,8 +66,9 @@ try:
     payload = json.loads(proc.stdout)
     check("--json stdout is parseable JSON", True)
 except ValueError as exc:
-    check("--json stdout is parseable JSON (%s; stderr: %s)"
-          % (exc, proc.stderr.strip().splitlines()[-1:] or ""), False)
+    err_lines = proc.stderr.strip().splitlines()
+    check("--json stdout is parseable JSON (%s; last stderr line: %s)"
+          % (exc, err_lines[-1] if err_lines else "<none>"), False)
 
 if payload is not None:
     # The documented contract: --json exits with the drift count it reports.
