@@ -496,6 +496,58 @@ else
   bad "a malformed hook command truncated the derived target list" ""
 fi
 
+# Two legal direct-invocation spellings that the derivation used to mishandle. `_invokes_hook`
+# in the same file already normalised both, so these were siblings disagreeing.
+python3 - "$GATE" <<'PYSHAPES'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+want = ".claude/hooks/hook-health.sh"
+cases = {
+    'MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'A=1 B=2 "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
+    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'echo hi': None,
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': None,
+}
+bad = [c for c, exp in cases.items() if m._command_target(c) != exp]
+sys.exit(0 if not bad else 1)
+PYSHAPES
+if [ $? -eq 0 ]; then
+  ok "leading assignments and the braced \$\{CLAUDE_PROJECT_DIR\} spelling resolve correctly"
+else
+  bad "a legal direct-invocation spelling was mis-resolved" ""
+fi
+
+# End-to-end: rewriting a hook with an env-assignment prefix must not make its executable
+# check disappear. The derived list and the expected count read the same source, so a dropped
+# target hides itself in both.
+FIX_ASSIGN="$TMP/assignhook"
+make_fixture "$FIX_ASSIGN"
+python3 - "$FIX_ASSIGN" <<'PYASSIGN'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "MODE=health " + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYASSIGN
+chmod -x "$FIX_ASSIGN/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_ASSIGN" "$TMP/assignhook.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$TMP/assignhook.log"; then
+  ok "an env-assignment prefix does not hide a hook from the executable check"
+else
+  bad "an assignment-prefixed hook escaped the executable check" "$(tail -3 "$TMP/assignhook.log")"
+fi
+
 # Adding a hook must not trip the exact-count assertion.
 FIX_ADD="$TMP/addhook"
 make_fixture "$FIX_ADD"

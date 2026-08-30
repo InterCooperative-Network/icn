@@ -206,16 +206,33 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
 
 
 def _command_target(command: str) -> str | None:
-    """The repo-relative path a hook command execs directly, or None."""
+    """The repo-relative path a hook command execs directly, or None.
+
+    Two shapes this missed, both of which `_invokes_hook` in this same file already handles --
+    an inconsistency between siblings is how one of them ends up wrong:
+
+      - `MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh`. A leading environment
+        assignment is a legal direct invocation, and tokens[0] is the assignment, so the hook
+        was dropped from the derived set entirely -- taking its executable check and its slot
+        in the expected count with it.
+      - `"${CLAUDE_PROJECT_DIR}"/...`. The braced spelling is equally valid; unnormalised it
+        produced a literal `${CLAUDE_PROJECT_DIR}` path that exists nowhere, so a configured
+        and working hook was reported `missing`.
+    """
     cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
     try:
         tokens = shlex.split(cmd)
     except ValueError:
         return None
+    # Walk past leading VAR=value assignments; they precede the executable, they are not it.
+    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        tokens = tokens[1:]
     if not tokens:
         return None
-    argv0 = tokens[0].replace("$CLAUDE_PROJECT_DIR/", "").replace(
-        "$CLAUDE_PROJECT_DIR", "").lstrip("/")
+    argv0 = tokens[0]
+    for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+        argv0 = argv0.replace(spelling + "/", "").replace(spelling, "")
+    argv0 = argv0.lstrip("/")
     # A bare builtin or PATH command has no directory component; a repo hook always does.
     if not argv0 or "/" not in argv0 or argv0.startswith(".."):
         return None
