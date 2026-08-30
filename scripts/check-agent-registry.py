@@ -35,6 +35,7 @@ stage 2 and is not checked here.
 Run: python3 scripts/check-agent-registry.py [--verbose]
 """
 import argparse
+import difflib
 import json
 import pathlib
 import re
@@ -180,6 +181,26 @@ class Checker:
             self.fail("%s: declared provider_variant but every body is identical. An "
                       "adjudicated intent does not keep a claim true -- if stage 2 converged "
                       "these, the record is now exact_mirror." % rec["name"])
+        else:
+            self._report_similarity(rec)
+        if "body_similarity" in div:
+            self.fail("%s: divergence.body_similarity is stored derived data and is not "
+                      "recomputed. Remove it -- --verbose prints fresh values." % rec["name"])
+
+    def _report_similarity(self, rec):
+        """Compute pairwise body similarity fresh and print it. Never stored.
+
+        A stored score goes stale the moment a prompt is partially edited, while the record
+        still reads green -- derived data rotting inside a truth owner is the defect this
+        registry exists to end, so the number is produced on demand instead.
+        """
+        b = self.bodies(rec)
+        ids = sorted(b)
+        for i, x in enumerate(ids):
+            for y in ids[i + 1:]:
+                self.ok("%s: body similarity %s/%s = %.2f (recomputed, not stored)"
+                        % (rec["name"], x, y,
+                           difflib.SequenceMatcher(None, b[x], b[y]).ratio()))
 
     def _v_divergent_unreviewed(self, rec):
         div = rec.get("divergence") or {}
@@ -195,6 +216,12 @@ class Checker:
             self.fail("%s: declared divergent_unreviewed but every body is now identical. "
                       "Promote it to exact_mirror -- a resolved divergence must not keep "
                       "claiming to be one." % rec["name"])
+        else:
+            self._report_similarity(rec)
+        if "body_similarity" in div:
+            self.fail("%s: divergence.body_similarity is stored derived data. A partial prompt "
+                      "edit makes it stale while this record still reads green. Remove it -- "
+                      "--verbose recomputes similarity on every run." % rec["name"])
 
     @property
     def RELATIONSHIP_VALIDATORS(self):
@@ -437,6 +464,12 @@ class Checker:
             if un in trees:
                 self.fail("skills.json lists %s as covered by no registry, but agents.json "
                           "declares it as a surface." % un)
+            elif not (self.root / un).exists():
+                self.fail("skills.json names %s as an uncovered provider surface, but no such "
+                          "tree exists. A gap list that names phantom trees is as untrue as "
+                          "one that omits real ones." % un)
+            else:
+                self.ok("uncovered surface %s exists and is named as a gap" % un)
 
     def report(self):
         for n in self.notes:

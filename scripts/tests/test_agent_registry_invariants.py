@@ -371,6 +371,32 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- derived data must not be stored in a truth owner ---------------------------
+print()
+print("--- stored derived data ---")
+
+case("REAL P2: divergent_unreviewed stores a body_similarity score",
+     mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "divergent_unreviewed"),
+                           r["agents"][1].__setitem__("divergence",
+                               {"owning_issue": "icn#2632", "body_similarity": {"a/b": 0.5}})),
+     mutate_files=lambda f: f.__setitem__(
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Other body")),
+     expect="stored derived data")
+
+case("provider_variant stores a body_similarity score",
+     mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "provider_variant"),
+                           r["agents"][1].__setitem__("divergence",
+                               {"adjudicated": True, "why": "x", "body_similarity": 0.4})),
+     mutate_files=lambda f: f.__setitem__(
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Other body")),
+     expect="stored derived data")
+
+case("REAL P2: skills.json names an uncovered surface that does not exist",
+     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
+         "provider_surfaces_no_registry_covers", ["tools/does-not-exist/skills"]),
+     expect="phantom trees")
+
+
 # --- relationship vocabulary must equal enforcement, both directions -------------
 print()
 print("--- relationship vocabulary vs enforcement ---")

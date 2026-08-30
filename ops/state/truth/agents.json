@@ -22,7 +22,7 @@
     },
     "copilot": {
       "tree": ".github/agents",
-      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents selection. icn-orchestrator carries infer: true and is the default router; the rest are infer: false so Copilot does not auto-select the wrong specialist.",
+      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents the surface. NOTE: this field deliberately makes NO claim about which agents are automatically invocable. An earlier revision summarised that here and the summary was wrong -- it said every agent but icn-orchestrator declared infer: false, while icn-docs-synchronizer declares neither invocation key and is therefore automatically invocable. Nothing validated the prose. Per-agent automatic_invocation is the mechanically enforced answer; do not restate it here.",
       "provider_front_matter_keys": [
         "infer"
       ]
@@ -63,14 +63,10 @@
       "name": "icn-architect",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "agent_pack/claude": 0.53,
-          "agent_pack/copilot": 0.03,
-          "claude/copilot": 0.04
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "agent_pack": {
@@ -121,14 +117,10 @@
         ]
       ],
       "divergence": {
-        "body_similarity": {
-          "agent_pack/claude": 0.06,
-          "agent_pack/copilot": 0.06,
-          "claude/copilot": 1.0
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "agent_pack": {
@@ -254,12 +246,10 @@
       "name": "icn-economist",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "agent_pack/claude": 0.07
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "agent_pack": {
@@ -300,12 +290,10 @@
       "name": "icn-gossip-net",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "claude/copilot": 0.11
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "claude": {
@@ -402,12 +390,10 @@
       "name": "icn-invariants-guardian",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "claude/copilot": 0.65
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "claude": {
@@ -487,12 +473,10 @@
       "name": "icn-ops",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "agent_pack/claude": 0.12
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "agent_pack": {
@@ -535,12 +519,10 @@
       "name": "icn-planner",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "claude/copilot": 0.16
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "claude": {
@@ -590,12 +572,10 @@
       "name": "icn-rust-core",
       "relationship": "divergent_unreviewed",
       "divergence": {
-        "body_similarity": {
-          "claude/copilot": 0.33
-        },
         "adjudicated": false,
         "owning_issue": "icn#2632",
-        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated.",
+        "evidence": "Pairwise body similarity is NOT stored. It is derived data that a partial prompt edit makes stale while the record still reads green, so storing it recreates the defect this registry exists to end. scripts/check-agent-registry.py --verbose recomputes and prints it fresh on every run."
       },
       "surfaces": {
         "claude": {
