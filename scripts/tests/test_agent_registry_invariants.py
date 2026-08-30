@@ -118,7 +118,15 @@ def build(tmp, registry, skills, files):
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(str(CHECKER), str(root / "scripts/check-agent-registry.py"))
     (root / "scripts/tests/test_agent_registry_invariants.py").write_text(
-        "# exercises scripts/check-agent-registry.py\n", encoding="utf-8")
+        'import subprocess\n'
+        'subprocess.run(["python3", "scripts/check-agent-registry.py"])\n',
+        encoding="utf-8")
+    (root / "prose-tests.md").write_text(
+        "See scripts/check-agent-registry.py for details.\n", encoding="utf-8")
+    (root / "names-only.py").write_text(
+        'PATH = "scripts/check-agent-registry.py"\n', encoding="utf-8")
+    (root / "echo-caller.sh").write_text(
+        '#!/bin/sh\necho "python3 scripts/check-agent-registry.py"\n', encoding="utf-8")
     (root / "caller.sh").write_text(
         "python3 scripts/check-agent-registry.py\n", encoding="utf-8")
     (root / "not-a-caller.md").write_text("no invocation here\n", encoding="utf-8")
@@ -393,6 +401,72 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- round 9: mentions, bytes, and metadata that outlives its relationship -------
+print()
+print("--- role claims must be executable, not textual ---")
+
+case("REAL P2: enforcement.tests names a prose file that mentions the checker",
+     lambda r: r["enforcement"].__setitem__("tests", "prose-tests.md"),
+     expect="not a Python module")
+
+case("REAL P2: enforcement.tests names Python that imports no runner",
+     lambda r: r["enforcement"].__setitem__("tests", "names-only.py"),
+     expect="imports none of subprocess/importlib/runpy")
+
+case("REAL P2: an invoked_by caller that only echoes the command",
+     lambda r: r["enforcement"].__setitem__("invoked_by", ["echo-caller.sh"]),
+     expect="no executable line there runs the checker")
+
+# MUST-PASS: the shapes the three real callers actually use.
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("checker_under_test", CHECKER)
+_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+for label, line in (
+        ("shell `if out=$(python3 ...)`",
+         'if out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
+        ("workflow `run:`", "        run: python3 scripts/check-agent-registry.py --verbose"),
+        ("bare invocation", "python3 scripts/check-agent-registry.py")):
+    check("MUST-PASS %s counts as an invocation" % label, _mod.invokes_checker(line))
+for label, line in (
+        ("echo-wrapped", 'echo "python3 scripts/check-agent-registry.py"'),
+        ("existence guard", 'if [[ -f "scripts/check-agent-registry.py" ]]; then'),
+        ("error string", 'fail "scripts/check-agent-registry.py is missing"'),
+        ("workflow paths filter", "      - 'scripts/check-agent-registry.py'"),
+        ("comment", "# we used to run python3 scripts/check-agent-registry.py")):
+    check("MUST-FAIL %s is not an invocation" % label, not _mod.invokes_checker(line))
+
+
+print()
+print("--- a mirror claim is a claim about bytes ---")
+
+# `.strip()` erased leading/trailing whitespace before comparison, so a four-space indent --
+# which turns the first line into a Markdown code block -- read as byte-identical.
+for label, body in (("leading indent", "    Body for twin."),
+                    ("trailing whitespace", "Body for twin.   "),
+                    ("extra blank line", "Body for twin.\n")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: fixture\ninfer: false\n---\n\n%s\n" % body)
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: exact_mirror differing only by %s is rejected" % label,
+          rc != 0 and "bodies differ" in out)
+
+
+print()
+print("--- divergence metadata must not outlive its relationship ---")
+
+case("REAL P2: exact_mirror retaining divergence metadata",
+     lambda r: r["agents"][1].__setitem__(
+         "divergence", {"adjudicated": True, "why": "different"}),
+     expect="divergence metadata is retained")
+
+case("single_surface retaining divergence metadata",
+     lambda r: r["agents"][0].__setitem__("divergence", {"owning_issue": "icn#2632"}),
+     expect="divergence metadata is retained")
+
+
 # --- round 8: the provider scalar's type, and claims of role ---------------------
 print()
 print("--- provider scalar types ---")
@@ -480,7 +554,7 @@ case("REAL P2: enforcement.checker points at an unrelated existing file",
 
 case("enforcement.tests points at a file that never exercises the checker",
      lambda r: r["enforcement"].__setitem__("tests", "not-a-caller.md"),
-     expect="nothing there exercises the declared checker")
+     expect="not a Python module")
 
 
 # --- round 7: claims that pass for the wrong reason -----------------------------

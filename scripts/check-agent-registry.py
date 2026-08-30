@@ -35,10 +35,12 @@ stage 2 and is not checked here.
 Run: python3 scripts/check-agent-registry.py [--verbose]
 """
 import argparse
+import ast
 import difflib
 import json
 import pathlib
 import re
+import shlex
 import sys
 
 REGISTRY = "ops/state/truth/agents.json"
@@ -281,15 +283,47 @@ ALL_SEMANTIC_FIELDS = frozenset(f for spec in PROVIDER_ADAPTERS.values() for f i
 # and YAML), then a line must actually run the checker through an interpreter. A bare path in
 # a workflow `paths:` filter, an `if [[ -f ... ]]` guard or a `fail "... is missing"` string
 # is a reference, not a gate.
-_INVOCATION = re.compile(r"python3?\s+[^\n]*check-agent-registry\.py")
+_INTERPRETERS = ("python", "python3")
 
 
-def invokes_checker(text):
+def _candidate_commands(line):
+    """Command strings a line could actually execute.
+
+    The line itself with a leading YAML `run:` or shell keyword removed, plus the contents of
+    any `$(...)`. The real callers wrap the invocation in `if out=$(python3 ... ); then`, so
+    the substitution has to be looked inside; `echo "python3 ..."` must NOT match, which a
+    substring search on the whole line could not distinguish.
+    """
+    stripped = line.strip()
+    stripped = re.sub(r"^-?\s*(run|command)\s*:\s*", "", stripped)
+    stripped = re.sub(r"^(if|elif|while|until|then|do|else)\s+", "", stripped)
+    yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", stripped)
+    for inner in re.findall(r"\$\(([^()]*)\)", line):
+        yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", inner.strip())
+
+
+def invokes_checker(text, target="check-agent-registry.py"):
+    """True only when some line RUNS the checker, not merely mentions it.
+
+    `echo "python3 scripts/check-agent-registry.py"` mentions it. So does an `if [[ -f ... ]]`
+    guard, a `fail "... is missing"` string and a workflow `paths:` entry. The interpreter must
+    be argv0 and the target must be one of its arguments.
+    """
     for line in text.splitlines():
         if line.strip().startswith("#"):
             continue
-        if _INVOCATION.search(line):
-            return True
+        for cand in _candidate_commands(line):
+            if target not in cand:
+                continue
+            try:
+                tokens = shlex.split(cand, comments=True)
+            except ValueError:
+                continue
+            if not tokens:
+                continue
+            argv0 = tokens[0].strip("\"'").rsplit("/", 1)[-1]
+            if argv0 in _INTERPRETERS and any(target in t for t in tokens[1:]):
+                return True
     return False
 
 
@@ -322,21 +356,37 @@ class Checker:
                 for p in sorted(d.glob("*.md")) if p.name != "README.md"}
 
     def bodies(self, rec):
+        """Raw post-front-matter bodies. NOT stripped.
+
+        `.strip()` erased leading and trailing whitespace before every comparison, so
+        indenting a prompt's first line by four spaces -- which turns it into a Markdown code
+        block, changing what the provider renders -- still reported the bodies byte-identical.
+        A mirror claim is a claim about bytes; normalising them first makes it a claim about
+        something else.
+        """
         out = {}
         for sid, entry in (rec.get("surfaces") or {}).items():
             fp = self.root / (entry or {}).get("path", "")
             if fp.exists():
                 _, body = split_front_matter(fp.read_text(encoding="utf-8"))
-                out[sid] = body.strip()
+                out[sid] = body
         return out
 
     # ---- relationship validators. One per declared type; see SEMANTICS above. -------
+
+    def _reject_divergence(self, rec, rel):
+        if rec.get("divergence"):
+            self.fail("%s: relationship %s but divergence metadata is retained. Stage 2 "
+                      "converges records by changing the relationship, and leftover "
+                      "adjudication or owning-issue fields would keep asserting a difference "
+                      "the relationship says no longer exists." % (rec["name"], rel))
 
     def _v_single_surface(self, rec):
         n = len(rec.get("surfaces") or {})
         if n != 1:
             self.fail("%s: relationship single_surface but %d surfaces are named"
                       % (rec["name"], n))
+        self._reject_divergence(rec, "single_surface")
 
     def _v_exact_mirror(self, rec):
         b = self.bodies(rec)
@@ -350,6 +400,7 @@ class Checker:
                       % (rec["name"], " vs ".join(sorted(b))))
         else:
             self.ok("%s: exact_mirror verified byte-identical" % rec["name"])
+        self._reject_divergence(rec, "exact_mirror")
 
     def _v_provider_variant(self, rec):
         div = rec.get("divergence") or {}
@@ -689,15 +740,14 @@ class Checker:
             self.fail("enforcement.tests: must be a non-empty path string")
         elif not (self.root / val).is_file():
             self.fail("enforcement.tests names %s, which does not exist." % val)
-        elif not invokes_checker((self.root / val).read_text(
-                encoding="utf-8", errors="replace")) and \
-                enf.get("checker", "") not in (self.root / val).read_text(
-                    encoding="utf-8", errors="replace"):
-            self.fail("enforcement.tests names %s, but nothing there exercises the declared "
-                      "checker. A tests claim that names an unrelated file is the same defect "
-                      "as a checker claim that does." % val)
         else:
-            self.ok("enforcement.tests -> %s exercises the declared checker" % val)
+            problem = self._tests_problem(val, enf.get("checker", ""))
+            if problem:
+                self.fail("enforcement.tests names %s, but %s. Naming a file that merely "
+                          "mentions the checker is the same defect as naming an unrelated "
+                          "one." % (val, problem))
+            else:
+                self.ok("enforcement.tests -> %s executes the declared checker" % val)
         callers = enf.get("invoked_by")
         if not isinstance(callers, list):
             self.fail("enforcement.invoked_by: must be an array of caller paths")
@@ -747,6 +797,33 @@ class Checker:
                 self.fail("%s.%s: %r is not a semantic provider type %r projects. Adapters own "
                           "which semantics exist; recording one here asserts behaviour that "
                           "provider does not have." % (name, sid, field, provider_type))
+
+    def _tests_problem(self, rel, checker_rel):
+        """Why the named tests file does not exercise the checker, or None.
+
+        A prose file naming the path passed the previous substring fallback. This requires
+        actual code: it must parse as Python, reference the checker path in a literal, and
+        import a mechanism that can run or load it.
+        """
+        text = (self.root / rel).read_text(encoding="utf-8", errors="replace")
+        if not rel.endswith(".py"):
+            return "it is not a Python module"
+        try:
+            tree = ast.parse(text)
+        except SyntaxError as exc:
+            return "it does not parse as Python (%s)" % exc
+        target = checker_rel.rsplit("/", 1)[-1] if checker_rel else "check-agent-registry.py"
+        names = {n.name.split(".")[0] for n in ast.walk(tree)
+                 if isinstance(n, ast.alias)}
+        runners = names & {"subprocess", "importlib", "runpy"}
+        if not runners:
+            return ("it imports none of subprocess/importlib/runpy, so nothing there can run "
+                    "or load the checker")
+        literals = [n.value for n in ast.walk(tree)
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+        if not any(target in lit for lit in literals):
+            return "no string literal in it names %s" % target
+        return None
 
     def check_cross_registry(self, surfaces):
         sk = self.root / SKILLS
