@@ -97,6 +97,14 @@ class Checker:
             if not tree:
                 self.fail("provider_surfaces.%s: no tree declared" % sid)
                 continue
+            # The v1 orchestrator record escaped the repo root and nothing noticed. A surface
+            # tree can do the same one level higher: the checker would scan an out-of-repo
+            # directory and report clean over it.
+            if tree.startswith("/") or ".." in pathlib.PurePosixPath(tree).parts:
+                self.fail("provider_surfaces.%s: tree %s is absolute or escapes the repository "
+                          "root. A surface must be inside the repo or the checker validates "
+                          "something this repo does not own." % (sid, tree))
+                continue
             found = self.definitions_on_disk(tree)
             if found is None:
                 self.fail("provider_surfaces.%s: declared tree %s does not exist" % (sid, tree))
@@ -219,9 +227,23 @@ class Checker:
                     self.ok("%s: mirror pair %s/%s verified byte-identical" % (name, a, b))
 
             div = rec.get("divergence") or {}
-            if rel == "divergent_unreviewed" and not div.get("owning_issue"):
-                self.fail("%s: divergent_unreviewed requires divergence.owning_issue so the "
-                          "debt has an owner." % name)
+            if rel == "divergent_unreviewed":
+                if not div.get("owning_issue"):
+                    self.fail("%s: divergent_unreviewed requires divergence.owning_issue so "
+                              "the debt has an owner." % name)
+                # The claim must remain true. Once stage 2 makes the bodies identical, this
+                # record is asserting a divergence that no longer exists, carrying stale
+                # body_similarity numbers -- and would otherwise stay green forever.
+                bodies = {}
+                for sid, entry in rec_surfaces.items():
+                    fp = self.root / entry.get("path", "")
+                    if fp.exists():
+                        _, body = split_front_matter(fp.read_text(encoding="utf-8"))
+                        bodies[sid] = body.strip()
+                if len(bodies) > 1 and len(set(bodies.values())) == 1:
+                    self.fail("%s: declared divergent_unreviewed but every body is now "
+                              "identical. Promote it to exact_mirror -- a resolved divergence "
+                              "must not keep claiming to be one." % name)
             if rel == "provider_variant":
                 if not div.get("adjudicated"):
                     self.fail("%s: provider_variant asserts the divergence is deliberate and "
@@ -239,11 +261,18 @@ class Checker:
 
         # ---- 5. skills.json must not restate a false claim about this file ---
         sk = self.root / SKILLS
+        if not sk.exists():
+            self.fail("%s is missing. The cross-registry boundary between the two registries "
+                      "cannot be verified without it." % SKILLS)
         if sk.exists():
             try:
                 sj = json.loads(sk.read_text(encoding="utf-8"))
-            except ValueError:
+            except ValueError as exc:
                 sj = None
+                self.fail("skills.json is unparseable (%s). It is a registered truth owner and "
+                          "holds the structured cross-registry contract, so skipping the "
+                          "boundary check on a parse error would be fail-open exactly where "
+                          "this checker is supposed to fail closed." % exc)
             if sj:
                 trees = {v["tree"] for v in surfaces.values() if v.get("tree")}
                 cross = (sj.get("declared_scope", {}) or {}).get("cross_registry") or {}
@@ -271,196 +300,6 @@ class Checker:
                         if un in trees:
                             self.fail("skills.json lists %s as covered by no registry, but "
                                       "agents.json declares it as a surface." % un)
-
-        return self.report()
-
-        surfaces = reg.get("provider_surfaces") or {}
-        if not surfaces:
-            self.fail("provider_surfaces: missing or empty -- nothing declares which trees "
-                      "hold agent definitions, so completeness cannot mean anything.")
-            return self.report()
-
-        rel_model = reg.get("relationship_model") or {}
-        records = reg.get("agents") or []
-
-        # ---- 1. every declared surface tree must exist ----------------------
-        disk = {}
-        for sid, sdef in sorted(surfaces.items()):
-            tree = (sdef or {}).get("tree")
-            if not tree:
-                self.fail("provider_surfaces.%s: no tree declared" % sid)
-                continue
-            found = self.definitions_on_disk(tree)
-            if found is None:
-                self.fail("provider_surfaces.%s: declared tree %s does not exist" % (sid, tree))
-                continue
-            disk[sid] = found
-            self.ok("surface %s -> %s (%d definitions)" % (sid, tree, len(found)))
-
-        # ---- 2. record integrity --------------------------------------------
-        seen = set()
-        registered = {sid: set() for sid in disk}
-        for rec in records:
-            name = rec.get("name")
-            if not name:
-                self.fail("a record has no name: %r" % (rec,))
-                continue
-            if name in seen:
-                self.fail("%s: duplicate record. One logical agent, one record -- two records "
-                          "sharing a name is exactly the masquerade this registry prevents."
-                          % name)
-                continue
-            seen.add(name)
-
-            rec_surfaces = rec.get("surfaces") or {}
-            if not rec_surfaces:
-                self.fail("%s: no surfaces. A record that names no surface describes nothing."
-                          % name)
-                continue
-
-            for sid, entry in sorted(rec_surfaces.items()):
-                if sid not in surfaces:
-                    self.fail("%s: surface %r is not a declared provider_surface" % (name, sid))
-                    continue
-                path = (entry or {}).get("path")
-                if not path:
-                    self.fail("%s.%s: no path" % (name, sid))
-                    continue
-
-                tree = surfaces[sid]["tree"]
-                if not path.startswith(tree + "/"):
-                    self.fail("%s.%s: path %s is not inside the declared tree %s"
-                              % (name, sid, path, tree))
-                    continue
-                if ".." in pathlib.PurePosixPath(path).parts:
-                    self.fail("%s.%s: path %s escapes the repository root" % (name, sid, path))
-                    continue
-
-                fp = self.root / path
-                if not fp.exists():
-                    self.fail("%s.%s -> %s (missing)" % (name, sid, path))
-                    continue
-
-                if fp.stem != name:
-                    self.fail("%s.%s: file is %s.md. A record must not point at a file with a "
-                              "different name -- that is two agents wearing one name."
-                              % (name, sid, fp.stem))
-                    continue
-
-                fm, _ = split_front_matter(fp.read_text(encoding="utf-8"))
-                declared = front_matter_value(fm, "name")
-                if declared is not None and declared != name:
-                    self.fail("%s.%s: front matter declares name: %s. The provider loads the "
-                              "front-matter name, so the registry would route to a name the "
-                              "provider does not answer to." % (name, sid, declared))
-
-                registered.setdefault(sid, set()).add(name)
-                self.ok("%s.%s -> %s" % (name, sid, path))
-
-            # ---- 3. the relationship must be declared and true --------------
-            rel = rec.get("relationship")
-            if rel not in rel_model:
-                self.fail("%s: relationship %r is not in relationship_model" % (name, rel))
-                continue
-
-            n = len(rec_surfaces)
-            if rel == "single_surface" and n != 1:
-                self.fail("%s: relationship single_surface but %d surfaces are named" % (name, n))
-            if rel != "single_surface" and n < 2:
-                self.fail("%s: relationship %s claims a cross-surface relationship but only %d "
-                          "surface is named" % (name, rel, n))
-
-            if rel == "exact_mirror" and n >= 2:
-                bodies = {}
-                for sid, entry in rec_surfaces.items():
-                    fp = self.root / entry["path"]
-                    if fp.exists():
-                        _, body = split_front_matter(fp.read_text(encoding="utf-8"))
-                        bodies[sid] = body.strip()
-                if len(set(bodies.values())) > 1:
-                    self.fail("%s: declared exact_mirror but the bodies differ (%s). A mirror "
-                              "that drifts must fail, not silently become a variant."
-                              % (name, " vs ".join(sorted(bodies))))
-                else:
-                    self.ok("%s: exact_mirror verified byte-identical" % name)
-
-            # A mirror pair is an enforced promise between two surfaces, independent of the
-            # record-level relationship. copilot-instructions.md documents one; nothing
-            # checked it until now.
-            for pair in rec.get("mirror_pairs") or []:
-                if not (isinstance(pair, list) and len(pair) == 2):
-                    self.fail("%s: mirror_pairs entries must name exactly two surfaces, "
-                              "found %r" % (name, pair))
-                    continue
-                a, b = pair
-                missing = [x for x in pair if x not in rec_surfaces]
-                if missing:
-                    self.fail("%s: mirror_pairs names surface(s) %s that this record does not "
-                              "expose" % (name, ", ".join(missing)))
-                    continue
-                bodies = {}
-                for sid in pair:
-                    fp = self.root / rec_surfaces[sid]["path"]
-                    if fp.exists():
-                        _, body = split_front_matter(fp.read_text(encoding="utf-8"))
-                        bodies[sid] = body.strip()
-                if len(bodies) == 2 and bodies[a] != bodies[b]:
-                    self.fail("%s: %s and %s are declared a mirror pair but their bodies "
-                              "differ. The claim is enforced, so drift fails here rather "
-                              "than quietly becoming a variant." % (name, a, b))
-                elif len(bodies) == 2:
-                    self.ok("%s: mirror pair %s/%s verified byte-identical" % (name, a, b))
-
-            div = rec.get("divergence") or {}
-            if rel == "divergent_unreviewed" and not div.get("owning_issue"):
-                self.fail("%s: divergent_unreviewed requires divergence.owning_issue so the "
-                          "debt has an owner." % name)
-            if rel == "provider_variant":
-                if not div.get("adjudicated"):
-                    self.fail("%s: provider_variant asserts the divergence is deliberate and "
-                              "requires divergence.adjudicated = true." % name)
-                if not div.get("why"):
-                    self.fail("%s: provider_variant requires divergence.why." % name)
-
-        # ---- 4. completeness, the other direction ---------------------------
-        for sid, found in sorted(disk.items()):
-            for stem in sorted(found):
-                if stem not in registered.get(sid, set()):
-                    self.fail("%s/%s.md exists but no record names it on surface %r. An "
-                              "unregistered provider agent must not be able to appear silently."
-                              % (surfaces[sid]["tree"], stem, sid))
-
-        # ---- 5. skills.json must not restate a false claim about this file ---
-        sk = self.root / SKILLS
-        if sk.exists():
-            try:
-                sj = json.loads(sk.read_text(encoding="utf-8"))
-            except ValueError:
-                sj = None
-            if sj:
-                trees = {v["tree"] for v in surfaces.values() if v.get("tree")}
-                for line in (sj.get("declared_scope", {}) or {}).get("out_of_scope", []) or []:
-                    if "agents.json" not in line:
-                        continue
-                    # Every tree the sentence claims agents.json tracks must be a declared
-                    # surface here. Two registered owners must not contradict each other --
-                    # the v1 file was silent about .github/agents/ while skills.json said it
-                    # was tracked, and nothing could see the contradiction.
-                    claimed = re.findall(r"`?([\w./-]*(?:agents|plugins)[\w./*-]*)`?/?", line)
-                    for c in claimed:
-                        c = c.rstrip("/*").rstrip("/")
-                        if not c or "agents.json" in c or c.endswith(".json"):
-                            continue
-                        if not (self.root / c).exists():
-                            continue
-                        if c not in trees:
-                            self.fail(
-                                "skills.json out_of_scope claims %s is tracked by agents.json, "
-                                "but agents.json declares no such provider surface. Fix the "
-                                "claim or declare the surface -- do not leave two registered "
-                                "owners disagreeing." % c)
-                        else:
-                            self.ok("skills.json's claim about %s is true" % c)
 
         return self.report()
 

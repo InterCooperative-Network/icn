@@ -281,6 +281,9 @@ fi
 # and it never validated a registered path. Delegated to the checker that does both
 # directions across every declared surface (Refs icn#2632).
 
+# A missing checker must FAIL, not skip. This script is a documented standalone entrypoint,
+# so a conditional skip would let it report success while enforcement had disappeared --
+# fail-open on the gate whose whole purpose is failing closed.
 if [[ -f "${REPO_ROOT}/scripts/check-agent-registry.py" ]]; then
   if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then
     ok "Agent registry consistent across all declared provider surfaces"
@@ -289,6 +292,8 @@ if [[ -f "${REPO_ROOT}/scripts/check-agent-registry.py" ]]; then
       [[ -n "${line}" ]] && fail "agent registry: ${line}"
     done <<< "${agent_registry_out}"
   fi
+else
+  fail "scripts/check-agent-registry.py is missing — agent-registry enforcement would be silently absent"
 fi
 
 # ─── Check 7: All SKILL.md files must have truth_contract ────────────────────

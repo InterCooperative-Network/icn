@@ -99,9 +99,13 @@ def build(tmp, registry, skills, files):
         fp.write_text(text, encoding="utf-8")
     (root / "ops/state/truth/agents.json").write_text(
         json.dumps(registry, indent=2), encoding="utf-8")
-    if skills is not None:
-        (root / "ops/state/truth/skills.json").write_text(
-            json.dumps(skills, indent=2), encoding="utf-8")
+    sk = root / "ops/state/truth/skills.json"
+    if skills == "DELETE":
+        pass                                   # deliberately absent
+    elif isinstance(skills, dict) and "__RAW__" in skills:
+        sk.write_text(skills["__RAW__"], encoding="utf-8")
+    elif skills is not None:
+        sk.write_text(json.dumps(skills, indent=2), encoding="utf-8")
     return root
 
 
@@ -155,7 +159,9 @@ def case(label, mutate_reg=None, mutate_skills=None, mutate_files=None, expect=N
     r, s, f = base_registry(), base_skills(), dict(BASE_FILES)
     if mutate_reg:
         mutate_reg(r)
-    if mutate_skills:
+    if mutate_skills == "DELETE":
+        s = "DELETE"
+    elif mutate_skills:
         mutate_skills(s)
     if mutate_files:
         mutate_files(f)
@@ -260,6 +266,29 @@ case("skills.json calls a registered surface uncovered by any registry",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
          "provider_surfaces_no_registry_covers", [".github/agents"]),
      expect="covered by no registry")
+
+
+# --- fail-open cases. Every one of these was green before review: a checker that skips
+# --- silently is worse than absent, because it reports the skip as a pass.
+case("a surface tree that escapes the repository root",
+     lambda r: r["provider_surfaces"]["claude"].__setitem__("tree", "../outside/agents"),
+     expect="escapes the repository root")
+
+case("a surface tree given as an absolute path",
+     lambda r: r["provider_surfaces"]["claude"].__setitem__("tree", "/etc/agents"),
+     expect="absolute")
+
+case("divergent_unreviewed whose bodies are now identical (stage 2 will cause this)",
+     mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "divergent_unreviewed"),
+                           r["agents"][1].__setitem__("divergence", {"owning_issue": "x"})),
+     expect="every body is now identical")
+
+case("skills.json present but unparseable",
+     mutate_skills=lambda s: s.__setitem__("__RAW__", "{not json"),
+     expect="unparseable")
+
+case("skills.json absent entirely",
+     mutate_skills="DELETE", expect="missing")
 
 
 # --------------------------------------------------------------- the real repository
