@@ -125,6 +125,20 @@ def build(tmp, registry, skills, files):
         "See scripts/check-agent-registry.py for details.\n", encoding="utf-8")
     (root / "names-only.py").write_text(
         'PATH = "scripts/check-agent-registry.py"\n', encoding="utf-8")
+    # Ingredients without an execution path: a runner imported, the checker stored, no call.
+    (root / "noop-tests.py").write_text(
+        'import subprocess\nCHECKER = "scripts/check-agent-registry.py"\n', encoding="utf-8")
+    # A runner call that goes somewhere else entirely, with the path present but unused.
+    (root / "unrelated-call.py").write_text(
+        'import subprocess\n'
+        'CHECKER = "scripts/check-agent-registry.py"\n'
+        'subprocess.run(["echo", "hi"])\n', encoding="utf-8")
+    # The shape the real suite uses: a name bound to a path expression, passed to a runner.
+    (root / "real-shape.py").write_text(
+        'import pathlib, subprocess, sys\n'
+        'CHECKER = pathlib.Path("scripts") / "check-agent-registry.py"\n'
+        'subprocess.run([sys.executable, str(CHECKER), "--repo-root", "."])\n',
+        encoding="utf-8")
     (root / "echo-caller.sh").write_text(
         '#!/bin/sh\necho "python3 scripts/check-agent-registry.py"\n', encoding="utf-8")
     (root / "caller.sh").write_text(
@@ -401,6 +415,58 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- round 10: a role is proven by the operation, not by role-shaped tokens ------
+print()
+print("--- enforcement.tests must EXECUTE the checker ---")
+
+case("REAL P2: a runner imported and the path stored, but no call",
+     lambda r: r["enforcement"].__setitem__("tests", "noop-tests.py"),
+     expect="no supported runner call there reaches it")
+
+case("REAL P2: a runner call that goes somewhere else",
+     lambda r: r["enforcement"].__setitem__("tests", "unrelated-call.py"),
+     expect="no supported runner call there reaches it")
+
+r = base_registry()
+r["enforcement"]["tests"] = "real-shape.py"
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("MUST-PASS the real suite shape -- subprocess.run([sys.executable, str(CHECKER)])",
+      rc == 0)
+
+
+print()
+print("--- invoked_by: the checker must be Python's SELECTED program ---")
+
+import importlib.util as _ilu2
+_spec2 = _ilu2.spec_from_file_location("checker_r10", CHECKER)
+_m2 = _ilu2.module_from_spec(_spec2)
+_spec2.loader.exec_module(_m2)
+
+# Python's synopsis is `[-c cmd | -m mod | file | -]`. After -c or -m, a later token naming
+# the checker is an ARGUMENT to the selected program: the checker never runs.
+for label, line in (
+        ("-c selects an inline program", "python3 -c 'pass' scripts/check-agent-registry.py"),
+        ("-m selects a module", "python3 -m something scripts/check-agent-registry.py"),
+        ("- selects stdin", "python3 - scripts/check-agent-registry.py"),
+        ("echo-wrapped", 'echo "python3 scripts/check-agent-registry.py"'),
+        ("existence guard", 'if [[ -f "scripts/check-agent-registry.py" ]]; then'),
+        ("error string", 'fail "scripts/check-agent-registry.py is missing"'),
+        ("workflow paths filter", "      - 'scripts/check-agent-registry.py'"),
+        ("comment", "# python3 scripts/check-agent-registry.py")):
+    check("MUST-FAIL %s is not an invocation" % label, not _m2.invokes_checker(line))
+
+# Every shape the three real callers actually use.
+for label, line in (
+        ("bare", "python3 scripts/check-agent-registry.py"),
+        ("with args", "python3 scripts/check-agent-registry.py --verbose"),
+        ("drift-check.sh",
+         'if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
+        ("check-preflight-consistency.sh",
+         "if agent_reg_out=$(python3 scripts/check-agent-registry.py 2>&1); then"),
+        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
+    check("MUST-PASS %s counts as an invocation" % label, _m2.invokes_checker(line))
+
+
 # --- round 9: mentions, bytes, and metadata that outlives its relationship -------
 print()
 print("--- role claims must be executable, not textual ---")
@@ -411,7 +477,7 @@ case("REAL P2: enforcement.tests names a prose file that mentions the checker",
 
 case("REAL P2: enforcement.tests names Python that imports no runner",
      lambda r: r["enforcement"].__setitem__("tests", "names-only.py"),
-     expect="imports none of subprocess/importlib/runpy")
+     expect="no supported runner call there reaches it")
 
 case("REAL P2: an invoked_by caller that only echoes the command",
      lambda r: r["enforcement"].__setitem__("invoked_by", ["echo-caller.sh"]),

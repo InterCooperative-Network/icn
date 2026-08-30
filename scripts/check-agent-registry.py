@@ -92,6 +92,15 @@ def as_str_list(v):
 ALL_SEMANTIC_FIELDS = frozenset()   # rebound below, once the adapters are defined.
 
 
+# Call vocabulary derived from what this repository actually uses to run the checker, not
+# from imagined future mechanisms. Widen it deliberately, never speculatively.
+SUPPORTED_TEST_RUNNERS = frozenset({
+    "subprocess.run", "subprocess.Popen", "subprocess.call",
+    "subprocess.check_call", "subprocess.check_output",
+    "runpy.run_path", "importlib.util.spec_from_file_location",
+})
+
+
 class InvalidProviderBoolean(Exception):
     """A provider key is present with a value the provider does not define."""
 
@@ -285,14 +294,24 @@ ALL_SEMANTIC_FIELDS = frozenset(f for spec in PROVIDER_ADAPTERS.values() for f i
 # is a reference, not a gate.
 _INTERPRETERS = ("python", "python3")
 
+# Python's own synopsis is `[-c cmd | -m mod | file | -]`: the executable alternatives are
+# mutually exclusive, and after `-c` or `-m` every later token is an ARGUMENT to the selected
+# program, not a script. `python3 -c 'pass' scripts/check-agent-registry.py` runs nothing.
+#
+# Deliberately no option modelling. All three real callers are `python3 <path> [args]` with no
+# interpreter options at all, so the first token after argv0 must BE the script. A future
+# caller that legitimately adds `-u` will turn this gate red until the shape is added on
+# purpose -- which is the safer failure than a verifier speculating broadly enough to accept a
+# no-op.
+_VAR_PREFIX = re.compile(r"^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/")
+
 
 def _candidate_commands(line):
     """Command strings a line could actually execute.
 
     The line itself with a leading YAML `run:` or shell keyword removed, plus the contents of
-    any `$(...)`. The real callers wrap the invocation in `if out=$(python3 ... ); then`, so
-    the substitution has to be looked inside; `echo "python3 ..."` must NOT match, which a
-    substring search on the whole line could not distinguish.
+    any `$(...)`. The three real callers wrap the invocation as `if out=$(python3 ... ); then`,
+    so the substitution has to be looked inside.
     """
     stripped = line.strip()
     stripped = re.sub(r"^-?\s*(run|command)\s*:\s*", "", stripped)
@@ -302,27 +321,41 @@ def _candidate_commands(line):
         yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", inner.strip())
 
 
-def invokes_checker(text, target="check-agent-registry.py"):
-    """True only when some line RUNS the checker, not merely mentions it.
+def _selected_script(tokens):
+    """The file Python would execute, or None if it selects something else."""
+    if len(tokens) < 2:
+        return None
+    argv0 = tokens[0].strip("\"'").rsplit("/", 1)[-1]
+    if argv0 not in _INTERPRETERS:
+        return None
+    candidate = tokens[1].strip("\"'")
+    if candidate.startswith("-"):
+        # -c, -m, - and every other option: the program is not this token.
+        return None
+    return _VAR_PREFIX.sub("", candidate)
 
-    `echo "python3 scripts/check-agent-registry.py"` mentions it. So does an `if [[ -f ... ]]`
-    guard, a `fail "... is missing"` string and a workflow `paths:` entry. The interpreter must
-    be argv0 and the target must be one of its arguments.
+
+def invokes_checker(text, target="scripts/check-agent-registry.py"):
+    """True only when some line RUNS the checker as Python's selected program.
+
+    A role is proven by the operation performed, not by the presence of role-shaped tokens.
+    Mentions that must NOT count: `echo "python3 ..."`, an `[[ -f ... ]]` guard, a
+    `fail "... is missing"` string, a workflow `paths:` entry, a comment, and any invocation
+    where the path is an argument to a different selected program.
     """
     for line in text.splitlines():
         if line.strip().startswith("#"):
             continue
         for cand in _candidate_commands(line):
-            if target not in cand:
+            if target.rsplit("/", 1)[-1] not in cand:
                 continue
             try:
                 tokens = shlex.split(cand, comments=True)
             except ValueError:
                 continue
-            if not tokens:
-                continue
-            argv0 = tokens[0].strip("\"'").rsplit("/", 1)[-1]
-            if argv0 in _INTERPRETERS and any(target in t for t in tokens[1:]):
+            script = _selected_script(tokens)
+            if script and (script == target or script.endswith("/" + target)
+                           or script.endswith(target)):
                 return True
     return False
 
@@ -799,11 +832,17 @@ class Checker:
                           "provider does not have." % (name, sid, field, provider_type))
 
     def _tests_problem(self, rel, checker_rel):
-        """Why the named tests file does not exercise the checker, or None.
+        """Why the named tests file does not execute the checker, or None.
 
-        A prose file naming the path passed the previous substring fallback. This requires
-        actual code: it must parse as Python, reference the checker path in a literal, and
-        import a mechanism that can run or load it.
+        Ingredients coexisting in a module is not an execution path. A file holding
+        `import subprocess` beside `CHECKER = "...check-agent-registry.py"` passed the previous
+        check while never calling anything.
+
+        The supported vocabulary is derived from what this repository actually does -- the real
+        suite runs `subprocess.run([sys.executable, str(CHECKER), ...])` -- not from imagined
+        future mechanisms. Deliberately not data-flow analysis: a runner CALL must exist whose
+        argument subtree reaches the checker, either as a string literal or through a name bound
+        to a path expression naming it.
         """
         text = (self.root / rel).read_text(encoding="utf-8", errors="replace")
         if not rel.endswith(".py"):
@@ -812,18 +851,41 @@ class Checker:
             tree = ast.parse(text)
         except SyntaxError as exc:
             return "it does not parse as Python (%s)" % exc
-        target = checker_rel.rsplit("/", 1)[-1] if checker_rel else "check-agent-registry.py"
-        names = {n.name.split(".")[0] for n in ast.walk(tree)
-                 if isinstance(n, ast.alias)}
-        runners = names & {"subprocess", "importlib", "runpy"}
-        if not runners:
-            return ("it imports none of subprocess/importlib/runpy, so nothing there can run "
-                    "or load the checker")
-        literals = [n.value for n in ast.walk(tree)
-                    if isinstance(n, ast.Constant) and isinstance(n.value, str)]
-        if not any(target in lit for lit in literals):
-            return "no string literal in it names %s" % target
-        return None
+
+        target = (checker_rel or "scripts/check-agent-registry.py").rsplit("/", 1)[-1]
+
+        def names_the_checker(node):
+            return any(isinstance(n, ast.Constant) and isinstance(n.value, str)
+                       and target in n.value for n in ast.walk(node))
+
+        # Names bound to an expression that names the checker: CHECKER = ROOT / "..." / "x.py"
+        bound = {t.id for a in ast.walk(tree) if isinstance(a, ast.Assign)
+                 and names_the_checker(a.value)
+                 for t in a.targets if isinstance(t, ast.Name)}
+
+        def call_reaches_checker(call):
+            for arg in list(call.args) + [k.value for k in call.keywords]:
+                if names_the_checker(arg):
+                    return True
+                if any(isinstance(n, ast.Name) and n.id in bound for n in ast.walk(arg)):
+                    return True
+            return False
+
+        for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call)):
+            dotted = []
+            f = call.func
+            while isinstance(f, ast.Attribute):
+                dotted.append(f.attr)
+                f = f.value
+            if isinstance(f, ast.Name):
+                dotted.append(f.id)
+            qual = ".".join(reversed(dotted))
+            if qual in SUPPORTED_TEST_RUNNERS and call_reaches_checker(call):
+                return None
+
+        return ("no supported runner call there reaches it. The suite must actually execute or "
+                "load the checker (%s), not merely import a runner and store the path"
+                % ", ".join(sorted(SUPPORTED_TEST_RUNNERS)))
 
     def check_cross_registry(self, surfaces):
         sk = self.root / SKILLS
