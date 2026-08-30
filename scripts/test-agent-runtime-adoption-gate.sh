@@ -334,16 +334,25 @@ fi
 # ── 4. the count itself is asserted, not decorative ────────────────────────
 # PARSED, not grepped: `grep -q "EXPECTED_CHECKS = 25"` is satisfied by a COMMENT, so setting
 # the constant to 24 and adding `# EXPECTED_CHECKS = 25` left this case green.
+# The expectation is now fixed + derived (icn#2691): the hook-executable checks come from
+# .claude/settings.json, so their count legitimately changes when a hook is added. The fixed
+# part stays exact; this asserts the SUM, which is the property that actually matters.
 DECLARED=$(python3 -c '
-import re, sys
+import importlib.util, json, pathlib, re, sys
 src = open(sys.argv[1]).read()
-m = re.search(r"^EXPECTED_CHECKS\s*=\s*(\d+)\s*$", src, re.M)
-print(m.group(1) if m else "")
-' "$GATE")
+m = re.search(r"^EXPECTED_STATIC_CHECKS\s*=\s*(\d+)\s*$", src, re.M)
+if not m:
+    print(""); sys.exit()
+spec = importlib.util.spec_from_file_location("gate", sys.argv[1])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+root = pathlib.Path(sys.argv[2])
+settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
+print(int(m.group(1)) + len(mod.direct_hook_targets(settings, root)))
+' "$GATE" "$FIX")
 if [ -n "$BASE_COUNT" ] && [ "$DECLARED" = "$BASE_COUNT" ]; then
-  ok "EXPECTED_CHECKS ($BASE_COUNT) matches what a complete run actually performs"
+  ok "EXPECTED_STATIC_CHECKS + derived hook checks ($BASE_COUNT) matches a complete run"
 else
-  bad "EXPECTED_CHECKS does not match the observed count" "declared=${DECLARED:-<unparseable>} observed=$BASE_COUNT"
+  bad "the expected check count does not match the observed count" "declared=${DECLARED:-<unparseable>} observed=$BASE_COUNT"
 fi
 
 # ── 5. the prose the gate prints must match what it verified ───────────────
@@ -419,6 +428,57 @@ wrapper_case "the degraded envelope is complete and parseable (exit 3)" "plain"
 wrapper_case "...and survives a double quote in the repo path" 'has"quote'
 wrapper_case "...and a backslash" 'has\backslash'
 wrapper_case "...and a tab" "$(printf 'has\ttab')"
+
+# ── 6. a hook invoked directly must be executable (icn#2691) ───────────────
+# hook-health.sh was committed 100644 while settings.json ran it AS the command, so it exited
+# 126 at every session start. The gate did not look: its executable list was hardcoded and
+# omitted it. The list is derived from settings.json now; these prove the derivation both
+# catches a real regression and does not over-reach.
+
+FIX_X="$TMP/hookexec"
+make_fixture "$FIX_X"
+chmod -x "$FIX_X/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_X" "$TMP/hookexec.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$TMP/hookexec.log"; then
+  ok "a directly-invoked hook without the executable bit fails the gate"
+else
+  bad "a non-executable direct hook did not fail the gate" "$(tail -3 "$TMP/hookexec.log")"
+fi
+
+# The .py hooks run through python3 and are correctly 100644. Rejecting them would be a false
+# positive that pressures someone into chmod-ing files that do not need it.
+FIX_PY="$TMP/pyhooks"
+make_fixture "$FIX_PY"
+chmod -x "$FIX_PY"/.claude/hooks/*.py 2>/dev/null || true
+rc=$(run_gate "$FIX_PY" "$TMP/pyhooks.log")
+if [ "$rc" -eq 0 ]; then
+  ok "hooks invoked through an interpreter are not required to be executable"
+else
+  bad "non-executable .py hooks were wrongly rejected" "$(tail -3 "$TMP/pyhooks.log")"
+fi
+
+# Adding a hook must not trip the exact-count assertion.
+FIX_ADD="$TMP/addhook"
+make_fixture "$FIX_ADD"
+python3 - "$FIX_ADD" <<'PYADD'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+new = root / ".claude/hooks/extra-guard.sh"
+new.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+os.chmod(new, 0o755)
+p = root / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["hooks"].setdefault("PreToolUse", []).append(
+    {"matcher": "Bash", "hooks": [{"type": "command",
+     "command": '"$CLAUDE_PROJECT_DIR"/.claude/hooks/extra-guard.sh'}]})
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYADD
+rc=$(run_gate "$FIX_ADD" "$TMP/addhook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "adding an executable hook does not trip the exact-count assertion"
+else
+  bad "adding a hook broke the count assertion" "$(tail -3 "$TMP/addhook.log")"
+fi
 
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"

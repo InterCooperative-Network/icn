@@ -159,16 +159,60 @@ def _invokes_hook(command: str, root: Path) -> bool:
         return False
 
 
+# Executables this gate requires regardless of how settings.json is wired. Hook targets are
+# NOT listed here -- they are DERIVED from .claude/settings.json below, because a hardcoded
+# list is a second copy of the wiring and it rotted: hook-health.sh was invoked directly at
+# settings.json while being committed 100644, so it exited 126 at every session start and this
+# gate never looked at it. Deriving means a newly added direct hook is covered on the day it
+# is added (Refs icn#2691).
 REQUIRED_EXECUTABLES = [
     "ops/scripts/icn-agent-session",
     "ops/scripts/icn-wait",
-    HOOK,
 ]
+
+
+def direct_hook_targets(settings: dict, root: Path) -> list[str]:
+    """Repo files that settings.json runs AS the command, so the kernel must exec them.
+
+    A file run through an interpreter -- `python3 .../pre-tool-guard.py` -- does not need the
+    bit, which is why the three .py hooks are correctly 100644. The distinction is argv0: if
+    the first token is a repo file, the kernel execs it directly and the mode matters.
+    """
+    found: list[str] = []
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "command" and isinstance(node.get("command"), str):
+                cmd = _mask_unexpanded_dollars(node["command"].split("#", 1)[0].strip())
+                try:
+                    tokens = shlex.split(cmd)
+                except ValueError:
+                    return
+                if not tokens:
+                    return
+                argv0 = tokens[0].replace("$CLAUDE_PROJECT_DIR/", "").replace(
+                    "$CLAUDE_PROJECT_DIR", "").lstrip("/")
+                if argv0 and (root / argv0).is_file() and argv0 not in found:
+                    found.append(argv0)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(settings.get("hooks", {}))
+    return found
 
 # Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
 # COVERAGE below), so the MCP surface is the only capability route they have.
 # How many checks a COMPLETE run performs. Asserted, not decorative — see the floor in main().
-EXPECTED_CHECKS = 25
+#
+# Split into a fixed part and a derived part (icn#2691). The fixed part stays EXACT for the
+# reason the original comment gives: a check that skipped itself is not a check that passed.
+# The hook-executable checks are derived from settings.json, so their count legitimately
+# changes when a hook is added or removed — pinning that to a literal would make adding a hook
+# a spurious failure, and the temptation would be to lower the number rather than look.
+EXPECTED_STATIC_CHECKS = 24
 
 PROVIDER_MCP_CONFIGS = [
     (".mcp.json", ["mcpServers", "icn-ops"]),
@@ -262,7 +306,7 @@ def main() -> int:
         ok(f"{event} -> {HOOK} (matcher {invoking[0]!r})")
 
     # 2. the things the hooks call actually exist and can be executed
-    for rel in REQUIRED_EXECUTABLES:
+    for rel in REQUIRED_EXECUTABLES + direct_hook_targets(settings, root):
         path = root / rel
         if not path.is_file():
             failures.append(f"missing: {rel}")
@@ -460,12 +504,14 @@ def main() -> int:
     # this was latent rather than live; a floor makes it neither.
     # EXACT, not a floor. `checked < EXPECTED_CHECKS` let a spurious extra ok() report
     # "26 check(s) passed" and exit 0 — which is how a duplicated check masks a lost one.
-    if checked != EXPECTED_CHECKS:
+    expected = EXPECTED_STATIC_CHECKS + len(direct_hook_targets(settings, root))
+    if checked != expected:
         failures.append(
-            f"{checked} checks ran, expected exactly {EXPECTED_CHECKS} — a check that skipped "
+            f"{checked} checks ran, expected exactly {expected} — a check that skipped "
             "itself is "
             "not a check that passed. Something the gate depends on is missing (an unbuilt "
-            "ops/mcp/dist, a deleted adapter); fix that rather than lowering EXPECTED_CHECKS"
+            "ops/mcp/dist, a deleted adapter); fix that rather than lowering "
+            "EXPECTED_STATIC_CHECKS"
         )
 
     print(f"agent-runtime adoption: {checked} check(s) passed, {len(failures)} failure(s)")
