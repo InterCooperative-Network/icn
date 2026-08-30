@@ -4,9 +4,37 @@ This repo defines custom Copilot agents under `.github/agents/`.
 
 ## How selection works
 
-- `infer: true` agents may be auto-selected by Copilot based on the prompt.
-- Most ICN specialists are **infer: false** (manual) to avoid "wrong agent drift."
-- The **icn-orchestrator** is `infer: true` and is the default router.
+GitHub has **retired `infer`**. Per
+[custom agents configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration)
+(verified 2026-08-30):
+
+- `disable-model-invocation` replaces it, defaults to **false**, and **takes precedence**
+  when both keys are present.
+- The retired `infer` defaults to **true**.
+- So an agent declaring **neither** key **is** automatically invocable. Silence is not
+  "manual" here — it is the opposite.
+
+Effective automatic invocation is therefore:
+
+```
+disable-model-invocation when present (inverted)
+  else the retired `infer`
+  else true
+```
+
+This is a projection, not a per-file claim: `ops/state/truth/agents.json` records each
+agent's derived `automatic_invocation`, and `scripts/check-agent-registry.py` re-derives it
+from this directory on every run, so the two cannot disagree (icn#2632).
+
+Today **two** agents are automatically invocable:
+
+- **`icn-orchestrator`** — `infer: true`, the default router. Intended.
+- **`icn-docs-synchronizer`** — declares neither key, so it inherits the automatic default.
+  Almost certainly **not** intended: every other specialist is explicitly manual to avoid
+  "wrong agent drift." Left as-is and flagged for a maintainer, because changing it changes
+  agent behaviour, which is not a change an inventory task should make on its own.
+
+The remaining 19 specialists are explicitly manual.
 
 ## Agent Categories
 

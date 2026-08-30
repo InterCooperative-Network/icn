@@ -46,8 +46,10 @@ def agent_file(text_name, extra=""):
         text_name, extra, text_name)
 
 
-def copilot_file(text_name, infer="false"):
-    return agent_file(text_name, "infer: %s\n" % infer)
+def copilot_file(text_name, extra="infer: false\n"):
+    """A Copilot definition. `extra` is raw front matter, so a test can express any
+    combination of the retired `infer` and its replacement `disable-model-invocation`."""
+    return agent_file(text_name, extra)
 
 
 def base_registry():
@@ -58,6 +60,7 @@ def base_registry():
             "claude": {"tree": ".claude/agents"},
             "copilot": {"tree": ".github/agents"},
         },
+        # Must equal the checker's implemented vocabulary exactly, in both directions.
         "relationship_model": {
             "single_surface": "one",
             "exact_mirror": "identical",
@@ -76,7 +79,8 @@ def base_registry():
                 "relationship": "exact_mirror",
                 "surfaces": {
                     "claude": {"path": ".claude/agents/twin.md"},
-                    "copilot": {"path": ".github/agents/twin.md", "infer": False},
+                    "copilot": {"path": ".github/agents/twin.md",
+                                "automatic_invocation": False},
                 },
             },
         ],
@@ -162,16 +166,13 @@ f[".github/agents/twin.md"] = copilot_file("twin")
 rc, out = run(r, base_skills(), f)
 check("exact_mirror holds when only provider-specific front matter differs", rc == 0)
 
-# A copilot file that declares nothing is legal, provided the registry records null
-# rather than guessing a default Copilot does not document.
-r = base_registry()
-r["agents"][1]["surfaces"]["copilot"]["infer"] = None
-r["agents"][1]["relationship"] = "divergent_unreviewed"
-r["agents"][1]["divergence"] = {"owning_issue": "icn#2632"}
-f = dict(BASE_FILES)
-f[".github/agents/twin.md"] = agent_file("twin").replace("Body", "Other body")  # no infer: matches the null record above
-rc, out = run(r, base_skills(), f)
-check("an undeclared infer recorded as null (never guessed) passes", rc == 0)
+# NOTE: an earlier revision asserted here that a Copilot file declaring no `infer` was
+# "unknown", and recorded null. GitHub's reference documentation disproves that -- `infer`
+# is retired with default true and `disable-model-invocation` defaults to false, so an
+# agent declaring neither IS automatically invocable. That control was removed rather than
+# adjusted: it was not a weak assertion, it was a false one. The replacement is the
+# `neither key -> provider default` case in the semantics matrix above.
+
 
 
 # --------------------------------------------------------------------------- must-fail
@@ -239,7 +240,7 @@ case("two records share one logical name",
 
 case("relationship is not in relationship_model",
      lambda r: r["agents"][0].__setitem__("relationship", "vibes"),
-     expect="relationship_model")
+     expect="no enforcement semantics")
 
 case("single_surface declared but two surfaces named",
      lambda r: r["agents"][1].__setitem__("relationship", "single_surface"),
@@ -294,31 +295,108 @@ case("skills.json calls a registered surface uncovered by any registry",
      expect="covered by no registry")
 
 
-# --- provider-metadata ownership boundary (the P2 on #2690) -------------------
+# --- provider semantics: effective behaviour, not raw syntax --------------------
+# GitHub retired `infer` and replaced it with `disable-model-invocation`
+# (docs.github.com/en/copilot/reference/custom-agents-configuration, verified 2026-08-30):
+#   infer                     retired, default TRUE
+#   disable-model-invocation  default FALSE, takes precedence when both are present
+# So these test effective automatic invocation, not one obsolete key.
 print()
-print("--- provider-metadata ownership ---")
+print("--- provider semantics (effective automatic invocation) ---")
 
-case("REAL P2: a copilot agent's infer drifts from the registry",
+def semantics(label, front, expect_auto):
+    """MUST-PASS: the registry claim matching the provider's effective behaviour."""
+    r = base_registry()
+    r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = expect_auto
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = copilot_file("twin", front)
+    rc, out = run(r, base_skills(), f)
+    check("%s -> automatic_invocation=%s" % (label, expect_auto), rc == 0)
+
+semantics("legacy `infer: true`", "infer: true\n", True)
+semantics("legacy `infer: false`", "infer: false\n", False)
+semantics("neither key -> provider default", "", True)
+semantics("`disable-model-invocation: true`", "disable-model-invocation: true\n", False)
+semantics("`disable-model-invocation: false`", "disable-model-invocation: false\n", True)
+semantics("PRECEDENCE: dmi:false wins over infer:false",
+          "infer: false\ndisable-model-invocation: false\n", True)
+semantics("PRECEDENCE: dmi:true wins over infer:true",
+          "infer: true\ndisable-model-invocation: true\n", False)
+
+# The registry concept must survive the provider renaming its own key. Both spellings
+# below mean "not automatically invocable", so the same registry claim holds for each --
+# which is the whole point of projecting semantics instead of mirroring syntax.
+for label, front in (("retired spelling", "infer: false\n"),
+                     ("current spelling", "disable-model-invocation: true\n")):
+    r = base_registry()
+    r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = False
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = copilot_file("twin", front)
+    rc, out = run(r, base_skills(), f)
+    check("the registry claim is unchanged by the provider's %s" % label, rc == 0)
+
+print()
+case("REAL P2: the registry claim disagrees with effective behaviour",
      mutate_files=lambda f: f.__setitem__(".github/agents/twin.md",
-                                          copilot_file("twin", infer="true")),
-     expect="auto-selection behaviour")
+                                          copilot_file("twin", "infer: true\n")),
+     expect="registry says automatic_invocation")
 
-case("a copilot record that does not state infer at all",
-     lambda r: r["agents"][1]["surfaces"]["copilot"].pop("infer"),
+case("REAL P2: an unsupported scalar (`infer: flase`) is not false",
+     mutate_files=lambda f: f.__setitem__(".github/agents/twin.md",
+                                          copilot_file("twin", "infer: flase\n")),
+     expect="not a boolean the provider defines")
+
+case("an unsupported scalar in the replacement key either",
+     mutate_files=lambda f: f.__setitem__(
+         ".github/agents/twin.md", copilot_file("twin", "disable-model-invocation: yes\n")),
+     expect="not a boolean the provider defines")
+
+case("omitted key recorded as manual, when the provider default is automatic",
+     mutate_files=lambda f: f.__setitem__(".github/agents/twin.md", copilot_file("twin", "")),
+     expect="registry says automatic_invocation")
+
+case("a copilot record that states no automatic_invocation at all",
+     lambda r: r["agents"][1]["surfaces"]["copilot"].pop("automatic_invocation"),
      expect="silently unclassified")
 
-case("registry says infer=false where the provider file declares nothing",
-     mutate_files=lambda f: f.__setitem__(".github/agents/twin.md", agent_file("twin")),
-     expect="says infer=None")
+case("automatic_invocation recorded on a Claude surface, which projects no semantics",
+     lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__(
+         "automatic_invocation", True),
+     expect="not a semantic this surface projects")
 
-case("`infer` recorded on a Claude surface, which has no such behaviour",
-     lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__("infer", True),
-     expect="Copilot front-matter key")
-
-for k in ("description", "color", "model", "tools"):
-    case("provider-owned %r copied back into the registry" % k,
-         (lambda key: (lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__(key, "x")))(k),
+for k in ("description", "color", "model", "tools", "target",
+          "infer", "disable-model-invocation", "user-invocable"):
+    case("provider-native %r copied back into the registry" % k,
+         (lambda key: (lambda r: r["agents"][1]["surfaces"]["copilot"].__setitem__(key, "x")))(k),
          expect="owned by the provider definition")
+
+
+# --- relationship vocabulary must equal enforcement, both directions -------------
+print()
+print("--- relationship vocabulary vs enforcement ---")
+
+case("REAL P2: the registry invents a relationship the checker cannot enforce",
+     lambda r: (r["relationship_model"].__setitem__("unconstrained", "anything"),
+                r["agents"][0].__setitem__("relationship", "unconstrained")),
+     expect="no validator implements it")
+
+case("a relationship assigned to a record but absent from relationship_model",
+     lambda r: r["agents"][0].__setitem__("relationship", "invented"),
+     expect="no enforcement semantics")
+
+case("relationship_model drops a type the checker still implements",
+     lambda r: r["relationship_model"].pop("provider_variant"),
+     expect="does not declare it")
+
+case("REAL P2: provider_variant whose bodies have all become identical",
+     mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "provider_variant"),
+                           r["agents"][1].__setitem__(
+                               "divergence", {"adjudicated": True, "why": "claimed"})),
+     expect="every body is identical")
+
+case("single_surface record that names two surfaces",
+     lambda r: r["agents"][1].__setitem__("relationship", "single_surface"),
+     expect="single_surface but 2")
 
 
 # --- fail-open cases. Every one of these was green before review: a checker that skips

@@ -81,7 +81,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-architect.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -105,7 +105,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-ci-reliability.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -139,7 +139,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-code-reviewer.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -188,7 +188,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-devnet-deploy.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -200,7 +200,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-docs-spec.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -212,7 +212,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-docs-synchronizer.md",
-          "infer": null
+          "automatic_invocation": true
         }
       },
       "routing_triggers": [],
@@ -290,7 +290,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-gateway-api.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -313,7 +313,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-gossip-net.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -359,7 +359,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-governance-ccl.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -371,7 +371,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-homelab-infra.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -415,7 +415,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-invariants-guardian.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -434,7 +434,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-ledger-econ.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -466,7 +466,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-monitoring.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -525,7 +525,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-orchestrator.md",
-          "infer": true
+          "automatic_invocation": true
         }
       },
       "routing_triggers": [],
@@ -548,7 +548,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-planner.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -568,7 +568,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-pr-writer.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -580,7 +580,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-refactoring.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -603,7 +603,7 @@
         },
         "copilot": {
           "path": ".github/agents/icn-rust-core.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [
@@ -624,7 +624,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-sdk-web.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -636,7 +636,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-security-auditor.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -707,7 +707,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-trust-identity.md",
-          "infer": false
+          "automatic_invocation": false
         }
       },
       "routing_triggers": [],
@@ -715,15 +715,17 @@
     }
   ],
   "provider_metadata_ownership": {
-    "principle": "The registry owns logical identity, surface topology and relationships. A provider definition owns its own native representation. A value is duplicated here ONLY when the registry makes a mechanically meaningful claim about it AND the checker pins that claim to the provider file -- an enforced projection is not a second owner; an unenforced copy is.",
+    "principle": "The registry owns logical identity, surface topology, relationships, and semantic projections that are organizationally meaningful. A provider definition owns its own native syntax. The translation between them is owned by scripts/check-agent-registry.py, so the shape is provider syntax -> provider adapter -> stable registry claim, never provider syntax <-> duplicated provider syntax. A value appears in both places only when the checker pins the registry's claim: an enforced projection is not a second owner; an unenforced copy is.",
     "owned_here": {
-      "surfaces.copilot.infer": "Auto-selection reachability. `infer: true` means GitHub Copilot may select the agent WITHOUT anyone invoking it, so it is not presentation metadata -- it is the difference between an agent that can influence ICN work on request and one that can influence it unbidden, which is exactly what this registry exists to enumerate. scripts/check-agent-registry.py re-reads the front matter and fails on any disagreement, including declared-vs-absent. Tri-state: true, false, or null when the provider file does not declare it -- null is recorded, never guessed, because Copilot's default for an absent key is not stated by .github/agents/README.md."
+      "surfaces.<surface>.automatic_invocation": "Can this provider surface cause the agent to be selected WITHOUT an explicit invocation? That question is organizationally meaningful -- it is the difference between an agent that influences ICN work on request and one that can influence it unbidden, which is the population this registry exists to enumerate. It is a SEMANTIC projection, not a provider key: the previous revision stored Copilot's raw `infer`, which GitHub has since retired, so the registry was pinned to obsolete syntax. Derived per surface by the checker's adapter and re-derived on every run.",
+      "derivation.copilot": "disable-model-invocation when present (inverted), else the retired `infer`, else true. Verified against https://docs.github.com/en/copilot/reference/custom-agents-configuration on 2026-08-30: `infer` is RETIRED with default true; `disable-model-invocation` replaces it, defaults to false, and takes precedence when both are present. An agent declaring neither key IS automatically invocable -- recording that absence as unknown would be truthful about syntax and false about behaviour."
     },
     "owned_by_the_provider": {
-      "description": "Provider-native routing text. No consumer read it from the registry -- verified across every agents.json reader -- so the copy was an unpinned duplicate that could only rot. Read it from the path the registry names.",
-      "color": "Claude UI presentation. No cross-provider meaning.",
-      "model": "Claude execution metadata. No cross-provider meaning.",
-      "tools, and any other provider front-matter key": "Provider-native. The checker deliberately does not mirror the provider schema: the goal is truthful ownership, not maximal checking."
+      "description / color / model / tools / target / mcp-servers / metadata": "Provider-native. No consumer read them from the registry -- verified across every agents.json reader -- so 71 copies were removed and the checker now rejects them coming back.",
+      "infer / disable-model-invocation / user-invocable": "Provider SYNTAX. The registry records the derived automatic_invocation semantic instead, so a provider renaming its key does not change the registry's concept. Recording the raw keys is rejected."
+    },
+    "deliberately_not_projected": {
+      "user-invocable": "GitHub documents it (default true) and it would project cleanly as manual_invocation. NOT added: no ICN consumer or invariant needs to answer 'can a person pick this agent by hand', and the registry must not grow a projection merely because the provider supports the field. Add it when a real consumer appears, not before."
     },
     "registry_native": "name, surfaces, relationship, mirror_pairs, divergence, routing_triggers and not_for exist only here. They are cross-provider routing intent and topology, so no provider file is their source and nothing needs pinning."
   }
