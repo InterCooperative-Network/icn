@@ -1225,9 +1225,21 @@ mod did_spelling_vote_integrity {
             "control requires both spellings to decode to one key"
         );
         assert_ne!(
+            canonical.as_str(),
+            alias.as_str(),
+            "control requires the two spellings to be distinct *strings*; if this \
+             fails the alias helper is not producing a re-spelling and the rest of \
+             this test proves nothing"
+        );
+        // The `Did` values themselves are no longer distinct: I7 (#2627) made
+        // equality principal equality, so these two spellings are one principal.
+        // This assertion used to read `assert_ne!(canonical, alias)` and warned
+        // that its failure would mean `Did` had become key-equal. It has, on
+        // purpose — #2641's premise is now the implementation, so what is
+        // asserted here is the textual distinctness the control actually needs.
+        assert_eq!(
             canonical, alias,
-            "control requires the spellings to be distinct under today's Did equality; \
-             if this fails, Did is already key-equal and #2641's premise changed"
+            "post-I7 the two spellings name one principal and must compare equal"
         );
     }
 
