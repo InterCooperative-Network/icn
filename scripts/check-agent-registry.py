@@ -115,11 +115,25 @@ def strict_bool(block, key):
     raw = front_matter_value(block, key)
     if raw is None:
         return None
-    v = raw.strip().strip('"').strip("'")
+    v = raw.strip()
+    # No quote stripping. `infer: "false"` is a YAML *string*, and turning it into a boolean
+    # manufactures a type the provider never declared -- the registry would then certify
+    # behaviour on the strength of the checker's own coercion. Only the two unquoted YAML
+    # boolean literals are accepted; everything else, quoted or otherwise, is unknown.
+    #
+    # Deliberately not a YAML parser: the repository has no established YAML dependency for
+    # this path (only tools/validate-governed-bridge-conformance.py imports it, inside a
+    # function, and no CI step installs it), and two scalar keys do not justify one. This
+    # preserves exactly the distinction that matters and pretends to nothing more.
     if v == "true":
         return True
     if v == "false":
         return False
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in ("\"", "'"):
+        raise InvalidProviderBoolean(
+            "%s: %s is a quoted string, not a YAML boolean. The provider reads a string "
+            "here, so treating it as %s would be the checker inventing a type."
+            % (key, raw, v.strip("\"'")))
     raise InvalidProviderBoolean("%s: %r is not a boolean the provider defines" % (key, raw))
 
 
@@ -458,6 +472,26 @@ class Checker:
                     % len(implemented))
 
         # ---- surface trees --------------------------------------------------
+        # One physical tree is one registered surface. Two ids over the same directory made
+        # every file appear as two exposures, let an exact_mirror compare a body with itself,
+        # and collapsed back to one entry in the cross-registry set -- so the registry claimed
+        # a provider surface that does not independently exist. There is no alias model and no
+        # demonstrated need for one; if one is ever added it must carry its own semantics
+        # rather than reusing this field.
+        seen_trees = {}
+        for sid, sdef in sorted(surfaces.items()):
+            t = (sdef or {}).get("tree")
+            if not isinstance(t, str):
+                continue
+            norm = pathlib.PurePosixPath(t).as_posix().rstrip("/")
+            if norm in seen_trees:
+                self.fail("provider_surfaces.%s declares tree %s, already declared by %s. One "
+                          "physical tree is one surface: two ids over one directory inventory "
+                          "it twice and let a mirror compare a file with itself."
+                          % (sid, t, seen_trees[norm]))
+            else:
+                seen_trees[norm] = sid
+
         disk = {}
         usable = {}          # surface ids whose declaration validated; records may use these
         for sid, sdef in sorted(surfaces.items()):
@@ -625,14 +659,45 @@ class Checker:
             self.fail("enforcement: must be an object naming the checker, its tests and its "
                       "callers.")
             return
-        for key in ("checker", "tests"):
-            val = enf.get(key)
-            if not isinstance(val, str) or not val:
-                self.fail("enforcement.%s: must be a non-empty path string" % key)
+        # Existence is not role verification. `checker` must identify THIS script, and
+        # `tests` must actually exercise it -- otherwise the registry can point readers at
+        # any file that happens to exist, which is how AGENTS.md passed as the enforcement
+        # implementation.
+        # The running script's own repository-relative path. Compared as a normalized
+        # relative path, not an absolute one, so this holds under --repo-root too: a fixture
+        # root is a different directory but the claim is about which file plays the role.
+        me = pathlib.Path(__file__).resolve()
+        my_rel = pathlib.PurePosixPath(me.parent.name, me.name).as_posix()
+        val = enf.get("checker")
+        if not isinstance(val, str) or not val:
+            self.fail("enforcement.checker: must be a non-empty path string")
+        else:
+            declared_rel = pathlib.PurePosixPath(val).as_posix()
+            if declared_rel != my_rel:
+                self.fail("enforcement.checker names %s, but the running checker is %s. "
+                          "Existence is not role verification: the registry must identify its "
+                          "actual enforcement implementation, not any file that exists."
+                          % (val, my_rel))
             elif not (self.root / val).is_file():
-                self.fail("enforcement.%s names %s, which does not exist." % (key, val))
+                self.fail("enforcement.checker names %s, which does not exist under this "
+                          "repository root." % val)
             else:
-                self.ok("enforcement.%s -> %s exists" % (key, val))
+                self.ok("enforcement.checker identifies the running checker (%s)" % my_rel)
+
+        val = enf.get("tests")
+        if not isinstance(val, str) or not val:
+            self.fail("enforcement.tests: must be a non-empty path string")
+        elif not (self.root / val).is_file():
+            self.fail("enforcement.tests names %s, which does not exist." % val)
+        elif not invokes_checker((self.root / val).read_text(
+                encoding="utf-8", errors="replace")) and \
+                enf.get("checker", "") not in (self.root / val).read_text(
+                    encoding="utf-8", errors="replace"):
+            self.fail("enforcement.tests names %s, but nothing there exercises the declared "
+                      "checker. A tests claim that names an unrelated file is the same defect "
+                      "as a checker claim that does." % val)
+        else:
+            self.ok("enforcement.tests -> %s exercises the declared checker" % val)
         callers = enf.get("invoked_by")
         if not isinstance(callers, list):
             self.fail("enforcement.invoked_by: must be an array of caller paths")

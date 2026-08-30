@@ -112,9 +112,13 @@ def build(tmp, registry, skills, files):
     # Stubs for the paths the enforcement block names. They must exist inside the fixture
     # root, and the caller stub must actually mention the checker, because the checker now
     # verifies both -- a caller list nothing verifies is how a gate silently stops running.
-    (root / "scripts/check-agent-registry.py").write_text("# stub\n", encoding="utf-8")
+    # `enforcement.checker` must identify the RUNNING checker, so a fixture cannot stub it:
+    # it points at the real file, resolved through the fixture root. The tests stub must
+    # actually mention the declared checker, since that claim is role-verified too.
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    shutil.copy(str(CHECKER), str(root / "scripts/check-agent-registry.py"))
     (root / "scripts/tests/test_agent_registry_invariants.py").write_text(
-        "# stub\n", encoding="utf-8")
+        "# exercises scripts/check-agent-registry.py\n", encoding="utf-8")
     (root / "caller.sh").write_text(
         "python3 scripts/check-agent-registry.py\n", encoding="utf-8")
     (root / "not-a-caller.md").write_text("no invocation here\n", encoding="utf-8")
@@ -389,6 +393,96 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- round 8: the provider scalar's type, and claims of role ---------------------
+print()
+print("--- provider scalar types ---")
+
+# The full matrix the provider actually defines. Quoted forms are YAML STRINGS; accepting
+# them would be the checker inventing a type the provider never declared.
+for front, expect_auto, label in (
+        ("infer: true\n", True, "unquoted true"),
+        ("infer: false\n", False, "unquoted false"),
+        ("disable-model-invocation: true\n", False, "unquoted dmi true"),
+        ("disable-model-invocation: false\n", True, "unquoted dmi false"),
+        ("", True, "neither key (provider default)"),
+        ("infer: true\ndisable-model-invocation: true\n", False, "precedence: dmi wins"),
+        ("infer: false\ndisable-model-invocation: false\n", True, "precedence: dmi wins"),
+):
+    r = base_registry()
+    r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = expect_auto
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = copilot_file("twin", front)
+    rc, out = run(r, base_skills(), f)
+    check("MUST-PASS %s -> automatic_invocation=%s" % (label, expect_auto), rc == 0)
+
+# Both truth values, both quote styles, both keys: a quoted scalar must never be coerced,
+# and must fail whichever value the registry happens to claim.
+for key in ("infer", "disable-model-invocation"):
+    for quoted in ('"true"', "'true'", '"false"', "'false'"):
+        for claim in (True, False):
+            r = base_registry()
+            r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = claim
+            f = dict(BASE_FILES)
+            f[".github/agents/twin.md"] = copilot_file("twin", "%s: %s\n" % (key, quoted))
+            rc, out = run(r, base_skills(), f)
+            check("REAL P2: %s: %s is a string, not a boolean (registry claims %s)"
+                  % (key, quoted, claim),
+                  rc != 0 and "quoted string, not a YAML boolean" in out)
+
+for junk in ("yes", "0", "1", "flase", "TRUE", "True"):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = copilot_file("twin", "infer: %s\n" % junk)
+    rc, out = run(r, base_skills(), f)
+    check("unsupported scalar infer: %s is rejected" % junk,
+          rc != 0 and "not a boolean the provider defines" in out)
+
+
+print()
+print("--- one physical tree, one surface ---")
+
+def alias_case():
+    """REAL P2: two surface ids over one tree.
+
+    Every file is inventoried twice and exposed under both ids, an exact_mirror compares a
+    body with itself, and the cross-registry set collapses the duplicate -- so the registry
+    claims a provider surface that does not independently exist.
+    """
+    r = base_registry()
+    r["provider_surfaces"]["claude_alias"] = {"tree": ".claude/agents",
+                                              "provider_type": "claude-code"}
+    for rec in r["agents"]:
+        if "claude" in rec["surfaces"]:
+            rec["surfaces"]["claude_alias"] = dict(rec["surfaces"]["claude"])
+            if rec["relationship"] == "single_surface":
+                rec["relationship"] = "exact_mirror"
+    s = base_skills()
+    s["declared_scope"]["cross_registry"][
+        "agent_surfaces_tracked_by_agents_json"] = [".claude/agents", ".github/agents"]
+    rc, out = run(r, s, dict(BASE_FILES))
+    check("REAL P2: two surface ids declaring the same tree",
+          rc != 0 and "One physical tree is one surface" in out)
+
+alias_case()
+
+case("a trailing-slash spelling of an already-declared tree",
+     lambda r: r["provider_surfaces"].__setitem__(
+         "dupe", {"tree": ".claude/agents/", "provider_type": "claude-code"}),
+     expect="already declared by")
+
+
+print()
+print("--- enforcement claims name roles, not just files ---")
+
+case("REAL P2: enforcement.checker points at an unrelated existing file",
+     lambda r: r["enforcement"].__setitem__("checker", "not-a-caller.md"),
+     expect="the running checker is")
+
+case("enforcement.tests points at a file that never exercises the checker",
+     lambda r: r["enforcement"].__setitem__("tests", "not-a-caller.md"),
+     expect="nothing there exercises the declared checker")
+
+
 # --- round 7: claims that pass for the wrong reason -----------------------------
 print()
 print("--- weak-check hardening ---")
@@ -440,7 +534,7 @@ print("--- enforcement claims ---")
 
 case("enforcement.checker names a file that does not exist",
      lambda r: r["enforcement"].__setitem__("checker", "scripts/gone.py"),
-     expect="which does not exist")
+     expect="the running checker is")
 
 case("enforcement.invoked_by names a file that exists but does not invoke the checker",
      lambda r: r["enforcement"].__setitem__("invoked_by", ["not-a-caller.md"]),
