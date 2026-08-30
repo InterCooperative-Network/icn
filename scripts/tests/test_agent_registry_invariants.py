@@ -41,9 +41,13 @@ def check(desc, cond):
         failures.append(desc)
 
 
-def agent_file(text_name):
-    return "---\nname: %s\ndescription: fixture\n---\n\nBody for %s.\n" % (
-        text_name, text_name)
+def agent_file(text_name, extra=""):
+    return "---\nname: %s\ndescription: fixture\n%s---\n\nBody for %s.\n" % (
+        text_name, extra, text_name)
+
+
+def copilot_file(text_name, infer="false"):
+    return agent_file(text_name, "infer: %s\n" % infer)
 
 
 def base_registry():
@@ -72,7 +76,7 @@ def base_registry():
                 "relationship": "exact_mirror",
                 "surfaces": {
                     "claude": {"path": ".claude/agents/twin.md"},
-                    "copilot": {"path": ".github/agents/twin.md"},
+                    "copilot": {"path": ".github/agents/twin.md", "infer": False},
                 },
             },
         ],
@@ -124,7 +128,9 @@ def run(registry, skills, files):
 BASE_FILES = {
     ".claude/agents/solo.md": agent_file("solo"),
     ".claude/agents/twin.md": agent_file("twin"),
-    ".github/agents/twin.md": agent_file("twin"),
+    # Provider-specific front matter differs on purpose: `infer` is Copilot-native and has
+    # no Claude counterpart. Bodies are what an exact_mirror compares.
+    ".github/agents/twin.md": copilot_file("twin"),
 }
 
 
@@ -143,9 +149,29 @@ r = base_registry()
 r["agents"][1]["relationship"] = "provider_variant"
 r["agents"][1]["divergence"] = {"adjudicated": True, "why": "deliberate"}
 f = dict(BASE_FILES)
-f[".github/agents/twin.md"] = agent_file("twin").replace("Body for", "Different body for")
+f[".github/agents/twin.md"] = copilot_file("twin").replace("Body for", "Different body for")
 rc, out = run(r, base_skills(), f)
 check("an adjudicated provider_variant with differing bodies passes", rc == 0)
+
+# The registry must not demand cross-provider front-matter equivalence: `infer` is
+# Copilot-only, `color`/`model` are Claude-only, and an exact_mirror compares BODIES.
+r = base_registry()
+f = dict(BASE_FILES)
+f[".claude/agents/twin.md"] = agent_file("twin", "color: purple\nmodel: opus\ntools: all\n")
+f[".github/agents/twin.md"] = copilot_file("twin")
+rc, out = run(r, base_skills(), f)
+check("exact_mirror holds when only provider-specific front matter differs", rc == 0)
+
+# A copilot file that declares nothing is legal, provided the registry records null
+# rather than guessing a default Copilot does not document.
+r = base_registry()
+r["agents"][1]["surfaces"]["copilot"]["infer"] = None
+r["agents"][1]["relationship"] = "divergent_unreviewed"
+r["agents"][1]["divergence"] = {"owning_issue": "icn#2632"}
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = agent_file("twin").replace("Body", "Other body")  # no infer: matches the null record above
+rc, out = run(r, base_skills(), f)
+check("an undeclared infer recorded as null (never guessed) passes", rc == 0)
 
 
 # --------------------------------------------------------------------------- must-fail
@@ -221,7 +247,7 @@ case("single_surface declared but two surfaces named",
 
 case("exact_mirror declared but the bodies differ",
      mutate_files=lambda f: f.__setitem__(
-         ".github/agents/twin.md", agent_file("twin").replace("Body", "Drifted body")),
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Drifted body")),
      expect="bodies differ")
 
 case("a declared mirror_pair whose bodies differ",
@@ -229,7 +255,7 @@ case("a declared mirror_pair whose bodies differ",
                            r["agents"][1].__setitem__("divergence", {"owning_issue": "x"}),
                            r["agents"][1].__setitem__("mirror_pairs", [["claude", "copilot"]])),
      mutate_files=lambda f: f.__setitem__(
-         ".github/agents/twin.md", agent_file("twin").replace("Body", "Drifted body")),
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Drifted body")),
      expect="mirror pair")
 
 case("mirror_pairs names a surface the record does not expose",
@@ -240,7 +266,7 @@ case("divergent_unreviewed with no owning issue",
      mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "divergent_unreviewed"),
                            r["agents"][1].__setitem__("divergence", {})),
      mutate_files=lambda f: f.__setitem__(
-         ".github/agents/twin.md", agent_file("twin").replace("Body", "Other body")),
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Other body")),
      expect="owning_issue")
 
 case("provider_variant asserted without adjudication",
@@ -266,6 +292,33 @@ case("skills.json calls a registered surface uncovered by any registry",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
          "provider_surfaces_no_registry_covers", [".github/agents"]),
      expect="covered by no registry")
+
+
+# --- provider-metadata ownership boundary (the P2 on #2690) -------------------
+print()
+print("--- provider-metadata ownership ---")
+
+case("REAL P2: a copilot agent's infer drifts from the registry",
+     mutate_files=lambda f: f.__setitem__(".github/agents/twin.md",
+                                          copilot_file("twin", infer="true")),
+     expect="auto-selection behaviour")
+
+case("a copilot record that does not state infer at all",
+     lambda r: r["agents"][1]["surfaces"]["copilot"].pop("infer"),
+     expect="silently unclassified")
+
+case("registry says infer=false where the provider file declares nothing",
+     mutate_files=lambda f: f.__setitem__(".github/agents/twin.md", agent_file("twin")),
+     expect="says infer=None")
+
+case("`infer` recorded on a Claude surface, which has no such behaviour",
+     lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__("infer", True),
+     expect="Copilot front-matter key")
+
+for k in ("description", "color", "model", "tools"):
+    case("provider-owned %r copied back into the registry" % k,
+         (lambda key: (lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__(key, "x")))(k),
+         expect="owned by the provider definition")
 
 
 # --- fail-open cases. Every one of these was green before review: a checker that skips

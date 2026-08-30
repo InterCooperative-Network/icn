@@ -74,19 +74,13 @@
       },
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md",
-          "description": "ICN protocol architect. Use this agent for crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, and threat modeling. Typical triggers include \"should this live in the kernel or an app\", \"review this cross-crate refactor\", \"does this change need an ADR\", and \"threat-model this surface\". NOT for economics/ledger (use icn-economist), NOT for deployment/ops (use icn-ops). See \"When to invoke\" in the body.",
-          "color": "purple",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md"
         },
         "claude": {
-          "path": ".claude/agents/icn-architect.md",
-          "description": "ICN protocol architect — use for crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, and threat modeling. NOT for economics/ledger (use icn-economist), NOT for deployment/ops (use icn-ops).",
-          "color": "purple"
+          "path": ".claude/agents/icn-architect.md"
         },
         "copilot": {
           "path": ".github/agents/icn-architect.md",
-          "description": "System design and architecture agent. Use for crate boundaries, API design review, abstraction decisions, and technical debt assessment. Reviews and advises.",
           "infer": false
         }
       },
@@ -111,7 +105,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-ci-reliability.md",
-          "description": "CI and test reliability specialist. Hunts flaky tests, fixes timing issues, ensures deterministic builds, and maintains CI parity with local development.",
           "infer": false
         }
       },
@@ -139,19 +132,13 @@
       },
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md",
-          "description": "ICN PR/diff reviewer with the invariants lens. Use this agent to review PRs, diffs, or staged changes for bugs, security issues, and ICN invariant violations. Typical triggers include \"review this diff\", \"is this PR safe to merge\", \"check this change against the invariants\", and proactively after a logical chunk of code is written. High signal-to-noise — surfaces only issues that genuinely matter. See \"When to invoke\" in the body.",
-          "color": "cyan",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md"
         },
         "claude": {
-          "path": ".claude/agents/icn-code-reviewer.md",
-          "description": "PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and declares FULL or DELTA.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-code-reviewer.md"
         },
         "copilot": {
           "path": ".github/agents/icn-code-reviewer.md",
-          "description": "PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and declares FULL or DELTA.",
           "infer": false
         }
       },
@@ -168,9 +155,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-design-advisor.md",
-          "description": "Design system specialist for ICN. Use for changes to docs/design/, docs/design-language/, website/ styles or components, accessibility audits of member-facing surfaces, UI copy review against the regulatory-safe vocabulary, and Claude Design briefing prep. Activate when the user asks about design tokens, visual primitives, the closure-loop concepts, the accessibility baseline, WCAG, content style, the action-card contract, the receipt UI, or Claude Design setup.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-design-advisor.md"
         }
       },
       "routing_triggers": [
@@ -203,7 +188,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-devnet-deploy.md",
-          "description": "Deployment specialist for Docker/K8s manifests, config templates, Helm charts, and deployment automation. Ensures no secrets committed and docs stay current.",
           "infer": false
         }
       },
@@ -216,7 +200,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-docs-spec.md",
-          "description": "Docs/spec consistency enforcer. Ensures documentation matches implementation. Updates canonical docs when semantics change; flags inconsistencies.",
           "infer": false
         }
       },
@@ -229,8 +212,7 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-docs-synchronizer.md",
-          "description": "Keeps ICN documentation, onboarding guides, and architecture references synchronized with current code.",
-          "infer": false
+          "infer": null
         }
       },
       "routing_triggers": [],
@@ -241,10 +223,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md",
-          "description": "ICN docs / public-claim truth auditor. Use this agent to audit docs, READMEs, website copy, and API descriptions for claim safety, proof level, and stale state before anything is published. Typical triggers include \"audit these docs for over-claims\", \"what proof backs this statement\", \"is this safe to put on the website\", and \"find stale state in docs/\". Read-only. See \"When to invoke\" in the body.",
-          "color": "yellow",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md"
         }
       },
       "routing_triggers": [],
@@ -255,9 +234,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-economics-advisor.md",
-          "description": "Ledger, mutual credit, commons credits, and settlement specialist. Use for changes to icn-ledger, apps/ledger, commons credit accounting, JournalEntry construction, settlement flows, credit policy, EarningTracker, fork detection, and economic invariants. Activate when working on ledger entries, credit ceilings, commons earn/spend, settlement dedup, or credit formula weights.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-economics-advisor.md"
         }
       },
       "routing_triggers": [
@@ -286,15 +263,10 @@
       },
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md",
-          "description": "ICN economics specialist. Use this agent for ledger logic, CCL contracts, mutual credit invariants, treasury integration, mana/resource allocation, settlement flows, and regulatory terminology compliance. Typical triggers include \"review this JournalEntry / settlement path\", \"check the credit-limit logic\", \"does this CCL change roll back atomically\", and \"is this terminology regulatory-safe\". NOT for protocol architecture (use icn-architect), NOT for deployment (use icn-ops). See \"When to invoke\" in the body.",
-          "color": "green",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md"
         },
         "claude": {
-          "path": ".claude/agents/icn-economist.md",
-          "description": "ICN economics specialist — use for ledger logic, CCL contracts, mutual credit invariants, treasury integration, mana/resource allocation, settlement flows, and regulatory terminology compliance. Also use for Phase 1 compliance sprint (payment->settlement renaming). NOT for protocol architecture (use icn-architect), NOT for deployment (use icn-ops).",
-          "color": "green"
+          "path": ".claude/agents/icn-economist.md"
         }
       },
       "routing_triggers": [
@@ -318,7 +290,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-gateway-api.md",
-          "description": "Gateway/API specialist. Owns icn-gateway HTTP API changes, validation, routing, OpenAPI export, and TypeScript types drift control.",
           "infer": false
         }
       },
@@ -338,13 +309,10 @@
       },
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-gossip-net.md",
-          "description": "Gossip protocol and networking specialist. Use for changes to icn-gossip, icn-net, icn-protocol, message formats, topic subscriptions, anti-entropy, QUIC/TLS sessions, mDNS discovery, and SignedEnvelope handling.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-gossip-net.md"
         },
         "copilot": {
           "path": ".github/agents/icn-gossip-net.md",
-          "description": "Gossip/networking specialist. Use for message envelopes, signature verification, QUIC/TLS, subscriptions, NAT traversal, discovery, and network safety.",
           "infer": false
         }
       },
@@ -367,9 +335,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-governance-advisor.md",
-          "description": "Democratic governance, CCL contracts, cooperative lifecycle, and civic engine specialist. Use for changes to icn-governance, icn-ccl, icn-community, icn-coop, icn-entity, and apps/governance. Activate when working on proposals, voting, CCL semantics, governance parameters, cooperative constitution, threshold mechanics, or civic engine rules.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-governance-advisor.md"
         }
       },
       "routing_triggers": [
@@ -393,7 +359,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-governance-ccl.md",
-          "description": "Governance + CCL specialist. Use for constitutions, governance proofs, proposals, voting, policy oracles, and Cooperative Contract Language.",
           "infer": false
         }
       },
@@ -406,7 +371,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-homelab-infra.md",
-          "description": "Infrastructure specialist for the ICN homelab environment. Knows K3s cluster details, NFS storage, GitHub Actions runner, network topology, and operational procedures.",
           "infer": false
         }
       },
@@ -418,9 +382,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-identity-iam-advisor.md",
-          "description": "Identity, principal, subject, device, continuity, naming, keystore, and authorization-boundary specialist. Load registered identity semantics before reasoning about identity classes or substitutions.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-identity-iam-advisor.md"
         }
       },
       "routing_triggers": [
@@ -449,13 +411,10 @@
       },
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-invariants-guardian.md",
-          "description": "Architecture and safety gatekeeper. Reviews proposed changes against the 5 ICN invariants and cross-doc consistency. Blocks changes that violate safety properties. Use before merging significant changes.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-invariants-guardian.md"
         },
         "copilot": {
           "path": ".github/agents/icn-invariants-guardian.md",
-          "description": "Architecture/invariants gatekeeper. Reviews proposed changes against ICN invariants and cross-doc consistency. Blocks changes that violate safety properties.",
           "infer": false
         }
       },
@@ -475,7 +434,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-ledger-econ.md",
-          "description": "Ledger/economics specialist. Use for mutual credit, safety constraints, balance integrity, demurrage, transaction validation, and economic policy primitives.",
           "infer": false
         }
       },
@@ -487,9 +445,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-mobile-advisor.md",
-          "description": "Mobile and React Native specialist for ICN. Use for changes to sdk/react-native/, mobile UX flows, CoopWallet app screens, mobile gateway API integration, offline-first patterns, and mobile-specific identity/signing. Activate when the user asks about mobile, React Native, CoopWallet, the five-tab navigation, or mobile SDK screens.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-mobile-advisor.md"
         }
       },
       "routing_triggers": [
@@ -510,7 +466,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-monitoring.md",
-          "description": "Observability specialist for Prometheus rules, Grafana dashboards, alerting, and distributed tracing. Focuses on actionable alerts and cardinality management.",
           "infer": false
         }
       },
@@ -522,10 +477,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md",
-          "description": "ICN repository navigator and knowledge-graph builder. Use this agent to map the repo's crates/subsystems/claims, trace a concept or claim to the source that backs it, and build impact maps for a proposed change area. Typical triggers include \"map this subsystem\", \"trace this concept to its source\", \"what would this change impact\", and \"refresh the repo knowledge graph\". Read-mostly, and only writes a generated map artifact when explicitly asked. See \"When to invoke\" in the body.",
-          "color": "blue",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md"
         }
       },
       "routing_triggers": [],
@@ -544,15 +496,10 @@
       },
       "surfaces": {
         "agent_pack": {
-          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md",
-          "description": "ICN operations specialist (read-mostly, MCP-first). Use this agent for CI/CD health, demo-flow readiness, release-readiness checks, deployment-manifest review, and pre-demo checklists. Typical triggers include \"is the demo ready to run\", \"check CI health\", \"are we release-ready\", and \"review this deploy manifest\". Consults the icn-ops MCP server and live evidence — it does NOT assert cluster state from static text. NOT for protocol design (use icn-architect), NOT for economics (use icn-economist). See \"When to invoke\" in the body.",
-          "color": "orange",
-          "model": "inherit"
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md"
         },
         "claude": {
-          "path": ".claude/agents/icn-ops.md",
-          "description": "ICN operations specialist — use for K3s cluster state, demo flow validation, CI/CD health, pod diagnostics, release readiness, and pre-deployment checks. Has access to the icn-dev MCP server for live cluster queries. NOT for protocol design (use icn-architect), NOT for economics (use icn-economist).",
-          "color": "orange"
+          "path": ".claude/agents/icn-ops.md"
         }
       },
       "routing_triggers": [
@@ -578,7 +525,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-orchestrator.md",
-          "description": "Router + decomposer for ICN work. Use when a request spans multiple subsystems (Rust crates + gateway + docs + deploy + SDKs). Produces a parallelizable plan, then invokes specialist agents or instructs which agent to run per task.",
           "infer": true
         }
       },
@@ -598,13 +544,10 @@
       },
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-planner.md",
-          "description": "Strategic planning agent for ICN. Produces actionable plans with task breakdown, dependency analysis, risk assessment, and merge ordering. Does NOT implement - only plans.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-planner.md"
         },
         "copilot": {
           "path": ".github/agents/icn-planner.md",
-          "description": "Strategic planning agent. Use for task breakdown, dependency analysis, risk assessment, and incremental delivery planning. Does not implement—produces actionable plans.",
           "infer": false
         }
       },
@@ -625,7 +568,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-pr-writer.md",
-          "description": "PR descriptions, commit messages, and changelog entries. Follows conventional commits and produces clear, informative PR bodies with proper context.",
           "infer": false
         }
       },
@@ -638,7 +580,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-refactoring.md",
-          "description": "Safe refactoring agent. Performs behavior-preserving transformations with invariant protection. Specializes in crate restructuring, API migrations, and technical debt.",
           "infer": false
         }
       },
@@ -658,13 +599,10 @@
       },
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-rust-core.md",
-          "description": "Rust workspace implementer for ICN. Use for crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure work. Follows mandatory plan-implement-verify loop.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-rust-core.md"
         },
         "copilot": {
           "path": ".github/agents/icn-rust-core.md",
-          "description": "Rust workspace implementer for ICN. Use for crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure.",
           "infer": false
         }
       },
@@ -686,7 +624,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-sdk-web.md",
-          "description": "SDK and web UI specialist. Use for TypeScript SDK, React Native SDK, Pilot UI, and web dashboard changes.",
           "infer": false
         }
       },
@@ -699,7 +636,6 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-security-auditor.md",
-          "description": "Security review agent. Performs threat modeling, attack surface analysis, and security-focused code review. Uses STRIDE and adversarial thinking.",
           "infer": false
         }
       },
@@ -711,9 +647,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-security-reviewer.md",
-          "description": "Security-focused code review agent specializing in cryptography, authentication, key handling, replay attacks, and protocol security. Use for reviewing security-sensitive changes to identity, crypto, JWT, signed envelopes, and rate limiting code.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-security-reviewer.md"
         }
       },
       "routing_triggers": [
@@ -733,9 +667,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-test-generator.md",
-          "description": "Test generation specialist for ICN. Use for writing integration tests with icn-testkit, multi-node convergence scenarios, property-based tests, and unit test scaffolding. Knows the TestNode helper pattern, unique port allocation, and convergence retry patterns. Activate when the user asks to write tests, mentions icn-testkit, or needs integration test coverage.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-test-generator.md"
         }
       },
       "routing_triggers": [
@@ -754,9 +686,7 @@
       "relationship": "single_surface",
       "surfaces": {
         "claude": {
-          "path": ".claude/agents/icn-trust-federation-advisor.md",
-          "description": "Trust graph, reputation, TrustPolicyOracle, and inter-cooperative federation specialist. Use for changes to icn-trust, icn-federation, TrustPolicyOracle, trust score computation, trust-gated rate limiting, federated task placement, and cross-coop coordination protocols. Activate when working on trust graph algorithms, bottleneck computation, federation treaties, or cross-cooperative trust propagation.",
-          "model": "inherit"
+          "path": ".claude/agents/icn-trust-federation-advisor.md"
         }
       },
       "routing_triggers": [
@@ -777,12 +707,24 @@
       "surfaces": {
         "copilot": {
           "path": ".github/agents/icn-trust-identity.md",
-          "description": "Trust + Identity specialist. Use for DIDs, credentials, trust graphs, scope-bounded trust, trust-gated behavior, SDIS enrollment, and membership credentials.",
           "infer": false
         }
       },
       "routing_triggers": [],
       "not_for": []
     }
-  ]
+  ],
+  "provider_metadata_ownership": {
+    "principle": "The registry owns logical identity, surface topology and relationships. A provider definition owns its own native representation. A value is duplicated here ONLY when the registry makes a mechanically meaningful claim about it AND the checker pins that claim to the provider file -- an enforced projection is not a second owner; an unenforced copy is.",
+    "owned_here": {
+      "surfaces.copilot.infer": "Auto-selection reachability. `infer: true` means GitHub Copilot may select the agent WITHOUT anyone invoking it, so it is not presentation metadata -- it is the difference between an agent that can influence ICN work on request and one that can influence it unbidden, which is exactly what this registry exists to enumerate. scripts/check-agent-registry.py re-reads the front matter and fails on any disagreement, including declared-vs-absent. Tri-state: true, false, or null when the provider file does not declare it -- null is recorded, never guessed, because Copilot's default for an absent key is not stated by .github/agents/README.md."
+    },
+    "owned_by_the_provider": {
+      "description": "Provider-native routing text. No consumer read it from the registry -- verified across every agents.json reader -- so the copy was an unpinned duplicate that could only rot. Read it from the path the registry names.",
+      "color": "Claude UI presentation. No cross-provider meaning.",
+      "model": "Claude execution metadata. No cross-provider meaning.",
+      "tools, and any other provider front-matter key": "Provider-native. The checker deliberately does not mirror the provider schema: the goal is truthful ownership, not maximal checking."
+    },
+    "registry_native": "name, surfaces, relationship, mirror_pairs, divergence, routing_triggers and not_for exist only here. They are cross-provider routing intent and topology, so no provider file is their source and nothing needs pinning."
+  }
 }

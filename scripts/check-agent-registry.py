@@ -41,6 +41,24 @@ def front_matter_value(block, key):
     return m.group(1).strip() if m else None
 
 
+def front_matter_infer(block):
+    """Tri-state: True / False / None when the key is absent.
+
+    None is a real answer, not a failure: `.github/agents/README.md` documents what
+    `infer: true` and `infer: false` mean but never states Copilot's default for an absent
+    key, so the registry records the absence rather than guessing a behaviour.
+    """
+    raw = front_matter_value(block, "infer")
+    if raw is None:
+        return None
+    return raw.strip().lower() == "true"
+
+
+# Values the ownership model assigns to the provider. The registry must not carry a second,
+# unpinned copy of them -- that is the drift this checker exists to end, one level in.
+PROVIDER_OWNED_KEYS = ("description", "color", "model", "tools")
+
+
 class Checker:
     def __init__(self, root, verbose=False):
         self.root = pathlib.Path(root)
@@ -168,6 +186,39 @@ class Checker:
                     self.fail("%s.%s: front matter declares name: %s. The provider loads the "
                               "front-matter name, so the registry would route to a name the "
                               "provider does not answer to." % (name, sid, declared))
+
+                # No second copy of provider-owned values. Nothing read these from the
+                # registry, so a copy here could only drift -- which is exactly how the
+                # registry came to describe a surface set that had not been true for months.
+                for k in PROVIDER_OWNED_KEYS:
+                    if k in (entry or {}):
+                        self.fail("%s.%s: %r is owned by the provider definition, not the "
+                                  "registry (provider_metadata_ownership.owned_by_the_provider)."
+                                  " Nothing consumes it from here, so the copy can only rot. "
+                                  "Read it from %s." % (name, sid, k, path))
+
+                # infer IS owned here, so it is pinned to the file rather than trusted.
+                if sid == "copilot":
+                    if "infer" not in (entry or {}):
+                        self.fail("%s.%s: the registry owns auto-selection reachability and "
+                                  "this record does not state `infer`. An agent Copilot may "
+                                  "select unbidden must not be silently unclassified."
+                                  % (name, sid))
+                    else:
+                        actual = front_matter_infer(fm)
+                        if entry["infer"] != actual:
+                            self.fail(
+                                "%s.%s: registry says infer=%r, %s says infer=%r. Copilot "
+                                "loads the file, so the registry would be asserting the wrong "
+                                "auto-selection behaviour for a live agent."
+                                % (name, sid, entry["infer"], path, actual))
+                        else:
+                            self.ok("%s.%s: infer=%r matches the provider file"
+                                    % (name, sid, actual))
+                elif "infer" in (entry or {}):
+                    self.fail("%s.%s: `infer` is a Copilot front-matter key. Recording it on a "
+                              "%s surface asserts a behaviour that provider does not have."
+                              % (name, sid, sid))
 
                 registered.setdefault(sid, set()).add(name)
                 self.ok("%s.%s -> %s" % (name, sid, path))
