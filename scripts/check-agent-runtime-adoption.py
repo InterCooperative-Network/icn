@@ -172,28 +172,29 @@ REQUIRED_EXECUTABLES = [
 
 
 def direct_hook_targets(settings: dict, root: Path) -> list[str]:
-    """Repo files that settings.json runs AS the command, so the kernel must exec them.
+    """Repo paths that settings.json runs AS the command, so the kernel must exec them.
 
-    A file run through an interpreter -- `python3 .../pre-tool-guard.py` -- does not need the
-    bit, which is why the three .py hooks are correctly 100644. The distinction is argv0: if
-    the first token is a repo file, the kernel execs it directly and the mode matters.
+    SYNTACTIC, not existence-filtered. Filtering on is_file() removed a configured hook from
+    this list the moment its file was deleted, so both the executable loop and the derived
+    check count shrank by one and the gate reported no `missing:` failure while settings.json
+    went on invoking a command that was not there. Identification is by shape -- a relative
+    path with a directory component, which `echo` and other bare builtins do not have -- and
+    the existing missing/executable branches then fail closed on it.
+
+    A file run through an interpreter (`python3 .../pre-tool-guard.py`) is not argv0 and does
+    not need the bit, which is why the three .py hooks are correctly 100644.
     """
     found: list[str] = []
 
     def walk(node) -> None:
         if isinstance(node, dict):
             if node.get("type") == "command" and isinstance(node.get("command"), str):
-                cmd = _mask_unexpanded_dollars(node["command"].split("#", 1)[0].strip())
-                try:
-                    tokens = shlex.split(cmd)
-                except ValueError:
-                    return
-                if not tokens:
-                    return
-                argv0 = tokens[0].replace("$CLAUDE_PROJECT_DIR/", "").replace(
-                    "$CLAUDE_PROJECT_DIR", "").lstrip("/")
-                if argv0 and (root / argv0).is_file() and argv0 not in found:
-                    found.append(argv0)
+                # A command this function cannot parse yields no target. It must NOT stop the
+                # traversal: one malformed entry would otherwise skip whatever sits below it,
+                # and the "derived from settings.json" guarantee is only as good as the walk.
+                target = _command_target(node["command"])
+                if target and target not in found:
+                    found.append(target)
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
@@ -202,6 +203,23 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
 
     walk(settings.get("hooks", {}))
     return found
+
+
+def _command_target(command: str) -> str | None:
+    """The repo-relative path a hook command execs directly, or None."""
+    cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError:
+        return None
+    if not tokens:
+        return None
+    argv0 = tokens[0].replace("$CLAUDE_PROJECT_DIR/", "").replace(
+        "$CLAUDE_PROJECT_DIR", "").lstrip("/")
+    # A bare builtin or PATH command has no directory component; a repo hook always does.
+    if not argv0 or "/" not in argv0 or argv0.startswith(".."):
+        return None
+    return argv0
 
 # Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
 # COVERAGE below), so the MCP surface is the only capability route they have.

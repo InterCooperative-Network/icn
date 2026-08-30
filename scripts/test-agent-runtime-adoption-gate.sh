@@ -457,6 +457,45 @@ else
   bad "non-executable .py hooks were wrongly rejected" "$(tail -3 "$TMP/pyhooks.log")"
 fi
 
+# A configured hook whose FILE is gone must be reported missing, not quietly dropped from the
+# derived list. Filtering on existence shrank the list and the expected count together, so the
+# gate stayed green while settings.json invoked a command that was not there.
+FIX_DEL="$TMP/delhook"
+make_fixture "$FIX_DEL"
+rm -f "$FIX_DEL/.claude/hooks/firewall-guard.sh"
+rc=$(run_gate "$FIX_DEL" "$TMP/delhook.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/firewall-guard.sh" "$TMP/delhook.log"; then
+  ok "deleting a hook settings.json still invokes is reported missing"
+else
+  bad "a deleted but still-configured hook was silently dropped" "$(tail -3 "$TMP/delhook.log")"
+fi
+
+# One unparseable command must not stop the walk and take the rest of the hooks with it.
+FIX_BAD="$TMP/badcmd"
+make_fixture "$FIX_BAD"
+python3 - "$FIX_BAD" <<'PYBAD'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+first = next(iter(d["hooks"]))
+d["hooks"][first].insert(0, {"matcher": "*", "hooks": [
+    {"type": "command", "command": 'unclosed "quote'}]})
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYBAD
+python3 -c "
+import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location('g', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(sys.argv[2])
+s = json.loads((root / '.claude/settings.json').read_text(encoding='utf-8'))
+sys.exit(0 if len(m.direct_hook_targets(s, root)) == 9 else 1)
+" "$GATE" "$FIX_BAD"
+if [ $? -eq 0 ]; then
+  ok "a malformed hook command does not abort the derivation walk"
+else
+  bad "a malformed hook command truncated the derived target list" ""
+fi
+
 # Adding a hook must not trip the exact-count assertion.
 FIX_ADD="$TMP/addhook"
 make_fixture "$FIX_ADD"
