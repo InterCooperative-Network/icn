@@ -130,10 +130,18 @@ class Checker:
             self.notes.append(msg)
 
     def definitions_on_disk(self, tree):
+        """Direct children only, keyed by repo-relative PATH.
+
+        Keyed by path, not stem: a record pointing at `<tree>/subdir/foo.md` and a provider
+        file at `<tree>/foo.md` share a stem, so a stem-keyed reverse scan counted the
+        top-level file as registered while the provider loaded a body no record described.
+        Identity is the path.
+        """
         d = self.root / tree
         if not d.is_dir():
             return None
-        return {p.stem: p for p in sorted(d.glob("*.md")) if p.name != "README.md"}
+        return {"%s/%s" % (tree, p.name): p
+                for p in sorted(d.glob("*.md")) if p.name != "README.md"}
 
     def bodies(self, rec):
         out = {}
@@ -328,6 +336,14 @@ class Checker:
                 if ".." in pathlib.PurePosixPath(path).parts:
                     self.fail("%s.%s: path %s escapes the repository root" % (name, sid, path))
                     continue
+                # Providers load the tree's direct children. A nested path is loaded by
+                # nobody, and it lets a record satisfy every per-record check while the file
+                # the provider actually reads goes unregistered.
+                if pathlib.PurePosixPath(path).parent != pathlib.PurePosixPath(tree):
+                    self.fail("%s.%s: path %s is nested below the declared tree %s. Only "
+                              "direct children are loaded, so a nested file is a record "
+                              "describing something no provider reads." % (name, sid, path, tree))
+                    continue
                 fp = self.root / path
                 if not fp.exists():
                     self.fail("%s.%s -> %s (missing)" % (name, sid, path))
@@ -353,7 +369,7 @@ class Checker:
                                   % (name, sid, k, path))
 
                 self.check_semantics(name, sid, entry, fm, path)
-                registered.setdefault(sid, set()).add(name)
+                registered.setdefault(sid, set()).add(path)
                 self.ok("%s.%s -> %s" % (name, sid, path))
 
             # mirror pairs: an enforced promise between two surfaces, independent of the
@@ -386,11 +402,11 @@ class Checker:
 
         # ---- completeness, the other direction ------------------------------
         for sid, found in sorted(disk.items()):
-            for stem in sorted(found):
-                if stem not in registered.get(sid, set()):
-                    self.fail("%s/%s.md exists but no record names it on surface %r. An "
+            for relpath in sorted(found):
+                if relpath not in registered.get(sid, set()):
+                    self.fail("%s exists but no record names that exact path on surface %r. An "
                               "unregistered provider agent must not be able to appear silently."
-                              % (surfaces[sid]["tree"], stem, sid))
+                              % (relpath, sid))
 
         self.check_cross_registry(surfaces)
         return self.report()

@@ -26,15 +26,18 @@ This is a projection, not a per-file claim: `ops/state/truth/agents.json` record
 agent's derived `automatic_invocation`, and `scripts/check-agent-registry.py` re-derives it
 from this directory on every run, so the two cannot disagree (icn#2632).
 
-Today **two** agents are automatically invocable:
+Which agents this currently yields is **not restated here**. A count and a list in prose is
+an unpinned copy: make an agent manual, update `agents.json` as the checker requires, and
+this file would still assert the old answer with nothing to catch it. An earlier revision
+of this README did exactly that, one commit after the same mistake was removed from
+`agents.json` itself.
 
-- **`icn-orchestrator`** — `infer: true`, the default router. Intended.
-- **`icn-docs-synchronizer`** — declares neither key, so it inherits the automatic default.
-  Almost certainly **not** intended: every other specialist is explicitly manual to avoid
-  "wrong agent drift." Left as-is and flagged for a maintainer, because changing it changes
-  agent behaviour, which is not a change an inventory task should make on its own.
+The enforced answer is per-agent `automatic_invocation` in
+[`ops/state/truth/agents.json`](../../ops/state/truth/agents.json). To see it:
 
-The remaining 19 specialists are explicitly manual.
+```bash
+python3 scripts/check-agent-registry.py --verbose
+```
 
 ## Agent Categories
 

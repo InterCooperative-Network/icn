@@ -225,7 +225,7 @@ case("registered path sits outside its declared tree",
 case("REAL: a definition on disk that no record names (.github/agents/)",
      mutate_files=lambda f: f.__setitem__(
          ".github/agents/unregistered.md", agent_file("unregistered")),
-     expect="no record names it")
+     expect="no record names that exact path")
 
 case("a record points at a file with a different stem",
      mutate_reg=setpath(0, "claude", ".claude/agents/twin.md"),
@@ -369,6 +369,49 @@ for k in ("description", "color", "model", "tools", "target",
     case("provider-native %r copied back into the registry" % k,
          (lambda key: (lambda r: r["agents"][1]["surfaces"]["copilot"].__setitem__(key, "x")))(k),
          expect="owned by the provider definition")
+
+
+# --- identity is the path, not a derived name ----------------------------------
+print()
+print("--- path identity ---")
+
+def nested_decoy_case():
+    """REAL P2: a record points at a nested file sharing a stem with the real one.
+
+    Every per-record check passes (inside the tree, exists, stem matches, front matter
+    matches), and a stem-keyed reverse scan then counts the top-level file as registered --
+    so the body the provider actually loads escapes relationship and semantic validation.
+    """
+    tmp = tempfile.mkdtemp()
+    try:
+        root = pathlib.Path(tmp)
+        (root / ".claude/agents/subdir").mkdir(parents=True)
+        (root / "ops/state/truth").mkdir(parents=True)
+        (root / ".claude/agents/subdir/solo.md").write_text(agent_file("solo"), encoding="utf-8")
+        (root / ".claude/agents/solo.md").write_text(
+            agent_file("solo", "color: red\n"), encoding="utf-8")
+        reg = {"schema": "icn-agents/v2",
+               "provider_surfaces": {"claude": {"tree": ".claude/agents"}},
+               "relationship_model": {"single_surface": "x", "exact_mirror": "x",
+                                      "provider_variant": "x", "divergent_unreviewed": "x"},
+               "declared_scope": {},
+               "agents": [{"name": "solo", "relationship": "single_surface",
+                           "surfaces": {"claude": {"path": ".claude/agents/subdir/solo.md"}}}]}
+        sk = {"declared_scope": {"cross_registry": {
+            "agent_surfaces_tracked_by_agents_json": [".claude/agents"]}}}
+        (root / "ops/state/truth/agents.json").write_text(json.dumps(reg), encoding="utf-8")
+        (root / "ops/state/truth/skills.json").write_text(json.dumps(sk), encoding="utf-8")
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a nested decoy sharing a stem is rejected",
+              p.returncode != 0 and "nested below the declared tree" in out)
+        check("...and the unregistered top-level file is reported by exact path",
+              "no record names that exact path" in out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+nested_decoy_case()
 
 
 # --- derived data must not be stored in a truth owner ---------------------------
