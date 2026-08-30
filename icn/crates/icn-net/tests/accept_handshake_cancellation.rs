@@ -56,9 +56,19 @@
 //!   client *does* reach verification — and sits there, so the Finished flight the server
 //!   is waiting on is still a second away. This is the path that used to lose the race.
 //!
-//! For a whole second after the server pops the `Incoming` there is therefore *no* completed
-//! handshake to hand over — not unlikely, impossible — however long any thread is
-//! descheduled for. The negative assertion below is causal rather than probabilistic.
+//! For a whole second after the server pops the `Incoming` there is therefore no completed
+//! handshake to hand over. The negative assertion below no longer depends on the cancellation
+//! *winning* anything — only on the polling thread resuming within that second.
+//!
+//! Be precise about what that buys: it is a bound, not a synchronisation barrier. A pause
+//! longer than the stall would still defeat it. What changes is the size and the kind of the
+//! margin — from "one poll must beat a sub-millisecond loopback handshake", which the
+//! scheduler lost roughly once in twenty runs, to "a thread must resume within a second",
+//! roughly 80x the worst delay measured here. A true happens-before is possible (have the
+//! verifier block on a latch the loop releases on its next cancellation after the client
+//! signals that it is verifying) and is deliberately left as a follow-up: this is a bound
+//! wide enough to be sound in practice, and swapping it for a new synchronisation protocol
+//! is not a de-flaking change.
 //!
 //! That is verified rather than argued: injecting a 50ms block between `Incoming::accept()`
 //! and the first poll of the resulting `Connecting` — the second path above, made
@@ -135,10 +145,10 @@ const POLL_GAP: Duration = Duration::from_millis(5);
 
 /// How long the client below is held inside its own certificate verification.
 ///
-/// This is a *causal barrier*, not a margin to be tuned: while the client sits here it has
-/// not sent its Finished flight, so the server-side handshake cannot complete no matter how
-/// long the server's thread is descheduled for. A second is orders of magnitude beyond any
-/// scheduling delay observed on a loaded host. It is not normally waited out at all — on
+/// While the client sits here it has not sent its Finished flight, so the server-side
+/// handshake cannot complete — for this long. That is the bound the negative assertion rests
+/// on, and a second is roughly 80x the worst scheduling delay measured on a loaded host. It
+/// is a wide bound rather than a true happens-before; see the module docs. It is not normally waited out at all — on
 /// the ordinary path the accept is cancelled before the server transmits, so the client
 /// never reaches verification and the stall never engages.
 const HANDSHAKE_BARRIER: Duration = Duration::from_secs(1);
