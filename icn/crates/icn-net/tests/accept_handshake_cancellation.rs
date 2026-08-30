@@ -99,6 +99,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
+use tokio::sync::oneshot::error::TryRecvError;
 
 /// Drive `fut` for exactly one poll, then drop it — the production loop's cancellation
 /// reduced to its essence.
@@ -279,11 +280,18 @@ async fn a_fused_accept_cancelled_after_one_poll_destroys_the_handshake() -> Res
             None => {
                 // Once the dial has resolved the phase under test is behind us and no
                 // further `Incoming` is coming; keep polling until then.
-                if dialled_rx.try_recv().is_ok() {
-                    reached_the_handshake = true;
-                    break;
+                match dialled_rx.try_recv() {
+                    Ok(()) => {
+                        reached_the_handshake = true;
+                        break;
+                    }
+                    // The dial task ended without ever getting as far as sending: it
+                    // failed before `connect()` resolved, or it panicked. Spinning out the
+                    // rest of the window here would blame the deadline for a harness that
+                    // was already broken, so stop now and let the assertion below say so.
+                    Err(TryRecvError::Closed) => break,
+                    Err(TryRecvError::Empty) => tokio::time::sleep(POLL_GAP).await,
                 }
-                tokio::time::sleep(POLL_GAP).await;
             }
             Some(Ok(Some(connection))) => {
                 handed_over = Some(connection);
@@ -306,9 +314,9 @@ async fn a_fused_accept_cancelled_after_one_poll_destroys_the_handshake() -> Res
     );
     assert!(
         reached_the_handshake,
-        "the client's dial never resolved within {}s, so the loop above never took an \
-         `Incoming` off the queue and the assertion above proved nothing. This is a broken \
-         harness, not a property failure.",
+        "the client's dial never resolved within {}s, or the dial task ended before it \
+         could report, so the loop above never took an `Incoming` off the queue and the \
+         assertion above proved nothing. This is a broken harness, not a property failure.",
         ACCEPT_WINDOW.as_secs()
     );
 
