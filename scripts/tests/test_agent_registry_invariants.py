@@ -56,9 +56,10 @@ def base_registry():
     """A minimal, well-formed icn-agents/v2 registry over two surfaces."""
     return {
         "schema": "icn-agents/v2",
+        # The surface KEY is an arbitrary label; provider_type is what semantics bind to.
         "provider_surfaces": {
-            "claude": {"tree": ".claude/agents"},
-            "copilot": {"tree": ".github/agents"},
+            "claude": {"tree": ".claude/agents", "provider_type": "claude-code"},
+            "copilot": {"tree": ".github/agents", "provider_type": "github-copilot"},
         },
         # Must equal the checker's implemented vocabulary exactly, in both directions.
         "relationship_model": {
@@ -68,6 +69,9 @@ def base_registry():
             "divergent_unreviewed": "unadjudicated",
         },
         "declared_scope": {"in_scope": [], "out_of_scope": [], "completeness_claim": "x"},
+        "enforcement": {"checker": "scripts/check-agent-registry.py",
+                        "tests": "scripts/tests/test_agent_registry_invariants.py",
+                        "invoked_by": ["caller.sh"]},
         "agents": [
             {
                 "name": "solo",
@@ -99,8 +103,17 @@ def base_skills():
 
 def build(tmp, registry, skills, files):
     root = pathlib.Path(tmp)
-    for rel in (".claude/agents", ".github/agents", "ops/state/truth"):
+    for rel in (".claude/agents", ".github/agents", "ops/state/truth", "scripts/tests"):
         (root / rel).mkdir(parents=True, exist_ok=True)
+    # Stubs for the paths the enforcement block names. They must exist inside the fixture
+    # root, and the caller stub must actually mention the checker, because the checker now
+    # verifies both -- a caller list nothing verifies is how a gate silently stops running.
+    (root / "scripts/check-agent-registry.py").write_text("# stub\n", encoding="utf-8")
+    (root / "scripts/tests/test_agent_registry_invariants.py").write_text(
+        "# stub\n", encoding="utf-8")
+    (root / "caller.sh").write_text(
+        "python3 scripts/check-agent-registry.py\n", encoding="utf-8")
+    (root / "not-a-caller.md").write_text("no invocation here\n", encoding="utf-8")
     for rel, text in files.items():
         fp = root / rel
         fp.parent.mkdir(parents=True, exist_ok=True)
@@ -209,7 +222,8 @@ case("provider_surfaces missing entirely",
      lambda r: r.__setitem__("provider_surfaces", {}), expect="provider_surfaces")
 
 case("a declared surface tree does not exist",
-     lambda r: r["provider_surfaces"].__setitem__("ghost", {"tree": ".ghost/agents"}),
+     lambda r: r["provider_surfaces"].__setitem__(
+         "ghost", {"tree": ".ghost/agents", "provider_type": "claude-code"}),
      expect="does not exist")
 
 case("REAL: registered path escapes the repository root (the v1 orchestrator record)",
@@ -362,13 +376,128 @@ case("a copilot record that states no automatic_invocation at all",
 case("automatic_invocation recorded on a Claude surface, which projects no semantics",
      lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__(
          "automatic_invocation", True),
-     expect="not a semantic this surface projects")
+     expect="not a semantic provider type")
 
 for k in ("description", "color", "model", "tools", "target",
           "infer", "disable-model-invocation", "user-invocable"):
     case("provider-native %r copied back into the registry" % k,
          (lambda key: (lambda r: r["agents"][1]["surfaces"]["copilot"].__setitem__(key, "x")))(k),
          expect="owned by the provider definition")
+
+
+# --- the registry's own enforcement claims -------------------------------------
+print()
+print("--- enforcement claims ---")
+
+case("enforcement.checker names a file that does not exist",
+     lambda r: r["enforcement"].__setitem__("checker", "scripts/gone.py"),
+     expect="which does not exist")
+
+case("enforcement.invoked_by names a file that exists but does not invoke the checker",
+     lambda r: r["enforcement"].__setitem__("invoked_by", ["not-a-caller.md"]),
+     expect="does not invoke this checker")
+
+case("enforcement block is missing entirely",
+     lambda r: r.pop("enforcement"), expect="must be an object")
+
+
+# --- provider identity vs surface label -----------------------------------------
+print()
+print("--- provider type binds semantics, surface id does not ---")
+
+def relabel(r, old, new):
+    """Rename a surface key everywhere, changing nothing else."""
+    r["provider_surfaces"][new] = r["provider_surfaces"].pop(old)
+    for rec in r["agents"]:
+        if old in rec.get("surfaces", {}):
+            rec["surfaces"][new] = rec["surfaces"].pop(old)
+        if rec.get("mirror_pairs"):
+            rec["mirror_pairs"] = [[new if x == old else x for x in p]
+                                   for p in rec["mirror_pairs"]]
+
+# MUST-PASS: a harmless relabel must not change what is enforced.
+r = base_registry()
+relabel(r, "copilot", "github")
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("a surface id renamed copilot->github still passes with semantics intact", rc == 0)
+
+# MUST-FAIL: the same rename must NOT let the semantic disappear.
+r = base_registry()
+relabel(r, "copilot", "github")
+r["agents"][1]["surfaces"]["github"].pop("automatic_invocation")
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("REAL P2: renaming the surface id cannot drop behavioural enforcement",
+      rc != 0 and "silently unclassified" in out)
+
+# MUST-PASS: two surfaces may share one provider technology.
+r = base_registry()
+r["provider_surfaces"]["claude"]["provider_type"] = "claude-code"
+r["provider_surfaces"]["second_claude"] = {"tree": ".claude/agents",
+                                           "provider_type": "claude-code"}
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("two surfaces may declare the same provider_type (tree reuse aside)",
+      "no adapter" not in out)
+
+case("an unknown provider_type",
+     lambda r: r["provider_surfaces"]["copilot"].__setitem__("provider_type", "acme-ai"),
+     expect="has no adapter")
+
+case("a surface with no provider_type at all",
+     lambda r: r["provider_surfaces"]["copilot"].pop("provider_type"),
+     expect="provider_type")
+
+case("a semantic recorded for a provider_type that projects none",
+     lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__(
+         "automatic_invocation", True),
+     expect="not a semantic provider type")
+
+
+# --- structural validation: valid VALUE before true CLAIM -----------------------
+print()
+print("--- structural validation ---")
+
+for bad, label in ((0, "0"), (1, "1"), ("false", '"false"'), (None, "null"),
+                   ([], "[]"), ({}, "{}")):
+    case("REAL P2: automatic_invocation is %s, not a boolean" % label,
+         (lambda v: (lambda r: r["agents"][1]["surfaces"]["copilot"].__setitem__(
+             "automatic_invocation", v)))(bad),
+         expect="must be a real JSON boolean")
+
+case("agents is not an array",
+     lambda r: r.__setitem__("agents", {"nope": 1}), expect="must be an array")
+
+case("a surface entry is not an object",
+     lambda r: r["agents"][0]["surfaces"].__setitem__("claude", "a string"),
+     expect="must be an object")
+
+case("a record path is not a string",
+     lambda r: r["agents"][0]["surfaces"]["claude"].__setitem__("path", 42),
+     expect="path: must be a non-empty string")
+
+case("relationship is not a string",
+     lambda r: r["agents"][0].__setitem__("relationship", ["single_surface"]),
+     expect="relationship must be a non-empty string")
+
+case("divergence.adjudicated is 1 rather than true",
+     lambda r: (r["agents"][1].__setitem__("relationship", "provider_variant"),
+                r["agents"][1].__setitem__("divergence", {"adjudicated": 1, "why": "x"})),
+     expect="must be a real boolean")
+
+case("a mirror_pairs entry is not two strings",
+     lambda r: r["agents"][1].__setitem__("mirror_pairs", [["claude"]]),
+     expect="two surface-id strings")
+
+case("cross_registry list contains a non-string",
+     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
+         "agent_surfaces_tracked_by_agents_json", [".claude/agents", 7]),
+     expect="cross_registry")
+
+# A malformed document must produce findings, never a traceback.
+r = base_registry()
+r["provider_surfaces"] = "not an object"
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("a malformed registry reports findings rather than raising",
+      rc != 0 and "Traceback" not in out and "must be an object" in out)
 
 
 # --- identity is the path, not a derived name ----------------------------------
@@ -391,7 +520,8 @@ def nested_decoy_case():
         (root / ".claude/agents/solo.md").write_text(
             agent_file("solo", "color: red\n"), encoding="utf-8")
         reg = {"schema": "icn-agents/v2",
-               "provider_surfaces": {"claude": {"tree": ".claude/agents"}},
+               "provider_surfaces": {"claude": {"tree": ".claude/agents",
+                                               "provider_type": "claude-code"}},
                "relationship_model": {"single_surface": "x", "exact_mirror": "x",
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
                "declared_scope": {},

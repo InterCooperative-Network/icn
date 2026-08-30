@@ -64,6 +64,32 @@ COPILOT_AUTOMATIC_INVOCATION = (
     "(docs.github.com/en/copilot/reference/custom-agents-configuration, verified 2026-08-30)")
 
 
+# --- one reusable type mechanism ------------------------------------------------------
+# Deliberately the same shape as scripts/check-merge-policy-schema.py, which learned this in
+# icn#2651/#2658: `isinstance(False, int)` is True, so a JSON number satisfied a boolean check
+# and `0 == False` compared equal. This checker repeated that defect -- a stored
+# `automatic_invocation: 0` compared equal to a derived `False` and reported clean.
+def as_obj(v):
+    return (True, v) if isinstance(v, dict) else (False, None)
+
+
+def as_str(v):
+    return (True, v) if isinstance(v, str) and v else (False, None)
+
+
+def as_exact_bool(v):
+    return (True, v) if type(v) is bool else (False, None)
+
+
+def as_str_list(v):
+    if not isinstance(v, list):
+        return (False, None)
+    return (True, v) if all(isinstance(x, str) and x for x in v) else (False, None)
+
+
+ALL_SEMANTIC_FIELDS = frozenset()   # rebound below, once the adapters are defined.
+
+
 class InvalidProviderBoolean(Exception):
     """A provider key is present with a value the provider does not define."""
 
@@ -108,11 +134,127 @@ def copilot_automatic_invocation(block):
     return True
 
 
-# Which surfaces project which semantics. A surface absent from this map makes no
-# behavioural claim, and the registry must not record one for it.
-SURFACE_SEMANTICS = {
-    "copilot": {"automatic_invocation": copilot_automatic_invocation},
+# Semantics belong to the PROVIDER TECHNOLOGY, not to the registry's label for a surface.
+# Dispatching on the surface ID meant renaming `copilot` to `github` -- a harmless relabel --
+# silently dropped every behavioural check, because an unknown ID projected nothing.
+#
+# A provider type that genuinely projects no organizational behaviour maps to an explicit
+# empty dict. That is deliberate representation, not absence from a table: adding a new
+# provider type without deciding what it projects fails rather than defaulting to silence.
+#
+# Several surfaces may share one provider type -- `.claude/agents` and the icn-agent-pack
+# plugin tree are both loaded by Claude Code -- so this is keyed by technology, not by tree.
+PROVIDER_ADAPTERS = {
+    "github-copilot": {"automatic_invocation": copilot_automatic_invocation},
+    "claude-code": {},
 }
+
+
+def validate_structure(reg):
+    """Is this a valid registry VALUE? Returns messages; empty means structurally sound.
+
+    TOTAL over any JSON-shaped input -- it must never raise merely because the document is
+    malformed, because a validator that crashes reports nothing and nothing reads as clean.
+    This checker demonstrated that directly: a surface missing `provider_type` produced a
+    KeyError instead of a finding.
+
+    Structural validation answers "is this a valid registry value". Semantic validation, in
+    Checker, answers "is that valid value TRUE about the repository and provider state".
+    The two questions are kept apart: semantic code below may assume these types hold.
+    """
+    bad = []
+
+    def req(cond, msg):
+        if not cond:
+            bad.append(msg)
+        return bool(cond)
+
+    ok, reg = as_obj(reg)
+    if not req(ok, "registry: not a JSON object"):
+        return bad
+
+    req(as_str(reg.get("schema"))[0], "schema: must be a non-empty string")
+
+    ok, surfaces = as_obj(reg.get("provider_surfaces"))
+    if req(ok, "provider_surfaces: must be an object"):
+        for sid, sdef in sorted(surfaces.items()):
+            ok, sdef = as_obj(sdef)
+            if not req(ok, "provider_surfaces.%s: must be an object" % sid):
+                continue
+            req(as_str(sdef.get("tree"))[0],
+                "provider_surfaces.%s.tree: must be a non-empty string" % sid)
+            req(as_str(sdef.get("provider_type"))[0],
+                "provider_surfaces.%s.provider_type: must be a non-empty string -- semantics "
+                "dispatch on it, so it cannot be absent or of another type" % sid)
+
+    req(as_obj(reg.get("relationship_model"))[0], "relationship_model: must be an object")
+
+    agents = reg.get("agents")
+    if req(isinstance(agents, list), "agents: must be an array"):
+        for i, rec in enumerate(agents):
+            ok, rec = as_obj(rec)
+            if not req(ok, "agents[%d]: must be an object" % i):
+                continue
+            label = rec.get("name") if isinstance(rec.get("name"), str) else "agents[%d]" % i
+            req(as_str(rec.get("name"))[0], "%s: name must be a non-empty string" % label)
+            req(as_str(rec.get("relationship"))[0],
+                "%s: relationship must be a non-empty string" % label)
+
+            ok, surfs = as_obj(rec.get("surfaces"))
+            if req(ok, "%s: surfaces must be an object" % label):
+                for sid, entry in sorted(surfs.items()):
+                    ok, entry = as_obj(entry)
+                    if not req(ok, "%s.%s: must be an object" % (label, sid)):
+                        continue
+                    req(as_str(entry.get("path"))[0],
+                        "%s.%s.path: must be a non-empty string" % (label, sid))
+                    for field, value in sorted(entry.items()):
+                        # Only KNOWN semantic projections are type-checked here. An unknown
+                        # key is a semantic question -- is it provider-owned, or not projected
+                        # by this provider type -- and answering it structurally would pre-empt
+                        # the better message with a type complaint.
+                        if field not in ALL_SEMANTIC_FIELDS:
+                            continue
+                        req(as_exact_bool(value)[0],
+                            "%s.%s.%s: must be a real JSON boolean, not %s(%r). bool is a "
+                            "subclass of int in Python, so 0/1 would compare equal to the "
+                            "derived value and pass."
+                            % (label, sid, field, type(value).__name__, value))
+
+            mp = rec.get("mirror_pairs")
+            if mp is not None and req(isinstance(mp, list),
+                                      "%s: mirror_pairs must be an array" % label):
+                for pair in mp:
+                    req(as_str_list(pair)[0] and len(pair) == 2,
+                        "%s: each mirror_pairs entry must be two surface-id strings, got %r"
+                        % (label, pair))
+
+            div = rec.get("divergence")
+            if div is not None and req(as_obj(div)[0],
+                                       "%s: divergence must be an object" % label):
+                if "adjudicated" in div:
+                    req(as_exact_bool(div["adjudicated"])[0],
+                        "%s: divergence.adjudicated must be a real boolean, not %s(%r)"
+                        % (label, type(div["adjudicated"]).__name__, div["adjudicated"]))
+                for k in ("why", "owning_issue"):
+                    if k in div:
+                        req(as_str(div[k])[0],
+                            "%s: divergence.%s must be a non-empty string" % (label, k))
+
+    ok, scope = as_obj(reg.get("declared_scope"))
+    if ok:
+        ok, cross = as_obj(scope.get("cross_registry"))
+        if ok:
+            for k in ("agent_surfaces_tracked_by_agents_json",
+                      "provider_surfaces_no_registry_covers"):
+                if k in cross:
+                    req(as_str_list(cross[k])[0],
+                        "declared_scope.cross_registry.%s: must be an array of non-empty "
+                        "strings" % k)
+    return bad
+
+
+ALL_SEMANTIC_FIELDS = frozenset(f for spec in PROVIDER_ADAPTERS.values() for f in spec)
 
 
 class Checker:
@@ -253,6 +395,14 @@ class Checker:
             print("UNPARSEABLE: %s (%s)" % (REGISTRY, exc))
             return 1
 
+        structural = validate_structure(reg)
+        if structural:
+            for m in structural:
+                self.fail("STRUCTURE %s" % m)
+            # Semantic checks below assume these types. Running them on a malformed value is
+            # how a checker crashes instead of reporting, so stop here.
+            return self.report()
+
         if reg.get("schema") != "icn-agents/v2":
             self.fail("schema: expected icn-agents/v2, found %r. This checker enforces the "
                       "provider-surface model; a v1 file cannot express it."
@@ -282,7 +432,18 @@ class Checker:
 
         # ---- surface trees --------------------------------------------------
         disk = {}
+        usable = {}          # surface ids whose declaration validated; records may use these
         for sid, sdef in sorted(surfaces.items()):
+            ptype = (sdef or {}).get("provider_type")
+            if ptype not in PROVIDER_ADAPTERS:
+                self.fail("provider_surfaces.%s: provider_type %r has no adapter. Semantics "
+                          "bind to the provider technology, not to this surface's label, and a "
+                          "type with no adapter must fail rather than silently project nothing. "
+                          "Known types: %s." % (sid, ptype, ", ".join(sorted(PROVIDER_ADAPTERS))))
+                continue
+            usable[sid] = ptype
+            self.ok("surface %s is provider_type %s (%d semantics)"
+                    % (sid, ptype, len(PROVIDER_ADAPTERS[ptype])))
             tree = (sdef or {}).get("tree")
             if not tree:
                 self.fail("provider_surfaces.%s: no tree declared" % sid)
@@ -323,6 +484,12 @@ class Checker:
             for sid, entry in sorted(rec_surfaces.items()):
                 if sid not in surfaces:
                     self.fail("%s: surface %r is not a declared provider_surface" % (name, sid))
+                    continue
+                if sid not in usable:
+                    # Its declaration already failed above. Continuing would index an adapter
+                    # that does not exist -- a checker that raises reports nothing.
+                    self.fail("%s.%s: surface declaration is invalid, so this record cannot be "
+                              "validated against it." % (name, sid))
                     continue
                 path = (entry or {}).get("path")
                 if not path:
@@ -368,7 +535,8 @@ class Checker:
                                   "SEMANTICS, never mirrored syntax -- read it from %s."
                                   % (name, sid, k, path))
 
-                self.check_semantics(name, sid, entry, fm, path)
+                self.check_semantics(name, sid, entry, fm, path,
+                                     surfaces[sid]["provider_type"])
                 registered.setdefault(sid, set()).add(path)
                 self.ok("%s.%s -> %s" % (name, sid, path))
 
@@ -408,12 +576,50 @@ class Checker:
                               "unregistered provider agent must not be able to appear silently."
                               % (relpath, sid))
 
+        self.check_enforcement_claims(reg)
         self.check_cross_registry(surfaces)
         return self.report()
 
-    def check_semantics(self, name, sid, entry, fm, path):
+    def check_enforcement_claims(self, reg):
+        """The registry names its own checker, tests and callers. Those are claims too.
+
+        Nothing verified them, so moving or renaming any of these files would leave the truth
+        owner pointing at something that does not exist -- the same unpinned-copy failure this
+        file keeps finding, applied to its own enforcement block.
+        """
+        enf = reg.get("enforcement")
+        if not isinstance(enf, dict):
+            self.fail("enforcement: must be an object naming the checker, its tests and its "
+                      "callers.")
+            return
+        for key in ("checker", "tests"):
+            val = enf.get(key)
+            if not isinstance(val, str) or not val:
+                self.fail("enforcement.%s: must be a non-empty path string" % key)
+            elif not (self.root / val).is_file():
+                self.fail("enforcement.%s names %s, which does not exist." % (key, val))
+            else:
+                self.ok("enforcement.%s -> %s exists" % (key, val))
+        callers = enf.get("invoked_by")
+        if not isinstance(callers, list):
+            self.fail("enforcement.invoked_by: must be an array of caller paths")
+            return
+        for c in callers:
+            if not isinstance(c, str) or not c:
+                self.fail("enforcement.invoked_by: %r is not a path string" % (c,))
+            elif not (self.root / c).is_file():
+                self.fail("enforcement.invoked_by names %s, which does not exist." % c)
+            elif "check-agent-registry" not in (self.root / c).read_text(
+                    encoding="utf-8", errors="replace"):
+                self.fail("enforcement.invoked_by names %s, but that file does not invoke this "
+                          "checker. A caller list nothing verifies is how a gate silently "
+                          "stops running." % c)
+            else:
+                self.ok("enforcement.invoked_by -> %s invokes this checker" % c)
+
+    def check_semantics(self, name, sid, entry, fm, path, provider_type):
         """Registry semantic projections must equal what the provider file actually means."""
-        spec = SURFACE_SEMANTICS.get(sid, {})
+        spec = PROVIDER_ADAPTERS[provider_type]
         for field, derive in sorted(spec.items()):
             if field not in (entry or {}):
                 self.fail("%s.%s: the registry owns %r for this surface and this record does "
@@ -438,9 +644,9 @@ class Checker:
             if field == "path":
                 continue
             if field not in spec:
-                self.fail("%s.%s: %r is not a semantic this surface projects. Surfaces declare "
-                          "their semantics in SURFACE_SEMANTICS; recording one here asserts "
-                          "behaviour that provider does not have." % (name, sid, field))
+                self.fail("%s.%s: %r is not a semantic provider type %r projects. Adapters own "
+                          "which semantics exist; recording one here asserts behaviour that "
+                          "provider does not have." % (name, sid, field, provider_type))
 
     def check_cross_registry(self, surfaces):
         sk = self.root / SKILLS

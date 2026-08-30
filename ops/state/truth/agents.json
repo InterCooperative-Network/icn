@@ -4,28 +4,18 @@
   "provider_surfaces": {
     "claude": {
       "tree": ".claude/agents",
-      "loaded_by": "Claude Code, by directory convention.",
-      "provider_front_matter_keys": [
-        "color",
-        "model",
-        "tools"
-      ]
+      "provider_type": "claude-code",
+      "loaded_by": "Claude Code, by directory convention."
     },
     "agent_pack": {
       "tree": "tools/claude-code/plugins/icn-agent-pack/agents",
-      "loaded_by": "The icn-agent-pack Claude Code plugin (tools/claude-code/plugins/icn-agent-pack/.claude-plugin/plugin.json), loaded when a developer installs the plugin. Its README states it complements rather than replaces the project-local .claude/ config, so an agent name here can coexist with a different body under .claude/agents.",
-      "provider_front_matter_keys": [
-        "color",
-        "model",
-        "tools"
-      ]
+      "provider_type": "claude-code",
+      "loaded_by": "The icn-agent-pack Claude Code plugin (tools/claude-code/plugins/icn-agent-pack/.claude-plugin/plugin.json), loaded when a developer installs the plugin. Its README states it complements rather than replaces the project-local .claude/ config, so an agent name here can coexist with a different body under .claude/agents."
     },
     "copilot": {
       "tree": ".github/agents",
-      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents the surface. NOTE: this field deliberately makes NO claim about which agents are automatically invocable. An earlier revision summarised that here and the summary was wrong -- it said every agent but icn-orchestrator declared infer: false, while icn-docs-synchronizer declares neither invocation key and is therefore automatically invocable. Nothing validated the prose. Per-agent automatic_invocation is the mechanically enforced answer; do not restate it here.",
-      "provider_front_matter_keys": [
-        "infer"
-      ]
+      "provider_type": "github-copilot",
+      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents the surface. NOTE: this field deliberately makes NO claim about which agents are automatically invocable. An earlier revision summarised that here and the summary was wrong -- it said every agent but icn-orchestrator declared infer: false, while icn-docs-synchronizer declares neither invocation key and is therefore automatically invocable. Nothing validated the prose. Per-agent automatic_invocation is the mechanically enforced answer; do not restate it here."
     }
   },
   "mirror_pairs_note": "A record may additionally name mirror_pairs: surface pairs whose bodies MUST stay byte-identical, enforced by the checker even when the record as a whole is divergent. This exists because .github/copilot-instructions.md states that icn-code-reviewer 'mirrors its Claude counterpart' -- a claim that was documented and unenforced. A record-level relationship cannot express it once a third surface diverges.",
@@ -702,11 +692,13 @@
     },
     "owned_by_the_provider": {
       "description / color / model / tools / target / mcp-servers / metadata": "Provider-native. No consumer read them from the registry -- verified across every agents.json reader -- so 71 copies were removed and the checker now rejects them coming back.",
-      "infer / disable-model-invocation / user-invocable": "Provider SYNTAX. The registry records the derived automatic_invocation semantic instead, so a provider renaming its key does not change the registry's concept. Recording the raw keys is rejected."
+      "infer / disable-model-invocation / user-invocable": "Provider SYNTAX. The registry records the derived automatic_invocation semantic instead, so a provider renaming its key does not change the registry's concept. Recording the raw keys is rejected.",
+      "provider_front_matter_keys (removed)": "This surface field listed each provider's front-matter keys and had ZERO consumers -- verified across the branch. It had already rotted: the copilot surface still listed `infer`, the key GitHub retired and this registry stopped modelling. Removed rather than synchronised, per the rule this file now follows."
     },
     "deliberately_not_projected": {
       "user-invocable": "GitHub documents it (default true) and it would project cleanly as manual_invocation. NOT added: no ICN consumer or invariant needs to answer 'can a person pick this agent by hand', and the registry must not grow a projection merely because the provider supports the field. Add it when a real consumer appears, not before."
     },
     "registry_native": "name, surfaces, relationship, mirror_pairs, divergence, routing_triggers and not_for exist only here. They are cross-provider routing intent and topology, so no provider file is their source and nothing needs pinning."
-  }
+  },
+  "provider_type_note": "provider_type names the provider TECHNOLOGY and is what semantic adapters dispatch on. The surface key beside it ('claude', 'copilot', 'agent_pack') is an arbitrary logical label and carries no behaviour: renaming it must not change enforcement. Two surfaces may share a provider_type -- .claude/agents and the icn-agent-pack plugin tree are both loaded by Claude Code -- and a provider_type with no adapter in scripts/check-agent-registry.py#PROVIDER_ADAPTERS fails rather than silently projecting nothing. A type that genuinely projects no organizational behaviour maps to an explicit empty adapter, so 'projects nothing' is a decision rather than an omission."
 }
