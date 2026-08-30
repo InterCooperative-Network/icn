@@ -50,8 +50,35 @@ impl PartialOrd for PeerId {
 
 impl Ord for PeerId {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Order by DID string representation
-        self.0.to_string().cmp(&other.0.to_string())
+        // I7 (#2627): order by the principal the DID names, not by its spelling.
+        //
+        // `PeerId` derives `PartialEq`/`Eq`/`Hash` from `Did`, so when `Did`
+        // equality became principal equality this comparator had to move in the
+        // same commit. Rust's ordered containers require the biconditional
+        // `a == b  <=>  a.cmp(b) == Ordering::Equal`, and `NeighborSets` keeps
+        // the same peers in four `BTreeSet`s *and* a `HashMap`: if the two
+        // notions disagree, `remove_neighbor` drops a peer from one and orphans
+        // its metadata row in the other, and the cardinality of those sets —
+        // which `enforce_limit` reads to decide whether a neighbour class is
+        // full — starts counting one principal several times.
+        // `tests/peerid_i7_ordering_tripwire.rs` asserts that biconditional
+        // directly rather than either side's current value.
+        match (self.0.identifier_bytes(), other.0.identifier_bytes()) {
+            // The principals the two spellings name — the same bytes `Did`'s
+            // equality and hash now key on.
+            (Ok(a), Ok(b)) => a.cmp(&b),
+            // Values naming no principal are ordered among themselves by
+            // spelling, which is the relation `Did` equality falls back to for
+            // exactly that population.
+            (Err(_), Err(_)) => self.0.as_str().cmp(other.0.as_str()),
+            // The two populations never interleave, so a value naming no
+            // principal can never compare `Equal` to one that does — which is
+            // what `Did`'s equality says about that pair. Ordering within each
+            // class is total and the classes are totally ordered, so this is a
+            // total order.
+            (Ok(_), Err(_)) => std::cmp::Ordering::Less,
+            (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
+        }
     }
 }
 

@@ -1002,8 +1002,9 @@ async fn alias_spelled_did_cannot_add_a_second_vote_on_the_actor_path() {
     // cannot pass vacuously. If `Did` becomes key-equal (N2-A / #2627) this
     // assertion fails and the proof must be re-derived rather than assumed.
     assert_ne!(
-        node.did, alias,
-        "control: the two spellings must differ under current Did equality"
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
     );
 
     node.ops
@@ -1094,19 +1095,36 @@ async fn alias_self_delegation_cannot_launder_a_second_vote_at_close() {
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
     assert_ne!(
-        node.did, alias,
-        "control: the two spellings must differ under current Did equality"
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
     );
 
     // Delegate from the canonical spelling to an alias of the very same key.
-    node.ops
+    //
+    // **Updated by the I7 patch (#2627).** This used to be *accepted* — the two
+    // spellings were different `Did` values, so `add_delegation`'s
+    // self-delegation guard did not recognise it — and the laundering it
+    // enabled had to be caught downstream in the tally. I7 makes the two
+    // spellings one principal, so that existing guard now sees the delegation
+    // for what it is and the attack is refused at the door. The guard moved
+    // earlier; it did not disappear.
+    let refused = node
+        .ops
         .create_delegation(Delegation::new(
             node.did.clone(),
             alias.clone(),
             DelegationScope::Blanket,
         ))
         .await
-        .expect("self-delegation across spellings is accepted today");
+        .expect_err(
+            "a delegation from one spelling of a key to another spelling of the same key \
+             is self-delegation and must be refused",
+        );
+    assert!(
+        refused.to_string().to_lowercase().contains("yourself"),
+        "the refusal must name self-delegation, got: {refused}"
+    );
 
     // Vote once, as the delegate spelling.
     node.ops
@@ -1129,7 +1147,8 @@ async fn alias_self_delegation_cannot_launder_a_second_vote_at_close() {
     assert!(
         !matches!(closed.state, ProposalState::Accepted { .. }),
         "one key produced one vote of three eligible members, which cannot reach a 50% \
-         quorum; Accepted means the delegation expansion counted it twice (got {:?})",
+         quorum; Accepted means a second vote was manufactured for that key despite the \
+         self-delegation above being refused (got {:?})",
         closed.state
     );
     assert!(
@@ -1157,8 +1176,9 @@ async fn close_fails_closed_on_conflicting_alias_rows_rather_than_counting_both(
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
     assert_ne!(
-        node.did, alias,
-        "control: the two spellings must differ under current Did equality"
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
     );
 
     // Two conflicting acts by one key, as a pre-#2641 binary would have left them.
@@ -1209,7 +1229,11 @@ async fn vote_change_over_legacy_duplicate_rows_refuses_without_mutating() {
     let bytes = node.did.identifier_bytes().expect("node DID must decode");
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
-    assert_ne!(node.did, alias, "control: the spellings must differ");
+    assert_ne!(
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+    );
 
     // Two *agreeing* rows for one principal, as a pre-#2641 binary left them.
     for voter in [node.did.clone(), alias] {
@@ -1274,7 +1298,11 @@ async fn filtered_close_fails_closed_on_conflicts_the_standing_filter_would_hide
     let bytes = node.did.identifier_bytes().expect("node DID must decode");
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
-    assert_ne!(node.did, alias, "control: the spellings must differ");
+    assert_ne!(
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+    );
 
     node.state
         .save_vote(
@@ -1321,7 +1349,11 @@ async fn quorum_denominator_counts_principals_not_did_spellings() {
     let bytes = node.did.identifier_bytes().expect("node DID must decode");
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
-    assert_ne!(node.did, alias, "control: the spellings must differ");
+    assert_ne!(
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+    );
 
     // One member, named twice. Quorum 100% makes the difference decisive:
     // 1/1 of the electorate reaches it, 1/2 does not.
@@ -1384,9 +1416,16 @@ async fn quorum_denominator_counts_principals_not_did_spellings() {
 /// #2641, competing delegations: where a membership list names one principal
 /// under several spellings and those spellings hold delegations to different
 /// voters, expanding whichever entry the resolver happens to list first would
-/// make list order the authority over a vote. Fail closed instead.
+/// make list order the authority over a vote.
+///
+/// **Renamed and re-scoped by the I7 patch (#2627).** It read
+/// `competing_delegations_across_spellings_fail_closed_at_close` and asserted
+/// that `close` refused the pair. I7 made the two spellings one principal, so
+/// `create_delegation` now refuses the second delegation outright and the
+/// conflicting state cannot be reached. The hazard is prevented rather than
+/// detected, which is the better place for it.
 #[tokio::test(flavor = "current_thread")]
-async fn competing_delegations_across_spellings_fail_closed_at_close() {
+async fn competing_delegations_across_spellings_are_refused_at_creation() {
     let node = Node::spawn(true).await;
     let domain_id = GovernanceDomainId("alias-delegation-conflict".to_string());
     let delegate_a = icn_identity::KeyPair::generate().unwrap().did().clone();
@@ -1395,7 +1434,11 @@ async fn competing_delegations_across_spellings_fail_closed_at_close() {
     let bytes = node.did.identifier_bytes().expect("node DID must decode");
     let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes)))
         .expect("base16 multibase spelling must parse");
-    assert_ne!(node.did, alias, "control: the spellings must differ");
+    assert_ne!(
+        node.did.as_str(),
+        alias.as_str(),
+        "control: the spellings must differ as *strings*. Comparing the `Did` values themselves stopped proving this at I7 (#2627): they now name one principal and compare equal, which is the property under test"
+    );
 
     node.ops
         .create_domain(
@@ -1434,6 +1477,14 @@ async fn competing_delegations_across_spellings_fail_closed_at_close() {
         .expect("open_proposal");
 
     // One key, two spellings, two different delegates.
+    //
+    // **Updated by the I7 patch (#2627).** The first delegation is accepted; the
+    // second names the *same principal* under a different spelling, so
+    // `add_delegation`'s duplicate guard now refuses it. Before I7 both were
+    // stored and the conflict had to be caught at close, where expanding
+    // whichever entry the resolver listed first would have made list order the
+    // authority over a vote. The conflicting state can no longer be built, so
+    // the hazard is prevented rather than detected.
     node.ops
         .create_delegation(Delegation::new(
             node.did.clone(),
@@ -1442,14 +1493,25 @@ async fn competing_delegations_across_spellings_fail_closed_at_close() {
         ))
         .await
         .expect("delegation from the canonical spelling");
-    node.ops
+    let refused = node
+        .ops
         .create_delegation(Delegation::new(
             alias,
             delegate_b.clone(),
             DelegationScope::Blanket,
         ))
         .await
-        .expect("delegation from the alias spelling");
+        .expect_err(
+            "a second competing delegation for one principal, spelled differently, must be \
+             refused rather than stored alongside the first",
+        );
+    assert!(
+        refused
+            .to_string()
+            .to_lowercase()
+            .contains("already exists"),
+        "the refusal must name the existing delegation, got: {refused}"
+    );
 
     // Both delegates vote, and they disagree.
     node.ops
@@ -1461,13 +1523,33 @@ async fn competing_delegations_across_spellings_fail_closed_at_close() {
         .await
         .expect("delegate b votes");
 
-    let err = node
-        .ops
+    // **Updated by the I7 patch (#2627).** This used to assert that `close`
+    // failed closed naming "competing delegations", because both delegations
+    // existed and the resolver would otherwise have let membership-list order
+    // pick a winner. With the second delegation refused above, there is nothing
+    // left to disagree about, so `close` completes and reaches a decision.
+    //
+    // The close-time guard in `compute_tally_with_delegations` is deliberately
+    // left in place as defence in depth: `DelegationManager` has no
+    // load-from-store path today, so the conflicting state is unreachable
+    // through the public API — but the tally takes a manager from its caller,
+    // and the guard is what keeps a future construction path honest.
+    node.ops
         .close_proposal(proposal_id.clone())
         .await
-        .expect_err("membership-list order must not choose which delegated act counts");
+        .expect("with the competing delegation refused, the tally has no conflict to fail on");
+
+    let closed = node
+        .ops
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
     assert!(
-        err.to_string().contains("competing delegations"),
-        "must name the competing delegations, got: {err}"
+        !matches!(closed.state, ProposalState::Open { .. }),
+        "the proposal must reach a decision rather than stay open (got {:?}). Which \
+         decision is #2677's tally contract, not I7's: what this test pins is that one \
+         principal holds one delegation however it is spelled.",
+        closed.state
     );
 }

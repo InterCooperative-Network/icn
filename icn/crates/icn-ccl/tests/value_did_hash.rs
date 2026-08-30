@@ -1,8 +1,8 @@
 //! `Value::Did` / `Value::Set` hash compatibility across DID spellings.
 //!
 //! ICN accepts more than one textual encoding for the same 32-byte principal
-//! identifier. `Did` equality is still spelling-sensitive today; N2-A (#2627)
-//! intends to make it principal-sensitive (`IDENTITY_SEMANTICS.md` §11, I7).
+//! identifier. `Did` equality is now principal-sensitive: N2-A / I7 (#2627)
+//! landed (`IDENTITY_SEMANTICS.md` §11, I7).
 //!
 //! Rust's contract is one-way:
 //!
@@ -11,14 +11,22 @@
 //! ```
 //!
 //! The converse is not required, so a hash may be *coarser* than equality. That
-//! is what lets this land before the equality flip: two spellings of one
-//! principal share a hash today while `Did` still calls them distinct — a
-//! deliberate collision, which `HashSet` resolves by comparing — and the same
-//! rule is already correct once they become equal.
+//! asymmetry is why this file could land (#2681) **before** the equality flip:
+//! two spellings of one principal shared a hash while `Did` still called them
+//! distinct — a deliberate collision, which `HashSet` resolved by comparing —
+//! and the same keying rule stayed correct once they became equal. It now is
+//! equality rather than a collision, and the rule did not have to change.
 //!
-//! These tests do not change or simulate `Did` equality in production. Where a
-//! test needs the post-I7 relation it builds it locally, from
-//! `Did::identifier_bytes`.
+//! Two tests here were regime-dependent by construction and were updated by the
+//! I7 patch: [`a_hash_map_keys_both_spellings_as_one_principal`] (which
+//! described the deliberate collision) and the non-vacuity guard in
+//! [`the_hash_eq_contract_holds_under_simulated_principal_equality`], whose
+//! witness was "unequal today, equal after I7" and can no longer be met.
+//!
+//! These tests still do not read production `Did` equality where they need the
+//! principal relation: they build it locally from `Did::identifier_bytes`, so
+//! the law below is checked against an independent definition rather than
+//! against itself.
 
 #![allow(unknown_lints, clippy::unwrap_used, clippy::expect_used)]
 
@@ -121,10 +129,17 @@ fn two_distinct_principals_stay_distinct_in_a_hash_set() {
 }
 
 #[test]
-fn a_hash_map_still_resolves_each_spelling_under_the_deliberate_collision() {
-    // Both spellings hash alike now but are still unequal under today's `Did`
-    // equality, so the map holds two entries in one bucket. Lookup must not
-    // confuse them: a colliding hash is resolved by `Eq`, not by the hash.
+fn a_hash_map_keys_both_spellings_as_one_principal() {
+    // **Updated by the I7 patch (#2627), as designed.** Before I7 these two
+    // spellings hashed alike but compared *unequal*, so the map held two
+    // entries in one bucket and this test asserted that lookup resolved them
+    // apart by `Eq`. I7 made `Did` equality principal equality, so the
+    // deliberate collision became genuine equality: one principal is one key,
+    // and the second insert *updates* the first instead of joining it.
+    //
+    // That is the intended destination — `Value::Set`, `participants` and CCL
+    // `in` checks must see one principal once, however it is spelled — not a
+    // regression to work around.
     let canonical = a_principal();
     let alias = alternate_spelling(&canonical);
 
@@ -132,7 +147,14 @@ fn a_hash_map_still_resolves_each_spelling_under_the_deliberate_collision() {
     map.insert(Value::Did(canonical.clone()), "canonical");
     map.insert(Value::Did(alias.clone()), "alias");
 
-    assert_eq!(map.get(&Value::Did(canonical)), Some(&"canonical"));
+    assert_eq!(
+        map.len(),
+        1,
+        "two accepted spellings of one principal must be one key, not two"
+    );
+
+    // Either spelling reads that one entry, and it holds the later write.
+    assert_eq!(map.get(&Value::Did(canonical)), Some(&"alias"));
     assert_eq!(map.get(&Value::Did(alias)), Some(&"alias"));
 }
 
@@ -361,15 +383,29 @@ fn the_hash_eq_contract_holds_under_simulated_principal_equality() {
                 hash_of(b),
                 "values equal after I7 must already hash equally:\n  {a:?}\n  {b:?}"
             );
-            if a != b {
-                proved_a_cross_spelling_pair = true;
+            // Non-vacuity witness. **Updated by the I7 patch (#2627).** This
+            // read `a != b` — "a pair today's equality separates and I7 will
+            // merge" — which cannot be met once production equality *is* the
+            // principal relation.
+            //
+            // Differing *spellings* is the same witness stated
+            // regime-independently: true before I7 and still true, and it is
+            // what makes the assertion above non-trivial, since two values that
+            // are textually identical hashing alike proves nothing. Narrowed to
+            // a `Did` pair on purpose — a `Value::Set` witness would be
+            // ambiguous, because two equal sets can render in different orders
+            // for reasons that have nothing to do with spelling.
+            if let (Value::Did(x), Value::Did(y)) = (a, b) {
+                if x.as_str() != y.as_str() {
+                    proved_a_cross_spelling_pair = true;
+                }
             }
         }
     }
 
     assert!(
         proved_a_cross_spelling_pair,
-        "the corpus must contain a pair that is unequal today but equal after I7, \
-         or this test passes vacuously"
+        "the corpus must contain two values that render differently yet are one \
+         principal, or this test passes vacuously"
     );
 }
