@@ -20,25 +20,66 @@
 //! rather than threshold failure, which is why the defect presented as an intermittent
 //! flake. (The arrival-phase distribution was not measured; no exact rate is claimed.)
 //!
-//! These tests pin the boundary deterministically, by construction rather than by
-//! shrinking a duration until failure becomes likely. `tokio::time::timeout` polls its
-//! inner future *before* it checks the deadline, so a `Duration::ZERO` budget grants
-//! exactly one poll. That single poll is enough to tell the two phases apart:
+//! These tests pin the boundary deterministically, and how they do it is the whole design,
+//! because the obvious way does not work.
+//!
+//! The obvious way is to cancel on a budget too short for a handshake and assert that no
+//! connection came out. **Every version of that is a race, and the race is against the
+//! scheduler, not against the network.** Shrinking the budget does not fix it:
+//!
+//! - "1ms is shorter than any handshake" is false. A warm loopback handshake completes in
+//!   well under a millisecond, and the test then passes for the wrong reason.
+//! - `tokio::time::timeout(Duration::ZERO, ..)` reads like a one-poll budget and is not.
+//!   `timeout` does poll its inner future before checking the deadline, but tokio's timer
+//!   wheel has millisecond granularity and rounds deadlines **up**, so that timers never
+//!   fire early. A zero-duration sleep is therefore pending on its first poll and elapses
+//!   at the next tick, so the inner future is polled again — and again, for as long as the
+//!   timer driver takes to get there. Measured at 0.6ms to 12ms on a loaded 4-core box:
+//!   the previous bullet wearing a disguise, and it flaked accordingly (5 of 8 runs).
+//! - Even a *genuine* single poll is unsafe, which is the subtle one. A poll is
+//!   synchronous but it is not atomic: within one poll the fused accept pops the
+//!   `Incoming`, calls `Incoming::accept()` — which hands the connection to the endpoint
+//!   driver — and only then polls the resulting `Connecting`. The thread can be preempted
+//!   between those last two steps, and under contention that gap is long enough for the
+//!   driver to finish the round trip and signal completion first (1 failure in 20 loaded
+//!   runs).
+//!
+//! So the budget is not what makes these tests deterministic. **The client is.** It stalls
+//! inside its own verification of the server's certificate, which gates its Finished
+//! flight, which is precisely what the server's handshake is waiting on. That leaves two
+//! paths out of a cancelled accept, and neither can yield a connection:
+//!
+//! - The cancellation lands before the server transmits, so the attempt is destroyed with
+//!   nothing on the wire and the client sees only the implicit close. This is the ordinary
+//!   path, and the stall never even engages.
+//! - The polling thread is descheduled long enough for the server to transmit. Now the
+//!   client *does* reach verification — and sits there, so the Finished flight the server
+//!   is waiting on is still a second away. This is the path that used to lose the race.
+//!
+//! For a whole second after the server pops the `Incoming` there is therefore *no* completed
+//! handshake to hand over — not unlikely, impossible — however long any thread is
+//! descheduled for. The negative assertion below is causal rather than probabilistic.
+//!
+//! That is verified rather than argued: injecting a 50ms block between `Incoming::accept()`
+//! and the first poll of the resulting `Connecting` — the second path above, made
+//! deterministic — fails this test 3 times out of 3 with the stall removed and passes 3
+//! times out of 3 with it restored.
+//!
+//! With the race gone, the cancellation can be as sharp as we like, and [`one_poll`] makes
+//! it exactly one poll with no timer involved. That sharpness is what tells the two phases
+//! apart:
 //!
 //! - `Endpoint::accept()` pops an already-queued `Incoming` on its first poll, so the
-//!   cancel-safe phase always survives a zero budget.
-//! - `Connecting::poll` reads a oneshot that the freshly-spawned connection driver cannot
-//!   possibly have signalled yet, so the handshake phase never survives one.
+//!   cancel-safe phase survives cancellation however often it is repeated.
+//! - The fused accept consumes that `Incoming` into a `Connecting` on the same poll, so
+//!   cancelling there destroys the attempt outright.
 //!
-//! A zero budget is therefore not a strawman duration — it is the sharpest available
+//! A one-poll budget is therefore not a strawman duration — it is the sharpest available
 //! probe for *where the cancellation boundary sits*. The production 100ms value has the
 //! same defect with a merely probabilistic trigger.
 //!
-//! Two earlier attempts at this test are worth recording, because both produce
-//! false confidence:
+//! One further false oracle is worth recording:
 //!
-//! - A "1ms is shorter than any handshake" budget is not: a warm loopback handshake can
-//!   complete in well under a millisecond, and the test then passes for the wrong reason.
 //! - The *client's* view is not a valid oracle. The server can complete the handshake,
 //!   let the client's `connect()` resolve `Ok`, and only then discard the connection — so
 //!   asserting `connect()` failed is flaky. This is not merely a test artifact: it is
@@ -53,18 +94,53 @@ use icn_identity::IdentityBundle;
 use icn_net::session::SessionManager;
 use icn_net::{NetworkActor, NetworkMessage, VersionInfo};
 use quinn::{ClientConfig, Endpoint};
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
 
-/// A one-poll budget. See the module docs: this is what makes the tests deterministic
-/// rather than a race against how fast the host completes a loopback handshake.
-const ONE_POLL: Duration = Duration::ZERO;
+/// Drive `fut` for exactly one poll, then drop it — the production loop's cancellation
+/// reduced to its essence.
+///
+/// Returns `Some(output)` if that single poll completed the future, `None` if it was still
+/// pending and was therefore cancelled.
+///
+/// No timer is involved, which is the point. A `tokio::time::timeout` budget — even
+/// `Duration::ZERO` — is a *wall-clock* budget, so its width is set by how promptly the
+/// timer driver runs, and on a loaded host that stretches into the milliseconds a loopback
+/// handshake needs. Granting one poll by construction removes that source of slack.
+///
+/// It does not remove all of it, and nothing at this layer could: a poll is not atomic, so
+/// the peer can still make progress while the polling thread is descheduled mid-poll. What
+/// actually makes the callers below sound is the stalled client, not the width of this
+/// budget. See the module docs.
+async fn one_poll<F: Future>(fut: F) -> Option<F::Output> {
+    let mut fut = std::pin::pin!(fut);
+    std::future::poll_fn(|cx| {
+        Poll::Ready(match fut.as_mut().poll(cx) {
+            Poll::Ready(output) => Some(output),
+            Poll::Pending => None,
+        })
+    })
+    .await
+    // `fut` is dropped here, exactly as the production loop dropped its cancelled accept.
+}
 
-/// Spacing between accept attempts, so a zero-budget loop does not spin hot while it
+/// Spacing between accept attempts, so a one-poll loop does not spin hot while it
 /// waits for the client's first packet to arrive. This sits *outside* the accept, so it
 /// has no bearing on the property under test.
 const POLL_GAP: Duration = Duration::from_millis(5);
+
+/// How long the client below is held inside its own certificate verification.
+///
+/// This is a *causal barrier*, not a margin to be tuned: while the client sits here it has
+/// not sent its Finished flight, so the server-side handshake cannot complete no matter how
+/// long the server's thread is descheduled for. A second is orders of magnitude beyond any
+/// scheduling delay observed on a loaded host. It is not normally waited out at all — on
+/// the ordinary path the accept is cancelled before the server transmits, so the client
+/// never reaches verification and the stall never engages.
+const HANDSHAKE_BARRIER: Duration = Duration::from_secs(1);
 
 /// How long an accept loop is given to produce a connection before the test gives up.
 /// This is a hang guard, not the assertion — the assertions below are about *whether* a
@@ -92,6 +168,25 @@ fn client_endpoint() -> Result<Endpoint> {
     let bundle = IdentityBundle::generate()?;
     let rustls_client =
         icn_net::tls::create_tofu_client_config(vec![bundle.tls_cert().clone()], bundle.tls_key())?;
+    let mut endpoint = Endpoint::client("127.0.0.1:0".parse()?)?;
+    endpoint.set_default_client_config(ClientConfig::new(Arc::new(
+        quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client)?,
+    )));
+    Ok(endpoint)
+}
+
+/// The same legitimate client, but stalled inside its own verification of the server's
+/// certificate for `stall`.
+///
+/// See [`StallingServerCertVerifier`] below for why that placement lengthens the *server's*
+/// handshake without touching the server's TLS semantics.
+fn stalling_client_endpoint(stall: Duration) -> Result<Endpoint> {
+    let bundle = IdentityBundle::generate()?;
+    let mut rustls_client = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(StallingServerCertVerifier::new(stall)))
+        .with_client_auth_cert(vec![bundle.tls_cert().clone()], bundle.tls_key())?;
+    rustls_client.alpn_protocols = vec![b"icn/1".to_vec()];
     let mut endpoint = Endpoint::client("127.0.0.1:0".parse()?)?;
     endpoint.set_default_client_config(ClientConfig::new(Arc::new(
         quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client)?,
@@ -144,34 +239,58 @@ async fn an_uncancelled_accept_completes_the_inbound_handshake() -> Result<()> {
 async fn a_fused_accept_cancelled_after_one_poll_destroys_the_handshake() -> Result<()> {
     init();
     let (server, addr) = start_server().await?;
-    let client = client_endpoint()?;
+
+    // A legitimate client, stalled inside its own certificate verification. That step gates
+    // its Finished flight, and the server's handshake cannot complete without it — so from
+    // the moment the server pops the `Incoming`, its handshake provably cannot finish for
+    // `HANDSHAKE_BARRIER`, whatever the scheduler does. That is what makes the negative
+    // assertion below causal instead of a race. See the module docs.
+    let client = stalling_client_endpoint(HANDSHAKE_BARRIER)?;
 
     // The client is kept alive for the whole window so the server has a genuine, live
     // connection attempt to accept on every iteration below.
+    //
+    // `dialled_tx` fires when the client's dial resolves, either way. Nothing but this
+    // server answers that address, so the dial cannot resolve until the server has taken
+    // the `Incoming` off the queue and acted on it — which is the witness that the loop
+    // below entered the cancel-unsafe phase rather than spinning on an empty queue. It is
+    // *only* a witness; the verdict stays server-side, for the reason given in the module
+    // docs. (What the client actually observes here is the server's implicit close, the
+    // production symptom of #2521.)
+    let (dialled_tx, mut dialled_rx) = tokio::sync::oneshot::channel();
     let dial = tokio::spawn(async move {
         let result = client.connect(addr, "localhost")?.await;
+        let _ = dialled_tx.send(());
         tokio::time::sleep(ACCEPT_WINDOW).await;
         Ok::<_, anyhow::Error>((result, client))
     });
 
-    // Exactly the shape the production accept loop used: re-arm a poll timeout around the
+    // Exactly the shape the production accept loop used: re-arm a cancellation around the
     // fused accept, discarding whatever was in flight when it fires.
     let deadline = tokio::time::Instant::now() + ACCEPT_WINDOW;
     let mut handed_over = None;
+    let mut reached_the_handshake = false;
     while tokio::time::Instant::now() < deadline {
-        match tokio::time::timeout(ONE_POLL, server.accept()).await {
-            // Elapsed: the production loop dropped this future and looped. The `Incoming`
-            // was already consumed off the endpoint's queue by that single poll, so the
-            // connection attempt is now gone — a later iteration will not rediscover it.
-            Err(_elapsed) => {
+        match one_poll(server.accept()).await {
+            // Still pending after its one poll, so the production loop dropped this future
+            // and looped. The `Incoming` was already consumed off the endpoint's queue by
+            // that single poll, so the connection attempt is now gone — a later iteration
+            // will not rediscover it.
+            None => {
+                // Once the dial has resolved the phase under test is behind us and no
+                // further `Incoming` is coming; keep polling until then.
+                if dialled_rx.try_recv().is_ok() {
+                    reached_the_handshake = true;
+                    break;
+                }
                 tokio::time::sleep(POLL_GAP).await;
             }
-            Ok(Ok(Some(connection))) => {
+            Some(Ok(Some(connection))) => {
                 handed_over = Some(connection);
                 break;
             }
-            Ok(Ok(None)) => break,
-            Ok(Err(_)) => {
+            Some(Ok(None)) => break,
+            Some(Err(_)) => {
                 tokio::time::sleep(POLL_GAP).await;
             }
         }
@@ -179,9 +298,18 @@ async fn a_fused_accept_cancelled_after_one_poll_destroys_the_handshake() -> Res
 
     assert!(
         handed_over.is_none(),
-        "a one-poll budget cannot span a QUIC/TLS handshake: the connection driver has \
-         only just been spawned and cannot have signalled completion. Handing over a \
-         connection here would mean this test has stopped probing the boundary."
+        "a cancelled accept handed over a connection whose handshake cannot have \
+         completed: the client stalls {}ms inside certificate verification before it will \
+         send its Finished flight, so there was no completed handshake to hand over. \
+         Reaching this means the test has stopped probing the boundary.",
+        HANDSHAKE_BARRIER.as_millis()
+    );
+    assert!(
+        reached_the_handshake,
+        "the client's dial never resolved within {}s, so the loop above never took an \
+         `Incoming` off the queue and the assertion above proved nothing. This is a broken \
+         harness, not a property failure.",
+        ACCEPT_WINDOW.as_secs()
     );
 
     dial.abort();
@@ -216,15 +344,15 @@ async fn cancelling_the_accept_wait_does_not_destroy_an_inbound_handshake() -> R
     let deadline = tokio::time::Instant::now() + ACCEPT_WINDOW;
     let mut arrived = None;
     while tokio::time::Instant::now() < deadline {
-        match tokio::time::timeout(ONE_POLL, endpoint.accept()).await {
-            Err(_elapsed) => {
+        match one_poll(endpoint.accept()).await {
+            None => {
                 tokio::time::sleep(POLL_GAP).await;
             }
-            Ok(Some(incoming)) => {
+            Some(Some(incoming)) => {
                 arrived = Some(incoming);
                 break;
             }
-            Ok(None) => break,
+            Some(None) => break,
         }
     }
     let incoming = arrived.expect(
@@ -262,6 +390,12 @@ async fn cancelling_the_accept_wait_does_not_destroy_an_inbound_handshake() -> R
 #[derive(Debug)]
 struct StallingServerCertVerifier {
     delay: Duration,
+}
+
+impl StallingServerCertVerifier {
+    fn new(delay: Duration) -> Self {
+        Self { delay }
+    }
 }
 
 impl rustls::client::danger::ServerCertVerifier for StallingServerCertVerifier {
@@ -350,9 +484,9 @@ async fn a_slow_but_legitimate_peer_is_still_admitted() -> Result<()> {
     let sender_did = sender.did().clone();
     let mut rustls_client = rustls::ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(StallingServerCertVerifier {
-            delay: HANDSHAKE_STALL,
-        }))
+        .with_custom_certificate_verifier(Arc::new(StallingServerCertVerifier::new(
+            HANDSHAKE_STALL,
+        )))
         .with_client_auth_cert(vec![sender.tls_cert().clone()], sender.tls_key())?;
     rustls_client.alpn_protocols = vec![b"icn/1".to_vec()];
 
