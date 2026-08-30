@@ -76,11 +76,15 @@ def base_registry():
             {
                 "name": "solo",
                 "relationship": "single_surface",
+                "routing_triggers": ["solo work"],
+                "not_for": [],
                 "surfaces": {"claude": {"path": ".claude/agents/solo.md"}},
             },
             {
                 "name": "twin",
                 "relationship": "exact_mirror",
+                "routing_triggers": ["twin work"],
+                "not_for": [],
                 "surfaces": {
                     "claude": {"path": ".claude/agents/twin.md"},
                     "copilot": {"path": ".github/agents/twin.md",
@@ -385,6 +389,51 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- round 7: claims that pass for the wrong reason -----------------------------
+print()
+print("--- weak-check hardening ---")
+
+case("REAL P2: a caller that only MENTIONS the checker in a comment",
+     lambda r: r["enforcement"].__setitem__("invoked_by", ["mentions-only.sh"]),
+     mutate_files=lambda f: f.__setitem__(
+         "mentions-only.sh",
+         "#!/bin/sh\n# we used to run scripts/check-agent-registry.py here\necho hi\n"),
+     expect="no executable line there runs the checker")
+
+case("a caller that names the checker in a workflow paths filter but never runs it",
+     lambda r: r["enforcement"].__setitem__("invoked_by", ["paths-only.yml"]),
+     mutate_files=lambda f: f.__setitem__(
+         "paths-only.yml",
+         "on:\n  push:\n    paths:\n      - 'scripts/check-agent-registry.py'\n"),
+     expect="no executable line there runs the checker")
+
+case("REAL P2: divergent_unreviewed that is also adjudicated",
+     mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "divergent_unreviewed"),
+                           r["agents"][1].__setitem__("divergence",
+                               {"owning_issue": "icn#2632", "adjudicated": True})),
+     mutate_files=lambda f: f.__setitem__(
+         ".github/agents/twin.md", copilot_file("twin").replace("Body", "Other body")),
+     expect="both unreviewed and adjudicated")
+
+case("REAL P2: a mirror pair naming one surface twice",
+     lambda r: r["agents"][1].__setitem__("mirror_pairs", [["claude", "claude"]]),
+     expect="names one surface twice")
+
+for k in ("routing_triggers", "not_for"):
+    case("REAL P2: %s deleted from a record" % k,
+         (lambda key: (lambda r: r["agents"][0].pop(key)))(k),
+         expect="must be an array of strings")
+    case("REAL P2: %s replaced with a scalar" % k,
+         (lambda key: (lambda r: r["agents"][0].__setitem__(key, "a string")))(k),
+         expect="must be an array of strings")
+
+# MUST-PASS: a real caller still passes.
+r = base_registry()
+r["enforcement"]["invoked_by"] = ["caller.sh"]
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("a caller that actually runs the checker still passes", rc == 0)
+
+
 # --- the registry's own enforcement claims -------------------------------------
 print()
 print("--- enforcement claims ---")
@@ -395,7 +444,7 @@ case("enforcement.checker names a file that does not exist",
 
 case("enforcement.invoked_by names a file that exists but does not invoke the checker",
      lambda r: r["enforcement"].__setitem__("invoked_by", ["not-a-caller.md"]),
-     expect="does not invoke this checker")
+     expect="no executable line there runs the checker")
 
 case("enforcement block is missing entirely",
      lambda r: r.pop("enforcement"), expect="must be an object")
@@ -526,6 +575,7 @@ def nested_decoy_case():
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
                "declared_scope": {},
                "agents": [{"name": "solo", "relationship": "single_surface",
+                           "routing_triggers": [], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/subdir/solo.md"}}}]}
         sk = {"declared_scope": {"cross_registry": {
             "agent_surfaces_tracked_by_agents_json": [".claude/agents"]}}}

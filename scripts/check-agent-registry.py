@@ -200,6 +200,12 @@ def validate_structure(reg):
             req(as_str(rec.get("relationship"))[0],
                 "%s: relationship must be a non-empty string" % label)
 
+            for k in ("routing_triggers", "not_for"):
+                req(as_str_list(rec.get(k)) [0] if isinstance(rec.get(k), list) else False,
+                    "%s: %s must be an array of strings. This file is the canonical owner of "
+                    "agent routing, so a deleted or scalar routing field is a malformed routing "
+                    "table, not a missing nicety." % (label, k))
+
             ok, surfs = as_obj(rec.get("surfaces"))
             if req(ok, "%s: surfaces must be an object" % label):
                 for sid, entry in sorted(surfs.items()):
@@ -255,6 +261,22 @@ def validate_structure(reg):
 
 
 ALL_SEMANTIC_FIELDS = frozenset(f for spec in PROVIDER_ADAPTERS.values() for f in spec)
+
+
+# An invocation, not a mention. Comment lines are dropped (`#` opens a comment in both shell
+# and YAML), then a line must actually run the checker through an interpreter. A bare path in
+# a workflow `paths:` filter, an `if [[ -f ... ]]` guard or a `fail "... is missing"` string
+# is a reference, not a gate.
+_INVOCATION = re.compile(r"python3?\s+[^\n]*check-agent-registry\.py")
+
+
+def invokes_checker(text):
+    for line in text.splitlines():
+        if line.strip().startswith("#"):
+            continue
+        if _INVOCATION.search(line):
+            return True
+    return False
 
 
 class Checker:
@@ -361,6 +383,11 @@ class Checker:
         if not div.get("owning_issue"):
             self.fail("%s: divergent_unreviewed requires divergence.owning_issue so the debt "
                       "has an owner." % rec["name"])
+        if div.get("adjudicated") is True:
+            self.fail("%s: divergent_unreviewed with divergence.adjudicated = true claims the "
+                      "divergence is both unreviewed and adjudicated. Promote it to "
+                      "provider_variant, which is what an adjudicated divergence is."
+                      % rec["name"])
         b = self.bodies(rec)
         if len(b) > 1 and len(set(b.values())) == 1:
             self.fail("%s: declared divergent_unreviewed but every body is now identical. "
@@ -547,6 +574,12 @@ class Checker:
                     self.fail("%s: mirror_pairs entries must name exactly two surfaces, found "
                               "%r" % (name, pair))
                     continue
+                if pair[0] == pair[1]:
+                    self.fail("%s: mirror_pairs entry %r names one surface twice. Both "
+                              "membership checks pass and the body is compared with itself, so "
+                              "the pair reports verified while the surface it was meant to pin "
+                              "drifts freely." % (name, pair))
+                    continue
                 missing = [x for x in pair if x not in rec_surfaces]
                 if missing:
                     self.fail("%s: mirror_pairs names surface(s) %s that this record does not "
@@ -609,11 +642,13 @@ class Checker:
                 self.fail("enforcement.invoked_by: %r is not a path string" % (c,))
             elif not (self.root / c).is_file():
                 self.fail("enforcement.invoked_by names %s, which does not exist." % c)
-            elif "check-agent-registry" not in (self.root / c).read_text(
-                    encoding="utf-8", errors="replace"):
-                self.fail("enforcement.invoked_by names %s, but that file does not invoke this "
-                          "checker. A caller list nothing verifies is how a gate silently "
-                          "stops running." % c)
+            elif not invokes_checker((self.root / c).read_text(
+                    encoding="utf-8", errors="replace")):
+                self.fail("enforcement.invoked_by names %s, but no executable line there runs "
+                          "the checker. A textual mention is not an invocation: all three "
+                          "current callers name the path in comments, error strings or a "
+                          "workflow paths filter, so a substring test would keep passing after "
+                          "the real `run:` was deleted." % c)
             else:
                 self.ok("enforcement.invoked_by -> %s invokes this checker" % c)
 
