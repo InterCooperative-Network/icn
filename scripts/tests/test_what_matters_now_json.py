@@ -21,8 +21,10 @@ Run: python3 scripts/tests/test_what_matters_now_json.py
 import json
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "ops" / "scripts" / "what-matters-now.sh"
@@ -163,6 +165,70 @@ pre_run2 = subprocess.run(
 )
 check("CONTROL: the pre-fix form dies with SyntaxError on that legal branch name",
       pre_run2.returncode != 0 and "SyntaxError" in pre_run2.stderr)
+
+
+print()
+print("--- branch is reported truthfully on a detached HEAD (CI's own checkout) ---")
+
+# actions/checkout leaves a detached HEAD on pull_request events. `git branch
+# --show-current` exits 0 there and prints nothing, so the script's original
+# `|| echo "unknown"` fallback was dead code and --json shipped "branch": "" to every
+# consumer. This was invisible until --json got the runner icn#2638 asked for.
+tmp = tempfile.mkdtemp()
+try:
+    def git(*args):
+        return subprocess.run(("git", "-C", tmp) + args,
+                              capture_output=True, text=True)
+
+    subprocess.run(["git", "init", "-q", tmp], capture_output=True)
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    git("commit", "-q", "--allow-empty", "-m", "one")
+    git("checkout", "-q", "--detach", "HEAD")
+
+    probe = git("branch", "--show-current")
+    check("CONTROL: on a detached HEAD `git branch --show-current` exits 0 and prints "
+          "nothing, so an `|| echo` fallback on it is dead code",
+          probe.returncode == 0 and probe.stdout.strip() == "")
+
+    # The whole script cannot run outside a real checkout -- it derives REPO_ROOT from
+    # its own location and aborts early under `set -euo pipefail`, which icn#2638 records
+    # as a trap that masks defects. So extract the SHIPPED branch-resolution block and
+    # execute that verbatim against the detached repo: real code, no re-implementation.
+    block = re.search(
+        r"^BRANCH=\$\(git -C .*?\n(?:.*?\n)*?^fi$",
+        SCRIPT.read_text(encoding="utf-8"), re.M)
+    check("the shipped branch-resolution block was located", block is not None)
+
+    if block is not None:
+        det = subprocess.run(
+            ["bash", "-c",
+             'set -euo pipefail\nREPO_ROOT="$1"\n' + block.group(0) + '\nprintf "%s" "$BRANCH"',
+             "_", tmp],
+            capture_output=True, text=True,
+        )
+        branch = det.stdout
+        check("branch resolution succeeds on a detached HEAD (rc=%d, stderr=%r)"
+              % (det.returncode, det.stderr.strip()[:80]), det.returncode == 0)
+        check('branch is non-empty on a detached HEAD -- CI emitted "" here -- got %r'
+              % (branch,), branch.strip() != "")
+        check("branch says it is detached rather than naming a branch that is not "
+              "checked out -- got %r" % (branch,), "detached" in branch)
+
+        # Control: the same block on an attached checkout still names the branch.
+        subprocess.run(["git", "-C", tmp, "checkout", "-q", "-b", "some-branch"],
+                       capture_output=True)
+        att = subprocess.run(
+            ["bash", "-c",
+             'set -euo pipefail\nREPO_ROOT="$1"\n' + block.group(0) + '\nprintf "%s" "$BRANCH"',
+             "_", tmp],
+            capture_output=True, text=True,
+        )
+        check("CONTROL: an attached checkout still reports its real branch name "
+              "(got %r) -- the fix did not replace branches with 'detached'"
+              % (att.stdout,), att.stdout.strip() == "some-branch")
+finally:
+    shutil.rmtree(tmp, ignore_errors=True)
 
 
 print()

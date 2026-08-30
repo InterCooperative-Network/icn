@@ -120,7 +120,15 @@ done
 
 # ─── Phase 4: live git state ─────────────────────────────────────────────────
 
-BRANCH=$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || echo "unknown")
+BRANCH=$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || true)
+if [[ -z "${BRANCH}" ]]; then
+  # A detached HEAD is not an error: `git branch --show-current` exits 0 and prints
+  # nothing, so the `|| echo "unknown"` fallback this replaces could never fire. CI
+  # checks out detached on pull_request, so --json shipped "branch": "" to every
+  # consumer and the human mode printed a bare "Branch:". Found by the --json runner
+  # added for icn#2638 -- the mode had no consumer to notice before.
+  BRANCH="detached at $(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+fi
 DIRTY=$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 DIRTY_STATUS=$([[ "${DIRTY}" == "0" ]] && echo "clean" || echo "${DIRTY} uncommitted change(s)")
 
