@@ -19,6 +19,9 @@ on:
       - 'scripts/tests/test_skill_registry_invariants.py'
       - 'scripts/check-merge-policy-schema.py'
       - 'scripts/tests/test_merge_policy_schema.py'
+      - 'scripts/check-agent-registry.py'
+      - 'scripts/tests/test_agent_registry_invariants.py'
+      - 'tools/claude-code/plugins/**'
       # icn#2651 stage B: the executable that owns ordinary-merge semantics, and its controls.
       - 'tools/icn-merge-pr/**'
       - 'scripts/tests/test_icn_merge_pr.py'
@@ -72,6 +75,16 @@ jobs:
 
       - name: Skill registry enforcement rejects its own violations (Refs icn#2633)
         run: python3 scripts/tests/test_skill_registry_invariants.py
+
+      # icn#2632 stage 1. The v1 registry described 17 paths under one tree and called itself
+      # the list of all agents, while .github/agents/ held 21 live Copilot definitions and the
+      # icn-agent-pack plugin held 6 more. Nothing failed, because the only checks that existed
+      # walked a single tree in a single direction.
+      - name: Agent registry is true about every provider surface (Refs icn#2632)
+        run: python3 scripts/check-agent-registry.py --verbose
+
+      - name: Agent registry enforcement rejects its own violations (Refs icn#2632)
+        run: python3 scripts/tests/test_agent_registry_invariants.py
 
       - name: Truth-spine validation (warning-mode, Refs icn#2141)
         run: python3 scripts/check-truth-spine.py

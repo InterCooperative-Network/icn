@@ -274,27 +274,21 @@ except Exception as e:
   fi
 fi
 
-# ─── Check 6: agents.json lists all agents in .claude/agents/ ───────────────
+# ─── Check 6: the agent registry is true about every provider surface ───────
 
-AGENTS_FILE="${REPO_ROOT}/ops/state/truth/agents.json"
-AGENTS_DIR="${REPO_ROOT}/.claude/agents"
+# Was: a bash loop over .claude/agents/ only, one direction, comparing basenames. It could
+# not see .github/agents/ (21 live Copilot definitions) or the icn-agent-pack plugin tree,
+# and it never validated a registered path. Delegated to the checker that does both
+# directions across every declared surface (Refs icn#2632).
 
-if [[ -f "${AGENTS_FILE}" ]] && [[ -d "${AGENTS_DIR}" ]]; then
-  registered=$(python3 -c "
-import json
-d = json.load(open('${AGENTS_FILE}'))
-names = {a['name'] for a in d['agents']}
-print('\n'.join(sorted(names)))
-" 2>/dev/null || echo "")
-
-  for agent_file in "${AGENTS_DIR}"/*.md; do
-    agent_name=$(basename "${agent_file}" .md)
-    if ! echo "${registered}" | grep -qx "${agent_name}"; then
-      fail "Agent not in registry: ${agent_name} (add to ops/state/truth/agents.json)"
-    else
-      ok "Agent registered: ${agent_name}"
-    fi
-  done
+if [[ -f "${REPO_ROOT}/scripts/check-agent-registry.py" ]]; then
+  if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then
+    ok "Agent registry consistent across all declared provider surfaces"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && fail "agent registry: ${line}"
+    done <<< "${agent_registry_out}"
+  fi
 fi
 
 # ─── Check 7: All SKILL.md files must have truth_contract ────────────────────

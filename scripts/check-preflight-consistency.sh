@@ -111,9 +111,14 @@ import json, os, sys
 bad = []
 
 agents = json.load(open("ops/state/truth/agents.json"))
+# icn-agents/v2 moved the path under surfaces, because one logical agent can be exposed by
+# more than one provider. Iterating a single top-level "path" was also why the v1 orchestrator
+# record could name a file outside the repository without ever failing.
 for a in agents["agents"]:
-    if not os.path.exists(a["path"]):
-        bad.append(f'agents.json: {a["name"]} -> {a["path"]} (missing)')
+    for surface, entry in sorted((a.get("surfaces") or {}).items()):
+        path = entry.get("path")
+        if not path or not os.path.exists(path):
+            bad.append(f'agents.json: {a["name"]}.{surface} -> {path} (missing)')
 
 skills = json.load(open("ops/state/truth/skills.json"))
 for e in skills["skills"]["ops_automation_canonical"]:

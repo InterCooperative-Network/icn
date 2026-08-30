@@ -1,111 +1,788 @@
 {
-  "schema": "icn-agents/v1",
-  "description": "Registry of all available specialist agents. Routing table for orchestrator and icn-dev skill. Edit here — do not maintain separate lists in prompt files.",
+  "schema": "icn-agents/v2",
+  "description": "Registry of every agent definition in a declared scope, the provider surface(s) that expose it, and the relationship between those surfaces. A provider directory is NOT canonical merely because a provider loads it: canonical routing identity lives here, prompt bodies live on the surfaces. Edit here -- scripts/check-agent-registry.py fails if this file and the trees disagree in either direction.",
+  "provider_surfaces": {
+    "claude": {
+      "tree": ".claude/agents",
+      "loaded_by": "Claude Code, by directory convention.",
+      "provider_front_matter_keys": [
+        "color",
+        "model",
+        "tools"
+      ]
+    },
+    "agent_pack": {
+      "tree": "tools/claude-code/plugins/icn-agent-pack/agents",
+      "loaded_by": "The icn-agent-pack Claude Code plugin (tools/claude-code/plugins/icn-agent-pack/.claude-plugin/plugin.json), loaded when a developer installs the plugin. Its README states it complements rather than replaces the project-local .claude/ config, so an agent name here can coexist with a different body under .claude/agents.",
+      "provider_front_matter_keys": [
+        "color",
+        "model",
+        "tools"
+      ]
+    },
+    "copilot": {
+      "tree": ".github/agents",
+      "loaded_by": "GitHub Copilot custom agents. Routed by .github/copilot-instructions.md; .github/agents/README.md documents selection. icn-orchestrator carries infer: true and is the default router; the rest are infer: false so Copilot does not auto-select the wrong specialist.",
+      "provider_front_matter_keys": [
+        "infer"
+      ]
+    }
+  },
+  "mirror_pairs_note": "A record may additionally name mirror_pairs: surface pairs whose bodies MUST stay byte-identical, enforced by the checker even when the record as a whole is divergent. This exists because .github/copilot-instructions.md states that icn-code-reviewer 'mirrors its Claude counterpart' -- a claim that was documented and unenforced. A record-level relationship cannot express it once a third surface diverges.",
+  "relationship_model": {
+    "single_surface": "Exposed by exactly one provider. No cross-surface claim is made.",
+    "exact_mirror": "Exposed by every named surface with byte-identical bodies modulo provider front matter. MECHANICALLY ENFORCED: the checker re-compares the bodies, so a mirror that drifts fails rather than silently becoming a variant.",
+    "provider_variant": "Exposed by both providers with deliberately different bodies. Requires divergence.adjudicated = true and a why. Not enforced byte-wise, by definition.",
+    "divergent_unreviewed": "Exposed by both providers with different bodies whose intent has NOT been adjudicated. Requires divergence.owning_issue. This value exists so an unreviewed divergence is explicit debt rather than two unrelated definitions silently sharing one name."
+  },
+  "declared_scope": {
+    "in_scope": [
+      ".claude/agents/*.md",
+      ".github/agents/*.md",
+      "tools/claude-code/plugins/icn-agent-pack/agents/*.md"
+    ],
+    "out_of_scope": [
+      "Agent directories outside the repository -- for example a project-level ~/.claude/agents/ -- are machine-local. They are neither registered nor enforceable here. The icn-agents/v1 'orchestrator' record pointed at ../../../.claude/agents/orchestrator.md, which escapes the repository root; it named no in-repo file and no checker covered it, so it never failed. Removed rather than repointed: see the note on icn-orchestrator below.",
+      ".github/agents/README.md documents the Copilot surface and is not an agent definition. The same applies to any README.md in a surface tree.",
+      "`.codex/skills/*/agents/` directories exist but hold no agent definitions today. They sit inside skill trees owned by ops/state/truth/skills.json#enforcement.scan_scope, so they are that registry's territory, not this one's. If an agent definition ever lands there it must be declared as a surface here rather than absorbed silently.",
+      "Prompt CONTENT is out of scope here. This registry owns inventory and provider topology. Stale doctrine inside a prompt is icn#2632 stage 2 and is enforced by forbidden_patterns, not by this file."
+    ],
+    "completeness_claim": "Within in_scope this registry is exhaustive in BOTH directions: every agent definition on disk has exactly one record naming the surface that exposes it, and every registered surface path exists. scripts/check-agent-registry.py fails if either direction breaks."
+  },
+  "enforcement": {
+    "checker": "scripts/check-agent-registry.py",
+    "tests": "scripts/tests/test_agent_registry_invariants.py",
+    "invoked_by": [
+      "ops/scripts/drift-check.sh",
+      "scripts/check-preflight-consistency.sh",
+      ".github/workflows/agent-drift-check.yml"
+    ]
+  },
   "agents": [
     {
       "name": "icn-architect",
-      "path": ".claude/agents/icn-architect.md",
-      "color": "purple",
-      "routing_triggers": ["crate boundary", "cross-crate refactor", "public API", "kernel/app separation", "ADR", "protocol shape", "concurrency", "architecture"],
-      "not_for": ["economics/ledger (use icn-economist)", "deployment/ops (use icn-ops)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "agent_pack/claude": 0.53,
+          "agent_pack/copilot": 0.03,
+          "claude/copilot": 0.04
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md",
+          "description": "ICN protocol architect. Use this agent for crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, and threat modeling. Typical triggers include \"should this live in the kernel or an app\", \"review this cross-crate refactor\", \"does this change need an ADR\", and \"threat-model this surface\". NOT for economics/ledger (use icn-economist), NOT for deployment/ops (use icn-ops). See \"When to invoke\" in the body.",
+          "color": "purple",
+          "model": "inherit"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-architect.md",
+          "description": "ICN protocol architect — use for crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, and threat modeling. NOT for economics/ledger (use icn-economist), NOT for deployment/ops (use icn-ops).",
+          "color": "purple"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-architect.md",
+          "description": "System design and architecture agent. Use for crate boundaries, API design review, abstraction decisions, and technical debt assessment. Reviews and advises.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "crate boundary",
+        "cross-crate refactor",
+        "public API",
+        "kernel/app separation",
+        "ADR",
+        "protocol shape",
+        "concurrency",
+        "architecture"
+      ],
+      "not_for": [
+        "economics/ledger (use icn-economist)",
+        "deployment/ops (use icn-ops)"
+      ]
+    },
+    {
+      "name": "icn-ci-reliability",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-ci-reliability.md",
+          "description": "CI and test reliability specialist. Hunts flaky tests, fixes timing issues, ensures deterministic builds, and maintains CI parity with local development.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
     },
     {
       "name": "icn-code-reviewer",
-      "path": ".claude/agents/icn-code-reviewer.md",
-      "routing_triggers": ["PR review", "diff review", "staged changes", "invariant check"],
+      "relationship": "divergent_unreviewed",
+      "mirror_pairs": [
+        [
+          "claude",
+          "copilot"
+        ]
+      ],
+      "divergence": {
+        "body_similarity": {
+          "agent_pack/claude": 0.06,
+          "agent_pack/copilot": 0.06,
+          "claude/copilot": 1.0
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md",
+          "description": "ICN PR/diff reviewer with the invariants lens. Use this agent to review PRs, diffs, or staged changes for bugs, security issues, and ICN invariant violations. Typical triggers include \"review this diff\", \"is this PR safe to merge\", \"check this change against the invariants\", and proactively after a logical chunk of code is written. High signal-to-noise — surfaces only issues that genuinely matter. See \"When to invoke\" in the body.",
+          "color": "cyan",
+          "model": "inherit"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-code-reviewer.md",
+          "description": "PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and declares FULL or DELTA.",
+          "model": "inherit"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-code-reviewer.md",
+          "description": "PR review agent with an ICN invariants lens, bound to the canonical delivery lifecycle. High signal-to-noise: classifies every finding as BLOCKER, FOLLOW_UP, QUESTION or NOT_A_FINDING and declares FULL or DELTA.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "PR review",
+        "diff review",
+        "staged changes",
+        "invariant check"
+      ],
       "not_for": []
     },
     {
       "name": "icn-design-advisor",
-      "path": ".claude/agents/icn-design-advisor.md",
-      "routing_triggers": ["docs/design", "docs/design-language", "website styles", "design system", "design tokens", "design language", "visual primitives", "closure loop", "accessibility audit", "WCAG", "content style", "regulatory-safe vocabulary", "action card", "receipt UI", "Claude Design", "design briefing", "concept map"],
-      "not_for": ["mobile-specific (use icn-mobile-advisor)", "kernel architecture (use icn-architect)"]
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-design-advisor.md",
+          "description": "Design system specialist for ICN. Use for changes to docs/design/, docs/design-language/, website/ styles or components, accessibility audits of member-facing surfaces, UI copy review against the regulatory-safe vocabulary, and Claude Design briefing prep. Activate when the user asks about design tokens, visual primitives, the closure-loop concepts, the accessibility baseline, WCAG, content style, the action-card contract, the receipt UI, or Claude Design setup.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "docs/design",
+        "docs/design-language",
+        "website styles",
+        "design system",
+        "design tokens",
+        "design language",
+        "visual primitives",
+        "closure loop",
+        "accessibility audit",
+        "WCAG",
+        "content style",
+        "regulatory-safe vocabulary",
+        "action card",
+        "receipt UI",
+        "Claude Design",
+        "design briefing",
+        "concept map"
+      ],
+      "not_for": [
+        "mobile-specific (use icn-mobile-advisor)",
+        "kernel architecture (use icn-architect)"
+      ]
+    },
+    {
+      "name": "icn-devnet-deploy",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-devnet-deploy.md",
+          "description": "Deployment specialist for Docker/K8s manifests, config templates, Helm charts, and deployment automation. Ensures no secrets committed and docs stay current.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-spec",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-docs-spec.md",
+          "description": "Docs/spec consistency enforcer. Ensures documentation matches implementation. Updates canonical docs when semantics change; flags inconsistencies.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-synchronizer",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-docs-synchronizer.md",
+          "description": "Keeps ICN documentation, onboarding guides, and architecture references synchronized with current code.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-docs-truth-auditor",
+      "relationship": "single_surface",
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md",
+          "description": "ICN docs / public-claim truth auditor. Use this agent to audit docs, READMEs, website copy, and API descriptions for claim safety, proof level, and stale state before anything is published. Typical triggers include \"audit these docs for over-claims\", \"what proof backs this statement\", \"is this safe to put on the website\", and \"find stale state in docs/\". Read-only. See \"When to invoke\" in the body.",
+          "color": "yellow",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
     },
     {
       "name": "icn-economics-advisor",
-      "path": ".claude/agents/icn-economics-advisor.md",
-      "routing_triggers": ["icn-ledger", "apps/ledger", "commons credit", "JournalEntry", "settlement flow", "EarningTracker", "credit ceiling", "commons earn", "commons spend"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-economics-advisor.md",
+          "description": "Ledger, mutual credit, commons credits, and settlement specialist. Use for changes to icn-ledger, apps/ledger, commons credit accounting, JournalEntry construction, settlement flows, credit policy, EarningTracker, fork detection, and economic invariants. Activate when working on ledger entries, credit ceilings, commons earn/spend, settlement dedup, or credit formula weights.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "icn-ledger",
+        "apps/ledger",
+        "commons credit",
+        "JournalEntry",
+        "settlement flow",
+        "EarningTracker",
+        "credit ceiling",
+        "commons earn",
+        "commons spend"
+      ],
       "not_for": []
     },
     {
       "name": "icn-economist",
-      "path": ".claude/agents/icn-economist.md",
-      "color": "green",
-      "routing_triggers": ["ledger logic", "CCL contracts", "mutual credit", "treasury", "mana", "settlement", "regulatory terminology", "payment->settlement renaming"],
-      "not_for": ["protocol architecture (use icn-architect)", "deployment (use icn-ops)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "agent_pack/claude": 0.07
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md",
+          "description": "ICN economics specialist. Use this agent for ledger logic, CCL contracts, mutual credit invariants, treasury integration, mana/resource allocation, settlement flows, and regulatory terminology compliance. Typical triggers include \"review this JournalEntry / settlement path\", \"check the credit-limit logic\", \"does this CCL change roll back atomically\", and \"is this terminology regulatory-safe\". NOT for protocol architecture (use icn-architect), NOT for deployment (use icn-ops). See \"When to invoke\" in the body.",
+          "color": "green",
+          "model": "inherit"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-economist.md",
+          "description": "ICN economics specialist — use for ledger logic, CCL contracts, mutual credit invariants, treasury integration, mana/resource allocation, settlement flows, and regulatory terminology compliance. Also use for Phase 1 compliance sprint (payment->settlement renaming). NOT for protocol architecture (use icn-architect), NOT for deployment (use icn-ops).",
+          "color": "green"
+        }
+      },
+      "routing_triggers": [
+        "ledger logic",
+        "CCL contracts",
+        "mutual credit",
+        "treasury",
+        "mana",
+        "settlement",
+        "regulatory terminology",
+        "payment->settlement renaming"
+      ],
+      "not_for": [
+        "protocol architecture (use icn-architect)",
+        "deployment (use icn-ops)"
+      ]
+    },
+    {
+      "name": "icn-gateway-api",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-gateway-api.md",
+          "description": "Gateway/API specialist. Owns icn-gateway HTTP API changes, validation, routing, OpenAPI export, and TypeScript types drift control.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
     },
     {
       "name": "icn-gossip-net",
-      "path": ".claude/agents/icn-gossip-net.md",
-      "routing_triggers": ["icn-gossip", "icn-net", "icn-protocol", "gossip", "anti-entropy", "QUIC", "TLS", "mDNS", "SignedEnvelope", "topic subscription"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "claude/copilot": 0.11
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-gossip-net.md",
+          "description": "Gossip protocol and networking specialist. Use for changes to icn-gossip, icn-net, icn-protocol, message formats, topic subscriptions, anti-entropy, QUIC/TLS sessions, mDNS discovery, and SignedEnvelope handling.",
+          "model": "inherit"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-gossip-net.md",
+          "description": "Gossip/networking specialist. Use for message envelopes, signature verification, QUIC/TLS, subscriptions, NAT traversal, discovery, and network safety.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "icn-gossip",
+        "icn-net",
+        "icn-protocol",
+        "gossip",
+        "anti-entropy",
+        "QUIC",
+        "TLS",
+        "mDNS",
+        "SignedEnvelope",
+        "topic subscription"
+      ],
       "not_for": []
     },
     {
       "name": "icn-governance-advisor",
-      "path": ".claude/agents/icn-governance-advisor.md",
-      "routing_triggers": ["icn-governance", "icn-ccl", "icn-community", "icn-coop", "icn-entity", "apps/governance", "proposal", "voting", "CCL semantics", "civic engine", "cooperative constitution"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-governance-advisor.md",
+          "description": "Democratic governance, CCL contracts, cooperative lifecycle, and civic engine specialist. Use for changes to icn-governance, icn-ccl, icn-community, icn-coop, icn-entity, and apps/governance. Activate when working on proposals, voting, CCL semantics, governance parameters, cooperative constitution, threshold mechanics, or civic engine rules.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "icn-governance",
+        "icn-ccl",
+        "icn-community",
+        "icn-coop",
+        "icn-entity",
+        "apps/governance",
+        "proposal",
+        "voting",
+        "CCL semantics",
+        "civic engine",
+        "cooperative constitution"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-governance-ccl",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-governance-ccl.md",
+          "description": "Governance + CCL specialist. Use for constitutions, governance proofs, proposals, voting, policy oracles, and Cooperative Contract Language.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-homelab-infra",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-homelab-infra.md",
+          "description": "Infrastructure specialist for the ICN homelab environment. Knows K3s cluster details, NFS storage, GitHub Actions runner, network topology, and operational procedures.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
       "not_for": []
     },
     {
       "name": "icn-identity-iam-advisor",
-      "path": ".claude/agents/icn-identity-iam-advisor.md",
-      "routing_triggers": ["icn-identity", "icn-naming", "DID", "keystore", "key rotation", "capability token", "DID-TLS", "bearer token", "IAM"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-identity-iam-advisor.md",
+          "description": "Identity, principal, subject, device, continuity, naming, keystore, and authorization-boundary specialist. Load registered identity semantics before reasoning about identity classes or substitutions.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "icn-identity",
+        "icn-naming",
+        "DID",
+        "keystore",
+        "key rotation",
+        "capability token",
+        "DID-TLS",
+        "bearer token",
+        "IAM"
+      ],
       "not_for": []
     },
     {
       "name": "icn-invariants-guardian",
-      "path": ".claude/agents/icn-invariants-guardian.md",
-      "routing_triggers": ["invariant check", "safety review", "pre-merge review", "adversarial-by-default", "determinism", "canonical encodings"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "claude/copilot": 0.65
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-invariants-guardian.md",
+          "description": "Architecture and safety gatekeeper. Reviews proposed changes against the 5 ICN invariants and cross-doc consistency. Blocks changes that violate safety properties. Use before merging significant changes.",
+          "model": "inherit"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-invariants-guardian.md",
+          "description": "Architecture/invariants gatekeeper. Reviews proposed changes against ICN invariants and cross-doc consistency. Blocks changes that violate safety properties.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "invariant check",
+        "safety review",
+        "pre-merge review",
+        "adversarial-by-default",
+        "determinism",
+        "canonical encodings"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-ledger-econ",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-ledger-econ.md",
+          "description": "Ledger/economics specialist. Use for mutual credit, safety constraints, balance integrity, demurrage, transaction validation, and economic policy primitives.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
       "not_for": []
     },
     {
       "name": "icn-mobile-advisor",
-      "path": ".claude/agents/icn-mobile-advisor.md",
-      "routing_triggers": ["sdk/react-native", "mobile", "React Native", "CoopWallet", "five-tab navigation", "mobile SDK", "offline-first", "mobile identity"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-mobile-advisor.md",
+          "description": "Mobile and React Native specialist for ICN. Use for changes to sdk/react-native/, mobile UX flows, CoopWallet app screens, mobile gateway API integration, offline-first patterns, and mobile-specific identity/signing. Activate when the user asks about mobile, React Native, CoopWallet, the five-tab navigation, or mobile SDK screens.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "sdk/react-native",
+        "mobile",
+        "React Native",
+        "CoopWallet",
+        "five-tab navigation",
+        "mobile SDK",
+        "offline-first",
+        "mobile identity"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-monitoring",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-monitoring.md",
+          "description": "Observability specialist for Prometheus rules, Grafana dashboards, alerting, and distributed tracing. Focuses on actionable alerts and cardinality management.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-navigator",
+      "relationship": "single_surface",
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md",
+          "description": "ICN repository navigator and knowledge-graph builder. Use this agent to map the repo's crates/subsystems/claims, trace a concept or claim to the source that backs it, and build impact maps for a proposed change area. Typical triggers include \"map this subsystem\", \"trace this concept to its source\", \"what would this change impact\", and \"refresh the repo knowledge graph\". Read-mostly, and only writes a generated map artifact when explicitly asked. See \"When to invoke\" in the body.",
+          "color": "blue",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [],
       "not_for": []
     },
     {
       "name": "icn-ops",
-      "path": ".claude/agents/icn-ops.md",
-      "color": "orange",
-      "routing_triggers": ["K3s", "cluster", "demo flow", "CI/CD health", "pod", "release readiness", "pre-deployment", "ops/mcp", "disk space", "icn-dev VM"],
-      "not_for": ["protocol design (use icn-architect)", "economics (use icn-economist)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "agent_pack/claude": 0.12
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "agent_pack": {
+          "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md",
+          "description": "ICN operations specialist (read-mostly, MCP-first). Use this agent for CI/CD health, demo-flow readiness, release-readiness checks, deployment-manifest review, and pre-demo checklists. Typical triggers include \"is the demo ready to run\", \"check CI health\", \"are we release-ready\", and \"review this deploy manifest\". Consults the icn-ops MCP server and live evidence — it does NOT assert cluster state from static text. NOT for protocol design (use icn-architect), NOT for economics (use icn-economist). See \"When to invoke\" in the body.",
+          "color": "orange",
+          "model": "inherit"
+        },
+        "claude": {
+          "path": ".claude/agents/icn-ops.md",
+          "description": "ICN operations specialist — use for K3s cluster state, demo flow validation, CI/CD health, pod diagnostics, release readiness, and pre-deployment checks. Has access to the icn-dev MCP server for live cluster queries. NOT for protocol design (use icn-architect), NOT for economics (use icn-economist).",
+          "color": "orange"
+        }
+      },
+      "routing_triggers": [
+        "K3s",
+        "cluster",
+        "demo flow",
+        "CI/CD health",
+        "pod",
+        "release readiness",
+        "pre-deployment",
+        "ops/mcp",
+        "disk space",
+        "icn-dev VM"
+      ],
+      "not_for": [
+        "protocol design (use icn-architect)",
+        "economics (use icn-economist)"
+      ]
+    },
+    {
+      "name": "icn-orchestrator",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-orchestrator.md",
+          "description": "Router + decomposer for ICN work. Use when a request spans multiple subsystems (Rust crates + gateway + docs + deploy + SDKs). Produces a parallelizable plan, then invokes specialist agents or instructs which agent to run per task.",
+          "infer": true
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
     },
     {
       "name": "icn-planner",
-      "path": ".claude/agents/icn-planner.md",
-      "routing_triggers": ["planning", "task breakdown", "dependency analysis", "merge ordering", "sprint planning"],
-      "not_for": ["implementation (plans only)"]
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "claude/copilot": 0.16
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-planner.md",
+          "description": "Strategic planning agent for ICN. Produces actionable plans with task breakdown, dependency analysis, risk assessment, and merge ordering. Does NOT implement - only plans.",
+          "model": "inherit"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-planner.md",
+          "description": "Strategic planning agent. Use for task breakdown, dependency analysis, risk assessment, and incremental delivery planning. Does not implement—produces actionable plans.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "planning",
+        "task breakdown",
+        "dependency analysis",
+        "merge ordering",
+        "sprint planning"
+      ],
+      "not_for": [
+        "implementation (plans only)"
+      ]
+    },
+    {
+      "name": "icn-pr-writer",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-pr-writer.md",
+          "description": "PR descriptions, commit messages, and changelog entries. Follows conventional commits and produces clear, informative PR bodies with proper context.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-refactoring",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-refactoring.md",
+          "description": "Safe refactoring agent. Performs behavior-preserving transformations with invariant protection. Specializes in crate restructuring, API migrations, and technical debt.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
     },
     {
       "name": "icn-rust-core",
-      "path": ".claude/agents/icn-rust-core.md",
-      "routing_triggers": ["Rust implementation", "crate change", "daemon", "kernel interface", "actor runtime", "storage", "encoding", "protocol implementation"],
+      "relationship": "divergent_unreviewed",
+      "divergence": {
+        "body_similarity": {
+          "claude/copilot": 0.33
+        },
+        "adjudicated": false,
+        "owning_issue": "icn#2632",
+        "note": "Same logical agent on every surface named here -- same name and role -- with different prompt bodies. Whether the divergence is deliberate specialisation or drift is not determinable from the files and has not been adjudicated."
+      },
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-rust-core.md",
+          "description": "Rust workspace implementer for ICN. Use for crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure work. Follows mandatory plan-implement-verify loop.",
+          "model": "inherit"
+        },
+        "copilot": {
+          "path": ".github/agents/icn-rust-core.md",
+          "description": "Rust workspace implementer for ICN. Use for crate changes, daemon, kernel interfaces, actor runtime, storage, encoding, protocol, and core infrastructure.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [
+        "Rust implementation",
+        "crate change",
+        "daemon",
+        "kernel interface",
+        "actor runtime",
+        "storage",
+        "encoding",
+        "protocol implementation"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-sdk-web",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-sdk-web.md",
+          "description": "SDK and web UI specialist. Use for TypeScript SDK, React Native SDK, Pilot UI, and web dashboard changes.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
+      "not_for": []
+    },
+    {
+      "name": "icn-security-auditor",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-security-auditor.md",
+          "description": "Security review agent. Performs threat modeling, attack surface analysis, and security-focused code review. Uses STRIDE and adversarial thinking.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
       "not_for": []
     },
     {
       "name": "icn-security-reviewer",
-      "path": ".claude/agents/icn-security-reviewer.md",
-      "routing_triggers": ["cryptography", "authentication", "key handling", "replay attack", "JWT", "signed envelope", "rate limiting", "security review"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-security-reviewer.md",
+          "description": "Security-focused code review agent specializing in cryptography, authentication, key handling, replay attacks, and protocol security. Use for reviewing security-sensitive changes to identity, crypto, JWT, signed envelopes, and rate limiting code.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "cryptography",
+        "authentication",
+        "key handling",
+        "replay attack",
+        "JWT",
+        "signed envelope",
+        "rate limiting",
+        "security review"
+      ],
       "not_for": []
     },
     {
       "name": "icn-test-generator",
-      "path": ".claude/agents/icn-test-generator.md",
-      "routing_triggers": ["icn-testkit", "write tests", "integration test", "multi-node", "property-based test", "TestNode", "convergence test"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-test-generator.md",
+          "description": "Test generation specialist for ICN. Use for writing integration tests with icn-testkit, multi-node convergence scenarios, property-based tests, and unit test scaffolding. Knows the TestNode helper pattern, unique port allocation, and convergence retry patterns. Activate when the user asks to write tests, mentions icn-testkit, or needs integration test coverage.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "icn-testkit",
+        "write tests",
+        "integration test",
+        "multi-node",
+        "property-based test",
+        "TestNode",
+        "convergence test"
+      ],
       "not_for": []
     },
     {
       "name": "icn-trust-federation-advisor",
-      "path": ".claude/agents/icn-trust-federation-advisor.md",
-      "routing_triggers": ["icn-trust", "icn-federation", "TrustPolicyOracle", "trust score", "trust-gated", "federation treaty", "cross-coop", "bottleneck algorithm"],
+      "relationship": "single_surface",
+      "surfaces": {
+        "claude": {
+          "path": ".claude/agents/icn-trust-federation-advisor.md",
+          "description": "Trust graph, reputation, TrustPolicyOracle, and inter-cooperative federation specialist. Use for changes to icn-trust, icn-federation, TrustPolicyOracle, trust score computation, trust-gated rate limiting, federated task placement, and cross-coop coordination protocols. Activate when working on trust graph algorithms, bottleneck computation, federation treaties, or cross-cooperative trust propagation.",
+          "model": "inherit"
+        }
+      },
+      "routing_triggers": [
+        "icn-trust",
+        "icn-federation",
+        "TrustPolicyOracle",
+        "trust score",
+        "trust-gated",
+        "federation treaty",
+        "cross-coop",
+        "bottleneck algorithm"
+      ],
+      "not_for": []
+    },
+    {
+      "name": "icn-trust-identity",
+      "relationship": "single_surface",
+      "surfaces": {
+        "copilot": {
+          "path": ".github/agents/icn-trust-identity.md",
+          "description": "Trust + Identity specialist. Use for DIDs, credentials, trust graphs, scope-bounded trust, trust-gated behavior, SDIS enrollment, and membership credentials.",
+          "infer": false
+        }
+      },
+      "routing_triggers": [],
       "not_for": []
     }
-  ],
-  "orchestrator": {
-    "name": "orchestrator",
-    "path": "../../../.claude/agents/orchestrator.md",
-    "note": "Lives at project-level .claude/agents/. Cross-repo coordinator.",
-    "routing_triggers": ["cross-repo task", "birds-eye view", "unfamiliar area", "multiple repos"]
-  }
+  ]
 }
