@@ -564,6 +564,11 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = pathlib.Path(".").resolve()
 want = ".claude/hooks/hook-health.sh"
 cases = {
+    'env -i "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'command -p "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'env -u FOO "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'env --unset=FOO "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
+    'env -i MODE=1 "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
     'command "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
     'env MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
     'exec "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
@@ -577,7 +582,7 @@ bad = [c for c, exp in cases.items() if m._command_target(c, root) != exp]
 sys.exit(0 if not bad else 1)
 PYLAUNCH
 if [ $? -eq 0 ]; then
-  ok "launcher prefixes resolve to the hook; external absolute executables do not"
+  ok "launcher prefixes AND their options resolve to the hook; external absolute executables do not"
 else
   bad "a launcher-prefixed or absolute-interpreter command was mis-resolved" ""
 fi

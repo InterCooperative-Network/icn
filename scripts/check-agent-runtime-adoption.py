@@ -210,6 +210,13 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
 # behind one of these is still a direct invocation and its executable bit still matters.
 _LAUNCHERS = ("command", "env", "exec", "nohup")
 
+# Launcher options that consume the NEXT token, so it is an option argument rather than the
+# command. From `env --help` / `help command`; anything else starting with `-` is a flag.
+# Note the failure direction here is inverted from the registry checker: returning None drops
+# a hook from the derived set, which is FAIL-OPEN, so an unparsed option must not silently
+# discard the target.
+_LAUNCHER_OPTS_WITH_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
+
 
 def _command_target(command: str, root: Path | None = None) -> str | None:
     """The repo-relative path a hook command execs directly, or None.
@@ -223,19 +230,31 @@ def _command_target(command: str, root: Path | None = None) -> str | None:
     except ValueError:
         return None
 
-    # Walk past leading assignments and launcher prefixes. `MODE=health hook.sh`,
-    # `command hook.sh` and `env MODE=health hook.sh` all exec the hook; taking tokens[0]
-    # literally dropped every one of them out of the derived set, and because the expected
-    # count is derived from the same list, the loss concealed itself.
+    # Walk past leading assignments, launcher prefixes and their options. `MODE=health
+    # hook.sh`, `command hook.sh`, `env MODE=health hook.sh` and `env -i hook.sh` all exec the
+    # hook -- `env -i` on a non-executable file returns Permission denied exactly as a bare
+    # invocation would -- so every one of them must resolve to the target.
+    seen_launcher = False
     while tokens:
         head = tokens[0]
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", head):
             tokens = tokens[1:]
             continue
         if head.rsplit("/", 1)[-1] in _LAUNCHERS:
+            seen_launcher = True
             tokens = tokens[1:]
             continue
+        if seen_launcher and head.startswith("-"):
+            # An option to the launcher, not the command.
+            if head in _LAUNCHER_OPTS_WITH_ARG:
+                tokens = tokens[2:]
+            elif "=" in head:            # --unset=FOO
+                tokens = tokens[1:]
+            else:
+                tokens = tokens[1:]
+            continue
         break
+
     if not tokens:
         return None
 
