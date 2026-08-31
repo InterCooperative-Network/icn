@@ -290,9 +290,27 @@ def parse_registered_agent_front_matter(text, provider_type):
             "key would vanish and its default would be derived instead. The root mapping of a "
             "registered definition begins at column 0" % (first_no, first[:60]))
 
+    # AN INDENTED LINE IS NOT AUTOMATICALLY NESTED CONTENT. Every indented line used to be
+    # skipped, so `infer: false` followed by `  orphan: value` was certified -- and a YAML
+    # parser rejects that outright ("mapping values are not allowed here"), meaning the
+    # provider cannot load the definition at all while the canonical registry called it valid.
+    #
+    # YAML introduces indented content in exactly two ways: a block-scalar indicator, or an
+    # empty value opening a nested mapping or list. After a key whose value is already a
+    # scalar, indentation is either an error or a multi-line plain scalar -- and the latter is
+    # excluded on purpose, the round-14 trade again: quote it or use a block scalar. All 43
+    # checked-in definitions are inside this subset; every one of their 42 indented lines sits
+    # beneath a block scalar, and none opens a nested mapping or continues a plain scalar.
+    opens_nested = False
     for i, line in substantive:
         if line[0].isspace():
-            continue                      # nested content below a validated root key
+            if not opens_nested:
+                raise InvalidDefinition(
+                    "line %d, %r: indented content follows a key whose value is already a "
+                    "scalar. A YAML parser rejects this, so the provider cannot load the "
+                    "definition -- indentation is supported only beneath a block scalar or an "
+                    "empty value. Quote the value or use a block scalar." % (i, line[:60]))
+            continue
         if not _PLAIN_TOP_LEVEL_KEY.match(line):
             raise InvalidDefinition(
                 "line %d, %r: registered ICN agent front matter requires plain unquoted "
@@ -300,6 +318,8 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "space-before-colon spellings are valid YAML the provider honours, and this "
                 "reader would treat them as the key being ABSENT -- so a semantic field could "
                 "change while the registry certified the old value." % (i, line[:60]))
+        value = strip_inline_comment(line.split(":", 1)[1])
+        opens_nested = not value or bool(_BLOCK_SCALAR.match(value))
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
         try:

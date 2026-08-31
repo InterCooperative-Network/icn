@@ -845,6 +845,52 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 20: an indented line is not automatically nested content -------------
+print()
+print("--- indentation is supported only where YAML introduces it ---")
+
+# Every indented line was skipped as "nested content below a validated root key", so a key
+# whose value is already a scalar could be followed by an indented mapping -- which a YAML
+# parser rejects outright. The provider cannot load the definition at all, and the canonical
+# registry certified it. Verified against PyYAML where it is importable.
+try:
+    import yaml as _yaml
+except ImportError:
+    _yaml = None
+
+for fm, label, should_pass in (
+        ("name: twin\ndescription: fixture\ninfer: false\n  orphan: value",
+         "an orphan mapping indented under a scalar", False),
+        ("name: twin\ndescription: fixture\ninfer: false\n  orphan",
+         "an orphan line indented under a scalar", False),
+        ("name: twin\ndescription: a long\n  continued description\ninfer: false",
+         "a multi-line plain scalar continuation", False),
+        # The two forms YAML actually uses to introduce indentation, and the flat case.
+        ("name: twin\ndescription: |\n  Real content.\ninfer: false",
+         "a block scalar body", True),
+        ("name: twin\ndescription: | # why\n  Real content.\ninfer: false",
+         "a block scalar body under a commented indicator", True),
+        ("name: twin\ndescription: fixture\nmetadata:\n  owner: x\ninfer: false",
+         "a nested mapping under an empty value", True),
+        ("name: twin\ndescription: fixture\ntools:\n  - Read\ninfer: false",
+         "a list under an empty value", True),
+        ("name: twin\ndescription: fixture\ninfer: false", "flat front matter", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    # A definition the registry ACCEPTS must be one the provider's parser can load. The
+    # converse is deliberately not asserted: the supported subset is narrower than YAML.
+    if should_pass and _yaml is not None:
+        try:
+            _yaml.safe_load(fm)
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and a real YAML parser loads it", loadable)
+
 # --- round 19: type by allowlist, compare by value, close the record ------------
 print()
 print("--- a plain scalar is a string only when it provably is ---")
