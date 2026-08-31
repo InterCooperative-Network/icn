@@ -193,6 +193,21 @@ def _substitution_present(command: str):
     return None
 
 
+def _unquoted_project_dir(command: str):
+    """The project-dir token spelling if it is expanded UNQUOTED, else None.
+
+    A single-quoted occurrence is literal rather than an expansion -- `_mask_unexpanded_dollars`
+    already handles that, and the resulting path simply does not exist -- so only the bare
+    (plain-state) spelling is reported here.
+    """
+    states = _shell_states(command)
+    for m in _PROJECT_DIR_TOKEN.finditer(command):
+        i = m.start()
+        if i < len(states) and states[i] == _PLAIN:
+            return m.group(0)
+    return None
+
+
 def _has_unquoted_newline(command: str) -> bool:
     """Does a bash COMMAND SEPARATOR hide in here as a literal newline?
 
@@ -532,6 +547,23 @@ def classify_hook_command(command: str, root: Path | None = None):
         return (HookCommandKind.UNCLASSIFIED, None,
                 "contains a %s command substitution; substitutions are executable shell and "
                 "are outside the supported hook-command language" % inside)
+
+    unquoted_var = _unquoted_project_dir(no_comment)
+    if unquoted_var is not None:
+        # AN UNQUOTED EXPANSION IS WORD-SPLIT. Checked AFTER the substitution refusal:
+        # `_shell_states` does not model a substitution's own quoting context, so a
+        # `"$(..."$VAR"...)"` would look bare here. A substitution is refused
+        # categorically above, so nothing containing one reaches this.
+        # `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` with a
+        # checkout path containing whitespace makes bash attempt the first word and exit 127,
+        # while normalisation here erased the variable and checked the intended hook.
+        # Verified: with CLAUDE_PROJECT_DIR='/tmp/icn review space', the unquoted form exits
+        # 127 on `/tmp/icn` and the quoted form runs. The classifier cannot see a difference
+        # the shell acts on, so the difference has to be part of the language.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%s is expanded unquoted; a checkout path containing whitespace would be "
+                "word-split and the command would not launch. Quote it as \"$%s\"."
+                % (unquoted_var, unquoted_var.strip("${}")))
 
     # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
     # file already treats them as part of a direct invocation, and the suite exercises that

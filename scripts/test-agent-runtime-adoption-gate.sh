@@ -751,7 +751,20 @@ cases = {
     '"${CLAUDE_PROJECT_DIR}/${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh"': K.UNCLASSIFIED,
     '${CLAUDE_PROJECT_DIRoops}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     '$HOME/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
-    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.DIRECT,
+    # THE EXPANSION MUST BE QUOTED. Verified against bash with a checkout path containing a
+    # space: the unquoted form is word-split and exits 127 on the first word, while the quoted
+    # form runs. Normalisation here erased the variable and checked the intended hook, so the
+    # gate certified a command that never launches.
+    '$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 $CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    # ...and the quoted spellings, including quoting the whole word, still classify.
+    '"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.DIRECT,
+    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': K.DIRECT,
+    # FLIPPED: braces do not prevent word splitting. Verified against bash with a checkout
+    # path containing a space -- the unquoted braced form exits 127 on the first word exactly
+    # like the bare one. An earlier round asserted DIRECT here, which was wrong.
+    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     # ...but an assignment in front of a repo PATH stays supported: a path is not looked up.
     'MODE=health %s' % H: K.DIRECT,
     # A COMMAND SUBSTITUTION is executable shell wherever it appears, including inside the
@@ -836,6 +849,33 @@ if [ $? -eq 0 ]; then
   ok "no command substitution can be classified as a non-hook"
 else
   bad "a command substitution escaped the categorical refusal" ""
+fi
+
+# The word-splitting claim is checked against BASH, not asserted. If this stops reproducing,
+# the rule above is guarding something that no longer happens and should be revisited.
+python3 - <<'PYSPLIT'
+import os, pathlib, shutil, subprocess, sys, tempfile
+d = tempfile.mkdtemp(prefix="icn gate space ")
+try:
+    p = pathlib.Path(d)
+    (p / ".claude/hooks").mkdir(parents=True)
+    h = p / ".claude/hooks/hook-health.sh"
+    h.write_text("#!/usr/bin/env bash\necho ran\n")
+    h.chmod(0o755)
+    env = dict(os.environ)
+    env["CLAUDE_PROJECT_DIR"] = str(p)
+    unq = subprocess.run(["bash", "-c", "$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"],
+                         capture_output=True, text=True, env=env)
+    quo = subprocess.run(["bash", "-c", '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'],
+                         capture_output=True, text=True, env=env)
+    sys.exit(0 if (unq.returncode == 127 and quo.returncode == 0) else 1)
+finally:
+    shutil.rmtree(d, ignore_errors=True)
+PYSPLIT
+if [ $? -eq 0 ]; then
+  ok "bash really does word-split an unquoted project-dir expansion (127 vs 0)"
+else
+  bad "the word-splitting premise no longer reproduces; revisit the quoting rule" ""
 fi
 
 # The one live substitution moved into a repository executable, so the gate proves what it
