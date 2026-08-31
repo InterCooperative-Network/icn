@@ -136,6 +136,60 @@ PROVIDER_REQUIRED_FIELDS = {
     "github-copilot": ("description",),
 }
 
+# Plain scalars YAML reads as something other than a string. A required string field whose
+# value is one of these is not "present" in any useful sense: `description: null` and
+# `description: []` are nonempty SOURCE TEXT, which is all the previous presence check
+# proved.
+_YAML_NON_STRING = frozenset({
+    "null", "~", "true", "false", "yes", "no", "on", "off",
+    "Null", "NULL", "True", "TRUE", "False", "FALSE",
+    "Yes", "YES", "No", "NO", "On", "ON", "Off", "OFF",
+})
+_NUMERIC = re.compile(r"^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$")
+_BLOCK_SCALAR = re.compile(r"^[|>][+-]?\d*$")
+
+
+def required_string_problem(block, key):
+    """Why `key` is not a nonempty string in the supported subset, or None.
+
+    The supported value forms are exactly the ones the 43 checked-in definitions use plus
+    the quoted spelling: a plain scalar, a quoted scalar, or a block scalar with content.
+    Anything whose type this cannot establish fails rather than being counted as present.
+    """
+    raw = front_matter_value(block, key)
+    if raw is None:
+        return "is absent"
+    v = raw.strip()
+    if not v:
+        return "is empty"
+
+    if _BLOCK_SCALAR.match(v):
+        # `description: >` -- the value is the indented block beneath it.
+        lines = block.split("\n")
+        idx = next(i for i, ln in enumerate(lines)
+                   if re.match(r"^%s:[ \t]*%s\s*$" % (re.escape(key), re.escape(v)), ln))
+        body = []
+        for ln in lines[idx + 1:]:
+            if ln.strip() and not ln[0].isspace():
+                break
+            body.append(ln)
+        if not any(ln.strip() for ln in body):
+            return "is a block scalar with no content"
+        return None
+
+    if v[0] in "\"'":
+        if len(v) < 2 or v[-1] != v[0]:
+            return "is an unterminated quoted scalar"
+        return "is an empty quoted string" if not v[1:-1].strip() else None
+
+    if v in _YAML_NON_STRING:
+        return "is the YAML %s literal, not a string" % v
+    if _NUMERIC.match(v):
+        return "is a number, not a string"
+    if v[0] in "[{":
+        return "is a flow %s, not a string" % ("sequence" if v[0] == "[" else "mapping")
+    return None
+
 
 def parse_registered_agent_front_matter(text, provider_type):
     """Validate a file AS a definition and return its front-matter block.
@@ -183,15 +237,15 @@ def parse_registered_agent_front_matter(text, provider_type):
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
         try:
-            value = front_matter_value(block, field)
+            problem = required_string_problem(block, field)
         except AmbiguousFrontMatter as exc:
             raise InvalidDefinition(str(exc))
-        if not value:
+        if problem:
             raise InvalidDefinition(
-                "provider_type %r requires %r for the file to be a valid agent definition, "
-                "and it is absent or empty. The registry does not own that field -- it only "
-                "refuses to certify a file the provider would reject as malformed"
-                % (provider_type, field))
+                "provider_type %r requires %r to be a nonempty string for the file to be a "
+                "valid agent definition, and it %s. The registry does not own that field -- "
+                "it only refuses to certify a file the provider would reject as malformed"
+                % (provider_type, field, problem))
     return block
 
 
@@ -608,19 +662,45 @@ class Checker:
         # a provider surface that does not independently exist. There is no alias model and no
         # demonstrated need for one; if one is ever added it must carry its own semantics
         # rather than reusing this field.
+        # PHYSICAL identity, not lexical. A lexically distinct second tree can be a symlink
+        # to the first: both ids then inventory the same files, mirror comparisons become
+        # self-comparisons, and the registry claims a surface that does not independently
+        # exist. Round 8 closed the string-identity case; this closes the filesystem one.
+        #
+        # Resolution also proves containment, which a `..`-free path does not: a symlink can
+        # leave the repository without any lexical evidence.
+        try:
+            repo_root = self.root.resolve()
+        except (ValueError, OSError) as exc:
+            self.fail("cannot resolve the repository root (%s)" % exc)
+            repo_root = None
         seen_trees = {}
         for sid, sdef in sorted(surfaces.items()):
             t = (sdef or {}).get("tree")
-            if not isinstance(t, str):
+            if not isinstance(t, str) or repo_root is None:
                 continue
-            norm = pathlib.PurePosixPath(t).as_posix().rstrip("/")
-            if norm in seen_trees:
-                self.fail("provider_surfaces.%s declares tree %s, already declared by %s. One "
-                          "physical tree is one surface: two ids over one directory inventory "
-                          "it twice and let a mirror compare a file with itself."
-                          % (sid, t, seen_trees[norm]))
+            try:
+                real = (self.root / t).resolve()
+            except (ValueError, OSError) as exc:
+                self.fail("provider_surfaces.%s: tree %s cannot be resolved (%s)"
+                          % (sid, t, exc))
+                continue
+            if not real.exists():
+                continue                      # reported by the tree-existence check below
+            if not real.is_relative_to(repo_root):
+                self.fail("provider_surfaces.%s: tree %s resolves to %s, outside the "
+                          "repository. A path with no `..` can still leave the repo through a "
+                          "symlink, so containment is proven by resolution, not by spelling."
+                          % (sid, t, real))
+                continue
+            if real in seen_trees:
+                self.fail("provider_surfaces.%s declares tree %s, which resolves to the same "
+                          "directory as %s. One physical tree is one surface: two ids over one "
+                          "directory inventory it twice and let a mirror compare a file with "
+                          "itself -- and a symlink makes them lexically distinct."
+                          % (sid, t, seen_trees[real]))
             else:
-                seen_trees[norm] = sid
+                seen_trees[real] = sid
 
         disk = {}
         usable = {}          # surface ids whose declaration validated; records may use these
@@ -845,6 +925,17 @@ class Checker:
         scope = (sj.get("enforcement", {}) or {}).get("scan_scope") or {}
         scan_trees = set(scope.get("canonical_trees") or []) | set(scope.get("provider_trees") or [])
         cross = (sj.get("declared_scope", {}) or {}).get("cross_registry") or {}
+        for field in ("agent_surfaces_tracked_by_agents_json",
+                      "known_uncovered_directories",
+                      "provider_surfaces_no_registry_covers"):
+            if field in cross and not as_str_list(cross[field])[0]:
+                self.fail("skills.json declared_scope.cross_registry.%s must be an array of "
+                          "nonempty strings, found %r. Malformed canonical data must produce a "
+                          "finding here, not a traceback: this checker consumes the field "
+                          "directly as its own standalone gate and cannot assume another "
+                          "checker ran first." % (field, cross[field]))
+                cross = {k: v for k, v in cross.items() if k != field}
+
         claimed = cross.get("agent_surfaces_tracked_by_agents_json")
         if claimed is None:
             self.fail("skills.json declared_scope.cross_registry."

@@ -20,6 +20,7 @@ Run: python3 scripts/tests/test_agent_registry_invariants.py
 """
 import copy
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -594,7 +595,7 @@ alias_case()
 case("a trailing-slash spelling of an already-declared tree",
      lambda r: r["provider_surfaces"].__setitem__(
          "dupe", {"tree": ".claude/agents/", "provider_type": "claude-code"}),
-     expect="already declared by")
+     expect="resolves to the same directory")
 
 
 print()
@@ -840,6 +841,120 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 16: prove types, physical identity, and totality --------------------
+print()
+print("--- a required string field must actually be a string ---")
+
+# `description: null` is nonempty SOURCE TEXT, which is all a presence check proved.
+for value, label in (("null", "the null literal"), ("~", "the ~ null literal"),
+                     ("[]", "an empty flow sequence"), ("{}", "an empty flow mapping"),
+                     ("true", "a boolean"), ("yes", "a YAML 1.1 boolean"),
+                     ("123", "an integer"), ("0.5", "a float"),
+                     ('""', "an empty double-quoted string"),
+                     ("''", "an empty single-quoted string")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: required description as %s is rejected" % label,
+          rc != 0 and "nonempty string" in out)
+
+# The value forms the 43 real definitions use, plus the quoted spelling.
+for value, label in (("a plain description", "plain scalar"),
+                     ('"a quoted description"', "quoted scalar"),
+                     (">\n  a folded\n  description", "block scalar")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("MUST-PASS description as a %s" % label, rc == 0)
+
+r = base_registry()
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = (
+    "---\nname: twin\ndescription: >\ninfer: false\n---\n\nBody for twin.\n")
+rc, out = run(r, base_skills(), f)
+check("a block scalar with no content is rejected", rc != 0 and "no content" in out)
+
+
+print()
+print("--- provider trees are PHYSICALLY distinct and inside the repo ---")
+
+def symlink_cases():
+    """Lexical uniqueness is not filesystem uniqueness.
+
+    A second tree that is a symlink to the first is lexically distinct, so both ids
+    inventory the same files and a mirror comparison becomes a self-comparison. The same
+    mechanism catches a `..`-free path that leaves the repo through a symlink.
+    """
+    tmp = tempfile.mkdtemp()
+    try:
+        root = pathlib.Path(tmp)
+        (root / ".claude/agents").mkdir(parents=True)
+        (root / "ops/state/truth").mkdir(parents=True)
+        (root / ".claude/agents/solo.md").write_text(
+            agent_file("solo", "description: fixture\n"), encoding="utf-8")
+        os.symlink(".claude/agents", str(root / "alias-agents"))
+        outside = tempfile.mkdtemp()
+        os.symlink(outside, str(root / "escape-tree"))
+
+        def run_reg(surfaces, agents, claimed):
+            reg = {"schema": "icn-agents/v2", "provider_surfaces": surfaces,
+                   "relationship_model": {"single_surface": "x", "exact_mirror": "x",
+                                          "provider_variant": "x",
+                                          "divergent_unreviewed": "x"},
+                   "declared_scope": {}, "agents": agents}
+            sk = {"declared_scope": {"cross_registry": {
+                "agent_surfaces_tracked_by_agents_json": claimed}}}
+            (root / "ops/state/truth/agents.json").write_text(json.dumps(reg), encoding="utf-8")
+            (root / "ops/state/truth/skills.json").write_text(json.dumps(sk), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                               capture_output=True, text=True)
+            return p.returncode, p.stdout + p.stderr
+
+        rc, out = run_reg(
+            {"claude": {"tree": ".claude/agents", "provider_type": "claude-code"},
+             "alias": {"tree": "alias-agents", "provider_type": "claude-code"}},
+            [{"name": "solo", "relationship": "exact_mirror",
+              "routing_triggers": [], "not_for": [],
+              "surfaces": {"claude": {"path": ".claude/agents/solo.md"},
+                           "alias": {"path": "alias-agents/solo.md"}}}],
+            [".claude/agents", "alias-agents"])
+        check("REAL P2: a symlinked second surface tree is rejected",
+              rc != 0 and "resolves to the same directory" in out)
+
+        rc, out = run_reg(
+            {"claude": {"tree": ".claude/agents", "provider_type": "claude-code"},
+             "esc": {"tree": "escape-tree", "provider_type": "claude-code"}},
+            [{"name": "solo", "relationship": "single_surface",
+              "routing_triggers": [], "not_for": [],
+              "surfaces": {"claude": {"path": ".claude/agents/solo.md"}}}],
+            [".claude/agents", "escape-tree"])
+        check("a tree leaving the repo through a symlink is rejected",
+              rc != 0 and "outside the repository" in out)
+        shutil.rmtree(outside, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+symlink_cases()
+
+
+print()
+print("--- malformed cross-registry data produces findings, not tracebacks ---")
+
+for value, label in (([1], "an integer element"), ([None], "a null element"),
+                     ([{}], "an object element"), ([""], "an empty-string element"),
+                     ("not-an-array", "a bare string")):
+    r = base_registry()
+    sk = base_skills()
+    sk["declared_scope"]["cross_registry"]["known_uncovered_directories"] = value
+    rc, out = run(r, sk, dict(BASE_FILES))
+    check("REAL P2: known_uncovered_directories with %s -> finding, not crash" % label,
+          rc != 0 and "Traceback" not in out and "array of nonempty strings" in out)
+
+
 # --- round 15: a definition must be PROVEN valid before it is registered --------
 print()
 print("--- registration requires a valid definition, not just a filename ---")
