@@ -169,42 +169,63 @@ def flow_problem(value):
     red on the repository it guards. What can be proven on one line is balance and
     termination, so that is what is proven.
     """
-    if value[:1] not in "[{":
+    # `value[:1] not in "[{"` was WRONG for the empty value: `"" in "[{"` is True, because
+    # the empty string is a substring of everything -- so an ordinary `key:` with no value
+    # fell through and `value[0]` raised IndexError. A guard that mistakes a substring test
+    # for a membership test is how this function started crashing the gate it protects.
+    if not value or value[0] not in "[{":
         return None
-    stack = []
-    pairs = {"]": "[", "}": "{"}
-    i, n = 0, len(value)
+    closer = "]" if value[0] == "[" else "}"
+    if value[-1:] != closer:
+        return "is an unterminated flow %s" % ("sequence" if closer == "]" else "mapping")
+
+    # ONE FLAT LEVEL, and the elements are not interpreted. Balance alone proved only that
+    # brackets matched: `tools: [Read,, Write]` is balanced and a YAML loader still raises.
+    # The answer is NOT to parse flow properly -- that is the whole language arriving one
+    # counterexample at a time. It is to support the shape the repository actually writes,
+    # `tools: ["Read", "Grep", "Glob", "Bash"]`, and refuse everything else by name.
+    #
+    # So: no nesting, and every comma-separated element non-empty. A single trailing comma is
+    # allowed because YAML allows it. Element CONTENT is still not interpreted -- what is
+    # proven is that the collection has a shape a loader accepts, nothing about its meaning.
+    inner = value[1:-1]
+    if not inner.strip():
+        return None                        # the empty collection, which YAML accepts
+    elements, buf, i, n = [], [], 0, len(inner)
     while i < n:
-        c = value[i]
-        if c == '"':
-            j = i + 1
-            while j < n and value[j] != '"':
-                j += 2 if value[j] == "\\" else 1
-            if j >= n:
-                return "contains an unterminated double-quoted string"
-            i = j + 1
-            continue
-        if c == "'":
+        c = inner[i]
+        if c in "\"'":
             j = i + 1
             while j < n:
-                if value[j] == "'":
-                    if j + 1 < n and value[j + 1] == "'":
+                if inner[j] == c:
+                    if c == "'" and j + 1 < n and inner[j + 1] == "'":
                         j += 2
                         continue
                     break
-                j += 1
+                j += 2 if (c == '"' and inner[j] == "\\") else 1
             if j >= n:
-                return "contains an unterminated single-quoted string"
+                return "contains an unterminated %s-quoted string" % (
+                    "double" if c == '"' else "single")
+            buf.append(inner[i:j + 1])
             i = j + 1
             continue
-        if c in "[{":
-            stack.append(c)
-        elif c in "]}":
-            if not stack or stack.pop() != pairs[c]:
-                return "closes a flow collection that was never opened, or closes the wrong one"
+        if c in "[]{}":
+            return ("is a nested flow collection, which is not a supported spelling here; "
+                    "write one flat collection")
+        if c == ",":
+            elements.append("".join(buf).strip())
+            buf = []
+            i += 1
+            continue
+        buf.append(c)
         i += 1
-    if stack:
-        return "is an unterminated flow %s" % ("sequence" if stack[-1] == "[" else "mapping")
+    tail = "".join(buf).strip()
+    if tail:
+        elements.append(tail)
+    # A single TRAILING comma is legal YAML, so an empty tail is dropped rather than counted.
+    # `[,]` is not that: its empty element comes BEFORE the comma and a loader rejects it.
+    if any(e == "" for e in elements):
+        return "contains an empty element, which a YAML loader rejects"
     return None
 
 
@@ -804,7 +825,13 @@ class Checker:
         out = {}
         for sid, entry in (rec.get("surfaces") or {}).items():
             fp = self.root / (entry or {}).get("path", "")
-            if fp.exists():
+            # is_file(), not exists(). The per-surface loop already reports a DIRECTORY named
+            # `twin.md` as a topology error and moves on -- and then the relationship
+            # validator called this, `read_text` raised IsADirectoryError, and the checker
+            # terminated BEFORE printing the findings it had already collected. A second
+            # reader of the same path has to be as careful as the first, or the first one's
+            # correct finding never reaches anyone.
+            if fp.is_file():
                 _, body = split_front_matter(fp.read_text(encoding="utf-8"))
                 out[sid] = body
         return out

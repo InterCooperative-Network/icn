@@ -845,6 +845,91 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 26: balance is not syntax, and a second reader must be as careful ----
+print()
+print("--- a flow collection must have the shape a loader accepts ---")
+
+# Balance proved only that brackets matched: `tools: [Read,, Write]` is balanced and PyYAML
+# still raises. The fix is NOT to parse flow properly -- it is to support the shape the
+# repository writes and refuse everything else by name.
+try:
+    import yaml as _y26
+except ImportError:
+    _y26 = None
+
+_B26 = "name: twin\ndescription: fixture\n"
+for value, label, should_pass in (
+        ("[Read,, Write]", "an empty element in a flow sequence", False),
+        ("{a: 1,, b: 2}", "an empty element in a flow mapping", False),
+        ("[,]", "a flow sequence that is only a comma", False),
+        ("[,a]", "a leading empty element", False),
+        ("[a,,]", "a doubled trailing comma", False),
+        # A single trailing comma IS legal YAML, and the empty collection is legal too.
+        ("[Read,]", "a single trailing comma", True),
+        ("[Read, ]", "a trailing comma with a space", True),
+        ("[]", "the empty flow sequence", True),
+        ("{}", "the empty flow mapping", True),
+        ("[ ]", "an empty flow sequence with a space", True),
+        # Element CONTENT is still not interpreted: a comma or a hash inside a quoted string
+        # is data, and a plain scalar with a space is one element.
+        ('["a,b"]', "a comma inside a quoted element", True),
+        ('["a#b"]', "a hash inside a quoted element", True),
+        ("[a b, c]", "a plain element containing a space", True),
+        ("['it''s']", "a doubled quote inside a single-quoted element", True),
+        ('["Read", "Grep", "Glob", "Bash"]', "the shape two real definitions use", True),
+        # DELIBERATELY NARROWER THAN YAML, which is why this block asserts the oracle in one
+        # direction only. Nested flow LOADS fine and no checked-in definition writes it;
+        # supporting it means parsing flow properly, which is the whole language arriving one
+        # counterexample at a time. Refused by name, and recorded as a narrowing rather than
+        # a soundness claim.
+        ("[{a: [1, 2]}]", "a nested flow collection (narrowed, not unsound)", False),
+        ("[[a], b]", "a nested flow sequence (narrowed, not unsound)", False)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\n%stools: %s\ninfer: false\n---\n\nBody for twin.\n" % (_B26, value))
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if _y26 is not None:
+        try:
+            _y26.safe_load("%stools: %s\ninfer: false" % (_B26, value))
+            loadable = True
+        except Exception:
+            loadable = False
+        # One direction only: what the reader ACCEPTS must load. The reverse does not hold --
+        # nested flow is legal YAML and deliberately refused.
+        if should_pass:
+            check("   ...and a real YAML parser loads it", loadable)
+
+
+print()
+print("--- a second reader of a path must be as careful as the first ---")
+
+# The per-surface loop reports a DIRECTORY named `twin.md` as a topology error and moves on.
+# The relationship validator then called `bodies()`, `read_text` raised IsADirectoryError, and
+# the checker TERMINATED before printing the findings it had already collected. The first
+# reader's correct finding never reached anyone.
+def mirror_directory_case():
+    tmp = tempfile.mkdtemp()
+    try:
+        root = build(tmp, base_registry(), base_skills(), dict(BASE_FILES))
+        target = root / ".github/agents/twin.md"       # a MIRROR surface, so bodies() runs
+        target.unlink()
+        target.mkdir()
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a mirror record pointing at a directory reports, not crashes",
+              p.returncode != 0 and "Traceback" not in out)
+        check("   ...and the per-surface finding actually reaches the report",
+              "not a regular file" in out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+mirror_directory_case()
+
 # --- round 25: which items own children, and flow that must balance ------------
 print()
 print("--- a sequence item owns a child only if it carries a mapping ---")
@@ -875,7 +960,6 @@ for fm, label, should_pass in (
         (_B25 + 'tools: ["Read", "Grep", "Glob", "Bash"]',
          "the flow sequence two real definitions use", True),
         (_B25 + "metadata: {a: 1, b: 2}", "a flow mapping", True),
-        (_B25 + "tools: [{a: [1, 2]}]", "nested flow collections", True),
         (_B25 + 'tools: ["a#b"]', "a hash inside a flow string", True)):
     r = base_registry()
     f = dict(BASE_FILES)
