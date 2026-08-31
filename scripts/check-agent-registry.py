@@ -50,6 +50,10 @@ PROVIDER_OWNED_KEYS = ("description", "color", "model", "tools", "target",
                        "mcp-servers", "metadata", "infer",
                        "disable-model-invocation", "user-invocable")
 
+# The complete record vocabulary, checked as an ALLOWLIST -- see the record loop.
+RECORD_KEYS = ("name", "relationship", "surfaces", "routing_triggers", "not_for",
+               "divergence", "mirror_pairs")
+
 # Verified against https://docs.github.com/en/copilot/reference/custom-agents-configuration
 # on 2026-08-30:
 #   infer                      RETIRED. "Enables Copilot cloud agent to automatically use
@@ -136,17 +140,85 @@ PROVIDER_REQUIRED_FIELDS = {
     "github-copilot": ("description",),
 }
 
-# Plain scalars YAML reads as something other than a string. A required string field whose
-# value is one of these is not "present" in any useful sense: `description: null` and
-# `description: []` are nonempty SOURCE TEXT, which is all the previous presence check
-# proved.
-_YAML_NON_STRING = frozenset({
-    "null", "~", "true", "false", "yes", "no", "on", "off",
-    "Null", "NULL", "True", "TRUE", "False", "FALSE",
-    "Yes", "YES", "No", "NO", "On", "ON", "Off", "OFF",
-})
-_NUMERIC = re.compile(r"^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$")
+# Plain scalars YAML reads as something other than a string, RESTRICTED to those that begin
+# with an ASCII letter. A required string field whose value is one of these is not "present"
+# in any useful sense: `description: null` is nonempty SOURCE TEXT, which is all the original
+# presence check proved.
+#
+# Every other non-string plain scalar begins with a digit, a sign, `.`, `~`, `<` or `=`, and
+# is excluded by the allowlist in `decode_inline_scalar` rather than by being named here.
+# The YAML 1.1 single letters y/n are in the set because 1.1 resolvers are still in the field
+# and a one-letter `name:` would otherwise load as a boolean.
+_NON_STRING_WORDS = frozenset(
+    w for base in ("null", "true", "false", "yes", "no", "on", "off", "y", "n")
+    for w in (base, base.capitalize(), base.upper())
+)
 _BLOCK_SCALAR = re.compile(r"^[|>][+-]?\d*$")
+
+
+def strip_inline_comment(raw):
+    """The scalar text with any inline comment removed, stripped.
+
+    In YAML `#` opens a comment only when it starts the scalar or follows whitespace, and only
+    outside quotes -- so a quoted value keeps its `#` verbatim. Shared, because the block
+    indicator, the type test and the identity comparison must agree on where the value ends:
+    when only one of them stripped, `description: | # rationale` stopped looking like a block
+    scalar and a VALID definition was rejected.
+    """
+    v = raw.strip()
+    if v[:1] in ("\"", "'"):
+        return v
+    return re.split(r"(?:^|\s)#", v, maxsplit=1)[0].strip()
+
+
+def decode_inline_scalar(raw):
+    """(text, problem) for a value written on the key's own line -- exactly one is None.
+
+    THE ONE READER. The required-field check and the front-matter/registry identity
+    comparison both call this, because they disagreed: the field check accepted
+    `name: "icn-ci-reliability"` and `name: icn-ci-reliability # canonical` as valid strings,
+    and the comparison then matched the RAW text against the registered name and reported
+    drift for a definition the provider loads correctly. A false rejection, from two
+    functions holding different opinions about what a definition says.
+    """
+    if not raw.strip():
+        return None, "is empty"
+    v = strip_inline_comment(raw)
+    if not v:
+        return None, "is only a comment"
+
+    if v[0] in "\"'":
+        if len(v) < 2 or v[-1] != v[0]:
+            return None, "is an unterminated quoted scalar"
+        body = v[1:-1]
+        return (None, "is an empty quoted string") if not body.strip() else (body, None)
+
+    # PLAIN SCALARS ARE ACCEPTED BY ALLOWLIST, NOT BY EXCLUSION LIST.
+    #
+    # The exclusion list named the null/boolean words and a decimal-number regex, so every
+    # OTHER non-string YAML literal was certified as a string: `0x10`, `0o17`, `0b1010`,
+    # `1_000`, `.inf`, `.nan`, `2026-01-01`, `2026-01-01T00:00:00Z`, `12:30:45` (1.1
+    # sexagesimal) and the 1.1 booleans `y`/`n`. Naming them one at a time is the losing side
+    # of this: every miss is silent, and the resolver set is not ours to freeze.
+    #
+    # Every non-string plain scalar in YAML 1.1 and 1.2 either begins with a character that is
+    # not an ASCII letter -- a digit, sign, `.`, `~`, `<`, `=` -- or is one of a CLOSED set of
+    # words. So a plain scalar is PROVABLY a string when it starts with an ASCII letter and is
+    # not one of those words, and nothing else is accepted.
+    #
+    # All 43 checked-in definitions are inside that subset: 43 plain names and 23 plain
+    # descriptions all start with a letter, 20 descriptions are block scalars, none is quoted
+    # and none is digit-leading. `description: 5 reviewers approve` IS a string to YAML and
+    # fails here anyway, explicitly, saying to quote it -- the round-14 trade, a narrow
+    # grammar that fails loudly over a broad one that guesses.
+    if v in _NON_STRING_WORDS or v == "~":
+        return None, "is the YAML %s literal, not a string" % v
+    if v[0] in "[{":
+        return None, "is a flow %s, not a string" % ("sequence" if v[0] == "[" else "mapping")
+    if not re.match(r"^[A-Za-z]", v):
+        return None, ("begins with %r, so YAML may resolve it as a number, date, timestamp or "
+                      "null rather than a string; quote it to make it one" % v[0])
+    return v, None
 
 
 def required_string_problem(block, key):
@@ -159,21 +231,10 @@ def required_string_problem(block, key):
     raw = front_matter_value(block, key)
     if raw is None:
         return "is absent"
-    v = raw.strip()
-    if not v:
+    if not raw.strip():
         return "is empty"
 
-    # An inline comment is not part of the value. `description: null # why` kept the comment
-    # in the string, so the exact-membership test below missed the null literal and the
-    # fallback accepted it. In YAML a `#` opens a comment only when it starts the scalar or
-    # follows whitespace, and only outside quotes -- quoted values are handled further down
-    # and keep their `#` verbatim.
-    if v[0] not in "\"'":
-        v = re.split(r"(?:^|\s)#", v, maxsplit=1)[0].strip()
-        if not v:
-            return "is only a comment"
-
-    if _BLOCK_SCALAR.match(v):
+    if _BLOCK_SCALAR.match(strip_inline_comment(raw)):
         # `description: >` -- the value is the indented block beneath it. Located by KEY:
         # an earlier revision searched for the line ending in the stripped indicator, so
         # `description: | # rationale` matched nothing and raised StopIteration, rejecting a
@@ -193,18 +254,7 @@ def required_string_problem(block, key):
             return "is a block scalar with no content"
         return None
 
-    if v[0] in "\"'":
-        if len(v) < 2 or v[-1] != v[0]:
-            return "is an unterminated quoted scalar"
-        return "is an empty quoted string" if not v[1:-1].strip() else None
-
-    if v in _YAML_NON_STRING:
-        return "is the YAML %s literal, not a string" % v
-    if _NUMERIC.match(v):
-        return "is a number, not a string"
-    if v[0] in "[{":
-        return "is a flow %s, not a string" % ("sequence" if v[0] == "[" else "mapping")
-    return None
+    return decode_inline_scalar(raw)[1]
 
 
 def parse_registered_agent_front_matter(text, provider_type):
@@ -770,6 +820,25 @@ class Checker:
                 continue
             seen.add(name)
 
+            # RECORD KEYS ARE AN ALLOWLIST. The provider-owned check below reads each
+            # SURFACE entry, so a provider-native field written at RECORD level -- a
+            # top-level `description` on the agent -- left the registry carrying exactly the
+            # unpinned copy `PROVIDER_OWNED_KEYS` exists to forbid, and the gate stayed
+            # green. An unknown key is refused for the same reason a misspelled one is:
+            # `mirror_pairs` is optional, so `mirror_pair` silently drops the only promise
+            # the record was making. Every other record key is required and would fail as
+            # absent; this one would not.
+            for k in sorted(set(rec) - set(RECORD_KEYS)):
+                if k in PROVIDER_OWNED_KEYS:
+                    self.fail("%s: %r is provider-native syntax owned by the provider "
+                              "definition, not the registry, and a record-level copy is "
+                              "unpinned by any surface -- the registry records derived "
+                              "SEMANTICS, never mirrored syntax." % (name, k))
+                else:
+                    self.fail("%s: %r is not a record key (%s). An unrecognised key is most "
+                              "often a misspelled optional one, which drops its promise "
+                              "silently." % (name, k, ", ".join(RECORD_KEYS)))
+
             rec_surfaces = rec.get("surfaces") or {}
             if not rec_surfaces:
                 self.fail("%s: no surfaces. A record that names no surface describes nothing."
@@ -834,10 +903,26 @@ class Checker:
                 except AmbiguousFrontMatter as exc:
                     self.fail("%s.%s: %s" % (name, sid, exc))
                     continue
-                if declared is not None and declared != name:
-                    self.fail("%s.%s: front matter declares name: %s. The provider loads the "
-                              "front-matter name, so the registry would route to a name the "
-                              "provider does not answer to." % (name, sid, declared))
+                if declared is not None:
+                    # DECODED, not raw. The provider's loader sees the VALUE; this saw the
+                    # spelling, so a quoted name or an inline comment on it was reported as
+                    # drift against a definition the provider resolves to exactly the
+                    # registered name -- a false rejection. A block-scalar name is refused
+                    # rather than guessed at: folding is not something this checker can do,
+                    # and no checked-in definition writes one.
+                    if _BLOCK_SCALAR.match(strip_inline_comment(declared)):
+                        self.fail("%s.%s: front matter writes name as a block scalar. The "
+                                  "registry compares identities and cannot fold one; write "
+                                  "the name inline." % (name, sid))
+                    else:
+                        text, problem = decode_inline_scalar(declared)
+                        if problem is not None:
+                            self.fail("%s.%s: front-matter name %s" % (name, sid, problem))
+                        elif text != name:
+                            self.fail("%s.%s: front matter declares name: %s. The provider "
+                                      "loads the front-matter name, so the registry would "
+                                      "route to a name the provider does not answer to."
+                                      % (name, sid, text))
 
                 for k in PROVIDER_OWNED_KEYS:
                     if k in (entry or {}):

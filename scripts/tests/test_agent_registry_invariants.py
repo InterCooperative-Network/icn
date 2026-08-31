@@ -845,6 +845,90 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 19: type by allowlist, compare by value, close the record ------------
+print()
+print("--- a plain scalar is a string only when it provably is ---")
+
+# The type test named the null/boolean words and matched a DECIMAL regex, so every other
+# non-string YAML literal was certified as a provider-required string. Naming them one at a
+# time is the losing side: each miss is silent. The rule is an allowlist now -- starts with an
+# ASCII letter, and is not one of the closed words -- so these fail without being enumerated.
+for value, label in (("0x10", "hexadecimal integer"),
+                     ("0o17", "octal integer"),
+                     ("0b1010", "binary integer"),
+                     ("1_000", "underscored integer"),
+                     (".inf", "positive infinity"),
+                     ("-.Inf", "signed infinity"),
+                     (".nan", "not-a-number"),
+                     ("2026-01-01", "date"),
+                     ("2026-01-01T00:00:00Z", "timestamp"),
+                     ("12:30:45", "YAML 1.1 sexagesimal"),
+                     ("y", "YAML 1.1 single-letter true"),
+                     ("N", "YAML 1.1 single-letter false")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: description: %s (%s) is not a string" % (value, label),
+          rc != 0 and "Traceback" not in out)
+
+# The allowlist must still admit what the 43 checked-in definitions actually write, or the
+# gate is red on the repository it guards.
+for value, label in (("Reviews PRs for ICN invariants.", "ordinary prose"),
+                     ('"a quoted description"', "double-quoted"),
+                     ("'a quoted description'", "single-quoted"),
+                     ("fixture # trailing note", "plain value with an inline comment")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("MUST-PASS description as %s" % label, rc == 0)
+
+
+print()
+print("--- identity is compared by VALUE, not by spelling ---")
+
+# The required-field check accepted a quoted name and an inline comment on one; the identity
+# comparison then matched the RAW text against the registered name and reported drift for a
+# definition the provider resolves correctly. Two functions, two opinions, one false
+# rejection. Both read the same decoder now.
+for spelling, label, should_pass in (
+        ('twin', "plain name", True),
+        ('"twin"', "double-quoted name", True),
+        ("'twin'", "single-quoted name", True),
+        ('twin # canonical', "name with an inline comment", True),
+        ('"other"', "quoted name that does NOT match the record", False),
+        ('other # canonical', "commented name that does NOT match the record", False),
+        ('| # folded\n  twin', "block-scalar name", False)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: %s\ndescription: fixture\ninfer: false\n---\n\nBody for twin.\n"
+        % spelling)
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+
+
+print()
+print("--- the record vocabulary is closed ---")
+
+# The provider-owned check read each SURFACE entry, so a provider-native field written at
+# RECORD level left the registry carrying exactly the unpinned copy that check exists to
+# forbid. And `mirror_pairs` is the one optional record key, so a misspelling of it drops the
+# only promise the record was making while every required key would have failed as absent.
+for key, value, label in (
+        ("description", "a copied description", "a record-level provider-owned description"),
+        ("model", "opus", "a record-level provider-owned model"),
+        ("tools", ["Read"], "record-level provider-owned tools"),
+        ("mirror_pair", [["claude", "copilot"]], "a misspelled mirror_pairs"),
+        ("surface", {}, "a misspelled surfaces")):
+    def mutate(r, k=key, v=value):
+        r["agents"][1][k] = v
+    case(label, mutate_reg=mutate)
+
 # --- round 18: guards must not crash ahead of the validator that reports ------
 print()
 print("--- structural validation runs before any semantic access ---")
