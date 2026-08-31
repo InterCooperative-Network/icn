@@ -840,6 +840,71 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 15: a definition must be PROVEN valid before it is registered --------
+print()
+print("--- registration requires a valid definition, not just a filename ---")
+
+def definition_case(label, front_matter_text, expect_fragment, provider="copilot"):
+    """Replace one surface file's whole front matter and assert the registry refuses it."""
+    r = base_registry()
+    f = dict(BASE_FILES)
+    path = ".github/agents/twin.md" if provider == "copilot" else ".claude/agents/twin.md"
+    f[path] = front_matter_text
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: %s" % label, rc != 0 and expect_fragment in out)
+
+definition_case("a registered definition with no front matter at all",
+                "Body for twin.\n", "no well-formed front matter")
+definition_case("an opening delimiter with no closing delimiter",
+                "---\nname: twin\ndescription: fixture\ninfer: false\n\nBody for twin.\n",
+                "no well-formed front matter")
+definition_case("an empty front-matter block",
+                "---\n\n# only a comment\n---\n\nBody for twin.\n", "empty")
+definition_case("a fully indented root mapping",
+                "---\n  name: twin\n  description: fixture\n  infer: false\n---\n\n"
+                "Body for twin.\n", "root mapping is indented")
+definition_case("a github-copilot definition missing description",
+                "---\nname: twin\ninfer: false\n---\n\nBody for twin.\n",
+                "requires 'description'")
+definition_case("a claude-code definition missing description",
+                "---\nname: twin\n---\n\nBody for twin.\n",
+                "requires 'description'", provider="claude")
+definition_case("a claude-code definition missing name",
+                "---\ndescription: fixture\n---\n\nBody for twin.\n",
+                "requires 'name'", provider="claude")
+
+# The indented-root case is the one that changed a SEMANTIC: a YAML parser reads
+# `infer: false`, the old reader saw no key and derived the default `true`.
+r = base_registry()
+r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = True
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = (
+    "---\n  name: twin\n  description: fixture\n  infer: false\n---\n\nBody for twin.\n")
+rc, out = run(r, base_skills(), f)
+check("REAL P2: an indented root cannot silently flip automatic_invocation",
+      rc != 0 and "root mapping is indented" in out)
+
+# MUST-PASS: everything the 43 real definitions actually use stays legal.
+r = base_registry()
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = (
+    "---\n"
+    "name: twin\n"
+    "description: >\n"
+    "  a folded scalar\n"
+    "  across lines\n"
+    "metadata:\n"
+    "  nested: value\n"
+    "tools:\n"
+    "  - one\n"
+    "\n"
+    "# a comment\n"
+    "infer: false\n"
+    "---\n\nBody for twin.\n")
+rc, out = run(r, base_skills(), f)
+check("MUST-PASS nested maps, folded scalars, lists, blanks and comments", rc == 0)
+
+
 # --- round 14: the front-matter contract is a verifiable subset of YAML ---------
 print()
 print("--- unsupported top-level key syntax fails loudly ---")

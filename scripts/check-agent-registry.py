@@ -118,31 +118,81 @@ def split_front_matter(text):
 _PLAIN_TOP_LEVEL_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:(?:[ \t]|$)")
 
 
-class UnsupportedFrontMatter(Exception):
-    """A top-level key uses YAML syntax outside the registered-agent subset."""
+class InvalidDefinition(Exception):
+    """The file is not a valid registered agent definition in the supported subset."""
 
 
-def check_front_matter_grammar(block):
-    """Return a message for the first unsupported top-level construct, else None.
+# What each provider requires before a file IS a definition -- distinct from what the
+# registry OWNS. Requiring `description` to exist does not make agents.json its owner; the
+# value stays provider-side and is never copied here.
+#
+#   claude-code     name + description. Evidenced by this repository's own validator,
+#                   scripts/check-claude-plugin.py:231-234, which errors on either missing.
+#   github-copilot  description is required per
+#                   docs.github.com/en/copilot/reference/custom-agents-configuration
+#                   (verified 2026-08-30); `name` is optional there, the filename standing in.
+PROVIDER_REQUIRED_FIELDS = {
+    "claude-code": ("name", "description"),
+    "github-copilot": ("description",),
+}
 
-    Only column-0 lines are inspected: indented lines are continuations, nested mappings or
-    block scalars belonging to a key already validated.
+
+def parse_registered_agent_front_matter(text, provider_type):
+    """Validate a file AS a definition and return its front-matter block.
+
+    Raises InvalidDefinition. This is the single gate a file must pass before it counts as a
+    registered provider definition, so that afterwards `front_matter_value(block, key) is
+    None` means exactly one thing: the definition is structurally valid and this optional key
+    is genuinely absent. It no longer also means "the file had no front matter", "the YAML was
+    spelled differently", or "the root mapping was indented".
+
+    Deliberately not a YAML parser. It proves the file lies inside the supported subset and
+    refuses everything else, which is a claim it can actually keep.
     """
-    if not block:
-        return None
-    for i, line in enumerate(block.split("\n"), 1):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        raise InvalidDefinition(
+            "no well-formed front matter: a registered definition must open and close with a "
+            "`---` line. An earlier revision read a missing block as an empty one, so a file "
+            "the provider rejects as malformed could still be registered")
+    block = m.group(1)
+
+    substantive = [(i, ln) for i, ln in enumerate(block.split("\n"), 1)
+                   if ln.strip() and not ln.lstrip().startswith("#")]
+    if not substantive:
+        raise InvalidDefinition("front matter block is empty")
+
+    first_no, first = substantive[0]
+    if first[0].isspace():
+        raise InvalidDefinition(
+            "line %d, %r: the root mapping is indented. A YAML parser still reads it as the "
+            "root, but this reader treats indented lines as nested content, so every semantic "
+            "key would vanish and its default would be derived instead. The root mapping of a "
+            "registered definition begins at column 0" % (first_no, first[:60]))
+
+    for i, line in substantive:
         if line[0].isspace():
-            continue
+            continue                      # nested content below a validated root key
         if not _PLAIN_TOP_LEVEL_KEY.match(line):
-            return ("line %d, %r: registered ICN agent front matter requires plain unquoted "
-                    "top-level keys. Quoted, explicit (`? key`), flow-mapping and "
-                    "space-before-colon spellings are valid YAML the provider honours, and "
-                    "this reader would treat them as the key being ABSENT -- so a semantic "
-                    "field could change while the registry certified the old value."
-                    % (i, line[:60]))
-    return None
+            raise InvalidDefinition(
+                "line %d, %r: registered ICN agent front matter requires plain unquoted "
+                "top-level keys. Quoted, explicit (`? key`), flow-mapping and "
+                "space-before-colon spellings are valid YAML the provider honours, and this "
+                "reader would treat them as the key being ABSENT -- so a semantic field could "
+                "change while the registry certified the old value." % (i, line[:60]))
+
+    for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
+        try:
+            value = front_matter_value(block, field)
+        except AmbiguousFrontMatter as exc:
+            raise InvalidDefinition(str(exc))
+        if not value:
+            raise InvalidDefinition(
+                "provider_type %r requires %r for the file to be a valid agent definition, "
+                "and it is absent or empty. The registry does not own that field -- it only "
+                "refuses to certify a file the provider would reject as malformed"
+                % (provider_type, field))
+    return block
 
 
 class AmbiguousFrontMatter(Exception):
@@ -669,10 +719,11 @@ class Checker:
                               % (name, sid, fp.stem))
                     continue
 
-                fm, _ = split_front_matter(fp.read_text(encoding="utf-8"))
-                grammar = check_front_matter_grammar(fm)
-                if grammar:
-                    self.fail("%s.%s: %s (%s)" % (name, sid, grammar, path))
+                try:
+                    fm = parse_registered_agent_front_matter(
+                        fp.read_text(encoding="utf-8"), surfaces[sid]["provider_type"])
+                except InvalidDefinition as exc:
+                    self.fail("%s.%s: %s (%s)" % (name, sid, exc, path))
                     continue
                 try:
                     declared = front_matter_value(fm, "name")
