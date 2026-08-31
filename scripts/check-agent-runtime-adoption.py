@@ -185,6 +185,7 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
     not need the bit, which is why the three .py hooks are correctly 100644.
     """
     found: list[str] = []
+    unclassified: list[tuple[str, str]] = []
 
     def walk(node) -> None:
         if isinstance(node, dict):
@@ -192,8 +193,10 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
                 # A command this function cannot parse yields no target. It must NOT stop the
                 # traversal: one malformed entry would otherwise skip whatever sits below it,
                 # and the "derived from settings.json" guarantee is only as good as the walk.
-                target = _command_target(node["command"], root)
-                if target and target not in found:
+                kind, target, detail = classify_hook_command(node["command"], root)
+                if kind == HookCommandKind.UNCLASSIFIED:
+                    unclassified.append((node["command"], detail))
+                elif kind == HookCommandKind.DIRECT and target not in found:
                     found.append(target)
             for v in node.values():
                 walk(v)
@@ -202,38 +205,55 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
                 walk(v)
 
     walk(settings.get("hooks", {}))
-    return found
+    return found, unclassified
 
 
 # Shell launchers that exec the command they are handed and return its status. `help command`
 # and `env(1)` both confirm the target is attempted and its exit status propagates, so a hook
 # behind one of these is still a direct invocation and its executable bit still matters.
+# Launchers whose bare form review has already established as a direct invocation. Options
+# are deliberately NOT parsed generically: `env -S "cmd args"` hides the command inside a
+# quoted string and `exec -a NAME cmd` replaces argv0, so a loop that skips every `-*` token
+# mis-reads both. Only these no-argument flags are recognised; anything else is UNCLASSIFIED.
 _LAUNCHERS = ("command", "env", "exec", "nohup")
+_SAFE_LAUNCHER_FLAGS = {"-i", "--ignore-environment", "-p", "-v", "-0", "--null"}
+_LAUNCHER_FLAGS_WITH_ARG = {"-u", "--unset", "-C", "--chdir"}
 
-# Launcher options that consume the NEXT token, so it is an option argument rather than the
-# command. From `env --help` / `help command`; anything else starting with `-` is a flag.
-# Note the failure direction here is inverted from the registry checker: returning None drops
-# a hook from the derived set, which is FAIL-OPEN, so an unparsed option must not silently
-# discard the target.
-_LAUNCHER_OPTS_WITH_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"}
+# argv0 values that are deliberately not hooks. Kept explicit: an unrecognised bare word is
+# unclassified, not silently ignored.
+_INTENTIONAL_NON_HOOK = ("echo", "true", ":")
+_INTERPRETERS = ("python", "python3")
 
 
-def _command_target(command: str, root: Path | None = None) -> str | None:
-    """The repo-relative path a hook command execs directly, or None.
+class HookCommandKind:
+    DIRECT = "direct repo executable"
+    INTERPRETED = "interpreter-invoked repo script"
+    NON_HOOK = "intentional non-hook command"
+    UNCLASSIFIED = "unclassified"
 
-    Returns None for anything the kernel does not exec from this repository -- a bare
-    builtin, an interpreter-invoked script, or an executable outside the repo.
+
+def classify_hook_command(command: str, root: Path | None = None):
+    """Classify a settings.json hook command. Returns (kind, target_or_None, detail).
+
+    Replaces a `command -> target or None` helper whose None was self-concealing: an
+    unparsed form dropped the hook from the derived set, and because the expected check
+    count derives from that same list, the loss hid itself and the gate stayed green.
+
+    The honest answer for a form this cannot read is "I cannot prove whether this executes a
+    repository hook", which is a FAILURE -- not silence. Live settings.json uses three forms
+    only (direct repo executable, python3-invoked script, echo), so the recognised contract
+    is narrow on purpose.
     """
     cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
+    if not cmd:
+        return HookCommandKind.NON_HOOK, None, "empty command"
     try:
         tokens = shlex.split(cmd)
-    except ValueError:
-        return None
+    except ValueError as exc:
+        return HookCommandKind.UNCLASSIFIED, None, "unparseable (%s)" % exc
+    if not tokens:
+        return HookCommandKind.NON_HOOK, None, "empty command"
 
-    # Walk past leading assignments, launcher prefixes and their options. `MODE=health
-    # hook.sh`, `command hook.sh`, `env MODE=health hook.sh` and `env -i hook.sh` all exec the
-    # hook -- `env -i` on a non-executable file returns Permission denied exactly as a bare
-    # invocation would -- so every one of them must resolve to the target.
     seen_launcher = False
     while tokens:
         head = tokens[0]
@@ -245,42 +265,55 @@ def _command_target(command: str, root: Path | None = None) -> str | None:
             tokens = tokens[1:]
             continue
         if seen_launcher and head.startswith("-"):
-            # An option to the launcher, not the command.
-            if head in _LAUNCHER_OPTS_WITH_ARG:
+            if head in _SAFE_LAUNCHER_FLAGS:
+                tokens = tokens[1:]
+            elif head in _LAUNCHER_FLAGS_WITH_ARG:
                 tokens = tokens[2:]
-            elif "=" in head:            # --unset=FOO
+            elif "=" in head and head.split("=", 1)[0] in _LAUNCHER_FLAGS_WITH_ARG:
                 tokens = tokens[1:]
             else:
-                tokens = tokens[1:]
+                # -S rewrites the whole command line; -a rewrites argv0. Guessing here is how
+                # a target silently disappears.
+                return (HookCommandKind.UNCLASSIFIED, None,
+                        "launcher option %r is not in the recognised set" % head)
             continue
         break
-
     if not tokens:
-        return None
+        return HookCommandKind.UNCLASSIFIED, None, "launcher with no command"
 
     argv0 = tokens[0]
+    base = argv0.rsplit("/", 1)[-1]
+    if base in _INTERPRETERS:
+        return HookCommandKind.INTERPRETED, None, "runs %s" % base
+    if base in _INTENTIONAL_NON_HOOK and "/" not in argv0:
+        return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
+
     for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
         argv0 = argv0.replace(spelling + "/", "").replace(spelling, "")
 
     if argv0.startswith("/"):
-        # An absolute path is a repo target only if it is actually inside the repo.
-        # `lstrip("/")` turned /usr/bin/python3 into usr/bin/python3 and then reported
-        # <repo>/usr/bin/python3 missing, failing a correct configuration.
         if root is None:
-            return None
+            return HookCommandKind.UNCLASSIFIED, None, "absolute path, no root to resolve against"
         try:
             resolved = Path(argv0).resolve()
-            base = Path(root).resolve()
-            if not resolved.is_relative_to(base):
-                return None
-            argv0 = resolved.relative_to(base).as_posix()
-        except (ValueError, OSError):
-            return None
+            base_dir = Path(root).resolve()
+            if not resolved.is_relative_to(base_dir):
+                return (HookCommandKind.NON_HOOK, None,
+                        "absolute executable outside the repository")
+            argv0 = resolved.relative_to(base_dir).as_posix()
+        except (ValueError, OSError) as exc:
+            return HookCommandKind.UNCLASSIFIED, None, "unresolvable path (%s)" % exc
 
-    # A bare builtin or PATH command has no directory component; a repo hook always does.
-    if not argv0 or "/" not in argv0 or argv0.startswith(".."):
-        return None
-    return argv0
+    if "/" not in argv0 or argv0.startswith(".."):
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%r is neither a repository path nor a recognised non-hook command" % argv0)
+    return HookCommandKind.DIRECT, argv0, "direct repo executable"
+
+
+def _command_target(command: str, root: Path | None = None) -> str | None:
+    """Back-compat shim: the DIRECT target, or None."""
+    kind, target, _ = classify_hook_command(command, root)
+    return target if kind == HookCommandKind.DIRECT else None
 
 # Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
 # COVERAGE below), so the MCP surface is the only capability route they have.
@@ -385,7 +418,13 @@ def main() -> int:
         ok(f"{event} -> {HOOK} (matcher {invoking[0]!r})")
 
     # 2. the things the hooks call actually exist and can be executed
-    for rel in REQUIRED_EXECUTABLES + direct_hook_targets(settings, root):
+    hook_targets, unclassified_cmds = direct_hook_targets(settings, root)
+    for cmd, detail in unclassified_cmds:
+        failures.append(
+            f"settings.json hook command cannot be classified: {cmd!r} ({detail}). The gate "
+            "cannot prove whether this executes a repository hook, and silently ignoring it "
+            "would drop an executable check while shrinking the expected count to match")
+    for rel in REQUIRED_EXECUTABLES + hook_targets:
         path = root / rel
         if not path.is_file():
             failures.append(f"missing: {rel}")
@@ -583,7 +622,7 @@ def main() -> int:
     # this was latent rather than live; a floor makes it neither.
     # EXACT, not a floor. `checked < EXPECTED_CHECKS` let a spurious extra ok() report
     # "26 check(s) passed" and exit 0 — which is how a duplicated check masks a lost one.
-    expected = EXPECTED_STATIC_CHECKS + len(direct_hook_targets(settings, root))
+    expected = EXPECTED_STATIC_CHECKS + len(hook_targets)
     if checked != expected:
         failures.append(
             f"{checked} checks ran, expected exactly {expected} — a check that skipped "

@@ -347,7 +347,7 @@ spec = importlib.util.spec_from_file_location("gate", sys.argv[1])
 mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 root = pathlib.Path(sys.argv[2])
 settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
-print(int(m.group(1)) + len(mod.direct_hook_targets(settings, root)))
+print(int(m.group(1)) + len(mod.direct_hook_targets(settings, root)[0]))
 ' "$GATE" "$FIX")
 if [ -n "$BASE_COUNT" ] && [ "$DECLARED" = "$BASE_COUNT" ]; then
   ok "EXPECTED_STATIC_CHECKS + derived hook checks ($BASE_COUNT) matches a complete run"
@@ -492,8 +492,8 @@ spec = importlib.util.spec_from_file_location('g', sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 clean, dirty = pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
 load = lambda r: json.loads((r / '.claude/settings.json').read_text(encoding='utf-8'))
-before = set(m.direct_hook_targets(load(clean), clean))
-after = set(m.direct_hook_targets(load(dirty), dirty))
+before = set(m.direct_hook_targets(load(clean), clean)[0])
+after = set(m.direct_hook_targets(load(dirty), dirty)[0])
 sys.exit(0 if before and before == after else 1)
 " "$GATE" "$FIX" "$FIX_BAD"
 if [ $? -eq 0 ]; then
@@ -562,29 +562,36 @@ import importlib.util, pathlib, sys
 spec = importlib.util.spec_from_file_location("g", sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = pathlib.Path(".").resolve()
-want = ".claude/hooks/hook-health.sh"
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
 cases = {
-    'env -i "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'command -p "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'env -u FOO "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'env --unset=FOO "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'env -i MODE=1 "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'command "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'env MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'exec "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
-    'MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': None,
-    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': None,
-    'echo hi': None,
+    # Recognised: the three forms live settings.json actually uses, plus the simple
+    # launcher spellings earlier review established.
+    H: K.DIRECT,
+    'env %s' % H: K.DIRECT,
+    'env -i %s' % H: K.DIRECT,
+    'command -p %s' % H: K.DIRECT,
+    'env -u FOO %s' % H: K.DIRECT,
+    'MODE=health %s' % H: K.DIRECT,
+    'python3 %s' % PY: K.INTERPRETED,
+    '/usr/bin/python3 %s' % PY: K.INTERPRETED,
+    'echo "branch: x"': K.NON_HOOK,
+    # UNCLASSIFIED, deliberately: -S hides the command inside a quoted string and -a
+    # rewrites argv0, so guessing is how a target silently disappears. Failing loudly is
+    # the correct answer, not silence.
+    'env -S "%s --verbose"' % H: K.UNCLASSIFIED,
+    'exec -a health %s' % H: K.UNCLASSIFIED,
+    'env --split-string="%s"' % H: K.UNCLASSIFIED,
+    'curl https://example.invalid': K.UNCLASSIFIED,
 }
-bad = [c for c, exp in cases.items() if m._command_target(c, root) != exp]
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
 sys.exit(0 if not bad else 1)
 PYLAUNCH
 if [ $? -eq 0 ]; then
-  ok "launcher prefixes AND their options resolve to the hook; external absolute executables do not"
+  ok "every hook command form is classified; unreadable forms are UNCLASSIFIED, not silent"
 else
-  bad "a launcher-prefixed or absolute-interpreter command was mis-resolved" ""
+  bad "a hook command form was mis-classified" ""
 fi
 
 # End-to-end: a launcher prefix must not hide a hook from the executable check.
@@ -611,6 +618,33 @@ if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$T
   ok "a 'command'-prefixed hook does not escape the executable check"
 else
   bad "a launcher-prefixed hook escaped the executable check" "$(tail -3 "$TMP/cmdhook.log")"
+fi
+
+# An unclassifiable configured hook must FAIL the gate, not vanish from it. This is the
+# self-concealing shape: an unparsed form used to return None, the target left the derived
+# set, and the expected count shrank to match, so the gate stayed green.
+FIX_UNC="$TMP/unclassified"
+make_fixture "$FIX_UNC"
+python3 - "$FIX_UNC" <<'PYUNC'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = 'env -S "%s --verbose"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYUNC
+rc=$(run_gate "$FIX_UNC" "$TMP/unclassified.log")
+if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/unclassified.log"; then
+  ok "an unclassifiable hook command fails the gate and is named"
+else
+  bad "an unclassifiable hook command did not fail the gate" "$(tail -3 "$TMP/unclassified.log")"
 fi
 
 # Adding a hook must not trip the exact-count assertion.
