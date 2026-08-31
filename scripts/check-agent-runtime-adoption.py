@@ -209,6 +209,7 @@ def _has_unquoted_newline(command: str) -> bool:
 
 _PROJECT_DIR_TOKEN = re.compile(r"\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?![A-Za-z0-9_]))")
 _PROJECT_DIR_TOKEN_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/")
+_PROJECT_DIR_TOKEN_OPT_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/?")
 
 
 def _sub_project_dir(text: str, replacement: str = "") -> str:
@@ -223,14 +224,23 @@ def _sub_project_dir(text: str, replacement: str = "") -> str:
     now, because a reader corrected in one place and not the others is how this file has been
     wrong four times.
     """
+    # ONCE. Replacing EVERY occurrence collapsed
+    # `$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh` to the real hook,
+    # while bash expands both and attempts a doubled absolute path, exiting 127. A second
+    # occurrence now keeps its `$`, and the unresolved-expansion rule refuses the command --
+    # the right answer, reached by an existing rule rather than a new one.
     if replacement:
-        return _PROJECT_DIR_TOKEN.sub(lambda _: replacement, text)
+        return _PROJECT_DIR_TOKEN.sub(lambda _: replacement, text, count=1)
     # Removing the variable also removes the slash that FOLLOWED it, so `$VAR/x` becomes `x`
     # rather than `/x`. Only that slash: my first version stripped any leading `/`, which
     # turned the token `/dev/null` -- an absolute path outside the repo, and the live
     # `2>/dev/null` redirection -- into the repo-relative `dev/null`, and the gate went red on
     # its own settings.json. The live run caught it, which is the point of running it.
-    return _PROJECT_DIR_TOKEN.sub("", _PROJECT_DIR_TOKEN_SLASH.sub("", text))
+    # ONE pass, not two. Two subs each capped at count=1 still remove TWO occurrences, which
+    # is the defect this cap exists to close -- the second token has to survive so the
+    # unresolved-expansion rule can refuse it by name rather than by an incidental
+    # containment failure. The optional trailing slash goes with the token it follows.
+    return _PROJECT_DIR_TOKEN_OPT_SLASH.sub("", text, count=1)
 
 
 def _leading_assignment_words(command: str) -> int:
@@ -571,6 +581,19 @@ def classify_hook_command(command: str, root: Path | None = None):
     if "/" in argv0:
         if root is None:
             return HookCommandKind.UNCLASSIFIED, None, "path command, no root to resolve against"
+        if ".." in Path(argv0).parts:
+            # NO `..` IN A HOOK PATH. `Path.resolve()` is non-strict, so
+            # `$CLAUDE_PROJECT_DIR/missing/../.claude/hooks/hook-health.sh` collapses to the
+            # real hook and the executable check passes -- while bash cannot traverse a
+            # component that does not exist and exits 127. Resolving strictly would trade
+            # that for a crash on a legitimately missing file, and verifying every
+            # intermediate component is machinery. No live hook path contains `..`, so the
+            # supported language simply does not have it -- which also retires the earlier
+            # out-of-repository traversal case by construction rather than by containment.
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s contains a `..` component; a hook path must name its target "
+                    "directly, because a traversal through a component that does not exist "
+                    "resolves cleanly here and fails in the shell" % argv0)
         try:
             base_dir = Path(root).resolve()
             candidate = Path(argv0)

@@ -642,17 +642,19 @@ assert os.access("/usr/bin/env", os.X_OK), "fixture assumption: /usr/bin/env is 
 cases = {
     # Interior traversal has no LEADING `..`, so a lexical containment test saw a repository
     # path and the executable check then certified a program outside the tree.
-    esc: (K.UNCLASSIFIED, None),
+    esc: (K.UNCLASSIFIED, None),   # now refused for its `..`, before containment is reached
     '"$CLAUDE_PROJECT_DIR"/.claude/../../../usr/bin/env %s' % H: (K.UNCLASSIFIED, None),
     # A repository file that IS argv0 needs the executable bit whatever it is NAMED. The
     # basename exemptions used to fire first and drop it.
     '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python3': (K.DIRECT, ".claude/hooks/python3"),
     '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python': (K.DIRECT, ".claude/hooks/python"),
     '"$CLAUDE_PROJECT_DIR"/.claude/hooks/echo': (K.DIRECT, ".claude/hooks/echo"),
-    # Traversal that stays inside is legal, and the target is reported RESOLVED: the caller
-    # joins it to the root, so handing back the raw spelling hands back the traversal too.
-    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh':
-        (K.DIRECT, ".claude/hooks/hook-health.sh"),
+    # NARROWED: an inside-staying traversal used to be DIRECT with a resolved target. It is
+    # refused now, because the distinction that made it safe -- every intermediate component
+    # existing -- is exactly the check that `Path.resolve()` does NOT perform, and verifying
+    # each component is the machinery this file keeps declining to build. `..` is out of the
+    # language; no live hook path has one.
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh': (K.UNCLASSIFIED, None),
     # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
     # interpreter and non-hook vocabularies apply to it, and ONLY to it.
     'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
@@ -731,6 +733,17 @@ cases = {
     # and what remains is a value this gate cannot know, so it refuses rather than joining it
     # to the root as a literal segment where a `..` would cancel it out.
     '$CLAUDE_PROJECT_DIRoops/../.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # A `..` COMPONENT IS OUT OF THE LANGUAGE. `Path.resolve()` is non-strict, so a traversal
+    # through a component that does NOT exist collapses to the real hook here and exits 127
+    # in the shell. No live hook path contains `..`, so it is refused outright -- which also
+    # retires the earlier out-of-repository traversal case by construction.
+    '"$CLAUDE_PROJECT_DIR"/missing/../.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh': K.UNCLASSIFIED,
+    # THE PROJECT-DIR TOKEN IS ACCEPTED ONCE. Replacing every occurrence collapsed a doubled
+    # variable to the real hook, while bash expands both and attempts a doubled absolute
+    # path. The second occurrence keeps its `$` and the unresolved-expansion rule names it.
+    '"$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.UNCLASSIFIED,
+    '"${CLAUDE_PROJECT_DIR}/${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh"': K.UNCLASSIFIED,
     '${CLAUDE_PROJECT_DIRoops}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     '$HOME/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.DIRECT,
@@ -1146,7 +1159,10 @@ walk(d.get("hooks", {}))
 p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 PYESC
 rc=$(run_gate "$FIX_ESC" "$TMP/escapehook.log")
-if [ "$rc" -ne 0 ] && grep -q "outside the repository" "$TMP/escapehook.log"; then
+# The message changed when `..` left the language: a traversal is now refused for CONTAINING
+# `..` rather than for where it lands. Either is a correct refusal of this fixture, and the
+# `..` rule is the stronger one -- it does not depend on the traversal happening to escape.
+if [ "$rc" -ne 0 ] && grep -qE "outside the repository|\`\.\.\` component" "$TMP/escapehook.log"; then
   ok "a hook path traversing out of the repository fails the gate instead of certifying /usr/bin/env"
 else
   bad "an escaping hook path was accepted as a repository executable" "$(tail -3 "$TMP/escapehook.log")"
