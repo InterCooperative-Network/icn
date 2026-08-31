@@ -192,7 +192,7 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
                 # A command this function cannot parse yields no target. It must NOT stop the
                 # traversal: one malformed entry would otherwise skip whatever sits below it,
                 # and the "derived from settings.json" guarantee is only as good as the walk.
-                target = _command_target(node["command"])
+                target = _command_target(node["command"], root)
                 if target and target not in found:
                     found.append(target)
             for v in node.values():
@@ -205,34 +205,59 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
     return found
 
 
-def _command_target(command: str) -> str | None:
+# Shell launchers that exec the command they are handed and return its status. `help command`
+# and `env(1)` both confirm the target is attempted and its exit status propagates, so a hook
+# behind one of these is still a direct invocation and its executable bit still matters.
+_LAUNCHERS = ("command", "env", "exec", "nohup")
+
+
+def _command_target(command: str, root: Path | None = None) -> str | None:
     """The repo-relative path a hook command execs directly, or None.
 
-    Two shapes this missed, both of which `_invokes_hook` in this same file already handles --
-    an inconsistency between siblings is how one of them ends up wrong:
-
-      - `MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh`. A leading environment
-        assignment is a legal direct invocation, and tokens[0] is the assignment, so the hook
-        was dropped from the derived set entirely -- taking its executable check and its slot
-        in the expected count with it.
-      - `"${CLAUDE_PROJECT_DIR}"/...`. The braced spelling is equally valid; unnormalised it
-        produced a literal `${CLAUDE_PROJECT_DIR}` path that exists nowhere, so a configured
-        and working hook was reported `missing`.
+    Returns None for anything the kernel does not exec from this repository -- a bare
+    builtin, an interpreter-invoked script, or an executable outside the repo.
     """
     cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
     try:
         tokens = shlex.split(cmd)
     except ValueError:
         return None
-    # Walk past leading VAR=value assignments; they precede the executable, they are not it.
-    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
-        tokens = tokens[1:]
+
+    # Walk past leading assignments and launcher prefixes. `MODE=health hook.sh`,
+    # `command hook.sh` and `env MODE=health hook.sh` all exec the hook; taking tokens[0]
+    # literally dropped every one of them out of the derived set, and because the expected
+    # count is derived from the same list, the loss concealed itself.
+    while tokens:
+        head = tokens[0]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", head):
+            tokens = tokens[1:]
+            continue
+        if head.rsplit("/", 1)[-1] in _LAUNCHERS:
+            tokens = tokens[1:]
+            continue
+        break
     if not tokens:
         return None
+
     argv0 = tokens[0]
     for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
         argv0 = argv0.replace(spelling + "/", "").replace(spelling, "")
-    argv0 = argv0.lstrip("/")
+
+    if argv0.startswith("/"):
+        # An absolute path is a repo target only if it is actually inside the repo.
+        # `lstrip("/")` turned /usr/bin/python3 into usr/bin/python3 and then reported
+        # <repo>/usr/bin/python3 missing, failing a correct configuration.
+        if root is None:
+            return None
+        try:
+            resolved = Path(argv0).resolve()
+            base = Path(root).resolve()
+            if not resolved.is_relative_to(base):
+                return None
+            argv0 = resolved.relative_to(base).as_posix()
+        except (ValueError, OSError):
+            return None
+
     # A bare builtin or PATH command has no directory component; a repo hook always does.
     if not argv0 or "/" not in argv0 or argv0.startswith(".."):
         return None
