@@ -727,6 +727,13 @@ cases = {
     # entry fell back to NON_HOOK while bash still runs the hook.
     'echo "$(echo \')\'; %s)"' % H: K.UNCLASSIFIED,
     'echo "$(echo \'(\'; %s)"' % H: K.UNCLASSIFIED,
+    # The BACKTICK scanner had the same defect one round later: it closed on the first
+    # backtick `find` reached, so an escaped or quoted one truncated the body and the hook
+    # inside it was never seen. Its delimiter is located with shell-aware state now.
+    'echo "`printf \'\\`\'; %s`"' % H: K.UNCLASSIFIED,
+    'echo "`printf \'x`y\'; %s`"' % H: K.UNCLASSIFIED,
+    'echo "`%s`"' % H: K.UNCLASSIFIED,
+    'echo "`date`"': K.NON_HOOK,
     # OPERATOR TEXT INSIDE A COMMENT IS NOT COMPOSITION. Scanning the raw command made the
     # gate red on a hook carrying an explanatory comment -- bash never sees those characters.
     '%s # use && fallback' % H: K.DIRECT,
@@ -955,6 +962,32 @@ if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/parenhook.log"; 
   ok "a quoted parenthesis does not close the substitution early"
 else
   bad "a hook hid behind a quoted parenthesis in a substitution" "$(tail -3 "$TMP/parenhook.log")"
+fi
+
+# End-to-end: an escaped backtick must not close the substitution early either.
+FIX_TICK="$TMP/tickhook"
+make_fixture "$FIX_TICK"
+python3 - "$FIX_TICK" <<'PYTICK'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "`printf \'\\`\'; %s`"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYTICK
+chmod -x "$FIX_TICK/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_TICK" "$TMP/tickhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/tickhook.log"; then
+  ok "an escaped backtick does not close the substitution early"
+else
+  bad "a hook hid behind an escaped backtick" "$(tail -3 "$TMP/tickhook.log")"
 fi
 
 # End-to-end, both halves. A dropped target hides in the derived list AND in the expected

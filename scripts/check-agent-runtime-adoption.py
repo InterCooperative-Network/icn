@@ -192,11 +192,20 @@ def _repo_path_in_substitution(command: str, root):
             i = i + 2 + j
             continue
         if st in (_PLAIN, _DOUBLE) and command[i] == "`":
-            j = command.find("`", i + 1)
-            if j < 0:
+            # The closing backtick is found with SHELL-AWARE STATE, not `find`. A backtick
+            # that is escaped or quoted inside the body -- `` `printf '\`'; <hook>` `` -- is
+            # not the delimiter, and closing there truncated the body so the hook inside it
+            # was never seen. The `$(` boundary was fixed the same way one round earlier and
+            # this scanner was left on `find`, which is the same defect twice in one function.
+            body = command[i + 1:]
+            body_states = _shell_states(body)
+            j = next((k for k, c in enumerate(body)
+                      if c == "`" and body_states[k] == _PLAIN), None)
+            if j is None:
+                bodies.append(body)         # unterminated: refuse rather than guess
                 break
-            bodies.append(command[i + 1:j])
-            i = j + 1
+            bodies.append(body[:j])
+            i = i + 1 + j + 1
             continue
         i += 1
 
