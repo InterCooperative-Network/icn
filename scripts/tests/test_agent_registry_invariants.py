@@ -848,6 +848,34 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- a canonical truth file that is not a file --------------------------------
+print()
+print("--- an unreadable truth owner is a finding, not a traceback ---")
+
+# Third instance of this class in this PR, after a definition directory and a non-UTF-8
+# definition: `read_text()` on a path replaced by a DIRECTORY raises IsADirectoryError, an
+# OSError, which the ValueError handler did not catch -- so the run ended before report().
+# Both truth owners are covered here rather than only the one that was reported.
+def unreadable_truth_owner_case():
+    for victim in ("agents.json", "skills.json"):
+        tmp = tempfile.mkdtemp()
+        try:
+            root = build(tmp, base_registry(), base_skills(), dict(BASE_FILES))
+            target = root / "ops/state/truth" / victim
+            target.unlink()
+            target.mkdir()
+            p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                               capture_output=True, text=True)
+            out = p.stdout + p.stderr
+            check("REAL P2: %s replaced by a directory is reported, not raised" % victim,
+                  p.returncode != 0 and "Traceback" not in out
+                  and ("unparseable" in out.lower() or "UNPARSEABLE" in out))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+unreadable_truth_owner_case()
+
 # --- the logical name is provider-specific ------------------------------------
 print()
 print("--- a compound provider suffix is not part of the agent name ---")

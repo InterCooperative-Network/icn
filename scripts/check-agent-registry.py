@@ -917,7 +917,11 @@ class Checker:
             return 1
         try:
             reg = json.loads(reg_path.read_text(encoding="utf-8"))
-        except ValueError as exc:
+        # OSError too, not only ValueError. A canonical truth file replaced by a DIRECTORY
+        # raises IsADirectoryError, which is an OSError, and the run terminated before
+        # report() -- the third instance of this class in this PR, after a definition
+        # directory and a non-UTF-8 definition. A checker that crashes reports nothing.
+        except (ValueError, OSError) as exc:
             print("UNPARSEABLE: %s (%s)" % (REGISTRY, exc))
             return 1
 
@@ -1310,7 +1314,7 @@ class Checker:
             return
         try:
             sj = json.loads(sk.read_text(encoding="utf-8"))
-        except ValueError as exc:
+        except (ValueError, OSError) as exc:
             self.fail("skills.json is unparseable (%s). It is a registered truth owner and "
                       "holds the structured cross-registry contract, so skipping the boundary "
                       "check on a parse error would be fail-open exactly where this checker is "
