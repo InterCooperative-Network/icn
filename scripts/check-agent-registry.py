@@ -373,9 +373,27 @@ def parse_registered_agent_front_matter(text, provider_type):
             # A stack rather than a single frame, because the same mistake one level deeper is
             # the same mistake.
             if not in_block:
-                kind = "sequence" if line.lstrip()[:1] == "-" else "mapping"
                 while frames and frames[-1][0] > indent:
                     frames.pop()
+
+                # Below a NESTED block scalar every line is content, exactly as at root
+                # level. `in_block` only ever tracked the ROOT key, so `tools:` / `  key: |`
+                # / `    body` was read as structure and refused -- a false rejection of
+                # ordinary YAML.
+                if frames and frames[-1][0] < indent and frames[-1][3]:
+                    continue
+
+                stripped = line.lstrip()
+                kind = "sequence" if stripped[:1] == "-" else "mapping"
+                # Can THIS entry own a child node? A mapping key whose value is already a
+                # scalar cannot: `tools:` / `  key: value` / `    child: bad` is "mapping
+                # values are not allowed here" to a YAML parser, and opening a deeper frame
+                # for it certified a definition the provider cannot load. A sequence item can
+                # -- `- name: a` followed by a deeper `extra: b` is one mapping in one item.
+                value = strip_inline_comment(stripped.partition(":")[2]) if ":" in stripped else "x"
+                opens_block = bool(_BLOCK_SCALAR.match(value))
+                entry_opens = kind == "sequence" or opens_block or not value
+
                 if frames and frames[-1][0] == indent:
                     if frames[-1][1] != kind:
                         raise InvalidDefinition(
@@ -383,8 +401,15 @@ def parse_registered_agent_front_matter(text, provider_type):
                             "opened this level. A YAML parser raises rather than switching "
                             "collection kind in place."
                             % (i, line[:60], kind, frames[-1][1]))
+                    frames[-1] = (indent, kind, entry_opens, opens_block)
                 else:
-                    frames.append((indent, kind))
+                    if frames and not frames[-1][2]:
+                        raise InvalidDefinition(
+                            "line %d, %r: indented below an entry whose value is already a "
+                            "scalar, which cannot own a child node. A YAML parser raises "
+                            "rather than nesting under it -- give that entry an empty value "
+                            "or a block scalar." % (i, line[:60]))
+                    frames.append((indent, kind, entry_opens, opens_block))
             continue
         if line.lstrip().startswith("#"):
             continue
@@ -688,8 +713,12 @@ class Checker:
         d = self.root / tree
         if not d.is_dir():
             return None
+        # is_file(), not just the glob. A DIRECTORY named `solo.md` matches `*.md`, so the
+        # inventory listed it as a definition and the read below raised IsADirectoryError --
+        # a traceback out of the canonical gate instead of a finding. A checker that crashes
+        # reports nothing, and nothing reads as clean.
         return {"%s/%s" % (tree, p.name): p
-                for p in sorted(d.glob("*.md")) if p.name != "README.md"}
+                for p in sorted(d.glob("*.md")) if p.name != "README.md" and p.is_file()}
 
     def bodies(self, rec):
         """Raw post-front-matter bodies. NOT stripped.
@@ -1030,6 +1059,13 @@ class Checker:
                 fp = self.root / path
                 if not fp.exists():
                     self.fail("%s.%s -> %s (missing)" % (name, sid, path))
+                    continue
+                if not fp.is_file():
+                    # `exists()` is true for a DIRECTORY named `solo.md`, and the read below
+                    # then raised IsADirectoryError -- a traceback rather than a finding.
+                    self.fail("%s.%s: %s is not a regular file. A provider reads a definition "
+                              "as a file, so a directory wearing the name is a topology error, "
+                              "not a definition." % (name, sid, path))
                     continue
                 # RESOLVED, not merely lexical. The parent, suffix, stem, existence and
                 # front-matter checks all FOLLOW a symlink, so a direct child of a valid

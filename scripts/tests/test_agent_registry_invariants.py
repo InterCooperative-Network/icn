@@ -845,6 +845,81 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 24: what may own a child, and what is not a file --------------------
+print()
+print("--- a nested entry may own a child only if its value can hold one ---")
+
+# Round 23 checked that siblings agree on kind and opened a deeper frame for anything.
+# `tools:` / `  key: value` / `    child: bad` is "mapping values are not allowed here" to a
+# YAML parser, and was certified.
+try:
+    import yaml as _y24
+except ImportError:
+    _y24 = None
+
+_B24 = "name: twin\ndescription: fixture\n"
+for fm, label, should_pass in (
+        (_B24 + "tools:\n  key: value\n    child: bad",
+         "a mapping nested under an entry whose value is a scalar", False),
+        (_B24 + "tools:\n  key:\n    child: ok",
+         "a mapping nested under an empty-valued entry", True),
+        (_B24 + "tools:\n  - name: a\n    extra: b",
+         "a second key inside a sequence item", True),
+        (_B24 + "a:\n  b:\n    c: 1", "three levels of empty-valued keys", True),
+        # `in_block` only ever tracked the ROOT key, so a NESTED block scalar's body was read
+        # as structure. Refusing it would have been a false rejection of ordinary YAML, and
+        # the naive version of this fix did exactly that.
+        (_B24 + "tools:\n  key: |\n    body", "a nested block scalar body", True),
+        (_B24 + "tools:\n  key: |\n    - not a list",
+         "a nested block body that looks like a sequence", True),
+        (_B24 + "tools:\n  key: |\n    body\n  other: x",
+         "a nested block followed by a sibling key", True),
+        (_B24 + "tools:\n  key: | # why\n    body",
+         "a nested block whose indicator carries a comment", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\ninfer: false\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if should_pass and _y24 is not None:
+        try:
+            _y24.safe_load(fm + "\ninfer: false")
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and a real YAML parser loads it", loadable)
+
+
+print()
+print("--- a definition is a FILE, and a checker that crashes reports nothing ---")
+
+# A DIRECTORY named `solo.md` matches `*.md`, so the inventory listed it as a definition and
+# the read raised IsADirectoryError -- a traceback out of the canonical gate, which is the
+# one outcome worse than a wrong answer.
+def md_directory_case():
+    tmp = tempfile.mkdtemp()
+    try:
+        root = build(tmp, base_registry(), base_skills(), dict(BASE_FILES))
+        target = root / ".claude/agents/solo.md"
+        target.unlink()
+        target.mkdir()
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a directory named solo.md is a finding, not a traceback",
+              p.returncode != 0 and "not a regular file" in out and "Traceback" not in out)
+
+        # ...and it must not be inventoried as a definition either, or the reverse scan would
+        # report an unregistered agent that does not exist.
+        check("   ...and it is not counted as an unregistered definition",
+              "unregistered" not in out.lower())
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+md_directory_case()
+
 # --- round 23: equal indentation is not equal structure ------------------------
 print()
 print("--- a nested collection may not change kind at its own level ---")
