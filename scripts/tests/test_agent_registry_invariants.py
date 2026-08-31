@@ -848,6 +848,47 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- the allowlist one level up, and a file that is not text -------------------
+print()
+print("--- a surface declaration says WHERE definitions live, never what they say ---")
+
+# The record-level allowlist left `provider_surfaces` open, so a provider-native field could
+# sit on the surface DECLARATION instead -- the same unpinned copy PROVIDER_OWNED_KEYS
+# forbids, one level up from where the rule was written.
+for key, value, label in (
+        ("infer", False, "a provider-owned infer on a surface declaration"),
+        ("description", "copied", "a provider-owned description on a surface declaration"),
+        ("tools", ["Read"], "provider-owned tools on a surface declaration"),
+        ("treee", ".github/agents", "a misspelled tree")):
+    def mutate(r, k=key, v=value):
+        r["provider_surfaces"]["copilot"][k] = v
+    case(label, mutate_reg=mutate, expect="provider_surfaces.copilot")
+
+
+print()
+print("--- a file that is not text is a finding, not a traceback ---")
+
+# `read_text()` raised UnicodeDecodeError outside the InvalidDefinition handler, so a
+# malformed provider input stopped the gate from reporting anything -- including findings it
+# had already collected. Same shape as the directory-named-`twin.md` case.
+def non_utf8_case():
+    tmp = tempfile.mkdtemp()
+    try:
+        root = build(tmp, base_registry(), base_skills(), dict(BASE_FILES))
+        target = root / ".claude/agents/solo.md"
+        target.write_bytes(b"---\nname: solo\ndescription: fixture\n---\n\n\xff\xfe not text\n")
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a non-UTF-8 definition is reported, not raised",
+              p.returncode != 0 and "Traceback" not in out
+              and "cannot be read as UTF-8" in out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+non_utf8_case()
+
 # --- a comment on a provider boolean is not part of the value -----------------
 print()
 print("--- an explanatory comment must not break a valid definition ---")

@@ -63,6 +63,9 @@ PROVIDER_OWNED_KEYS = ("description", "color", "model", "tools", "target",
                        "mcp-servers", "metadata", "infer",
                        "disable-model-invocation", "user-invocable")
 
+# The complete surface-declaration vocabulary, checked as an ALLOWLIST in validate_structure.
+SURFACE_KEYS = ("tree", "provider_type", "loaded_by")
+
 # The complete record vocabulary, checked as an ALLOWLIST -- see the record loop.
 RECORD_KEYS = ("name", "relationship", "surfaces", "routing_triggers", "not_for",
                "divergence", "mirror_pairs")
@@ -617,6 +620,21 @@ def validate_structure(reg):
             req(as_str(sdef.get("provider_type"))[0],
                 "provider_surfaces.%s.provider_type: must be a non-empty string -- semantics "
                 "dispatch on it, so it cannot be absent or of another type" % sid)
+            # A SURFACE DECLARATION IS AN ALLOWLIST TOO. The record-level one left this open,
+            # so `provider_surfaces.copilot.infer: false` was accepted -- the registry holding
+            # exactly the unpinned copy of provider-native behaviour that PROVIDER_OWNED_KEYS
+            # exists to forbid, one level up from where the rule was written.
+            for k in sorted(set(sdef) - set(SURFACE_KEYS)):
+                if k in PROVIDER_OWNED_KEYS:
+                    req(False,
+                        "provider_surfaces.%s: %r is provider-native syntax owned by the "
+                        "provider definition, not the registry. A surface declaration says "
+                        "WHERE definitions live, never what they say." % (sid, k))
+                else:
+                    req(False,
+                        "provider_surfaces.%s: %r is not a surface key (%s). An unrecognised "
+                        "key is most often a misspelled one, which drops its meaning "
+                        "silently." % (sid, k, ", ".join(SURFACE_KEYS)))
 
     req(as_obj(reg.get("relationship_model"))[0], "relationship_model: must be an object")
     if "declared_scope" in reg:
@@ -753,7 +771,11 @@ class Checker:
             # reader of the same path has to be as careful as the first, or the first one's
             # correct finding never reaches anyone.
             if fp.is_file():
-                _, body = split_front_matter(fp.read_text(encoding="utf-8"))
+                try:
+                    raw = fp.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue           # the per-surface loop reports it; do not crash here
+                _, body = split_front_matter(raw)
                 out[sid] = body
         return out
 
@@ -1114,8 +1136,20 @@ class Checker:
                     continue
 
                 try:
+                    text = fp.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError) as exc:
+                    # A DECODE FAILURE IS A FINDING, NOT A TRACEBACK. Invalid UTF-8 in a
+                    # registered .md raised outside the InvalidDefinition handler and
+                    # terminated the run, so a malformed provider input could stop the gate
+                    # from reporting anything -- including the findings it had already
+                    # collected. Same shape as the directory-named-`twin.md` case.
+                    self.fail("%s.%s: %s cannot be read as UTF-8 text (%s). A provider loads "
+                              "a definition as text, so a file that is not text is a "
+                              "malformed definition." % (name, sid, path, exc))
+                    continue
+                try:
                     fm = parse_registered_agent_front_matter(
-                        fp.read_text(encoding="utf-8"), surfaces[sid]["provider_type"])
+                        text, surfaces[sid]["provider_type"])
                 except InvalidDefinition as exc:
                     self.fail("%s.%s: %s (%s)" % (name, sid, exc, path))
                     continue
