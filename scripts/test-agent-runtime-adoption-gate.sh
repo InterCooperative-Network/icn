@@ -590,8 +590,9 @@ cases = {
     'env %s' % H: K.UNCLASSIFIED,
     'env -i %s' % H: K.UNCLASSIFIED,
     # An external absolute program is NOT harmless: `/usr/bin/env <hook>` runs the hook and
-    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. A supported
-    # interpreter is matched earlier by identity, which is why /usr/bin/python3 still works.
+    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. The interpreter
+    # names are consulted only AFTER the path is found to land outside the tree, which is why
+    # /usr/bin/python3 still classifies and a repo file named python3 no longer escapes.
     '/usr/bin/env %s' % H: K.UNCLASSIFIED,
     '/usr/bin/nohup %s' % H: K.UNCLASSIFIED,
     '/bin/sh -c "anything"': K.UNCLASSIFIED,
@@ -607,6 +608,109 @@ if [ $? -eq 0 ]; then
   ok "the supported command language is the three live shapes; everything else is UNCLASSIFIED"
 else
   bad "a hook command form was mis-classified" ""
+fi
+
+
+# CONTAINMENT, decided physically and BEFORE any name-based exemption. Two opposite fail-open
+# holes, both of which left the target out of the derived set -- and the expected check count
+# reads that same list, so each loss concealed itself.
+python3 - "$GATE" <<'PYCONTAIN'
+import importlib.util, os, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+# Enough `..` to leave THIS root from inside .claude/, so the escape lands on a real,
+# executable /usr/bin/env rather than on nothing -- otherwise the old code would have been
+# caught by `missing:` and the hole would look self-limiting.
+up = "../" * len(root.parts[1:])
+esc = '"$CLAUDE_PROJECT_DIR"/.claude/../%susr/bin/env %s' % (up, H)
+assert (root / (".claude/../%susr/bin/env" % up)).resolve() == pathlib.Path("/usr/bin/env")
+assert os.access("/usr/bin/env", os.X_OK), "fixture assumption: /usr/bin/env is executable"
+cases = {
+    # Interior traversal has no LEADING `..`, so a lexical containment test saw a repository
+    # path and the executable check then certified a program outside the tree.
+    esc: (K.UNCLASSIFIED, None),
+    '"$CLAUDE_PROJECT_DIR"/.claude/../../../usr/bin/env %s' % H: (K.UNCLASSIFIED, None),
+    # A repository file that IS argv0 needs the executable bit whatever it is NAMED. The
+    # basename exemptions used to fire first and drop it.
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python3': (K.DIRECT, ".claude/hooks/python3"),
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python': (K.DIRECT, ".claude/hooks/python"),
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/echo': (K.DIRECT, ".claude/hooks/echo"),
+    # Traversal that stays inside is legal, and the target is reported RESOLVED: the caller
+    # joins it to the root, so handing back the raw spelling hands back the traversal too.
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh':
+        (K.DIRECT, ".claude/hooks/hook-health.sh"),
+    # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
+    # interpreter and non-hook vocabularies still apply to it, and only to it.
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    'echo hi': (K.NON_HOOK, None),
+    H: (K.DIRECT, ".claude/hooks/hook-health.sh"),
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[:2] != exp]
+sys.exit(0 if not bad else 1)
+PYCONTAIN
+if [ $? -eq 0 ]; then
+  ok "containment is physical and precedes the name exemptions"
+else
+  bad "a path command escaped the repository or was exempted by its name" ""
+fi
+
+# End-to-end, both halves. A dropped target hides in the derived list AND in the expected
+# count, so only a full run proves the gate goes red.
+FIX_ESC="$TMP/escapehook"
+make_fixture "$FIX_ESC"
+python3 - "$FIX_ESC" <<'PYESC'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+up = "../" * len(root.parts[1:])
+esc = '"$CLAUDE_PROJECT_DIR"/.claude/../%susr/bin/env ' % up
+p = root / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = esc + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYESC
+rc=$(run_gate "$FIX_ESC" "$TMP/escapehook.log")
+if [ "$rc" -ne 0 ] && grep -q "outside the repository" "$TMP/escapehook.log"; then
+  ok "a hook path traversing out of the repository fails the gate instead of certifying /usr/bin/env"
+else
+  bad "an escaping hook path was accepted as a repository executable" "$(tail -3 "$TMP/escapehook.log")"
+fi
+
+FIX_PYNAME="$TMP/pynamehook"
+make_fixture "$FIX_PYNAME"
+mv "$FIX_PYNAME/.claude/hooks/hook-health.sh" "$FIX_PYNAME/.claude/hooks/python3"
+python3 - "$FIX_PYNAME" <<'PYNAME'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = c.replace("hook-health.sh", "python3")
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYNAME
+chmod -x "$FIX_PYNAME/.claude/hooks/python3"
+rc=$(run_gate "$FIX_PYNAME" "$TMP/pynamehook.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/python3" "$TMP/pynamehook.log"; then
+  ok "a repository hook named python3 is still checked for its executable bit"
+else
+  bad "a repository hook was exempted because of its basename" "$(tail -3 "$TMP/pynamehook.log")"
 fi
 
 

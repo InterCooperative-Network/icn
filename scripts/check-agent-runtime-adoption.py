@@ -326,42 +326,64 @@ def classify_hook_command(command: str, root: Path | None = None):
         return HookCommandKind.UNCLASSIFIED, None, "assignments with no command"
 
     argv0 = tokens[0]
-    base = argv0.rsplit("/", 1)[-1]
-    if base in _INTERPRETERS:
-        return HookCommandKind.INTERPRETED, None, "runs %s" % base
-    if base in _INTENTIONAL_NON_HOOK and "/" not in argv0:
-        return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
-
     for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
         argv0 = argv0.replace(spelling + "/", "").replace(spelling, "")
+    base = argv0.rsplit("/", 1)[-1]
 
-    if argv0.startswith("/"):
+    # CONTAINMENT IS DECIDED PHYSICALLY, AND BEFORE ANY NAME-BASED EXEMPTION.
+    #
+    # Two opposite failures came from getting that order and that test wrong, and both were
+    # fail-open -- the target left the derived set, and the expected check count derives from
+    # that same list, so each loss concealed itself:
+    #
+    #   * The interpreter exemption was applied to the BASENAME first, so a repository hook
+    #     NAMED `python3` (`$CLAUDE_PROJECT_DIR/.claude/hooks/python3`) was read as "runs the
+    #     interpreter" although it is argv0 itself. Mode 0644 on it left the gate green while
+    #     Claude got exit 126.
+    #   * Containment was tested LEXICALLY (`startswith("..")`), which sees only the FIRST
+    #     component. `.claude/../../../usr/bin/env <hook>` has no leading `..`, so it passed
+    #     as a repository path, and joining it to the root then escaped the tree entirely --
+    #     the executable check certified /usr/bin/env while the hook `env` actually runs, and
+    #     its executable bit, went unexamined.
+    #
+    # So: anything spelled as a PATH is resolved against the root and classified by where it
+    # physically lands. A BARE name keeps shell semantics -- it is looked up on PATH, never
+    # against the repository -- so `python3` is the interpreter even if a file of that name
+    # sits at the root, and `echo` is the builtin.
+    if "/" in argv0:
         if root is None:
-            return HookCommandKind.UNCLASSIFIED, None, "absolute path, no root to resolve against"
+            return HookCommandKind.UNCLASSIFIED, None, "path command, no root to resolve against"
         try:
-            resolved = Path(argv0).resolve()
             base_dir = Path(root).resolve()
-            if not resolved.is_relative_to(base_dir):
-                # NOT harmless. `/usr/bin/env <hook>` runs the hook and returns 126 when it
-                # is not executable; `/bin/sh -c …` can run anything. Treating every external
-                # absolute program as a non-hook let the target vanish from the derived set
-                # -- and the expected count derives from that same list, so the loss hid
-                # itself. An arbitrary external executable may wrap, source or otherwise
-                # invoke a repository hook, so it is unclassified until the repository
-                # actually needs one and specifies it. A supported interpreter is matched
-                # earlier by identity, which is why /usr/bin/python3 still classifies.
-                return (HookCommandKind.UNCLASSIFIED, None,
-                        "external absolute executable %s: not a supported command form, and "
-                        "not provably harmless -- it may invoke a repository hook"
-                        % resolved)
-            argv0 = resolved.relative_to(base_dir).as_posix()
+            candidate = Path(argv0)
+            resolved = (candidate if candidate.is_absolute() else base_dir / candidate).resolve()
         except (ValueError, OSError) as exc:
             return HookCommandKind.UNCLASSIFIED, None, "unresolvable path (%s)" % exc
-
-    if "/" not in argv0 or argv0.startswith(".."):
+        if resolved.is_relative_to(base_dir):
+            # Reported in RESOLVED form. The caller joins this to the root, so handing back
+            # the raw spelling would hand back the traversal with it.
+            return (HookCommandKind.DIRECT, resolved.relative_to(base_dir).as_posix(),
+                    "direct repo executable")
+        if base in _INTERPRETERS:
+            # Only OUTSIDE the tree does the name decide: an interpreter we did not ship is
+            # the one thing we cannot check an executable bit on, and `/usr/bin/python3` is
+            # live configuration.
+            return HookCommandKind.INTERPRETED, None, "runs %s" % base
+        # NOT harmless. `/usr/bin/env <hook>` runs the hook and returns 126 when it is not
+        # executable; `/bin/sh -c …` can run anything. An arbitrary external executable may
+        # wrap, source or otherwise invoke a repository hook, so it stays unclassified until
+        # the repository actually needs one and specifies it.
         return (HookCommandKind.UNCLASSIFIED, None,
-                "%r is neither a repository path nor a recognised non-hook command" % argv0)
-    return HookCommandKind.DIRECT, argv0, "direct repo executable"
+                "%s resolves to %s, outside the repository: not a supported command form, "
+                "and not provably harmless -- it may invoke a repository hook"
+                % (argv0, resolved))
+
+    if base in _INTERPRETERS:
+        return HookCommandKind.INTERPRETED, None, "runs %s" % base
+    if base in _INTENTIONAL_NON_HOOK:
+        return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
+    return (HookCommandKind.UNCLASSIFIED, None,
+            "%r is neither a repository path nor a recognised non-hook command" % argv0)
 
 
 def main() -> int:
