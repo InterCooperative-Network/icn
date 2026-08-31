@@ -160,6 +160,36 @@ _NON_STRING_WORDS = frozenset(
 _BLOCK_SCALAR = re.compile(r"^[|>][+-]?$")
 
 
+def quoted_scalar_problem(value):
+    """Why a quoted inline value is malformed, or None. Unquoted values return None.
+
+    WELL-FORMEDNESS ONLY, and that boundary is the point. `decode_inline_scalar` also refuses
+    non-string plain scalars, which is right for a required STRING field and wrong for every
+    other key -- `infer: false` is a legitimate boolean. So the check that applies to all
+    values is the narrower one: the quote closes, and nothing follows it.
+
+    Optional fields were not checked at all, so `tools: "Read` was certified while a YAML
+    loader raises ScannerError. Reproduction also found `tools: "a" trailing`, which the
+    review did not name and which fails the same way.
+    """
+    if value[:1] not in ("\"", "'"):
+        return None
+    q, n = value[0], len(value)
+    j = 1
+    while j < n:
+        if value[j] == q:
+            if q == "'" and j + 1 < n and value[j + 1] == "'":
+                j += 2
+                continue
+            break
+        j += 2 if (q == '"' and value[j] == "\\") else 1
+    if j >= n:
+        return "is an unterminated %s-quoted scalar" % ("double" if q == '"' else "single")
+    if value[j + 1:].strip():
+        return "has trailing content after its closing quote"
+    return None
+
+
 def flow_problem(value):
     """Why a flow collection value is malformed, or None. Non-flow values return None.
 
@@ -476,7 +506,7 @@ def parse_registered_agent_front_matter(text, provider_type):
                              if ":" in stripped else "x")
                     opens_block = bool(_BLOCK_SCALAR.match(value))
                     entry_opens = opens_block or not value
-                problem = flow_problem(value)
+                problem = quoted_scalar_problem(value) or flow_problem(value)
                 if problem:
                     raise InvalidDefinition(
                         "line %d, %r: the value %s. A YAML parser rejects it, so the provider "
@@ -509,7 +539,7 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "reader would treat them as the key being ABSENT -- so a semantic field could "
                 "change while the registry certified the old value." % (i, line[:60]))
         value = strip_inline_comment(line.split(":", 1)[1])
-        problem = flow_problem(value)
+        problem = quoted_scalar_problem(value) or flow_problem(value)
         if problem:
             raise InvalidDefinition(
                 "line %d, %r: the value %s. A YAML parser rejects it, so the provider cannot "
@@ -1418,6 +1448,15 @@ class Checker:
             self.fail("skills.json still declares provider_surfaces_no_registry_covers. That "
                       "name claims a provider classification no owner supplies; it is "
                       "known_uncovered_directories now, which is what the checker can prove.")
+        if "known_uncovered_directories" not in cross:
+            # ABSENT IS NOT EMPTY. `or []` read a deleted claim as "no known gaps" and the
+            # boundary gate went green while four checked-in uncovered directories still sit
+            # there unscanned by any registry. The sibling claim beside it is already required
+            # for exactly this reason; this one was not.
+            self.fail("skills.json declared_scope.cross_registry.known_uncovered_directories "
+                      "is missing. Deleting the structured record of known coverage gaps must "
+                      "not read as 'there are none' -- the directories do not stop existing "
+                      "when the claim about them is removed.")
         for un in cross.get("known_uncovered_directories") or []:
             path = pathlib.PurePosixPath(un)
             if un.startswith("/") or ".." in path.parts:

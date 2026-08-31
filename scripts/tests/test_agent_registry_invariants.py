@@ -102,6 +102,9 @@ def base_skills():
         "declared_scope": {
             "cross_registry": {
                 "agent_surfaces_tracked_by_agents_json": [".claude/agents", ".github/agents"],
+                # REQUIRED as of round 27: a deleted claim must not read as "no known gaps".
+                # The fixture declares the empty list because the fixture genuinely has none.
+                "known_uncovered_directories": [],
             }
         }
     }
@@ -845,6 +848,61 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 27: every inline value, and a claim that must be present ------------
+print()
+print("--- quoted well-formedness applies to every value, not only required ones ---")
+
+# Optional fields were not value-checked at all, so `tools: "Read` was certified while a YAML
+# loader raises ScannerError. The check that can apply to ALL values is narrower than the one
+# for required string fields: quote closes, nothing follows. `infer: false` must stay legal.
+try:
+    import yaml as _y27
+except ImportError:
+    _y27 = None
+
+for value, label, should_pass in (
+        ('"Read', "an unterminated double-quoted optional value", False),
+        ("'Read", "an unterminated single-quoted optional value", False),
+        ('"a" trailing', "trailing content after a closing quote", False),
+        ('"Read"', "a well-formed double-quoted optional value", True),
+        ("'Read'", "a well-formed single-quoted optional value", True),
+        ("'it''s'", "a doubled quote inside a single-quoted value", True),
+        ('"a#b"', "a hash inside a quoted optional value", True),
+        ('"a\\"b"', "an escaped quote inside a quoted value", True),
+        # The narrow boundary: NON-STRING plain scalars stay legal in an optional field.
+        # `infer: false` is real provider syntax, so the required-field type rule must not
+        # leak out here.
+        ("false", "a boolean optional value", True),
+        ("0x10", "a hexadecimal optional value", True),
+        ("[Read, Write]", "a flow optional value", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: fixture\ntools: %s\ninfer: false\n---\n\nBody for twin.\n"
+        % value)
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if should_pass and _y27 is not None:
+        try:
+            _y27.safe_load("name: twin\ndescription: fixture\ntools: %s\ninfer: false" % value)
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and a real YAML parser loads it", loadable)
+
+
+print()
+print("--- a deleted coverage claim is not a claim of no gaps ---")
+
+# `or []` read a DELETED known_uncovered_directories as "no known gaps" and the boundary gate
+# went green, while the checked-in uncovered directories still sit there unscanned. The
+# sibling claim beside it was already required for exactly this reason.
+case("known_uncovered_directories deleted entirely",
+     mutate_skills=lambda sk: sk["declared_scope"]["cross_registry"].pop(
+         "known_uncovered_directories", None),
+     expect="must not read as 'there are none'")
+
 # --- round 26: balance is not syntax, and a second reader must be as careful ----
 print()
 print("--- a flow collection must have the shape a loader accepts ---")
