@@ -914,6 +914,10 @@ def parser_bypass_control():
             mod.parse_registered_agent_front_matter(text, "github-copilot")
             survived.append(label)          # accepted with the parser neutered
         except mod.InvalidDefinition:
+            # Still refused with the parser neutered, which means an ICN rule caught it --
+            # the agreement rule and the duplicate-key rule both still run. That is a pass
+            # for this control: what it measures is the cases that ONLY the parser catches,
+            # counted in `survived` above.
             pass
     # Some cases are ALSO caught by ICN rules (the reader/parser agreement rule still runs
     # against the neutered loader). The control is that neutering the parser changes the
