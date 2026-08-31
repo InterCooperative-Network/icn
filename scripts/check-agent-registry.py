@@ -39,6 +39,19 @@ import difflib
 import json
 import pathlib
 import re
+
+try:
+    import yaml
+except ModuleNotFoundError as exc:      # pragma: no cover - provisioning failure
+    # LOUD, never skipped. This checker proves that a registered definition is one a provider
+    # can actually load, and a real parser owns that claim (icn#2632). A checker that silently
+    # drops its correctness check when a dependency is missing reports the skip as a pass,
+    # which is the exact failure mode this gate exists to prevent.
+    raise SystemExit(
+        "check-agent-registry: PyYAML is required and is not installed (%s).\n"
+        "  It owns YAML parse validity for registered provider definitions.\n"
+        "  Install it: python3 -m pip install pyyaml\n"
+        "  CI provisions it in .github/workflows/agent-drift-check.yml." % exc)
 import sys
 
 REGISTRY = "ops/state/truth/agents.json"
@@ -158,131 +171,6 @@ _NON_STRING_WORDS = frozenset(
 # one thing the block check below establishes from the body itself. All 20 block scalars in
 # the checked-in definitions are a bare `>`.
 _BLOCK_SCALAR = re.compile(r"^[|>][+-]?$")
-
-
-def _map_separator(text):
-    """Split `text` at a YAML MAPPING SEPARATOR: `(key, sep, rest)`, or `(text, "", "")`.
-
-    A separator is `:` followed by a space, or `:` ending the line. Any other colon is part of
-    a plain scalar -- `https://example.com` is one value, not a key and a value -- which is
-    exactly what YAML says and exactly what a `":" in item` test got wrong.
-    """
-    i = 0
-    while True:
-        i = text.find(":", i)
-        if i < 0:
-            return text, "", ""
-        rest = text[i + 1:]
-        if rest == "" or rest[:1] in (" ", "\t"):
-            return text[:i], ":", rest
-        i += 1
-
-
-def quoted_scalar_problem(value):
-    """Why a quoted inline value is malformed, or None. Unquoted values return None.
-
-    WELL-FORMEDNESS ONLY, and that boundary is the point. `decode_inline_scalar` also refuses
-    non-string plain scalars, which is right for a required STRING field and wrong for every
-    other key -- `infer: false` is a legitimate boolean. So the check that applies to all
-    values is the narrower one: the quote closes, and nothing follows it.
-
-    Optional fields were not checked at all, so `tools: "Read` was certified while a YAML
-    loader raises ScannerError. Reproduction also found `tools: "a" trailing`, which the
-    review did not name and which fails the same way.
-    """
-    if value[:1] not in ("\"", "'"):
-        return None
-    q, n = value[0], len(value)
-    j = 1
-    while j < n:
-        if value[j] == q:
-            if q == "'" and j + 1 < n and value[j + 1] == "'":
-                j += 2
-                continue
-            break
-        j += 2 if (q == '"' and value[j] == "\\") else 1
-    if j >= n:
-        return "is an unterminated %s-quoted scalar" % ("double" if q == '"' else "single")
-    if value[j + 1:].strip():
-        return "has trailing content after its closing quote"
-    return None
-
-
-def flow_problem(value):
-    """Why a flow collection value is malformed, or None. Non-flow values return None.
-
-    VALIDATED, NOT REFUSED. `tools: [Read` was accepted and the provider cannot load it, but
-    two checked-in definitions really do write `tools: ["Read", "Grep", "Glob", "Bash"]`, so
-    refusing flow syntax outright -- the usual disposal in this file -- would take the gate
-    red on the repository it guards. What can be proven on one line is balance and
-    termination, so that is what is proven.
-    """
-    # `value[:1] not in "[{"` was WRONG for the empty value: `"" in "[{"` is True, because
-    # the empty string is a substring of everything -- so an ordinary `key:` with no value
-    # fell through and `value[0]` raised IndexError. A guard that mistakes a substring test
-    # for a membership test is how this function started crashing the gate it protects.
-    if not value or value[0] not in "[{":
-        return None
-    closer = "]" if value[0] == "[" else "}"
-    if value[-1:] != closer:
-        return "is an unterminated flow %s" % ("sequence" if closer == "]" else "mapping")
-
-    # ONE FLAT LEVEL, and the elements are not interpreted. Balance alone proved only that
-    # brackets matched: `tools: [Read,, Write]` is balanced and a YAML loader still raises.
-    # The answer is NOT to parse flow properly -- that is the whole language arriving one
-    # counterexample at a time. It is to support the shape the repository actually writes,
-    # `tools: ["Read", "Grep", "Glob", "Bash"]`, and refuse everything else by name.
-    #
-    # So: no nesting, and every comma-separated element non-empty. A single trailing comma is
-    # allowed because YAML allows it. Element CONTENT is still not interpreted -- what is
-    # proven is that the collection has a shape a loader accepts, nothing about its meaning.
-    inner = value[1:-1]
-    if not inner.strip():
-        return None                        # the empty collection, which YAML accepts
-    elements, buf, i, n = [], [], 0, len(inner)
-    while i < n:
-        c = inner[i]
-        if c in "\"'":
-            j = i + 1
-            while j < n:
-                if inner[j] == c:
-                    if c == "'" and j + 1 < n and inner[j + 1] == "'":
-                        j += 2
-                        continue
-                    break
-                j += 2 if (c == '"' and inner[j] == "\\") else 1
-            if j >= n:
-                return "contains an unterminated %s-quoted string" % (
-                    "double" if c == '"' else "single")
-            buf.append(inner[i:j + 1])
-            i = j + 1
-            continue
-        if c in "[]{}":
-            return ("is a nested flow collection, which is not a supported spelling here; "
-                    "write one flat collection")
-        if c == ",":
-            elements.append("".join(buf).strip())
-            buf = []
-            i += 1
-            continue
-        buf.append(c)
-        i += 1
-    tail = "".join(buf).strip()
-    if tail:
-        elements.append(tail)
-    # A single TRAILING comma is legal YAML, so an empty tail is dropped rather than counted.
-    # `[,]` is not that: its empty element comes BEFORE the comma and a loader rejects it.
-    if any(e == "" for e in elements):
-        return "contains an empty element, which a YAML loader rejects"
-    # ...and a NONEMPTY element still has to be a well-formed one. `["a" "b"]` has two
-    # nonempty segments by the comma test and a loader raises: adjacent quoted scalars need a
-    # comma between them. The element goes through the SAME reader that checks a quoted value
-    # anywhere else, which is why this is a reuse rather than another parser.
-    for e in elements:
-        problem = quoted_scalar_problem(e)
-        if problem:
-            return "contains an element that %s" % problem
-    return None
 
 
 def strip_inline_comment(raw):
@@ -405,17 +293,58 @@ def required_string_problem(block, key):
     return decode_inline_scalar(raw)[1]
 
 
+# Front-matter keys this checker READS and derives semantics from. The reader/parser
+# agreement rule applies to exactly these: a key nobody consumes cannot be misread into a
+# wrong registry claim.
+CONSUMED_FRONT_MATTER_KEYS = frozenset(
+    {"name", "description", "infer", "disable-model-invocation"}
+    | {f for fields in PROVIDER_REQUIRED_FIELDS.values() for f in fields}
+)
+
+
+def _line_reader_text(block, key, raw):
+    """What ICN's line-based reader believes `key` says, or None if it cannot say.
+
+    Deliberately mirrors `required_string_problem`: inline scalar, or block scalar body.
+    """
+    if _BLOCK_SCALAR.match(strip_inline_comment(raw)):
+        # NO OPINION about a block scalar's text. Folding and chomping are the parser's
+        # rules, and my first version of this reimplemented them -- badly, which is the exact
+        # trap this whole change exists to leave. The line reader only ever needed to know a
+        # block HAS content, which `required_string_problem` establishes separately.
+        return None
+    text, problem = decode_inline_scalar(raw)
+    if problem is None:
+        return text
+    # The decoder could not TYPE this value -- it is a YAML literal, an escape spelling, or
+    # something else outside ICN's supported scalar forms. That is not the same as having no
+    # opinion: the line reader still sees exactly one line of text, and if the parser read
+    # more than that (or decoded an escape) they disagree, which is the thing worth catching.
+    # `infer: false` + an indented `orphan` is the worked case: the parser returns the STRING
+    # "false orphan", the line reader sees "false".
+    return strip_inline_comment(raw)
+
+
 def parse_registered_agent_front_matter(text, provider_type):
     """Validate a file AS a definition and return its front-matter block.
 
     Raises InvalidDefinition. This is the single gate a file must pass before it counts as a
     registered provider definition, so that afterwards `front_matter_value(block, key) is
     None` means exactly one thing: the definition is structurally valid and this optional key
-    is genuinely absent. It no longer also means "the file had no front matter", "the YAML was
-    spelled differently", or "the root mapping was indented".
+    is genuinely absent.
 
-    Deliberately not a YAML parser. It proves the file lies inside the supported subset and
-    refuses everything else, which is a claim it can actually keep.
+    OWNERSHIP. YAML parse validity belongs to a YAML parser; this function owns ICN's
+    deliberately narrower contract on top of it. Rounds 20-29 of review found ten variants of
+    one defect -- a hand-written reader accepting or rejecting syntax differently from a real
+    parser. Every fix was correct and none ended the class, because the class was an ownership
+    error rather than a series of bugs (maintainer decision, icn#2632).
+
+    The relationship is deliberately ONE-directional:
+
+        ICN accepts a definition  =>  a real YAML parser accepts it
+
+    and NOT the converse. Valid YAML that is outside ICN's supported provider contract is
+    still refused here, with an ICN message.
     """
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     if not m:
@@ -425,144 +354,38 @@ def parse_registered_agent_front_matter(text, provider_type):
             "the provider rejects as malformed could still be registered")
     block = m.group(1)
 
+    # 1. PARSE VALIDITY, owned by the parser. Everything a provider's loader would reject is
+    #    rejected here, once, by the thing that actually defines the answer.
+    try:
+        loaded = yaml.safe_load(block)
+    except yaml.YAMLError as exc:
+        detail = str(exc).replace("\n", " ")
+        raise InvalidDefinition(
+            "front matter is not valid YAML, so no provider can load this definition: %s"
+            % detail[:300])
+
+    if loaded is None:
+        raise InvalidDefinition("front matter block is empty")
+    if not isinstance(loaded, dict):
+        raise InvalidDefinition(
+            "front matter is valid YAML but not a mapping (found %s). A definition's front "
+            "matter is a set of keys." % type(loaded).__name__)
+
+    # 2. ICN'S NARROWER CONTRACT. Valid YAML is necessary and not sufficient.
     substantive = [(i, ln) for i, ln in enumerate(block.split("\n"), 1)
                    if ln.strip() and not ln.lstrip().startswith("#")]
-    if not substantive:
-        raise InvalidDefinition("front matter block is empty")
-
     first_no, first = substantive[0]
     if first[0].isspace():
         raise InvalidDefinition(
             "line %d, %r: the root mapping is indented. A YAML parser still reads it as the "
-            "root, but this reader treats indented lines as nested content, so every semantic "
-            "key would vanish and its default would be derived instead. The root mapping of a "
-            "registered definition begins at column 0" % (first_no, first[:60]))
+            "root, which is exactly why this is an ICN rule and not a syntax one: the key "
+            "readers below scan root-level lines, so every semantic key would vanish and its "
+            "default would be derived instead. The root mapping of a registered definition "
+            "begins at column 0" % (first_no, first[:60]))
 
-    # AN INDENTED LINE IS NOT AUTOMATICALLY NESTED CONTENT. Every indented line used to be
-    # skipped, so `infer: false` followed by `  orphan: value` was certified -- and a YAML
-    # parser rejects that outright ("mapping values are not allowed here"), meaning the
-    # provider cannot load the definition at all while the canonical registry called it valid.
-    #
-    # YAML introduces indented content in exactly two ways: a block-scalar indicator, or an
-    # empty value opening a nested mapping or list. After a key whose value is already a
-    # scalar, indentation is either an error or a multi-line plain scalar -- and the latter is
-    # excluded on purpose, the round-14 trade again: quote it or use a block scalar. All 43
-    # checked-in definitions are inside this subset; every one of their 42 indented lines sits
-    # beneath a block scalar, and none opens a nested mapping or continues a plain scalar.
-    # Walked over ALL lines rather than `substantive`, because a `#` line INSIDE a block
-    # scalar is content, not a comment -- dropping it would lose the indentation sample that
-    # decides whether the block is well formed.
-    opens_nested = False        # may an indented line follow the key just read?
-    in_block = False            # ...and is that indentation a block scalar's body?
-    nested_indent = None        # the indent its first nested line established
-    frames = []                 # (indent, collection kind) per nested depth
-    for i, line in enumerate(block.split("\n"), 1):
-        if not line.strip():
-            continue
+    for i, line in substantive:
         if line[0].isspace():
-            if not opens_nested:
-                raise InvalidDefinition(
-                    "line %d, %r: indented content follows a key whose value is already a "
-                    "scalar. A YAML parser rejects this, so the provider cannot load the "
-                    "definition -- indentation is supported only beneath a block scalar or an "
-                    "empty value. Quote the value or use a block scalar." % (i, line[:60]))
-            # Inside a block scalar every line is CONTENT, comments included. Inside a
-            # nested collection a `#` line is an ordinary comment and settles nothing about
-            # the structure -- treating it as an entry rejected a commented sequence, which
-            # YAML accepts.
-            if not in_block and line.lstrip().startswith("#"):
-                continue
-
-            # NESTED INDENTATION IS PART OF THE VALUE'S VALIDITY, and that holds for BOTH
-            # things that open it. Checking only block scalars left the other half: `tools:`
-            # then `  - Read` then ` - Write` was certified while the YAML loader raised
-            # ParserError. The first nested line establishes the indent; a later line below it
-            # has dedented out of the value without reaching column 0, so it is not a root key
-            # either and there is nothing for a parser to do with it.
-            indent = len(line) - len(line.lstrip())
-            if nested_indent is None:
-                nested_indent = indent
-            elif indent < nested_indent:
-                raise InvalidDefinition(
-                    "line %d, %r: indented %d columns, inside %s whose content established "
-                    "%d. A line that dedents out of the value without reaching column 0 is "
-                    "not a root key either, and a YAML parser raises rather than reading it "
-                    "as content."
-                    % (i, line[:60], indent,
-                       "a block scalar" if in_block else "a nested value", nested_indent))
-
-            # EQUAL INDENTATION IS NOT EQUAL STRUCTURE. `tools:` then `  - Read` then
-            # `  orphan: value` shares one indent and still cannot be parsed: a block sequence
-            # does not become a mapping at its own level. Each depth remembers which kind
-            # opened it, so a sibling that changes kind is refused where a parser would raise.
-            # A stack rather than a single frame, because the same mistake one level deeper is
-            # the same mistake.
-            if not in_block:
-                while frames and frames[-1][0] > indent:
-                    frames.pop()
-
-                # Below a NESTED block scalar every line is content, exactly as at root
-                # level. `in_block` only ever tracked the ROOT key, so `tools:` / `  key: |`
-                # / `    body` was read as structure and refused -- a false rejection of
-                # ordinary YAML.
-                if frames and frames[-1][0] < indent and frames[-1][3]:
-                    continue
-
-                stripped = line.lstrip()
-                kind = "sequence" if stripped[:1] == "-" else "mapping"
-                # Can THIS entry own a child node? A mapping key whose value is already a
-                # scalar cannot: `tools:` / `  key: value` / `    child: bad` is "mapping
-                # values are not allowed here" to a YAML parser, and opening a deeper frame
-                # for it certified a definition the provider cannot load. A sequence item can
-                # -- `- name: a` followed by a deeper `extra: b` is one mapping in one item.
-                if kind == "sequence":
-                    # A SEQUENCE ITEM IS NOT AUTOMATICALLY ABLE TO OWN A CHILD. `- Read` is a
-                    # scalar item; `tools:` / `  - Read` / `    child: bad` is "mapping values
-                    # are not allowed here" to a parser, and marking every item an opener
-                    # certified it. An item DOES open when it carries a mapping -- `- name: a`
-                    # followed by a deeper `extra: b` is one mapping with two keys, and that
-                    # child belongs to the ITEM, not to `a`.
-                    item = stripped[1:].lstrip()
-                    # A MAPPING SEPARATOR IS `: ` OR A TRAILING `:`, not any colon. Mere
-                    # presence marked `- https://example.com` as a mapping item able to own a
-                    # child, so `    child: bad` beneath it was certified while a loader
-                    # raises -- the URL is a scalar item. YAML says the same thing: a plain
-                    # scalar may contain `:` as long as no space follows it.
-                    key, sep, rest = _map_separator(item)
-                    inner = strip_inline_comment(rest) if sep else item
-                    opens_block = bool(_BLOCK_SCALAR.match(inner))
-                    entry_opens = (not item) or bool(sep) or opens_block
-                    value = inner
-                else:
-                    _, sep, rest = _map_separator(stripped)
-                    value = strip_inline_comment(rest) if sep else "x"
-                    opens_block = bool(_BLOCK_SCALAR.match(value))
-                    entry_opens = opens_block or not value
-                problem = quoted_scalar_problem(value) or flow_problem(value)
-                if problem:
-                    raise InvalidDefinition(
-                        "line %d, %r: the value %s. A YAML parser rejects it, so the provider "
-                        "cannot load the definition." % (i, line[:60], problem))
-
-                if frames and frames[-1][0] == indent:
-                    if frames[-1][1] != kind:
-                        raise InvalidDefinition(
-                            "line %d, %r: a %s entry at the same indentation as the %s that "
-                            "opened this level. A YAML parser raises rather than switching "
-                            "collection kind in place."
-                            % (i, line[:60], kind, frames[-1][1]))
-                    frames[-1] = (indent, kind, entry_opens, opens_block)
-                else:
-                    if frames and not frames[-1][2]:
-                        raise InvalidDefinition(
-                            "line %d, %r: indented below an entry whose value is already a "
-                            "scalar, which cannot own a child node. A YAML parser raises "
-                            "rather than nesting under it -- give that entry an empty value "
-                            "or a block scalar." % (i, line[:60]))
-                    frames.append((indent, kind, entry_opens, opens_block))
-            continue
-        if line.lstrip().startswith("#"):
-            continue
+            continue                      # nested content; the parser already validated it
         if not _PLAIN_TOP_LEVEL_KEY.match(line):
             raise InvalidDefinition(
                 "line %d, %r: registered ICN agent front matter requires plain unquoted "
@@ -570,22 +393,24 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "space-before-colon spellings are valid YAML the provider honours, and this "
                 "reader would treat them as the key being ABSENT -- so a semantic field could "
                 "change while the registry certified the old value." % (i, line[:60]))
-        value = strip_inline_comment(line.split(":", 1)[1])
-        problem = quoted_scalar_problem(value) or flow_problem(value)
-        if problem:
+
+    # 3. DUPLICATE KEYS, which the parser does NOT own for us. `yaml.safe_load` accepts a
+    #    repeated mapping key and silently keeps the last one, so delegating parse validity
+    #    must not be allowed to quietly drop this. ICN refuses an ambiguous security/routing
+    #    field outright, and that rule is asserted here against the loaded document rather
+    #    than inferred from the parser's tolerance.
+    counts = {}
+    for i, line in substantive:
+        if line[0].isspace() or not _PLAIN_TOP_LEVEL_KEY.match(line):
+            continue
+        counts.setdefault(line.split(":", 1)[0], []).append(i)
+    for key, at in sorted(counts.items()):
+        if len(at) > 1:
             raise InvalidDefinition(
-                "line %d, %r: the value %s. A YAML parser rejects it, so the provider cannot "
-                "load the definition." % (i, line[:60], problem))
-        if re.match(r"^[|>][+-]?\d", value):
-            raise InvalidDefinition(
-                "line %d, %r: an explicit block indentation indicator is not supported. It "
-                "moves the indent the body must use, which is the one thing this reader "
-                "establishes from the body itself -- so supporting it would mean guessing. "
-                "Use a bare `|` or `>`." % (i, line[:60]))
-        in_block = bool(_BLOCK_SCALAR.match(value))
-        nested_indent = None
-        frames = []
-        opens_nested = in_block or not value
+                "top-level key %r appears %d times (lines %s). A YAML loader keeps the last "
+                "value silently, so a definition could declare a routing or capability field "
+                "twice and be certified as whichever one the loader happened to keep."
+                % (key, len(at), ", ".join(str(x) for x in at)))
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
         try:
@@ -598,7 +423,36 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "valid agent definition, and it %s. The registry does not own that field -- "
                 "it only refuses to certify a file the provider would reject as malformed"
                 % (provider_type, field, problem))
+    # 4. ICN'S READER AND THE PARSER MUST AGREE ABOUT EVERY VALUE ICN CONSUMES.
+    #
+    # This is the rule that replaces nine rounds of hand-written narrowings. The semantic
+    # readers below are LINE-BASED, so a value the parser reads differently -- a plain scalar
+    # continued onto the next line, a flow collection, anything spanning lines -- would be
+    # certified as whatever the line reader happened to see. That was the real ICN reason
+    # behind those narrowings; the parse-validity reasoning attached to them was borrowed.
+    #
+    # Stated as one falsifiable rule, it needs no grammar: if the two disagree, refuse. It
+    # cannot be outrun by a spelling nobody has thought of yet, which is the property every
+    # individual narrowing lacked.
+    for key in sorted(CONSUMED_FRONT_MATTER_KEYS):
+        if key not in loaded or not isinstance(loaded[key], str):
+            continue
+        try:
+            raw = front_matter_value(block, key)
+        except AmbiguousFrontMatter as exc:
+            raise InvalidDefinition(str(exc))
+        if raw is None:
+            continue
+        mine = _line_reader_text(block, key, raw)
+        if mine is not None and mine != loaded[key]:
+            raise InvalidDefinition(
+                "the value of %r is read differently by this checker (%r) and by a YAML "
+                "parser (%r). ICN's readers are line-based, so a value spanning lines would "
+                "be certified as whatever the line reader saw. Write it as a single-line "
+                "scalar or a block scalar." % (key, mine[:60], loaded[key][:60]))
+
     return block
+
 
 
 class AmbiguousFrontMatter(Exception):

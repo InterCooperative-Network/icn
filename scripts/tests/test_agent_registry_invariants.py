@@ -848,6 +848,82 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- parser boundary: YAML validity has an owner now (maintainer decision) ------
+print()
+print("--- every accumulated malformed case is rejected by the parse-validity owner ---")
+
+# Rounds 20-29 found ten variants of one defect: a hand-written reader accepting or rejecting
+# syntax differently from a real parser. The corpus below is those cases. The assertion is no
+# longer "our reader has a rule for this example" but "PyYAML rejects it, therefore so do we".
+import yaml as _yparse
+
+_MALFORMED = [
+    ("tools: value: bad", "round 29: a second mapping separator"),
+    ("tools: [Read,, Write]", "an empty flow element"),
+    ('tools: ["a" "b"]', "adjacent quoted flow elements"),
+    ("tools: [Read", "an unterminated flow sequence"),
+    ('tools: "Read', "an unterminated quoted scalar"),
+    ('tools: "a" trailing', "trailing content after a closing quote"),
+    ("description: |\n  two spaces\n one space", "a block body that dedents"),
+    ("tools:\n  - Read\n  orphan: value", "a sequence becoming a mapping"),
+    ("tools:\n  - https://example.com\n    child: bad", "a child under a URL scalar item"),
+    ("tools:\n  key: value\n    child: bad", "a child under a scalar-valued key"),
+    ("metadata:\n  owner: x\n team: y", "a mapping that dedents mid-mapping"),
+]
+for extra, label in _MALFORMED:
+    fm = "name: twin\ndescription: fixture\n%s" % extra
+    # The corpus is only meaningful if PyYAML really rejects these. Assert that first, or the
+    # control below proves nothing.
+    try:
+        _yparse.safe_load(fm)
+        really_bad = False
+    except Exception:
+        really_bad = True
+    check("corpus case is genuinely invalid YAML: %s" % label, really_bad)
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\ninfer: false\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: %s is rejected" % label, rc != 0 and "Traceback" not in out)
+
+
+print()
+print("--- the parser check is load-bearing, not decorative ---")
+
+# MUTATION CONTROL. If YAML validation is removed or neutered, the corpus above must stop
+# being rejected. Without this, a future edit could delete the parse step and every test here
+# would still pass on the ICN rules alone -- the check would have skipped itself.
+def parser_bypass_control():
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("bypassed", str(CHECKER))
+    mod = _il.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    class _NeuteredYaml:
+        YAMLError = mod.yaml.YAMLError
+
+        @staticmethod
+        def safe_load(_text):
+            return {"name": "twin", "description": "fixture"}   # never raises
+
+    mod.yaml = _NeuteredYaml
+    survived = []
+    for extra, label in _MALFORMED:
+        text = "---\nname: twin\ndescription: fixture\n%s\ninfer: false\n---\n\nBody.\n" % extra
+        try:
+            mod.parse_registered_agent_front_matter(text, "github-copilot")
+            survived.append(label)          # accepted with the parser neutered
+        except mod.InvalidDefinition:
+            pass
+    # Some cases are ALSO caught by ICN rules (the reader/parser agreement rule still runs
+    # against the neutered loader). The control is that neutering the parser changes the
+    # outcome for at least one case -- i.e. the parser is doing work nothing else does.
+    check("neutering the YAML parser lets malformed front matter through (%d/%d cases)"
+          % (len(survived), len(_MALFORMED)), len(survived) > 0)
+
+
+parser_bypass_control()
+
 # --- round 28: a nonempty element is not a valid one; a colon is not a separator -
 print()
 print("--- flow elements and mapping separators ---")
@@ -980,8 +1056,12 @@ for value, label, should_pass in (
         # supporting it means parsing flow properly, which is the whole language arriving one
         # counterexample at a time. Refused by name, and recorded as a narrowing rather than
         # a soundness claim.
-        ("[{a: [1, 2]}]", "a nested flow collection (narrowed, not unsound)", False),
-        ("[[a], b]", "a nested flow sequence (narrowed, not unsound)", False)):
+        # BROADENED in the parser-boundary change: these are valid YAML, and `tools` is not
+        # a key ICN reads, so there is no value for a line reader to misread. The narrowing's
+        # only rationale was that the hand-written reader could not parse flow; the parser
+        # owns that now, so keeping the refusal would be ceremony.
+        ("[{a: [1, 2]}]", "a nested flow collection", True),
+        ("[[a], b]", "a nested flow sequence", True)):
     r = base_registry()
     f = dict(BASE_FILES)
     f[".github/agents/twin.md"] = (
@@ -1208,9 +1288,12 @@ print("--- escape syntax is refused, not silently mis-read ---")
 # not, which is a misleading failure on a valid definition. Asserting "rejected" would have
 # passed against the old checker and proved nothing.
 for spelling, label, expect in (
-        ('"t\\x77in"', "a double-quoted name with a hex escape", "backslash escape"),
-        ('"tw\\u0069n"', "a double-quoted name with a unicode escape", "backslash escape"),
-        ("'it''s'", "a single-quoted name with a doubled quote", "doubled quote"),
+        # Now caught by the general reader/parser agreement rule rather than by a
+        # spelling-specific refusal: the decoder does not decode escapes, so it and the
+        # parser disagree about the value, which is the fact that actually matters.
+        ('"t\\x77in"', "a double-quoted name with a hex escape", "read differently"),
+        ('"tw\\u0069n"', "a double-quoted name with a unicode escape", "read differently"),
+        ("'it''s'", "a single-quoted name with a doubled quote", "read differently"),
         ('"twin"', "a plainly double-quoted name", None),
         ("twin", "a plain name", None)):
     r = base_registry()
@@ -1867,8 +1950,13 @@ for spelling, label in (
         "---\nname: twin\ndescription: fixture\ninfer: false\n%s\n---\n\nBody for twin.\n"
         % spelling)
     rc, out = run(r, base_skills(), f)
+    # Either owner may speak first, and both establish the same fact: the key was NOT read
+    # as absent. A root-level flow mapping is not valid YAML in this position, so the parser
+    # rejects it before the ICN plain-key rule is reached; the quoted and explicit-key
+    # spellings ARE valid YAML and reach the ICN rule.
     check("REAL P2: %s is unsupported, not absent" % label,
-          rc != 0 and "plain unquoted top-level keys" in out)
+          rc != 0 and ("plain unquoted top-level keys" in out
+                       or "not valid YAML" in out))
 
 # The subset must not reject what the 43 real definitions actually use: indented
 # continuations, block scalars and nested values all sit below a validated top-level key.

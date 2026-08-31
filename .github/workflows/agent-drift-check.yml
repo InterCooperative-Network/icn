@@ -64,6 +64,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # The registry checker delegates YAML PARSE VALIDITY to a real parser (icn#2632).
+      # It is a hard dependency, not an optional enhancement: the checker refuses to run
+      # without it rather than silently skipping the check that proves a provider can load
+      # a definition. Provisioned the way this repository already provisions Python tool
+      # dependencies (see docs-freshness.yml, ci.yml).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Provision the YAML parser the registry checker requires
+        run: python3 -m pip install pyyaml
+
       - name: Verify canonical truth files exist
         run: bash ops/scripts/drift-check.sh
 
