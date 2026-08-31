@@ -713,6 +713,20 @@ cases = {
     # nothing local to have changed what the name resolves to.
     'PATH=/tmp:$PATH python3 %s' % PY: K.UNCLASSIFIED,
     'FOO=1 echo hi': K.UNCLASSIFIED,
+    # AN ASSIGNMENT IS DECIDED BEFORE QUOTING IS DISCARDED. shlex strips quote provenance, so
+    # an escaped or quoted `=` still looked like an assignment prefix -- and bash treats every
+    # one of these as the COMMAND NAME, exiting 127 without running the hook.
+    'FOO\\=bar %s' % H: K.UNCLASSIFIED,
+    "'FOO=bar' %s" % H: K.UNCLASSIFIED,
+    '"FOO=bar" %s' % H: K.UNCLASSIFIED,
+    # AN UNRESOLVED EXPANSION IS NOT A PATH SEGMENT. The variable is substituted at a token
+    # boundary now -- a shell expands the LONGEST valid name, not the prefix we hoped for --
+    # and what remains is a value this gate cannot know, so it refuses rather than joining it
+    # to the root as a literal segment where a `..` would cancel it out.
+    '$CLAUDE_PROJECT_DIRoops/../.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '${CLAUDE_PROJECT_DIRoops}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '$HOME/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.DIRECT,
     # ...but an assignment in front of a repo PATH stays supported: a path is not looked up.
     'MODE=health %s' % H: K.DIRECT,
     # A COMMAND SUBSTITUTION is executable shell wherever it appears, including inside the

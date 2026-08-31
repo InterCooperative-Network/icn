@@ -220,8 +220,7 @@ def _repo_path_in_substitution(command: str, root):
     base_dir = Path(root).resolve()
     for body in bodies:
         for token in (_tokenize(body) or []):
-            for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
-                token = token.replace(spelling + "/", "").replace(spelling, "")
+            token = _sub_project_dir(token)
             if "/" not in token:
                 continue
             try:
@@ -246,6 +245,62 @@ def _has_unquoted_newline(command: str) -> bool:
     """
     return any(c == "\n" and st == _PLAIN
                for c, st in zip(command, _shell_states(command)))
+
+
+_PROJECT_DIR_TOKEN = re.compile(r"\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?![A-Za-z0-9_]))")
+_PROJECT_DIR_TOKEN_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/")
+
+
+def _sub_project_dir(text: str, replacement: str = "") -> str:
+    """Replace the project-dir variable AT A TOKEN BOUNDARY, and only there.
+
+    A plain `.replace("$CLAUDE_PROJECT_DIR", ...)` also rewrites the prefix of a LONGER name:
+    `$CLAUDE_PROJECT_DIRoops/../.claude/hooks/hook-health.sh` became the real hook, so the
+    executable check passed for a command bash resolves to something else entirely and exits
+    127. A shell expands the longest valid name, not the prefix we hoped for.
+
+    Five call sites asked this same question in four slightly different ways. They ask it here
+    now, because a reader corrected in one place and not the others is how this file has been
+    wrong four times.
+    """
+    if replacement:
+        return _PROJECT_DIR_TOKEN.sub(lambda _: replacement, text)
+    # Removing the variable also removes the slash that FOLLOWED it, so `$VAR/x` becomes `x`
+    # rather than `/x`. Only that slash: my first version stripped any leading `/`, which
+    # turned the token `/dev/null` -- an absolute path outside the repo, and the live
+    # `2>/dev/null` redirection -- into the repo-relative `dev/null`, and the gate went red on
+    # its own settings.json. The live run caught it, which is the point of running it.
+    return _PROJECT_DIR_TOKEN.sub("", _PROJECT_DIR_TOKEN_SLASH.sub("", text))
+
+
+def _leading_assignment_words(command: str) -> int:
+    """How many leading words are REAL `VAR=value` assignment prefixes.
+
+    Decided before quoting is discarded. shlex strips quote provenance, so `FOO\\=bar <hook>`,
+    `'FOO=bar' <hook>` and `"FOO=bar" <hook>` all arrived looking like assignments -- and bash
+    treats every one of them as the COMMAND NAME, exiting 127 without ever running the hook,
+    while the classifier skipped the word and certified the hook as a direct target.
+
+    A word is an assignment only when its `NAME=` prefix is entirely unquoted.
+    """
+    states = _shell_states(command)
+    count, i, n = 0, 0, len(command)
+    while i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        start = i
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        word, word_states = command[start:i], states[start:i]
+        eq = word.find("=")
+        if eq <= 0:
+            return count
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=$", word[:eq + 1]):
+            return count
+        if any(st != _PLAIN for st in word_states[:eq + 1]):
+            return count                    # the `=` (or the name) was quoted or escaped
+        count += 1
+    return count
 
 
 def _invokes_hook(command: str, root: Path) -> bool:
@@ -280,7 +335,7 @@ def _invokes_hook(command: str, root: Path) -> bool:
     # asks whether the invocation is unadorned, and an expansion is something else deciding
     # what the hook receives. That asymmetry is fail-CLOSED -- the gate goes red on a config
     # that would work -- and it is pinned by tests rather than left to be rediscovered.
-    if _unquoted_operators(stripped.replace("$CLAUDE_PROJECT_DIR", ""),
+    if _unquoted_operators(_sub_project_dir(stripped),
                            set("<>;&|`$(){}"), _EXPANDS_IN_DOUBLE_QUOTES):
         return False
 
@@ -289,9 +344,8 @@ def _invokes_hook(command: str, root: Path) -> bool:
     except ValueError:
         return False
     # Leading VAR=value environment assignments are legitimate and are not the program.
-    idx = 0
-    while idx < len(tokens) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[idx]):
-        idx += 1
+    # Same question, same answer: an escaped or quoted `=` makes the word a command name.
+    idx = _leading_assignment_words(stripped)
     if idx >= len(tokens):
         return False
     argv0 = tokens[idx]
@@ -305,9 +359,7 @@ def _invokes_hook(command: str, root: Path) -> bool:
     # exits 127 and lifecycle tracking is entirely off — satisfied `endswith()` and left the
     # gate reporting 25 checks passed. Resolve the path and compare it to the file the gate
     # separately execs.
-    resolved = argv0.replace("$CLAUDE_PROJECT_DIR", str(root)).replace(
-        "${CLAUDE_PROJECT_DIR}", str(root)
-    )
+    resolved = _sub_project_dir(argv0, str(root))
     candidate = Path(resolved)
     if not candidate.is_absolute():
         candidate = root / resolved
@@ -513,16 +565,24 @@ def classify_hook_command(command: str, root: Path | None = None):
     # file already treats them as part of a direct invocation, and the suite exercises that
     # shape -- two siblings disagreeing about what a hook command looks like is how one of
     # them ends up wrong. Launchers had no such sibling support and no live use.
-    assigned = False
-    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
-        assigned = True
-        tokens = tokens[1:]
+    n_assign = _leading_assignment_words(cmd)
+    assigned = n_assign > 0
+    tokens = tokens[n_assign:]
     if not tokens:
         return HookCommandKind.UNCLASSIFIED, None, "assignments with no command"
 
     argv0 = tokens[0]
-    for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
-        argv0 = argv0.replace(spelling + "/", "").replace(spelling, "")
+    argv0 = _sub_project_dir(argv0)
+    if "$" in argv0:
+        # AN UNRESOLVED EXPANSION IS NOT A PATH SEGMENT. `$CLAUDE_PROJECT_DIRoops/../.claude/
+        # hooks/hook-health.sh` survives the token-boundary substitution correctly -- and then
+        # got joined to the root as a LITERAL segment, where the `..` cancelled it and the
+        # path resolved to the real hook. Bash expands the longer name to empty and attempts
+        # `/../.claude/...`, exiting 127. Fixing the substitution was necessary and not
+        # sufficient: what remains is a value this gate cannot know, so it says so.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%s contains a shell expansion this gate cannot resolve, so the path bash "
+                "actually runs is not knowable here" % argv0)
     base = argv0.rsplit("/", 1)[-1]
 
     # CONTAINMENT IS DECIDED PHYSICALLY, AND BEFORE ANY NAME-BASED EXEMPTION.
@@ -610,8 +670,7 @@ def classify_hook_command(command: str, root: Path | None = None):
                     "something this gate can establish"
                     % (base, ("no argument" if not rest else "the option %r" % rest[0])))
         script = rest[0]
-        for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
-            script = script.replace(spelling + "/", "").replace(spelling, "")
+        script = _sub_project_dir(script)
         try:
             base_dir = Path(root).resolve() if root is not None else None
             cand = Path(script)
