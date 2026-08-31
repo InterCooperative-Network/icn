@@ -342,8 +342,18 @@ def classify_hook_command(command: str, root: Path | None = None):
             resolved = Path(argv0).resolve()
             base_dir = Path(root).resolve()
             if not resolved.is_relative_to(base_dir):
-                return (HookCommandKind.NON_HOOK, None,
-                        "absolute executable outside the repository")
+                # NOT harmless. `/usr/bin/env <hook>` runs the hook and returns 126 when it
+                # is not executable; `/bin/sh -c …` can run anything. Treating every external
+                # absolute program as a non-hook let the target vanish from the derived set
+                # -- and the expected count derives from that same list, so the loss hid
+                # itself. An arbitrary external executable may wrap, source or otherwise
+                # invoke a repository hook, so it is unclassified until the repository
+                # actually needs one and specifies it. A supported interpreter is matched
+                # earlier by identity, which is why /usr/bin/python3 still classifies.
+                return (HookCommandKind.UNCLASSIFIED, None,
+                        "external absolute executable %s: not a supported command form, and "
+                        "not provably harmless -- it may invoke a repository hook"
+                        % resolved)
             argv0 = resolved.relative_to(base_dir).as_posix()
         except (ValueError, OSError) as exc:
             return HookCommandKind.UNCLASSIFIED, None, "unresolvable path (%s)" % exc

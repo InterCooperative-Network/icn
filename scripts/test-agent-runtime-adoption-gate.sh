@@ -589,6 +589,13 @@ cases = {
     'nohup -i %s' % H: K.UNCLASSIFIED,
     'env %s' % H: K.UNCLASSIFIED,
     'env -i %s' % H: K.UNCLASSIFIED,
+    # An external absolute program is NOT harmless: `/usr/bin/env <hook>` runs the hook and
+    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. A supported
+    # interpreter is matched earlier by identity, which is why /usr/bin/python3 still works.
+    '/usr/bin/env %s' % H: K.UNCLASSIFIED,
+    '/usr/bin/nohup %s' % H: K.UNCLASSIFIED,
+    '/bin/sh -c "anything"': K.UNCLASSIFIED,
+    '/opt/vendor/wrapper %s' % H: K.UNCLASSIFIED,
     # `true` and `:` are gone from the non-hook vocabulary; nothing live uses them.
     'true': K.UNCLASSIFIED,
     'curl https://example.invalid': K.UNCLASSIFIED,
@@ -628,6 +635,33 @@ if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/unclassified.log"; th
   ok "a compound hook command fails the gate and is named"
 else
   bad "a compound hook command did not fail the gate" "$(tail -3 "$TMP/unclassified.log")"
+fi
+
+# End-to-end: an absolute launcher must FAIL rather than quietly removing the hook from the
+# derived set. Bash runs the hook through /usr/bin/env and returns 126 when it is not
+# executable, so classifying the entry as a harmless external command hid a real breakage.
+FIX_ABS="$TMP/abslauncher"
+make_fixture "$FIX_ABS"
+python3 - "$FIX_ABS" <<'PYABS'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "/usr/bin/env " + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYABS
+rc=$(run_gate "$FIX_ABS" "$TMP/abslauncher.log")
+if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/abslauncher.log"; then
+  ok "an absolute launcher fails the gate and is named"
+else
+  bad "an absolute launcher did not fail the gate" "$(tail -3 "$TMP/abslauncher.log")"
 fi
 
 # Adding a hook must not trip the exact-count assertion.
