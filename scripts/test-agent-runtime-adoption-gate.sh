@@ -722,6 +722,16 @@ cases = {
     'echo "|"': K.NON_HOOK,
     'echo \\;': K.NON_HOOK,
     '%s ";"' % H: K.DIRECT,
+    # A SUBSTITUTION BODY HAS ITS OWN QUOTING CONTEXT. Counting parentheses against the OUTER
+    # states closed the body at a quoted `)`, so the scan found no repository path and the
+    # entry fell back to NON_HOOK while bash still runs the hook.
+    'echo "$(echo \')\'; %s)"' % H: K.UNCLASSIFIED,
+    'echo "$(echo \'(\'; %s)"' % H: K.UNCLASSIFIED,
+    # OPERATOR TEXT INSIDE A COMMENT IS NOT COMPOSITION. Scanning the raw command made the
+    # gate red on a hook carrying an explanatory comment -- bash never sees those characters.
+    '%s # use && fallback' % H: K.DIRECT,
+    '%s # x | y' % H: K.DIRECT,
+    '%s # step 1; step 2' % H: K.DIRECT,
 }
 bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
 sys.exit(0 if not bad else 1)
@@ -894,6 +904,57 @@ if [ "$rc" -eq 0 ]; then
   ok "an argument made of quoted punctuation is data, not a composition"
 else
   bad "a quoted operator argument was mistaken for a composition" "$(tail -3 "$TMP/quotedop.log")"
+fi
+
+# End-to-end: a hook carrying an explanatory comment with punctuation in it must stay green.
+FIX_CMT="$TMP/commenthook"
+make_fixture "$FIX_CMT"
+python3 - "$FIX_CMT" <<'PYCMT'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = c + " # health check; see docs && runbook"
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYCMT
+rc=$(run_gate "$FIX_CMT" "$TMP/commenthook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "operator text inside a comment is not read as composition"
+else
+  bad "a comment containing punctuation was read as a composition" "$(tail -3 "$TMP/commenthook.log")"
+fi
+
+# End-to-end: a quoted `)` must not close the substitution early and let the hook vanish.
+FIX_PAREN="$TMP/parenhook"
+make_fixture "$FIX_PAREN"
+python3 - "$FIX_PAREN" <<'PYPAREN'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "$(echo \')\'; %s)"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYPAREN
+chmod -x "$FIX_PAREN/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_PAREN" "$TMP/parenhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/parenhook.log"; then
+  ok "a quoted parenthesis does not close the substitution early"
+else
+  bad "a hook hid behind a quoted parenthesis in a substitution" "$(tail -3 "$TMP/parenhook.log")"
 fi
 
 # End-to-end, both halves. A dropped target hides in the derived list AND in the expected

@@ -169,15 +169,27 @@ def _repo_path_in_substitution(command: str, root):
     while i < n:
         st = states[i] if i < len(states) else _PLAIN
         if st in (_PLAIN, _DOUBLE) and command.startswith("$(", i):
-            depth, j = 1, i + 2
-            while j < n and depth:
-                if command[j] == "(":
-                    depth += 1
-                elif command[j] == ")":
-                    depth -= 1
+            # A SUBSTITUTION BODY HAS ITS OWN QUOTING CONTEXT. Counting parentheses against
+            # the OUTER states closed `echo "$(echo ')'; <hook>)"` at the quoted `)`, leaving
+            # a truncated body that would not tokenise -- so the scan found no repository path
+            # and the entry fell back to NON_HOOK while bash still runs the hook. Bash re-opens
+            # quoting inside `$(`, so the body is walked with a fresh state machine.
+            body = command[i + 2:]
+            body_states = _shell_states(body)
+            depth, j = 1, 0
+            while j < len(body) and depth:
+                if body_states[j] == _PLAIN:
+                    if body[j] == "(":
+                        depth += 1
+                    elif body[j] == ")":
+                        depth -= 1
                 j += 1
-            bodies.append(command[i + 2:j - 1])
-            i = j
+            if depth:
+                # Unterminated: refuse rather than guess where it ends.
+                bodies.append(body)
+                break
+            bodies.append(body[:j - 1])
+            i = i + 2 + j
             continue
         if st in (_PLAIN, _DOUBLE) and command[i] == "`":
             j = command.find("`", i + 1)
@@ -428,7 +440,13 @@ def classify_hook_command(command: str, root: Path | None = None):
         return (HookCommandKind.UNCLASSIFIED, None,
                 "contains a literal newline, which bash reads as a command separator; only a "
                 "single simple command is supported")
-    cmd = _mask_unexpanded_dollars(_strip_shell_comment(command).strip())
+    # THE COMMENT-STRIPPED SPELLING, with quoting still intact, is what every reader below
+    # uses. Scanning the raw command for operators flagged text inside an explanatory comment
+    # -- `<hook> # use && fallback` was reported as composition and the gate went red on a
+    # command bash runs normally. Stripping only removes comment ranges, so quote provenance
+    # survives it.
+    no_comment = _strip_shell_comment(command)
+    cmd = _mask_unexpanded_dollars(no_comment.strip())
     if not cmd:
         return HookCommandKind.NON_HOOK, None, "empty command"
     tokens = _tokenize(cmd)
@@ -437,7 +455,7 @@ def classify_hook_command(command: str, root: Path | None = None):
     if not tokens:
         return HookCommandKind.NON_HOOK, None, "empty command"
 
-    ops = _unquoted_operators(command)
+    ops = _unquoted_operators(no_comment)
     if ops:
         # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
         # a later one may be a hook whose executable bit decides whether it runs.
@@ -445,7 +463,7 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "top-level shell composition (%s); only a single simple command is supported"
                 % " ".join(sorted(ops)))
 
-    inside = _repo_path_in_substitution(command, root)
+    inside = _repo_path_in_substitution(no_comment, root)
     if inside is not None:
         # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
         # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
