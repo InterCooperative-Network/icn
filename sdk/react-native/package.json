@@ -42,16 +42,16 @@
     "@noble/post-quantum": "^0.6.0"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.28.5",
-    "@babel/preset-typescript": "^7.28.5",
+    "@babel/preset-env": "^8.0.2",
+    "@babel/preset-typescript": "^8.0.1",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.2.7",
     "@types/react-native": "^0.73.0",
     "jest": "^30.2.0",
     "react": "^19.2.3",
-    "react-native": "^0.85.1",
+    "react-native": "^0.87.1",
     "ts-jest": "^29.1.0",
-    "typescript": "^6.0.2"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
