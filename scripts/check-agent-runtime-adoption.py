@@ -51,6 +51,48 @@ REQUIRED_MATCHER_TOKENS = {
 LITERAL_DOLLAR = "__ICN_LITERAL_DOLLAR__"
 
 
+_PLAIN, _SINGLE, _DOUBLE, _ESCAPED = "plain", "single", "double", "escaped"
+
+
+def _shell_states(command: str) -> list:
+    """How a shell reads each character of `command`: plain, single-quoted, double-quoted or
+    backslash-escaped.
+
+    ONE quoting model, three consumers -- `$` masking, comment stripping and separator
+    detection. There used to be two, and they disagreed: masking tracked quotes properly while
+    comment stripping was an unconditional `split("#", 1)`. A parser and a splitter holding
+    different opinions about quoting is the defect this file has now hit three times.
+    """
+    states = []
+    i, n = 0, len(command)
+    in_single = in_double = False
+    while i < n:
+        c = command[i]
+        if in_single:
+            # Inside '...' NOTHING is special except the closing quote -- not even backslash.
+            states.append(_SINGLE)
+            if c == "'":
+                in_single = False
+        elif c == "\\" and i + 1 < n:
+            # A backslash escapes in the unquoted and double-quoted contexts alike.
+            states.append(_DOUBLE if in_double else _PLAIN)
+            states.append(_ESCAPED)
+            i += 2
+            continue
+        elif in_double:
+            states.append(_DOUBLE)   # `$` IS expanded inside double quotes.
+            if c == '"':
+                in_double = False
+        else:
+            states.append(_PLAIN)
+            if c == "'":
+                in_single = True
+            elif c == '"':
+                in_double = True
+        i += 1
+    return states
+
+
 def _mask_unexpanded_dollars(command: str) -> str:
     """
     Neutralise every `$` a shell would NOT expand.
@@ -68,39 +110,51 @@ def _mask_unexpanded_dollars(command: str) -> str:
     "25 check(s) passed, 0 failure(s)" while `bash -c` on the identical string exited 127.
     A quoting model that is wrong about quoting is worse than no model, because it looks like one.
     """
+    return "".join(
+        LITERAL_DOLLAR if c == "$" and st in (_SINGLE, _ESCAPED) else c
+        for c, st in zip(command, _shell_states(command)))
+
+
+def _strip_shell_comment(command: str) -> str:
+    """`command` with every unquoted comment removed.
+
+    A comment runs from an unquoted `#` that BEGINS A WORD to the end of ITS LINE. Both halves
+    of that matter, and the previous `command.split("#", 1)[0]` had neither:
+
+      * it cut inside quotes, so `echo "ticket #123"` was truncated mid-string and the leftover
+        unmatched quote came back as "unparseable command" -- the required workflow red on a
+        command the shell runs perfectly well; and
+      * it cut to the end of the STRING, so everything after a comment vanished, including a
+        second command on a later line.
+    """
+    states = _shell_states(command)
     out: list[str] = []
     i, n = 0, len(command)
-    in_single = False
-    in_double = False
     while i < n:
-        c = command[i]
-        if in_single:
-            # Inside '...' NOTHING is special except the closing quote — not even backslash.
-            if c == "'":
-                in_single = False
-            elif c == "$":
-                out.append(LITERAL_DOLLAR)
-                i += 1
-                continue
-            out.append(c)
-        elif c == "\\" and i + 1 < n:
-            # A backslash-escaped $ is literal in both the unquoted and double-quoted contexts.
-            out.append(c)
-            out.append(LITERAL_DOLLAR if command[i + 1] == "$" else command[i + 1])
-            i += 2
+        if (command[i] == "#" and states[i] == _PLAIN
+                and (i == 0 or command[i - 1] in " \t\n")):
+            nl = command.find("\n", i)
+            if nl < 0:
+                break
+            i = nl
             continue
-        elif in_double:
-            if c == '"':
-                in_double = False
-            out.append(c)          # `$` IS expanded inside double quotes — leave it alone.
-        else:
-            if c == "'":
-                in_single = True
-            elif c == '"':
-                in_double = True
-            out.append(c)
+        out.append(command[i])
         i += 1
     return "".join(out)
+
+
+def _has_unquoted_newline(command: str) -> bool:
+    """Does a bash COMMAND SEPARATOR hide in here as a literal newline?
+
+    `shlex` reads a newline as ordinary whitespace, so `echo hi\n<hook>` tokenised to
+    `["echo", "hi", "<hook>"]`, argv0 was `echo`, and the entry classified NON_HOOK -- while
+    bash runs both lines and returns 126 from the second if the hook is not executable. The
+    hook then left the derived set, taking its executable check and its share of the expected
+    count with it. `;`, `&&` and `|` were already caught as tokens; a newline is the spelling
+    that never reaches the lexer.
+    """
+    return any(c == "\n" and st == _PLAIN
+               for c, st in zip(command, _shell_states(command)))
 
 
 def _invokes_hook(command: str, root: Path) -> bool:
@@ -115,7 +169,7 @@ def _invokes_hook(command: str, root: Path) -> bool:
     runtime is wired must not accept a command that provably never runs it.
     """
     # Mask literal `$` BEFORE shlex removes the quoting that decides whether it expands.
-    stripped = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
+    stripped = _mask_unexpanded_dollars(_strip_shell_comment(command).strip())
 
     # NO SHELL OPERATORS. Everything after argv0 used to be ignored, so appending ` </dev/null`
     # to each hook left the gate at 25/0 while the hook received no payload at all and answered
@@ -299,7 +353,13 @@ def classify_hook_command(command: str, root: Path | None = None):
     target, which dropped it from the derived set -- and the expected check count derives
     from that same list, so the loss concealed itself and the gate stayed green.
     """
-    cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
+    if _has_unquoted_newline(command):
+        # Checked on the RAW command: a newline inside a comment still ends that comment and
+        # starts a new one, and the lexer below never sees a newline at all.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a literal newline, which bash reads as a command separator; only a "
+                "single simple command is supported")
+    cmd = _mask_unexpanded_dollars(_strip_shell_comment(command).strip())
     if not cmd:
         return HookCommandKind.NON_HOOK, None, "empty command"
     tokens = _tokenize(cmd)
@@ -364,11 +424,16 @@ def classify_hook_command(command: str, root: Path | None = None):
             # the raw spelling would hand back the traversal with it.
             return (HookCommandKind.DIRECT, resolved.relative_to(base_dir).as_posix(),
                     "direct repo executable")
-        if base in _INTERPRETERS:
-            # Only OUTSIDE the tree does the name decide: an interpreter we did not ship is
-            # the one thing we cannot check an executable bit on, and `/usr/bin/python3` is
-            # live configuration.
-            return HookCommandKind.INTERPRETED, None, "runs %s" % base
+        # NO NAME EXEMPTION OUT HERE. The interpreter exemption used to apply to an external
+        # path whose BASENAME looked right, so `/tmp/python3` -- a symlink to `/usr/bin/env`,
+        # or any program at all -- was certified as "runs the interpreter" and the hook it
+        # actually launches left the derived set. Verifying the binary would mean resolving
+        # symlinks, or executing it, to defend a spelling NOTHING USES: live settings.json
+        # runs 13 repository paths, 3 bare `python3` and 2 bare `echo`, and not one absolute
+        # interpreter. So the claim is removed rather than defended, exactly as launcher
+        # support was. A future `/usr/bin/python3 x.py` makes this gate red until support is
+        # added deliberately.
+        #
         # NOT harmless. `/usr/bin/env <hook>` runs the hook and returns 126 when it is not
         # executable; `/bin/sh -c …` can run anything. An arbitrary external executable may
         # wrap, source or otherwise invoke a repository hook, so it stays unclassified until

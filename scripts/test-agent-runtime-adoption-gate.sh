@@ -574,7 +574,11 @@ cases = {
     # The three shapes live settings.json actually uses.
     H: K.DIRECT,
     'python3 %s' % PY: K.INTERPRETED,
-    '/usr/bin/python3 %s' % PY: K.INTERPRETED,
+    # An ABSOLUTE interpreter is no longer exempt. Nothing uses the spelling, and defending it
+    # meant trusting a basename: `/tmp/python3` symlinked to `/usr/bin/env` was certified as
+    # "runs the interpreter" while the hook it launches left the derived set.
+    '/usr/bin/python3 %s' % PY: K.UNCLASSIFIED,
+    '/tmp/python3 %s' % H: K.UNCLASSIFIED,
     # The real echo carries `||` INSIDE a command substitution. Quoting is respected, so this
     # is one simple command -- a substring search for operators would have got it wrong.
     'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
@@ -590,9 +594,9 @@ cases = {
     'env %s' % H: K.UNCLASSIFIED,
     'env -i %s' % H: K.UNCLASSIFIED,
     # An external absolute program is NOT harmless: `/usr/bin/env <hook>` runs the hook and
-    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. The interpreter
-    # names are consulted only AFTER the path is found to land outside the tree, which is why
-    # /usr/bin/python3 still classifies and a repo file named python3 no longer escapes.
+    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. No name exempts
+    # a path that lands outside the tree, and a repo file named python3 does not escape either:
+    # the interpreter vocabulary applies to BARE names only, which is what a shell looks up.
     '/usr/bin/env %s' % H: K.UNCLASSIFIED,
     '/usr/bin/nohup %s' % H: K.UNCLASSIFIED,
     '/bin/sh -c "anything"': K.UNCLASSIFIED,
@@ -643,9 +647,9 @@ cases = {
     '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh':
         (K.DIRECT, ".claude/hooks/hook-health.sh"),
     # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
-    # interpreter and non-hook vocabularies still apply to it, and only to it.
+    # interpreter and non-hook vocabularies apply to it, and ONLY to it.
     'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
-    '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
     'echo hi': (K.NON_HOOK, None),
     H: (K.DIRECT, ".claude/hooks/hook-health.sh"),
 }
@@ -656,6 +660,100 @@ if [ $? -eq 0 ]; then
   ok "containment is physical and precedes the name exemptions"
 else
   bad "a path command escaped the repository or was exempted by its name" ""
+fi
+
+# One quoting model, three consumers. Masking tracked quotes properly while comment stripping
+# was an unconditional split, and the lexer never saw a newline at all.
+python3 - "$GATE" <<'PYQUOTE'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+cases = {
+    # A LITERAL NEWLINE is a bash command separator. shlex reads it as ordinary whitespace, so
+    # argv0 was `echo`, the entry classified NON_HOOK, and the hook on the second line left the
+    # derived set -- while bash runs it and returns 126 when it is not executable.
+    'echo hi\n%s' % H: K.UNCLASSIFIED,
+    '%s\necho done' % H: K.UNCLASSIFIED,
+    # A comment ends at its LINE, not at the end of the string, so this still hides a command.
+    'echo hi # note\n%s' % H: K.UNCLASSIFIED,
+    # ...but a newline INSIDE quotes is data, not a separator.
+    'echo "a\nb"': K.NON_HOOK,
+    # A quoted `#` is part of the argument. The unconditional split cut here, leaving an
+    # unmatched quote that came back as "unparseable" -- the required workflow RED on a command
+    # the shell runs perfectly well. That is a false rejection, not a missed detection.
+    'echo "ticket #123"': K.NON_HOOK,
+    "echo 'ticket #123'": K.NON_HOOK,
+    'echo ticket\\#123': K.NON_HOOK,
+    # A real comment is still a comment.
+    'echo hi # a note': K.NON_HOOK,
+    '%s # runs the health check' % H: K.DIRECT,
+    # And the live command, which carries `||` inside a command substitution.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
+sys.exit(0 if not bad else 1)
+PYQUOTE
+if [ $? -eq 0 ]; then
+  ok "newlines separate commands, and quoted hashes are not comments"
+else
+  bad "a separator was missed or a quoted hash truncated a valid command" ""
+fi
+
+# End-to-end: the newline spelling must take the gate red, not quietly drop a hook.
+FIX_NL="$TMP/newlinehook"
+make_fixture "$FIX_NL"
+python3 - "$FIX_NL" <<'PYNL'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "echo starting\n" + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYNL
+chmod -x "$FIX_NL/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_NL" "$TMP/newlinehook.log")
+if [ "$rc" -ne 0 ] && grep -q "literal newline" "$TMP/newlinehook.log"; then
+  ok "a newline-separated hook command fails the gate instead of vanishing behind echo"
+else
+  bad "a hook hidden after a newline escaped the executable check" "$(tail -3 "$TMP/newlinehook.log")"
+fi
+
+# End-to-end the other way: a quoted hash must NOT make a working configuration fail.
+FIX_HASH="$TMP/hashhook"
+make_fixture "$FIX_HASH"
+python3 - "$FIX_HASH" <<'PYHASH'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("echo") and not done:
+            n["command"] = 'echo "see ticket #123"'
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json has an echo hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYHASH
+rc=$(run_gate "$FIX_HASH" "$TMP/hashhook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "a quoted hash in a hook command does not fail the gate"
+else
+  bad "a valid command containing a quoted hash was rejected" "$(tail -3 "$TMP/hashhook.log")"
 fi
 
 # End-to-end, both halves. A dropped target hides in the derived list AND in the expected
