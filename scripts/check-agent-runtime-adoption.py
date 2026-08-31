@@ -143,7 +143,13 @@ def _strip_shell_comment(command: str) -> str:
     return "".join(out)
 
 
-def _unquoted_operators(command: str) -> set:
+# Characters that make a command more than one simple invocation. Split by WHERE a shell
+# still acts on them: `$` and a backtick expand inside double quotes as well as bare, while
+# the rest are only operators when unquoted.
+_EXPANDS_IN_DOUBLE_QUOTES = set("$`")
+
+
+def _unquoted_operators(command: str, chars=None, also_in_double=frozenset()) -> set:
     """Shell operator characters the command carries UNQUOTED.
 
     Read from the character states, not from the token list. shlex strips quote provenance in
@@ -152,8 +158,10 @@ def _unquoted_operators(command: str) -> set:
     went red on a command bash runs normally. Another false rejection from asking a reader a
     question it had already thrown away the answer to.
     """
+    chars = _SHELL_OPERATOR_CHARS if chars is None else chars
     return {c for c, st in zip(command, _shell_states(command))
-            if st == _PLAIN and c in _SHELL_OPERATOR_CHARS}
+            if c in chars and (st == _PLAIN
+                               or (st == _DOUBLE and c in also_in_double))}
 
 
 def _repo_path_in_substitution(command: str, root):
@@ -259,7 +267,21 @@ def _invokes_hook(command: str, root: Path) -> bool:
     # "DEGRADED — hook payload unparseable" on every single event: no register, no progress, no
     # release. A redirection, a pipe or a second command can change what runs or what it reads,
     # and none of them belong in a hook invocation.
-    if re.search(r"[<>;&|`$(){}]", stripped.replace("$CLAUDE_PROJECT_DIR", "")):
+    #
+    # QUOTE-AWARE, for the reason the classifier already is. A plain `re.search` treated a
+    # data argument made of punctuation -- `<hook> ";"` -- as a redirection and returned
+    # False, so the event was reported as not invoking the hook at all while the classifier
+    # called the very same command a direct invocation. Two siblings reading one command
+    # string must not disagree about what an operator is; that disagreement is how one of
+    # them ends up wrong, and here it would have been a false rejection of a valid config.
+    #
+    # The two functions still differ DELIBERATELY on `$` and backticks inside double quotes.
+    # The classifier asks what program argv0 is, and `<hook> "$HOME"` runs the hook; this
+    # asks whether the invocation is unadorned, and an expansion is something else deciding
+    # what the hook receives. That asymmetry is fail-CLOSED -- the gate goes red on a config
+    # that would work -- and it is pinned by tests rather than left to be rediscovered.
+    if _unquoted_operators(stripped.replace("$CLAUDE_PROJECT_DIR", ""),
+                           set("<>;&|`$(){}"), _EXPANDS_IN_DOUBLE_QUOTES):
         return False
 
     try:

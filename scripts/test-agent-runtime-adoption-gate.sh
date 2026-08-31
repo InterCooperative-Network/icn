@@ -749,6 +749,46 @@ else
   bad "a separator was missed or a quoted hash truncated a valid command" ""
 fi
 
+# THE TWO SIBLINGS THAT READ ONE COMMAND STRING MUST AGREE, or one of them is wrong. The
+# classifier decides what argv0 is; `_invokes_hook` decides whether the event runs the hook.
+# A plain `re.search` in the second treated `<hook> ";"` as a redirection and answered "this
+# event does not invoke the hook" while the first called the same command a direct
+# invocation -- the gate red on a valid configuration.
+python3 - "$GATE" <<'PYSIB'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+HOOK = '"$CLAUDE_PROJECT_DIR"/' + m.HOOK
+must_agree = [
+    HOOK,
+    '%s ";"' % HOOK,
+    '%s "|"' % HOOK,
+    "%s '&&'" % HOOK,
+    '%s # use && fallback' % HOOK,
+    '%s </dev/null' % HOOK,
+    '%s; echo x' % HOOK,
+    'MODE=health %s' % HOOK,
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"',
+]
+bad = [c for c in must_agree
+       if (m.classify_hook_command(c, root)[0] == K.DIRECT) != m._invokes_hook(c, root)]
+# ...and the two places they differ ON PURPOSE. The classifier asks what argv0 IS;
+# `_invokes_hook` asks whether the invocation is unadorned. Fail-closed, and pinned here so
+# it cannot drift into an accident.
+deliberate = ['%s "$HOME"' % HOOK, '%s "`date`"' % HOOK]
+bad += [c for c in deliberate
+        if not (m.classify_hook_command(c, root)[0] == K.DIRECT
+                and not m._invokes_hook(c, root))]
+sys.exit(0 if not bad else 1)
+PYSIB
+if [ $? -eq 0 ]; then
+  ok "the classifier and _invokes_hook agree, except where they differ on purpose"
+else
+  bad "the two readers of a hook command disagree" ""
+fi
+
 # End-to-end: the newline spelling must take the gate red, not quietly drop a hook.
 FIX_NL="$TMP/newlinehook"
 make_fixture "$FIX_NL"
