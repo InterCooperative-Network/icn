@@ -845,6 +845,56 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 21: the block's own indentation, and the comment after a quote -------
+print()
+print("--- a block scalar's indentation is part of its validity ---")
+
+# `opens_nested` accepted EVERY indented line once a block scalar opened, so a body that
+# dedents mid-block was certified while the YAML loader raised ParserError -- the provider
+# cannot load a definition the canonical registry called valid.
+try:
+    import yaml as _y21
+except ImportError:
+    _y21 = None
+
+_B21 = "name: twin\ninfer: false\n"
+for fm, label, should_pass in (
+        (_B21 + "description: |\n  two spaces\n one space",
+         "a block body that dedents mid-block", False),
+        # A `#` line INSIDE a block scalar is CONTENT. Filtering it as a comment would have
+        # dropped the indentation sample that makes the dedent below detectable.
+        (_B21 + "description: |\n  # content, not a comment\n one space",
+         "a dedent below a comment-looking block line", False),
+        (_B21 + "description: |2\n   body",
+         "an explicit block indentation indicator", False),
+        (_B21 + "description: |\n  two spaces\n    four spaces",
+         "a block body that indents further", True),
+        (_B21 + "description: >-\n  folded body", "a chomping modifier", True),
+        # A `#` after the CLOSING quote is a comment; one inside is data. Returning the whole
+        # string made `description: "fixture" # rationale` look unterminated, so a definition
+        # a YAML loader accepts was refused -- the required workflow red on valid input.
+        (_B21 + 'description: "fixture" # rationale', "a comment after a quoted scalar", True),
+        (_B21 + "description: 'fixture' # rationale",
+         "a comment after a single-quoted scalar", True),
+        (_B21 + 'description: "ticket #123"', "a hash inside a quoted scalar", True),
+        (_B21 + 'description: "fixture', "a genuinely unterminated quote", False)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if _y21 is not None:
+        try:
+            _y21.safe_load(fm)
+            loadable = True
+        except Exception:
+            loadable = False
+        # Only one direction is asserted: what the registry ACCEPTS must load. The subset is
+        # narrower than YAML on purpose, so a rejection proves nothing about the loader.
+        if should_pass:
+            check("   ...and a real YAML parser loads it", loadable)
+
 # --- round 20: an indented line is not automatically nested content -------------
 print()
 print("--- indentation is supported only where YAML introduces it ---")

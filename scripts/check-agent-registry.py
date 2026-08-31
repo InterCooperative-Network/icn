@@ -153,7 +153,11 @@ _NON_STRING_WORDS = frozenset(
     w for base in ("null", "true", "false", "yes", "no", "on", "off", "y", "n")
     for w in (base, base.capitalize(), base.upper())
 )
-_BLOCK_SCALAR = re.compile(r"^[|>][+-]?\d*$")
+# Bare `|`/`>` with an optional CHOMPING modifier. The explicit indentation indicator
+# (`|2`) is deliberately not supported: it moves the indent the body must use, which is the
+# one thing the block check below establishes from the body itself. All 20 block scalars in
+# the checked-in definitions are a bare `>`.
+_BLOCK_SCALAR = re.compile(r"^[|>][+-]?$")
 
 
 def strip_inline_comment(raw):
@@ -167,7 +171,14 @@ def strip_inline_comment(raw):
     """
     v = raw.strip()
     if v[:1] in ("\"", "'"):
-        return v
+        # A `#` INSIDE the quotes is data; one AFTER the closing quote is a comment. Returning
+        # the whole string treated `description: "fixture" # rationale` as a quoted scalar
+        # whose last character is no longer a quote, so it was refused as UNTERMINATED -- the
+        # required workflow red on a definition a YAML loader accepts.
+        end = v.find(v[0], 1)
+        if end < 0:
+            return v                      # unterminated; the decoder reports it as such
+        return (v[:end + 1] + re.split(r"(?:^|\s)#", v[end + 1:], maxsplit=1)[0]).strip()
     return re.split(r"(?:^|\s)#", v, maxsplit=1)[0].strip()
 
 
@@ -301,8 +312,15 @@ def parse_registered_agent_front_matter(text, provider_type):
     # excluded on purpose, the round-14 trade again: quote it or use a block scalar. All 43
     # checked-in definitions are inside this subset; every one of their 42 indented lines sits
     # beneath a block scalar, and none opens a nested mapping or continues a plain scalar.
-    opens_nested = False
-    for i, line in substantive:
+    # Walked over ALL lines rather than `substantive`, because a `#` line INSIDE a block
+    # scalar is content, not a comment -- dropping it would lose the indentation sample that
+    # decides whether the block is well formed.
+    opens_nested = False        # may an indented line follow the key just read?
+    in_block = False            # ...and is that indentation a block scalar's body?
+    block_indent = None         # the indent its first body line established
+    for i, line in enumerate(block.split("\n"), 1):
+        if not line.strip():
+            continue
         if line[0].isspace():
             if not opens_nested:
                 raise InvalidDefinition(
@@ -310,6 +328,23 @@ def parse_registered_agent_front_matter(text, provider_type):
                     "scalar. A YAML parser rejects this, so the provider cannot load the "
                     "definition -- indentation is supported only beneath a block scalar or an "
                     "empty value. Quote the value or use a block scalar." % (i, line[:60]))
+            if in_block:
+                # A BLOCK SCALAR'S INDENTATION IS PART OF ITS VALIDITY. Accepting every
+                # indented line meant a body that dedents mid-block -- two spaces, then one --
+                # was certified while the YAML loader raised ParserError, so the provider could
+                # not load a definition the canonical registry called valid.
+                indent = len(line) - len(line.lstrip())
+                if block_indent is None:
+                    block_indent = indent
+                elif indent < block_indent:
+                    raise InvalidDefinition(
+                        "line %d, %r: indented %d columns, inside a block scalar whose body "
+                        "established %d. A line that dedents out of the block without reaching "
+                        "column 0 is not a root key either, and a YAML parser raises rather "
+                        "than reading it as content."
+                        % (i, line[:60], indent, block_indent))
+            continue
+        if line.lstrip().startswith("#"):
             continue
         if not _PLAIN_TOP_LEVEL_KEY.match(line):
             raise InvalidDefinition(
@@ -319,7 +354,15 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "reader would treat them as the key being ABSENT -- so a semantic field could "
                 "change while the registry certified the old value." % (i, line[:60]))
         value = strip_inline_comment(line.split(":", 1)[1])
-        opens_nested = not value or bool(_BLOCK_SCALAR.match(value))
+        if re.match(r"^[|>][+-]?\d", value):
+            raise InvalidDefinition(
+                "line %d, %r: an explicit block indentation indicator is not supported. It "
+                "moves the indent the body must use, which is the one thing this reader "
+                "establishes from the body itself -- so supporting it would mean guessing. "
+                "Use a bare `|` or `>`." % (i, line[:60]))
+        in_block = bool(_BLOCK_SCALAR.match(value))
+        block_indent = None
+        opens_nested = in_block or not value
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
         try:
