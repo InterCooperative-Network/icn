@@ -488,7 +488,12 @@ def strict_bool(block, key):
     raw = front_matter_value(block, key)
     if raw is None:
         return None
-    v = raw.strip()
+    # An inline comment is not part of the value. `infer: false # keep manual` loads as the
+    # boolean False, and comparing the RAW string saw `false # keep manual` and refused the
+    # definition -- the required gate red on a valid file for adding an explanatory comment.
+    # A false rejection, and the reader/parser agreement rule cannot catch it because the
+    # parser's value here is a bool, not a string.
+    v = strip_inline_comment(raw)
     # No quote stripping. `infer: "false"` is a YAML *string*, and turning it into a boolean
     # manufactures a type the provider never declared -- the registry would then certify
     # behaviour on the strength of the checker's own coercion. Only the two unquoted YAML

@@ -848,6 +848,34 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- a comment on a provider boolean is not part of the value -----------------
+print()
+print("--- an explanatory comment must not break a valid definition ---")
+
+# The strict boolean comparison read the RAW string, so `infer: false # keep manual` was
+# refused -- the required gate red on a valid file for carrying a comment. A false rejection,
+# and one the reader/parser agreement rule cannot catch, because the parser's value here is a
+# bool rather than a string.
+for value, label, should_pass in (
+        ("false # keep manual", "commented false", True),
+        ("true  # cloud may pick this", "commented true", True),
+        ("false", "plain false", True),
+        ("true", "plain true", True),
+        ('"false"', "quoted false is still unknown, not a boolean", False),
+        ("flase # typo", "a commented typo is still unknown", False)):
+    r = base_registry()
+    # `infer: true` projects to automatic_invocation TRUE; `infer: false` to FALSE. The
+    # record must state the projection the definition implies, or the semantic check fails
+    # for an unrelated reason and the control proves nothing.
+    r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = (
+        value.split("#")[0].strip() == "true")
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: fixture\ninfer: %s\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+
 # --- parser boundary: YAML validity has an owner now (maintainer decision) ------
 print()
 print("--- every accumulated malformed case is rejected by the parse-validity owner ---")
