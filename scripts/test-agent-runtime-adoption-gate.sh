@@ -671,6 +671,7 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 root = pathlib.Path(".").resolve()
 K = m.HookCommandKind
 H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
 cases = {
     # A LITERAL NEWLINE is a bash command separator. shlex reads it as ordinary whitespace, so
     # argv0 was `echo`, the entry classified NON_HOOK, and the hook on the second line left the
@@ -690,6 +691,19 @@ cases = {
     # A real comment is still a comment.
     'echo hi # a note': K.NON_HOOK,
     '%s # runs the health check' % H: K.DIRECT,
+    # ...and shlex must not strip comments a SECOND time, by a different rule. Its commenter
+    # fires mid-word, but bash treats `#` inside a word as part of it, so `<hook>#missing` was
+    # truncated to the real hook and its bit checked while Claude runs the suffixed path and
+    # exits 127. The target must keep the suffix so the `missing:` branch fails on it.
+    '%s#missing' % H: K.DIRECT,
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/a#b.sh': K.DIRECT,
+    # A bare name is resolved through PATH, and an assignment can BE the PATH:
+    # `PATH=/tmp:$PATH python3 <hook>` runs whatever /tmp/python3 is. A name exemption needs
+    # nothing local to have changed what the name resolves to.
+    'PATH=/tmp:$PATH python3 %s' % PY: K.UNCLASSIFIED,
+    'FOO=1 echo hi': K.UNCLASSIFIED,
+    # ...but an assignment in front of a repo PATH stays supported: a path is not looked up.
+    'MODE=health %s' % H: K.DIRECT,
     # And the live command, which carries `||` inside a command substitution.
     'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
 }
@@ -754,6 +768,61 @@ if [ "$rc" -eq 0 ]; then
   ok "a quoted hash in a hook command does not fail the gate"
 else
   bad "a valid command containing a quoted hash was rejected" "$(tail -3 "$TMP/hashhook.log")"
+fi
+
+# End-to-end: a `#` suffix on the path must not be lexed away, or the gate checks a different
+# file from the one Claude runs.
+FIX_SUF="$TMP/suffixhook"
+make_fixture "$FIX_SUF"
+python3 - "$FIX_SUF" <<'PYSUF'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = c + "#missing"
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYSUF
+rc=$(run_gate "$FIX_SUF" "$TMP/suffixhook.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/hook-health.sh#missing" "$TMP/suffixhook.log"; then
+  ok "a hash suffix on a hook path is checked as part of the path, not lexed away"
+else
+  bad "a hash-suffixed hook path was checked as the unsuffixed file" "$(tail -3 "$TMP/suffixhook.log")"
+fi
+
+# End-to-end: an assignment that can change PATH lookup must take the gate red, not exempt the
+# interpreter and drop the hook.
+FIX_PATH="$TMP/pathhook"
+make_fixture "$FIX_PATH"
+python3 - "$FIX_PATH" <<'PYPATH'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("python3 ") and not done:
+            n["command"] = "PATH=/tmp:$PATH " + c
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json invokes at least one python3 hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYPATH
+rc=$(run_gate "$FIX_PATH" "$TMP/pathhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command-local assignment" "$TMP/pathhook.log"; then
+  ok "an interpreter behind a PATH-changing assignment is not exempted"
+else
+  bad "a PATH-overridden interpreter kept its name exemption" "$(tail -3 "$TMP/pathhook.log")"
 fi
 
 # End-to-end, both halves. A dropped target hides in the derived list AND in the expected

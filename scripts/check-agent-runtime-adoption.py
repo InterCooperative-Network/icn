@@ -341,6 +341,13 @@ def _tokenize(cmd):
     try:
         lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
+        # THE THIRD READER. `_strip_shell_comment` already removed comments quote-awarely, and
+        # shlex's own commenter then removed them AGAIN by a different rule -- one that fires
+        # mid-word. Bash treats `#` inside a word as part of it, so
+        # `.claude/hooks/hook-health.sh#missing` was truncated to the real hook, whose bit was
+        # checked, while Claude runs the suffixed path and exits 127. Comments are stripped in
+        # exactly one place.
+        lexer.commenters = ""
         return list(lexer)
     except ValueError:
         return None
@@ -380,7 +387,9 @@ def classify_hook_command(command: str, root: Path | None = None):
     # file already treats them as part of a direct invocation, and the suite exercises that
     # shape -- two siblings disagreeing about what a hook command looks like is how one of
     # them ends up wrong. Launchers had no such sibling support and no live use.
+    assigned = False
     while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        assigned = True
         tokens = tokens[1:]
     if not tokens:
         return HookCommandKind.UNCLASSIFIED, None, "assignments with no command"
@@ -443,6 +452,19 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "and not provably harmless -- it may invoke a repository hook"
                 % (argv0, resolved))
 
+    # A COMMAND-LOCAL ASSIGNMENT AND A BARE NAME DO NOT MIX. A bare name is resolved through
+    # PATH, and an assignment can BE the PATH: `PATH=/tmp:$PATH python3 <hook>` runs whatever
+    # /tmp/python3 is -- a symlink to `env`, say, which then launches the hook directly and
+    # returns 126 on a mode-0644 file, while the name exemption reported "runs python3" and
+    # dropped the target. Enumerating which variables matter (PATH, ENV, LD_PRELOAD, ...) is a
+    # list to be wrong about; a name-based exemption simply requires that nothing local could
+    # have changed what the name resolves to. Assignments stay supported in front of a repo
+    # PATH, which is the shape live settings.json would use and the one the suite exercises,
+    # because a path is not looked up.
+    if assigned:
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%r is a bare name behind a command-local assignment, which can change what "
+                "it resolves to" % argv0)
     if base in _INTERPRETERS:
         return HookCommandKind.INTERPRETED, None, "runs %s" % base
     if base in _INTENTIONAL_NON_HOOK:
