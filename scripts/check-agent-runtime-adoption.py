@@ -382,7 +382,7 @@ REQUIRED_EXECUTABLES = [
 ]
 
 
-def direct_hook_targets(settings: dict, root: Path) -> list[str]:
+def direct_hook_targets(settings: dict, root: Path):
     """Repo paths that settings.json runs AS the command, so the kernel must exec them.
 
     SYNTACTIC, not existence-filtered. Filtering on is_file() removed a configured hook from
@@ -396,6 +396,7 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
     not need the bit, which is why the three .py hooks are correctly 100644.
     """
     found: list[str] = []
+    interpreted: list[str] = []
     unclassified: list[tuple[str, str]] = []
 
     def walk(node) -> None:
@@ -409,6 +410,9 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
                     unclassified.append((node["command"], detail))
                 elif kind == HookCommandKind.DIRECT and target not in found:
                     found.append(target)
+                elif (kind == HookCommandKind.INTERPRETED and target
+                      and target not in interpreted):
+                    interpreted.append(target)
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
@@ -416,7 +420,7 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
                 walk(v)
 
     walk(settings.get("hooks", {}))
-    return found, unclassified
+    return found, interpreted, unclassified
 
 
 # Shell launchers that exec the command they are handed and return its status. `help command`
@@ -683,7 +687,15 @@ def classify_hook_command(command: str, root: Path | None = None):
         if not resolved.is_relative_to(base_dir) or resolved.suffix != ".py":
             return (HookCommandKind.UNCLASSIFIED, None,
                     "%s is handed %s, which is not a repository .py script" % (base, script))
-        return HookCommandKind.INTERPRETED, None, "runs %s on %s" % (base, script)
+        # The SCRIPT PATH is returned, not None. Classifying from containment and the `.py`
+        # suffix alone meant a deleted or renamed guard stayed INTERPRETED with no target, so
+        # nothing checked that the file exists -- Claude gets a Python file-not-found and the
+        # derived count never moves. It is a separate target class from the direct ones: an
+        # interpreted script is argv[1], so it must EXIST and be readable, and must NOT be
+        # required to be executable. That is why the three .py guards are correctly 100644.
+        return (HookCommandKind.INTERPRETED,
+                resolved.relative_to(base_dir).as_posix(),
+                "runs %s on %s" % (base, script))
     if base in _INTENTIONAL_NON_HOOK:
         return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
     return (HookCommandKind.UNCLASSIFIED, None,
@@ -750,7 +762,7 @@ def main() -> int:
         ok(f"{event} -> {HOOK} (matcher {invoking[0]!r})")
 
     # 2. the things the hooks call actually exist and can be executed
-    hook_targets, unclassified_cmds = direct_hook_targets(settings, root)
+    hook_targets, interpreted_targets, unclassified_cmds = direct_hook_targets(settings, root)
     for cmd, detail in unclassified_cmds:
         failures.append(
             f"settings.json hook command cannot be classified: {cmd!r} ({detail}). The gate "
@@ -764,6 +776,19 @@ def main() -> int:
             failures.append(f"not executable: {rel} (chmod +x)")
         else:
             ok(f"executable: {rel}")
+
+    # 2a. An INTERPRETED script is argv[1], so its executable bit does not matter -- but its
+    # EXISTENCE does. Renaming one left the gate green while Claude got a file-not-found.
+    for rel in interpreted_targets:
+        path = root / rel
+        if not path.is_file():
+            failures.append(
+                f"missing: {rel} — settings.json runs it through an interpreter, so the bit "
+                "is not required, but the file has to be there")
+        elif not os.access(path, os.R_OK):
+            failures.append(f"not readable: {rel} (the interpreter must be able to open it)")
+        else:
+            ok(f"interpreted script present: {rel}")
 
     # 3. provider adapters still reach the ops MCP
     for rel, keypath in PROVIDER_MCP_CONFIGS:
@@ -954,7 +979,7 @@ def main() -> int:
     # this was latent rather than live; a floor makes it neither.
     # EXACT, not a floor. `checked < EXPECTED_CHECKS` let a spurious extra ok() report
     # "26 check(s) passed" and exit 0 — which is how a duplicated check masks a lost one.
-    expected = EXPECTED_STATIC_CHECKS + len(hook_targets)
+    expected = EXPECTED_STATIC_CHECKS + len(hook_targets) + len(interpreted_targets)
     if checked != expected:
         failures.append(
             f"{checked} checks ran, expected exactly {expected} — a check that skipped "

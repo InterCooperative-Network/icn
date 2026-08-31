@@ -347,7 +347,12 @@ spec = importlib.util.spec_from_file_location("gate", sys.argv[1])
 mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 root = pathlib.Path(sys.argv[2])
 settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
-print(int(m.group(1)) + len(mod.direct_hook_targets(settings, root)[0]))
+d, i, _ = mod.direct_hook_targets(settings, root)
+# BOTH derived classes. Interpreted scripts are checked for existence (not the bit), so the
+# expected count derives from them too. If this formula and the one in the gate ever disagree,
+# the count assertion stops meaning anything. (No apostrophes here: this block lives inside a
+# single-quoted python3 -c, and one closed the string.)
+print(int(m.group(1)) + len(d) + len(i))
 ' "$GATE" "$FIX")
 if [ -n "$BASE_COUNT" ] && [ "$DECLARED" = "$BASE_COUNT" ]; then
   ok "EXPECTED_STATIC_CHECKS + derived hook checks ($BASE_COUNT) matches a complete run"
@@ -520,7 +525,9 @@ cases = {
     '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': (K.DIRECT, want),
     H: (K.DIRECT, want),
     'echo hi': (K.NON_HOOK, None),
-    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    # INTERPRETED now carries the SCRIPT PATH as its target, so its EXISTENCE can be
+    # checked. Its executable bit still must not be: the three .py guards are 100644.
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
 }
 bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[:2] != exp]
 sys.exit(0 if not bad else 1)
@@ -648,7 +655,7 @@ cases = {
         (K.DIRECT, ".claude/hooks/hook-health.sh"),
     # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
     # interpreter and non-hook vocabularies apply to it, and ONLY to it.
-    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
     # ...and the ARGUMENT is part of that grammar. A basename-only exemption made `python3`
     # mean "not a hook invocation" whatever followed, so `-c` could run one: the nested
     # shell's permission-denied is invisible because os.system's status is discarded and
@@ -659,7 +666,7 @@ cases = {
     'python3': (K.UNCLASSIFIED, None),
     'python3 /tmp/x.py': (K.UNCLASSIFIED, None),
     'python3 %s' % H: (K.UNCLASSIFIED, None),
-    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py --flag': (K.INTERPRETED, None),
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py --flag': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
     '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
     'echo hi': (K.NON_HOOK, None),
     H: (K.DIRECT, ".claude/hooks/hook-health.sh"),
@@ -1108,6 +1115,31 @@ if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/python3" "$TMP/pyna
   ok "a repository hook named python3 is still checked for its executable bit"
 else
   bad "a repository hook was exempted because of its basename" "$(tail -3 "$TMP/pynamehook.log")"
+fi
+
+# An INTERPRETED script is argv[1]: its executable bit does not matter, but its EXISTENCE
+# does. Classifying from containment and the `.py` suffix alone returned no target, so a
+# deleted guard left the gate green while Claude gets a Python file-not-found.
+FIX_PYMISS="$TMP/pymissing"
+make_fixture "$FIX_PYMISS"
+rm -f "$FIX_PYMISS/.claude/hooks/pre-tool-guard.py"
+rc=$(run_gate "$FIX_PYMISS" "$TMP/pymissing.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/pre-tool-guard.py" "$TMP/pymissing.log"; then
+  ok "a deleted interpreted hook script is reported missing"
+else
+  bad "a deleted interpreted script left the gate green" "$(tail -3 "$TMP/pymissing.log")"
+fi
+
+# ...and it must still NOT be required to be executable. The three .py guards are correctly
+# committed 100644, so demanding the bit here would take the gate red on the real repository.
+FIX_PYMODE="$TMP/pymode"
+make_fixture "$FIX_PYMODE"
+chmod 644 "$FIX_PYMODE/.claude/hooks/pre-tool-guard.py"
+rc=$(run_gate "$FIX_PYMODE" "$TMP/pymode.log")
+if [ "$rc" -eq 0 ]; then
+  ok "an interpreted script is not required to be executable"
+else
+  bad "a 100644 interpreted script was wrongly required to be executable" "$(tail -3 "$TMP/pymode.log")"
 fi
 
 
