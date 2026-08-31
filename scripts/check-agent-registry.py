@@ -328,6 +328,33 @@ def _line_reader_text(block, key, raw):
     return strip_inline_comment(raw)
 
 
+# Filename suffixes a provider treats as a definition, longest first. The logical agent name
+# is the filename with one of these removed.
+#
+# GitHub's CURRENT template creates `<name>.agent.md`, and its configuration reference says
+# the config file's name is taken "minus `.md` or `.agent.md`" -- so BOTH are loaded, and a
+# review claim that only `.agent.md` is discovered is not what the documentation says
+# (docs.github.com/en/copilot/reference/custom-agents-configuration, and the create-custom-
+# agents how-to, both read 2026-08-31). All 22 checked-in Copilot definitions use `.md`.
+#
+# What was really broken is narrower and real: `Path.stem` on `icn-architect.agent.md` is
+# `icn-architect.agent`, so adopting the newer convention for even one file would have made
+# this checker reject a definition the provider loads.
+PROVIDER_DEFINITION_SUFFIXES = {
+    "github-copilot": (".agent.md", ".md"),
+    "claude-code": (".md",),
+}
+
+
+def logical_name_of(path, provider_type):
+    """The logical agent name a provider derives from `path`, or None if it is not a definition."""
+    fname = path.name if hasattr(path, "name") else str(path).rsplit("/", 1)[-1]
+    for suffix in PROVIDER_DEFINITION_SUFFIXES.get(provider_type, (".md",)):
+        if fname.endswith(suffix) and len(fname) > len(suffix):
+            return fname[: -len(suffix)]
+    return None
+
+
 def parse_registered_agent_front_matter(text, provider_type):
     """Validate a file AS a definition and return its front-matter block.
 
@@ -1129,10 +1156,14 @@ class Checker:
                               "would be certifying a file no clone contains."
                               % (name, sid, path, resolved_fp))
                     continue
-                if fp.stem != name:
-                    self.fail("%s.%s: file is %s.md. A record must not point at a file with a "
-                              "different name -- that is two agents wearing one name."
-                              % (name, sid, fp.stem))
+                logical = logical_name_of(fp, surfaces[sid]["provider_type"])
+                if logical != name:
+                    # PROVIDER-SPECIFIC. `Path.stem` is not the logical name for a provider
+                    # whose convention carries a compound suffix: on `x.agent.md` it yields
+                    # `x.agent`, so a definition GitHub loads would have been refused here.
+                    self.fail("%s.%s: file is %s, whose logical name is %r. A record must not "
+                              "point at a file with a different name -- that is two agents "
+                              "wearing one name." % (name, sid, fp.name, logical))
                     continue
 
                 try:

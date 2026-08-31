@@ -848,6 +848,46 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- the logical name is provider-specific ------------------------------------
+print()
+print("--- a compound provider suffix is not part of the agent name ---")
+
+# GitHub's current template creates `<name>.agent.md`, and its configuration reference takes
+# the config file name "minus `.md` or `.agent.md`" -- so both are loaded. `Path.stem` on
+# `x.agent.md` is `x.agent`, so adopting that convention for even one file would have made
+# this checker reject a definition the provider loads. The name extraction is per provider now.
+def agent_md_suffix_case():
+    r = base_registry()
+    r["agents"][1]["surfaces"]["copilot"]["path"] = ".github/agents/twin.agent.md"
+    f = dict(BASE_FILES)
+    f.pop(".github/agents/twin.md")
+    f[".github/agents/twin.agent.md"] = copilot_file("twin")
+    rc, out = run(r, base_skills(), f)
+    check("MUST-PASS a github-copilot definition named <name>.agent.md", rc == 0)
+
+    # ...and the suffix is NOT a universal convention. Claude Code has no `.agent.md` form,
+    # so the same filename there yields the logical name `twin.agent` and must be refused.
+    r2 = base_registry()
+    r2["agents"][1]["surfaces"]["claude"]["path"] = ".claude/agents/twin.agent.md"
+    f2 = dict(BASE_FILES)
+    f2.pop(".claude/agents/twin.md")
+    f2[".claude/agents/twin.agent.md"] = agent_file("twin")
+    rc2, out2 = run(r2, base_skills(), f2)
+    check("REAL P2: .agent.md is not a claude-code convention",
+          rc2 != 0 and "twin.agent" in out2)
+
+    # A genuine name mismatch must still be caught for both providers.
+    r3 = base_registry()
+    r3["agents"][1]["surfaces"]["copilot"]["path"] = ".github/agents/other.agent.md"
+    f3 = dict(BASE_FILES)
+    f3.pop(".github/agents/twin.md")
+    f3[".github/agents/other.agent.md"] = copilot_file("twin")
+    rc3, out3 = run(r3, base_skills(), f3)
+    check("REAL P2: a real name mismatch is still caught under the compound suffix", rc3 != 0)
+
+
+agent_md_suffix_case()
+
 # --- the allowlist one level up, and a file that is not text -------------------
 print()
 print("--- a surface declaration says WHERE definitions live, never what they say ---")
