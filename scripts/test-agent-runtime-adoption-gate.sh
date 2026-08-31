@@ -704,8 +704,24 @@ cases = {
     'FOO=1 echo hi': K.UNCLASSIFIED,
     # ...but an assignment in front of a repo PATH stays supported: a path is not looked up.
     'MODE=health %s' % H: K.DIRECT,
-    # And the live command, which carries `||` inside a command substitution.
+    # A COMMAND SUBSTITUTION is executable shell wherever it appears, including inside the
+    # quoted argument of an exempt command. `echo "$(<hook>)"` RUNS the hook, and the outer
+    # echo returns 0 whatever the hook does -- so a mode-0644 file reported permission denied
+    # while the gate stayed green and the target never entered the derived set.
+    'echo "$(%s)"' % H: K.UNCLASSIFIED,
+    'echo "`%s`"' % H: K.UNCLASSIFIED,
+    'echo $(%s)' % H: K.UNCLASSIFIED,
+    # ...but only one NAMING A REPOSITORY PATH. The live command carries a substitution and
+    # must stay classifiable, which is the whole reason this is not a blanket refusal.
     'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
+    # OPERATORS ARE READ BEFORE QUOTING IS DISCARDED. shlex strips quote provenance, so an
+    # argument made entirely of punctuation came back indistinguishable from a real operator
+    # and the gate went RED on a command bash runs normally.
+    'echo ";"': K.NON_HOOK,
+    "echo '&&'": K.NON_HOOK,
+    'echo "|"': K.NON_HOOK,
+    'echo \\;': K.NON_HOOK,
+    '%s ";"' % H: K.DIRECT,
 }
 bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
 sys.exit(0 if not bad else 1)
@@ -823,6 +839,61 @@ if [ "$rc" -ne 0 ] && grep -q "command-local assignment" "$TMP/pathhook.log"; th
   ok "an interpreter behind a PATH-changing assignment is not exempted"
 else
   bad "a PATH-overridden interpreter kept its name exemption" "$(tail -3 "$TMP/pathhook.log")"
+fi
+
+# End-to-end, the fail-open half: a hook run from inside a substitution must not hide behind
+# the outer echo, whose exit status says nothing about it.
+FIX_SUB="$TMP/subhook"
+make_fixture "$FIX_SUB"
+python3 - "$FIX_SUB" <<'PYSUB'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "$(%s)"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYSUB
+chmod -x "$FIX_SUB/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_SUB" "$TMP/subhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/subhook.log"; then
+  ok "a hook invoked inside a command substitution does not hide behind the outer echo"
+else
+  bad "a substituted hook escaped the executable check" "$(tail -3 "$TMP/subhook.log")"
+fi
+
+# End-to-end, the false-rejection half: a quoted operator is data and must leave the gate green.
+FIX_QOP="$TMP/quotedop"
+make_fixture "$FIX_QOP"
+python3 - "$FIX_QOP" <<'PYQOP'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("echo") and not done:
+            n["command"] = 'echo ";"'
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json has an echo hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYQOP
+rc=$(run_gate "$FIX_QOP" "$TMP/quotedop.log")
+if [ "$rc" -eq 0 ]; then
+  ok "an argument made of quoted punctuation is data, not a composition"
+else
+  bad "a quoted operator argument was mistaken for a composition" "$(tail -3 "$TMP/quotedop.log")"
 fi
 
 # End-to-end, both halves. A dropped target hides in the derived list AND in the expected

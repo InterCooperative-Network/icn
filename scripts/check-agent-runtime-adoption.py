@@ -143,6 +143,68 @@ def _strip_shell_comment(command: str) -> str:
     return "".join(out)
 
 
+def _unquoted_operators(command: str) -> set:
+    """Shell operator characters the command carries UNQUOTED.
+
+    Read from the character states, not from the token list. shlex strips quote provenance in
+    posix mode, so a data argument made entirely of punctuation -- `echo ";"`, `echo '&&'`,
+    `echo \\;` -- came back as a token indistinguishable from a real operator and the gate
+    went red on a command bash runs normally. Another false rejection from asking a reader a
+    question it had already thrown away the answer to.
+    """
+    return {c for c, st in zip(command, _shell_states(command))
+            if st == _PLAIN and c in _SHELL_OPERATOR_CHARS}
+
+
+def _repo_path_in_substitution(command: str, root):
+    """A repository path named inside a command substitution, or None.
+
+    `$(...)` and backticks are executable shell wherever they appear, including inside the
+    quoted argument of an otherwise exempt command.
+    """
+    if root is None:
+        return None
+    states = _shell_states(command)
+    bodies, i, n = [], 0, len(command)
+    while i < n:
+        st = states[i] if i < len(states) else _PLAIN
+        if st in (_PLAIN, _DOUBLE) and command.startswith("$(", i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if command[j] == "(":
+                    depth += 1
+                elif command[j] == ")":
+                    depth -= 1
+                j += 1
+            bodies.append(command[i + 2:j - 1])
+            i = j
+            continue
+        if st in (_PLAIN, _DOUBLE) and command[i] == "`":
+            j = command.find("`", i + 1)
+            if j < 0:
+                break
+            bodies.append(command[i + 1:j])
+            i = j + 1
+            continue
+        i += 1
+
+    base_dir = Path(root).resolve()
+    for body in bodies:
+        for token in (_tokenize(body) or []):
+            for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+                token = token.replace(spelling + "/", "").replace(spelling, "")
+            if "/" not in token:
+                continue
+            try:
+                cand = Path(token)
+                resolved = (cand if cand.is_absolute() else base_dir / cand).resolve()
+            except (ValueError, OSError):
+                continue
+            if resolved.is_relative_to(base_dir):
+                return resolved.relative_to(base_dir).as_posix()
+    return None
+
+
 def _has_unquoted_newline(command: str) -> bool:
     """Does a bash COMMAND SEPARATOR hide in here as a literal newline?
 
@@ -375,13 +437,28 @@ def classify_hook_command(command: str, root: Path | None = None):
     if not tokens:
         return HookCommandKind.NON_HOOK, None, "empty command"
 
-    ops = [t for t in tokens if t and set(t) <= _SHELL_OPERATOR_CHARS]
+    ops = _unquoted_operators(command)
     if ops:
         # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
         # a later one may be a hook whose executable bit decides whether it runs.
         return (HookCommandKind.UNCLASSIFIED, None,
                 "top-level shell composition (%s); only a single simple command is supported"
-                % " ".join(sorted(set(ops))))
+                % " ".join(sorted(ops)))
+
+    inside = _repo_path_in_substitution(command, root)
+    if inside is not None:
+        # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
+        # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
+        # returns 0 whatever the hook does, so a mode-0644 file reported permission denied
+        # while the gate stayed green and the target never entered the derived set.
+        #
+        # Only a substitution NAMING A REPOSITORY PATH is refused, not every substitution:
+        # live settings.json carries `echo "branch: $(git … || echo detached)"`, which names
+        # no repository file and is what this gate is meant to accept.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "a command substitution runs %s, a repository path: substitutions are "
+                "executable shell, so the entry is not the single simple command it looks "
+                "like" % inside)
 
     # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
     # file already treats them as part of a direct invocation, and the suite exercises that
