@@ -160,6 +160,24 @@ _NON_STRING_WORDS = frozenset(
 _BLOCK_SCALAR = re.compile(r"^[|>][+-]?$")
 
 
+def _map_separator(text):
+    """Split `text` at a YAML MAPPING SEPARATOR: `(key, sep, rest)`, or `(text, "", "")`.
+
+    A separator is `:` followed by a space, or `:` ending the line. Any other colon is part of
+    a plain scalar -- `https://example.com` is one value, not a key and a value -- which is
+    exactly what YAML says and exactly what a `":" in item` test got wrong.
+    """
+    i = 0
+    while True:
+        i = text.find(":", i)
+        if i < 0:
+            return text, "", ""
+        rest = text[i + 1:]
+        if rest == "" or rest[:1] in (" ", "\t"):
+            return text[:i], ":", rest
+        i += 1
+
+
 def quoted_scalar_problem(value):
     """Why a quoted inline value is malformed, or None. Unquoted values return None.
 
@@ -256,6 +274,14 @@ def flow_problem(value):
     # `[,]` is not that: its empty element comes BEFORE the comma and a loader rejects it.
     if any(e == "" for e in elements):
         return "contains an empty element, which a YAML loader rejects"
+    # ...and a NONEMPTY element still has to be a well-formed one. `["a" "b"]` has two
+    # nonempty segments by the comma test and a loader raises: adjacent quoted scalars need a
+    # comma between them. The element goes through the SAME reader that checks a quoted value
+    # anywhere else, which is why this is a reuse rather than another parser.
+    for e in elements:
+        problem = quoted_scalar_problem(e)
+        if problem:
+            return "contains an element that %s" % problem
     return None
 
 
@@ -497,13 +523,19 @@ def parse_registered_agent_front_matter(text, provider_type):
                     # followed by a deeper `extra: b` is one mapping with two keys, and that
                     # child belongs to the ITEM, not to `a`.
                     item = stripped[1:].lstrip()
-                    inner = strip_inline_comment(item.partition(":")[2]) if ":" in item else item
+                    # A MAPPING SEPARATOR IS `: ` OR A TRAILING `:`, not any colon. Mere
+                    # presence marked `- https://example.com` as a mapping item able to own a
+                    # child, so `    child: bad` beneath it was certified while a loader
+                    # raises -- the URL is a scalar item. YAML says the same thing: a plain
+                    # scalar may contain `:` as long as no space follows it.
+                    key, sep, rest = _map_separator(item)
+                    inner = strip_inline_comment(rest) if sep else item
                     opens_block = bool(_BLOCK_SCALAR.match(inner))
-                    entry_opens = (not item) or (":" in item) or opens_block
+                    entry_opens = (not item) or bool(sep) or opens_block
                     value = inner
                 else:
-                    value = (strip_inline_comment(stripped.partition(":")[2])
-                             if ":" in stripped else "x")
+                    _, sep, rest = _map_separator(stripped)
+                    value = strip_inline_comment(rest) if sep else "x"
                     opens_block = bool(_BLOCK_SCALAR.match(value))
                     entry_opens = opens_block or not value
                 problem = quoted_scalar_problem(value) or flow_problem(value)

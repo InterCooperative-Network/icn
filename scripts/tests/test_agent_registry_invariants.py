@@ -848,6 +848,46 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 28: a nonempty element is not a valid one; a colon is not a separator -
+print()
+print("--- flow elements and mapping separators ---")
+
+try:
+    import yaml as _y28
+except ImportError:
+    _y28 = None
+
+_B28 = "name: twin\ndescription: fixture\n"
+for fm, label, should_pass in (
+        # Nonempty by the comma test, and a loader still raises: adjacent quoted scalars need
+        # a comma. The element goes through the SAME quoted-scalar reader used everywhere else.
+        ('fixture: ["a" "b"]', "adjacent quoted flow elements", False),
+        ('fixture: ["a"x]', "trailing junk after a quoted element", False),
+        ('fixture: ["a", "b"]', "a well-formed quoted flow sequence", True),
+        ("fixture: [a, b]", "a plain flow sequence", True),
+        # A MAPPING SEPARATOR is `: ` or a trailing `:`. Mere colon presence marked a URL as a
+        # mapping item able to own a child.
+        ("tools:\n  - https://example.com\n    child: bad",
+         "a child under a URL-valued scalar sequence item", False),
+        ("tools:\n  - https://example.com", "a URL as a scalar sequence item", True),
+        ("homepage: https://example.com", "a URL as a mapping value", True),
+        ("tools:\n  - name: a\n    extra: b", "a real mapping sequence item", True),
+        ("tools:\n  key:\n    child: ok", "a child under an empty-valued key", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s%s\ninfer: false\n---\n\nBody for twin.\n" % (_B28, fm)
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if _y28 is not None:
+        try:
+            _y28.safe_load("%s%s\ninfer: false" % (_B28, fm))
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and PyYAML agrees (%s)" % ("loads" if should_pass else "rejects"),
+              loadable == should_pass)
+
 # --- round 27: every inline value, and a claim that must be present ------------
 print()
 print("--- quoted well-formedness applies to every value, not only required ones ---")
