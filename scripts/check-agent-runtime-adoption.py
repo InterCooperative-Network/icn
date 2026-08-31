@@ -208,7 +208,6 @@ def _has_unquoted_newline(command: str) -> bool:
 
 
 _PROJECT_DIR_TOKEN = re.compile(r"\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?![A-Za-z0-9_]))")
-_PROJECT_DIR_TOKEN_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/")
 _PROJECT_DIR_TOKEN_OPT_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/?")
 
 
