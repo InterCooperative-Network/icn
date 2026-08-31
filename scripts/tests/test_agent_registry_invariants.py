@@ -841,6 +841,57 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 17: the level above the one already typed ---------------------------
+print()
+print("--- an inline comment is not part of the value ---")
+
+# Round 16 compared the whole scalar against the YAML non-string literals, so a trailing
+# comment defeated the membership test and the fallback accepted it.
+for value, label in (("null # why", "null with a comment"),
+                     ("~ # why", "~ with a comment"),
+                     ("true  # why", "a boolean with a comment"),
+                     ("123 # why", "a number with a comment"),
+                     ("# only a comment", "nothing but a comment")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: description as %s is rejected" % label,
+          rc != 0 and ("nonempty string" in out or "only a comment" in out))
+
+# A `#` inside a quoted scalar is literal, and a plain value keeps its text before any
+# comment -- both remain valid nonempty strings.
+for value, label in ('a real description # trailing note', "plain value with a trailing comment"), \
+                    ('"quoted # hash"', "a quoted value containing a hash"):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % value)
+    rc, out = run(r, base_skills(), f)
+    check("MUST-PASS %s" % label, rc == 0)
+
+
+print()
+print("--- malformed cross-registry PARENTS are typed too ---")
+
+# Round 16 typed the cross-registry lists and left the objects holding them untyped, so the
+# same non-totality survived one level up.
+for mutate, label in (
+        (lambda s: s.__setitem__("enforcement", "a string"), "enforcement as a string"),
+        (lambda s: s.__setitem__("enforcement", None), "enforcement as null"),
+        (lambda s: s.__setitem__("declared_scope", "a string"), "declared_scope as a string"),
+        (lambda s: s["declared_scope"].__setitem__("cross_registry", [1]),
+         "cross_registry as an array")):
+    r = base_registry()
+    sk = base_skills()
+    sk.setdefault("enforcement", {})
+    mutate(sk)
+    rc, out = run(r, sk, dict(BASE_FILES))
+    check("REAL P2: %s -> finding, not crash" % label,
+          rc != 0 and "Traceback" not in out)
+
+
 # --- round 16: prove types, physical identity, and totality --------------------
 print()
 print("--- a required string field must actually be a string ---")

@@ -163,6 +163,16 @@ def required_string_problem(block, key):
     if not v:
         return "is empty"
 
+    # An inline comment is not part of the value. `description: null # why` kept the comment
+    # in the string, so the exact-membership test below missed the null literal and the
+    # fallback accepted it. In YAML a `#` opens a comment only when it starts the scalar or
+    # follows whitespace, and only outside quotes -- quoted values are handled further down
+    # and keep their `#` verbatim.
+    if v[0] not in "\"'":
+        v = re.split(r"(?:^|\s)#", v, maxsplit=1)[0].strip()
+        if not v:
+            return "is only a comment"
+
     if _BLOCK_SCALAR.match(v):
         # `description: >` -- the value is the indented block beneath it.
         lines = block.split("\n")
@@ -922,9 +932,39 @@ class Checker:
                       "supposed to fail closed." % exc)
             return
         trees = {v["tree"] for v in surfaces.values() if v.get("tree")}
-        scope = (sj.get("enforcement", {}) or {}).get("scan_scope") or {}
-        scan_trees = set(scope.get("canonical_trees") or []) | set(scope.get("provider_trees") or [])
-        cross = (sj.get("declared_scope", {}) or {}).get("cross_registry") or {}
+
+        # Type every PARENT before chaining. Round 16 typed the cross-registry LISTS and left
+        # the objects holding them untyped, so `skills.json.enforcement: "a string"` raised
+        # AttributeError rather than reporting -- the same non-totality one level up. This
+        # checker runs as its own standalone gate and cannot assume the skill checker ran.
+        def child_obj(parent, key, label):
+            if key not in parent:
+                return {}
+            ok, value = as_obj(parent[key])
+            if not ok:
+                self.fail("skills.json %s must be an object, found %s. Malformed canonical "
+                          "data must produce a finding here, not a traceback."
+                          % (label, type(parent[key]).__name__))
+                return {}
+            return value
+
+        ok, sj_obj = as_obj(sj)
+        if not ok:
+            self.fail("skills.json must be a JSON object, found %s" % type(sj).__name__)
+            return
+        enforcement = child_obj(sj_obj, "enforcement", "enforcement")
+        scope = child_obj(enforcement, "scan_scope", "enforcement.scan_scope")
+        scan_trees = set()
+        for key in ("canonical_trees", "provider_trees"):
+            if key in scope:
+                ok, lst = as_str_list(scope[key])
+                if not ok:
+                    self.fail("skills.json enforcement.scan_scope.%s must be an array of "
+                              "nonempty strings, found %r" % (key, scope[key]))
+                else:
+                    scan_trees |= set(lst)
+        declared = child_obj(sj_obj, "declared_scope", "declared_scope")
+        cross = child_obj(declared, "cross_registry", "declared_scope.cross_registry")
         for field in ("agent_surfaces_tracked_by_agents_json",
                       "known_uncovered_directories",
                       "provider_surfaces_no_registry_covers"):
