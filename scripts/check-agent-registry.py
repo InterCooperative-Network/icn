@@ -160,6 +160,54 @@ _NON_STRING_WORDS = frozenset(
 _BLOCK_SCALAR = re.compile(r"^[|>][+-]?$")
 
 
+def flow_problem(value):
+    """Why a flow collection value is malformed, or None. Non-flow values return None.
+
+    VALIDATED, NOT REFUSED. `tools: [Read` was accepted and the provider cannot load it, but
+    two checked-in definitions really do write `tools: ["Read", "Grep", "Glob", "Bash"]`, so
+    refusing flow syntax outright -- the usual disposal in this file -- would take the gate
+    red on the repository it guards. What can be proven on one line is balance and
+    termination, so that is what is proven.
+    """
+    if value[:1] not in "[{":
+        return None
+    stack = []
+    pairs = {"]": "[", "}": "{"}
+    i, n = 0, len(value)
+    while i < n:
+        c = value[i]
+        if c == '"':
+            j = i + 1
+            while j < n and value[j] != '"':
+                j += 2 if value[j] == "\\" else 1
+            if j >= n:
+                return "contains an unterminated double-quoted string"
+            i = j + 1
+            continue
+        if c == "'":
+            j = i + 1
+            while j < n:
+                if value[j] == "'":
+                    if j + 1 < n and value[j + 1] == "'":
+                        j += 2
+                        continue
+                    break
+                j += 1
+            if j >= n:
+                return "contains an unterminated single-quoted string"
+            i = j + 1
+            continue
+        if c in "[{":
+            stack.append(c)
+        elif c in "]}":
+            if not stack or stack.pop() != pairs[c]:
+                return "closes a flow collection that was never opened, or closes the wrong one"
+        i += 1
+    if stack:
+        return "is an unterminated flow %s" % ("sequence" if stack[-1] == "[" else "mapping")
+    return None
+
+
 def strip_inline_comment(raw):
     """The scalar text with any inline comment removed, stripped.
 
@@ -390,9 +438,28 @@ def parse_registered_agent_front_matter(text, provider_type):
                 # values are not allowed here" to a YAML parser, and opening a deeper frame
                 # for it certified a definition the provider cannot load. A sequence item can
                 # -- `- name: a` followed by a deeper `extra: b` is one mapping in one item.
-                value = strip_inline_comment(stripped.partition(":")[2]) if ":" in stripped else "x"
-                opens_block = bool(_BLOCK_SCALAR.match(value))
-                entry_opens = kind == "sequence" or opens_block or not value
+                if kind == "sequence":
+                    # A SEQUENCE ITEM IS NOT AUTOMATICALLY ABLE TO OWN A CHILD. `- Read` is a
+                    # scalar item; `tools:` / `  - Read` / `    child: bad` is "mapping values
+                    # are not allowed here" to a parser, and marking every item an opener
+                    # certified it. An item DOES open when it carries a mapping -- `- name: a`
+                    # followed by a deeper `extra: b` is one mapping with two keys, and that
+                    # child belongs to the ITEM, not to `a`.
+                    item = stripped[1:].lstrip()
+                    inner = strip_inline_comment(item.partition(":")[2]) if ":" in item else item
+                    opens_block = bool(_BLOCK_SCALAR.match(inner))
+                    entry_opens = (not item) or (":" in item) or opens_block
+                    value = inner
+                else:
+                    value = (strip_inline_comment(stripped.partition(":")[2])
+                             if ":" in stripped else "x")
+                    opens_block = bool(_BLOCK_SCALAR.match(value))
+                    entry_opens = opens_block or not value
+                problem = flow_problem(value)
+                if problem:
+                    raise InvalidDefinition(
+                        "line %d, %r: the value %s. A YAML parser rejects it, so the provider "
+                        "cannot load the definition." % (i, line[:60], problem))
 
                 if frames and frames[-1][0] == indent:
                     if frames[-1][1] != kind:
@@ -421,6 +488,11 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "reader would treat them as the key being ABSENT -- so a semantic field could "
                 "change while the registry certified the old value." % (i, line[:60]))
         value = strip_inline_comment(line.split(":", 1)[1])
+        problem = flow_problem(value)
+        if problem:
+            raise InvalidDefinition(
+                "line %d, %r: the value %s. A YAML parser rejects it, so the provider cannot "
+                "load the definition." % (i, line[:60], problem))
         if re.match(r"^[|>][+-]?\d", value):
             raise InvalidDefinition(
                 "line %d, %r: an explicit block indentation indicator is not supported. It "

@@ -845,6 +845,55 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 25: which items own children, and flow that must balance ------------
+print()
+print("--- a sequence item owns a child only if it carries a mapping ---")
+
+try:
+    import yaml as _y25
+except ImportError:
+    _y25 = None
+
+_B25 = "name: twin\ndescription: fixture\n"
+for fm, label, should_pass in (
+        # Round 24 marked EVERY sequence item an opener. `- Read` is a scalar item.
+        (_B25 + "tools:\n  - Read\n    child: bad",
+         "a child under a scalar sequence item", False),
+        # ...but `- name: a` then a deeper `extra: b` is one mapping with two keys, and the
+        # child belongs to the ITEM, not to `a`. Refusing it would be a false rejection.
+        (_B25 + "tools:\n  - name: a\n    extra: b",
+         "a second key under a mapping sequence item", True),
+        (_B25 + "tools:\n  -\n    name: a", "a child under an empty sequence item", True),
+        (_B25 + "tools:\n  - |\n    body", "a block scalar as a sequence item", True),
+        # Flow syntax is VALIDATED, not refused: two checked-in definitions really write
+        # `tools: ["Read", "Grep", "Glob", "Bash"]`, so refusing it would take the gate red
+        # on the repository it guards. What one line can prove is balance and termination.
+        (_B25 + "tools: [Read", "an unterminated flow sequence", False),
+        (_B25 + "metadata: {a: 1", "an unterminated flow mapping", False),
+        (_B25 + "tools: [Read}", "a mismatched flow close", False),
+        (_B25 + 'tools: ["Read]', "an unterminated string inside flow", False),
+        (_B25 + 'tools: ["Read", "Grep", "Glob", "Bash"]',
+         "the flow sequence two real definitions use", True),
+        (_B25 + "metadata: {a: 1, b: 2}", "a flow mapping", True),
+        (_B25 + "tools: [{a: [1, 2]}]", "nested flow collections", True),
+        (_B25 + 'tools: ["a#b"]', "a hash inside a flow string", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\ninfer: false\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if _y25 is not None:
+        try:
+            _y25.safe_load(fm + "\ninfer: false")
+            loadable = True
+        except Exception:
+            loadable = False
+        # Both directions hold for THIS block: every case here is one PyYAML and the narrow
+        # reader should agree on, so the oracle is asserted both ways rather than one.
+        check("   ...and PyYAML agrees (%s)" % ("loads" if should_pass else "rejects"),
+              loadable == should_pass)
+
 # --- round 24: what may own a child, and what is not a file --------------------
 print()
 print("--- a nested entry may own a child only if its value can hold one ---")
