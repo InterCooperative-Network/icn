@@ -321,6 +321,13 @@ def _candidate_commands(line):
         yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", inner.strip())
 
 
+# Operators that stop a non-zero exit from reaching the caller, or hand the status to
+# something else. `2>&1` is a redirection and contains none of these, which is why the real
+# callers still pass. Anything else fails closed: a novel wrapper should make this gate red
+# until its status semantics are deliberately established.
+_STATUS_BREAKING = re.compile(r"\|\||&&|;|(?<![0-9>&])\|(?!\|)")
+
+
 def _selected_script(tokens):
     """The file Python would execute, or None if it selects something else."""
     if len(tokens) < 2:
@@ -352,6 +359,10 @@ def invokes_checker(text, target="scripts/check-agent-registry.py"):
             try:
                 tokens = shlex.split(cand, comments=True)
             except ValueError:
+                continue
+            if _STATUS_BREAKING.search(cand):
+                # `python3 ... || true` runs the checker and throws its verdict away, so the
+                # advertised standalone gate can no longer fail.
                 continue
             script = _selected_script(tokens)
             if script and (script == target or script.endswith("/" + target)
@@ -651,6 +662,13 @@ class Checker:
                 # Providers load the tree's direct children. A nested path is loaded by
                 # nobody, and it lets a record satisfy every per-record check while the file
                 # the provider actually reads goes unregistered.
+                if not path.endswith(".md"):
+                    self.fail("%s.%s: path %s does not end in .md. The inventory reads only "
+                              "*.md, and so does the provider, so a record pointing at any "
+                              "other extension describes a file nothing loads -- renaming a "
+                              "definition and updating its record would otherwise remove the "
+                              "agent from the surface silently." % (name, sid, path))
+                    continue
                 if pathlib.PurePosixPath(path).parent != pathlib.PurePosixPath(tree):
                     self.fail("%s.%s: path %s is nested below the declared tree %s. Only "
                               "direct children are loaded, so a nested file is a record "
@@ -863,13 +881,50 @@ class Checker:
                  and names_the_checker(a.value)
                  for t in a.targets if isinstance(t, ast.Name)}
 
-        def call_reaches_checker(call):
-            for arg in list(call.args) + [k.value for k in call.keywords]:
-                if names_the_checker(arg):
-                    return True
-                if any(isinstance(n, ast.Name) and n.id in bound for n in ast.walk(arg)):
-                    return True
-            return False
+        def is_checker_ref(node):
+            """This expression denotes the checker: a literal naming it, or a bound name."""
+            if names_the_checker(node):
+                return True
+            return any(isinstance(n, ast.Name) and n.id in bound for n in ast.walk(node))
+
+        def is_interpreter(node):
+            """sys.executable, or a literal python/python3."""
+            if isinstance(node, ast.Attribute) and node.attr == "executable":
+                return True
+            return (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and node.value.rsplit("/", 1)[-1] in _INTERPRETERS)
+
+        def subprocess_execs_checker(call):
+            """The checker must be argv0, or argv1 behind an interpreter.
+
+            The exact mirror of the shell rule: `subprocess.run(["echo", CHECKER])` puts the
+            checker in an ARGUMENT position, so echo runs and the checker does not. Accepting
+            any reference anywhere in the argument tree is the same defect as accepting any
+            token anywhere on a command line.
+            """
+            if not call.args:
+                return False
+            argv = call.args[0]
+            if isinstance(argv, (ast.List, ast.Tuple)):
+                items = list(argv.elts)
+            else:
+                return is_checker_ref(argv)          # shell=True / a single program string
+            if not items:
+                return False
+            if is_checker_ref(items[0]):
+                return True
+            return (len(items) > 1 and is_interpreter(items[0])
+                    and is_checker_ref(items[1]))
+
+        # Loader forms: the checker must be the path being loaded, not an incidental argument.
+        LOADER_TARGET_POSITION = {"runpy.run_path": 0,
+                                  "importlib.util.spec_from_file_location": 1}
+
+        def call_reaches_checker(call, qual):
+            if qual in LOADER_TARGET_POSITION:
+                i = LOADER_TARGET_POSITION[qual]
+                return len(call.args) > i and is_checker_ref(call.args[i])
+            return subprocess_execs_checker(call)
 
         for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call)):
             dotted = []
@@ -880,11 +935,13 @@ class Checker:
             if isinstance(f, ast.Name):
                 dotted.append(f.id)
             qual = ".".join(reversed(dotted))
-            if qual in SUPPORTED_TEST_RUNNERS and call_reaches_checker(call):
+            if qual in SUPPORTED_TEST_RUNNERS and call_reaches_checker(call, qual):
                 return None
 
-        return ("no supported runner call there reaches it. The suite must actually execute or "
-                "load the checker (%s), not merely import a runner and store the path"
+        return ("no supported runner call there EXECUTES it. The checker must be the program "
+                "the call runs -- argv0, or argv1 behind an interpreter -- or the path a "
+                "loader loads. Appearing anywhere in the argument tree is not enough: "
+                "subprocess.run([\"echo\", CHECKER]) runs echo. Supported runners: %s"
                 % ", ".join(sorted(SUPPORTED_TEST_RUNNERS)))
 
     def check_cross_registry(self, surfaces):

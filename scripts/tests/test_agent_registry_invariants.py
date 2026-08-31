@@ -134,6 +134,19 @@ def build(tmp, registry, skills, files):
         'CHECKER = "scripts/check-agent-registry.py"\n'
         'subprocess.run(["echo", "hi"])\n', encoding="utf-8")
     # The shape the real suite uses: a name bound to a path expression, passed to a runner.
+    # The checker present in an ARGUMENT position while something else is executed.
+    (root / "echo-runner.py").write_text(
+        'import subprocess\n'
+        'CHECKER = "scripts/check-agent-registry.py"\n'
+        'subprocess.run(["echo", CHECKER])\n', encoding="utf-8")
+    (root / "trailing-arg.py").write_text(
+        'import subprocess\n'
+        'CHECKER = "scripts/check-agent-registry.py"\n'
+        'subprocess.run(["cat", "--file", CHECKER])\n', encoding="utf-8")
+    (root / "loader-shape.py").write_text(
+        'import runpy\n'
+        'CHECKER = "scripts/check-agent-registry.py"\n'
+        'runpy.run_path(CHECKER)\n', encoding="utf-8")
     (root / "real-shape.py").write_text(
         'import pathlib, subprocess, sys\n'
         'CHECKER = pathlib.Path("scripts") / "check-agent-registry.py"\n'
@@ -415,17 +428,112 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
+# --- round 11: the executable position, the exit status, and the extension ------
+print()
+print("--- the checker must be the program the call runs ---")
+
+case("REAL P2: subprocess.run([\"echo\", CHECKER]) -- echo runs, the checker does not",
+     lambda r: r["enforcement"].__setitem__("tests", "echo-runner.py"),
+     expect="no supported runner call there EXECUTES it")
+
+case("the checker sitting in a trailing argument position",
+     lambda r: r["enforcement"].__setitem__("tests", "trailing-arg.py"),
+     expect="no supported runner call there EXECUTES it")
+
+r = base_registry()
+r["enforcement"]["tests"] = "loader-shape.py"
+rc, out = run(r, base_skills(), dict(BASE_FILES))
+check("MUST-PASS runpy.run_path(CHECKER) loads the checker", rc == 0)
+
+
+print()
+print("--- an advertised gate must be able to fail ---")
+
+import importlib.util as _ilu3
+_spec3 = _ilu3.spec_from_file_location("checker_r11", CHECKER)
+_m3 = _ilu3.module_from_spec(_spec3)
+_spec3.loader.exec_module(_m3)
+
+# The checker IS Python's selected program in each of these, so round 10's rule accepts
+# them; the exit status never reaches the caller, so the advertised gate cannot fail.
+for label, line in (
+        ("|| true", "python3 scripts/check-agent-registry.py || true"),
+        ("|| echo", "python3 scripts/check-agent-registry.py || echo skipped"),
+        ("; true", "python3 scripts/check-agent-registry.py; true"),
+        ("piped away", "python3 scripts/check-agent-registry.py | tee log"),
+        ("&& chained", "python3 scripts/check-agent-registry.py && true")):
+    check("MUST-FAIL a caller that %s cannot fail" % label, not _m3.invokes_checker(line))
+
+# `2>&1` is a redirection, not a status operator: every real caller uses it.
+for label, line in (
+        ("bare", "python3 scripts/check-agent-registry.py"),
+        ("with args", "python3 scripts/check-agent-registry.py --verbose"),
+        ("drift-check.sh",
+         'if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
+        ("check-preflight-consistency.sh",
+         "if agent_reg_out=$(python3 scripts/check-agent-registry.py 2>&1); then"),
+        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
+    check("MUST-PASS %s still counts (2>&1 is a redirection)" % label,
+          _m3.invokes_checker(line))
+
+
+print()
+print("--- a record must point at a file the provider loads ---")
+
+def wrong_extension_case():
+    """REAL P2: renaming a definition off .md and updating its record.
+
+    Every per-record check passed -- inside the tree, direct child, exists, stem matches --
+    while `definitions_on_disk` inventories only *.md, so the agent left the surface and the
+    reverse scan had nothing to miss.
+    """
+    tmp = tempfile.mkdtemp()
+    try:
+        root = pathlib.Path(tmp)
+        (root / ".claude/agents").mkdir(parents=True)
+        (root / "ops/state/truth").mkdir(parents=True)
+        (root / "scripts/tests").mkdir(parents=True)
+        shutil.copy(str(CHECKER), str(root / "scripts/check-agent-registry.py"))
+        (root / "scripts/tests/t.py").write_text(
+            'import subprocess\nsubprocess.run(["python3", "scripts/check-agent-registry.py"])\n',
+            encoding="utf-8")
+        (root / ".claude/agents/solo.txt").write_text(agent_file("solo"), encoding="utf-8")
+        reg = {"schema": "icn-agents/v2",
+               "provider_surfaces": {"claude": {"tree": ".claude/agents",
+                                                "provider_type": "claude-code"}},
+               "relationship_model": {"single_surface": "x", "exact_mirror": "x",
+                                      "provider_variant": "x", "divergent_unreviewed": "x"},
+               "declared_scope": {},
+               "enforcement": {"checker": "scripts/check-agent-registry.py",
+                               "tests": "scripts/tests/t.py", "invoked_by": []},
+               "agents": [{"name": "solo", "relationship": "single_surface",
+                           "routing_triggers": [], "not_for": [],
+                           "surfaces": {"claude": {"path": ".claude/agents/solo.txt"}}}]}
+        sk = {"declared_scope": {"cross_registry": {
+            "agent_surfaces_tracked_by_agents_json": [".claude/agents"]}}}
+        (root / "ops/state/truth/agents.json").write_text(json.dumps(reg), encoding="utf-8")
+        (root / "ops/state/truth/skills.json").write_text(json.dumps(sk), encoding="utf-8")
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        check("REAL P2: a record path that is not .md is rejected",
+              p.returncode != 0 and "does not end in .md" in (p.stdout + p.stderr))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+wrong_extension_case()
+
+
 # --- round 10: a role is proven by the operation, not by role-shaped tokens ------
 print()
 print("--- enforcement.tests must EXECUTE the checker ---")
 
 case("REAL P2: a runner imported and the path stored, but no call",
      lambda r: r["enforcement"].__setitem__("tests", "noop-tests.py"),
-     expect="no supported runner call there reaches it")
+     expect="no supported runner call there EXECUTES it")
 
 case("REAL P2: a runner call that goes somewhere else",
      lambda r: r["enforcement"].__setitem__("tests", "unrelated-call.py"),
-     expect="no supported runner call there reaches it")
+     expect="no supported runner call there EXECUTES it")
 
 r = base_registry()
 r["enforcement"]["tests"] = "real-shape.py"
@@ -477,7 +585,7 @@ case("REAL P2: enforcement.tests names a prose file that mentions the checker",
 
 case("REAL P2: enforcement.tests names Python that imports no runner",
      lambda r: r["enforcement"].__setitem__("tests", "names-only.py"),
-     expect="no supported runner call there reaches it")
+     expect="no supported runner call there EXECUTES it")
 
 case("REAL P2: an invoked_by caller that only echoes the command",
      lambda r: r["enforcement"].__setitem__("invoked_by", ["echo-caller.sh"]),
