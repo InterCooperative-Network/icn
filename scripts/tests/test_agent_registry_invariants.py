@@ -70,7 +70,6 @@ def base_registry():
         },
         "declared_scope": {"in_scope": [], "out_of_scope": [], "completeness_claim": "x"},
         "enforcement": {"checker": "scripts/check-agent-registry.py",
-                        "tests": "scripts/tests/test_agent_registry_invariants.py",
                         "invoked_by": ["caller.sh"]},
         "agents": [
             {
@@ -112,46 +111,8 @@ def build(tmp, registry, skills, files):
     # Stubs for the paths the enforcement block names. They must exist inside the fixture
     # root, and the caller stub must actually mention the checker, because the checker now
     # verifies both -- a caller list nothing verifies is how a gate silently stops running.
-    # `enforcement.checker` must identify the RUNNING checker, so a fixture cannot stub it:
-    # it points at the real file, resolved through the fixture root. The tests stub must
-    # actually mention the declared checker, since that claim is role-verified too.
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(str(CHECKER), str(root / "scripts/check-agent-registry.py"))
-    (root / "scripts/tests/test_agent_registry_invariants.py").write_text(
-        'import subprocess\n'
-        'subprocess.run(["python3", "scripts/check-agent-registry.py"])\n',
-        encoding="utf-8")
-    (root / "prose-tests.md").write_text(
-        "See scripts/check-agent-registry.py for details.\n", encoding="utf-8")
-    (root / "names-only.py").write_text(
-        'PATH = "scripts/check-agent-registry.py"\n', encoding="utf-8")
-    # Ingredients without an execution path: a runner imported, the checker stored, no call.
-    (root / "noop-tests.py").write_text(
-        'import subprocess\nCHECKER = "scripts/check-agent-registry.py"\n', encoding="utf-8")
-    # A runner call that goes somewhere else entirely, with the path present but unused.
-    (root / "unrelated-call.py").write_text(
-        'import subprocess\n'
-        'CHECKER = "scripts/check-agent-registry.py"\n'
-        'subprocess.run(["echo", "hi"])\n', encoding="utf-8")
-    # The shape the real suite uses: a name bound to a path expression, passed to a runner.
-    # The checker present in an ARGUMENT position while something else is executed.
-    (root / "echo-runner.py").write_text(
-        'import subprocess\n'
-        'CHECKER = "scripts/check-agent-registry.py"\n'
-        'subprocess.run(["echo", CHECKER])\n', encoding="utf-8")
-    (root / "trailing-arg.py").write_text(
-        'import subprocess\n'
-        'CHECKER = "scripts/check-agent-registry.py"\n'
-        'subprocess.run(["cat", "--file", CHECKER])\n', encoding="utf-8")
-    (root / "loader-shape.py").write_text(
-        'import runpy\n'
-        'CHECKER = "scripts/check-agent-registry.py"\n'
-        'runpy.run_path(CHECKER)\n', encoding="utf-8")
-    (root / "real-shape.py").write_text(
-        'import pathlib, subprocess, sys\n'
-        'CHECKER = pathlib.Path("scripts") / "check-agent-registry.py"\n'
-        'subprocess.run([sys.executable, str(CHECKER), "--repo-root", "."])\n',
-        encoding="utf-8")
     (root / "echo-caller.sh").write_text(
         '#!/bin/sh\necho "python3 scripts/check-agent-registry.py"\n', encoding="utf-8")
     (root / "caller.sh").write_text(
@@ -346,10 +307,10 @@ case("skills.json has no structured cross_registry claim at all",
      mutate_skills=lambda s: s["declared_scope"].pop("cross_registry"),
      expect="cross_registry")
 
-case("skills.json calls a registered surface uncovered by any registry",
+case("known_uncovered_directories names a tracked provider tree",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
-         "provider_surfaces_no_registry_covers", [".github/agents"]),
-     expect="covered by no registry")
+         "known_uncovered_directories", [".github/agents"]),
+     expect="agents.json declares it as a surface")
 
 
 # --- provider semantics: effective behaviour, not raw syntax --------------------
@@ -428,22 +389,91 @@ for k in ("description", "color", "model", "tools", "target",
          expect="owned by the provider definition")
 
 
-# --- round 11: the executable position, the exit status, and the extension ------
+# --- round 12: ambiguity, asynchrony, and claims narrowed to what is provable ----
 print()
-print("--- the checker must be the program the call runs ---")
+print("--- a semantic cannot come from an ambiguous declaration ---")
 
-case("REAL P2: subprocess.run([\"echo\", CHECKER]) -- echo runs, the checker does not",
-     lambda r: r["enforcement"].__setitem__("tests", "echo-runner.py"),
-     expect="no supported runner call there EXECUTES it")
-
-case("the checker sitting in a trailing argument position",
-     lambda r: r["enforcement"].__setitem__("tests", "trailing-arg.py"),
-     expect="no supported runner call there EXECUTES it")
+# One helper reads every front-matter key this checker consumes, so the uniqueness rule is
+# one rule rather than a per-key patch. Repetition is invalid whether the values conflict
+# or agree: the provider is free to resolve it differently than we do.
+for key, first, second, label in (
+        ("infer", "false", "true", "conflicting"),
+        ("infer", "false", "false", "identical"),
+        ("disable-model-invocation", "true", "false", "conflicting"),
+        ("name", "twin", "other", "identity")):
+    r = base_registry()
+    r["agents"][1]["surfaces"]["copilot"]["automatic_invocation"] = False
+    f = dict(BASE_FILES)
+    if key == "name":
+        fm = "name: %s\nname: %s\ndescription: fixture\ninfer: false\n" % (first, second)
+    else:
+        fm = ("name: twin\ndescription: fixture\n%s: %s\n%s: %s\n"
+              % (key, first, key, second))
+    f[".github/agents/twin.md"] = "---\n%s---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: duplicate %s (%s) is rejected" % (key, label),
+          rc != 0 and ("appears 2 times" in out or "appears 3 times" in out))
 
 r = base_registry()
-r["enforcement"]["tests"] = "loader-shape.py"
-rc, out = run(r, base_skills(), dict(BASE_FILES))
-check("MUST-PASS runpy.run_path(CHECKER) loads the checker", rc == 0)
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = copilot_file("twin", "infer: false\n")
+rc, out = run(r, base_skills(), f)
+check("MUST-PASS a single occurrence of each key still resolves", rc == 0)
+
+
+print()
+print("--- background execution does not propagate a verdict ---")
+
+import importlib.util as _ilu4
+_spec4 = _ilu4.spec_from_file_location("checker_r12", CHECKER)
+_m4 = _ilu4.module_from_spec(_spec4)
+_spec4.loader.exec_module(_m4)
+
+for label, line in (
+        ("backgrounded", "python3 scripts/check-agent-registry.py &"),
+        ("backgrounded with redirection",
+         "python3 scripts/check-agent-registry.py >/tmp/log 2>&1 &"),
+        ("|| true", "python3 scripts/check-agent-registry.py || true"),
+        ("; true", "python3 scripts/check-agent-registry.py; true"),
+        ("piped", "python3 scripts/check-agent-registry.py | tee log"),
+        ("&& chained", "python3 scripts/check-agent-registry.py && true")):
+    check("MUST-FAIL a %s caller cannot fail" % label, not _m4.invokes_checker(line))
+
+# `2>&1` and `&>` are redirections, not control operators. Every real caller uses the first.
+for label, line in (
+        ("bare", "python3 scripts/check-agent-registry.py"),
+        ("2>&1 inside $()",
+         'if o=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
+        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
+    check("MUST-PASS %s still counts" % label, _m4.invokes_checker(line))
+
+
+print()
+print("--- the gap list claims only what enforcement proves ---")
+
+case("REAL P2: known_uncovered_directories names an ordinary file",
+     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
+         "known_uncovered_directories", ["caller.sh"]),
+     expect="not an existing directory")
+
+case("known_uncovered_directories names an escaping path",
+     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
+         "known_uncovered_directories", ["../outside"]),
+     expect="escapes the repository root")
+
+case("the retired provider_surfaces_no_registry_covers name is rejected",
+     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
+         "provider_surfaces_no_registry_covers", [".claude/commands"]),
+     expect="claims a provider classification no owner supplies")
+
+case("re-adding enforcement.tests reintroduces an unpinned claim",
+     lambda r: r["enforcement"].__setitem__(
+         "tests", "scripts/tests/test_agent_registry_invariants.py"),
+     expect="was removed in icn#2632 review round 12")
+
+
+# --- round 11: the executable position, the exit status, and the extension ------
+print()
 
 
 print()
@@ -525,21 +555,6 @@ wrong_extension_case()
 
 # --- round 10: a role is proven by the operation, not by role-shaped tokens ------
 print()
-print("--- enforcement.tests must EXECUTE the checker ---")
-
-case("REAL P2: a runner imported and the path stored, but no call",
-     lambda r: r["enforcement"].__setitem__("tests", "noop-tests.py"),
-     expect="no supported runner call there EXECUTES it")
-
-case("REAL P2: a runner call that goes somewhere else",
-     lambda r: r["enforcement"].__setitem__("tests", "unrelated-call.py"),
-     expect="no supported runner call there EXECUTES it")
-
-r = base_registry()
-r["enforcement"]["tests"] = "real-shape.py"
-rc, out = run(r, base_skills(), dict(BASE_FILES))
-check("MUST-PASS the real suite shape -- subprocess.run([sys.executable, str(CHECKER)])",
-      rc == 0)
 
 
 print()
@@ -578,14 +593,6 @@ for label, line in (
 # --- round 9: mentions, bytes, and metadata that outlives its relationship -------
 print()
 print("--- role claims must be executable, not textual ---")
-
-case("REAL P2: enforcement.tests names a prose file that mentions the checker",
-     lambda r: r["enforcement"].__setitem__("tests", "prose-tests.md"),
-     expect="not a Python module")
-
-case("REAL P2: enforcement.tests names Python that imports no runner",
-     lambda r: r["enforcement"].__setitem__("tests", "names-only.py"),
-     expect="no supported runner call there EXECUTES it")
 
 case("REAL P2: an invoked_by caller that only echoes the command",
      lambda r: r["enforcement"].__setitem__("invoked_by", ["echo-caller.sh"]),
@@ -725,10 +732,6 @@ print("--- enforcement claims name roles, not just files ---")
 case("REAL P2: enforcement.checker points at an unrelated existing file",
      lambda r: r["enforcement"].__setitem__("checker", "not-a-caller.md"),
      expect="the running checker is")
-
-case("enforcement.tests points at a file that never exercises the checker",
-     lambda r: r["enforcement"].__setitem__("tests", "not-a-caller.md"),
-     expect="not a Python module")
 
 
 # --- round 7: claims that pass for the wrong reason -----------------------------
@@ -956,10 +959,10 @@ case("provider_variant stores a body_similarity score",
          ".github/agents/twin.md", copilot_file("twin").replace("Body", "Other body")),
      expect="stored derived data")
 
-case("REAL P2: skills.json names an uncovered surface that does not exist",
+case("REAL P2: known_uncovered_directories names a path that does not exist",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
-         "provider_surfaces_no_registry_covers", ["tools/does-not-exist/skills"]),
-     expect="phantom trees")
+         "known_uncovered_directories", ["tools/does-not-exist/skills"]),
+     expect="not an existing directory")
 
 
 # --- relationship vocabulary must equal enforcement, both directions -------------

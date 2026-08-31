@@ -92,15 +92,6 @@ def as_str_list(v):
 ALL_SEMANTIC_FIELDS = frozenset()   # rebound below, once the adapters are defined.
 
 
-# Call vocabulary derived from what this repository actually uses to run the checker, not
-# from imagined future mechanisms. Widen it deliberately, never speculatively.
-SUPPORTED_TEST_RUNNERS = frozenset({
-    "subprocess.run", "subprocess.Popen", "subprocess.call",
-    "subprocess.check_call", "subprocess.check_output",
-    "runpy.run_path", "importlib.util.spec_from_file_location",
-})
-
-
 class InvalidProviderBoolean(Exception):
     """A provider key is present with a value the provider does not define."""
 
@@ -110,11 +101,28 @@ def split_front_matter(text):
     return (m.group(1), m.group(2)) if m else (None, text)
 
 
+class AmbiguousFrontMatter(Exception):
+    """A key this checker consumes appears more than once at the top level."""
+
+
 def front_matter_value(block, key):
+    """The single top-level value for `key`, None if absent.
+
+    Raises when the key repeats. Taking the first match let a definition declare
+    `infer: false` and `infer: true` and be certified as one of them -- a registry semantic
+    cannot be derived from an ambiguous provider declaration, and that holds whether the
+    repeated values contradict each other or agree. Every key this checker consumes goes
+    through here, so the rule is one rule rather than a per-key patch.
+    """
     if not block:
         return None
-    m = re.search(r"^%s:\s*(.*)$" % re.escape(key), block, re.M)
-    return m.group(1).strip() if m else None
+    matches = re.findall(r"^%s:[ \t]*(.*)$" % re.escape(key), block, re.M)
+    if len(matches) > 1:
+        raise AmbiguousFrontMatter(
+            "%s appears %d times in the front matter. One occurrence or none -- a repeated "
+            "key leaves the provider free to resolve it differently than this checker does"
+            % (key, len(matches)))
+    return matches[0].strip() if matches else None
 
 
 def strict_bool(block, key):
@@ -325,7 +333,12 @@ def _candidate_commands(line):
 # something else. `2>&1` is a redirection and contains none of these, which is why the real
 # callers still pass. Anything else fails closed: a novel wrapper should make this gate red
 # until its status semantics are deliberately established.
-_STATUS_BREAKING = re.compile(r"\|\||&&|;|(?<![0-9>&])\|(?!\|)")
+# `&` as a control operator backgrounds the command, so its eventual status never reaches
+# the caller. `2>&1` and `&>` are redirections and must stay legal -- every real caller uses
+# the first. The negative lookbehind/ahead below distinguish them: a redirecting `&` is
+# preceded by a digit or `>`, or followed by `>`.
+_STATUS_BREAKING = re.compile(
+    r"\|\||&&|;|(?<![0-9>&])\|(?!\|)|(?<![0-9>&])&(?![>&])")
 
 
 def _selected_script(tokens):
@@ -685,7 +698,11 @@ class Checker:
                     continue
 
                 fm, _ = split_front_matter(fp.read_text(encoding="utf-8"))
-                declared = front_matter_value(fm, "name")
+                try:
+                    declared = front_matter_value(fm, "name")
+                except AmbiguousFrontMatter as exc:
+                    self.fail("%s.%s: %s" % (name, sid, exc))
+                    continue
                 if declared is not None and declared != name:
                     self.fail("%s.%s: front matter declares name: %s. The provider loads the "
                               "front-matter name, so the registry would route to a name the "
@@ -758,8 +775,7 @@ class Checker:
         """
         enf = reg.get("enforcement")
         if not isinstance(enf, dict):
-            self.fail("enforcement: must be an object naming the checker, its tests and its "
-                      "callers.")
+            self.fail("enforcement: must be an object naming the checker and its callers.")
             return
         # Existence is not role verification. `checker` must identify THIS script, and
         # `tests` must actually exercise it -- otherwise the registry can point readers at
@@ -786,19 +802,22 @@ class Checker:
             else:
                 self.ok("enforcement.checker identifies the running checker (%s)" % my_rel)
 
-        val = enf.get("tests")
-        if not isinstance(val, str) or not val:
-            self.fail("enforcement.tests: must be a non-empty path string")
-        elif not (self.root / val).is_file():
-            self.fail("enforcement.tests names %s, which does not exist." % val)
-        else:
-            problem = self._tests_problem(val, enf.get("checker", ""))
-            if problem:
-                self.fail("enforcement.tests names %s, but %s. Naming a file that merely "
-                          "mentions the checker is the same defect as naming an unrelated "
-                          "one." % (val, problem))
-            else:
-                self.ok("enforcement.tests -> %s executes the declared checker" % val)
+        if "tests" in enf:
+            self.fail("enforcement.tests was removed in icn#2632 review round 12 and must not "
+                      "return. No consumer read it, and four review rounds were spent building "
+                      "AST machinery to prove a copy nothing needed -- each round accepting "
+                      "something execution-shaped that did not execute. Re-adding it "
+                      "reintroduces an unpinned claim; the suite is gated directly in CI.")
+
+        # `enforcement.tests` was REMOVED (icn#2632 review round 12). It named this
+        # checker's invariant suite, and nothing outside this file ever read it:
+        # drift-check.sh, what-matters-now.sh and generate-live-state-overlay.py all
+        # consume agents.json without touching `enforcement`, and CI runs the suite
+        # directly from .github/workflows/agent-drift-check.yml rather than resolving a
+        # path through the registry. Four review rounds were spent building AST machinery
+        # to prove a copy nothing consumed -- each round accepting something
+        # execution-shaped that did not execute. Deleting the claim removes the class.
+        # The suite itself is untouched and still gated in CI.
         callers = enf.get("invoked_by")
         if not isinstance(callers, list):
             self.fail("enforcement.invoked_by: must be an array of caller paths")
@@ -829,6 +848,10 @@ class Checker:
                 continue
             try:
                 actual = derive(fm)
+            except AmbiguousFrontMatter as exc:
+                self.fail("%s.%s: %s (%s). A registry semantic cannot be derived from an "
+                          "ambiguous provider declaration." % (name, sid, exc, path))
+                continue
             except InvalidProviderBoolean as exc:
                 self.fail("%s.%s: %s (%s). An unsupported scalar is unknown, not false -- the "
                           "registry must not certify provider behaviour the provider does not "
@@ -849,101 +872,6 @@ class Checker:
                           "which semantics exist; recording one here asserts behaviour that "
                           "provider does not have." % (name, sid, field, provider_type))
 
-    def _tests_problem(self, rel, checker_rel):
-        """Why the named tests file does not execute the checker, or None.
-
-        Ingredients coexisting in a module is not an execution path. A file holding
-        `import subprocess` beside `CHECKER = "...check-agent-registry.py"` passed the previous
-        check while never calling anything.
-
-        The supported vocabulary is derived from what this repository actually does -- the real
-        suite runs `subprocess.run([sys.executable, str(CHECKER), ...])` -- not from imagined
-        future mechanisms. Deliberately not data-flow analysis: a runner CALL must exist whose
-        argument subtree reaches the checker, either as a string literal or through a name bound
-        to a path expression naming it.
-        """
-        text = (self.root / rel).read_text(encoding="utf-8", errors="replace")
-        if not rel.endswith(".py"):
-            return "it is not a Python module"
-        try:
-            tree = ast.parse(text)
-        except SyntaxError as exc:
-            return "it does not parse as Python (%s)" % exc
-
-        target = (checker_rel or "scripts/check-agent-registry.py").rsplit("/", 1)[-1]
-
-        def names_the_checker(node):
-            return any(isinstance(n, ast.Constant) and isinstance(n.value, str)
-                       and target in n.value for n in ast.walk(node))
-
-        # Names bound to an expression that names the checker: CHECKER = ROOT / "..." / "x.py"
-        bound = {t.id for a in ast.walk(tree) if isinstance(a, ast.Assign)
-                 and names_the_checker(a.value)
-                 for t in a.targets if isinstance(t, ast.Name)}
-
-        def is_checker_ref(node):
-            """This expression denotes the checker: a literal naming it, or a bound name."""
-            if names_the_checker(node):
-                return True
-            return any(isinstance(n, ast.Name) and n.id in bound for n in ast.walk(node))
-
-        def is_interpreter(node):
-            """sys.executable, or a literal python/python3."""
-            if isinstance(node, ast.Attribute) and node.attr == "executable":
-                return True
-            return (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                    and node.value.rsplit("/", 1)[-1] in _INTERPRETERS)
-
-        def subprocess_execs_checker(call):
-            """The checker must be argv0, or argv1 behind an interpreter.
-
-            The exact mirror of the shell rule: `subprocess.run(["echo", CHECKER])` puts the
-            checker in an ARGUMENT position, so echo runs and the checker does not. Accepting
-            any reference anywhere in the argument tree is the same defect as accepting any
-            token anywhere on a command line.
-            """
-            if not call.args:
-                return False
-            argv = call.args[0]
-            if isinstance(argv, (ast.List, ast.Tuple)):
-                items = list(argv.elts)
-            else:
-                return is_checker_ref(argv)          # shell=True / a single program string
-            if not items:
-                return False
-            if is_checker_ref(items[0]):
-                return True
-            return (len(items) > 1 and is_interpreter(items[0])
-                    and is_checker_ref(items[1]))
-
-        # Loader forms: the checker must be the path being loaded, not an incidental argument.
-        LOADER_TARGET_POSITION = {"runpy.run_path": 0,
-                                  "importlib.util.spec_from_file_location": 1}
-
-        def call_reaches_checker(call, qual):
-            if qual in LOADER_TARGET_POSITION:
-                i = LOADER_TARGET_POSITION[qual]
-                return len(call.args) > i and is_checker_ref(call.args[i])
-            return subprocess_execs_checker(call)
-
-        for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call)):
-            dotted = []
-            f = call.func
-            while isinstance(f, ast.Attribute):
-                dotted.append(f.attr)
-                f = f.value
-            if isinstance(f, ast.Name):
-                dotted.append(f.id)
-            qual = ".".join(reversed(dotted))
-            if qual in SUPPORTED_TEST_RUNNERS and call_reaches_checker(call, qual):
-                return None
-
-        return ("no supported runner call there EXECUTES it. The checker must be the program "
-                "the call runs -- argv0, or argv1 behind an interpreter -- or the path a "
-                "loader loads. Appearing anywhere in the argument tree is not enough: "
-                "subprocess.run([\"echo\", CHECKER]) runs echo. Supported runners: %s"
-                % ", ".join(sorted(SUPPORTED_TEST_RUNNERS)))
-
     def check_cross_registry(self, surfaces):
         sk = self.root / SKILLS
         if not sk.exists():
@@ -959,6 +887,8 @@ class Checker:
                       "supposed to fail closed." % exc)
             return
         trees = {v["tree"] for v in surfaces.values() if v.get("tree")}
+        scope = (sj.get("enforcement", {}) or {}).get("scan_scope") or {}
+        scan_trees = set(scope.get("canonical_trees") or []) | set(scope.get("provider_trees") or [])
         cross = (sj.get("declared_scope", {}) or {}).get("cross_registry") or {}
         claimed = cross.get("agent_surfaces_tracked_by_agents_json")
         if claimed is None:
@@ -978,16 +908,32 @@ class Checker:
                       "boundary between them." % missing)
         if claimed == trees:
             self.ok("skills.json and agents.json agree on all %d agent surfaces" % len(trees))
-        for un in cross.get("provider_surfaces_no_registry_covers") or []:
-            if un in trees:
+        # Only what enforcement can establish. The field used to be named
+        # `provider_surfaces_no_registry_covers`, which asserted a classification no owner
+        # supplies -- so the check could test existence and nothing more, and AGENTS.md
+        # passed as a provider surface. Narrowed to directories, verified as such.
+        legacy = cross.get("provider_surfaces_no_registry_covers")
+        if legacy is not None:
+            self.fail("skills.json still declares provider_surfaces_no_registry_covers. That "
+                      "name claims a provider classification no owner supplies; it is "
+                      "known_uncovered_directories now, which is what the checker can prove.")
+        for un in cross.get("known_uncovered_directories") or []:
+            path = pathlib.PurePosixPath(un)
+            if un.startswith("/") or ".." in path.parts:
+                self.fail("skills.json known_uncovered_directories: %s is absolute or escapes "
+                          "the repository root." % un)
+            elif un in trees:
                 self.fail("skills.json lists %s as covered by no registry, but agents.json "
                           "declares it as a surface." % un)
-            elif not (self.root / un).exists():
-                self.fail("skills.json names %s as an uncovered provider surface, but no such "
-                          "tree exists. A gap list that names phantom trees is as untrue as "
-                          "one that omits real ones." % un)
+            elif un in scan_trees:
+                self.fail("skills.json lists %s as covered by no registry, but its own "
+                          "enforcement.scan_scope already covers it." % un)
+            elif not (self.root / un).is_dir():
+                self.fail("skills.json known_uncovered_directories: %s is not an existing "
+                          "directory. A gap list naming a file or a phantom path is as untrue "
+                          "as one omitting a real gap." % un)
             else:
-                self.ok("uncovered surface %s exists and is named as a gap" % un)
+                self.ok("uncovered directory %s exists and is covered by no registry" % un)
 
     def report(self):
         for n in self.notes:

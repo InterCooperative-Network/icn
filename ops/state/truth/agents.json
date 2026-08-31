@@ -41,12 +41,12 @@
   },
   "enforcement": {
     "checker": "scripts/check-agent-registry.py",
-    "tests": "scripts/tests/test_agent_registry_invariants.py",
     "invoked_by": [
       "ops/scripts/drift-check.sh",
       "scripts/check-preflight-consistency.sh",
       ".github/workflows/agent-drift-check.yml"
-    ]
+    ],
+    "tests_note": "REMOVED in icn#2632 review round 12. This field named the checker's invariant suite and nothing outside scripts/check-agent-registry.py ever read it: drift-check.sh, what-matters-now.sh and generate-live-state-overlay.py all consume this file without touching `enforcement`, and CI runs the suite directly from .github/workflows/agent-drift-check.yml rather than resolving a path through here. Four review rounds were spent building AST machinery to prove a copy no consumer needed, each round accepting something execution-shaped that did not execute -- a stored path, then a runner call going elsewhere, then the checker in an argument position, then a ModuleSpec that constructs but never runs. Deleting the claim removes the class. The suite is untouched and still gated in CI."
   },
   "agents": [
     {

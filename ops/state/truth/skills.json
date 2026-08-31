@@ -25,13 +25,15 @@
         ".github/agents",
         "tools/claude-code/plugins/icn-agent-pack/agents"
       ],
-      "provider_surfaces_no_registry_covers": [
+      "uncovered_owner": "icn#2632",
+      "known_uncovered_directories": [
         ".claude/commands",
         "tools/claude-code/plugins/icn-agent-pack/skills",
         "tools/claude-code/plugins/icn-agent-pack/hooks",
         "tools/claude-code/plugins/icn-agent-pack/bin"
       ],
-      "uncovered_owner": "icn#2632"
+      "known_uncovered_directories_note": "RENAMED from provider_surfaces_no_registry_covers in icn#2632 review round 12. The old name asserted these are provider SURFACES, and no owner supplies that classification -- neither agents.json#provider_surfaces nor skills.json#enforcement.scan_scope can establish it for an arbitrary path, so the checker could only test existence and an ordinary file such as AGENTS.md passed. The field now claims exactly what enforcement proves: these are repo-relative directories that exist, do not escape the root, and are covered by neither registry. That they are provider-significant is explanatory rationale below, not derived truth.",
+      "known_uncovered_directories_why_they_matter": "Explanatory, not mechanically derived: .claude/commands/ holds provider command definitions, and the icn-agent-pack plugin's skills/, hooks/ and bin/ trees are loaded by the plugin. No registry covers them today; icn#2632 owns that gap."
     }
   },
   "mirror_model": {
