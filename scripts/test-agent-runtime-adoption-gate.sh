@@ -649,6 +649,17 @@ cases = {
     # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
     # interpreter and non-hook vocabularies apply to it, and ONLY to it.
     'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
+    # ...and the ARGUMENT is part of that grammar. A basename-only exemption made `python3`
+    # mean "not a hook invocation" whatever followed, so `-c` could run one: the nested
+    # shell's permission-denied is invisible because os.system's status is discarded and
+    # python exits 0.
+    ('python3 -c \'import os; os.system("$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh")\''):
+        (K.UNCLASSIFIED, None),
+    'python3 -m mymod': (K.UNCLASSIFIED, None),
+    'python3': (K.UNCLASSIFIED, None),
+    'python3 /tmp/x.py': (K.UNCLASSIFIED, None),
+    'python3 %s' % H: (K.UNCLASSIFIED, None),
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py --flag': (K.INTERPRETED, None),
     '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
     'echo hi': (K.NON_HOOK, None),
     H: (K.DIRECT, ".claude/hooks/hook-health.sh"),

@@ -592,7 +592,39 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "%r is a bare name behind a command-local assignment, which can change what "
                 "it resolves to" % argv0)
     if base in _INTERPRETERS:
-        return HookCommandKind.INTERPRETED, None, "runs %s" % base
+        # THE ARGUMENT IS PART OF THE GRAMMAR. A basename-only exemption made `python3` mean
+        # "not a hook invocation" whatever followed it, so
+        # `python3 -c 'import os; os.system("…/hook-health.sh")'` classified INTERPRETED and
+        # the hook left the derived set -- and the nested shell's permission-denied is
+        # invisible because os.system's return value is discarded and python exits 0.
+        #
+        # The supported form is the one live settings.json uses, three times and in one
+        # shape: the interpreter followed by a repository .py script. `-c`, `-m` and every
+        # other flag are refused rather than reasoned about, because reasoning about what a
+        # Python string argument executes is not something this gate can do.
+        rest = tokens[1:]
+        if not rest or rest[0].startswith("-"):
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is invoked with %s; the supported form is the interpreter followed by "
+                    "a repository .py script, and what any other argument executes is not "
+                    "something this gate can establish"
+                    % (base, ("no argument" if not rest else "the option %r" % rest[0])))
+        script = rest[0]
+        for spelling in ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR"):
+            script = script.replace(spelling + "/", "").replace(spelling, "")
+        try:
+            base_dir = Path(root).resolve() if root is not None else None
+            cand = Path(script)
+            resolved = None if base_dir is None else (
+                cand if cand.is_absolute() else base_dir / cand).resolve()
+        except (ValueError, OSError) as exc:
+            return HookCommandKind.UNCLASSIFIED, None, "unresolvable script path (%s)" % exc
+        if resolved is None:
+            return HookCommandKind.UNCLASSIFIED, None, "interpreter script, no root to resolve against"
+        if not resolved.is_relative_to(base_dir) or resolved.suffix != ".py":
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which is not a repository .py script" % (base, script))
+        return HookCommandKind.INTERPRETED, None, "runs %s on %s" % (base, script)
     if base in _INTENTIONAL_NON_HOOK:
         return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
     return (HookCommandKind.UNCLASSIFIED, None,
