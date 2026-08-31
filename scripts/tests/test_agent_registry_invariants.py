@@ -94,7 +94,11 @@ def base_registry():
 
 
 def base_skills():
+    # `enforcement.scan_scope` and both tree lists are REQUIRED: the uncovered-directory
+    # claim is proven against the scan scope, so an absent scope would certify the boundary
+    # on no evidence (icn#2632 review round 18).
     return {
+        "enforcement": {"scan_scope": {"canonical_trees": [], "provider_trees": []}},
         "declared_scope": {
             "cross_registry": {
                 "agent_surfaces_tracked_by_agents_json": [".claude/agents", ".github/agents"],
@@ -841,6 +845,61 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 18: guards must not crash ahead of the validator that reports ------
+print()
+print("--- structural validation runs before any semantic access ---")
+
+for value, label in ((1, "an integer"), ("a string", "a string"),
+                     ([], "an array"), (None, "null")):
+    r = base_registry()
+    r["declared_scope"] = value
+    rc, out = run(r, base_skills(), dict(BASE_FILES))
+    check("REAL P2: declared_scope as %s -> finding, not crash" % label,
+          rc != 0 and "Traceback" not in out and "must be an object" in out)
+
+
+print()
+print("--- the cross-registry boundary needs its parents to exist ---")
+
+# child_obj substituted {} for an ABSENT parent, leaving scan_trees empty -- so the
+# uncovered-directory claim was certified against no evidence at all.
+for mutate, label in (
+        (lambda s: s.pop("enforcement", None), "enforcement deleted"),
+        (lambda s: s["enforcement"].pop("scan_scope", None), "scan_scope deleted"),
+        (lambda s: s["enforcement"]["scan_scope"].pop("provider_trees", None),
+         "provider_trees deleted"),
+        (lambda s: s["enforcement"]["scan_scope"].pop("canonical_trees", None),
+         "canonical_trees deleted")):
+    r = base_registry()
+    sk = base_skills()
+    sk["enforcement"] = {"scan_scope": {"canonical_trees": [], "provider_trees": []}}
+    mutate(sk)
+    rc, out = run(r, sk, dict(BASE_FILES))
+    check("REAL P2: %s is a finding, not silence" % label,
+          rc != 0 and "Traceback" not in out)
+
+
+print()
+print("--- a commented block indicator must not raise ---")
+
+# Comment stripping turned `description: | # rationale` into `|`, and the block body was
+# then located by searching for a line ENDING in the stripped indicator. Nothing matched,
+# so a valid definition was rejected with StopIteration.
+for desc, label, should_pass in (
+        ("| # rationale\n  Real content.", "literal block with an inline comment", True),
+        ("> # note\n  Folded content.", "folded block with an inline comment", True),
+        ("| # only a comment", "indicator plus comment, no content", False),
+        ("|", "bare indicator, no content", False),
+        ("|\n  plain block content", "plain block scalar", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: %s\ninfer: false\n---\n\nBody for twin.\n" % desc)
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+
+
 # --- round 17: the level above the one already typed ---------------------------
 print()
 print("--- an inline comment is not part of the value ---")

@@ -174,10 +174,16 @@ def required_string_problem(block, key):
             return "is only a comment"
 
     if _BLOCK_SCALAR.match(v):
-        # `description: >` -- the value is the indented block beneath it.
+        # `description: >` -- the value is the indented block beneath it. Located by KEY:
+        # an earlier revision searched for the line ending in the stripped indicator, so
+        # `description: | # rationale` matched nothing and raised StopIteration, rejecting a
+        # VALID definition with a traceback. Comment stripping must not make the key
+        # unfindable.
         lines = block.split("\n")
-        idx = next(i for i, ln in enumerate(lines)
-                   if re.match(r"^%s:[ \t]*%s\s*$" % (re.escape(key), re.escape(v)), ln))
+        idx = next((i for i, ln in enumerate(lines)
+                    if re.match(r"^%s:" % re.escape(key), ln)), None)
+        if idx is None:
+            return "declares a block scalar whose key line cannot be located"
         body = []
         for ln in lines[idx + 1:]:
             if ln.strip() and not ln[0].isspace():
@@ -379,6 +385,10 @@ def validate_structure(reg):
                 "dispatch on it, so it cannot be absent or of another type" % sid)
 
     req(as_obj(reg.get("relationship_model"))[0], "relationship_model: must be an object")
+    if "declared_scope" in reg:
+        req(as_obj(reg["declared_scope"])[0],
+            "declared_scope: must be an object, found %s"
+            % type(reg["declared_scope"]).__name__)
 
     agents = reg.get("agents")
     if req(isinstance(agents, list), "agents: must be an array"):
@@ -618,18 +628,6 @@ class Checker:
             print("UNPARSEABLE: %s (%s)" % (REGISTRY, exc))
             return 1
 
-        if "enforcement" in reg:
-            self.fail("enforcement was removed in icn#2632 review round 13 and must not "
-                      "return. Nothing outside this checker ever dereferenced it, and each "
-                      "field spawned machinery to prove a self-description no consumer "
-                      "needed. The gates are real and unchanged; they do not need their "
-                      "identities copied here.")
-        if "in_scope" in (reg.get("declared_scope") or {}):
-            self.fail("declared_scope.in_scope was removed in icn#2632 review round 13. "
-                      "provider_surfaces is the one machine-readable owner of provider "
-                      "topology; a second glob list changed no behaviour and could only "
-                      "become false.")
-
         structural = validate_structure(reg)
         if structural:
             for m in structural:
@@ -637,6 +635,22 @@ class Checker:
             # Semantic checks below assume these types. Running them on a malformed value is
             # how a checker crashes instead of reporting, so stop here.
             return self.report()
+
+        # These run AFTER validate_structure, which has now proven declared_scope is an
+        # object. An earlier revision placed them first, so `declared_scope: 1` reached a
+        # membership test and raised TypeError -- a structural guard crashing ahead of the
+        # structural validator that exists to report it.
+        if "enforcement" in reg:
+            self.fail("enforcement was removed in icn#2632 review round 13 and must not "
+                      "return. Nothing outside this checker ever dereferenced it, and each "
+                      "field spawned machinery to prove a self-description no consumer "
+                      "needed. The gates are real and unchanged; they do not need their "
+                      "identities copied here.")
+        if "in_scope" in reg.get("declared_scope", {}):
+            self.fail("declared_scope.in_scope was removed in icn#2632 review round 13. "
+                      "provider_surfaces is the one machine-readable owner of provider "
+                      "topology; a second glob list changed no behaviour and could only "
+                      "become false.")
 
         if reg.get("schema") != "icn-agents/v2":
             self.fail("schema: expected icn-agents/v2, found %r. This checker enforces the "
@@ -937,8 +951,13 @@ class Checker:
         # the objects holding them untyped, so `skills.json.enforcement: "a string"` raised
         # AttributeError rather than reporting -- the same non-totality one level up. This
         # checker runs as its own standalone gate and cannot assume the skill checker ran.
-        def child_obj(parent, key, label):
+        def child_obj(parent, key, label, required=False):
             if key not in parent:
+                if required:
+                    self.fail("skills.json %s is missing. Without it this checker cannot "
+                              "prove known_uncovered_directories are actually uncovered, and "
+                              "silently substituting an empty scope would certify the "
+                              "boundary on no evidence." % label)
                 return {}
             ok, value = as_obj(parent[key])
             if not ok:
@@ -952,17 +971,28 @@ class Checker:
         if not ok:
             self.fail("skills.json must be a JSON object, found %s" % type(sj).__name__)
             return
-        enforcement = child_obj(sj_obj, "enforcement", "enforcement")
-        scope = child_obj(enforcement, "scan_scope", "enforcement.scan_scope")
+        enforcement_present = "enforcement" in sj_obj
+        enforcement = child_obj(sj_obj, "enforcement", "enforcement", required=True)
+        # Keyed on PRESENCE, not truthiness: popping scan_scope leaves enforcement as an
+        # empty dict, and `bool({})` would have read that as "enforcement absent" and skipped
+        # the requirement -- silently restoring the very gap this check closes.
+        scope = child_obj(enforcement, "scan_scope", "enforcement.scan_scope",
+                          required=enforcement_present)
+        scope_present = "scan_scope" in enforcement
         scan_trees = set()
         for key in ("canonical_trees", "provider_trees"):
-            if key in scope:
-                ok, lst = as_str_list(scope[key])
-                if not ok:
-                    self.fail("skills.json enforcement.scan_scope.%s must be an array of "
-                              "nonempty strings, found %r" % (key, scope[key]))
-                else:
-                    scan_trees |= set(lst)
+            if key not in scope:
+                if scope_present:
+                    self.fail("skills.json enforcement.scan_scope.%s is missing. The "
+                              "uncovered-directory claim is proven against the scan scope, so "
+                              "an absent list would let it be certified on no evidence." % key)
+                continue
+            ok, lst = as_str_list(scope[key])
+            if not ok:
+                self.fail("skills.json enforcement.scan_scope.%s must be an array of "
+                          "nonempty strings, found %r" % (key, scope[key]))
+            else:
+                scan_trees |= set(lst)
         declared = child_obj(sj_obj, "declared_scope", "declared_scope")
         cross = child_obj(declared, "cross_registry", "declared_scope.cross_registry")
         for field in ("agent_surfaces_tracked_by_agents_json",
