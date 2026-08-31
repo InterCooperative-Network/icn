@@ -211,18 +211,68 @@ def direct_hook_targets(settings: dict, root: Path) -> list[str]:
 # Shell launchers that exec the command they are handed and return its status. `help command`
 # and `env(1)` both confirm the target is attempted and its exit status propagates, so a hook
 # behind one of these is still a direct invocation and its executable bit still matters.
-# Launchers whose bare form review has already established as a direct invocation. Options
-# are deliberately NOT parsed generically: `env -S "cmd args"` hides the command inside a
-# quoted string and `exec -a NAME cmd` replaces argv0, so a loop that skips every `-*` token
-# mis-reads both. Only these no-argument flags are recognised; anything else is UNCLASSIFIED.
-_LAUNCHERS = ("command", "env", "exec", "nohup")
-_SAFE_LAUNCHER_FLAGS = {"-i", "--ignore-environment", "-p", "-v", "-0", "--null"}
-_LAUNCHER_FLAGS_WITH_ARG = {"-u", "--unset", "-C", "--chdir"}
-
-# argv0 values that are deliberately not hooks. Kept explicit: an unrecognised bare word is
-# unclassified, not silently ignored.
-_INTENTIONAL_NON_HOOK = ("echo", "true", ":")
+# The supported hook-command language, derived from live .claude/settings.json rather than
+# from what a shell can express. That file holds 18 command hooks in exactly three shapes:
+# 13 direct repository executables, 3 python3-invoked scripts, 2 echo. Zero launchers, no
+# `true`, no `:`, and no top-level shell composition.
+#
+# Launcher support (command/env/exec/nohup) was REMOVED. Nothing used it, and one flag set
+# shared across four programs mis-classified: `command -v <hook>` only PRINTS a description
+# and `env -0 <hook>` refuses to run a command at all, yet both were certified as direct
+# execution -- the gate claiming executable-bit coverage for commands that never invoke the
+# target. Sharing a grammar across four languages was the defect; no grammar is smaller than
+# a wrong one. A future `env … hook.sh` makes this gate red as an unclassified command form
+# until support is added deliberately, which is fail-closed evolution rather than regression.
+_INTENTIONAL_NON_HOOK = ("echo",)
 _INTERPRETERS = ("python", "python3")
+
+# Operators that compose several commands into one hook entry. Detected as TOKENS through
+# shlex punctuation_chars so quoting is respected -- the live
+# `echo "branch: $(git … || echo detached)"` carries `||` inside a command substitution and is
+# correctly NOT composition, which a substring search would have got wrong.
+_SHELL_OPERATOR_CHARS = set(";&|<>()")
+
+
+# How many checks a COMPLETE run performs. Asserted, not decorative — see the floor in main().
+#
+# Split into a fixed part and a derived part (icn#2691). The fixed part stays EXACT for the
+# reason the original comment gives: a check that skipped itself is not a check that passed.
+# The hook-executable checks are derived from settings.json, so their count legitimately
+# changes when a hook is added or removed — pinning that to a literal would make adding a hook
+# a spurious failure, and the temptation would be to lower the number rather than look.
+EXPECTED_STATIC_CHECKS = 24
+
+PROVIDER_MCP_CONFIGS = [
+    (".mcp.json", ["mcpServers", "icn-ops"]),
+    (".cursor/mcp.json", ["mcpServers", "icn-ops"]),
+]
+
+
+COVERAGE = {
+    "supported": {
+        "claude-code (icn-start)": "project .claude/settings.json hooks; auto-registers",
+        "claude-code (icn-claude, ssh)": "same hooks; lands in the mcp-host worktree",
+        "claude-code (remote/ccd-cli)": "same hooks (--setting-sources includes project)",
+        "any Claude Code session opened in the repo": "project settings are inherited",
+    },
+    "partial": {
+        ".cursor adapter":
+            "declares the ops MCP in .cursor/mcp.json, so icn_ops_agent_runtime and the "
+            "session tools work — but it does not execute Claude Code hooks, so it must call "
+            "register_session explicitly",
+        ".codex / .opencode adapters":
+            "do NOT declare the ops MCP at all (.codex/mcp/servers.example.json is an example "
+            "that omits it and points at the retired ~/projects/icn path; .opencode/opencode.json "
+            "has no MCP block). They get the capability manifest as a file and nothing else.",
+    },
+    "unsupported": {
+        "Claude Code subagents (Agent tool)":
+            "run in-process: no SessionStart event, no separate pid, no MCP client of their "
+            "own, so they cannot be auto-registered. Provider limitation, not an omission.",
+        "CI agents (.github/workflows)":
+            "ephemeral, no worktree, no persistent registry — deliberately out of scope.",
+    },
+}
 
 
 class HookCommandKind:
@@ -232,54 +282,48 @@ class HookCommandKind:
     UNCLASSIFIED = "unclassified"
 
 
+def _tokenize(cmd):
+    """Tokens with shell operators separated and quoting respected, or None if unlexable."""
+    try:
+        lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        return list(lexer)
+    except ValueError:
+        return None
+
+
 def classify_hook_command(command: str, root: Path | None = None):
-    """Classify a settings.json hook command. Returns (kind, target_or_None, detail).
+    """Classify one settings.json hook command: (kind, target_or_None, detail).
 
-    Replaces a `command -> target or None` helper whose None was self-concealing: an
-    unparsed form dropped the hook from the derived set, and because the expected check
-    count derives from that same list, the loss hid itself and the gate stayed green.
-
-    The honest answer for a form this cannot read is "I cannot prove whether this executes a
-    repository hook", which is a FAILURE -- not silence. Live settings.json uses three forms
-    only (direct repo executable, python3-invoked script, echo), so the recognised contract
-    is narrow on purpose.
+    UNCLASSIFIED is a gate FAILURE, never silence. An unreadable form used to yield no
+    target, which dropped it from the derived set -- and the expected check count derives
+    from that same list, so the loss concealed itself and the gate stayed green.
     """
     cmd = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
     if not cmd:
         return HookCommandKind.NON_HOOK, None, "empty command"
-    try:
-        tokens = shlex.split(cmd)
-    except ValueError as exc:
-        return HookCommandKind.UNCLASSIFIED, None, "unparseable (%s)" % exc
+    tokens = _tokenize(cmd)
+    if tokens is None:
+        return HookCommandKind.UNCLASSIFIED, None, "unparseable command"
     if not tokens:
         return HookCommandKind.NON_HOOK, None, "empty command"
 
-    seen_launcher = False
-    while tokens:
-        head = tokens[0]
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", head):
-            tokens = tokens[1:]
-            continue
-        if head.rsplit("/", 1)[-1] in _LAUNCHERS:
-            seen_launcher = True
-            tokens = tokens[1:]
-            continue
-        if seen_launcher and head.startswith("-"):
-            if head in _SAFE_LAUNCHER_FLAGS:
-                tokens = tokens[1:]
-            elif head in _LAUNCHER_FLAGS_WITH_ARG:
-                tokens = tokens[2:]
-            elif "=" in head and head.split("=", 1)[0] in _LAUNCHER_FLAGS_WITH_ARG:
-                tokens = tokens[1:]
-            else:
-                # -S rewrites the whole command line; -a rewrites argv0. Guessing here is how
-                # a target silently disappears.
-                return (HookCommandKind.UNCLASSIFIED, None,
-                        "launcher option %r is not in the recognised set" % head)
-            continue
-        break
+    ops = [t for t in tokens if t and set(t) <= _SHELL_OPERATOR_CHARS]
+    if ops:
+        # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
+        # a later one may be a hook whose executable bit decides whether it runs.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "top-level shell composition (%s); only a single simple command is supported"
+                % " ".join(sorted(set(ops))))
+
+    # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
+    # file already treats them as part of a direct invocation, and the suite exercises that
+    # shape -- two siblings disagreeing about what a hook command looks like is how one of
+    # them ends up wrong. Launchers had no such sibling support and no live use.
+    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        tokens = tokens[1:]
     if not tokens:
-        return HookCommandKind.UNCLASSIFIED, None, "launcher with no command"
+        return HookCommandKind.UNCLASSIFIED, None, "assignments with no command"
 
     argv0 = tokens[0]
     base = argv0.rsplit("/", 1)[-1]
@@ -308,54 +352,6 @@ def classify_hook_command(command: str, root: Path | None = None):
         return (HookCommandKind.UNCLASSIFIED, None,
                 "%r is neither a repository path nor a recognised non-hook command" % argv0)
     return HookCommandKind.DIRECT, argv0, "direct repo executable"
-
-
-def _command_target(command: str, root: Path | None = None) -> str | None:
-    """Back-compat shim: the DIRECT target, or None."""
-    kind, target, _ = classify_hook_command(command, root)
-    return target if kind == HookCommandKind.DIRECT else None
-
-# Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
-# COVERAGE below), so the MCP surface is the only capability route they have.
-# How many checks a COMPLETE run performs. Asserted, not decorative — see the floor in main().
-#
-# Split into a fixed part and a derived part (icn#2691). The fixed part stays EXACT for the
-# reason the original comment gives: a check that skipped itself is not a check that passed.
-# The hook-executable checks are derived from settings.json, so their count legitimately
-# changes when a hook is added or removed — pinning that to a literal would make adding a hook
-# a spurious failure, and the temptation would be to lower the number rather than look.
-EXPECTED_STATIC_CHECKS = 24
-
-PROVIDER_MCP_CONFIGS = [
-    (".mcp.json", ["mcpServers", "icn-ops"]),
-    (".cursor/mcp.json", ["mcpServers", "icn-ops"]),
-]
-
-COVERAGE = {
-    "supported": {
-        "claude-code (icn-start)": "project .claude/settings.json hooks; auto-registers",
-        "claude-code (icn-claude, ssh)": "same hooks; lands in the mcp-host worktree",
-        "claude-code (remote/ccd-cli)": "same hooks (--setting-sources includes project)",
-        "any Claude Code session opened in the repo": "project settings are inherited",
-    },
-    "partial": {
-        ".cursor adapter":
-            "declares the ops MCP in .cursor/mcp.json, so icn_ops_agent_runtime and the "
-            "session tools work — but it does not execute Claude Code hooks, so it must call "
-            "register_session explicitly",
-        ".codex / .opencode adapters":
-            "do NOT declare the ops MCP at all (.codex/mcp/servers.example.json is an example "
-            "that omits it and points at the retired ~/projects/icn path; .opencode/opencode.json "
-            "has no MCP block). They get the capability manifest as a file and nothing else.",
-    },
-    "unsupported": {
-        "Claude Code subagents (Agent tool)":
-            "run in-process: no SessionStart event, no separate pid, no MCP client of their "
-            "own, so they cannot be auto-registered. Provider limitation, not an omission.",
-        "CI agents (.github/workflows)":
-            "ephemeral, no worktree, no persistent registry — deliberately out of scope.",
-    },
-}
 
 
 def main() -> int:

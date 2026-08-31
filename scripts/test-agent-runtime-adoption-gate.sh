@@ -505,23 +505,28 @@ fi
 # Two legal direct-invocation spellings that the derivation used to mishandle. `_invokes_hook`
 # in the same file already normalised both, so these were siblings disagreeing.
 python3 - "$GATE" <<'PYSHAPES'
-import importlib.util, sys
+import importlib.util, pathlib, sys
 spec = importlib.util.spec_from_file_location("g", sys.argv[1])
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
 want = ".claude/hooks/hook-health.sh"
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+# Assignment prefixes and both project-dir spellings stay supported: `_invokes_hook` in the
+# same module already treats them as direct invocations.
 cases = {
-    'MODE=health "$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'A=1 B=2 "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
-    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': want,
-    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': want,
-    'echo hi': None,
-    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': None,
+    'MODE=health %s' % H: (K.DIRECT, want),
+    'A=1 B=2 "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': (K.DIRECT, want),
+    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': (K.DIRECT, want),
+    H: (K.DIRECT, want),
+    'echo hi': (K.NON_HOOK, None),
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, None),
 }
-bad = [c for c, exp in cases.items() if m._command_target(c) != exp]
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[:2] != exp]
 sys.exit(0 if not bad else 1)
 PYSHAPES
 if [ $? -eq 0 ]; then
-  ok "leading assignments and the braced \$\{CLAUDE_PROJECT_DIR\} spelling resolve correctly"
+  ok "assignment prefixes and both project-dir spellings classify as direct"
 else
   bad "a legal direct-invocation spelling was mis-resolved" ""
 fi
@@ -566,59 +571,37 @@ K = m.HookCommandKind
 H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
 PY = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
 cases = {
-    # Recognised: the three forms live settings.json actually uses, plus the simple
-    # launcher spellings earlier review established.
+    # The three shapes live settings.json actually uses.
     H: K.DIRECT,
-    'env %s' % H: K.DIRECT,
-    'env -i %s' % H: K.DIRECT,
-    'command -p %s' % H: K.DIRECT,
-    'env -u FOO %s' % H: K.DIRECT,
-    'MODE=health %s' % H: K.DIRECT,
     'python3 %s' % PY: K.INTERPRETED,
     '/usr/bin/python3 %s' % PY: K.INTERPRETED,
-    'echo "branch: x"': K.NON_HOOK,
-    # UNCLASSIFIED, deliberately: -S hides the command inside a quoted string and -a
-    # rewrites argv0, so guessing is how a target silently disappears. Failing loudly is
-    # the correct answer, not silence.
-    'env -S "%s --verbose"' % H: K.UNCLASSIFIED,
-    'exec -a health %s' % H: K.UNCLASSIFIED,
-    'env --split-string="%s"' % H: K.UNCLASSIFIED,
+    # The real echo carries `||` INSIDE a command substitution. Quoting is respected, so this
+    # is one simple command -- a substring search for operators would have got it wrong.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
+    # Top-level composition: argv0 is not the only program, and a later one may be a hook.
+    'true && %s' % H: K.UNCLASSIFIED,
+    'echo hello; %s' % H: K.UNCLASSIFIED,
+    'echo foo | %s' % H: K.UNCLASSIFIED,
+    # Launcher support was REMOVED: nothing used it, and `command -v` only prints while
+    # `env -0` refuses to run a command, so one shared flag set certified both as execution.
+    'command -v %s' % H: K.UNCLASSIFIED,
+    'env -0 %s' % H: K.UNCLASSIFIED,
+    'nohup -i %s' % H: K.UNCLASSIFIED,
+    'env %s' % H: K.UNCLASSIFIED,
+    'env -i %s' % H: K.UNCLASSIFIED,
+    # `true` and `:` are gone from the non-hook vocabulary; nothing live uses them.
+    'true': K.UNCLASSIFIED,
     'curl https://example.invalid': K.UNCLASSIFIED,
 }
 bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
 sys.exit(0 if not bad else 1)
 PYLAUNCH
 if [ $? -eq 0 ]; then
-  ok "every hook command form is classified; unreadable forms are UNCLASSIFIED, not silent"
+  ok "the supported command language is the three live shapes; everything else is UNCLASSIFIED"
 else
   bad "a hook command form was mis-classified" ""
 fi
 
-# End-to-end: a launcher prefix must not hide a hook from the executable check.
-FIX_CMD="$TMP/cmdhook"
-make_fixture "$FIX_CMD"
-python3 - "$FIX_CMD" <<'PYCMD'
-import json, pathlib, sys
-p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
-d = json.loads(p.read_text(encoding="utf-8"))
-def walk(n):
-    if isinstance(n, dict):
-        c = n.get("command")
-        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
-            n["command"] = "command " + c
-        for v in n.values(): walk(v)
-    elif isinstance(n, list):
-        for v in n: walk(v)
-walk(d.get("hooks", {}))
-p.write_text(json.dumps(d, indent=2), encoding="utf-8")
-PYCMD
-chmod -x "$FIX_CMD/.claude/hooks/hook-health.sh"
-rc=$(run_gate "$FIX_CMD" "$TMP/cmdhook.log")
-if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$TMP/cmdhook.log"; then
-  ok "a 'command'-prefixed hook does not escape the executable check"
-else
-  bad "a launcher-prefixed hook escaped the executable check" "$(tail -3 "$TMP/cmdhook.log")"
-fi
 
 # An unclassifiable configured hook must FAIL the gate, not vanish from it. This is the
 # self-concealing shape: an unparsed form used to return None, the target left the derived
@@ -633,7 +616,7 @@ def walk(n):
     if isinstance(n, dict):
         c = n.get("command")
         if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
-            n["command"] = 'env -S "%s --verbose"' % c
+            n["command"] = 'true && ' + c
         for v in n.values(): walk(v)
     elif isinstance(n, list):
         for v in n: walk(v)
@@ -642,9 +625,9 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 PYUNC
 rc=$(run_gate "$FIX_UNC" "$TMP/unclassified.log")
 if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/unclassified.log"; then
-  ok "an unclassifiable hook command fails the gate and is named"
+  ok "a compound hook command fails the gate and is named"
 else
-  bad "an unclassifiable hook command did not fail the gate" "$(tail -3 "$TMP/unclassified.log")"
+  bad "a compound hook command did not fail the gate" "$(tail -3 "$TMP/unclassified.log")"
 fi
 
 # Adding a hook must not trip the exact-count assertion.
