@@ -35,7 +35,6 @@ stage 2 and is not checked here.
 Run: python3 scripts/check-agent-registry.py [--verbose]
 """
 import argparse
-import ast
 import difflib
 import json
 import pathlib
@@ -300,90 +299,6 @@ ALL_SEMANTIC_FIELDS = frozenset(f for spec in PROVIDER_ADAPTERS.values() for f i
 # and YAML), then a line must actually run the checker through an interpreter. A bare path in
 # a workflow `paths:` filter, an `if [[ -f ... ]]` guard or a `fail "... is missing"` string
 # is a reference, not a gate.
-_INTERPRETERS = ("python", "python3")
-
-# Python's own synopsis is `[-c cmd | -m mod | file | -]`: the executable alternatives are
-# mutually exclusive, and after `-c` or `-m` every later token is an ARGUMENT to the selected
-# program, not a script. `python3 -c 'pass' scripts/check-agent-registry.py` runs nothing.
-#
-# Deliberately no option modelling. All three real callers are `python3 <path> [args]` with no
-# interpreter options at all, so the first token after argv0 must BE the script. A future
-# caller that legitimately adds `-u` will turn this gate red until the shape is added on
-# purpose -- which is the safer failure than a verifier speculating broadly enough to accept a
-# no-op.
-_VAR_PREFIX = re.compile(r"^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/")
-
-
-def _candidate_commands(line):
-    """Command strings a line could actually execute.
-
-    The line itself with a leading YAML `run:` or shell keyword removed, plus the contents of
-    any `$(...)`. The three real callers wrap the invocation as `if out=$(python3 ... ); then`,
-    so the substitution has to be looked inside.
-    """
-    stripped = line.strip()
-    stripped = re.sub(r"^-?\s*(run|command)\s*:\s*", "", stripped)
-    stripped = re.sub(r"^(if|elif|while|until|then|do|else)\s+", "", stripped)
-    yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", stripped)
-    for inner in re.findall(r"\$\(([^()]*)\)", line):
-        yield re.sub(r"^[A-Za-z_][A-Za-z0-9_]*=", "", inner.strip())
-
-
-# Operators that stop a non-zero exit from reaching the caller, or hand the status to
-# something else. `2>&1` is a redirection and contains none of these, which is why the real
-# callers still pass. Anything else fails closed: a novel wrapper should make this gate red
-# until its status semantics are deliberately established.
-# `&` as a control operator backgrounds the command, so its eventual status never reaches
-# the caller. `2>&1` and `&>` are redirections and must stay legal -- every real caller uses
-# the first. The negative lookbehind/ahead below distinguish them: a redirecting `&` is
-# preceded by a digit or `>`, or followed by `>`.
-_STATUS_BREAKING = re.compile(
-    r"\|\||&&|;|(?<![0-9>&])\|(?!\|)|(?<![0-9>&])&(?![>&])")
-
-
-def _selected_script(tokens):
-    """The file Python would execute, or None if it selects something else."""
-    if len(tokens) < 2:
-        return None
-    argv0 = tokens[0].strip("\"'").rsplit("/", 1)[-1]
-    if argv0 not in _INTERPRETERS:
-        return None
-    candidate = tokens[1].strip("\"'")
-    if candidate.startswith("-"):
-        # -c, -m, - and every other option: the program is not this token.
-        return None
-    return _VAR_PREFIX.sub("", candidate)
-
-
-def invokes_checker(text, target="scripts/check-agent-registry.py"):
-    """True only when some line RUNS the checker as Python's selected program.
-
-    A role is proven by the operation performed, not by the presence of role-shaped tokens.
-    Mentions that must NOT count: `echo "python3 ..."`, an `[[ -f ... ]]` guard, a
-    `fail "... is missing"` string, a workflow `paths:` entry, a comment, and any invocation
-    where the path is an argument to a different selected program.
-    """
-    for line in text.splitlines():
-        if line.strip().startswith("#"):
-            continue
-        for cand in _candidate_commands(line):
-            if target.rsplit("/", 1)[-1] not in cand:
-                continue
-            try:
-                tokens = shlex.split(cand, comments=True)
-            except ValueError:
-                continue
-            if _STATUS_BREAKING.search(cand):
-                # `python3 ... || true` runs the checker and throws its verdict away, so the
-                # advertised standalone gate can no longer fail.
-                continue
-            script = _selected_script(tokens)
-            if script and (script == target or script.endswith("/" + target)
-                           or script.endswith(target)):
-                return True
-    return False
-
-
 class Checker:
     def __init__(self, root, verbose=False):
         self.root = pathlib.Path(root)
@@ -543,6 +458,18 @@ class Checker:
         except ValueError as exc:
             print("UNPARSEABLE: %s (%s)" % (REGISTRY, exc))
             return 1
+
+        if "enforcement" in reg:
+            self.fail("enforcement was removed in icn#2632 review round 13 and must not "
+                      "return. Nothing outside this checker ever dereferenced it, and each "
+                      "field spawned machinery to prove a self-description no consumer "
+                      "needed. The gates are real and unchanged; they do not need their "
+                      "identities copied here.")
+        if "in_scope" in (reg.get("declared_scope") or {}):
+            self.fail("declared_scope.in_scope was removed in icn#2632 review round 13. "
+                      "provider_surfaces is the one machine-readable owner of provider "
+                      "topology; a second glob list changed no behaviour and could only "
+                      "become false.")
 
         structural = validate_structure(reg)
         if structural:
@@ -762,80 +689,8 @@ class Checker:
                               "unregistered provider agent must not be able to appear silently."
                               % (relpath, sid))
 
-        self.check_enforcement_claims(reg)
         self.check_cross_registry(surfaces)
         return self.report()
-
-    def check_enforcement_claims(self, reg):
-        """The registry names its own checker, tests and callers. Those are claims too.
-
-        Nothing verified them, so moving or renaming any of these files would leave the truth
-        owner pointing at something that does not exist -- the same unpinned-copy failure this
-        file keeps finding, applied to its own enforcement block.
-        """
-        enf = reg.get("enforcement")
-        if not isinstance(enf, dict):
-            self.fail("enforcement: must be an object naming the checker and its callers.")
-            return
-        # Existence is not role verification. `checker` must identify THIS script, and
-        # `tests` must actually exercise it -- otherwise the registry can point readers at
-        # any file that happens to exist, which is how AGENTS.md passed as the enforcement
-        # implementation.
-        # The running script's own repository-relative path. Compared as a normalized
-        # relative path, not an absolute one, so this holds under --repo-root too: a fixture
-        # root is a different directory but the claim is about which file plays the role.
-        me = pathlib.Path(__file__).resolve()
-        my_rel = pathlib.PurePosixPath(me.parent.name, me.name).as_posix()
-        val = enf.get("checker")
-        if not isinstance(val, str) or not val:
-            self.fail("enforcement.checker: must be a non-empty path string")
-        else:
-            declared_rel = pathlib.PurePosixPath(val).as_posix()
-            if declared_rel != my_rel:
-                self.fail("enforcement.checker names %s, but the running checker is %s. "
-                          "Existence is not role verification: the registry must identify its "
-                          "actual enforcement implementation, not any file that exists."
-                          % (val, my_rel))
-            elif not (self.root / val).is_file():
-                self.fail("enforcement.checker names %s, which does not exist under this "
-                          "repository root." % val)
-            else:
-                self.ok("enforcement.checker identifies the running checker (%s)" % my_rel)
-
-        if "tests" in enf:
-            self.fail("enforcement.tests was removed in icn#2632 review round 12 and must not "
-                      "return. No consumer read it, and four review rounds were spent building "
-                      "AST machinery to prove a copy nothing needed -- each round accepting "
-                      "something execution-shaped that did not execute. Re-adding it "
-                      "reintroduces an unpinned claim; the suite is gated directly in CI.")
-
-        # `enforcement.tests` was REMOVED (icn#2632 review round 12). It named this
-        # checker's invariant suite, and nothing outside this file ever read it:
-        # drift-check.sh, what-matters-now.sh and generate-live-state-overlay.py all
-        # consume agents.json without touching `enforcement`, and CI runs the suite
-        # directly from .github/workflows/agent-drift-check.yml rather than resolving a
-        # path through the registry. Four review rounds were spent building AST machinery
-        # to prove a copy nothing consumed -- each round accepting something
-        # execution-shaped that did not execute. Deleting the claim removes the class.
-        # The suite itself is untouched and still gated in CI.
-        callers = enf.get("invoked_by")
-        if not isinstance(callers, list):
-            self.fail("enforcement.invoked_by: must be an array of caller paths")
-            return
-        for c in callers:
-            if not isinstance(c, str) or not c:
-                self.fail("enforcement.invoked_by: %r is not a path string" % (c,))
-            elif not (self.root / c).is_file():
-                self.fail("enforcement.invoked_by names %s, which does not exist." % c)
-            elif not invokes_checker((self.root / c).read_text(
-                    encoding="utf-8", errors="replace")):
-                self.fail("enforcement.invoked_by names %s, but no executable line there runs "
-                          "the checker. A textual mention is not an invocation: all three "
-                          "current callers name the path in comments, error strings or a "
-                          "workflow paths filter, so a substring test would keep passing after "
-                          "the real `run:` was deleted." % c)
-            else:
-                self.ok("enforcement.invoked_by -> %s invokes this checker" % c)
 
     def check_semantics(self, name, sid, entry, fm, path, provider_type):
         """Registry semantic projections must equal what the provider file actually means."""

@@ -26,7 +26,7 @@ This is a projection, not a per-file claim: `ops/state/truth/agents.json` record
 agent's derived `automatic_invocation`, and `scripts/check-agent-registry.py` re-derives it
 from this directory on every run, so the two cannot disagree (icn#2632).
 
-Which agents this currently yields is **not restated here**. A count and a list in prose is
+Which agents this currently yields is **not restated anywhere in this file**. A count and a list in prose is
 an unpinned copy: make an agent manual, update `agents.json` as the checker requires, and
 this file would still assert the old answer with nothing to catch it. An earlier revision
 of this README did exactly that, one commit after the same mistake was removed from
@@ -45,7 +45,7 @@ python3 scripts/check-agent-registry.py --verbose
 
 | Agent | Purpose |
 |-------|---------|
-| `@icn-orchestrator` | Router + decomposer for multi-subsystem work (auto-selects) |
+| `@icn-orchestrator` | Router + decomposer for multi-subsystem work |
 | `@icn-planner` | Strategic planning, task breakdown, dependency analysis |
 | `@icn-architect` | System design, crate boundaries, API design review |
 | `@icn-code-reviewer` | PR review with ICN invariants lens, high signal-to-noise |
@@ -101,7 +101,7 @@ User Request
      │
      ▼
 ┌─────────────────┐
-│ icn-orchestrator│  ← auto-selected (infer: true)
+│ icn-orchestrator│  ← entry point for multi-subsystem work
 │                 │
 │ 1. Classify     │
 │ 2. Decompose    │

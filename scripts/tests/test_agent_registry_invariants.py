@@ -68,9 +68,7 @@ def base_registry():
             "provider_variant": "deliberate",
             "divergent_unreviewed": "unadjudicated",
         },
-        "declared_scope": {"in_scope": [], "out_of_scope": [], "completeness_claim": "x"},
-        "enforcement": {"checker": "scripts/check-agent-registry.py",
-                        "invoked_by": ["caller.sh"]},
+        "declared_scope": {"out_of_scope": [], "completeness_claim": "x"},
         "agents": [
             {
                 "name": "solo",
@@ -108,15 +106,8 @@ def build(tmp, registry, skills, files):
     root = pathlib.Path(tmp)
     for rel in (".claude/agents", ".github/agents", "ops/state/truth", "scripts/tests"):
         (root / rel).mkdir(parents=True, exist_ok=True)
-    # Stubs for the paths the enforcement block names. They must exist inside the fixture
-    # root, and the caller stub must actually mention the checker, because the checker now
-    # verifies both -- a caller list nothing verifies is how a gate silently stops running.
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     shutil.copy(str(CHECKER), str(root / "scripts/check-agent-registry.py"))
-    (root / "echo-caller.sh").write_text(
-        '#!/bin/sh\necho "python3 scripts/check-agent-registry.py"\n', encoding="utf-8")
-    (root / "caller.sh").write_text(
-        "python3 scripts/check-agent-registry.py\n", encoding="utf-8")
     (root / "not-a-caller.md").write_text("no invocation here\n", encoding="utf-8")
     for rel, text in files.items():
         fp = root / rel
@@ -191,7 +182,6 @@ check("exact_mirror holds when only provider-specific front matter differs", rc 
 # `neither key -> provider default` case in the semantics matrix above.
 
 
-
 # --------------------------------------------------------------------------- must-fail
 print()
 print("--- MUST-FAIL cases (each reconstructs a real or reachable defect) ---")
@@ -255,10 +245,6 @@ case("front matter declares a different name than the record",
 
 case("two records share one logical name",
      lambda r: r["agents"].append(copy.deepcopy(r["agents"][0])), expect="duplicate record")
-
-case("relationship is not in relationship_model",
-     lambda r: r["agents"][0].__setitem__("relationship", "vibes"),
-     expect="no enforcement semantics")
 
 case("single_surface declared but two surfaces named",
      lambda r: r["agents"][1].__setitem__("relationship", "single_surface"),
@@ -425,36 +411,9 @@ print()
 print("--- background execution does not propagate a verdict ---")
 
 import importlib.util as _ilu4
-_spec4 = _ilu4.spec_from_file_location("checker_r12", CHECKER)
-_m4 = _ilu4.module_from_spec(_spec4)
-_spec4.loader.exec_module(_m4)
-
-for label, line in (
-        ("backgrounded", "python3 scripts/check-agent-registry.py &"),
-        ("backgrounded with redirection",
-         "python3 scripts/check-agent-registry.py >/tmp/log 2>&1 &"),
-        ("|| true", "python3 scripts/check-agent-registry.py || true"),
-        ("; true", "python3 scripts/check-agent-registry.py; true"),
-        ("piped", "python3 scripts/check-agent-registry.py | tee log"),
-        ("&& chained", "python3 scripts/check-agent-registry.py && true")):
-    check("MUST-FAIL a %s caller cannot fail" % label, not _m4.invokes_checker(line))
-
 # `2>&1` and `&>` are redirections, not control operators. Every real caller uses the first.
-for label, line in (
-        ("bare", "python3 scripts/check-agent-registry.py"),
-        ("2>&1 inside $()",
-         'if o=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
-        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
-    check("MUST-PASS %s still counts" % label, _m4.invokes_checker(line))
-
-
 print()
 print("--- the gap list claims only what enforcement proves ---")
-
-case("REAL P2: known_uncovered_directories names an ordinary file",
-     mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
-         "known_uncovered_directories", ["caller.sh"]),
-     expect="not an existing directory")
 
 case("known_uncovered_directories names an escaping path",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
@@ -466,12 +425,6 @@ case("the retired provider_surfaces_no_registry_covers name is rejected",
          "provider_surfaces_no_registry_covers", [".claude/commands"]),
      expect="claims a provider classification no owner supplies")
 
-case("re-adding enforcement.tests reintroduces an unpinned claim",
-     lambda r: r["enforcement"].__setitem__(
-         "tests", "scripts/tests/test_agent_registry_invariants.py"),
-     expect="was removed in icn#2632 review round 12")
-
-
 # --- round 11: the executable position, the exit status, and the extension ------
 print()
 
@@ -480,33 +433,9 @@ print()
 print("--- an advertised gate must be able to fail ---")
 
 import importlib.util as _ilu3
-_spec3 = _ilu3.spec_from_file_location("checker_r11", CHECKER)
-_m3 = _ilu3.module_from_spec(_spec3)
-_spec3.loader.exec_module(_m3)
-
 # The checker IS Python's selected program in each of these, so round 10's rule accepts
 # them; the exit status never reaches the caller, so the advertised gate cannot fail.
-for label, line in (
-        ("|| true", "python3 scripts/check-agent-registry.py || true"),
-        ("|| echo", "python3 scripts/check-agent-registry.py || echo skipped"),
-        ("; true", "python3 scripts/check-agent-registry.py; true"),
-        ("piped away", "python3 scripts/check-agent-registry.py | tee log"),
-        ("&& chained", "python3 scripts/check-agent-registry.py && true")):
-    check("MUST-FAIL a caller that %s cannot fail" % label, not _m3.invokes_checker(line))
-
 # `2>&1` is a redirection, not a status operator: every real caller uses it.
-for label, line in (
-        ("bare", "python3 scripts/check-agent-registry.py"),
-        ("with args", "python3 scripts/check-agent-registry.py --verbose"),
-        ("drift-check.sh",
-         'if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
-        ("check-preflight-consistency.sh",
-         "if agent_reg_out=$(python3 scripts/check-agent-registry.py 2>&1); then"),
-        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
-    check("MUST-PASS %s still counts (2>&1 is a redirection)" % label,
-          _m3.invokes_checker(line))
-
-
 print()
 print("--- a record must point at a file the provider loads ---")
 
@@ -534,8 +463,6 @@ def wrong_extension_case():
                "relationship_model": {"single_surface": "x", "exact_mirror": "x",
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
                "declared_scope": {},
-               "enforcement": {"checker": "scripts/check-agent-registry.py",
-                               "tests": "scripts/tests/t.py", "invoked_by": []},
                "agents": [{"name": "solo", "relationship": "single_surface",
                            "routing_triggers": [], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/solo.txt"}}}]}
@@ -561,63 +488,15 @@ print()
 print("--- invoked_by: the checker must be Python's SELECTED program ---")
 
 import importlib.util as _ilu2
-_spec2 = _ilu2.spec_from_file_location("checker_r10", CHECKER)
-_m2 = _ilu2.module_from_spec(_spec2)
-_spec2.loader.exec_module(_m2)
-
 # Python's synopsis is `[-c cmd | -m mod | file | -]`. After -c or -m, a later token naming
 # the checker is an ARGUMENT to the selected program: the checker never runs.
-for label, line in (
-        ("-c selects an inline program", "python3 -c 'pass' scripts/check-agent-registry.py"),
-        ("-m selects a module", "python3 -m something scripts/check-agent-registry.py"),
-        ("- selects stdin", "python3 - scripts/check-agent-registry.py"),
-        ("echo-wrapped", 'echo "python3 scripts/check-agent-registry.py"'),
-        ("existence guard", 'if [[ -f "scripts/check-agent-registry.py" ]]; then'),
-        ("error string", 'fail "scripts/check-agent-registry.py is missing"'),
-        ("workflow paths filter", "      - 'scripts/check-agent-registry.py'"),
-        ("comment", "# python3 scripts/check-agent-registry.py")):
-    check("MUST-FAIL %s is not an invocation" % label, not _m2.invokes_checker(line))
-
 # Every shape the three real callers actually use.
-for label, line in (
-        ("bare", "python3 scripts/check-agent-registry.py"),
-        ("with args", "python3 scripts/check-agent-registry.py --verbose"),
-        ("drift-check.sh",
-         'if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
-        ("check-preflight-consistency.sh",
-         "if agent_reg_out=$(python3 scripts/check-agent-registry.py 2>&1); then"),
-        ("workflow run:", "        run: python3 scripts/check-agent-registry.py --verbose")):
-    check("MUST-PASS %s counts as an invocation" % label, _m2.invokes_checker(line))
-
-
 # --- round 9: mentions, bytes, and metadata that outlives its relationship -------
 print()
 print("--- role claims must be executable, not textual ---")
 
-case("REAL P2: an invoked_by caller that only echoes the command",
-     lambda r: r["enforcement"].__setitem__("invoked_by", ["echo-caller.sh"]),
-     expect="no executable line there runs the checker")
-
 # MUST-PASS: the shapes the three real callers actually use.
 import importlib.util as _ilu
-_spec = _ilu.spec_from_file_location("checker_under_test", CHECKER)
-_mod = _ilu.module_from_spec(_spec)
-_spec.loader.exec_module(_mod)
-for label, line in (
-        ("shell `if out=$(python3 ...)`",
-         'if out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then'),
-        ("workflow `run:`", "        run: python3 scripts/check-agent-registry.py --verbose"),
-        ("bare invocation", "python3 scripts/check-agent-registry.py")):
-    check("MUST-PASS %s counts as an invocation" % label, _mod.invokes_checker(line))
-for label, line in (
-        ("echo-wrapped", 'echo "python3 scripts/check-agent-registry.py"'),
-        ("existence guard", 'if [[ -f "scripts/check-agent-registry.py" ]]; then'),
-        ("error string", 'fail "scripts/check-agent-registry.py is missing"'),
-        ("workflow paths filter", "      - 'scripts/check-agent-registry.py'"),
-        ("comment", "# we used to run python3 scripts/check-agent-registry.py")):
-    check("MUST-FAIL %s is not an invocation" % label, not _mod.invokes_checker(line))
-
-
 print()
 print("--- a mirror claim is a claim about bytes ---")
 
@@ -727,30 +606,10 @@ case("a trailing-slash spelling of an already-declared tree",
 
 
 print()
-print("--- enforcement claims name roles, not just files ---")
-
-case("REAL P2: enforcement.checker points at an unrelated existing file",
-     lambda r: r["enforcement"].__setitem__("checker", "not-a-caller.md"),
-     expect="the running checker is")
-
 
 # --- round 7: claims that pass for the wrong reason -----------------------------
 print()
 print("--- weak-check hardening ---")
-
-case("REAL P2: a caller that only MENTIONS the checker in a comment",
-     lambda r: r["enforcement"].__setitem__("invoked_by", ["mentions-only.sh"]),
-     mutate_files=lambda f: f.__setitem__(
-         "mentions-only.sh",
-         "#!/bin/sh\n# we used to run scripts/check-agent-registry.py here\necho hi\n"),
-     expect="no executable line there runs the checker")
-
-case("a caller that names the checker in a workflow paths filter but never runs it",
-     lambda r: r["enforcement"].__setitem__("invoked_by", ["paths-only.yml"]),
-     mutate_files=lambda f: f.__setitem__(
-         "paths-only.yml",
-         "on:\n  push:\n    paths:\n      - 'scripts/check-agent-registry.py'\n"),
-     expect="no executable line there runs the checker")
 
 case("REAL P2: divergent_unreviewed that is also adjudicated",
      mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "divergent_unreviewed"),
@@ -774,26 +633,11 @@ for k in ("routing_triggers", "not_for"):
 
 # MUST-PASS: a real caller still passes.
 r = base_registry()
-r["enforcement"]["invoked_by"] = ["caller.sh"]
 rc, out = run(r, base_skills(), dict(BASE_FILES))
 check("a caller that actually runs the checker still passes", rc == 0)
 
 
-# --- the registry's own enforcement claims -------------------------------------
 print()
-print("--- enforcement claims ---")
-
-case("enforcement.checker names a file that does not exist",
-     lambda r: r["enforcement"].__setitem__("checker", "scripts/gone.py"),
-     expect="the running checker is")
-
-case("enforcement.invoked_by names a file that exists but does not invoke the checker",
-     lambda r: r["enforcement"].__setitem__("invoked_by", ["not-a-caller.md"]),
-     expect="no executable line there runs the checker")
-
-case("enforcement block is missing entirely",
-     lambda r: r.pop("enforcement"), expect="must be an object")
-
 
 # --- provider identity vs surface label -----------------------------------------
 print()
@@ -969,19 +813,6 @@ case("REAL P2: known_uncovered_directories names a path that does not exist",
 print()
 print("--- relationship vocabulary vs enforcement ---")
 
-case("REAL P2: the registry invents a relationship the checker cannot enforce",
-     lambda r: (r["relationship_model"].__setitem__("unconstrained", "anything"),
-                r["agents"][0].__setitem__("relationship", "unconstrained")),
-     expect="no validator implements it")
-
-case("a relationship assigned to a record but absent from relationship_model",
-     lambda r: r["agents"][0].__setitem__("relationship", "invented"),
-     expect="no enforcement semantics")
-
-case("relationship_model drops a type the checker still implements",
-     lambda r: r["relationship_model"].pop("provider_variant"),
-     expect="does not declare it")
-
 case("REAL P2: provider_variant whose bodies have all become identical",
      mutate_reg=lambda r: (r["agents"][1].__setitem__("relationship", "provider_variant"),
                            r["agents"][1].__setitem__(
@@ -1017,6 +848,21 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 13: two deleted claims must not come back --------------------------
+print()
+print("--- removed self-description stays removed ---")
+
+case("REAL P2: a re-added enforcement block",
+     lambda r: r.__setitem__("enforcement", {
+         "checker": "scripts/check-agent-registry.py",
+         "invoked_by": ["ops/scripts/drift-check.sh"]}),
+     expect="was removed in icn#2632 review round 13")
+
+case("REAL P2: a re-added declared_scope.in_scope glob list",
+     lambda r: r["declared_scope"].__setitem__("in_scope", [".claude/agents/*.md"]),
+     expect="provider_surfaces is the one machine-readable owner")
+
+
 print()
 print("--- the checked-in registry itself ---")
 

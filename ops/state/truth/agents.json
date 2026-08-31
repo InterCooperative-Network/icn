@@ -26,27 +26,14 @@
     "divergent_unreviewed": "Exposed by both providers with different bodies whose intent has NOT been adjudicated. Requires divergence.owning_issue. This value exists so an unreviewed divergence is explicit debt rather than two unrelated definitions silently sharing one name."
   },
   "declared_scope": {
-    "in_scope": [
-      ".claude/agents/*.md",
-      ".github/agents/*.md",
-      "tools/claude-code/plugins/icn-agent-pack/agents/*.md"
-    ],
     "out_of_scope": [
       "Agent directories outside the repository -- for example a project-level ~/.claude/agents/ -- are machine-local. They are neither registered nor enforceable here. The icn-agents/v1 'orchestrator' record pointed at ../../../.claude/agents/orchestrator.md, which escapes the repository root; it named no in-repo file and no checker covered it, so it never failed. Removed rather than repointed: see the note on icn-orchestrator below.",
       ".github/agents/README.md documents the Copilot surface and is not an agent definition. The same applies to any README.md in a surface tree.",
       "`.codex/skills/*/agents/` directories exist but hold no agent definitions today. They sit inside skill trees owned by ops/state/truth/skills.json#enforcement.scan_scope, so they are that registry's territory, not this one's. If an agent definition ever lands there it must be declared as a surface here rather than absorbed silently.",
-      "Prompt CONTENT is out of scope here: this registry owns inventory and provider topology. An earlier revision said stale doctrine 'is enforced by forbidden_patterns'. That was FALSE and gave a false assurance. The only forbidden_patterns implementation is scripts/check-skill-registry.py, and skills.json#enforcement.scan_scope covers ops/automation/skills, .agents/skills and .claude/skills -- ZERO overlap with the three agent trees registered here. Prompt content on these surfaces is therefore enforced by NOTHING today, and known stale doctrine remains reachable, including a DID form the code rejects sitting behind an automatically invocable Copilot router. Closing that gap is icn#2632 STAGE 2, which must clean the existing violations and extend scan_scope in one tranche -- adding dirty trees to scan scope first would only turn a silent gap into a red gate. This file states the gap; it does not gate it."
+      "Prompt CONTENT is out of scope here: this registry owns inventory and provider topology. An earlier revision said stale doctrine 'is enforced by forbidden_patterns'. That was FALSE and gave a false assurance. The only forbidden_patterns implementation is scripts/check-skill-registry.py, and skills.json#enforcement.scan_scope covers ops/automation/skills, .agents/skills and .claude/skills -- ZERO overlap with the three agent trees registered here. Prompt content on these surfaces is therefore enforced by NOTHING today, and known stale doctrine remains reachable, including a DID form the code rejects sitting behind an automatically invocable Copilot router. Closing that gap is icn#2632 STAGE 2, which must clean the existing violations and extend scan_scope in one tranche -- adding dirty trees to scan scope first would only turn a silent gap into a red gate. This file states the gap; it does not gate it.",
+      "The registry does not describe its own enforcement. An earlier revision carried an `enforcement` block naming the checker, its tests and its callers; nothing outside the checker ever dereferenced it, and four review rounds went into machinery proving a self-description no consumer needed. The gates are real and unchanged -- ops/scripts/drift-check.sh, scripts/check-preflight-consistency.sh and .github/workflows/agent-drift-check.yml each invoke the checker directly -- they simply do not need their identities copied into the agent-routing registry to do it."
     ],
-    "completeness_claim": "Within in_scope this registry is exhaustive in BOTH directions: every agent definition on disk has exactly one record naming the surface that exposes it, and every registered surface path exists. scripts/check-agent-registry.py fails if either direction breaks."
-  },
-  "enforcement": {
-    "checker": "scripts/check-agent-registry.py",
-    "invoked_by": [
-      "ops/scripts/drift-check.sh",
-      "scripts/check-preflight-consistency.sh",
-      ".github/workflows/agent-drift-check.yml"
-    ],
-    "tests_note": "REMOVED in icn#2632 review round 12. This field named the checker's invariant suite and nothing outside scripts/check-agent-registry.py ever read it: drift-check.sh, what-matters-now.sh and generate-live-state-overlay.py all consume this file without touching `enforcement`, and CI runs the suite directly from .github/workflows/agent-drift-check.yml rather than resolving a path through here. Four review rounds were spent building AST machinery to prove a copy no consumer needed, each round accepting something execution-shaped that did not execute -- a stored path, then a runner call going elsewhere, then the checker in an argument position, then a ModuleSpec that constructs but never runs. Deleting the claim removes the class. The suite is untouched and still gated in CI."
+    "completeness_claim": "Across every surface declared in provider_surfaces, every provider-loaded agent definition is represented exactly once, and every registered path maps back to a real provider definition. provider_surfaces is the ONE machine-readable owner of provider topology: an earlier revision also listed the in-scope globs here, which nothing read -- inventory is driven by provider_surfaces[].tree and the direct-child *.md convention -- so a glob added to that list changed no behaviour while making this claim false. scripts/check-agent-registry.py fails if either direction breaks."
   },
   "agents": [
     {
