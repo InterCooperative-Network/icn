@@ -668,6 +668,11 @@ cases = {
     'python3': (K.UNCLASSIFIED, None),
     'python3 /tmp/x.py': (K.UNCLASSIFIED, None),
     'python3 %s' % H: (K.UNCLASSIFIED, None),
+    # The argv0 rules apply to the interpreter's ARGUMENT too. They were written for argv0
+    # and not carried over, so a traversal through a missing component normalised to the real
+    # guard while bash cannot traverse it.
+    'python3 "$CLAUDE_PROJECT_DIR"/missing/../.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
+    'python3 "$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.py"': (K.UNCLASSIFIED, None),
     'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py --flag': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
     '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
     'echo hi': (K.NON_HOOK, None),

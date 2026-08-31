@@ -656,6 +656,19 @@ def classify_hook_command(command: str, root: Path | None = None):
                     % (base, ("no argument" if not rest else "the option %r" % rest[0])))
         script = rest[0]
         script = _sub_project_dir(script)
+        # THE SAME TWO RULES AS argv0. They were written for argv0 and not carried to the
+        # interpreter's argument, so `python3 $CLAUDE_PROJECT_DIR/missing/../<guard>.py`
+        # normalised to the real guard while bash cannot traverse `missing`. A rule applied
+        # to one path and not the other is how this file has been wrong repeatedly.
+        if "$" in script:
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which contains a shell expansion this gate cannot "
+                    "resolve" % (base, script))
+        if ".." in Path(script).parts:
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which contains a `..` component; a traversal through a "
+                    "component that does not exist resolves cleanly here and fails in the "
+                    "shell" % (base, script))
         try:
             base_dir = Path(root).resolve() if root is not None else None
             cand = Path(script)
