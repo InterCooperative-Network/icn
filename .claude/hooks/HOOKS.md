@@ -37,6 +37,21 @@ firewall hook) are centralized in `kernel-crates.conf`. Update that file when
 crates are added or removed. Advisory hooks (`scope-guard.sh`, `pre-tool-guard.py`)
 still use their own hardcoded lists — centralizing those is deferred.
 
+## Why the shell lives in files
+
+A hook command in `settings.json` must be a **single simple command** naming a repository
+executable. `scripts/check-agent-runtime-adoption.py` proves that command exists and has its
+executable bit, and it deliberately does not interpret shell.
+
+Command substitutions — `$(...)` and backticks — are therefore **not part of the supported
+hook-command language**. A substitution can execute a repository hook without naming one
+(`echo "$(find . -name hook-health.sh -exec {} \;)"`), and the only alternative was a
+blocklist of `-exec`/`xargs`/`sh -c`/`eval`/git aliases, which the sibling registry work spent
+nine review rounds establishing does not terminate (icn#2691, icn#2632).
+
+So when a hook needs shell, it goes in a file here and `settings.json` invokes the path.
+`report-branch.sh` is the worked example: its body was previously inline.
+
 ## Hook Inventory
 
 | File | Trigger | Effect |
@@ -45,6 +60,7 @@ still use their own hardcoded lists — centralizing those is deferred.
 | session-orient.sh | SessionStart (startup) | Prints branch, sprint cadence (resolved via the registered `sprint_state` owner), skills, invariants. Never blocks |
 | firewall-guard.sh | Edit/Write .rs in kernel crates | BLOCKS domain imports in kernel |
 | panic-guard.sh | Edit/Write .rs in non-test files | BLOCKS panic!(), WARNS unwrap() |
+| report-branch.sh | Edit/Write any file | Prints the current branch. Never blocks |
 | scope-guard.sh | Edit/Write any file | WARNS if edit is outside branch scope |
 | dep-guard.sh | Edit/Write Cargo.toml | WARNS on direct version pinning in crates |
 | todo-guard.sh | Edit/Write .rs/.ts | WARNS on bare TODO without issue number |

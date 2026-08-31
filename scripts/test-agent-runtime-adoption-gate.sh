@@ -588,7 +588,7 @@ cases = {
     '/tmp/python3 %s' % H: K.UNCLASSIFIED,
     # The real echo carries `||` INSIDE a command substitution. Quoting is respected, so this
     # is one simple command -- a substring search for operators would have got it wrong.
-    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.UNCLASSIFIED,   # was live; substitutions are outside the language now
     # Top-level composition: argv0 is not the only program, and a later one may be a hook.
     'true && %s' % H: K.UNCLASSIFIED,
     'echo hello; %s' % H: K.UNCLASSIFIED,
@@ -745,7 +745,7 @@ cases = {
     'echo $(%s)' % H: K.UNCLASSIFIED,
     # ...but only one NAMING A REPOSITORY PATH. The live command carries a substitution and
     # must stay classifiable, which is the whole reason this is not a blanket refusal.
-    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.NON_HOOK,
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.UNCLASSIFIED,   # was live; substitutions are outside the language now
     # OPERATORS ARE READ BEFORE QUOTING IS DISCARDED. shlex strips quote provenance, so an
     # argument made entirely of punctuation came back indistinguishable from a real operator
     # and the gate went RED on a command bash runs normally.
@@ -765,7 +765,7 @@ cases = {
     'echo "`printf \'\\`\'; %s`"' % H: K.UNCLASSIFIED,
     'echo "`printf \'x`y\'; %s`"' % H: K.UNCLASSIFIED,
     'echo "`%s`"' % H: K.UNCLASSIFIED,
-    'echo "`date`"': K.NON_HOOK,
+    'echo "`date`"': K.UNCLASSIFIED,
     # OPERATOR TEXT INSIDE A COMMENT IS NOT COMPOSITION. Scanning the raw command made the
     # gate red on a hook carrying an explanatory comment -- bash never sees those characters.
     '%s # use && fallback' % H: K.DIRECT,
@@ -779,6 +779,63 @@ if [ $? -eq 0 ]; then
   ok "newlines separate commands, and quoted hashes are not comments"
 else
   bad "a separator was missed or a quoted hash truncated a valid command" ""
+fi
+
+# COMMAND SUBSTITUTIONS ARE OUTSIDE THE LANGUAGE (maintainer decision, icn#2691). A
+# substitution can execute a repository hook without naming one -- `find . -name X -exec {} \;`
+# -- and the alternative was a blocklist of -exec/xargs/sh -c/eval/git-aliases, which the
+# sibling PR spent nine rounds proving does not terminate. No substitution may ever again be
+# classified NON_HOOK.
+python3 - "$GATE" <<'PYSUBST'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+must_refuse = [
+    # The discovery case that settled the decision: no slash-bearing token at all.
+    'echo "$(find . -name hook-health.sh -exec {} \;)"',
+    'echo "$(ls .claude/hooks | xargs -I{} sh -c {})"',
+    'echo "$(eval something)"',
+    # The command that used to be live, and every other shape.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"',
+    'echo "$(git rev-parse HEAD)"',
+    'echo "`date`"',
+    'echo "`%s`"' % H,
+    'echo "$(%s)"' % H,
+    '%s "`date`"' % H,
+    'echo "$(echo nested $(date))"',
+]
+bad = [c for c in must_refuse if m.classify_hook_command(c, root)[0] != K.UNCLASSIFIED]
+# ...and a substitution that is only LITERAL text must still classify normally: single quotes
+# make `$(` inert, so refusing it would be a false rejection.
+if m.classify_hook_command("echo '$(not a substitution)'", root)[0] != K.NON_HOOK:
+    bad.append("single-quoted literal")
+sys.exit(0 if not bad else 1)
+PYSUBST
+if [ $? -eq 0 ]; then
+  ok "no command substitution can be classified as a non-hook"
+else
+  bad "a command substitution escaped the categorical refusal" ""
+fi
+
+# The one live substitution moved into a repository executable, so the gate proves what it
+# actually needs -- argv0 exists and has its bit -- without interpreting shell.
+if grep -q 'report-branch.sh' "$REPO_ROOT/.claude/settings.json"; then
+  ok "the branch-report hook is invoked as a repository executable"
+else
+  bad "settings.json no longer invokes the branch-report helper" ""
+fi
+if [ -x "$REPO_ROOT/.claude/hooks/report-branch.sh" ]; then
+  ok "the branch-report helper is executable"
+else
+  bad "the branch-report helper is not executable" ""
+fi
+if ! grep -qE '\$\(|`' "$REPO_ROOT/.claude/settings.json"; then
+  ok "settings.json contains no command substitution at all"
+else
+  bad "a command substitution came back into settings.json" "$(grep -nE '\$\(|`' "$REPO_ROOT/.claude/settings.json" | head -2)"
 fi
 
 # THE TWO SIBLINGS THAT READ ONE COMMAND STRING MUST AGREE, or one of them is wrong. The
@@ -803,13 +860,17 @@ must_agree = [
     '%s; echo x' % HOOK,
     'MODE=health %s' % HOOK,
     'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"',
+    '%s "`date`"' % HOOK,
 ]
 bad = [c for c in must_agree
        if (m.classify_hook_command(c, root)[0] == K.DIRECT) != m._invokes_hook(c, root)]
 # ...and the two places they differ ON PURPOSE. The classifier asks what argv0 IS;
 # `_invokes_hook` asks whether the invocation is unadorned. Fail-closed, and pinned here so
 # it cannot drift into an accident.
-deliberate = ['%s "$HOME"' % HOOK, '%s "`date`"' % HOOK]
+# `<hook> "`date`"` USED to be a deliberate asymmetry -- DIRECT here, refused there. Making
+# substitutions categorically unsupported removed it: both readers now decline, so it moved
+# into must_agree above. One asymmetry left, and it is still deliberate.
+deliberate = ['%s "$HOME"' % HOOK]
 bad += [c for c in deliberate
         if not (m.classify_hook_command(c, root)[0] == K.DIRECT
                 and not m._invokes_hook(c, root))]
@@ -951,7 +1012,7 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 PYSUB
 chmod -x "$FIX_SUB/.claude/hooks/hook-health.sh"
 rc=$(run_gate "$FIX_SUB" "$TMP/subhook.log")
-if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/subhook.log"; then
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/subhook.log"; then
   ok "a hook invoked inside a command substitution does not hide behind the outer echo"
 else
   bad "a substituted hook escaped the executable check" "$(tail -3 "$TMP/subhook.log")"
@@ -1030,7 +1091,7 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 PYPAREN
 chmod -x "$FIX_PAREN/.claude/hooks/hook-health.sh"
 rc=$(run_gate "$FIX_PAREN" "$TMP/parenhook.log")
-if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/parenhook.log"; then
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/parenhook.log"; then
   ok "a quoted parenthesis does not close the substitution early"
 else
   bad "a hook hid behind a quoted parenthesis in a substitution" "$(tail -3 "$TMP/parenhook.log")"
@@ -1056,7 +1117,7 @@ p.write_text(json.dumps(d, indent=2), encoding="utf-8")
 PYTICK
 chmod -x "$FIX_TICK/.claude/hooks/hook-health.sh"
 rc=$(run_gate "$FIX_TICK" "$TMP/tickhook.log")
-if [ "$rc" -ne 0 ] && grep -q "command substitution runs" "$TMP/tickhook.log"; then
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/tickhook.log"; then
   ok "an escaped backtick does not close the substitution early"
 else
   bad "a hook hid behind an escaped backtick" "$(tail -3 "$TMP/tickhook.log")"

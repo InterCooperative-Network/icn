@@ -164,72 +164,32 @@ def _unquoted_operators(command: str, chars=None, also_in_double=frozenset()) ->
                                or (st == _DOUBLE and c in also_in_double))}
 
 
-def _repo_path_in_substitution(command: str, root):
-    """A repository path named inside a command substitution, or None.
+def _substitution_present(command: str):
+    r"""`"$(...)"` or `` "`...`" `` if the command contains one at all, else None.
 
-    `$(...)` and backticks are executable shell wherever they appear, including inside the
-    quoted argument of an otherwise exempt command.
+    CATEGORICAL. This used to refuse only substitutions NAMING a repository path, which left
+    the ones that FIND one: `echo "$(find . -name hook-health.sh -exec {} \;)"` executes a
+    repository hook without containing a single slash-bearing token, so the target left the
+    derived set and its executable bit went unchecked (icn#2691 review).
+
+    The alternative was a blocklist -- `-exec`, `-execdir`, `xargs`, `sh -c`, `eval`, `git`
+    aliases -- and the sibling PR spent nine rounds establishing where blocklists in this
+    codebase end up. A substitution is another command; the supported language is a SINGLE
+    SIMPLE command; so substitutions are outside it, and that is provable rather than
+    argued.
+
+    Live `.claude/settings.json` had exactly one, and it moved into
+    `.claude/hooks/report-branch.sh` where the shell has an owner and the gate can prove what
+    it needs about argv0. Maintainer-authorised, icn#2691.
     """
-    if root is None:
-        return None
     states = _shell_states(command)
-    bodies, i, n = [], 0, len(command)
-    while i < n:
+    for i, c in enumerate(command):
         st = states[i] if i < len(states) else _PLAIN
-        if st in (_PLAIN, _DOUBLE) and command.startswith("$(", i):
-            # A SUBSTITUTION BODY HAS ITS OWN QUOTING CONTEXT. Counting parentheses against
-            # the OUTER states closed `echo "$(echo ')'; <hook>)"` at the quoted `)`, leaving
-            # a truncated body that would not tokenise -- so the scan found no repository path
-            # and the entry fell back to NON_HOOK while bash still runs the hook. Bash re-opens
-            # quoting inside `$(`, so the body is walked with a fresh state machine.
-            body = command[i + 2:]
-            body_states = _shell_states(body)
-            depth, j = 1, 0
-            while j < len(body) and depth:
-                if body_states[j] == _PLAIN:
-                    if body[j] == "(":
-                        depth += 1
-                    elif body[j] == ")":
-                        depth -= 1
-                j += 1
-            if depth:
-                # Unterminated: refuse rather than guess where it ends.
-                bodies.append(body)
-                break
-            bodies.append(body[:j - 1])
-            i = i + 2 + j
-            continue
-        if st in (_PLAIN, _DOUBLE) and command[i] == "`":
-            # The closing backtick is found with SHELL-AWARE STATE, not `find`. A backtick
-            # that is escaped or quoted inside the body -- `` `printf '\`'; <hook>` `` -- is
-            # not the delimiter, and closing there truncated the body so the hook inside it
-            # was never seen. The `$(` boundary was fixed the same way one round earlier and
-            # this scanner was left on `find`, which is the same defect twice in one function.
-            body = command[i + 1:]
-            body_states = _shell_states(body)
-            j = next((k for k, c in enumerate(body)
-                      if c == "`" and body_states[k] == _PLAIN), None)
-            if j is None:
-                bodies.append(body)         # unterminated: refuse rather than guess
-                break
-            bodies.append(body[:j])
-            i = i + 1 + j + 1
-            continue
-        i += 1
-
-    base_dir = Path(root).resolve()
-    for body in bodies:
-        for token in (_tokenize(body) or []):
-            token = _sub_project_dir(token)
-            if "/" not in token:
-                continue
-            try:
-                cand = Path(token)
-                resolved = (cand if cand.is_absolute() else base_dir / cand).resolve()
-            except (ValueError, OSError):
-                continue
-            if resolved.is_relative_to(base_dir):
-                return resolved.relative_to(base_dir).as_posix()
+        if st in (_PLAIN, _DOUBLE):
+            if command.startswith("$(", i):
+                return "$(...)"
+            if c == "`":
+                return "backtick"
     return None
 
 
@@ -550,7 +510,7 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "top-level shell composition (%s); only a single simple command is supported"
                 % " ".join(sorted(ops)))
 
-    inside = _repo_path_in_substitution(no_comment, root)
+    inside = _substitution_present(no_comment)
     if inside is not None:
         # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
         # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
@@ -561,9 +521,8 @@ def classify_hook_command(command: str, root: Path | None = None):
         # live settings.json carries `echo "branch: $(git … || echo detached)"`, which names
         # no repository file and is what this gate is meant to accept.
         return (HookCommandKind.UNCLASSIFIED, None,
-                "a command substitution runs %s, a repository path: substitutions are "
-                "executable shell, so the entry is not the single simple command it looks "
-                "like" % inside)
+                "contains a %s command substitution; substitutions are executable shell and "
+                "are outside the supported hook-command language" % inside)
 
     # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
     # file already treats them as part of a direct invocation, and the suite exercises that
