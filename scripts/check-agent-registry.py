@@ -39,7 +39,6 @@ import difflib
 import json
 import pathlib
 import re
-import shlex
 import sys
 
 REGISTRY = "ops/state/truth/agents.json"
@@ -98,6 +97,52 @@ class InvalidProviderBoolean(Exception):
 def split_front_matter(text):
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.S)
     return (m.group(1), m.group(2)) if m else (None, text)
+
+
+# ICN's registered-agent front-matter contract is deliberately NARROWER than YAML. Providers
+# may accept the whole language; this checker requires a subset it can verify, because the
+# alternative is pretending a regex understands YAML. Every top-level key must be plain and
+# unquoted:
+#
+#     name: value          supported
+#     'name': value        UNSUPPORTED -- the old reader saw no `name` at all
+#     "name": value        UNSUPPORTED
+#     ? name               UNSUPPORTED (explicit key)
+#     name : value         UNSUPPORTED (space before the colon)
+#     {name: value}        UNSUPPORTED (flow mapping)
+#
+# Each of those is valid YAML the provider would honour, and each was silently read as
+# ABSENT -- so a definition could change `name`, `infer` or `disable-model-invocation` while
+# the registry certified the value it thought was there. Unsupported syntax now fails loudly
+# instead of being reinterpreted as absence. All 43 checked-in definitions already comply.
+_PLAIN_TOP_LEVEL_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:(?:[ \t]|$)")
+
+
+class UnsupportedFrontMatter(Exception):
+    """A top-level key uses YAML syntax outside the registered-agent subset."""
+
+
+def check_front_matter_grammar(block):
+    """Return a message for the first unsupported top-level construct, else None.
+
+    Only column-0 lines are inspected: indented lines are continuations, nested mappings or
+    block scalars belonging to a key already validated.
+    """
+    if not block:
+        return None
+    for i, line in enumerate(block.split("\n"), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0].isspace():
+            continue
+        if not _PLAIN_TOP_LEVEL_KEY.match(line):
+            return ("line %d, %r: registered ICN agent front matter requires plain unquoted "
+                    "top-level keys. Quoted, explicit (`? key`), flow-mapping and "
+                    "space-before-colon spellings are valid YAML the provider honours, and "
+                    "this reader would treat them as the key being ABSENT -- so a semantic "
+                    "field could change while the registry certified the old value."
+                    % (i, line[:60]))
+    return None
 
 
 class AmbiguousFrontMatter(Exception):
@@ -625,6 +670,10 @@ class Checker:
                     continue
 
                 fm, _ = split_front_matter(fp.read_text(encoding="utf-8"))
+                grammar = check_front_matter_grammar(fm)
+                if grammar:
+                    self.fail("%s.%s: %s (%s)" % (name, sid, grammar, path))
+                    continue
                 try:
                     declared = front_matter_value(fm, "name")
                 except AmbiguousFrontMatter as exc:

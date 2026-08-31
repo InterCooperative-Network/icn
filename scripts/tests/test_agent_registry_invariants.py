@@ -408,9 +408,7 @@ check("MUST-PASS a single occurrence of each key still resolves", rc == 0)
 
 
 print()
-print("--- background execution does not propagate a verdict ---")
 
-import importlib.util as _ilu4
 # `2>&1` and `&>` are redirections, not control operators. Every real caller uses the first.
 print()
 print("--- the gap list claims only what enforcement proves ---")
@@ -430,9 +428,7 @@ print()
 
 
 print()
-print("--- an advertised gate must be able to fail ---")
 
-import importlib.util as _ilu3
 # The checker IS Python's selected program in each of these, so round 10's rule accepts
 # them; the exit status never reaches the caller, so the advertised gate cannot fail.
 # `2>&1` is a redirection, not a status operator: every real caller uses it.
@@ -485,18 +481,14 @@ print()
 
 
 print()
-print("--- invoked_by: the checker must be Python's SELECTED program ---")
 
-import importlib.util as _ilu2
 # Python's synopsis is `[-c cmd | -m mod | file | -]`. After -c or -m, a later token naming
 # the checker is an ARGUMENT to the selected program: the checker never runs.
 # Every shape the three real callers actually use.
 # --- round 9: mentions, bytes, and metadata that outlives its relationship -------
 print()
-print("--- role claims must be executable, not textual ---")
 
 # MUST-PASS: the shapes the three real callers actually use.
-import importlib.util as _ilu
 print()
 print("--- a mirror claim is a claim about bytes ---")
 
@@ -848,6 +840,52 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 14: the front-matter contract is a verifiable subset of YAML ---------
+print()
+print("--- unsupported top-level key syntax fails loudly ---")
+
+# Every one of these is valid YAML the provider honours, and every one was read as the key
+# being ABSENT -- so a definition could change name/infer/disable-model-invocation while the
+# registry certified the value it thought was there.
+for spelling, label in (
+        ("'name': masquerade", "quoted 'name'"),
+        ('"name": masquerade', 'quoted "name"'),
+        ("'infer': true", "quoted 'infer'"),
+        ('"infer": true', 'quoted "infer"'),
+        ("'disable-model-invocation': true", "quoted 'disable-model-invocation'"),
+        ('"disable-model-invocation": true', 'quoted "disable-model-invocation"'),
+        ("? name", "explicit key (? name)"),
+        ("name : masquerade", "space before the colon"),
+        ("{name: masquerade}", "flow mapping")):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: twin\ndescription: fixture\ninfer: false\n%s\n---\n\nBody for twin.\n"
+        % spelling)
+    rc, out = run(r, base_skills(), f)
+    check("REAL P2: %s is unsupported, not absent" % label,
+          rc != 0 and "plain unquoted top-level keys" in out)
+
+# The subset must not reject what the 43 real definitions actually use: indented
+# continuations, block scalars and nested values all sit below a validated top-level key.
+r = base_registry()
+f = dict(BASE_FILES)
+f[".github/agents/twin.md"] = (
+    "---\n"
+    "name: twin\n"
+    "description: >\n"
+    "  a folded scalar\n"
+    "  spanning lines\n"
+    "tools:\n"
+    "  - one\n"
+    "  - two\n"
+    "# a comment\n"
+    "infer: false\n"
+    "---\n\nBody for twin.\n")
+rc, out = run(r, base_skills(), f)
+check("MUST-PASS folded scalars, lists and comments still parse", rc == 0)
+
+
 # --- round 13: two deleted claims must not come back --------------------------
 print()
 print("--- removed self-description stays removed ---")
