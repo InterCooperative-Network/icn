@@ -317,7 +317,7 @@ def parse_registered_agent_front_matter(text, provider_type):
     # decides whether the block is well formed.
     opens_nested = False        # may an indented line follow the key just read?
     in_block = False            # ...and is that indentation a block scalar's body?
-    block_indent = None         # the indent its first body line established
+    nested_indent = None        # the indent its first nested line established
     for i, line in enumerate(block.split("\n"), 1):
         if not line.strip():
             continue
@@ -328,21 +328,23 @@ def parse_registered_agent_front_matter(text, provider_type):
                     "scalar. A YAML parser rejects this, so the provider cannot load the "
                     "definition -- indentation is supported only beneath a block scalar or an "
                     "empty value. Quote the value or use a block scalar." % (i, line[:60]))
-            if in_block:
-                # A BLOCK SCALAR'S INDENTATION IS PART OF ITS VALIDITY. Accepting every
-                # indented line meant a body that dedents mid-block -- two spaces, then one --
-                # was certified while the YAML loader raised ParserError, so the provider could
-                # not load a definition the canonical registry called valid.
-                indent = len(line) - len(line.lstrip())
-                if block_indent is None:
-                    block_indent = indent
-                elif indent < block_indent:
-                    raise InvalidDefinition(
-                        "line %d, %r: indented %d columns, inside a block scalar whose body "
-                        "established %d. A line that dedents out of the block without reaching "
-                        "column 0 is not a root key either, and a YAML parser raises rather "
-                        "than reading it as content."
-                        % (i, line[:60], indent, block_indent))
+            # NESTED INDENTATION IS PART OF THE VALUE'S VALIDITY, and that holds for BOTH
+            # things that open it. Checking only block scalars left the other half: `tools:`
+            # then `  - Read` then ` - Write` was certified while the YAML loader raised
+            # ParserError. The first nested line establishes the indent; a later line below it
+            # has dedented out of the value without reaching column 0, so it is not a root key
+            # either and there is nothing for a parser to do with it.
+            indent = len(line) - len(line.lstrip())
+            if nested_indent is None:
+                nested_indent = indent
+            elif indent < nested_indent:
+                raise InvalidDefinition(
+                    "line %d, %r: indented %d columns, inside %s whose content established "
+                    "%d. A line that dedents out of the value without reaching column 0 is "
+                    "not a root key either, and a YAML parser raises rather than reading it "
+                    "as content."
+                    % (i, line[:60], indent,
+                       "a block scalar" if in_block else "a nested value", nested_indent))
             continue
         if line.lstrip().startswith("#"):
             continue
@@ -361,7 +363,7 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "establishes from the body itself -- so supporting it would mean guessing. "
                 "Use a bare `|` or `>`." % (i, line[:60]))
         in_block = bool(_BLOCK_SCALAR.match(value))
-        block_indent = None
+        nested_indent = None
         opens_nested = in_block or not value
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
@@ -458,6 +460,33 @@ PROVIDER_ADAPTERS = {
     "github-copilot": {"automatic_invocation": copilot_automatic_invocation},
     "claude-code": {},
 }
+
+
+def _covering(candidate, trees, root):
+    """The tree that already covers `candidate`, or None.
+
+    ANCESTRY AND RESOLVED IDENTITY, not string equality. `.agents/skills` is a canonical scan
+    tree whose direct children another registry inventories, so declaring `.agents/skills/foo`
+    "covered by no registry" makes the two canonical registries contradict each other about the
+    same directory -- and an equality test saw two different strings and reported clean. The
+    resolved comparison catches the same claim spelled through a symlinked alias.
+    """
+    cand = pathlib.PurePosixPath(candidate)
+    try:
+        cand_real = (root / candidate).resolve()
+    except OSError:
+        cand_real = None
+    for tree in trees:
+        t = pathlib.PurePosixPath(tree)
+        if cand == t or t in cand.parents:
+            return tree
+        if cand_real is not None:
+            try:
+                if cand_real.is_relative_to((root / tree).resolve()):
+                    return tree
+            except OSError:
+                pass
+    return None
 
 
 def validate_structure(reg):
@@ -949,6 +978,26 @@ class Checker:
                 if not fp.exists():
                     self.fail("%s.%s -> %s (missing)" % (name, sid, path))
                     continue
+                # RESOLVED, not merely lexical. The parent, suffix, stem, existence and
+                # front-matter checks all FOLLOW a symlink, so a direct child of a valid
+                # surface tree could be a link to a file outside the repository and every one
+                # of them passed. That definition is machine-local -- it can change with no
+                # commit -- which contradicts the completeness claim this registry makes about
+                # in-repo definitions. The surface tree is resolved too, so a legitimately
+                # symlinked tree still matches.
+                try:
+                    resolved_fp = fp.resolve()
+                    resolved_tree = (self.root / tree).resolve()
+                except OSError as exc:
+                    self.fail("%s.%s: %s cannot be resolved (%s)" % (name, sid, path, exc))
+                    continue
+                if not resolved_fp.is_relative_to(resolved_tree):
+                    self.fail("%s.%s: %s resolves to %s, outside the surface tree. A "
+                              "registered definition that lives outside the repository is "
+                              "machine-local: it can change with no commit, so the registry "
+                              "would be certifying a file no clone contains."
+                              % (name, sid, path, resolved_fp))
+                    continue
                 if fp.stem != name:
                     self.fail("%s.%s: file is %s.md. A record must not point at a file with a "
                               "different name -- that is two agents wearing one name."
@@ -1186,12 +1235,13 @@ class Checker:
             if un.startswith("/") or ".." in path.parts:
                 self.fail("skills.json known_uncovered_directories: %s is absolute or escapes "
                           "the repository root." % un)
-            elif un in trees:
+            elif surface_tree := _covering(un, trees, self.root):
                 self.fail("skills.json lists %s as covered by no registry, but agents.json "
-                          "declares it as a surface." % un)
-            elif un in scan_trees:
+                          "declares %s as a surface." % (un, surface_tree))
+            elif scan_tree := _covering(un, scan_trees, self.root):
                 self.fail("skills.json lists %s as covered by no registry, but its own "
-                          "enforcement.scan_scope already covers it." % un)
+                          "enforcement.scan_scope already covers it through %s."
+                          % (un, scan_tree))
             elif not (self.root / un).is_dir():
                 self.fail("skills.json known_uncovered_directories: %s is not an existing "
                           "directory. A gap list naming a file or a phantom path is as untrue "

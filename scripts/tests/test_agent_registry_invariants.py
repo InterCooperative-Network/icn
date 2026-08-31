@@ -301,7 +301,7 @@ case("skills.json has no structured cross_registry claim at all",
 case("known_uncovered_directories names a tracked provider tree",
      mutate_skills=lambda s: s["declared_scope"]["cross_registry"].__setitem__(
          "known_uncovered_directories", [".github/agents"]),
-     expect="agents.json declares it as a surface")
+     expect="agents.json declares .github/agents as a surface")
 
 
 # --- provider semantics: effective behaviour, not raw syntax --------------------
@@ -845,6 +845,124 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 22: the other half of every rule already written --------------------
+print()
+print("--- indentation is validated for BOTH things that open it ---")
+
+# Round 21 validated a block scalar's body indentation and left the other opener alone:
+# `tools:` then `  - Read` then ` - Write` was certified while the YAML loader raised
+# ParserError. One rule now, applied wherever a nested value opens.
+try:
+    import yaml as _y22
+except ImportError:
+    _y22 = None
+
+_B22 = "name: twin\ndescription: fixture\n"
+for fm, label, should_pass in (
+        (_B22 + "tools:\n  - Read\n - Write", "a list that dedents mid-list", False),
+        (_B22 + "metadata:\n  owner: x\n team: y", "a mapping that dedents mid-mapping", False),
+        (_B22 + "tools:\n  - Read\n  - Write", "a level list", True),
+        (_B22 + "metadata:\n  owner:\n    name: x", "a mapping nesting deeper", True),
+        (_B22 + "metadata:\n  owner: x\n  # a real comment\n  team: y",
+         "a comment inside a nested mapping", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\ninfer: false\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if should_pass and _y22 is not None:
+        try:
+            _y22.safe_load(fm + "\ninfer: false")
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and a real YAML parser loads it", loadable)
+
+
+print()
+print("--- a coverage claim is contradicted by ANCESTRY, not only by equality ---")
+
+# `.agents/skills` is a canonical scan tree whose direct children another registry
+# inventories, so declaring `.agents/skills/foo` "covered by no registry" makes the two
+# canonical registries contradict each other -- and an equality test saw two different
+# strings and reported clean.
+# The directory is MADE TO EXIST in every case. Without that, the old checker rejected these
+# through its phantom-path branch and the control would have proved only that a message
+# changed -- the finding is the contradiction, not the missing directory.
+for un, tree_list, label, fragment in (
+        (".github/agents/nested", None, "a directory INSIDE a declared surface",
+         "declares .github/agents as a surface"),
+        (".claude/agents/nested", None, "a directory inside the other surface",
+         "declares .claude/agents as a surface"),
+        (".claude/agents/deep/deeper", None, "a directory nested two levels inside a surface",
+         "declares .claude/agents as a surface"),
+        (".github/agents/nested", "canonical_trees", "a directory inside a canonical scan tree",
+         "scan_scope already covers it through .github/agents"),
+        (".github/agents/nested", "provider_trees", "a directory inside a provider scan tree",
+         "scan_scope already covers it through .github/agents")):
+    def mutate(sk, u=un, tl=tree_list):
+        sk["declared_scope"]["cross_registry"]["known_uncovered_directories"] = [u]
+        if tl:
+            # Take it out of the SURFACE list so the scan-scope branch is the one reached.
+            sk["declared_scope"]["cross_registry"][
+                "agent_surfaces_tracked_by_agents_json"] = [".claude/agents"]
+            sk["enforcement"]["scan_scope"][tl] = [".github/agents"]
+
+    def add_dir(f, u=un):
+        f[u + "/keep.txt"] = "not a definition\n"
+
+    if tree_list:
+        # That surface must also leave the registry, or its own record fails first.
+        def drop_surface(r):
+            r["provider_surfaces"].pop("copilot")
+            r["agents"][1]["surfaces"].pop("copilot")
+            r["agents"][1]["relationship"] = "single_surface"
+        case("known_uncovered_directories names %s" % label, mutate_reg=drop_surface,
+             mutate_skills=mutate, mutate_files=add_dir, expect=fragment)
+    else:
+        case("known_uncovered_directories names %s" % label,
+             mutate_skills=mutate, mutate_files=add_dir, expect=fragment)
+
+
+print()
+print("--- a registered definition must RESOLVE inside its surface tree ---")
+
+# The parent, suffix, stem, existence and front-matter checks all FOLLOW a symlink, so a
+# direct child of a valid tree could be a link to a file outside the repository and every
+# one of them passed. Such a definition is machine-local: it can change with no commit.
+def escaping_definition_case():
+    tmp = tempfile.mkdtemp()
+    outside = tempfile.mkdtemp()
+    try:
+        root = build(tmp, base_registry(), base_skills(), dict(BASE_FILES))
+        target = pathlib.Path(outside) / "solo.md"
+        target.write_text(agent_file("solo"), encoding="utf-8")
+        link = root / ".claude/agents/solo.md"
+        link.unlink()
+        os.symlink(str(target), str(link))
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a definition symlinked outside the repository is rejected",
+              p.returncode != 0 and "outside the surface tree" in out)
+
+        # ...and a link that stays INSIDE the tree is still a valid definition, so the check
+        # is containment rather than a ban on symlinks.
+        link.unlink()
+        inside = root / ".claude/agents/real-solo.txt"
+        inside.write_text(agent_file("solo"), encoding="utf-8")
+        os.symlink(str(inside), str(link))
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        check("MUST-PASS a definition symlinked WITHIN its own tree", p.returncode == 0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(outside, ignore_errors=True)
+
+
+escaping_definition_case()
+
 # --- round 21: the block's own indentation, and the comment after a quote -------
 print()
 print("--- a block scalar's indentation is part of its validity ---")
