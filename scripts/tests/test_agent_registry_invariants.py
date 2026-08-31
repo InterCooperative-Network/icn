@@ -845,6 +845,116 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- round 23: equal indentation is not equal structure ------------------------
+print()
+print("--- a nested collection may not change kind at its own level ---")
+
+# Round 22 validated nested INDENTATION and stopped there, so `tools:` then `  - Read` then
+# `  orphan: value` shares one indent and was certified -- a block sequence does not become a
+# mapping at its own level, and PyYAML raises. Each depth remembers which kind opened it.
+try:
+    import yaml as _y23
+except ImportError:
+    _y23 = None
+
+_B23 = "name: twin\ndescription: fixture\n"
+for fm, label, should_pass in (
+        (_B23 + "tools:\n  - Read\n  orphan: value",
+         "a sequence that becomes a mapping at its own level", False),
+        (_B23 + "metadata:\n  owner: x\n  - Read",
+         "a mapping that becomes a sequence at its own level", False),
+        (_B23 + "metadata:\n  owner:\n    - a\n    b: c",
+         "a kind switch one level deeper", False),
+        (_B23 + "tools:\n  - Read\n  - Write", "a level sequence", True),
+        (_B23 + "tools:\n  - name: a\n  - name: b", "a sequence of mappings", True),
+        (_B23 + "metadata:\n  owner:\n    name: x\n  team: y",
+         "a nested mapping followed by a sibling key", True),
+        # A `#` line settles nothing about structure inside a nested collection -- but IS
+        # content inside a block scalar. Reading it as an entry rejected a commented sequence.
+        (_B23 + "tools:\n  - Read\n  # note\n  - Write", "a commented sequence", True),
+        (_B23 + "metadata:\n  owner: x\n  # note\n  team: y", "a commented mapping", True),
+        (_B23 + "summary: |\n  # not a comment\n  more",
+         "a block scalar whose content starts with a hash", True)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = "---\n%s\ninfer: false\n---\n\nBody for twin.\n" % fm
+    rc, out = run(r, base_skills(), f)
+    ok = (rc == 0) if should_pass else (rc != 0 and "Traceback" not in out)
+    check("%s %s" % ("MUST-PASS" if should_pass else "REAL P2:", label), ok)
+    if should_pass and _y23 is not None:
+        try:
+            _y23.safe_load(fm + "\ninfer: false")
+            loadable = True
+        except Exception:
+            loadable = False
+        check("   ...and a real YAML parser loads it", loadable)
+
+
+print()
+print("--- escape syntax is refused, not silently mis-read ---")
+
+# A YAML loader turns `"t\x77in"` into `twin`; the decoder only removed the surrounding
+# quotes, so it compared text the provider never sees and reported drift against a definition
+# whose identity matches. Decoding YAML's escape table would be machinery for a spelling
+# nothing uses -- not one of the 43 checked-in definitions is quoted at all.
+# The MESSAGE is the assertion here, not merely the rejection. Every one of these was already
+# refused before the fix -- as a DRIFT report, claiming the provider answers to a name it does
+# not, which is a misleading failure on a valid definition. Asserting "rejected" would have
+# passed against the old checker and proved nothing.
+for spelling, label, expect in (
+        ('"t\\x77in"', "a double-quoted name with a hex escape", "backslash escape"),
+        ('"tw\\u0069n"', "a double-quoted name with a unicode escape", "backslash escape"),
+        ("'it''s'", "a single-quoted name with a doubled quote", "doubled quote"),
+        ('"twin"', "a plainly double-quoted name", None),
+        ("twin", "a plain name", None)):
+    r = base_registry()
+    f = dict(BASE_FILES)
+    f[".github/agents/twin.md"] = (
+        "---\nname: %s\ndescription: fixture\ninfer: false\n---\n\nBody for twin.\n" % spelling)
+    rc, out = run(r, base_skills(), f)
+    if expect is None:
+        check("MUST-PASS %s" % label, rc == 0)
+    else:
+        check("REAL P2: %s is refused AS unsupported syntax" % label,
+              rc != 0 and expect in out and "Traceback" not in out)
+
+
+print()
+print("--- a gap claim must not depend on machine-local state ---")
+
+# `is_dir()` FOLLOWS a symlink, so an uncovered directory could point outside the repository
+# and every check passed -- the same defect as a registered definition symlinked out of its
+# tree, in the other registry's claim.
+def escaping_gap_case():
+    tmp = tempfile.mkdtemp()
+    outside = tempfile.mkdtemp()
+    try:
+        sk = base_skills()
+        sk["declared_scope"]["cross_registry"]["known_uncovered_directories"] = ["external-gap"]
+        root = build(tmp, base_registry(), sk, dict(BASE_FILES))
+        os.symlink(outside, str(root / "external-gap"))
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: an uncovered directory symlinked outside the repository is rejected",
+              p.returncode != 0 and "resolves outside the repository" in out)
+
+        # ...and one that stays inside is still a legitimate gap, so this is containment
+        # rather than a ban on symlinks.
+        (root / "real-gap").mkdir()
+        (root / "external-gap").unlink()
+        os.symlink(str(root / "real-gap"), str(root / "external-gap"))
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        check("MUST-PASS an uncovered directory symlinked WITHIN the repository",
+              p.returncode == 0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(outside, ignore_errors=True)
+
+
+escaping_gap_case()
+
 # --- round 22: the other half of every rule already written --------------------
 print()
 print("--- indentation is validated for BOTH things that open it ---")

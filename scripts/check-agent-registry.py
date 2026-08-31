@@ -202,6 +202,18 @@ def decode_inline_scalar(raw):
         if len(v) < 2 or v[-1] != v[0]:
             return None, "is an unterminated quoted scalar"
         body = v[1:-1]
+        # ESCAPE SYNTAX IS REFUSED, NOT DECODED. A YAML loader turns `"t\x77in"` into `twin`
+        # and `'it''s'` into `it's`; this decoder only removed the surrounding quotes, so it
+        # returned text the provider never sees and reported drift against a definition whose
+        # identity matches. Decoding YAML's escape table would be machinery for a spelling
+        # NOTHING USES -- not one of the 43 checked-in definitions is quoted at all -- so the
+        # narrower claim is the honest one: say so, and say what to write instead.
+        if v[0] == '"' and "\\" in body:
+            return None, ("is a double-quoted scalar containing a backslash escape, which "
+                          "YAML decodes and this reader does not; write it as a plain scalar")
+        if v[0] == "'" and "''" in body:
+            return None, ("is a single-quoted scalar containing a doubled quote, which YAML "
+                          "decodes to one; write it as a plain scalar")
         return (None, "is an empty quoted string") if not body.strip() else (body, None)
 
     # PLAIN SCALARS ARE ACCEPTED BY ALLOWLIST, NOT BY EXCLUSION LIST.
@@ -318,6 +330,7 @@ def parse_registered_agent_front_matter(text, provider_type):
     opens_nested = False        # may an indented line follow the key just read?
     in_block = False            # ...and is that indentation a block scalar's body?
     nested_indent = None        # the indent its first nested line established
+    frames = []                 # (indent, collection kind) per nested depth
     for i, line in enumerate(block.split("\n"), 1):
         if not line.strip():
             continue
@@ -328,6 +341,13 @@ def parse_registered_agent_front_matter(text, provider_type):
                     "scalar. A YAML parser rejects this, so the provider cannot load the "
                     "definition -- indentation is supported only beneath a block scalar or an "
                     "empty value. Quote the value or use a block scalar." % (i, line[:60]))
+            # Inside a block scalar every line is CONTENT, comments included. Inside a
+            # nested collection a `#` line is an ordinary comment and settles nothing about
+            # the structure -- treating it as an entry rejected a commented sequence, which
+            # YAML accepts.
+            if not in_block and line.lstrip().startswith("#"):
+                continue
+
             # NESTED INDENTATION IS PART OF THE VALUE'S VALIDITY, and that holds for BOTH
             # things that open it. Checking only block scalars left the other half: `tools:`
             # then `  - Read` then ` - Write` was certified while the YAML loader raised
@@ -345,6 +365,26 @@ def parse_registered_agent_front_matter(text, provider_type):
                     "as content."
                     % (i, line[:60], indent,
                        "a block scalar" if in_block else "a nested value", nested_indent))
+
+            # EQUAL INDENTATION IS NOT EQUAL STRUCTURE. `tools:` then `  - Read` then
+            # `  orphan: value` shares one indent and still cannot be parsed: a block sequence
+            # does not become a mapping at its own level. Each depth remembers which kind
+            # opened it, so a sibling that changes kind is refused where a parser would raise.
+            # A stack rather than a single frame, because the same mistake one level deeper is
+            # the same mistake.
+            if not in_block:
+                kind = "sequence" if line.lstrip()[:1] == "-" else "mapping"
+                while frames and frames[-1][0] > indent:
+                    frames.pop()
+                if frames and frames[-1][0] == indent:
+                    if frames[-1][1] != kind:
+                        raise InvalidDefinition(
+                            "line %d, %r: a %s entry at the same indentation as the %s that "
+                            "opened this level. A YAML parser raises rather than switching "
+                            "collection kind in place."
+                            % (i, line[:60], kind, frames[-1][1]))
+                else:
+                    frames.append((indent, kind))
             continue
         if line.lstrip().startswith("#"):
             continue
@@ -364,6 +404,7 @@ def parse_registered_agent_front_matter(text, provider_type):
                 "Use a bare `|` or `>`." % (i, line[:60]))
         in_block = bool(_BLOCK_SCALAR.match(value))
         nested_indent = None
+        frames = []
         opens_nested = in_block or not value
 
     for field in PROVIDER_REQUIRED_FIELDS.get(provider_type, ()):
@@ -462,6 +503,14 @@ PROVIDER_ADAPTERS = {
 }
 
 
+def _resolves_inside(path, root):
+    """Does `path` resolve to something inside `root`? False if it cannot be resolved."""
+    try:
+        return pathlib.Path(path).resolve().is_relative_to(pathlib.Path(root).resolve())
+    except OSError:
+        return False
+
+
 def _covering(candidate, trees, root):
     """The tree that already covers `candidate`, or None.
 
@@ -485,7 +534,11 @@ def _covering(candidate, trees, root):
                 if cand_real.is_relative_to((root / tree).resolve()):
                     return tree
             except OSError:
-                pass
+                # An unresolvable TREE is not this function's finding to report -- the surface
+                # checks above own that, and the lexical comparison has already run against
+                # this tree. Skipping only the resolved comparison keeps the remaining trees
+                # in play, where returning or raising would drop them.
+                continue
     return None
 
 
@@ -1246,6 +1299,14 @@ class Checker:
                 self.fail("skills.json known_uncovered_directories: %s is not an existing "
                           "directory. A gap list naming a file or a phantom path is as untrue "
                           "as one omitting a real gap." % un)
+            elif not _resolves_inside(self.root / un, self.root):
+                # `is_dir()` FOLLOWS a symlink, so `external-gap -> /tmp/...` satisfied every
+                # check above. The gap list would then describe machine-local state that no
+                # commit contains -- the same defect as a registered definition symlinked out
+                # of the tree, in the other registry's claim.
+                self.fail("skills.json known_uncovered_directories: %s resolves outside the "
+                          "repository. A gap list that depends on machine-local state is not "
+                          "a claim any clone can check." % un)
             else:
                 self.ok("uncovered directory %s exists and is covered by no registry" % un)
 
