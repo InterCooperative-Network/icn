@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-08-28T16:35:09+00:00",
-  "source_commit": "7f3d18679f488c7f9bdc04bce00360511e0929e8",
+  "generated": "2026-09-01T01:50:10+00:00",
+  "source_commit": "43eb0a2059d1806d696117868d42540231895ac7",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -2004,7 +2004,7 @@
       "match_kind": "prefix",
       "description": "Code-quality brief for changes under `scripts/`.",
       "review_focus": [
-        "Python standard library only; dependency-free",
+        "Python standard library by default; declared dependencies in scripts/requirements.txt",
         "Deterministic output; --check drift mode stays correct",
         "No overclaim language emitted into generated artifacts"
       ],
