@@ -724,12 +724,47 @@ def validate_structure(reg):
                            "contract, not commentary"):
             pass
         else:
-            for key in ("ownership", "supported_front_matter", "required_execution_surfaces",
-                        "dependency_contract", "explicitly_out_of_contract"):
-                req(key in dom_obj,
-                    "declared_scope.supported_input_domain.%s is missing. An incomplete domain "
-                    "statement is worse than none: it reads as a contract while leaving the "
-                    "unstated part arguable." % key)
+            # PRESENCE IS NOT A TYPE, and it is not a value. `ownership: null` satisfied a
+            # membership test while the registry had lost the ownership boundary the contract
+            # says makes findings classifiable. This is round 16's lesson recurring inside the
+            # contract block written to end that class -- so the shapes are required here.
+            for key in ("supported_front_matter", "explicitly_out_of_contract"):
+                ok_l, lst = as_str_list(dom_obj.get(key)) if isinstance(
+                    dom_obj.get(key), list) else (False, [])
+                req(ok_l and bool(lst),
+                    "declared_scope.supported_input_domain.%s must be a nonempty array of "
+                    "nonempty strings. An empty or absent section reads as a contract while "
+                    "leaving the unstated part arguable." % key)
+
+            ok_own, own = as_obj(dom_obj.get("ownership"))
+            req(ok_own and bool(own),
+                "declared_scope.supported_input_domain.ownership must be a nonempty object: "
+                "it is the boundary that makes a review finding classifiable rather than "
+                "arguable, and losing it silently returns this checker to an unwritten domain")
+            if ok_own:
+                for k, v in sorted(own.items()):
+                    req(as_str(v)[0],
+                        "supported_input_domain.ownership.%s must be a nonempty string "
+                        "naming who owns that question" % k)
+
+            req(as_str(dom_obj.get("dependency_contract"))[0],
+                "declared_scope.supported_input_domain.dependency_contract must be a nonempty "
+                "string")
+
+            surfaces_decl = dom_obj.get("required_execution_surfaces")
+            if req(isinstance(surfaces_decl, list) and bool(surfaces_decl),
+                   "declared_scope.supported_input_domain.required_execution_surfaces must be "
+                   "a nonempty array"):
+                for idx, entry in enumerate(surfaces_decl):
+                    ok_e, e = as_obj(entry)
+                    if not req(ok_e, "required_execution_surfaces[%d]: must be an object with "
+                                     "path and kind" % idx):
+                        continue
+                    req(as_str(e.get("path"))[0],
+                        "required_execution_surfaces[%d].path must be a nonempty string" % idx)
+                    req(e.get("kind") in ("ci", "standalone", "direct"),
+                        "required_execution_surfaces[%d].kind must be ci, standalone or direct "
+                        "-- the kind decides what is verified about the surface" % idx)
 
     if "declared_scope" in reg:
         req(as_obj(reg["declared_scope"])[0],

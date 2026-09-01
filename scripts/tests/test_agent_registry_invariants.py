@@ -23,6 +23,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -32,9 +33,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 # The smallest structurally valid supported-domain contract. Bespoke fixtures below build
 # registries inline and must satisfy the same requirement every real registry does.
-MINIMAL_DOMAIN = {"ownership": {}, "supported_front_matter": [],
-                  "required_execution_surfaces": [], "dependency_contract": "x",
-                  "explicitly_out_of_contract": []}
+MINIMAL_DOMAIN = {"ownership": {"yaml_parse_validity": "a real YAML parser"},
+                  "supported_front_matter": ["a `---` delimited block"],
+                  "required_execution_surfaces": [
+                      {"path": "scripts/check-agent-registry.py", "kind": "direct"}],
+                  "dependency_contract": "PyYAML, declared in scripts/requirements.txt",
+                  "explicitly_out_of_contract": ["provider behaviour beyond the projections"]}
 CHECKER = ROOT / "scripts" / "check-agent-registry.py"
 
 failures = []
@@ -81,11 +85,7 @@ def base_registry():
         # to be structurally present, as every real registry must be.
         "declared_scope": {
             "out_of_scope": [], "completeness_claim": "x",
-            "supported_input_domain": {
-                "ownership": {}, "supported_front_matter": [],
-                "required_execution_surfaces": [], "dependency_contract": "x",
-                "explicitly_out_of_contract": [],
-            },
+            "supported_input_domain": copy.deepcopy(MINIMAL_DOMAIN),
         },
         "agents": [
             {
@@ -900,8 +900,24 @@ for surface in _DOMAIN["required_execution_surfaces"]:
     path = surface["path"]
     check("declared execution surface exists: %s" % path, (ROOT / path).exists())
     if surface["kind"] in ("ci", "standalone"):
-        check("   ...and really runs the checker",
-              "check-agent-registry.py" in (ROOT / path).read_text(encoding="utf-8"))
+        # A MENTION IS NOT AN EXECUTION. My first version of this grepped for the filename,
+        # which a comment or an error message satisfies -- so replacing the invocation with a
+        # successful no-op left the surface green. That is precisely the defect this program
+        # fixed in `_invokes_hook` on the sibling PR ("the hook must be THE COMMAND, not
+        # merely the last word"), reproduced here in the test that was supposed to prove it.
+        #
+        # This requires the checker to appear as a COMMAND on a non-comment line whose exit
+        # status is consumed. It is still static: it proves the invocation is in executable
+        # position and its status is used, not that the surface as a whole behaves correctly.
+        text = (ROOT / path).read_text(encoding="utf-8")
+        live = [ln for ln in text.splitlines()
+                if not ln.lstrip().startswith("#") and "check-agent-registry.py" in ln]
+        check("   ...invokes the checker on a non-comment line",
+              any(re.search(r"python3?\s+\S*check-agent-registry\.py", ln) for ln in live))
+        check("   ...and consumes its exit status",
+              any(re.search(r"(^|\s)(if\b|run:)\s*.*check-agent-registry\.py", ln)
+                  or re.search(r"=\$\(\s*python3?\s+\S*check-agent-registry\.py", ln)
+                  for ln in live))
 
 _WORKFLOW = (ROOT / ".github/workflows/agent-drift-check.yml").read_text(encoding="utf-8")
 check("the workflow provisions the declared dependency from the declared file",
