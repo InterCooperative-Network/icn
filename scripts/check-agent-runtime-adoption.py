@@ -54,6 +54,24 @@ LITERAL_DOLLAR = "__ICN_LITERAL_DOLLAR__"
 _PLAIN, _SINGLE, _DOUBLE, _ESCAPED = "plain", "single", "double", "escaped"
 
 
+def _starts_comment(command: str, i: int) -> bool:
+    """Does an unquoted `#` at `i` open a comment?
+
+    ONE definition, because there were two and they disagreed. bash opens a comment at a `#`
+    that begins a word, and an ESCAPED space does not end a word: `<hook> note\\ #123` keeps
+    the `#` inside the argument and runs -- measured, `rc=0`, argument `note #123`. The
+    stripper cut there anyway and left a trailing backslash that would not tokenise, taking
+    the gate red on a runnable command.
+    """
+    if command[i] != "#":
+        return False
+    if i == 0:
+        return True
+    if command[i - 1] not in " \t\n":
+        return False
+    return i < 2 or command[i - 2] != "\\"
+
+
 def _shell_states(command: str) -> list:
     """How a shell reads each character of `command`: plain, single-quoted, double-quoted or
     backslash-escaped.
@@ -73,8 +91,7 @@ def _shell_states(command: str) -> list:
         # `echo ok # "` left the model believing a double quote was open, and the NEWLINE
         # that followed was scored as quoted. The separator check then missed a second
         # command entirely. Everything from `#` to end of line is scored plain.
-        if (not in_single and not in_double and c == "#"
-                and (i == 0 or command[i - 1] in " \t\n")):
+        if not in_single and not in_double and _starts_comment(command, i):
             while i < n and command[i] != "\n":
                 states.append(_PLAIN)
                 i += 1
@@ -142,8 +159,7 @@ def _strip_shell_comment(command: str) -> str:
     out: list[str] = []
     i, n = 0, len(command)
     while i < n:
-        if (command[i] == "#" and states[i] == _PLAIN
-                and (i == 0 or command[i - 1] in " \t\n")):
+        if states[i] == _PLAIN and _starts_comment(command, i):
             nl = command.find("\n", i)
             if nl < 0:
                 break
@@ -635,6 +651,16 @@ def classify_hook_command(command: str, root: Path | None = None):
     # command bash runs normally. Stripping only removes comment ranges, so quote provenance
     # survives it.
     no_comment = _strip_shell_comment(command)
+    stray = next((c for c in command if c in "\r\x0b\x0c\x00"), None)
+    if stray is not None:
+        # NON-SHELL WHITESPACE IS NOT WHITESPACE. Python's `strip()` removes `\r`, so a
+        # CR-terminated executable word normalised to the real hook and its bit was checked --
+        # while bash does not treat CR as shell whitespace and attempts a CR-suffixed
+        # filename, exiting 127. Rejected rather than normalised away: the gate must reason
+        # about the command the SHELL sees, and stripping made the two differ.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains %r, which bash does not treat as shell whitespace; it becomes part "
+                "of a word rather than separating one" % stray)
     cmd = _mask_unexpanded_dollars(no_comment.strip())
     if not cmd:
         return HookCommandKind.NON_HOOK, None, "empty command"

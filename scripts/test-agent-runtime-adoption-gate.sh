@@ -782,6 +782,13 @@ cases = {
     # gate's: both of these run fine, and scanning the whole command refused them.
     'echo "$CLAUDE_PROJECT_DIR".claude': K.NON_HOOK,
     'echo $CLAUDE_PROJECT_DIR': K.NON_HOOK,
+    # NON-SHELL WHITESPACE IS NOT WHITESPACE. Python's strip() removes `\r`; bash does not
+    # treat it as shell whitespace and attempts a CR-suffixed filename, exiting 127.
+    '%s\r' % H: K.UNCLASSIFIED,
+    '%s\r extra' % H: K.UNCLASSIFIED,
+    # AN ESCAPED SPACE DOES NOT END A WORD, so the `#` after it is not a comment. Measured
+    # against bash: rc=0, the hook receives the argument `note #123`.
+    '%s note\\ #123' % H: K.DIRECT,
     # ...and the token must START the path word. `./"$VAR"/x` makes bash concatenate `./`
     # with an ABSOLUTE path and attempt `.//…`, exiting 127, while deleting the embedded
     # expansion left the real hook behind.
