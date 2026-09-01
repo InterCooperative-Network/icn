@@ -710,6 +710,27 @@ def validate_structure(reg):
                         "silently." % (sid, k, ", ".join(SURFACE_KEYS)))
 
     req(as_obj(reg.get("relationship_model"))[0], "relationship_model: must be an object")
+    ok_ds, ds = as_obj(reg.get("declared_scope"))
+    if ok_ds:
+        # THE SUPPORTED-DOMAIN CONTRACT MUST EXIST AND BE STRUCTURED. It is what lets a review
+        # finding be classified instead of argued: a counterexample inside the domain is a
+        # defect, one outside it is a documented limitation. Deleting it would return this
+        # checker to an unwritten domain, which is the state that produced ten consecutive
+        # review rounds in one defect class (icn#2632).
+        dom = ds.get("supported_input_domain")
+        ok_dom, dom_obj = as_obj(dom)
+        if not req(ok_dom, "declared_scope.supported_input_domain: must be an object -- the "
+                           "domain this checker claims to decide correctly is part of its "
+                           "contract, not commentary"):
+            pass
+        else:
+            for key in ("ownership", "supported_front_matter", "required_execution_surfaces",
+                        "dependency_contract", "explicitly_out_of_contract"):
+                req(key in dom_obj,
+                    "declared_scope.supported_input_domain.%s is missing. An incomplete domain "
+                    "statement is worse than none: it reads as a contract while leaving the "
+                    "unstated part arguable." % key)
+
     if "declared_scope" in reg:
         req(as_obj(reg["declared_scope"])[0],
             "declared_scope: must be an object, found %s"

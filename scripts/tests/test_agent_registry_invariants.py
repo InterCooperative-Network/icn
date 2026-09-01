@@ -29,6 +29,12 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+# The smallest structurally valid supported-domain contract. Bespoke fixtures below build
+# registries inline and must satisfy the same requirement every real registry does.
+MINIMAL_DOMAIN = {"ownership": {}, "supported_front_matter": [],
+                  "required_execution_surfaces": [], "dependency_contract": "x",
+                  "explicitly_out_of_contract": []}
 CHECKER = ROOT / "scripts" / "check-agent-registry.py"
 
 failures = []
@@ -70,7 +76,17 @@ def base_registry():
             "provider_variant": "deliberate",
             "divergent_unreviewed": "unadjudicated",
         },
-        "declared_scope": {"out_of_scope": [], "completeness_claim": "x"},
+        # The supported-domain contract is REQUIRED, so the fixture declares a minimal one.
+        # Its content is exercised against the real registry further down; here it only has
+        # to be structurally present, as every real registry must be.
+        "declared_scope": {
+            "out_of_scope": [], "completeness_claim": "x",
+            "supported_input_domain": {
+                "ownership": {}, "supported_front_matter": [],
+                "required_execution_surfaces": [], "dependency_contract": "x",
+                "explicitly_out_of_contract": [],
+            },
+        },
         "agents": [
             {
                 "name": "solo",
@@ -467,7 +483,7 @@ def wrong_extension_case():
                                                 "provider_type": "claude-code"}},
                "relationship_model": {"single_surface": "x", "exact_mirror": "x",
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
-               "declared_scope": {},
+               "declared_scope": {"supported_input_domain": MINIMAL_DOMAIN},
                "agents": [{"name": "solo", "relationship": "single_surface",
                            "routing_triggers": ["x"], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/solo.txt"}}}]}
@@ -763,7 +779,7 @@ def nested_decoy_case():
                                                "provider_type": "claude-code"}},
                "relationship_model": {"single_surface": "x", "exact_mirror": "x",
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
-               "declared_scope": {},
+               "declared_scope": {"supported_input_domain": MINIMAL_DOMAIN},
                "agents": [{"name": "solo", "relationship": "single_surface",
                            "routing_triggers": ["x"], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/subdir/solo.md"}}}]}
@@ -849,6 +865,53 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- the supported-domain contract is enforced AND true ------------------------
+print()
+print("--- the declared domain must exist, and must describe reality ---")
+
+# The domain statement is what lets a review finding be classified rather than argued. It is
+# only worth that if it cannot be deleted silently, and if its claims are checked against the
+# repository instead of taken on trust.
+for key in ("ownership", "supported_front_matter", "required_execution_surfaces",
+            "dependency_contract", "explicitly_out_of_contract"):
+    case("supported_input_domain.%s deleted" % key,
+         mutate_reg=lambda r, k=key: r["declared_scope"]["supported_input_domain"].pop(k),
+         expect="supported_input_domain")
+
+case("supported_input_domain deleted entirely",
+     mutate_reg=lambda r: r["declared_scope"].pop("supported_input_domain"),
+     expect="supported_input_domain")
+
+# ...and the claims are cross-checked against the repository, not merely present.
+REAL_REG = json.loads((ROOT / "ops/state/truth/agents.json").read_text(encoding="utf-8"))
+_DOMAIN = REAL_REG["declared_scope"]["supported_input_domain"]
+
+check("the declared dependency contract names scripts/requirements.txt",
+      "scripts/requirements.txt" in _DOMAIN["dependency_contract"])
+check("scripts/requirements.txt exists and declares PyYAML",
+      (ROOT / "scripts/requirements.txt").is_file()
+      and "pyyaml" in (ROOT / "scripts/requirements.txt").read_text(encoding="utf-8").lower())
+
+# Every declared execution surface must be a real path that really runs this checker. The
+# entries are STRUCTURED rather than prose, because a contract a test has to parse with string
+# surgery is not a testable contract -- my first version of this block did exactly that and
+# failed on its own punctuation.
+for surface in _DOMAIN["required_execution_surfaces"]:
+    path = surface["path"]
+    check("declared execution surface exists: %s" % path, (ROOT / path).exists())
+    if surface["kind"] in ("ci", "standalone"):
+        check("   ...and really runs the checker",
+              "check-agent-registry.py" in (ROOT / path).read_text(encoding="utf-8"))
+
+_WORKFLOW = (ROOT / ".github/workflows/agent-drift-check.yml").read_text(encoding="utf-8")
+check("the workflow provisions the declared dependency from the declared file",
+      "scripts/requirements.txt" in _WORKFLOW)
+check("the workflow still runs the checker it provisions for",
+      "check-agent-registry.py" in _WORKFLOW)
+check("every standalone surface in the contract is declared as such",
+      {s["path"] for s in _DOMAIN["required_execution_surfaces"] if s["kind"] == "standalone"}
+      == {"ops/scripts/drift-check.sh", "scripts/check-preflight-consistency.sh"})
+
 # --- an empty routing list is the absence of a record -------------------------
 print()
 print("--- routing_triggers must actually route ---")
@@ -2038,7 +2101,7 @@ def symlink_cases():
                    "relationship_model": {"single_surface": "x", "exact_mirror": "x",
                                           "provider_variant": "x",
                                           "divergent_unreviewed": "x"},
-                   "declared_scope": {}, "agents": agents}
+                   "declared_scope": {"supported_input_domain": MINIMAL_DOMAIN}, "agents": agents}
             sk = {"declared_scope": {"cross_registry": {
                 "agent_surfaces_tracked_by_agents_json": claimed}}}
             (root / "ops/state/truth/agents.json").write_text(json.dumps(reg), encoding="utf-8")

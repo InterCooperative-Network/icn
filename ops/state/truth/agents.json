@@ -33,7 +33,55 @@
       "Prompt CONTENT is out of scope here: this registry owns inventory and provider topology. An earlier revision said stale doctrine 'is enforced by forbidden_patterns'. That was FALSE and gave a false assurance. The only forbidden_patterns implementation is scripts/check-skill-registry.py, and skills.json#enforcement.scan_scope covers ops/automation/skills, .agents/skills and .claude/skills -- ZERO overlap with the three agent trees registered here. Prompt content on these surfaces is therefore enforced by NOTHING today, and known stale doctrine remains reachable, including a DID form the code rejects sitting behind an automatically invocable Copilot router. Closing that gap is icn#2632 STAGE 2, which must clean the existing violations and extend scan_scope in one tranche -- adding dirty trees to scan scope first would only turn a silent gap into a red gate. This file states the gap; it does not gate it.",
       "The registry does not describe its own enforcement. An earlier revision carried an `enforcement` block naming the checker, its tests and its callers; nothing outside the checker ever dereferenced it, and four review rounds went into machinery proving a self-description no consumer needed. The gates are real and unchanged -- ops/scripts/drift-check.sh, scripts/check-preflight-consistency.sh and .github/workflows/agent-drift-check.yml each invoke the checker directly -- they simply do not need their identities copied into the agent-routing registry to do it."
     ],
-    "completeness_claim": "Across every surface declared in provider_surfaces, every provider-loaded agent definition is represented exactly once, and every registered path maps back to a real provider definition. provider_surfaces is the ONE machine-readable owner of provider topology: an earlier revision also listed the in-scope globs here, which nothing read -- inventory is driven by provider_surfaces[].tree and the direct-child *.md convention -- so a glob added to that list changed no behaviour while making this claim false. scripts/check-agent-registry.py fails if either direction breaks."
+    "completeness_claim": "Across every surface declared in provider_surfaces, every provider-loaded agent definition is represented exactly once, and every registered path maps back to a real provider definition. provider_surfaces is the ONE machine-readable owner of provider topology: an earlier revision also listed the in-scope globs here, which nothing read -- inventory is driven by provider_surfaces[].tree and the direct-child *.md convention -- so a glob added to that list changed no behaviour while making this claim false. scripts/check-agent-registry.py fails if either direction breaks.",
+    "supported_input_domain": {
+      "note": "The exact inputs scripts/check-agent-registry.py claims to decide correctly, and the ownership boundary it decides them under. Written down so a review finding can be classified rather than argued: a counterexample INSIDE this domain that the checker gets wrong is a defect; one outside it is a documented limitation. Derived from what the repository actually contains, what the implementation intentionally supports, and the provider conventions we claim to honour -- not from what is convenient to exclude. Adopted icn#2632 after ten consecutive review rounds in one defect class established that an unwritten domain cannot terminate a review.",
+      "ownership": {
+        "yaml_parse_validity": "A real YAML parser (PyYAML). The checker does not decide whether front matter is valid YAML and must never reimplement that. If ICN accepts a definition, a parser accepts it; the converse deliberately does not hold.",
+        "duplicate_top_level_keys": "ICN, explicitly. A YAML loader accepts a repeated key and silently keeps the last value; ICN refuses the ambiguity outright, because a routing or capability field certified as whichever value a loader happened to keep is not a certified field.",
+        "icn_registry_schema": "ICN. Root, record, surface-declaration and divergence vocabularies are CLOSED allowlists. An unrecognised key fails: it is most often a misspelling, which otherwise drops its meaning silently.",
+        "provider_surface_relationships": "ICN. single_surface, exact_mirror, provider_variant and divergent_unreviewed, plus mirror_pairs, with the declared and implemented vocabularies required equal in both directions.",
+        "logical_name_derivation": "ICN, provider-aware. github-copilot definitions may be spelled <name>.md or <name>.agent.md -- GitHub's configuration reference takes the file name 'minus .md or .agent.md'. claude-code has no .agent.md convention, so there the suffix is part of the name.",
+        "reachable_agent_routing": "ICN. routing_triggers must be nonempty: this file is the canonical owner of agent routing, and an empty list is the absence of a routing record wearing the shape of a satisfied field. not_for may be empty -- excluding nothing is an answer.",
+        "filesystem_and_truth_owner_accessibility": "ICN, fail-closed. A repository-controlled path is untrusted input: a directory named like a definition, a non-UTF-8 file, an unreadable truth owner, a symlink escaping the tree and a symlink cycle must each produce a FINDING. A checker that crashes reports nothing, and nothing reads as clean.",
+        "provider_native_syntax": "The provider definition. description, color, model, tools, target, mcp-servers, metadata, infer, disable-model-invocation and user-invocable are never copied here; the registry records derived SEMANTICS. A provider-owned key at any level of this document is refused."
+      },
+      "supported_front_matter": [
+        "A `---` delimited block whose root mapping begins at column 0.",
+        "Plain unquoted top-level keys. Quoted, explicit (`? key`), flow-mapping and space-before-colon spellings are valid YAML and are refused, because the line-based semantic readers would treat them as absent.",
+        "Values ICN CONSUMES (name, description, infer, disable-model-invocation, and provider-required fields) must be read identically by the line reader and by the parser. A value the two disagree about is refused rather than guessed at.",
+        "Values ICN does not consume are the provider's business: booleans, numbers, flow collections and multi-line forms are all accepted so long as the document parses."
+      ],
+      "required_execution_surfaces": [
+        {
+          "path": ".github/workflows/agent-drift-check.yml",
+          "kind": "ci",
+          "note": "Required check `Agent Tooling Drift Check`. Provisions the dependency and runs the checker."
+        },
+        {
+          "path": "ops/scripts/drift-check.sh",
+          "kind": "standalone",
+          "note": "Documented as runnable standalone; runs the checker, so it needs the dependency locally."
+        },
+        {
+          "path": "scripts/check-preflight-consistency.sh",
+          "kind": "standalone",
+          "note": "Same: runs the checker as part of preflight."
+        },
+        {
+          "path": "scripts/check-agent-registry.py",
+          "kind": "direct",
+          "note": "Run directly by contributors and by the invariants suite."
+        }
+      ],
+      "dependency_contract": "PyYAML is REQUIRED, declared in scripts/requirements.txt, installed by the workflow from that file, and its absence exits 1 with instructions rather than skipping the check. A correctness check that silently disappears reports the skip as a pass. Every authoritative description of the scripts/ surface -- including the generated agent context spine -- must say so.",
+      "explicitly_out_of_contract": [
+        "Deciding what a valid-YAML document MEANS beyond the keys listed above. Front matter ICN does not consume is the provider's contract, not this one's.",
+        "Repairing or normalising malformed input. Every unsupported form fails explicitly; nothing is interpreted as absence, default, or harmlessness.",
+        "Provider behaviour beyond the semantic projections declared in provider_metadata_ownership.",
+        "Agent directories outside the repository, which are machine-local and unenforceable -- see out_of_scope above."
+      ]
+    }
   },
   "agents": [
     {
