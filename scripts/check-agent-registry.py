@@ -573,10 +573,15 @@ PROVIDER_ADAPTERS = {
 
 
 def _resolves_inside(path, root):
-    """Does `path` resolve to something inside `root`? False if it cannot be resolved."""
+    """Does `path` resolve to something inside `root`? False if it cannot be resolved.
+
+    RuntimeError is caught alongside OSError: `Path.resolve()` raises it on a SYMLINK CYCLE
+    under CPython 3.11, the version `agent-drift-check.yml` selects, and a committed
+    self-referential tree would otherwise end the run with a traceback rather than a finding.
+    """
     try:
         return pathlib.Path(path).resolve().is_relative_to(pathlib.Path(root).resolve())
-    except OSError:
+    except (OSError, RuntimeError):
         return False
 
 
@@ -592,7 +597,7 @@ def _covering(candidate, trees, root):
     cand = pathlib.PurePosixPath(candidate)
     try:
         cand_real = (root / candidate).resolve()
-    except OSError:
+    except (OSError, RuntimeError):
         cand_real = None
     for tree in trees:
         t = pathlib.PurePosixPath(tree)
@@ -602,7 +607,7 @@ def _covering(candidate, trees, root):
             try:
                 if cand_real.is_relative_to((root / tree).resolve()):
                     return tree
-            except OSError:
+            except (OSError, RuntimeError):
                 # An unresolvable TREE is not this function's finding to report -- the surface
                 # checks above own that, and the lexical comparison has already run against
                 # this tree. Skipping only the resolved comparison keeps the remaining trees
@@ -992,7 +997,7 @@ class Checker:
         # leave the repository without any lexical evidence.
         try:
             repo_root = self.root.resolve()
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, RuntimeError) as exc:
             self.fail("cannot resolve the repository root (%s)" % exc)
             repo_root = None
         seen_trees = {}
@@ -1002,7 +1007,7 @@ class Checker:
                 continue
             try:
                 real = (self.root / t).resolve()
-            except (ValueError, OSError) as exc:
+            except (ValueError, OSError, RuntimeError) as exc:
                 self.fail("provider_surfaces.%s: tree %s cannot be resolved (%s)"
                           % (sid, t, exc))
                 continue
@@ -1150,7 +1155,7 @@ class Checker:
                 try:
                     resolved_fp = fp.resolve()
                     resolved_tree = (self.root / tree).resolve()
-                except OSError as exc:
+                except (OSError, RuntimeError) as exc:
                     self.fail("%s.%s: %s cannot be resolved (%s)" % (name, sid, path, exc))
                     continue
                 if not resolved_fp.is_relative_to(resolved_tree):

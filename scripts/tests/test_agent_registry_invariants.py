@@ -19,6 +19,7 @@ Every case runs the real checker against a temporary repo root via --repo-root.
 Run: python3 scripts/tests/test_agent_registry_invariants.py
 """
 import copy
+import importlib.util
 import json
 import os
 import pathlib
@@ -848,6 +849,35 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- a symlink cycle is a finding, not a RuntimeError -------------------------
+print()
+print("--- a self-referential tree is reported ---")
+
+# `Path.resolve()` raises RuntimeError on a symlink cycle under CPython 3.11 -- the version
+# agent-drift-check.yml selects -- and RuntimeError is neither ValueError nor OSError, so a
+# committed self-referential tree ended the run with a traceback. Fourth instance of the
+# crash-instead-of-report class in this PR; every repository-controlled resolve() is guarded.
+def symlink_cycle_case():
+    tmp = tempfile.mkdtemp()
+    try:
+        r = base_registry()
+        r["provider_surfaces"]["loop"] = {"tree": "cycle", "provider_type": "claude-code"}
+        sk = base_skills()
+        sk["declared_scope"]["cross_registry"]["agent_surfaces_tracked_by_agents_json"] = [
+            ".claude/agents", ".github/agents", "cycle"]
+        root = build(tmp, r, sk, dict(BASE_FILES))
+        os.symlink(str(root / "cycle"), str(root / "cycle"))
+        p = subprocess.run([sys.executable, str(CHECKER), "--repo-root", str(root)],
+                           capture_output=True, text=True)
+        out = p.stdout + p.stderr
+        check("REAL P2: a self-referential provider tree is reported, not raised",
+              p.returncode != 0 and "Traceback" not in out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+symlink_cycle_case()
+
 # --- a canonical truth file that is not a file --------------------------------
 print()
 print("--- an unreadable truth owner is a finding, not a traceback ---")
@@ -2144,8 +2174,18 @@ check("the real ops/state/truth/agents.json passes its own checker", p.returncod
 reg = json.loads((ROOT / "ops/state/truth/agents.json").read_text(encoding="utf-8"))
 trees = {v["tree"] for v in reg["provider_surfaces"].values()}
 on_disk = set()
-for t in trees:
-    on_disk |= {q.stem for q in (ROOT / t).glob("*.md") if q.name != "README.md"}
+# PROVIDER-SPECIFIC, exactly like the checker. `Path.stem` on `foo.agent.md` is `foo.agent`,
+# so adopting the Copilot filename convention the checker supports would have left the CHECKER
+# green and turned this completeness assertion -- and therefore the required workflow -- red.
+# The suite and the thing it tests have to derive a name the same way.
+_spec = importlib.util.spec_from_file_location("registry_under_test", str(CHECKER))
+_checker = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_checker)
+for _sid, _sdef in reg["provider_surfaces"].items():
+    _pt, _tree = _sdef["provider_type"], _sdef["tree"]
+    on_disk |= {n for n in (_checker.logical_name_of(q, _pt)
+                            for q in (ROOT / _tree).glob("*.md") if q.name != "README.md")
+                if n is not None}
 check("every agent definition across all %d surfaces has a record (%d names)"
       % (len(trees), len(on_disk)),
       on_disk == {a["name"] for a in reg["agents"]})
