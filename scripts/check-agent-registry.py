@@ -66,6 +66,17 @@ PROVIDER_OWNED_KEYS = ("description", "color", "model", "tools", "target",
 # The complete surface-declaration vocabulary, checked as an ALLOWLIST in validate_structure.
 SURFACE_KEYS = ("tree", "provider_type", "loaded_by")
 
+# The complete ROOT vocabulary. Third and last level of the same allowlist: records, then
+# surface declarations, then the document itself. Each was opened by the previous one being
+# closed, which is this checker's recurring shape -- a rule applied where it was reported
+# rather than across its domain.
+# Keys deleted by an earlier review round, which keep their own explanatory failures.
+DELIBERATELY_REMOVED_KEYS = ("enforcement",)
+
+REGISTRY_KEYS = ("schema", "description", "provider_surfaces", "provider_type_note",
+                 "mirror_pairs_note", "relationship_model", "declared_scope", "agents",
+                 "provider_metadata_ownership")
+
 # The complete record vocabulary, checked as an ALLOWLIST -- see the record loop.
 RECORD_KEYS = ("name", "relationship", "surfaces", "routing_triggers", "not_for",
                "divergence", "mirror_pairs")
@@ -640,6 +651,23 @@ def validate_structure(reg):
         return bad
 
     req(as_str(reg.get("schema"))[0], "schema: must be a non-empty string")
+
+    for k in sorted(set(reg) - set(REGISTRY_KEYS)):
+        if k in DELIBERATELY_REMOVED_KEYS:
+            # These have their OWN message, which carries the reason they were removed. The
+            # allowlist would refuse them correctly and say something less useful, so it
+            # steps aside rather than flattening a decision into "unrecognised key".
+            continue
+        if k in PROVIDER_OWNED_KEYS:
+            req(False,
+                "registry root: %r is provider-native syntax owned by the provider "
+                "definition, not the registry. The document that forbids an unpinned copy "
+                "must not carry one itself." % k)
+        else:
+            req(False,
+                "registry root: %r is not a registry key (%s). An unrecognised key is most "
+                "often a misspelled one, which drops its meaning silently."
+                % (k, ", ".join(REGISTRY_KEYS)))
 
     ok, surfaces = as_obj(reg.get("provider_surfaces"))
     if req(ok, "provider_surfaces: must be an object"):

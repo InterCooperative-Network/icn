@@ -849,6 +849,21 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- the third and last level of the same allowlist ----------------------------
+print()
+print("--- the document that forbids an unpinned copy must not carry one ---")
+
+# Records were closed, then surface declarations, and the ROOT was still open: a top-level
+# `infer: false` in agents.json exited 0. Each level was opened by the previous one being
+# closed, which is this checker's recurring shape.
+for key, value, label in (
+        ("infer", False, "a provider-owned infer at the registry root"),
+        ("tools", ["Read"], "provider-owned tools at the registry root"),
+        ("agent", [], "a misspelled agents key")):
+    def mutate(r, k=key, v=value):
+        r[k] = v
+    case(label, mutate_reg=mutate, expect="registry root")
+
 # --- a symlink cycle is a finding, not a RuntimeError -------------------------
 print()
 print("--- a self-referential tree is reported ---")
