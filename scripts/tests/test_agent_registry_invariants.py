@@ -882,6 +882,42 @@ case("supported_input_domain deleted entirely",
      mutate_reg=lambda r: r["declared_scope"].pop("supported_input_domain"),
      expect="supported_input_domain")
 
+# PRESENCE IS NOT A VALUE. These were verified by hand first and did not discriminate as
+# tests until they were written here -- a mutation I ran in a scratch script proves nothing
+# durable. `ownership: null` satisfied the membership check while the registry had lost the
+# boundary that makes findings classifiable.
+def _dom(r):
+    return r["declared_scope"]["supported_input_domain"]
+
+case("supported_input_domain.ownership is null",
+     mutate_reg=lambda r: _dom(r).__setitem__("ownership", None),
+     expect="ownership must be a nonempty object")
+case("supported_input_domain.ownership is empty",
+     mutate_reg=lambda r: _dom(r).__setitem__("ownership", {}),
+     expect="ownership must be a nonempty object")
+case("an ownership entry has no owner named",
+     mutate_reg=lambda r: _dom(r)["ownership"].__setitem__("yaml_parse_validity", ""),
+     expect="must be a nonempty string naming who owns")
+case("supported_front_matter is empty",
+     mutate_reg=lambda r: _dom(r).__setitem__("supported_front_matter", []),
+     expect="supported_front_matter must be a nonempty array")
+case("explicitly_out_of_contract is empty",
+     mutate_reg=lambda r: _dom(r).__setitem__("explicitly_out_of_contract", []),
+     expect="explicitly_out_of_contract must be a nonempty array")
+case("dependency_contract is empty",
+     mutate_reg=lambda r: _dom(r).__setitem__("dependency_contract", ""),
+     expect="dependency_contract must be a nonempty string")
+case("required_execution_surfaces is empty",
+     mutate_reg=lambda r: _dom(r).__setitem__("required_execution_surfaces", []),
+     expect="required_execution_surfaces must be a nonempty array")
+case("a declared surface is not an object",
+     mutate_reg=lambda r: _dom(r).__setitem__("required_execution_surfaces", ["a string"]),
+     expect="must be an object with path and kind")
+case("a declared surface has an invented kind",
+     mutate_reg=lambda r: _dom(r)["required_execution_surfaces"][0].__setitem__(
+         "kind", "made-up"),
+     expect="kind must be ci, standalone or direct")
+
 # ...and the claims are cross-checked against the repository, not merely present.
 REAL_REG = json.loads((ROOT / "ops/state/truth/agents.json").read_text(encoding="utf-8"))
 _DOMAIN = REAL_REG["declared_scope"]["supported_input_domain"]
