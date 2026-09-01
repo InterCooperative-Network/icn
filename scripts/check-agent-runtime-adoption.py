@@ -69,7 +69,16 @@ def _starts_comment(command: str, i: int) -> bool:
         return True
     if command[i - 1] not in " \t\n":
         return False
-    return i < 2 or command[i - 2] != "\\"
+    # COUNT the backslashes; do not look at one. An ODD run escapes the whitespace, so the
+    # `#` stays inside the word (`arg\ #123`). An EVEN run is escaped backslashes followed by
+    # REAL whitespace, so the `#` does open a comment (`arg\\ # note`) -- and treating it as
+    # part of the word left an unstripped `; ` or `&& ` in the command, which the composition
+    # check then read as a second program. Measured: bash runs both, rc=0.
+    j, run = i - 2, 0
+    while j >= 0 and command[j] == "\\":
+        run += 1
+        j -= 1
+    return run % 2 == 0
 
 
 def _shell_states(command: str) -> list:

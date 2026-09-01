@@ -789,6 +789,12 @@ cases = {
     # AN ESCAPED SPACE DOES NOT END A WORD, so the `#` after it is not a comment. Measured
     # against bash: rc=0, the hook receives the argument `note #123`.
     '%s note\\ #123' % H: K.DIRECT,
+    # PARITY, not presence. An ODD backslash run escapes the whitespace so the `#` is data;
+    # an EVEN run is escaped backslashes followed by REAL whitespace, so the `#` opens a
+    # comment -- and treating it as data left `; ` or `&& ` unstripped for the composition
+    # check to read as a second program. Both spellings run in bash, rc=0.
+    '%s arg\\\\ # a; b' % H: K.DIRECT,
+    '%s arg\\\\ # a && b' % H: K.DIRECT,
     # ...and the token must START the path word. `./"$VAR"/x` makes bash concatenate `./`
     # with an ABSOLUTE path and attempt `.//…`, exiting 127, while deleting the embedded
     # expansion left the real hook behind.
@@ -890,6 +896,51 @@ if [ $? -eq 0 ]; then
   ok "no command substitution can be classified as a non-hook"
 else
   bad "a command substitution escaped the categorical refusal" ""
+fi
+
+# THE CONTRACT IS PART OF THE REVIEWABLE SURFACE (icn#2689 closure rule). It exists so a review
+# finding can be classified instead of argued, which is only worth anything if it cannot be
+# deleted silently and if its claims match the classifier.
+HOOKS_MD="$REPO_ROOT/.claude/hooks/HOOKS.md"
+missing=""
+for phrase in "Supported hook-command language" "Path-bearing operands" \
+              "Categorically unsupported" "Out of contract"; do
+  grep -qF "$phrase" "$HOOKS_MD" || missing="$missing [$phrase]"
+done
+if [ -z "$missing" ]; then
+  ok "the supported-language contract is present in HOOKS.md"
+else
+  bad "the supported-language contract lost a required section" "$missing"
+fi
+
+python3 - "$GATE" "$HOOKS_MD" <<'PYCONTRACT'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+doc = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY_ = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
+# Each row the contract states as SUPPORTED must actually classify as supported, and each
+# form it calls categorically unsupported must actually be UNCLASSIFIED. A contract the
+# classifier disagrees with is worse than none.
+supported = {H: K.DIRECT, 'python3 %s' % PY_: K.INTERPRETED, 'echo hi': K.NON_HOOK,
+             'MODE=health %s' % H: K.DIRECT}
+unsupported = ['echo "$(date)"', 'echo "`date`"', 'true && %s' % H, 'echo x | %s' % H,
+               '%s </dev/null' % H, '/usr/bin/env %s' % H, 'python3 -c "x"',
+               '$HOME/.claude/hooks/hook-health.sh', '%s\r' % H]
+bad = [c for c, k in supported.items() if m.classify_hook_command(c, root)[0] != k]
+bad += [c for c in unsupported if m.classify_hook_command(c, root)[0] != K.UNCLASSIFIED]
+# ...and the two path-bearing operands the contract names are the two the code checks.
+if "argv0" not in doc or "script operand" not in doc:
+    bad.append("contract no longer names the path-bearing operands")
+sys.exit(0 if not bad else 1)
+PYCONTRACT
+if [ $? -eq 0 ]; then
+  ok "the classifier agrees with every form the contract declares"
+else
+  bad "the contract and the classifier disagree about a declared form" ""
 fi
 
 # The word-splitting claim is checked against BASH, not asserted. If this stops reproducing,
