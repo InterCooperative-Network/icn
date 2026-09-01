@@ -50,7 +50,7 @@ except ModuleNotFoundError as exc:      # pragma: no cover - provisioning failur
     raise SystemExit(
         "check-agent-registry: PyYAML is required and is not installed (%s).\n"
         "  It owns YAML parse validity for registered provider definitions.\n"
-        "  Install it: python3 -m pip install pyyaml\n"
+        "  Install it: python3 -m pip install -r scripts/requirements.txt\n"
         "  CI provisions it in .github/workflows/agent-drift-check.yml." % exc)
 import sys
 

@@ -74,7 +74,7 @@ jobs:
           python-version: '3.11'
 
       - name: Provision the YAML parser the registry checker requires
-        run: python3 -m pip install pyyaml
+        run: python3 -m pip install -r scripts/requirements.txt
 
       - name: Verify canonical truth files exist
         run: bash ops/scripts/drift-check.sh

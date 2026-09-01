@@ -60,7 +60,13 @@ done
 #
 # Full verification introspects the live MCP server and lives in
 # scripts/check-agent-capabilities.py (run in CI). Here we only assert the generated manifest
-# EXISTS and parses, because drift-check.sh must stay fast and dependency-free.
+# EXISTS and parses, because drift-check.sh must stay fast.
+#
+# NOTE: this script is no longer strictly dependency-free. Check 8 below runs
+# scripts/check-agent-registry.py, which requires PyYAML -- YAML parse validity is owned by a
+# YAML parser rather than reimplemented (icn#2632). Install with
+# `python3 -m pip install -r scripts/requirements.txt`. The statement above was true when
+# written and is corrected here rather than left to mislead.
 
 CAP_MANIFEST="${REPO_ROOT}/docs/reference/project-index/generated/agent-capabilities.json"
 if [[ ! -f "${CAP_MANIFEST}" ]]; then
