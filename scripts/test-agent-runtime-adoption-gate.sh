@@ -927,10 +927,19 @@ PY_ = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
 # classifier disagrees with is worse than none.
 supported = {H: K.DIRECT, 'python3 %s' % PY_: K.INTERPRETED, 'echo hi': K.NON_HOOK,
              'MODE=health %s' % H: K.DIRECT}
+# An assignment before the INTERPRETER form is deliberately NOT supported: a bare name is
+# resolved through PATH and an assignment can be the PATH. Found by an adversarial pass over
+# the contract's own table, where the CONTRACT was wrong and the code was right.
+unsupported_by_design = {'MODE=x python3 %s' % PY_: K.UNCLASSIFIED}
+supported_check_only = dict(supported)
 unsupported = ['echo "$(date)"', 'echo "`date`"', 'true && %s' % H, 'echo x | %s' % H,
                '%s </dev/null' % H, '/usr/bin/env %s' % H, 'python3 -c "x"',
                '$HOME/.claude/hooks/hook-health.sh', '%s\r' % H]
 bad = [c for c, k in supported.items() if m.classify_hook_command(c, root)[0] != k]
+bad += [c for c, k in unsupported_by_design.items()
+        if m.classify_hook_command(c, root)[0] != k]
+if "before the **interpreter** form is deliberately NOT supported" not in doc:
+    bad.append("contract no longer states the assignment/interpreter exclusion")
 bad += [c for c in unsupported if m.classify_hook_command(c, root)[0] != K.UNCLASSIFIED]
 # ...and the two path-bearing operands the contract names are the two the code checks.
 if "argv0" not in doc or "script operand" not in doc:

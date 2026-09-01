@@ -54,7 +54,13 @@ The checker does not own Bash and must never grow toward owning it.
 | `"$CLAUDE_PROJECT_DIR"/<repo path>` | the file exists and is executable |
 | `python3 "$CLAUDE_PROJECT_DIR"/<repo path>.py` | the script exists and is readable; the executable bit is **not** required, because it is `argv[1]` |
 | `echo <text>` | nothing — an informational command that runs no repository file |
-| `VAR=value` prefixes before either path form | the same, and the assignment values are not analysed |
+| `VAR=value` prefixes before a **repository path** | the same, and the assignment values are not analysed |
+
+`VAR=value` before the **interpreter** form is deliberately NOT supported. A bare `python3` is
+resolved through `PATH`, and an assignment can *be* the `PATH` — `PATH=/tmp:$PATH python3 <hook>`
+runs whatever `/tmp/python3` happens to be. A name-based exemption requires that nothing
+command-local could have changed what the name resolves to. A repository path is not looked up,
+so an assignment in front of one is harmless.
 
 ### Path-bearing operands
 
