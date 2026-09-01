@@ -204,6 +204,63 @@ def _substitution_present(command: str):
     return None
 
 
+def _raw_words(command: str):
+    """The command's words as RAW slices, quoting intact, split on unquoted whitespace."""
+    states = _shell_states(command)
+    words, i, n = [], 0, len(command)
+    while i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        if i >= n:
+            break
+        start = i
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        words.append((start, command[start:i]))
+    return words
+
+
+def path_word_problem(command: str, word_index: int):
+    """Why the raw word at `word_index` is not a supported path spelling, or None.
+
+    POSITIONAL, and that is the correction. These rules previously scanned the WHOLE command,
+    so `echo "$CLAUDE_PROJECT_DIR".claude` and `echo $CLAUDE_PROJECT_DIR` -- which bash runs
+    fine, because the expansion is a data argument -- were refused, taking the required gate
+    red. Only two operands ever become a path the gate must prove: argv0, and an interpreter's
+    script. The rules belong to those positions, not to the text of the command.
+
+    That scoping also terminates a class rather than answering one more spelling: there is no
+    third position for an expansion to appear in and matter.
+    """
+    words = _raw_words(command)
+    if word_index >= len(words):
+        return None
+    offset, raw = words[word_index]
+    states = _shell_states(command)
+    matches = list(_PROJECT_DIR_TOKEN.finditer(raw))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        return ("%s expands the project directory more than once; the shell concatenates both"
+                % raw)
+    m = matches[0]
+    # The token must START the word, after at most an opening quote. `./"$CLAUDE_PROJECT_DIR"/x`
+    # has bash concatenate `./` with an ABSOLUTE path and attempt `.//…`, exiting 127, while
+    # deleting the embedded expansion left the real hook behind.
+    if m.start() not in (0, 1) or (m.start() == 1 and raw[0] not in "\"'"):
+        return "%s does not begin with the project-directory expansion" % raw
+    if states[offset + m.start()] == _PLAIN:
+        return ("%s expands the project directory unquoted; a checkout path containing "
+                "whitespace would be word-split" % raw)
+    rest = raw[m.end():]
+    if rest[:1] in ('"', "'"):
+        rest = rest[1:]
+    if rest[:1] != "/":
+        return ("%s does not put `/` after the expansion; the shell concatenates it with what "
+                "follows" % raw)
+    return None
+
+
 def _command_word_offset(command: str) -> int:
     """Index where the COMMAND WORD begins, past any leading `VAR=value` assignments.
 
@@ -224,47 +281,6 @@ def _command_word_offset(command: str) -> int:
     while i < n and command[i] in " \t" and states[i] == _PLAIN:
         i += 1
     return i
-
-
-def _project_dir_without_separator(command: str):
-    """The offending word if an EXPANDED project-dir token is followed by something but `/`.
-
-    Single-quoted text is literal, not an expansion -- `echo '$CLAUDE_PROJECT_DIR'.claude`
-    prints and exits 0 -- so a textual match there is not this rule's business.
-    """
-    states = _shell_states(command)
-    start = _command_word_offset(command)
-    for m in _PROJECT_DIR_TOKEN.finditer(command):
-        if m.start() < start or states[m.start()] == _SINGLE:
-            continue
-        rest = command[m.end():]
-        # Step over the CLOSING QUOTE first. In the supported spelling the token is quoted, so
-        # `"$CLAUDE_PROJECT_DIR".claude/...` puts a `"` between the expansion and the text the
-        # shell concatenates -- looking only at the next character missed exactly the case
-        # this rule is for.
-        if rest[:1] in ('"', "'"):
-            rest = rest[1:]
-        if rest and rest[0] not in "/ \t":
-            return command[m.start():].split()[0]
-    return None
-
-
-def _unquoted_project_dir(command: str):
-    """The project-dir token spelling if it is expanded UNQUOTED, else None.
-
-    A single-quoted occurrence is literal rather than an expansion -- `_mask_unexpanded_dollars`
-    already handles that, and the resulting path simply does not exist -- so only the bare
-    (plain-state) spelling is reported here.
-    """
-    states = _shell_states(command)
-    start = _command_word_offset(command)
-    for m in _PROJECT_DIR_TOKEN.finditer(command):
-        i = m.start()
-        # Assignment VALUES are excluded: bash does not word-split them, so requiring quotes
-        # there rejected a command that runs correctly on a path containing spaces.
-        if i >= start and i < len(states) and states[i] == _PLAIN:
-            return m.group(0)
-    return None
 
 
 def _has_unquoted_newline(command: str) -> bool:
@@ -607,38 +623,58 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "contains a %s command substitution; substitutions are executable shell and "
                 "are outside the supported hook-command language" % inside)
 
-    bad_join = _project_dir_without_separator(no_comment)
-    if bad_join is not None:
-        # THE TOKEN MUST BE FOLLOWED BY A SEPARATOR. `"$CLAUDE_PROJECT_DIR".claude/hooks/x.sh`
-        # had the variable removed and resolved to the real `.claude/hooks/x.sh`, while bash
-        # concatenates and attempts `<root>.claude/hooks/x.sh`, exiting 127. The gate was
-        # certifying an unrelated in-repository hook.
+    if _has_unquoted_newline(command):
+        # Checked on the RAW command: a newline inside a comment still ends that comment and
+        # starts a new one, and the lexer below never sees a newline at all.
         return (HookCommandKind.UNCLASSIFIED, None,
-                "the project-dir expansion in %s is not followed by `/`; the shell "
-                "concatenates it with what follows, which is a different path from the one "
-                "this would resolve" % bad_join)
-    unquoted_var = _unquoted_project_dir(no_comment)
-    if unquoted_var is not None:
-        # AN UNQUOTED EXPANSION IS WORD-SPLIT. Checked AFTER the substitution refusal:
-        # `_shell_states` does not model a substitution's own quoting context, so a
-        # `"$(..."$VAR"...)"` would look bare here. A substitution is refused
-        # categorically above, so nothing containing one reaches this.
-        # `$CLAUDE_PROJECT_DIR/.claude/hooks/x.sh` with a
-        # checkout path containing whitespace makes bash attempt the first word and exit 127,
-        # while normalisation here erased the variable and checked the intended hook.
-        # Verified: with CLAUDE_PROJECT_DIR='/tmp/icn review space', the unquoted form exits
-        # 127 on `/tmp/icn` and the quoted form runs. The classifier cannot see a difference
-        # the shell acts on, so the difference has to be part of the language.
+                "contains a literal newline, which bash reads as a command separator; only a "
+                "single simple command is supported")
+    # THE COMMENT-STRIPPED SPELLING, with quoting still intact, is what every reader below
+    # uses. Scanning the raw command for operators flagged text inside an explanatory comment
+    # -- `<hook> # use && fallback` was reported as composition and the gate went red on a
+    # command bash runs normally. Stripping only removes comment ranges, so quote provenance
+    # survives it.
+    no_comment = _strip_shell_comment(command)
+    cmd = _mask_unexpanded_dollars(no_comment.strip())
+    if not cmd:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+    tokens = _tokenize(cmd)
+    if tokens is None:
+        return HookCommandKind.UNCLASSIFIED, None, "unparseable command"
+    if not tokens:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+
+    ops = _unquoted_operators(no_comment)
+    if ops:
+        # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
+        # a later one may be a hook whose executable bit decides whether it runs.
         return (HookCommandKind.UNCLASSIFIED, None,
-                "%s is expanded unquoted; a checkout path containing whitespace would be "
-                "word-split and the command would not launch. Quote it as \"$%s\"."
-                % (unquoted_var, unquoted_var.strip("${}")))
+                "top-level shell composition (%s); only a single simple command is supported"
+                % " ".join(sorted(ops)))
+
+    inside = _substitution_present(no_comment)
+    if inside is not None:
+        # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
+        # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
+        # returns 0 whatever the hook does, so a mode-0644 file reported permission denied
+        # while the gate stayed green and the target never entered the derived set.
+        #
+        # Only a substitution NAMING A REPOSITORY PATH is refused, not every substitution:
+        # live settings.json carries `echo "branch: $(git … || echo detached)"`, which names
+        # no repository file and is what this gate is meant to accept.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a %s command substitution; substitutions are executable shell and "
+                "are outside the supported hook-command language" % inside)
+
 
     # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
     # file already treats them as part of a direct invocation, and the suite exercises that
     # shape -- two siblings disagreeing about what a hook command looks like is how one of
     # them ends up wrong. Launchers had no such sibling support and no live use.
     n_assign = _leading_assignment_words(cmd)
+    problem = path_word_problem(no_comment, n_assign)
+    if problem is not None:
+        return HookCommandKind.UNCLASSIFIED, None, problem
     assigned = n_assign > 0
     tokens = tokens[n_assign:]
     if not tokens:
@@ -756,6 +792,9 @@ def classify_hook_command(command: str, root: Path | None = None):
                     "something this gate can establish"
                     % (base, ("no argument" if not rest else "the option %r" % rest[0])))
         script = rest[0]
+        problem = path_word_problem(no_comment, n_assign + 1)
+        if problem is not None:
+            return HookCommandKind.UNCLASSIFIED, None, problem
         script = _sub_project_dir(script)
         # THE SAME TWO RULES AS argv0. They were written for argv0 and not carried to the
         # interpreter's argument, so `python3 $CLAUDE_PROJECT_DIR/missing/../<guard>.py`

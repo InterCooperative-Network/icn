@@ -778,6 +778,15 @@ cases = {
     # SINGLE-QUOTED TEXT IS LITERAL, not an expansion: bash prints it and exits 0, so the
     # separator rule has no business there.
     "echo '$CLAUDE_PROJECT_DIR'.claude": K.NON_HOOK,
+    # POSITIONAL, not textual. An expansion in a DATA argument is bash's business, not the
+    # gate's: both of these run fine, and scanning the whole command refused them.
+    'echo "$CLAUDE_PROJECT_DIR".claude': K.NON_HOOK,
+    'echo $CLAUDE_PROJECT_DIR': K.NON_HOOK,
+    # ...and the token must START the path word. `./"$VAR"/x` makes bash concatenate `./`
+    # with an ABSOLUTE path and attempt `.//…`, exiting 127, while deleting the embedded
+    # expansion left the real hook behind.
+    './"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 ./"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
     "echo '$CLAUDE_PROJECT_DIR'": K.NON_HOOK,
     '"${CLAUDE_PROJECT_DIR}".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     'python3 "$CLAUDE_PROJECT_DIR".claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
