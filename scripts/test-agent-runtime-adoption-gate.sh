@@ -758,6 +758,20 @@ cases = {
     '$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     'python3 $CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    # A QUOTE INSIDE A COMMENT IS INERT. bash ignores quote characters after an unquoted `#`,
+    # but the state walker toggled on them -- so a trailing `# "` left it believing a double
+    # quote was open, the following NEWLINE was scored as quoted, and the separator check
+    # missed a second command entirely.
+    'echo ok # "\n"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    "echo ok # '\n\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/hook-health.sh": K.UNCLASSIFIED,
+    # THE TOKEN MUST BE FOLLOWED BY `/`. Without it the shell CONCATENATES -- bash attempts
+    # `<root>.claude/hooks/x.sh` and exits 127 -- while normalisation here produced the real
+    # in-repository hook and certified an unrelated file.
+    '"$CLAUDE_PROJECT_DIR".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '"${CLAUDE_PROJECT_DIR}".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 "$CLAUDE_PROJECT_DIR".claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    # ...and the supported spellings, including quoting the whole word, still classify.
+    '"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.DIRECT,
     # ...and the quoted spellings, including quoting the whole word, still classify.
     '"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.DIRECT,
     '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': K.DIRECT,

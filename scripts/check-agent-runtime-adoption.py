@@ -68,6 +68,17 @@ def _shell_states(command: str) -> list:
     in_single = in_double = False
     while i < n:
         c = command[i]
+        # A COMMENT IS INERT, INCLUDING ITS QUOTES. bash ignores quote characters after an
+        # unquoted `#` that begins a word, but this walker was toggling on them -- so
+        # `echo ok # "` left the model believing a double quote was open, and the NEWLINE
+        # that followed was scored as quoted. The separator check then missed a second
+        # command entirely. Everything from `#` to end of line is scored plain.
+        if (not in_single and not in_double and c == "#"
+                and (i == 0 or command[i - 1] in " \t\n")):
+            while i < n and command[i] != "\n":
+                states.append(_PLAIN)
+                i += 1
+            continue
         if in_single:
             # Inside '...' NOTHING is special except the closing quote -- not even backslash.
             states.append(_SINGLE)
@@ -190,6 +201,21 @@ def _substitution_present(command: str):
                 return "$(...)"
             if c == "`":
                 return "backtick"
+    return None
+
+
+def _project_dir_without_separator(command: str):
+    """The offending word if a project-dir token is followed by something other than `/`."""
+    for m in _PROJECT_DIR_TOKEN.finditer(command):
+        rest = command[m.end():]
+        # Step over the CLOSING QUOTE first. In the supported spelling the token is quoted, so
+        # `"$CLAUDE_PROJECT_DIR".claude/...` puts a `"` between the expansion and the text the
+        # shell concatenates -- looking only at the next character missed exactly the case
+        # this rule is for.
+        if rest[:1] in ('"', "'"):
+            rest = rest[1:]
+        if rest and rest[0] not in "/ \t":
+            return command[m.start():].split()[0]
     return None
 
 
@@ -548,6 +574,16 @@ def classify_hook_command(command: str, root: Path | None = None):
                 "contains a %s command substitution; substitutions are executable shell and "
                 "are outside the supported hook-command language" % inside)
 
+    bad_join = _project_dir_without_separator(no_comment)
+    if bad_join is not None:
+        # THE TOKEN MUST BE FOLLOWED BY A SEPARATOR. `"$CLAUDE_PROJECT_DIR".claude/hooks/x.sh`
+        # had the variable removed and resolved to the real `.claude/hooks/x.sh`, while bash
+        # concatenates and attempts `<root>.claude/hooks/x.sh`, exiting 127. The gate was
+        # certifying an unrelated in-repository hook.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "the project-dir expansion in %s is not followed by `/`; the shell "
+                "concatenates it with what follows, which is a different path from the one "
+                "this would resolve" % bad_join)
     unquoted_var = _unquoted_project_dir(no_comment)
     if unquoted_var is not None:
         # AN UNQUOTED EXPANSION IS WORD-SPLIT. Checked AFTER the substitution refusal:
