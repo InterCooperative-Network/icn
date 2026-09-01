@@ -73,6 +73,19 @@ SURFACE_KEYS = ("tree", "provider_type", "loaded_by")
 # Keys deleted by an earlier review round, which keep their own explanatory failures.
 DELIBERATELY_REMOVED_KEYS = ("enforcement",)
 
+# The complete `divergence` vocabulary. A nested object inside a record is its own place for
+# an unpinned copy to hide, which the record-level allowlist does not reach.
+# DERIVED from the checked-in records, not guessed. My first draft of this list invented
+# plausible names (`reason`, `adjudicated_by`, `adjudicated_at`) and omitted two that are
+# actually used, which would have taken the gate red on the repository it guards.
+DIVERGENCE_KEYS = ("adjudicated", "evidence", "note", "owning_issue")
+
+# Keys inside `divergence` that have their OWN explanatory failure elsewhere. The allowlist
+# steps aside for them so a decision is not flattened into "unrecognised key" -- the same
+# courtesy the root allowlist gives a re-added `enforcement` block. Existing controls assert
+# those specific messages, and they caught this.
+DIVERGENCE_KEYS_WITH_OWN_MESSAGE = ("body_similarity", "why")
+
 REGISTRY_KEYS = ("schema", "description", "provider_surfaces", "provider_type_note",
                  "mirror_pairs_note", "relationship_model", "declared_scope", "agents",
                  "provider_metadata_ownership")
@@ -712,6 +725,16 @@ def validate_structure(reg):
             req(as_str(rec.get("name"))[0], "%s: name must be a non-empty string" % label)
             req(as_str(rec.get("relationship"))[0],
                 "%s: relationship must be a non-empty string" % label)
+
+            div = rec.get("divergence")
+            if isinstance(div, dict):
+                for k in sorted(set(div) - set(DIVERGENCE_KEYS)
+                                - set(DIVERGENCE_KEYS_WITH_OWN_MESSAGE)):
+                    req(False,
+                        "%s.divergence: %r is not a divergence key (%s). A nested object "
+                        "inside a record is its own place for an unpinned copy of provider "
+                        "syntax to hide, which the record-level allowlist does not reach."
+                        % (label, k, ", ".join(DIVERGENCE_KEYS)))
 
             for k in ("routing_triggers", "not_for"):
                 req(as_str_list(rec.get(k)) [0] if isinstance(rec.get(k), list) else False,

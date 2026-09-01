@@ -849,6 +849,27 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- a nested record object is its own hiding place ---------------------------
+print()
+print("--- divergence metadata has a closed vocabulary too ---")
+
+# The record-level allowlist does not reach INSIDE a record's nested objects, so
+# `divergence.infer` was accepted. The vocabulary is derived from the checked-in records:
+# adjudicated, evidence, note, owning_issue.
+for key, value, label in (
+        ("infer", False, "a provider-owned infer inside divergence"),
+        ("description", "copied", "a provider-owned description inside divergence"),
+        ("adjudicated_by", "someone", "an invented divergence key")):
+    def mutate(r, k=key, v=value):
+        rec = next(a for a in r["agents"] if a["name"] == "twin")
+        rec["relationship"] = "divergent_unreviewed"
+        # `owning_issue` is a STRING. My first version passed an int, which the prior head
+        # rejected for that unrelated reason -- so the control passed on the old code and
+        # proved nothing about the allowlist. The expectation names the allowlist message.
+        rec["divergence"] = {"adjudicated": False, "note": "n", "evidence": "e",
+                             "owning_issue": "icn#2632", k: v}
+    case(label, mutate_reg=mutate, expect="is not a divergence key")
+
 # --- the third and last level of the same allowlist ----------------------------
 print()
 print("--- the document that forbids an unpinned copy must not carry one ---")
