@@ -81,7 +81,11 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "flaky or timing-dependent tests",
+        "CI/local build parity",
+        "nondeterministic build failures"
+      ],
       "not_for": []
     },
     {
@@ -160,7 +164,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "Docker/K8s manifests and Helm charts",
+        "deployment automation and config templates"
+      ],
       "not_for": []
     },
     {
@@ -172,7 +179,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "documentation that disagrees with implementation",
+        "canonical docs updates after a semantic change"
+      ],
       "not_for": []
     },
     {
@@ -184,7 +194,9 @@
           "automatic_invocation": true
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "onboarding guides and architecture references drifting from code"
+      ],
       "not_for": []
     },
     {
@@ -195,7 +207,10 @@
           "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md"
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "claim safety and proof level in docs, READMEs, website copy",
+        "public API descriptions"
+      ],
       "not_for": []
     },
     {
@@ -260,7 +275,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "icn-gateway HTTP API and validation changes",
+        "OpenAPI export and TypeScript type drift"
+      ],
       "not_for": []
     },
     {
@@ -327,7 +345,11 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "constitutions, proposals, voting, policy oracles",
+        "Cooperative Contract Language",
+        "governance proofs"
+      ],
       "not_for": []
     },
     {
@@ -339,7 +361,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "K3s cluster, NFS storage, runner and network topology",
+        "homelab operational procedures"
+      ],
       "not_for": []
     },
     {
@@ -400,7 +425,11 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "mutual credit and balance integrity",
+        "demurrage and transaction validation",
+        "economic policy primitives"
+      ],
       "not_for": []
     },
     {
@@ -432,7 +461,11 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "Prometheus rules and Grafana dashboards",
+        "alerting and distributed tracing",
+        "alert cardinality"
+      ],
       "not_for": []
     },
     {
@@ -443,7 +476,10 @@
           "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md"
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "mapping crates, subsystems and claims",
+        "tracing a concept or claim to its source"
+      ],
       "not_for": []
     },
     {
@@ -489,7 +525,10 @@
           "automatic_invocation": true
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "work spanning multiple subsystems",
+        "decomposing a request into a parallelizable plan"
+      ],
       "not_for": []
     },
     {
@@ -530,7 +569,9 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "PR descriptions, commit messages and changelog entries"
+      ],
       "not_for": []
     },
     {
@@ -542,7 +583,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "behaviour-preserving transformations",
+        "crate restructuring and API migrations"
+      ],
       "not_for": []
     },
     {
@@ -584,7 +628,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "TypeScript and React Native SDKs",
+        "Pilot UI and web dashboard changes"
+      ],
       "not_for": []
     },
     {
@@ -596,7 +643,10 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "threat modelling and attack-surface analysis",
+        "security-focused code review"
+      ],
       "not_for": []
     },
     {
@@ -667,7 +717,11 @@
           "automatic_invocation": false
         }
       },
-      "routing_triggers": [],
+      "routing_triggers": [
+        "DIDs, credentials and trust graphs",
+        "scope-bounded and trust-gated behaviour",
+        "SDIS enrolment and membership credentials"
+      ],
       "not_for": []
     }
   ],

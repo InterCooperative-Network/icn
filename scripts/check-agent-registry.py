@@ -736,6 +736,15 @@ def validate_structure(reg):
                         "syntax to hide, which the record-level allowlist does not reach."
                         % (label, k, ", ".join(DIVERGENCE_KEYS)))
 
+            # routing_triggers must be NONEMPTY. This file is the canonical owner of agent
+            # routing, and an empty list answers "which work selects this agent?" with
+            # nothing while reading as a satisfied field -- 17 of 33 records were in that
+            # state. `not_for` may legitimately be empty: "nothing is excluded" is an answer.
+            req(bool(rec.get("routing_triggers")),
+                "%s: routing_triggers must be nonempty. This registry is the canonical owner "
+                "of agent routing, so an empty list is not a routing record -- it is the "
+                "absence of one, wearing the shape of a satisfied field." % label)
+
             for k in ("routing_triggers", "not_for"):
                 req(as_str_list(rec.get(k)) [0] if isinstance(rec.get(k), list) else False,
                     "%s: %s must be an array of strings. This file is the canonical owner of "

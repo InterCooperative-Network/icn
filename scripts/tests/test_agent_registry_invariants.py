@@ -469,7 +469,7 @@ def wrong_extension_case():
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
                "declared_scope": {},
                "agents": [{"name": "solo", "relationship": "single_surface",
-                           "routing_triggers": [], "not_for": [],
+                           "routing_triggers": ["x"], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/solo.txt"}}}]}
         sk = {"declared_scope": {"cross_registry": {
             "agent_surfaces_tracked_by_agents_json": [".claude/agents"]}}}
@@ -765,7 +765,7 @@ def nested_decoy_case():
                                       "provider_variant": "x", "divergent_unreviewed": "x"},
                "declared_scope": {},
                "agents": [{"name": "solo", "relationship": "single_surface",
-                           "routing_triggers": [], "not_for": [],
+                           "routing_triggers": ["x"], "not_for": [],
                            "surfaces": {"claude": {"path": ".claude/agents/subdir/solo.md"}}}]}
         sk = {"declared_scope": {"cross_registry": {
             "agent_surfaces_tracked_by_agents_json": [".claude/agents"]}}}
@@ -849,6 +849,25 @@ case("skills.json absent entirely",
 
 
 # --------------------------------------------------------------- the real repository
+# --- an empty routing list is the absence of a record -------------------------
+print()
+print("--- routing_triggers must actually route ---")
+
+# 17 of 33 records answered "which work selects this agent?" with an empty list, which reads
+# as a satisfied field. This file is the canonical owner of agent routing, so that is not a
+# routing record. `not_for` stays optional: "nothing is excluded" is a real answer.
+case("routing_triggers is an empty list",
+     mutate_reg=lambda r: r["agents"][1].__setitem__("routing_triggers", []),
+     expect="routing_triggers must be nonempty")
+case("routing_triggers is missing entirely",
+     mutate_reg=lambda r: r["agents"][1].pop("routing_triggers"),
+     expect="routing_triggers")
+
+r = base_registry()
+r["agents"][1]["not_for"] = []
+rc, _out = run(r, base_skills(), dict(BASE_FILES))
+check("MUST-PASS not_for may be empty; excluding nothing is an answer", rc == 0)
+
 # --- a nested record object is its own hiding place ---------------------------
 print()
 print("--- divergence metadata has a closed vocabulary too ---")
@@ -2032,7 +2051,7 @@ def symlink_cases():
             {"claude": {"tree": ".claude/agents", "provider_type": "claude-code"},
              "alias": {"tree": "alias-agents", "provider_type": "claude-code"}},
             [{"name": "solo", "relationship": "exact_mirror",
-              "routing_triggers": [], "not_for": [],
+              "routing_triggers": ["x"], "not_for": [],
               "surfaces": {"claude": {"path": ".claude/agents/solo.md"},
                            "alias": {"path": "alias-agents/solo.md"}}}],
             [".claude/agents", "alias-agents"])
@@ -2043,7 +2062,7 @@ def symlink_cases():
             {"claude": {"tree": ".claude/agents", "provider_type": "claude-code"},
              "esc": {"tree": "escape-tree", "provider_type": "claude-code"}},
             [{"name": "solo", "relationship": "single_surface",
-              "routing_triggers": [], "not_for": [],
+              "routing_triggers": ["x"], "not_for": [],
               "surfaces": {"claude": {"path": ".claude/agents/solo.md"}}}],
             [".claude/agents", "escape-tree"])
         check("a tree leaving the repo through a symlink is rejected",
