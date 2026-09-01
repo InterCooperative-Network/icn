@@ -1,0 +1,280 @@
+{
+  "schema": "icn-program/v1",
+  "description": "The Organizational Technical Alpha program structure: waves, lanes, and the bounded slices under them, each routed to the issue/PR/truth-owner that actually owns it. This file owns SEQUENCING AND STATUS ROUTING ONLY. It never restates a domain fact another owner holds: where a wave depends on identity semantics, it names docs/architecture/IDENTITY_SEMANTICS.md rather than summarising it. A cold-start agent should be able to reconstruct the programme from here plus the routers it names, with no chat history.",
+  "reconciliation_note": "Every entry carries a status drawn from a closed set. STILL_VALID / REFINED / SUPERSEDED / BLOCKED_ON_HUMAN_DECISION / DEFERRED_NOT_ABANDONED / OBSOLETE. A wave that has not started is not 'in progress', and a design that has been reviewed is not implemented. Reconciled against live repository evidence 2026-09-01; where evidence changed the trajectory the change is recorded in the entry rather than silently applied.",
+  "target": {
+    "statement": "One reproducibly deployed and recoverable two-node ICN environment, running one current identity/authority generation, producing independently verifiable evidence, with one complete institutional workflow exercised end to end by humans -- including a governance action and a bounded resource action -- and every unproven capability an explicit non-claim.",
+    "chain": [
+      "substrate",
+      "reproducible node",
+      "multi-node communication",
+      "institution package",
+      "human standing / authority",
+      "governance + resource coordination",
+      "action / execution",
+      "receipt / provenance",
+      "independent verification",
+      "recovery / continuity",
+      "truthful public explanation"
+    ],
+    "not_completion": "Technical Alpha completion is NOT green CI, a test count, or a merged PR. Those are necessary conditions for trusting the evidence, never the evidence itself."
+  },
+  "framing": {
+    "generation_convergence": {
+      "status": "STILL_VALID",
+      "statement": "Technical Alpha is primarily a GENERATION-CONVERGENCE event, not an attempt to invent every subsystem. ICN already contains strong proof islands built across different architectural generations; the goal is to select one exact current identity/authority profile and make identity, authority, governance, resource execution, receipts, evidence, recovery, node deployment and human workflow describe the same system at the same semantic generation.",
+      "generations": {
+        "A": "Practical integrated system. DID stood in for person/member/device/node in many runtime paths, but governance, execution, receipts and the organiser loop worked well enough for integrated proofs.",
+        "B": "Architectural decomposition specified: Principal != Human Subject != Institution != Node; account/resource != identity; authentication != authority != standing.",
+        "C": "Partially implemented current substrate: N1 authority log, canonical N2 semantics, I7 Principal equality, stronger SessionAuthority, networking/authentication hardening.",
+        "missing_proof": "Generation C driving the Generation A institutional/economic vertical. That is the convergence problem the Alpha exists to close."
+      }
+    },
+    "engineering_doctrine": {
+      "status": "STILL_VALID",
+      "learned_in": "Wave 0, icn#2632 and icn#2691",
+      "rules": [
+        "Do not infer semantics that another layer owns. YAML syntax -> a YAML parser. Shell evaluation -> the shell, or a repository-owned executable. Principal identity -> the identity layer. Subject authority -> the authority layer. Institutional recognition -> GEN/governance. Program state -> the actual truth owners, routed by icn#2689.",
+        "When a validator grows an endless series of exceptions, the abstraction boundary is wrong. Investigate that before the fifth syntax-specific patch, not the tenth.",
+        "A dependency change is not one edit. It is every execution surface that runs the thing, and every authoritative or generated description of that surface.",
+        "Write the supported input domain down. An unwritten domain cannot terminate a review, because no counterexample can be classified as out of scope.",
+        "A green gate is not proof the mechanism proves its claim. Ask whether the test passed for the right reason, and mutation-test the control against the code it was written to catch."
+      ]
+    }
+  },
+  "structure": "Program -> Wave -> Lane -> Bounded Slice -> Checkpoint. A slice is bounded when it has one owning issue, one reviewable change, and evidence that can be reproduced without this file.",
+  "router": {
+    "issue": "icn#2689",
+    "role": "Program router and restart checkpoint. It sequences and points; it does not hold domain facts. Follow: #2689 -> current wave -> lane -> bounded issue/spec -> implementation PR -> architecture truth owner -> required evidence -> next checkpoint."
+  },
+  "lanes": {
+    "core_assurance": {
+      "scope": [
+        "identity",
+        "authority",
+        "networking",
+        "storage",
+        "security",
+        "recovery"
+      ],
+      "status": "STILL_VALID"
+    },
+    "vertical_institution": {
+      "scope": [
+        "NYCN",
+        "humans",
+        "governance",
+        "resource/economic loop"
+      ],
+      "status": "STILL_VALID",
+      "note": "The complete institutional proof target. Wave 4 exercises it end to end; Wave 5 puts real organisers through it and captures where the HUMAN system fails. No claim of live federation, payment network, production adoption or banking semantics is implied."
+    },
+    "development_factory": {
+      "scope": [
+        "agent environment",
+        "CI",
+        "truth routing",
+        "reproducibility"
+      ],
+      "status": "STILL_VALID",
+      "note": "Wave 0 is an on-ramp, not the project."
+    },
+    "horizon_architecture": {
+      "scope": [
+        "N3",
+        "N4",
+        "N5",
+        "N7",
+        "G1",
+        "TIME",
+        "GEN",
+        "mobile/personal nodes",
+        "commons compute",
+        "wider federation/interoperation"
+      ],
+      "status": "DEFERRED_NOT_ABANDONED"
+    }
+  },
+  "waves": {
+    "0": {
+      "name": "Control-plane reconciliation",
+      "status": "REFINED",
+      "note": "Nearly closed. Its lasting output is not the validators but the doctrine in framing.engineering_doctrine and two written input-domain contracts.",
+      "slices": [
+        {
+          "id": "icn#2632 Stage 1",
+          "pr": "icn#2690",
+          "state": "REVIEW",
+          "contract": "ops/state/truth/agents.json#declared_scope.supported_input_domain",
+          "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false."
+        },
+        {
+          "id": "icn#2632 Stage 2",
+          "state": "NOT_STARTED",
+          "blocked_on": "Stage 1 freeze",
+          "note": "Prompt-content truth ownership: stale reachable agent doctrine, especially superseded identity semantics. Split separable semantic classes into bounded issues rather than one mega-change."
+        },
+        {
+          "id": "icn#2691",
+          "pr": "icn#2692",
+          "state": "REVIEW",
+          "contract": ".claude/hooks/HOOKS.md#supported-hook-command-language",
+          "note": "Hook execution semantics. The checker owns a deliberately tiny invocation language and does not own Bash."
+        }
+      ]
+    },
+    "1": {
+      "name": "Exact Technical Alpha core candidate / semantic generation convergence",
+      "status": "STILL_VALID",
+      "routes": [
+        "icn#2694",
+        "icn#2695",
+        "icn#2607"
+      ],
+      "note": "Selects one exact revision/profile and one identity/authority generation. Blocked on Wave 0 closing, then driven by the semantic vertical below."
+    },
+    "2": {
+      "name": "Sovereign node + evidence + recovery proof",
+      "status": "STILL_VALID",
+      "routes": [
+        "icn#2465",
+        "icn#2466"
+      ]
+    },
+    "3": {
+      "name": "Ecosystem semantic reconciliation",
+      "status": "STILL_VALID",
+      "note": "Downstream repos aligned to the same ICN semantic generation. No downstream repo currently holds a human-signed ICN lock; agents may prepare, only humans sign."
+    },
+    "4": {
+      "name": "Complete NYCN institutional vertical slice",
+      "status": "STILL_VALID"
+    },
+    "5": {
+      "name": "Actual organizer rehearsal",
+      "status": "STILL_VALID",
+      "note": "Real organisers through the workflow, capturing where the human system fails. Not a synthetic API demo."
+    },
+    "6": {
+      "name": "Learning / public state / contributor alignment",
+      "status": "STILL_VALID"
+    },
+    "7": {
+      "name": "Horizon and post-alpha expansion",
+      "status": "DEFERRED_NOT_ABANDONED"
+    }
+  },
+  "semantic_alpha_vertical": {
+    "status": "REFINED",
+    "owner": "icn#2694",
+    "note": "One falsifiable vertical: current-generation human governance front end driving the EXISTING resource/economic tail. Do not invent a replacement economic engine to make the vertical aesthetically uniform -- the existing allocation/settlement/execution/journal machinery is sound and its proof is reused.",
+    "order": [
+      {
+        "n": 1,
+        "id": "GEN-A",
+        "issue": "icn#2695",
+        "state": "DESIGN_REVIEWED_NOT_IMPLEMENTED",
+        "what": "Fresh context-bound Subject genesis."
+      },
+      {
+        "n": 2,
+        "id": "N1-D",
+        "state": "DESIGN",
+        "what": "Durable local AuthorityFactStore plus restart rehydration. Identity owns the fact interface; the runtime owns the persistent adapter. Proves local durable custody only, NOT N3 replication, and governance must not become the owner of human identity facts merely because it consumes them."
+      },
+      {
+        "n": 3,
+        "id": "GEN-B",
+        "state": "DESIGN",
+        "what": "Immutable SubjectRecognitionV1. Recognition is not ownership: an institution recognising a Subject does not create or own it."
+      },
+      {
+        "n": 4,
+        "id": "domain actor-model rail",
+        "state": "DESIGN",
+        "what": "LegacyPrincipalV1 vs ContextSubjectV1, with an empty legacy membership list for the Alpha domain as defence in depth. Old DID-vote endpoints reject ContextSubjectV1 domains. Do not migrate all existing domains."
+      },
+      {
+        "n": 5,
+        "id": "N4-A",
+        "issue": "icn#2599",
+        "state": "SPEC",
+        "what": "Relying-party-selected historical authorisation evaluation. Later ordinary revocation must prevent future acts, not rewrite a previously valid act as unauthored; fork/superseding evidence over the relevant prefix fails closed rather than choosing a branch."
+      },
+      {
+        "n": 6,
+        "id": "G1-A",
+        "issue": "icn#2600",
+        "state": "SPEC",
+        "what": "Bounded canonical proposal/effect commitment plus a frozen VotingProcessSnapshotV1. Alpha uses Majority + explicit closure; wall-clock deadlines are deliberately NOT part of the security proof."
+      },
+      {
+        "n": 7,
+        "id": "session rail",
+        "state": "DESIGN",
+        "what": "Authenticated Principal + acting Subject + institutional context, with a narrow governance:subject-vote capability. A session answers 'may this request enter this handler now'; it is not historical authorship."
+      },
+      {
+        "n": 8,
+        "id": "N5-A",
+        "issue": "icn#2605",
+        "state": "SPEC",
+        "what": "Preview of exact bytes, canonical MemberVoteActionV1, local device signature, immutable one-ballot storage. V1 scope is ONE human action: Vote."
+      },
+      {
+        "n": 9,
+        "id": "semantic close",
+        "state": "DESIGN",
+        "what": "SubjectVoteSetHashV1 and deterministic tally."
+      },
+      {
+        "n": 10,
+        "id": "GovernanceDecisionReceiptV4",
+        "state": "DESIGN",
+        "what": "Process-bound decision hash. Justified because V3 binds no proposal/effect payload -- verified in crates/icn-governance/src/proof.rs."
+      },
+      {
+        "n": 11,
+        "id": "economic convergence",
+        "state": "DESIGN",
+        "what": "The V4 decision hash into the EXISTING allocation, settlement intent, execution and journal. Do not teach allocation/settlement/ledger code what a SubjectId is; that semantic firewall is a feature."
+      },
+      {
+        "n": 12,
+        "id": "sovereignty proof",
+        "issue": "icn#2465, icn#2466",
+        "state": "SPEC",
+        "what": "Offline verification with the producer stopped, tamper-negative evidence, encrypted destroy/restore continuity."
+      }
+    ],
+    "ballot_identity": "The durable ballot slot is keyed by (process_hash, SubjectId), NOT by device Principal. One Subject with two authorised devices is two signers and one institutional voter.",
+    "gen_a_invariants": {
+      "derivation": "GovernanceDomainV1 context + public context_salt[32] + GEN domain/version framing -> SHA-256 -> the EXISTING opaque N1 ContextNonce[32] -> unchanged N1 inception -> SubjectId. Verified against crates/icn-identity/src/authority_log/body.rs: ContextNonce is [u8; 32] with a public const from_bytes, so GEN needs no N1 wire change.",
+      "determinism_correction": "Do NOT claim 'same secret + same salt = same Subject'. N1 inception commits next_commitment, which depends on the retained continuity plan/horizon -- verified in authority_log/construct.rs, where commitment() folds kind_at(g) and authority_set(g) from horizon() down. Deterministic re-derivation requires the retained continuity secret AND establishment plan/horizon AND GEN context descriptor AND context_salt.",
+      "reference_split": "subject_context_ref_hash (context/salt + inception EventId) is the stable recognition basis. initial_device_binding_ref_hash (context reference + initial authorize EventId) is separate. Institutional recognition must never be permanently coupled to the first device.",
+      "bootstrap_capabilities": "The initial N1 device authorisation grants Sign and Present only. No Recover, no shared root key, no global registrar, no global public Person ID. N7 owns generalised recovery."
+    }
+  },
+  "semantic_distinctions": {
+    "note": "Do not let future mapping collapse these. Each names a different thing that a single DID used to stand in for.",
+    "terms": {
+      "Principal": "Cryptographic verifying identity.",
+      "Subject": "Context-bound human/member identity.",
+      "Device Principal": "A cryptographic actor authorised to act for a Subject.",
+      "Institution / governance domain": "A governed collective context. NOT reducible to a custodian key.",
+      "Authority facts": "Evidence of who may act for a Subject.",
+      "Recognition": "Institutional acknowledgement of a Subject. Not creation, not ownership.",
+      "Authorization": "Historical authority evaluated at a point or process.",
+      "Member-origin action": "A device-authored action attributable through Subject semantics.",
+      "Governance process": "Proposal, frozen rules, eligible set, participation, deterministic close.",
+      "Resource/economic effect": "Material allocation, settlement, execution consequence.",
+      "Receipt/provenance": "An independently inspectable evidence chain."
+    },
+    "prohibitions": [
+      "Do not reduce an institution to a custodian key.",
+      "Do not turn SubjectId into a global Person identifier.",
+      "Do not make the first device part of stable Subject recognition identity.",
+      "Do not let current-generation commitments use an arbitrary DID spelling where the intended concept is Principal identity (see icn#2627)."
+    ]
+  }
+}
