@@ -204,9 +204,39 @@ def _substitution_present(command: str):
     return None
 
 
+def _command_word_offset(command: str) -> int:
+    """Index where the COMMAND WORD begins, past any leading `VAR=value` assignments.
+
+    Both path rules below apply to the program and its script argument, not to assignment
+    VALUES. bash does not word-split an assignment value -- verified: with a checkout path
+    containing spaces, `ROOT=$CLAUDE_PROJECT_DIR "$CLAUDE_PROJECT_DIR"/…/hook.sh` runs and
+    `$ROOT` keeps the whole path -- so scanning the entire command rejected a command that
+    works.
+    """
+    states = _shell_states(command)
+    i, n, remaining = 0, len(command), _leading_assignment_words(command)
+    while remaining and i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        remaining -= 1
+    while i < n and command[i] in " \t" and states[i] == _PLAIN:
+        i += 1
+    return i
+
+
 def _project_dir_without_separator(command: str):
-    """The offending word if a project-dir token is followed by something other than `/`."""
+    """The offending word if an EXPANDED project-dir token is followed by something but `/`.
+
+    Single-quoted text is literal, not an expansion -- `echo '$CLAUDE_PROJECT_DIR'.claude`
+    prints and exits 0 -- so a textual match there is not this rule's business.
+    """
+    states = _shell_states(command)
+    start = _command_word_offset(command)
     for m in _PROJECT_DIR_TOKEN.finditer(command):
+        if m.start() < start or states[m.start()] == _SINGLE:
+            continue
         rest = command[m.end():]
         # Step over the CLOSING QUOTE first. In the supported spelling the token is quoted, so
         # `"$CLAUDE_PROJECT_DIR".claude/...` puts a `"` between the expansion and the text the
@@ -227,9 +257,12 @@ def _unquoted_project_dir(command: str):
     (plain-state) spelling is reported here.
     """
     states = _shell_states(command)
+    start = _command_word_offset(command)
     for m in _PROJECT_DIR_TOKEN.finditer(command):
         i = m.start()
-        if i < len(states) and states[i] == _PLAIN:
+        # Assignment VALUES are excluded: bash does not word-split them, so requiring quotes
+        # there rejected a command that runs correctly on a path containing spaces.
+        if i >= start and i < len(states) and states[i] == _PLAIN:
             return m.group(0)
     return None
 

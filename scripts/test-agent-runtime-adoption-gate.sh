@@ -768,6 +768,17 @@ cases = {
     # `<root>.claude/hooks/x.sh` and exits 127 -- while normalisation here produced the real
     # in-repository hook and certified an unrelated file.
     '"$CLAUDE_PROJECT_DIR".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # BOTH PATH RULES ARE SCOPED TO THE COMMAND WORD. bash does not word-split an assignment
+    # VALUE -- verified with a checkout path containing spaces: the hook runs and $ROOT keeps
+    # the whole path -- so scanning the whole command rejected a command that works.
+    'ROOT=$CLAUDE_PROJECT_DIR %s' % H: K.DIRECT,
+    'A=1 B=$CLAUDE_PROJECT_DIR %s' % H: K.DIRECT,
+    # ...but an unquoted expansion in argv0 is still refused even behind an assignment.
+    'ROOT=x $CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # SINGLE-QUOTED TEXT IS LITERAL, not an expansion: bash prints it and exits 0, so the
+    # separator rule has no business there.
+    "echo '$CLAUDE_PROJECT_DIR'.claude": K.NON_HOOK,
+    "echo '$CLAUDE_PROJECT_DIR'": K.NON_HOOK,
     '"${CLAUDE_PROJECT_DIR}".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
     'python3 "$CLAUDE_PROJECT_DIR".claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
     # ...and the supported spellings, including quoting the whole word, still classify.
