@@ -104,15 +104,16 @@
         {
           "id": "icn#2632 Stage 1",
           "pr": "icn#2690",
-          "state": "REVIEW",
+          "state": "FROZEN",
           "contract": "ops/state/truth/agents.json#declared_scope.supported_input_domain",
-          "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false."
+          "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false. FROZEN at 73a49026 under that rule: 15/15 local gates, 11/11 required CI, zero unresolved findings, and the contract probed clause by clause. Not merged; merge authorization not granted.",
+          "freeze_head": "73a49026346dfa76615521b190a4945232c11be0"
         },
         {
           "id": "icn#2632 Stage 2",
-          "state": "NOT_STARTED",
-          "blocked_on": "Stage 1 freeze",
-          "note": "Prompt-content truth ownership: stale reachable agent doctrine, especially superseded identity semantics. Split separable semantic classes into bounded issues rather than one mega-change."
+          "state": "READY",
+          "blocked_on": null,
+          "note": "Prompt-content truth ownership: stale reachable agent doctrine, especially superseded identity semantics. Split separable semantic classes into bounded issues rather than one mega-change. Unblocked by the Stage 1 freeze."
         },
         {
           "id": "icn#2691",
