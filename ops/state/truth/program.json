@@ -107,7 +107,8 @@
           "state": "FROZEN",
           "contract": "ops/state/truth/agents.json#declared_scope.supported_input_domain",
           "note": "Provider-aware agent registry. Closure rule adopted icn#2689: a finding blocks freeze only if it falsifies a claimed behaviour, mis-accepts or mis-rejects an in-contract configuration, breaks a required execution surface, or makes stated semantics materially false. FROZEN at 73a49026 under that rule: 15/15 local gates, 11/11 required CI, zero unresolved findings, and the contract probed clause by clause. Not merged; merge authorization not granted.",
-          "freeze_head": "73a49026346dfa76615521b190a4945232c11be0"
+          "freeze_head": "45e103e6cc43512ef0a3ba74c1c72f581b38376f",
+          "freeze_note": "The freeze was first recorded at 73a49026 and the head then moved by one commit -- this file's own freeze record -- which is a process error on my part: a freeze SHA that is not the head is not a freeze. 45e103e6 is the frozen head. The intervening commit touched ops/state/truth/program.json only; the Stage-1 checker is byte-identical between the two, which is verifiable with `git diff 73a49026 45e103e6 -- scripts/`."
         },
         {
           "id": "icn#2632 Stage 2",
