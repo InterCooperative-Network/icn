@@ -544,3 +544,97 @@ seam, so this layer relies on the positive path instead: a supported primitive, 
 startup context. The attempt is preserved on `ops/agent-wait-guard`.
 
 Every wait is bounded. Indefinite blocking is available only behind an explicit flag.
+
+---
+
+## 10. Session checkpoints — state ICN owns
+
+### 10.1 The failure that motivated this
+
+A session finished successfully and its harness's own export malfunctioned. Recovery meant
+locating that harness's private transcript file by hand and reconstructing a handoff separately.
+Nothing was lost, but the incident named a real property of the current arrangement: a session's
+reconstructable state existed **only** inside a specific vendor's tooling, in a format that
+vendor owns, reachable only through a command that vendor implements.
+
+That is a portability failure rather than a harness defect. It would have looked the same in any
+other agent product.
+
+### 10.2 The principle
+
+> ICN's canonical development state, authority, evidence and workflow must not depend on the
+> continued availability or proprietary behaviour of a specific model provider or agent harness.
+
+Operational corollary:
+
+> A proprietary harness feature may accelerate development. State produced through it that the
+> project depends on must also have a representation ICN can read without that harness.
+
+Stated as a direction, not a status. **ICN is not harness-independent today.** §7 already records
+how narrow the non-Claude surface is: only Cursor declares the ops MCP server, no other provider
+gets automatic registration, and the Claude Code hook seam is the only launcher that registers a
+session at all. The rule this section adds is about *how the gap closes*: when a proprietary
+harness owns a strategically important function, or causes an actual portability failure, that
+responsibility is extracted below the vendor boundary **one bounded feature at a time** — not by
+designing a replacement for the harness.
+
+Checkpointing is the first such extraction. It is one tooth of a ratchet, not a plan.
+
+### 10.3 `ops/scripts/icn-session-checkpoint`
+
+```
+icn-session-checkpoint create --out DIR [--handoff F] [--transcript F]
+                              [--provider NAME] [--ref R]... [--note TEXT]...
+icn-session-checkpoint verify DIR
+```
+
+It writes `manifest.json` plus an `artifacts/` directory, and is a helper capability like any
+other — declared with a `#: capability:` header, discovered by §7's generator, so no launcher or
+prompt is edited to make it reachable.
+
+**The manifest keeps three kinds of fact apart**, because a consumer that cannot tell a
+re-derivable fact from a stale one will act on the stale one:
+
+| Block | What it holds | How a consumer must treat it |
+|---|---|---|
+| `observed` | repository, worktree, branch, HEAD, base, ahead/behind, dirty state, changed files, recent commits — derived here from Git | re-derivable, and cheap to re-derive |
+| `captured` | the branch's pull request and its check buckets, as GitHub reported them at `created_at` | historical the moment it was written; requery before acting |
+| `generated` | a handoff file and notes supplied by a person or agent | not derived from anything here, and not verified by anything here |
+
+This is the §2.5 field classification applied to a different artefact, and for the same reason:
+the runtime stores the **reference**, never the state.
+
+Three properties are deliberate:
+
+* **It works with no transcript.** A provider transcript is optional. When one is supplied it is
+  copied into `artifacts/` and hashed, and is **never parsed** — vendor evidence, not a
+  dependency. A Codex or local-model adapter attaches its own stream on identical terms.
+* **Artifacts are copied, not referenced.** A checkpoint pointing into a harness's private
+  directory would reproduce the dependency the format removes.
+* **It invents nothing.** Where a fact cannot be resolved — no PR for the branch, several PRs for
+  one branch, `gh` absent — the manifest records `resolved: null` with the reason. Narrative is
+  carried through from `--handoff`/`--note` and is never synthesised.
+
+`verify` re-hashes every artifact and **fails** on a mismatch or an unknown schema, so a
+checkpoint stays checkable after being copied off this machine.
+
+**Integrity, not attestation.** SHA-256 content hashes only. ICN has signing primitives, and
+reaching for them here would produce a weak ceremony rather than a real guarantee — the signer
+would be an agent process with no standing to attest anything. Stronger attestation is a later
+question, to be answered when there is a principal whose signature would mean something.
+
+**What a checkpoint is not.** It is not authority. Branch, PR, issue and CI state have owners
+named in `ops/state/truth/sources.json`, and those owners are authoritative. A checkpoint is
+memory and evidence, on exactly the terms `.agents/skills/handoff` already states for a handoff.
+
+### 10.4 Deliberately not built
+
+A normalized session **event stream** — `session.started`, `context.loaded`, `tool.called`,
+`file.changed`, `decision.recorded`, `test.completed`, `git.commit`, `pr.created`,
+`checkpoint.created` — is the obvious next primitive, and the ops MCP already has an events table
+(`ops/mcp/src/state/events.ts`) that a normalized stream would extend rather than replace. It is
+recorded here as a design note and nothing more. Building it now would be designing the whole
+future instead of adding the next tooth.
+
+Also not built, and not implied: an agent orchestrator, a model router, a UI, or any change to
+MCP. Model adapters remain vendor-specific; the checkpoint format and its exporter do not.

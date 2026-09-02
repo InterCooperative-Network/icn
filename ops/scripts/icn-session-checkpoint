@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+#: capability: session-checkpoint-export
+#: summary: Export a portable, harness-neutral checkpoint of a development session.
+#: safety: modifies_local
+#
+# icn-session-checkpoint — a session's durable state, in a form ICN owns.
+#
+# WHY THIS EXISTS
+#
+#   A session's reconstructable state currently lives inside whichever agent
+#   harness produced it. When one harness's own export failed, the recovery was
+#   to locate its private transcript file by hand. That is a portability
+#   failure, not a harness bug: project-critical state had no representation
+#   under ICN's control.
+#
+#   This tool is the smallest correction. It writes a checkpoint directory that
+#   another agent — Claude Code, Codex, a local model, a future one — can read
+#   without the originating harness, its export command, or its file formats.
+#
+# WHAT A CHECKPOINT IS NOT
+#
+#   It is not authority. Branch, PR, issue and CI state are live queries whose
+#   owners are named in ops/state/truth/sources.json. A checkpoint records what
+#   was observed and when; the next session requeries before acting. The
+#   manifest keeps the three kinds apart on purpose:
+#
+#     observed   — derived here from Git and the filesystem, re-derivable.
+#     captured   — point-in-time GitHub state. Historical the moment it is
+#                  written. Never a basis for action.
+#     generated  — narrative a person or agent wrote. This tool does not
+#                  synthesise it and will not pretend to.
+#
+#   Nothing here signs anything. Artifacts carry SHA-256 content hashes so a
+#   checkpoint can be verified after being copied; attestation is a later
+#   question and is deliberately not answered by inventing a weak version now.
+#
+# PROVIDER BOUNDARY
+#
+#   A provider transcript is optional, opaque and never parsed — it is copied
+#   and hashed as evidence. The format works with no transcript at all, so a
+#   Codex or local-model adapter attaches its own stream on the same terms.
+#
+# Usage:
+#   icn-session-checkpoint create --out DIR [options]
+#   icn-session-checkpoint verify DIR
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+SCHEMA = "icn-session-checkpoint/v1"
+MANIFEST_NAME = "manifest.json"
+ARTIFACT_DIR = "artifacts"
+
+
+# ── shelling out ────────────────────────────────────────────────────────────
+
+
+def run(args: list[str], cwd: Path | None = None, raw: bool = False) -> str | None:
+    """Return stdout, or None when the command is unavailable or fails.
+
+    Absence is reported as null in the manifest rather than as an empty string,
+    so a consumer can tell "not determined" from "determined to be empty".
+
+    `raw` keeps leading whitespace, which matters for column-oriented output:
+    `git status --porcelain` puts a space in column 1 for an unstaged change,
+    and trimming it shifts every path one character left.
+    """
+    try:
+        out = subprocess.run(
+            args,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.rstrip("\n") if raw else out.stdout.strip()
+
+
+def git(root: Path, *args: str) -> str | None:
+    return run(["git", *args], cwd=root)
+
+
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+# ── observed state ──────────────────────────────────────────────────────────
+
+
+def resolve_root(start: Path) -> Path:
+    root = run(["git", "rev-parse", "--show-toplevel"], cwd=start)
+    if not root:
+        sys.exit(f"icn-session-checkpoint: {start} is not inside a git worktree")
+    return Path(root)
+
+
+def observe(root: Path) -> dict:
+    """Everything derivable here and now, without asking a network service."""
+    branch = git(root, "branch", "--show-current") or None
+    head = git(root, "rev-parse", "HEAD")
+    upstream = git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+
+    # The comparison base is the merge-base with the upstream default, because
+    # "how far ahead" is only meaningful against a named base.
+    base_ref = "origin/main"
+    merge_base = git(root, "merge-base", "HEAD", base_ref)
+
+    ahead = behind = None
+    counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD")
+    if counts and len(counts.split()) == 2:
+        behind_s, ahead_s = counts.split()
+        behind, ahead = int(behind_s), int(ahead_s)
+
+    porcelain = run(["git", "status", "--porcelain"], cwd=root, raw=True) or ""
+    changed = [line[3:] for line in porcelain.splitlines() if len(line) > 3]
+
+    return {
+        "repository": {
+            "root": str(root),
+            "remote_origin": git(root, "remote", "get-url", "origin"),
+        },
+        "worktree": {
+            "path": str(root),
+            "name": root.name,
+            "is_linked_worktree": (root / ".git").is_file(),
+        },
+        "git": {
+            "branch": branch,
+            "head": head,
+            "upstream": upstream,
+            "base_ref": base_ref,
+            "merge_base": merge_base,
+            "commits_ahead_of_base": ahead,
+            "commits_behind_base": behind,
+            "dirty": bool(changed),
+            "changed_files": changed,
+            "recent_commits": (git(root, "log", "--oneline", "-10") or "").splitlines(),
+        },
+    }
+
+
+# ── captured state ──────────────────────────────────────────────────────────
+
+
+def capture_pull_request(root: Path, branch: str | None) -> dict:
+    """The PR for this branch, when exactly one is deterministically discoverable.
+
+    Ambiguity is reported, never guessed: two open PRs for one branch means the
+    checkpoint says so rather than picking the first.
+    """
+    if not branch:
+        return {"resolved": None, "reason": "no branch (detached HEAD)"}
+    if shutil.which("gh") is None:
+        return {"resolved": None, "reason": "gh not on PATH"}
+
+    raw = run(
+        [
+            "gh", "pr", "list", "--head", branch, "--state", "all", "--limit", "10",
+            "--json", "number,title,state,url,headRefOid,isDraft,mergeable,"
+                      "mergeStateStatus,reviewDecision",
+        ],
+        cwd=root,
+    )
+    if raw is None:
+        return {"resolved": None, "reason": "gh query failed or unauthenticated"}
+
+    try:
+        prs = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"resolved": None, "reason": "gh returned unparseable JSON"}
+
+    if not prs:
+        return {"resolved": None, "reason": "no pull request for this branch"}
+    if len(prs) > 1:
+        return {
+            "resolved": None,
+            "reason": "several pull requests share this branch",
+            "candidates": [p.get("number") for p in prs],
+        }
+    return {"resolved": prs[0]}
+
+
+def capture_checks(root: Path, pr_number: int | None) -> dict:
+    """Check states as GitHub reported them, counted by bucket.
+
+    Deliberately NOT a merge-readiness verdict. Which checks are *required* is
+    branch-protection state this tool does not read, so a consumer must not
+    infer readiness from these counts — that is the ci-status skill's job,
+    against live state.
+    """
+    if pr_number is None or shutil.which("gh") is None:
+        return {"resolved": None, "reason": "no pull request, or gh unavailable"}
+
+    raw = run(
+        ["gh", "pr", "checks", str(pr_number), "--json", "name,bucket,state"],
+        cwd=root,
+    )
+    if raw is None:
+        return {"resolved": None, "reason": "gh pr checks failed or returned non-zero"}
+    try:
+        checks = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"resolved": None, "reason": "gh returned unparseable JSON"}
+
+    buckets: dict[str, int] = {}
+    for check in checks:
+        bucket = check.get("bucket") or "unknown"
+        buckets[bucket] = buckets.get(bucket, 0) + 1
+    return {
+        "resolved": {
+            "total": len(checks),
+            "by_bucket": dict(sorted(buckets.items())),
+            "failing": sorted(
+                c.get("name", "?") for c in checks if c.get("bucket") == "fail"
+            ),
+        },
+        "required_checks_not_resolved": (
+            "branch protection was not queried; these counts include "
+            "non-required checks"
+        ),
+    }
+
+
+# ── artifacts ───────────────────────────────────────────────────────────────
+
+
+def adopt_artifact(out: Path, source: Path, role: str, extra: dict) -> dict:
+    """Copy a file into the checkpoint and record its hash.
+
+    Copied rather than referenced: a checkpoint that points at a path inside a
+    harness's private directory is exactly the dependency this tool removes.
+    """
+    if not source.is_file():
+        sys.exit(f"icn-session-checkpoint: {role} file not found: {source}")
+
+    artifacts = out / ARTIFACT_DIR
+    artifacts.mkdir(parents=True, exist_ok=True)
+    dest = artifacts / source.name
+    shutil.copyfile(source, dest)
+
+    record = {
+        "path": f"{ARTIFACT_DIR}/{dest.name}",
+        "role": role,
+        "bytes": dest.stat().st_size,
+        "sha256": sha256_of(dest),
+        "source_path": str(source),
+    }
+    record.update(extra)
+    return record
+
+
+# ── commands ────────────────────────────────────────────────────────────────
+
+
+def cmd_create(args: argparse.Namespace) -> int:
+    root = resolve_root(Path(args.cwd or os.getcwd()).resolve())
+    out = Path(args.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+
+    observed = observe(root)
+    branch = observed["git"]["branch"]
+
+    pull_request = capture_pull_request(root, branch)
+    pr_number = (pull_request.get("resolved") or {}).get("number")
+
+    artifacts: list[dict] = []
+    if args.handoff:
+        artifacts.append(
+            adopt_artifact(out, Path(args.handoff).resolve(), "handoff", {})
+        )
+    if args.transcript:
+        artifacts.append(
+            adopt_artifact(
+                out,
+                Path(args.transcript).resolve(),
+                "provider-transcript",
+                {
+                    "provider": args.provider or "unknown",
+                    "opaque": True,
+                    "note": (
+                        "Vendor-format evidence. Copied and hashed, never parsed. "
+                        "The checkpoint is complete without it."
+                    ),
+                },
+            )
+        )
+
+    manifest = {
+        "schema": SCHEMA,
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "truth_classes": {
+            "observed": (
+                "Derived here from Git and the filesystem at created_at. "
+                "Re-derivable, and cheap to re-derive."
+            ),
+            "captured": (
+                "Point-in-time GitHub state. Historical the moment it was "
+                "written. Requery before acting on it."
+            ),
+            "generated": (
+                "Narrative supplied by a person or an agent. Not derived from "
+                "anything here, and not verified by anything here."
+            ),
+        },
+        "provider": {
+            "harness": args.provider,
+            "note": (
+                "Which agent product produced the session. Recorded for "
+                "provenance; nothing in this format depends on it."
+            ),
+        },
+        "observed": observed,
+        "captured": {
+            "pull_request": pull_request,
+            "checks": capture_checks(root, pr_number),
+            "references": [
+                {"ref": r, "state": "not queried — resolve live"} for r in args.ref
+            ],
+        },
+        "generated": {
+            "handoff": next(
+                (a["path"] for a in artifacts if a["role"] == "handoff"), None
+            ),
+            "notes": args.note,
+        },
+        "artifacts": artifacts,
+        "authority": {
+            "live_state_owners": "ops/state/truth/sources.json",
+            "warning": (
+                "This checkpoint is memory and evidence. It is not the "
+                "authority on any volatile fact it records."
+            ),
+        },
+    }
+
+    (out / MANIFEST_NAME).write_text(
+        json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+    )
+
+    print(f"checkpoint: {out}")
+    print(f"  schema:   {SCHEMA}")
+    print(f"  branch:   {branch} @ {(observed['git']['head'] or '')[:12]}")
+    print(f"  dirty:    {observed['git']['dirty']} ({len(observed['git']['changed_files'])} file(s))")
+    pr = pull_request.get("resolved")
+    print(f"  pr:       {('#' + str(pr['number'])) if pr else pull_request.get('reason')}")
+    for artifact in artifacts:
+        print(f"  artifact: {artifact['path']}  {artifact['sha256'][:16]}…")
+    return 0
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    out = Path(args.checkpoint).resolve()
+    manifest_path = out / MANIFEST_NAME
+    if not manifest_path.is_file():
+        print(f"verify: no {MANIFEST_NAME} in {out}", file=sys.stderr)
+        return 1
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"verify: {MANIFEST_NAME} is not valid JSON: {exc}", file=sys.stderr)
+        return 1
+
+    schema = manifest.get("schema")
+    if schema != SCHEMA:
+        # A different version is not automatically wrong, but this binary must
+        # not claim to have verified something it does not understand.
+        print(f"verify: unknown schema {schema!r} (this tool writes {SCHEMA})", file=sys.stderr)
+        return 1
+
+    failures = 0
+    for artifact in manifest.get("artifacts", []):
+        path = out / artifact["path"]
+        if not path.is_file():
+            print(f"verify: MISSING {artifact['path']}", file=sys.stderr)
+            failures += 1
+            continue
+        actual = sha256_of(path)
+        if actual != artifact.get("sha256"):
+            print(f"verify: HASH MISMATCH {artifact['path']}", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"verify: ok {artifact['path']} ({artifact['bytes']} bytes)")
+
+    print(f"verify: schema ok, {len(manifest.get('artifacts', []))} artifact(s), {failures} failure(s)")
+    return 1 if failures else 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="icn-session-checkpoint",
+        description="Export or verify a portable, harness-neutral session checkpoint.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    create = sub.add_parser("create", help="write a checkpoint directory")
+    create.add_argument("--out", required=True, help="checkpoint directory to write")
+    create.add_argument("--cwd", help="worktree to describe (default: cwd)")
+    create.add_argument("--handoff", help="agent-authored handoff markdown to include")
+    create.add_argument(
+        "--transcript",
+        help="provider transcript to copy in as opaque evidence (optional)",
+    )
+    create.add_argument("--provider", help="agent harness that produced the session")
+    create.add_argument(
+        "--ref",
+        action="append",
+        default=[],
+        help="issue/PR reference to record (repeatable); state is not queried",
+    )
+    create.add_argument(
+        "--note",
+        action="append",
+        default=[],
+        help="agent-authored note (repeatable); recorded as generated, not derived",
+    )
+    create.set_defaults(func=cmd_create)
+
+    verify = sub.add_parser("verify", help="re-hash a checkpoint's artifacts")
+    verify.add_argument("checkpoint", help="checkpoint directory")
+    verify.set_defaults(func=cmd_verify)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

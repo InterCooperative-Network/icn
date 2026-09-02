@@ -473,6 +473,13 @@
       "safety": "modifies_local"
     },
     {
+      "name": "icn-session-checkpoint",
+      "path": "ops/scripts/icn-session-checkpoint",
+      "capability": "session-checkpoint-export",
+      "summary": "Export a portable, harness-neutral checkpoint of a development session.",
+      "safety": "modifies_local"
+    },
+    {
       "name": "icn-wait",
       "path": "ops/scripts/icn-wait",
       "capability": "safe-waiting",
