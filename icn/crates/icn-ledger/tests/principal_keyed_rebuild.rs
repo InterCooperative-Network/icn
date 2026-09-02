@@ -262,6 +262,22 @@ fn an_unparseable_cleared_volume_key_refuses_rather_than_being_dropped() {
     ));
 }
 
+#[test]
+fn a_currency_containing_a_colon_still_loads() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let account = a_principal();
+
+    // No charset validation stops a colon reaching a currency, so the key
+    // parser must not assume the last colon separates it from the DID. Under a
+    // `rfind` split this row names no principal, and the node refuses to start
+    // for good after having accepted the entry that wrote it.
+    put_cleared_volume_row(&store, &account, "USD:SPOT", 500);
+    put_cleared_volume_row(&store, &account, "EUR", 700);
+
+    Ledger::new(store).expect("a colon in a currency is not an unreadable principal");
+}
+
 // ── ledger:frozen: ──────────────────────────────────────────────────────────
 
 #[test]

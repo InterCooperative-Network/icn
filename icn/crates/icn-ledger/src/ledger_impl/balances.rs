@@ -349,14 +349,37 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     // with no cleared volume.
     let mut rows = Vec::with_capacity(pairs.len());
     for (key, value) in &pairs {
-        // Key format: "ledger:cleared_volume:{did}:{currency}". The DID itself
-        // contains colons, so the *last* colon is the currency separator.
+        // Key format: "ledger:cleared_volume:{did}:{currency}", where the DID
+        // itself contains colons.
+        //
+        // The separator is found from the DID side, not with `rfind`. A
+        // currency is not validated against a charset anywhere in this crate,
+        // so one containing a colon is persistable — and `rfind` would then
+        // fold part of the currency into the DID, leaving a key that decodes to
+        // no principal. That would let a node write an entry successfully and
+        // refuse to start ever after.
+        //
+        // A `did:icn:` spelling is the scheme followed by multibase, and no
+        // multibase alphabet contains a colon, so the spelling ends at the
+        // first colon *after* the scheme. That parse is exact whatever the
+        // currency holds, and it is byte-identical to the old one for every
+        // colon-free currency, so it re-reads existing rows unchanged.
         let key_str = String::from_utf8_lossy(key);
         let rest = key_str
             .strip_prefix(CLEARED_VOLUME_PREFIX)
             .unwrap_or(&key_str);
-        let (did_str, currency) = match rest.rfind(':') {
-            Some(last_colon) => (&rest[..last_colon], &rest[last_colon + 1..]),
+        const DID_SCHEME: &str = "did:icn:";
+        let (did_str, currency) = match rest
+            .strip_prefix(DID_SCHEME)
+            .and_then(|after_scheme| after_scheme.find(':'))
+        {
+            Some(offset) => {
+                let split = DID_SCHEME.len() + offset;
+                (&rest[..split], &rest[split + 1..])
+            }
+            // No scheme, or a spelling with no currency after it: hand the whole
+            // remainder to the guard, which reports it as naming no principal
+            // rather than this function deciding the row does not exist.
             None => (rest, ""),
         };
         rows.push((did_str.to_string(), currency.to_string(), value));
