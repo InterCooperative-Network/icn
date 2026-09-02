@@ -50,6 +50,22 @@ pub enum FederationError {
     #[error("Attestation rate limit exceeded")]
     AttestationRateLimitExceeded,
 
+    #[error("Unreadable persisted row in federation/attestations: {reason}")]
+    AttestationStoreUnreadable { reason: String },
+
+    #[error(
+        "Persisted federation/attestations key disagrees with its value for source {source_coop_id}"
+    )]
+    AttestationStoreKeyValueMismatch { source_coop_id: String },
+
+    #[error(
+        "Ambiguous federation/attestations rows for one principal from source {source_coop_id}: {row_count} rows"
+    )]
+    AttestationStorePrincipalCollision {
+        source_coop_id: String,
+        row_count: usize,
+    },
+
     // Clearing errors
     #[error("Clearing agreement not found: {0}")]
     ClearingAgreementNotFound(String),
