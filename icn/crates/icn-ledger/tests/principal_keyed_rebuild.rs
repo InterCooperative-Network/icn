@@ -336,6 +336,59 @@ fn a_lapsed_alias_freeze_does_not_block_a_start() {
     assert!(ledger.is_member_frozen(&member));
 }
 
+#[test]
+fn a_freeze_row_whose_key_and_body_disagree_refuses() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let member = a_principal();
+    let alias = alternate_spelling(&member);
+
+    // ONE row, stored under the alias spelling, whose body names the other
+    // spelling. Isolated deliberately: two keys would be an alias collision and
+    // would refuse for that reason instead, hiding whether the key/body check
+    // works at all. A guard reading only the body sees a single well-formed
+    // record here and adopts it — after which every write and delete addresses
+    // `ledger:frozen:<member>`, a key that does not exist, and the real row at
+    // `<alias>` survives every unfreeze.
+    let masquerading = FrozenMember::new(member.clone(), "legal hold".to_string(), None);
+    let key = format!("{FREEZE_PREFIX}{alias}");
+    store
+        .put(key.as_bytes(), &serde_json::to_vec(&masquerading).unwrap())
+        .unwrap();
+
+    assert!(
+        matches!(
+            refusal_of(Ledger::new(store)),
+            PrincipalRowsRefusal::KeyValueSpellingMismatch { .. }
+        ),
+        "a freeze row whose key names a different spelling than its body must refuse"
+    );
+}
+
+#[test]
+fn two_freeze_keys_are_refused_even_when_both_bodies_agree() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let member = a_principal();
+    let alias = alternate_spelling(&member);
+
+    // The same masquerade, reached from the other direction: the keyspace holds
+    // two spellings of one principal, which is a collision whatever the bodies
+    // say. Grouping by the stored key is what makes this visible.
+    for spelling in [&member, &alias] {
+        let record = FrozenMember::new(member.clone(), "legal hold".to_string(), None);
+        let key = format!("{FREEZE_PREFIX}{spelling}");
+        store
+            .put(key.as_bytes(), &serde_json::to_vec(&record).unwrap())
+            .unwrap();
+    }
+
+    assert!(
+        Ledger::new(store).is_err(),
+        "two spelling-keyed freeze rows for one principal must not load"
+    );
+}
+
 // ── write-back keeps the row identity it loaded ─────────────────────────────
 
 #[test]

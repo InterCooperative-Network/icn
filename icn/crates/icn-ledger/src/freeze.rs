@@ -33,7 +33,9 @@
 //! assert!(!freeze_manager.is_frozen(&did));
 //! ```
 
-use crate::principal_rows::{refuse_unless_one_spelling_per_principal, FROZEN_KEYSPACE};
+use crate::principal_rows::{
+    refuse_unless_one_spelling_per_principal, PrincipalRowsRefusal, FROZEN_KEYSPACE,
+};
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
@@ -233,16 +235,19 @@ impl FreezeManager {
     pub fn unfreeze(&mut self, did: &Did, reason: String) -> Option<FrozenMember> {
         let removed = self.forget_frozen(did);
 
-        if let Some(ref _record) = removed {
+        if let Some(ref record) = removed {
             info!(
-                did = %did,
+                did = %record.did,
                 reason = %reason,
                 "Unfreezing member"
             );
 
-            // Record unfreeze event
+            // The audit trail names the spelling that was actually stored and
+            // deleted, not the one the caller happened to type. Under I7 those
+            // can differ, and a history entry naming a DID string that was
+            // never a persisted key cannot be reconciled with the store.
             let event = UnfreezeEvent {
-                did: did.clone(),
+                did: record.did.clone(),
                 reason,
                 unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id: None,
@@ -264,16 +269,17 @@ impl FreezeManager {
     ) -> Option<FrozenMember> {
         let removed = self.forget_frozen(did);
 
-        if let Some(ref _record) = removed {
+        if let Some(ref record) = removed {
             info!(
-                did = %did,
+                did = %record.did,
                 reason = %reason,
                 proposal = ?proposal_id,
                 "Unfreezing member with metadata"
             );
 
+            // Same rule as `unfreeze`: the stored spelling is the audit fact.
             let event = UnfreezeEvent {
-                did: did.clone(),
+                did: record.did.clone(),
                 reason,
                 unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id,
@@ -366,11 +372,24 @@ impl FreezeManager {
             // dropped first because an expired freeze is not state: two rows
             // for one principal are only ambiguous when both still bind, and
             // refusing on a lapsed alias row would block a start for nothing.
+            //
+            // The stored **key** is what the guard groups by, not the spelling
+            // inside the record. The key is the row's identity — it is what a
+            // later `persist_frozen` or `remove_frozen` addresses — so a guard
+            // reading only the body would see two keyed rows whose bodies reuse
+            // one spelling, find no collision, and adopt them under a single
+            // map entry. The loser would then survive every unfreeze and
+            // re-freeze the member on the next start.
             let mut live = Vec::with_capacity(pairs.len());
-            for (_, value) in &pairs {
+            for (key, value) in &pairs {
+                let key_str = String::from_utf8_lossy(key);
+                let spelling = key_str
+                    .strip_prefix(FREEZE_PREFIX)
+                    .unwrap_or(&key_str)
+                    .to_string();
                 let record: FrozenMember = serde_json::from_slice(value)?;
                 if !record.is_expired() {
-                    live.push(record);
+                    live.push((spelling, record));
                 }
             }
 
@@ -380,10 +399,24 @@ impl FreezeManager {
             // in the migration gate is asserted, not authorized. Refuse.
             refuse_unless_one_spelling_per_principal(
                 FROZEN_KEYSPACE,
-                live.iter().map(|r| (r.did.as_str(), "")),
+                live.iter().map(|(spelling, _)| (spelling.as_str(), "")),
             )?;
 
-            for record in live {
+            // A record whose body spells the member differently from its own
+            // key cannot be addressed by the key the map would derive from it.
+            let strayed = live
+                .iter()
+                .filter(|(spelling, record)| record.did.as_str() != spelling)
+                .count();
+            if strayed > 0 {
+                return Err(PrincipalRowsRefusal::KeyValueSpellingMismatch {
+                    keyspace: FROZEN_KEYSPACE,
+                    rows: strayed,
+                }
+                .into());
+            }
+
+            for (_spelling, record) in live {
                 self.frozen.insert(record.did.clone(), record);
             }
         }
