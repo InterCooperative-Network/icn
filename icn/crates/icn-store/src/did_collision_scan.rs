@@ -46,6 +46,7 @@
 //! sort after every ASCII one, so the survivor is attacker-selectable. The
 //! ordinals are preserved so a reader can see which row would win.
 
+use anyhow::Context as _;
 use std::collections::BTreeMap;
 
 /// The identity of a principal-canonical shape.
@@ -692,7 +693,7 @@ impl DeferredCollisionPosture {
     pub fn label(self) -> &'static str {
         match self {
             DeferredCollisionPosture::ReportOnly => "report-only",
-            DeferredCollisionPosture::BlockStartup => "BLOCK-STARTUP",
+            DeferredCollisionPosture::BlockStartup => "block-startup",
         }
     }
 }
@@ -1109,45 +1110,84 @@ pub fn audit_sled_store(store: &crate::SledStore) -> anyhow::Result<SledStoreAud
 /// — a database's own `blobs/` directory is not another database — and the
 /// walk is bounded in depth so a stray symlink cycle cannot make it endless.
 ///
+/// **The sweep is all-or-nothing.** An unreadable directory, an unreadable
+/// entry, a symlink, or the depth bound each return an error rather than a
+/// shorter list. A caller cannot tell a partial list from a complete one, and
+/// the startup gate treats the list as the full set of databases: a directory
+/// that is searchable but not readable would otherwise let an omitted database
+/// pass as absent and earn a CLEAR receipt, which is precisely the lossy merge
+/// the gate exists to prevent.
+///
 /// This is how a caller finds the databases a deployment actually keeps, rather
 /// than the ones it expected: a deployment holds one database per domain under
 /// its store directory plus several at the data-directory level, and any store
 /// added after this list was written is found the same way. Enumerating by
 /// `conf` also means a directory that is *not* a database is never opened,
 /// because `sled::open` on such a directory creates one.
-pub fn find_sled_roots(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+pub fn find_sled_roots(dir: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
     const MAX_DEPTH: usize = 4;
 
-    fn walk(dir: &std::path::Path, depth: usize, out: &mut Vec<std::path::PathBuf>) {
+    fn walk(
+        dir: &std::path::Path,
+        depth: usize,
+        out: &mut Vec<std::path::PathBuf>,
+    ) -> anyhow::Result<()> {
         if depth > MAX_DEPTH {
-            return;
+            // Silently stopping here would report the databases found so far as
+            // if they were all of them.
+            anyhow::bail!(
+                "sled discovery hit its depth bound of {MAX_DEPTH} at {}; the sweep is \
+                 incomplete and its result cannot be treated as the full set",
+                dir.display()
+            );
         }
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.flatten() {
+
+        let entries = std::fs::read_dir(dir)
+            .with_context(|| format!("cannot enumerate {}", dir.display()))?;
+
+        for entry in entries {
+            let entry =
+                entry.with_context(|| format!("cannot read an entry of {}", dir.display()))?;
             let child = entry.path();
-            if !child.is_dir() {
+
+            // `file_type` does not follow symlinks, unlike `Path::is_dir`. A
+            // symlinked directory is refused rather than skipped or followed:
+            // following it lets the walk leave the intended subtree, and
+            // skipping it would omit a database the daemon can still open —
+            // which is the fail-open this whole function must not have.
+            let file_type = entry
+                .file_type()
+                .with_context(|| format!("cannot stat {}", child.display()))?;
+            if file_type.is_symlink() {
+                anyhow::bail!(
+                    "sled discovery found a symlink at {}; refusing to decide whether it \
+                     names a database inside or outside this data directory",
+                    child.display()
+                );
+            }
+            if !file_type.is_dir() {
                 continue;
             }
+
             if child.join("conf").is_file() {
                 out.push(child);
             } else {
-                walk(&child, depth + 1, out);
+                walk(&child, depth + 1, out)?;
             }
         }
+        Ok(())
     }
 
     let mut out = Vec::new();
     if dir.join("conf").is_file() {
         out.push(dir.to_path_buf());
     } else {
-        walk(dir, 0, &mut out);
+        walk(dir, 0, &mut out)?;
     }
     // Deterministic order: a receipt that lists stores must list them the same
     // way on every run, whatever order the filesystem returned them in.
     out.sort();
-    out
+    Ok(out)
 }
 
 /// The non-security-sensitive durable keyspaces N2-A must clear before `Did`
@@ -2187,6 +2227,63 @@ mod tests {
     }
 
     #[test]
+    fn sled_discovery_refuses_an_unreadable_directory_rather_than_shortening() {
+        // The failure this pins: a directory that is searchable but not
+        // readable. `read_dir` fails, and a walker that returned what it had so
+        // far would report the databases it did find as if they were all of
+        // them — so the startup gate would audit a subset, find it clean, and
+        // write a CLEAR receipt over a store it never opened.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let visible = data_dir.join("visible");
+        std::fs::create_dir_all(&visible).unwrap();
+        std::fs::write(visible.join("conf"), b"x").unwrap();
+
+        let hidden = data_dir.join("hidden");
+        std::fs::create_dir_all(hidden.join("db")).unwrap();
+        std::fs::write(hidden.join("db").join("conf"), b"x").unwrap();
+
+        // Searchable but not readable: `hidden/db` can still be opened by path,
+        // which is exactly why omitting it is unsafe rather than harmless.
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o111)).unwrap();
+
+        let result = find_sled_roots(data_dir);
+
+        // Restore before asserting, so a failure cannot leave an unreadable
+        // directory behind for the tempdir cleanup to trip over.
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = result.expect_err("an unreadable directory must refuse, not shorten the list");
+        assert!(
+            format!("{err:#}").contains("cannot enumerate"),
+            "the refusal must name the enumeration failure, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn sled_discovery_refuses_a_symlink_rather_than_following_or_skipping_it() {
+        // Following would let the sweep leave the data directory; skipping
+        // would omit a database the daemon can still open through the link.
+        // Neither is safe, so the sweep declines to decide.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let real = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join("conf"), b"x").unwrap();
+
+        std::os::unix::fs::symlink(&real, data_dir.join("linked")).unwrap();
+
+        let err = find_sled_roots(data_dir).expect_err("a symlink must refuse");
+        assert!(
+            format!("{err:#}").contains("symlink"),
+            "the refusal must name the symlink, got: {err:#}"
+        );
+    }
+
+    #[test]
     fn audit_sled_store_uses_the_canonical_registries_and_every_tree() {
         // The shared entry point both the offline tool and the startup gate
         // render: it must consult the real registries, and a principal row in
@@ -2237,7 +2334,7 @@ mod tests {
         std::fs::create_dir_all(data_dir.join("store/not-a-db")).unwrap();
         std::fs::write(data_dir.join("identity.age"), b"not a database").unwrap();
 
-        let roots = find_sled_roots(data_dir);
+        let roots = find_sled_roots(data_dir).expect("a readable fixture tree enumerates");
         let rel: Vec<String> = roots
             .iter()
             .map(|r| r.strip_prefix(data_dir).unwrap().display().to_string())

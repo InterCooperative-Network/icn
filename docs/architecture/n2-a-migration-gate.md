@@ -607,9 +607,22 @@ in `main`, then everything the supervisor opens. It is the fail-closed check §3
    (`commons.sled`, …). A directory that is not a database is never opened, because `sled::open`
    would create one. A database added after this document was written is found the same way —
    there is no list to fall out of date.
+
+   **The sweep is all-or-nothing.** An unreadable directory, an unreadable entry, a symlink, or
+   the depth bound each **refuse** rather than returning a shorter list. Review found the original
+   walk swallowed all four: a directory that is searchable but not readable — the daemon can still
+   open `…/store/ledger` by path while being unable to enumerate `…/store` — made an existing
+   database look absent, and the gate would then have written a CLEAR receipt over a store it never
+   audited. A caller cannot distinguish a partial list from a complete one, so the function must
+   not produce one. A symlink is refused rather than followed or skipped: following lets the sweep
+   leave the intended subtree, and skipping omits a database the daemon can still reach through it.
 3. Opens each database, runs `audit_sled_store` — the **same** computation `did-collision-scan`
    renders — and closes it so the daemon's own open can take the lock.
-4. Writes the receipt atomically (sibling temporary, `fsync`, rename), whatever the verdict.
+4. Writes the receipt atomically (sibling temporary, `fsync`, rename) **once a verdict exists** —
+   for `clear` and for `refused`. The refusals that occur before any store is audited (an
+   unreadable or newer-generation receipt, a missing data directory, an incomplete sweep, an
+   unverifiable store) return without recording anything: there is no verdict yet to record, and
+   overwriting a prior receipt would destroy the last one that meant something.
 5. Returns the receipt on `clear`; otherwise a `GateRefusal` that `icnd` turns into a non-zero
    exit with the payload-free summary in §10.4.
 

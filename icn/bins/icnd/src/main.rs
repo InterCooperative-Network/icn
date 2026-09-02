@@ -731,7 +731,10 @@ async fn main() -> Result<()> {
         })
         .await
         .context("N2-A startup gate task failed")?
-        .map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
+        // `anyhow::Error::new` keeps `GateRefusal` recoverable by `downcast_ref`
+        // and preserves its source chain; formatting it into a string discarded
+        // both, leaving an operator with prose where a typed refusal had been.
+        .map_err(anyhow::Error::new)?;
         tracing::info!(
             generation = receipt.generation,
             stores = receipt.stores.len(),

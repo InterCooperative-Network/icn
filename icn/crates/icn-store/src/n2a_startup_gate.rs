@@ -25,7 +25,13 @@
 //! 3. opens each in turn, audits it through the one shared
 //!    [`audit_sled_store`] computation, and closes it so the daemon can open it
 //!    for real;
-//! 4. writes a payload-free receipt atomically, whatever the verdict;
+//! 4. writes a payload-free receipt atomically once a verdict exists — that is,
+//!    for `clear` and for `refused`, but **not** for the refusals that occur
+//!    before any store is audited (an unreadable or newer-generation receipt, a
+//!    missing data directory, an incomplete discovery sweep, an unverifiable
+//!    store). Those return without recording anything, because there is no
+//!    verdict yet to record and overwriting a prior receipt would destroy the
+//!    last one that meant something;
 //! 5. returns the receipt on `clear`, and a [`GateRefusal`] otherwise.
 //!
 //! # What it deliberately does not do
@@ -295,6 +301,18 @@ pub enum GateRefusal {
     #[error("N2-A startup gate: data directory {0} is not a directory")]
     DataDirMissing(PathBuf),
 
+    /// The sweep for sled databases could not be completed, so the set of
+    /// stores to audit is unknown. Refusing is the only safe reading: an
+    /// omitted database is indistinguishable from a clean one, and a CLEAR
+    /// receipt written over a partial sweep would authorize exactly the lossy
+    /// merge this gate exists to prevent.
+    #[error(
+        "N2-A startup gate: could not enumerate the sled databases beneath {data_dir} \
+         ({reason}). Refusing to start rather than audit an unknown subset of the stores \
+         this daemon will open."
+    )]
+    DiscoveryIncomplete { data_dir: PathBuf, reason: String },
+
     /// A receipt is present but cannot be read as one. Refusing is the only
     /// safe reading: a receipt this binary cannot parse may be one a newer
     /// generation wrote, and guessing would defeat the generation boundary.
@@ -385,8 +403,16 @@ pub fn enforce(data_dir: &Path, now: SystemTime) -> Result<GateReceipt, GateRefu
     let receipt_path = receipt_path(data_dir);
     check_prior_receipt(&receipt_path)?;
 
+    // Discovery is fail-closed: a partial sweep must not be mistaken for a
+    // complete one, because every store below is audited and a store that was
+    // never found is indistinguishable from a store that was clean.
+    let roots = find_sled_roots(data_dir).map_err(|e| GateRefusal::DiscoveryIncomplete {
+        data_dir: data_dir.to_path_buf(),
+        reason: format!("{e:#}"),
+    })?;
+
     let mut stores = Vec::new();
-    for root in find_sled_roots(data_dir) {
+    for root in roots {
         let audit = audit_one(&root)?;
         stores.push(store_receipt(&root, &audit));
     }

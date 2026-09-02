@@ -153,7 +153,7 @@ fn ensure_sled_root(path: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let nested = find_sled_roots(path);
+    let nested = find_sled_roots(path)?;
 
     if nested.is_empty() {
         anyhow::bail!(
