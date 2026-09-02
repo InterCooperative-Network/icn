@@ -48,29 +48,19 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use icn_store::did_collision_scan::{
-    audit_store, n2a_deferred_namespaces, n2a_keyspaces, CoverageAudit,
+    audit_sled_store, find_sled_roots, CoverageAudit, SledStoreAudit,
 };
-use icn_store::{SledStore, Store};
+use icn_store::SledStore;
 
 /// One store's audit plus the per-tree coverage facts that produced it.
 ///
-/// The verdict is **not** recomputed here. `CoverageAudit::is_clear` is the
-/// gate, and this binary renders it — a runner that decided separately what its
-/// own report meant is how an exit status comes to disagree with the text above
-/// it.
-struct ScanOutcome {
-    audit: CoverageAudit,
-    /// Row count per sled tree, including the default tree.
-    trees: Vec<(String, usize)>,
-    /// Rows per tree whose key embeds a `did:icn:` spelling.
-    did_rows: Vec<(String, usize)>,
-}
-
-impl ScanOutcome {
-    fn is_clear(&self) -> bool {
-        self.audit.is_clear()
-    }
-}
+/// The verdict is **not** recomputed here. `SledStoreAudit::is_clear` is the
+/// gate — the same computation the in-process startup gate enforces — and this
+/// binary renders it. A runner that decided separately what its own report
+/// meant is how an exit status comes to disagree with the text above it, and
+/// how an offline scan comes to disagree with the binary it was meant to
+/// predict.
+type ScanOutcome = SledStoreAudit;
 
 fn main() -> ExitCode {
     match run() {
@@ -105,7 +95,6 @@ fn run() -> Result<bool> {
         anyhow::bail!("usage: did-collision-scan <store-path> [<store-path> ...] [--json]");
     }
 
-    let descriptors = n2a_keyspaces();
     let mut all_clear = true;
     let mut documents = Vec::with_capacity(paths.len());
 
@@ -115,8 +104,7 @@ fn run() -> Result<bool> {
         }
         ensure_sled_root(path)?;
 
-        let outcome = scan_copy_of(path, &descriptors)
-            .with_context(|| format!("scanning {}", path.display()))?;
+        let outcome = scan_copy_of(path).with_context(|| format!("scanning {}", path.display()))?;
 
         all_clear &= outcome.is_clear();
 
@@ -165,8 +153,7 @@ fn ensure_sled_root(path: &Path) -> Result<()> {
         return Ok(());
     }
 
-    let mut nested = Vec::new();
-    find_sled_roots(path, 0, &mut nested);
+    let nested = find_sled_roots(path);
 
     if nested.is_empty() {
         anyhow::bail!(
@@ -190,34 +177,9 @@ fn ensure_sled_root(path: &Path) -> Result<()> {
     );
 }
 
-/// Collect sled database roots beneath `dir`, bounded in depth.
-fn find_sled_roots(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
-    const MAX_DEPTH: usize = 4;
-    if depth > MAX_DEPTH {
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let child = entry.path();
-        if !child.is_dir() {
-            continue;
-        }
-        if child.join("conf").is_file() {
-            out.push(child);
-        } else {
-            find_sled_roots(&child, depth + 1, out);
-        }
-    }
-}
-
 /// Copy the store to scratch, scan the copy, remove it. The source is never
 /// opened.
-fn scan_copy_of(
-    source: &Path,
-    descriptors: &[icn_store::did_collision_scan::KeyspaceDescriptor],
-) -> Result<ScanOutcome> {
+fn scan_copy_of(source: &Path) -> Result<ScanOutcome> {
     let scratch = tempdir()?;
     let working = scratch.join("store");
 
@@ -231,25 +193,9 @@ fn scan_copy_of(
 
         let store = SledStore::open(&working)
             .with_context(|| format!("opening copy of {}", source.display()))?;
-        // `Store::scan` reads only sled's default tree. Read every tree so a
-        // zero result cannot be a named tree the scan never looked in — and so
-        // an unreadable row becomes an error rather than an absence.
-        let trees = store.tree_row_counts()?;
-        let did_rows = store.did_bearing_rows_per_tree()?;
-        let unreachable: usize = did_rows
-            .iter()
-            .filter(|(name, _)| name != "__sled__default")
-            .map(|(_, n)| *n)
-            .sum();
-
-        let deferrals = n2a_deferred_namespaces();
-        let audit = audit_store(&store as &dyn Store, descriptors, &deferrals, unreachable)?;
-
-        Ok(ScanOutcome {
-            audit,
-            trees,
-            did_rows,
-        })
+        // One computation, shared with the startup gate: registries, every
+        // tree, and the unreachable-row accounting all live in the library.
+        audit_sled_store(&store)
     })();
 
     // Best-effort cleanup; a failure to remove scratch must not mask a result.
@@ -338,6 +284,7 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
         report,
         overview,
         deferred,
+        deferred_reports,
         uncovered,
         unreachable_did_rows,
     } = audit;
@@ -423,9 +370,38 @@ fn print_human(path: &Path, outcome: &ScanOutcome) {
             .map(|(name, n)| format!("{name}={n}"))
             .collect();
         println!(
-            "  deferred: {} (behind a named gate; not scanned, not cleared)",
+            "  deferred: {} (behind a named gate; not dispositioned, not cleared)",
             listed.join(" ")
         );
+    }
+    for d in deferred_reports {
+        if d.report.collision_groups.is_empty() && d.report.rows_unreadable == 0 {
+            continue;
+        }
+        println!(
+            "    {}: {} collision group(s), {} row(s) in collisions, {} unreadable; posture {}{}",
+            d.name,
+            d.report.collision_groups.len(),
+            d.report.rows_in_collisions(),
+            d.report.rows_unreadable,
+            d.posture.label(),
+            if d.blocks() {
+                "  <-- BLOCKS STARTUP"
+            } else {
+                "  (reported for its gate; does not block)"
+            }
+        );
+        for group in &d.report.collision_groups {
+            println!(
+                "      principal {} : {} rows; survivor at scan ordinal {}",
+                group.principal_fingerprints.join("+"),
+                group.rows.len(),
+                group
+                    .last_writer_survivor()
+                    .map(|r| r.scan_ordinal.to_string())
+                    .unwrap_or_else(|| "-".into()),
+            );
+        }
     }
     if !uncovered.is_empty() {
         println!(
@@ -490,9 +466,19 @@ fn json_document(path: &Path, outcome: &ScanOutcome) -> serde_json::Value {
 
     let deferred: Vec<serde_json::Value> = outcome
         .audit
-        .deferred
+        .deferred_reports
         .iter()
-        .map(|(name, n)| serde_json::json!({ "namespace": name, "did_bearing_rows": n }))
+        .map(|d| {
+            serde_json::json!({
+                "namespace": d.name,
+                "did_bearing_rows": d.did_bearing_rows(),
+                "posture": d.posture.label(),
+                "collision_groups": d.report.collision_groups.len(),
+                "rows_in_collisions": d.report.rows_in_collisions(),
+                "rows_unreadable": d.report.rows_unreadable,
+                "blocks": d.blocks(),
+            })
+        })
         .collect();
 
     // Masked shapes only: `did:icn:…` is already `<did>` and non-printables are

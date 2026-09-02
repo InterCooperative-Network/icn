@@ -11,6 +11,9 @@ pub mod blob_store;
 pub mod did_collision_scan;
 /// Storage maintenance tasks
 pub mod maintenance;
+/// N2-A startup gate: refuse to open stores a key-equality binary cannot open
+/// safely (#2627)
+pub mod n2a_startup_gate;
 /// Peer cache for persisting discovered peers
 pub mod peer_cache;
 /// Proof-of-storage challenge system
