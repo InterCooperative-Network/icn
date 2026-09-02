@@ -174,6 +174,130 @@ def main() -> int:
         check("verify names the tampered file",
               "handoff.md" in (result.stdout + result.stderr))
 
+        # --- review findings from PR #2702, pinned so they cannot return -----
+        print("credentials and machine-local paths stay out of the manifest")
+        check("no absolute source path is recorded for an artefact",
+              all("source_path" not in a for a in m2["artifacts"]))
+
+        # The portable artifact must carry repository IDENTITY, never the remote
+        # string. Each shape below is exported and then the whole checkpoint
+        # tree is searched, byte-wise, for the sentinel secret.
+        SENTINEL = "s3cr3t-sentinel-not-a-real-token-9eec9e"
+        shapes = [
+            ("plain https", f"https://github.com/org/repo.git",
+             {"form": "url", "host": "github.com", "owner": "org", "name": "repo"}),
+            ("https with token userinfo",
+             f"https://x-access-token:{SENTINEL}@github.com/org/repo.git",
+             {"form": "url", "host": "github.com", "owner": "org", "name": "repo"}),
+            ("https with user:password",
+             f"https://alice:{SENTINEL}@example.com/team/sub/repo.git",
+             {"form": "url", "host": "example.com", "owner": "team/sub", "name": "repo"}),
+            ("ssh:// url", "ssh://git@github.com:22/org/repo.git",
+             {"form": "url", "host": "github.com", "owner": "org", "name": "repo"}),
+            ("scp-like", "git@github.com:org/repo.git",
+             {"form": "scp", "host": "github.com", "owner": "org", "name": "repo"}),
+            ("query and fragment",
+             f"https://github.com/org/repo.git?access_token={SENTINEL}#frag",
+             {"form": "url", "host": "github.com", "owner": "org", "name": "repo"}),
+            ("local path", "/srv/git/repo.git",
+             {"form": "path", "host": None, "owner": None, "name": "repo"}),
+            ("malformed", "not a url at all",
+             {"form": "unknown", "host": None, "owner": None, "name": None}),
+        ]
+
+        for label, remote_url, expected in shapes:
+            git(repo, "remote", "add", "origin", remote_url)
+            out_r = tmp / f"ckpt-remote-{abs(hash(label))}"
+            run = create(out_r, repo)
+            git(repo, "remote", "remove", "origin")
+
+            check(f"[{label}] create succeeds", run.returncode == 0)
+            if run.returncode != 0:
+                continue
+            mr = json.loads((out_r / "manifest.json").read_text(encoding="utf-8"))
+            origin = mr["observed"]["repository"]["origin"]
+            check(f"[{label}] identity parsed as expected",
+                  all(origin.get(k) == v for k, v in expected.items()))
+            check(f"[{label}] no raw remote URL field is emitted",
+                  "remote_origin" not in mr["observed"]["repository"])
+
+            # The real assertion: the sentinel appears NOWHERE in the artifact.
+            polluted = [
+                str(f.relative_to(out_r))
+                for f in out_r.rglob("*") if f.is_file()
+                and SENTINEL.encode() in f.read_bytes()
+            ]
+            check(f"[{label}] sentinel absent from the whole checkpoint tree",
+                  polluted == [])
+
+        # And the tripwire behind the allowlist must actually fire.
+        print("the credential tripwire fires")
+        import subprocess as _sp
+        probe = _sp.run(
+            [sys.executable, "-c",
+             "import importlib.util,sys;"
+             f"spec=importlib.util.spec_from_loader('t',importlib.machinery.SourceFileLoader('t',{str(TOOL)!r}));"
+             "m=importlib.util.module_from_spec(spec);"
+             "import importlib.machinery;"
+             "spec.loader.exec_module(m);"
+             "m.assert_no_credentials({'x':'https://u:p@h/'})"],
+            capture_output=True, text=True)
+        check("assert_no_credentials rejects a userinfo URL", probe.returncode != 0)
+        check("the tripwire does not print the offending value",
+              "u:p@h" not in (probe.stdout + probe.stderr))
+
+        print("artefacts cannot collide")
+        # Two artefacts sharing a basename must not overwrite one another.
+        collide_dir = tmp / "collide"
+        collide_dir.mkdir()
+        same_a = collide_dir / "a"
+        same_a.mkdir()
+        same_b = collide_dir / "b"
+        same_b.mkdir()
+        (same_a / "notes.md").write_text("handoff text\n", encoding="utf-8")
+        (same_b / "notes.md").write_text("transcript text\n", encoding="utf-8")
+        out_col = tmp / "ckpt-collide"
+        run = create(out_col, repo,
+                     "--handoff", str(same_a / "notes.md"),
+                     "--transcript", str(same_b / "notes.md"))
+        check("create succeeds with two same-named artefacts", run.returncode == 0)
+        mcol = json.loads((out_col / "manifest.json").read_text(encoding="utf-8"))
+        paths = {a["path"] for a in mcol["artifacts"]}
+        check("the two artefacts get distinct paths", len(paths) == 2)
+        bodies = {(out_col / p).read_text(encoding="utf-8") for p in paths}
+        check("neither artefact overwrote the other",
+              bodies == {"handoff text\n", "transcript text\n"})
+        check("verify passes on the collided-basename checkpoint",
+              verify(out_col).returncode == 0)
+
+        print("verify survives a malformed manifest")
+        for label, artifacts in (
+            ("artifact record is not a dict", ["just a string"]),
+            ("artifact record has no path", [{"sha256": "0" * 64}]),
+            ("artifact record has no sha256",
+             [{"path": "artifacts/handoff/notes.md"}]),
+            ("artifacts is not a list", {"nope": True}),
+            ("path escapes the checkpoint",
+             [{"path": "../../etc/passwd", "sha256": "0" * 64}]),
+            ("path is absolute",
+             [{"path": "/etc/passwd", "sha256": "0" * 64}]),
+            ("path is outside artifacts/",
+             [{"path": "manifest.json", "sha256": "0" * 64}]),
+        ):
+            out_bad = tmp / f"ckpt-bad-{abs(hash(label))}"
+            out_bad.mkdir()
+            # A real file at the referenced path, so a record missing `sha256`
+            # reaches the hash comparison instead of stopping at "MISSING".
+            real = out_bad / "artifacts" / "handoff"
+            real.mkdir(parents=True)
+            (real / "notes.md").write_text("x\n", encoding="utf-8")
+            bad = dict(m)
+            bad["artifacts"] = artifacts
+            (out_bad / "manifest.json").write_text(json.dumps(bad), encoding="utf-8")
+            result = verify(out_bad)
+            check(f"verify fails cleanly when {label}",
+                  result.returncode != 0 and "Traceback" not in result.stderr)
+
         # --- an unknown schema is refused, not half-understood ---------------
         print("schema discipline")
         out3 = tmp / "ckpt-future"

@@ -618,6 +618,29 @@ Three properties are deliberate:
 `verify` re-hashes every artifact and **fails** on a mismatch or an unknown schema, so a
 checkpoint stays checkable after being copied off this machine.
 
+### 10.3.1 Disclosure boundary — a checkpoint is exportable data
+
+A checkpoint is built to cross a trust boundary: Claude to Codex, this machine to another, one
+harness to the next. It is therefore **exportable data, not a dump of trusted local process
+state**, and its disclosure rules are stricter than ordinary local diagnostic tooling.
+
+The boundary is an **allowlist**, not redaction. Every field in `observed` is named individually;
+nothing serialises an environment, an argv, or a remote URL wholesale and cleans it afterwards.
+Concretely, the Git remote is *parsed* into `{remote, form, host, owner, name}` and the URL string
+itself is never written, so a remote carrying `https://x-access-token:<token>@…` — or a token in a
+query string, or a fragment — has no field to leak through. A parser emitting five known fields
+cannot disclose a shape it never anticipated; a redactor must anticipate every one.
+
+`assert_no_credentials` re-scans the finished manifest for credential-shaped text and aborts the
+export rather than writing it. That is **defence in depth behind the allowlist, not the boundary
+itself**, and it deliberately does not print what it matched.
+
+One surface stays outside this guarantee and must be understood as such: an attached provider
+transcript is **opaque vendor evidence**, copied verbatim and never parsed. Whatever a session
+printed is in it. It is optional for exactly this reason — a checkpoint is complete without one —
+and attaching a transcript to a checkpoint that will leave a trust boundary is a decision the
+operator makes per export, not a default.
+
 **Integrity, not attestation.** SHA-256 content hashes only. ICN has signing primitives, and
 reaching for them here would produce a weak ceremony rather than a real guarantee — the signer
 would be an agent process with no standing to attest anything. Stronger attestation is a later

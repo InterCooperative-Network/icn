@@ -50,13 +50,20 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 SCHEMA = "icn-session-checkpoint/v1"
+# One explicit string: adjacent literals inside an argv list read exactly like a
+# missing comma, which is how an argument list silently loses an element.
+PR_JSON_FIELDS = (
+    "number,title,state,url,headRefOid,isDraft,mergeable,"
+    + "mergeStateStatus,reviewDecision"
+)
 MANIFEST_NAME = "manifest.json"
 ARTIFACT_DIR = "artifacts"
 
@@ -104,6 +111,102 @@ def sha256_of(path: Path) -> str:
 # ── observed state ──────────────────────────────────────────────────────────
 
 
+def repository_identity(url: str | None, remote: str = "origin") -> dict:
+    """Parse a Git remote into the identity fields, and nothing else.
+
+    # Why this parses instead of redacting
+
+    A checkpoint is meant to be copied between machines and handed to another
+    agent harness, so it is exportable data rather than a dump of trusted local
+    process state. The safe construction is therefore an **allowlist**: name the
+    fields a downstream reader actually needs — which host, whose namespace,
+    which repository — and never serialise the remote string itself.
+
+    Redaction is the weaker model, because it must anticipate every shape a
+    secret can take. A remote can carry a credential in userinfo
+    (`https://x-access-token:<token>@host/...`), and a URL can also carry a
+    query string or fragment. A parser that emits four known fields cannot leak
+    any of them, whether or not this function anticipated the shape. Redaction
+    remains defence in depth (`assert_no_credentials`), not the boundary.
+
+    Unrecognised input yields `form: "unknown"` with empty fields — declining to
+    describe a remote is always safe, whereas guessing at one is not.
+    """
+    identity = {"remote": remote, "form": "unknown", "host": None, "owner": None, "name": None}
+    if not url:
+        return identity
+
+    def strip_repo(name: str) -> str:
+        return name[:-4] if name.endswith(".git") else name
+
+    def split_owner_repo(path: str, identity: dict) -> None:
+        # Query and fragment are never identity, and either can carry a token.
+        path = path.split("?", 1)[0].split("#", 1)[0].strip("/")
+        parts = [p for p in path.split("/") if p]
+        if parts:
+            identity["name"] = strip_repo(parts[-1])
+        if len(parts) > 1:
+            identity["owner"] = "/".join(parts[:-1])
+
+    scheme, sep, rest = url.partition("://")
+    if sep:
+        # scheme://[userinfo@]host[:port]/owner/repo — userinfo is dropped by
+        # taking only what follows the last '@' in the authority.
+        authority, _, path = rest.partition("/")
+        host = authority.rpartition("@")[2]
+        identity["form"] = "url"
+        identity["host"] = host.split(":", 1)[0] or None
+        split_owner_repo(path, identity)
+        return identity
+
+    # scp-style `[user@]host:owner/repo.git`. Distinguished from a local path by
+    # a colon that is not part of a drive letter or an absolute path.
+    if ":" in url and not url.startswith((".", "/", "~")):
+        authority, _, path = url.partition(":")
+        identity["form"] = "scp"
+        identity["host"] = authority.rpartition("@")[2] or None
+        split_owner_repo(path, identity)
+        return identity
+
+    if url.startswith((".", "/", "~")) or "/" in url:
+        identity["form"] = "path"
+        split_owner_repo(url, identity)
+        identity["owner"] = None  # a filesystem path names no namespace
+        return identity
+
+    return identity
+
+
+# Shapes that must never appear in a checkpoint, checked as defence in depth
+# after the allowlist above has already decided what gets written.
+_CREDENTIAL_SHAPES = (
+    re.compile(r"https?://[^/\s:@]+:[^/\s@]+@"),
+    re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"[Aa]uthorization:\s*Bearer\s+\S{12,}"),
+)
+
+
+def assert_no_credentials(manifest: dict) -> None:
+    """Refuse to write a manifest carrying credential-shaped text.
+
+    The allowlist in `repository_identity` and `observe` is the security
+    boundary; this is the tripwire behind it. If a future field ever starts
+    carrying something secret-shaped, the export fails loudly here rather than
+    producing a portable artifact nobody thought to re-inspect.
+    """
+    serialized = json.dumps(manifest)
+    for shape in _CREDENTIAL_SHAPES:
+        if shape.search(serialized):
+            sys.exit(
+                "icn-session-checkpoint: refusing to write a manifest containing "
+                "credential-shaped text. This is a bug in what the exporter "
+                "collects; the value is deliberately not printed."
+            )
+
+
 def resolve_root(start: Path) -> Path:
     root = run(["git", "rev-parse", "--show-toplevel"], cwd=start)
     if not root:
@@ -117,16 +220,46 @@ def observe(root: Path) -> dict:
     head = git(root, "rev-parse", "HEAD")
     upstream = git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 
-    # The comparison base is the merge-base with the upstream default, because
-    # "how far ahead" is only meaningful against a named base.
-    base_ref = "origin/main"
-    merge_base = git(root, "merge-base", "HEAD", base_ref)
+    # The comparison base is the remote's own default branch, because "how far
+    # ahead" is only meaningful against a named base — and a repository whose
+    # default is not `main` would otherwise be measured against a ref that does
+    # not exist. `origin/HEAD` is absent in plenty of clones, so it falls back.
+    # The base is the remote's DEFAULT branch, not the branch's own upstream.
+    # A feature branch's upstream is its own pushed copy, against which
+    # ahead/behind is 0/0 by construction — true, and useless to a reader asking
+    # how far this work sits from the integration target. The upstream ref is
+    # recorded separately above for anyone who wants it.
+    #
+    # When nothing names a default — a fresh repository, a clone with no
+    # origin/HEAD — the base and every field derived from it are null. A guessed
+    # base produces ahead/behind numbers that look authoritative while being
+    # measured against a ref that may not exist.
+    #
+    # `origin/HEAD` states the default explicitly, but it is unset in plenty of
+    # clones and in most linked worktrees, so the conventional names are tried
+    # after it — and each candidate is only accepted once `rev-parse --verify`
+    # confirms the ref actually exists. Resolving against a ref that is really
+    # there is not the same as guessing at one that might not be, and
+    # `base_ref_source` records which of the two happened.
+    declared = git(root, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+    base_ref = None
+    base_ref_source = None
+    for candidate, source in (
+        (declared, "origin/HEAD"),
+        ("origin/main", "conventional default"),
+        ("origin/master", "conventional default"),
+    ):
+        if candidate and git(root, "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}"):
+            base_ref, base_ref_source = candidate, source
+            break
 
-    ahead = behind = None
-    counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD")
-    if counts and len(counts.split()) == 2:
-        behind_s, ahead_s = counts.split()
-        behind, ahead = int(behind_s), int(ahead_s)
+    merge_base = ahead = behind = None
+    if base_ref:
+        merge_base = git(root, "merge-base", "HEAD", base_ref)
+        counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD")
+        if counts and len(counts.split()) == 2:
+            behind_s, ahead_s = counts.split()
+            behind, ahead = int(behind_s), int(ahead_s)
 
     porcelain = run(["git", "status", "--porcelain"], cwd=root, raw=True) or ""
     changed = [line[3:] for line in porcelain.splitlines() if len(line) > 3]
@@ -134,7 +267,7 @@ def observe(root: Path) -> dict:
     return {
         "repository": {
             "root": str(root),
-            "remote_origin": git(root, "remote", "get-url", "origin"),
+            "origin": repository_identity(git(root, "remote", "get-url", "origin")),
         },
         "worktree": {
             "path": str(root),
@@ -146,6 +279,7 @@ def observe(root: Path) -> dict:
             "head": head,
             "upstream": upstream,
             "base_ref": base_ref,
+            "base_ref_source": base_ref_source,
             "merge_base": merge_base,
             "commits_ahead_of_base": ahead,
             "commits_behind_base": behind,
@@ -173,8 +307,7 @@ def capture_pull_request(root: Path, branch: str | None) -> dict:
     raw = run(
         [
             "gh", "pr", "list", "--head", branch, "--state", "all", "--limit", "10",
-            "--json", "number,title,state,url,headRefOid,isDraft,mergeable,"
-                      "mergeStateStatus,reviewDecision",
+            "--json", PR_JSON_FIELDS,
         ],
         cwd=root,
     )
@@ -246,21 +379,34 @@ def adopt_artifact(out: Path, source: Path, role: str, extra: dict) -> dict:
 
     Copied rather than referenced: a checkpoint that points at a path inside a
     harness's private directory is exactly the dependency this tool removes.
+    For the same reason the record carries no absolute source path — the one
+    supplied here is typically inside the vendor's own directory, and writing
+    it down would put that dependency back in the manifest as a string.
+
+    Files land under `artifacts/<role>/`, so two artifacts that happen to share
+    a basename cannot overwrite each other. A second artifact for one role is
+    refused rather than silently replacing the first: a checkpoint that quietly
+    dropped an artifact would still verify, which is the worst available
+    outcome for a format whose job is to be trustworthy after copying.
     """
     if not source.is_file():
         sys.exit(f"icn-session-checkpoint: {role} file not found: {source}")
 
-    artifacts = out / ARTIFACT_DIR
-    artifacts.mkdir(parents=True, exist_ok=True)
-    dest = artifacts / source.name
+    role_dir = out / ARTIFACT_DIR / role
+    role_dir.mkdir(parents=True, exist_ok=True)
+    dest = role_dir / source.name
+    if dest.exists():
+        sys.exit(
+            f"icn-session-checkpoint: refusing to overwrite an existing "
+            f"{role} artifact at {dest}"
+        )
     shutil.copyfile(source, dest)
 
     record = {
-        "path": f"{ARTIFACT_DIR}/{dest.name}",
+        "path": f"{ARTIFACT_DIR}/{role}/{dest.name}",
         "role": role,
         "bytes": dest.stat().st_size,
         "sha256": sha256_of(dest),
-        "source_path": str(source),
     }
     record.update(extra)
     return record
@@ -350,6 +496,8 @@ def cmd_create(args: argparse.Namespace) -> int:
         },
     }
 
+    assert_no_credentials(manifest)
+
     (out / MANIFEST_NAME).write_text(
         json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8"
     )
@@ -385,21 +533,63 @@ def cmd_verify(args: argparse.Namespace) -> int:
         print(f"verify: unknown schema {schema!r} (this tool writes {SCHEMA})", file=sys.stderr)
         return 1
 
+    # A tampered manifest is the case this command exists for, so every field
+    # it reads is checked before it is used. Raising a KeyError here would turn
+    # a detected tamper into a crash, and a crash is not a verdict.
+    artifacts = manifest.get("artifacts")
+    if artifacts is None:
+        artifacts = []
+    if not isinstance(artifacts, list):
+        print("verify: MALFORMED artifacts (not a list)", file=sys.stderr)
+        return 1
+
     failures = 0
-    for artifact in manifest.get("artifacts", []):
-        path = out / artifact["path"]
-        if not path.is_file():
-            print(f"verify: MISSING {artifact['path']}", file=sys.stderr)
+    for index, artifact in enumerate(artifacts):
+        if (
+            not isinstance(artifact, dict)
+            or not isinstance(artifact.get("path"), str)
+            or not isinstance(artifact.get("sha256"), str)
+        ):
+            print(f"verify: MALFORMED artifact record at index {index}", file=sys.stderr)
             failures += 1
             continue
-        actual = sha256_of(path)
-        if actual != artifact.get("sha256"):
-            print(f"verify: HASH MISMATCH {artifact['path']}", file=sys.stderr)
+
+        relative = artifact["path"]
+        # The manifest is untrusted input the moment a checkpoint is copied from
+        # another machine. An absolute path would make `out / relative` discard
+        # `out` entirely, and `..` segments climb out of it, either of which
+        # would let a manifest "verify" by hashing an unrelated local file — the
+        # exact opposite of a self-contained artifact.
+        candidate = PurePosixPath(relative)
+        if (
+            candidate.is_absolute()
+            or ".." in candidate.parts
+            or not relative.startswith(f"{ARTIFACT_DIR}/")
+        ):
+            print(f"verify: PATH NOT INSIDE {ARTIFACT_DIR}/ -- {relative}", file=sys.stderr)
+            failures += 1
+            continue
+
+        path = out / relative
+        try:
+            path.resolve().relative_to(out.resolve())
+        except ValueError:
+            print(f"verify: PATH ESCAPES CHECKPOINT {relative}", file=sys.stderr)
+            failures += 1
+            continue
+
+        if not path.is_file():
+            print(f"verify: MISSING {relative}", file=sys.stderr)
+            failures += 1
+            continue
+
+        if sha256_of(path) != artifact["sha256"]:
+            print(f"verify: HASH MISMATCH {relative}", file=sys.stderr)
             failures += 1
         else:
-            print(f"verify: ok {artifact['path']} ({artifact['bytes']} bytes)")
+            print(f"verify: ok {relative} ({path.stat().st_size} bytes)")
 
-    print(f"verify: schema ok, {len(manifest.get('artifacts', []))} artifact(s), {failures} failure(s)")
+    print(f"verify: schema ok, {len(artifacts)} artifact(s), {failures} failure(s)")
     return 1 if failures else 0
 
 
