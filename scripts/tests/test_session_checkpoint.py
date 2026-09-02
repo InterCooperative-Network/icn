@@ -298,6 +298,53 @@ def main() -> int:
             check(f"verify fails cleanly when {label}",
                   result.returncode != 0 and "Traceback" not in result.stderr)
 
+        print("a reused output directory cannot smuggle stale artefacts")
+        reuse = tmp / "ckpt-reuse"
+        t2 = tmp / "second.jsonl"
+        t2.write_text('{"n":2}\n', encoding="utf-8")
+        h2 = tmp / "second.md"
+        h2.write_text("# second\n", encoding="utf-8")
+        run = create(reuse, repo, "--transcript", str(t2), "--handoff", str(h2))
+        check("first create into a fresh directory succeeds", run.returncode == 0)
+        first_files = {str(f.relative_to(reuse)) for f in reuse.rglob("*") if f.is_file()}
+        check("the first checkpoint has its artefacts", len(first_files) == 3)
+
+        run = create(reuse, repo)
+        check("a bare re-create into a non-empty directory is refused without --replace",
+              run.returncode != 0)
+        check("the refusal explains why", "not empty" in (run.stdout + run.stderr))
+
+        run = create(reuse, repo, "--replace")
+        check("--replace succeeds", run.returncode == 0)
+        mre = json.loads((reuse / "manifest.json").read_text(encoding="utf-8"))
+        check("the replacing manifest declares no artefacts", mre["artifacts"] == [])
+        left = {str(f.relative_to(reuse)) for f in reuse.rglob("*") if f.is_file()}
+        check("no stale artefact survived the replacement", left == {"manifest.json"})
+        check("verify passes on the replaced checkpoint", verify(reuse).returncode == 0)
+
+        print("verify catches undeclared and index-stripped manifests")
+        # Undeclared file planted beside a valid manifest.
+        planted = out2 / "artifacts" / "handoff" / "extra.md"
+        planted.parent.mkdir(parents=True, exist_ok=True)
+        planted.write_text("not in the manifest\n", encoding="utf-8")
+        result = verify(out2)
+        check("verify FAILS on an undeclared artefact", result.returncode != 0)
+        check("verify names the undeclared file", "extra.md" in (result.stdout + result.stderr))
+        planted.unlink()
+
+        for label, mutate in (
+            ("the artifacts index is removed", lambda d: d.pop("artifacts", None)),
+            ("the artifacts index is null", lambda d: d.update(artifacts=None)),
+        ):
+            out_ix = tmp / f"ckpt-ix-{abs(hash(label))}"
+            out_ix.mkdir()
+            (out_ix / "artifacts").mkdir()
+            (out_ix / "artifacts" / "orphan.bin").write_text("x", encoding="utf-8")
+            stripped = dict(m)
+            mutate(stripped)
+            (out_ix / "manifest.json").write_text(json.dumps(stripped), encoding="utf-8")
+            check(f"verify FAILS when {label}", verify(out_ix).returncode != 0)
+
         # --- an unknown schema is refused, not half-understood ---------------
         print("schema discipline")
         out3 = tmp / "ckpt-future"

@@ -418,7 +418,32 @@ def adopt_artifact(out: Path, source: Path, role: str, extra: dict) -> dict:
 def cmd_create(args: argparse.Namespace) -> int:
     root = resolve_root(Path(args.cwd or os.getcwd()).resolve())
     out = Path(args.out).resolve()
-    out.mkdir(parents=True, exist_ok=True)
+
+    # A checkpoint is assembled in a sibling staging directory and moved into
+    # place only once it is complete.
+    #
+    # Writing in place left whatever a previous run had put there. Re-using a
+    # directory for a checkpoint with fewer artifacts kept the old ones on disk
+    # while the new manifest listed none, so `verify` passed over stale session
+    # data that was neither declared nor hashed — a portable artifact silently
+    # carrying a previous session's transcript. Observed during this feature's
+    # own dogfooding: 2.19 MB of undeclared bytes in a checkpoint whose manifest
+    # said it held nothing.
+    #
+    # Staging also means a failed export cannot damage the checkpoint that is
+    # already there: nothing under `out` is touched until the new one is whole.
+    if out.exists() and any(out.iterdir()) and not args.replace:
+        sys.exit(
+            f"icn-session-checkpoint: {out} is not empty. Pass --replace to "
+            f"replace the checkpoint there, so stale artifacts cannot survive "
+            f"into a manifest that does not list them."
+        )
+
+    staging = out.parent / f".{out.name}.staging-{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    out_final, out = out, staging
 
     observed = observe(root)
     branch = observed["git"]["branch"]
@@ -502,6 +527,18 @@ def cmd_create(args: argparse.Namespace) -> int:
         json.dumps(manifest, indent=2, sort_keys=False) + "\n", encoding="utf-8"
     )
 
+    # Swap the completed checkpoint into place. The previous one is moved aside
+    # first and removed only after the new one has landed, so an interruption
+    # leaves one of the two intact rather than neither.
+    superseded = None
+    if out_final.exists():
+        superseded = out_final.parent / f".{out_final.name}.superseded-{os.getpid()}"
+        out_final.rename(superseded)
+    out.rename(out_final)
+    if superseded is not None:
+        shutil.rmtree(superseded, ignore_errors=True)
+    out = out_final
+
     print(f"checkpoint: {out}")
     print(f"  schema:   {SCHEMA}")
     print(f"  branch:   {branch} @ {(observed['git']['head'] or '')[:12]}")
@@ -536,12 +573,17 @@ def cmd_verify(args: argparse.Namespace) -> int:
     # A tampered manifest is the case this command exists for, so every field
     # it reads is checked before it is used. Raising a KeyError here would turn
     # a detected tamper into a crash, and a crash is not a verdict.
-    artifacts = manifest.get("artifacts")
-    if artifacts is None:
-        artifacts = []
-    if not isinstance(artifacts, list):
-        print("verify: MALFORMED artifacts (not a list)", file=sys.stderr)
+    # v1 requires the index to be present and list-valued. Treating a missing
+    # or null member as "no artifacts" let a stripped manifest verify clean
+    # while real artifact files sat beside it unhashed.
+    if "artifacts" not in manifest or not isinstance(manifest["artifacts"], list):
+        print(
+            "verify: MALFORMED artifacts index (absent or not a list); a v1 "
+            "manifest must list its artifacts, even when there are none",
+            file=sys.stderr,
+        )
         return 1
+    artifacts = manifest["artifacts"]
 
     failures = 0
     for index, artifact in enumerate(artifacts):
@@ -589,6 +631,20 @@ def cmd_verify(args: argparse.Namespace) -> int:
         else:
             print(f"verify: ok {relative} ({path.stat().st_size} bytes)")
 
+    # Defence in depth behind the staging swap: a file under `artifacts/` that
+    # the manifest does not list is undeclared and unhashed, and would travel
+    # with the checkpoint as though it belonged to it.
+    declared = {a["path"] for a in artifacts if isinstance(a, dict) and isinstance(a.get("path"), str)}
+    artifact_root = out / ARTIFACT_DIR
+    if artifact_root.is_dir():
+        for path in sorted(artifact_root.rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(out).as_posix()
+            if relative not in declared:
+                print(f"verify: UNDECLARED {relative}", file=sys.stderr)
+                failures += 1
+
     print(f"verify: schema ok, {len(artifacts)} artifact(s), {failures} failure(s)")
     return 1 if failures else 0
 
@@ -609,6 +665,12 @@ def main(argv: list[str]) -> int:
         help="provider transcript to copy in as opaque evidence (optional)",
     )
     create.add_argument("--provider", help="agent harness that produced the session")
+    create.add_argument(
+        "--replace",
+        action="store_true",
+        help="replace an existing checkpoint at --out (it is swapped in whole, "
+             "never merged into, so stale artifacts cannot survive)",
+    )
     create.add_argument(
         "--ref",
         action="append",
