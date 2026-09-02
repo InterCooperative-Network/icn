@@ -5,14 +5,15 @@
 **Canonical:** no — `docs/architecture/IDENTITY_SEMANTICS.md` owns the semantic contract and
 `docs/architecture/n2-a0-stored-key-inventory.md` owns the measured stored-key surface; this
 document owns only N2-A's *dispositions and design*
-**Last reviewed:** 2026-09-02
-**Source basis:** live `main` at `5add7a48d7b055625480de3f044d1189903f9d1c`
+**Last reviewed:** 2026-09-04
+**Source basis:** live `main` at `ceec48200cd2f99021befab90b308a052df62336` (§1 baseline rows
+still cite the `83682563` measurement they were taken at)
 **Gates:** N2-A / #2627 (`Did` canonicalization, I7)
 **Contract:** IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (`N2-A`)
 
 ---
 
-**Tranche state, in three separate claims.**
+**Tranche state, in four separate claims.**
 
 1. **I7 code has landed.** `Did` `PartialEq`/`Eq`/`Hash` compare the decoded identifier bytes
    (#2686, `0defbde5`). The design in §6 was applied; `Display`/`as_str`/`Serialize` are
@@ -24,9 +25,16 @@ document owns only N2-A's *dispositions and design*
    refuses to start over an unruled alias collision, an uncovered principal row, an unreadable
    row, or a receipt from a newer generation. This discharges §3.5's consequence and §12.1 item 7
    of the inventory *for the binary*; it is not deployment evidence.
-3. **Cutover is not complete.** The load/rebuild/write-back audit (§9 row 3), fresh point-in-time
-   evidence on quiesced stores, the two unscanned deployments, the §5 decision-**A** namespace
-   splits, and everything behind §7.5 remain open. Nothing here is a deployment-readiness claim.
+3. **The ledger's own loaders classify before they adopt** (§4.1). The three principal-keyed
+   rebuilds in `Ledger::new` — `ledger:balance:`, `ledger:cleared_volume:`, `ledger:frozen:` —
+   classify their whole keyspace and refuse with a typed `PrincipalRowsRefusal` rather than
+   collapse two spellings of one account, whether or not the startup gate ran in front of them.
+   That is the `icn-ledger` half of §9 row 3. It authorizes no merge rule; §10.6 states how the
+   gate and the loaders divide the work.
+4. **Cutover is not complete.** The rest of the load/rebuild/write-back audit (§9 row 3: the
+   loaders in §6.5), fresh point-in-time evidence on quiesced stores, the two unscanned
+   deployments, the §5 decision-**A** namespace splits, the peer-map pair (§6.3) and everything
+   behind §7.5 remain open. Nothing here is a deployment-readiness claim.
 
 This document is the design and evidence surface for N2-A. It does not migrate any store or
 discharge the §7.5 membership/vote gate. It records what was measured, what was decided, what
@@ -47,7 +55,7 @@ Companion documents:
 |---|---|
 | Merged `main` at entry | `836825632ebb5b7b9d8d16354974503a7c576569` |
 | Inventory measured at | `798c8d54` |
-| `Did` `Eq`/`Hash` | **unchanged** — still derived over the inner `String` (`icn/crates/icn-identity/src/lib.rs`) |
+| `Did` `Eq`/`Hash` | **principal-keyed** since #2686 — compares the decoded 32 identifier bytes (`icn/crates/icn-identity/src/lib.rs`) |
 | Governance #2641 / PR #2677 | merged; runtime vote interpretation is principal-safe, no persisted byte moved |
 
 ### 1.1 Drift from the prior evidence pass
@@ -168,7 +176,7 @@ This is a limit of the evidence, not a defect to code around: quiescing a store
 means stopping a workload, which this tranche must not do. It is printed with
 every report and carried in the JSON. For a verdict that is binding rather than
 indicative, scan a quiesced store or a coherent volume snapshot with writes held
-until the flip — and note that this is a further reason the fail-closed check
+until the cutover — and note that this is a further reason the fail-closed check
 belongs *inside* the key-equality binary (§3.5).
 
 ### 2.6 Fail-closed reads
@@ -367,10 +375,11 @@ scanned deployments, and no malformed or unreachable principal rows exist there 
    peer can write an alternate-spelled row at any time. A clean scan today does not imply a clean
    store at migration time.
 
-Consequence for the migration design: the scan must be re-run **immediately before** the flip, and
+Consequence for the migration design: the scan must be re-run **immediately before** the cutover, and
 the fail-closed check belongs *in the binary* — a key-equality build should refuse to start against
 a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.
-**Implemented** as the startup gate (§10) on 2026-09-02; the point-in-time limits above still
+**Implemented** as the startup gate (§10) on 2026-09-02, and enforced again for the three
+`icn-ledger` keyspaces inside `Ledger::new` (§4.1, §10.6); the point-in-time limits above still
 apply to any evidence gathered *outside* the binary.
 
 ## 4. Keyspace dispositions (decisions)
@@ -418,6 +427,51 @@ them (§12.1 item 4-ii).
 
 Every "unmeasured" cell is a direct consequence of §3.1 and is the substance of the open gate.
 
+### 4.1 The ledger loaders now enforce their own dispositions (#2627)
+
+Rows 5–7 name three keyspaces whose disposition is "fail closed until the economics owner signs
+off". Until this change that disposition existed in the scanner registry, in this table and —
+since #2700 — in the startup gate (§10), which refuses to start `icnd` over a collision there
+before any store is opened. It bound nothing at all inside `icn-ledger`: a `Ledger::new` reached
+with no gate in front of it — every embedder and test that is not `icnd` — would have collapsed a
+collision silently, whatever the registry said; and the gate never reads a value, so a row it
+cannot see as a problem was adopted unexamined. `icn_ledger::principal_rows` closes that gap: the
+three rebuilds classify their whole keyspace before adopting a row and refuse with a typed
+`PrincipalRowsRefusal` rather than electing a survivor. §10.6 states how the two layers divide
+the work.
+
+The audit that produced it found the collapse is **worse than last-writer-wins**, in a way worth
+recording because it generalises to every `HashMap<Did, _>` rebuilt from spelling-keyed rows:
+
+* `HashMap::insert` replaces the **value** but retains the **first-inserted key**. Rows arrive in
+  `Store::scan` order — lexicographic by key bytes — so the surviving value comes from the
+  byte-greatest row while the surviving key spelling comes from the byte-least one. The two halves
+  of the in-memory entry come from **different rows**.
+* `save_cached_balances` then re-derives the key from that map key and writes the *other* row's
+  balances under it, leaving the byte-greatest row on disk holding stale state. The next start
+  reads both again. The divergence is permanent, silent, and repeats every boot.
+* `save_*` is also reached from `recompute_balances`, whose maps are keyed by the spelling the
+  **journal entries** carry rather than the spelling the stored row uses — so a write-back could
+  open a second row for an account that already had one. Both rebuild paths now adopt the stored
+  spelling (`HashMap::get_key_value`) instead of re-deriving one.
+* `FreezeManager::remove_frozen` deleted only the caller's spelling, so an unfreeze naming a second
+  spelling left the freeze row live and the member came back frozen on the next start — a
+  revocation that does not revoke. Removal now goes through `HashMap::remove_entry` so it deletes
+  the row the map actually held.
+
+Refusal is scoped as narrowly as the semantics allow: two currencies of one account are two rows of
+state and not a collision, and an **expired** freeze row is not live state, so a lapsed alias does
+not block a start.
+
+A fourth refusal has no row in the table above because nothing writes it deliberately: a
+`ledger:balance:` row whose key spells the account differently from the `account_id` inside the row.
+That is the residue of a collapse that already happened, and loading it would adopt one row's money
+under another row's name.
+
+This discharges the `icn-ledger` half of blocker 3 (§9). It authorizes **no** merge rule: rows 5–7
+stay `AwaitingDomainSignOff`, and a test that asserted a sum or a union would be asserting an
+economic decision no domain owner has made.
+
 ---
 
 ## 5. Namespace decisions (Phase 5)
@@ -435,15 +489,18 @@ another representation. Each is decided explicitly below; none is left implicit.
 | `ReplicaMetadata` | `icn-store` | **B — remains representation-sensitive** | Replica placement is a storage-locality concern, not a principal-identity one. Documented rather than changed. |
 | `SenderPrincipal` (`icn-net`) | `replay_guard.rs:78` | **B — intentionally key-based, not byte-based** | Keys on `VerifyingKey` because the replay guard and the signature check must agree. It is *narrower* than `Did::identifier_bytes` (anchor DIDs may not decompress). Divergence is deliberate and must be documented, not "fixed". |
 
-Decision **A** namespaces gate the equality flip. Decision **B** namespaces do not, but each is now
-a stated choice rather than an omission.
+Decision **A** namespaces gated the equality flip when this was written. The flip has since landed
+(#2686) without them, so the split each names now *exists* rather than being anticipated, and they
+gate the **cutover** instead. Decision **B** namespaces gate neither, but each is now a stated
+choice rather than an omission.
 
 ---
 
 ## 6. Partner invariants (re-verified against `83682563`)
 
-These must change **with or before** the `Eq`/`Hash` flip. All three were re-verified live; none
-has moved since the prior pass.
+These had to change **with or before** the `Eq`/`Hash` flip. As of 2026-09-03: §6.1 moved with the
+flip (#2686), §6.2 moved before it (#2681), and §6.3 has not moved and now gates the cutover. The
+designs below are kept as written.
 
 ### 6.1 `PeerId` ordering — `icn/crates/icn-net/src/topology.rs:51`
 
@@ -511,6 +568,66 @@ principal entry leaks connection state in exactly the direction that is hard to 
 
 Not mass-rewritten: each needs its semantic classification confirmed at the site before change.
 
+### 6.5 Loader findings the ledger pass did not fix
+
+The §4.1 audit was run across the other principal-keyed loaders at the same time. These are
+**findings, not fixes** — no code below has been changed, and each is stated so the next slice
+starts from evidence rather than from a re-derivation.
+
+**`icn-federation` `AttestationStore` — an unregistered keyspace, and order-dependent reads.**
+`federation/attestations/<did-spelling>/<coop>` appears in **no** row of §4 and in no descriptor of
+`n2a_keyspaces`, so the scanner cannot report a collision there at all: §3.2's "zero collisions"
+never covered it. To the startup gate a principal-bearing row under a prefix nothing registered is
+*uncovered*, and it refuses the start rather than classify it (§10.2) — but only for a database
+beneath `icnd`'s data directory and only at `icnd`'s start; nothing in this store's own reads
+changed. The live defect does not need a migration to appear. The in-memory cache is
+`LruCache<Did, _>` and therefore principal-keyed, while `member_prefix` scans `did.as_str()` and is
+therefore spelling-keyed, so looking up spelling A then spelling B of one principal returns **A's
+attestations for B**, and the opposite order returns the opposite answer — the first non-empty
+lookup latches until eviction or invalidation. Long-lived instances (`icn-gateway`'s
+`federation_mgr`) are exposed; the RPC handlers construct a fresh store per call and are not.
+Separately, `remove_attestation` deletes one spelling's row, so a revocation naming the other
+spelling leaves the attestation live, and every read path drops an undecodable row with
+`if let Ok(..)`, turning a corrupt attestation into an absent one. The domain answer is not in
+doubt — an attestation is a claim about a **principal** — so the fix direction is a
+principal-consistent read, not a re-keying, with two rows for one `(principal, source_coop)`
+refused because that pair can only differ by disagreeing.
+
+**`icn-security` `MisbehaviorDetector` (#2676) — the survivor is attacker-selectable.** Four
+spelling-keyed keyspaces (`security:{reputation,banned,quarantine,violation}:`) load independently
+into four principal-keyed `HashMap`s, so a principal can end up with its reputation from one
+spelling and its ban timestamp from another. The winner in each is the byte-greatest key, i.e. the
+multibase base character, which the writer chooses. `save_to_store` writes only surviving entries
+and deletes nothing, so the losing rows persist and can win again on the next start. Since #2700
+the startup gate refuses to start `icnd` over a collision or an unreadable row in `security:*`
+(`DeferredCollisionPosture::BlockStartup`, §10.2) precisely because this loader folds; the loader
+itself is unchanged, and the fold remains reachable wherever the detector loads with no gate in
+front of it. The sharpest
+detail is not in the loader at all: `handle_signed` already derives a canonical `SenderPrincipal`
+for its replay and capability decisions, then passes the raw wire **spelling** to
+`record_violation` — the replay guard and the detector disagree about who the sender is. Security
+identity should resolve through the decoded principal at the recording site, which makes the
+loader's job smaller rather than larger.
+
+**`icn-net` peer maps (blocker 7) — and a snapshot restore whose winner is hash order.** §6.3's
+design is confirmed against live code, with two additions. First, nothing removes an entry from
+either map on transport error or close, so a peer that reconnects under a second spelling leaves
+`SessionManager.connections` (String-keyed) holding two entries — one dead, one live — while
+`NetworkActor.peer_connections` (`Did`-keyed) holds one; `connections_active` then over-reports,
+`peer_exchange` advertises both spellings to the federation as distinct peers, and a send naming
+the first spelling selects the dead connection. Second, and not previously recorded: snapshot
+restore (`actor/mod.rs`) parses each stored `String` key back into a `Did` and inserts, so two
+spellings collapse with **`HashMap` iteration order** deciding which x25519/ML-KEM key material and
+capability set the node comes up with — nondeterministic across restarts. Row 15 already says
+`peer_connections` has no authorized merge rule; restore is currently implementing one by accident.
+This remains the larger change (~20 call sites plus a restore policy) and stays its own slice.
+
+* `FreezeManager::load_from_store` (pre-existing, unchanged by this tranche): expired freeze rows
+  are dropped at load rather than adopted, exactly as the loader did before I7, so a row that
+  expired before a start is never deleted from disk by `cleanup_expired` and accumulates. It is
+  not state and it is not a collision, so it blocks nothing; deleting it at start-up would add a
+  writer to the load path, which this tranche deliberately does not do. Follow-up: #2683.
+
 ---
 
 ## 7. Site taxonomy carried in from #2641
@@ -541,6 +658,13 @@ The §6.3 peer-map work and the §5 weak-holder decision are both twin-shaped, a
 
 ## 8. Migration sequence
 
+**Status 2026-09-03.** Steps 6 and 7 of the sequence as originally planned — the flip and its
+discriminating tests — have landed (#2681, #2686). The planned order is kept in §8.1 as the
+historical record; the sequence to follow now is the post-flip cutover order in §8.2. Nothing in
+§8.1 is an instruction any more.
+
+### 8.1 As planned before the flip (historical)
+
 Unchanged in structure from the prior pass; step 4's content is narrowed by §1.1 (replay rows
 already carry their rule in-tree) and widened by §5 (the weak-holder id is a blocking prerequisite,
 not a follow-up).
@@ -557,36 +681,65 @@ not a follow-up).
 5. **Validate rollback/compatibility.** Equality-over-bytes moves no durable byte and changes no
    acceptance, so a binary rolled back to string equality reads the de-duplicated rows unchanged.
 6. **Flip `Did` `Eq`/`Hash`** to decoded identifier bytes, **atomically with** the CCL
-   `Value::Did` hash correction (§6.2).
+   `Value::Did` hash correction (§6.2). *Done: #2681 (CCL hash), #2686 (flip, `PeerId` ordering).*
 7. **Run broad discriminating tests**, including the mutation check that the new tests fail under
-   the old equality.
+   the old equality. *Done for the flip in #2686; each loader guard carries its own (§4.1).*
 8. **Membership and vote migration stay behind §7.5** and are not part of N2-A.
+
+### 8.2 The remaining cutover order (live)
+
+1. **Re-run the collision scan** read-only on every live deployment — the two not yet scanned
+   (§3.1) first — and again immediately before the cutover (§3.5). The scan gates the cutover; it
+   did not gate the flip, which moved no persisted byte. The same audit now runs unconditionally
+   at every `icnd` start (§10), which makes §3.5's point-in-time limit a limit on evidence
+   gathered *outside* the binary.
+2. **Settle the §5 decision-A namespaces**, above all the `icn-commons` weak-holder id, whose
+   split now exists rather than being anticipated.
+3. **Close the remaining partner invariant** — the `String`/`Did` peer-map pair (§6.3). `PeerId`
+   ordering and the CCL `Value::Did` hash are done.
+4. **Guard or de-duplicate before a deployment's first start on a build that still folds.** The
+   three `icn-ledger` loaders now refuse rather than fold (§4.1), so for them this step is the
+   refusal itself, and the startup gate (§10) refuses the `icnd` start in front of every loader
+   over an unruled collision, an unreadable or uncovered principal row and a `security:*`
+   collision. The loaders in §6.5 still fold; what the gate does not stand in front of — a
+   report-only deferral (§10.2), a database outside `icnd`'s data directory, a loader reached
+   without `icnd` — is exactly where, for each of them, either the guard lands first or that
+   deployment's collision-bearing rows are de-duplicated before its first start on a build
+   carrying I7. Choose the class-C merge rules (§4 rows 14–15) before decode collapses them.
+5. **Rollback/compatibility** holds as stated: equality-over-bytes moved no durable byte, so a
+   binary rolled back to string equality reads the same rows.
+6. **Membership and vote migration stay behind §7.5** and are not part of N2-A.
 
 ---
 
 ## 9. Remaining cutover blockers
 
-The equality flip (§8 step 6) has landed. What follows is what still stands between that code
-and a cutover anyone may rely on, re-stated against `main` at `5add7a48` plus the startup gate.
+The equality flip (§8.1 step 6) has landed (#2686). The **cutover** — the point at which persisted
+spelling-keyed state is proven safe under principal equality and the in-binary refusals (§10, §4.1)
+can be trusted to hold — may be declared only when **all** of the following hold, re-stated against
+`main` at `ceec4820` (the startup gate) plus the ledger loaders. Until 2026-09-03 this section gated
+the flip itself.
 
 | # | Blocker | State | Evidence |
 |---|---|---|---|
 | 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
 | 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed; the `AttestationStore` cache/prefix mismatch recorded on #2627 belongs to it |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); the loaders in §6.5 — the `AttestationStore` cache/prefix mismatch recorded on #2627 among them — have not been audited to that standard |
 | 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it |
-| 5 | `PeerId` ordering | **DONE** | #2684 — `Ord` over identifier bytes, non-interleaving classes |
-| 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | #2681 — hash over identifier bytes; #2685 consolidated the code hash |
-| 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented |
+| 5 | `PeerId` ordering | **DONE** | `Ord` over identifier bytes, non-interleaving classes, landed with the flip in #2686 (`icn-net/src/topology.rs`); #2684 had added the `peerid_i7_ordering_tripwire` that pins it |
+| 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | hash over identifier bytes in #2681, before the flip; #2686 pins the contract in `value_did_hash` |
+| 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented — `SessionManager.connections` is still keyed by the peer spelling (`icn-net/src/session.rs`) |
 | 8 | No §7.5 migration smuggled in | **HELD** | `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated; the startup gate reports vote collisions and does not act on them (§10.2) |
-| 9 | Broad discriminating tests for the flip | **DONE** | #2686 — fifteen tests flipped, three re-scoped; #2627 records the count |
-| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 28 fixture tests plus the scanner's |
-| 11 | Persisted principal-identity generation boundary | **DONE (generation 1)** | §10.3 — the receipt records the generation; a newer generation's receipt is refused. Generation 2 (any re-key) is *not* designed |
+| 9 | Broad discriminating tests for the flip | **DONE for the flip itself** | #2686 — `did_principal_equality`, fifteen tests flipped and three re-scoped (#2627 records the count), the `PeerId` tripwire; the ledger loaders carry the §4.1 fixtures. What remains untested is what remains unimplemented (rows 4 and 7) |
+| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 28 fixture tests plus the scanner's. Inside `icn-ledger`, the three loaders refuse again for their own keyspaces (§4.1; 30 fixtures) |
+| 11 | Persisted principal-identity generation boundary | **DONE (generation 1)** | §10.3 — the receipt records the generation; a newer generation's receipt is refused. Generation 2 (any re-key) is *not* designed; the ledger loaders re-key nothing and leave it at 1 |
 
 Blockers **3, 4 and 7 are independent of collision evidence** and would each remain even if every
-deployment scanned clean. They are the shortest path forward. Row 10 changes their consequence
+deployment scanned clean; rows 5, 6 and 9 are closed, and row 3 is done for its ledger half. Rows
+4 and 7, then the rest of row 3, are the shortest path forward. Row 10 changes their consequence
 rather than their status: until they are done, a store that trips one of them **refuses to
-start** instead of merging silently.
+start** instead of merging silently — and for the three ledger keyspaces the loader refuses again
+(§4.1), with or without the gate in front of it.
 
 The evidence gate (#1) has moved from *no evidence* to *no collisions in three deployments*, which
 is real but bounded, and §3.5 explains why a point-in-time clean scan cannot license anything on
@@ -707,3 +860,62 @@ elsewhere unverifiable and nothing recorded; the receipt and the refusal message
 payload nor identifier. `icn/crates/icn-store/src/did_collision_scan.rs` adds eight tests on the
 deferred postures and the shared audit. All fixture evidence; no deployment was scanned by the
 gate.
+
+### 10.6 The gate and the ledger loaders (#2701)
+
+The startup gate and the `icn-ledger` loaders of §4.1 are two enforcement layers, not one check
+in two places, and the cutover relies on both.
+
+The gate asks whether this node may safely open **all** persisted principal-bearing state beneath
+its data directory. It runs in `icnd` before the first store is opened, reads keys and never
+values, knows a keyspace only by its registered prefix (§2.7), and refuses or clears the whole
+directory. The loaders ask whether **this** keyspace's rows can be interpreted and adopted by the
+code that owns them. They run inside `Ledger::new` — in `icnd` after the gate has cleared, and in
+every other embedder and test with no gate in front of them — know the exact shape their writer
+produces, and read a value only after its key has been accepted.
+
+For `icn-ledger/balance`, `icn-ledger/cleared_volume` and `icn-ledger/frozen` the two layers agree
+wherever they observe the same thing, and differ only where they do not:
+
+| Question | Startup gate (§10) | Ledger loader (§4.1) |
+|---|---|---|
+| Collision unit | the raw key with each `did:icn:` spelling replaced by its decoded 32 identifier bytes (§2.7); the currency stays in a `cleared_volume` shape, so only same-currency rows group | the decoded identifier bytes plus the discriminator — the currency for `cleared_volume`, empty otherwise — through `icn_ledger::principal_rows`: **the same unit** |
+| Merge rule | none asserted; a collision under `AwaitingDomainSignOff` refuses (§10.2) | none asserted; a collision is `PrincipalRowsRefusal::AliasCollision`. No sum, union, latest-wins, normalization, re-key or de-duplication |
+| Readable spelling | one the layout-independent tokenizer can delimit and decode to 32 identifier bytes (§2.6); any other `did:icn:` token is an unreadable row and refuses | the writer's grammar plus `Did::from_str`, which also requires an Ed25519 point. Within the alphabets the tokenizer walks the loader is the stricter: a spelling that decodes but is no principal is `UnreadableKey` here and readable there. A spelling the tokenizer cannot delimit at all — an Identity-base body, whose sigil and raw bytes fall outside those alphabets — is unreadable to the gate and parses in the loader (§4.1's Identity fixture) |
+| Physical shape | prefix match plus the spelling; `did_ends_key` for `frozen` only. A key under `ledger:balance:` with no `did:icn:` in it is a row without a principal and does not block | the writer's exact shape: canonical JSON quoting for `balance` (a bare or non-canonically escaped key is `UnreadableKey`), a currency delimiter after the spelling for `cleared_volume`, strict UTF-8 for `frozen`; anything else refuses |
+| Values | never read | read only after the key is accepted; a `balance` or `frozen` body whose spelling disagrees with its own key is `KeyBodyMismatch` |
+| Expired freeze rows | not distinguishable without reading the value, so two spellings of one principal under `ledger:frozen:` are a collision whatever their expiry | dropped before grouping: an expired row is not live state, so a lapsed alias does not block a start |
+| Write-back | none — the gate writes to no domain store | keeps the stored row identity (`HashMap::get_key_value`, `remove_entry`); no spelling is normalized and no row is re-keyed, so `PRINCIPAL_IDENTITY_GENERATION` stays 1 |
+| Diagnostic | store, keyspace, rule and its authority, counts, four-byte (eight-hex) principal fingerprints (§10.4) | keyspace, counts, eight-byte principal fingerprints, and for `cleared_volume` an escaped and bounded currency discriminator; never a spelling, never a value |
+
+Three consequences follow, each deliberate:
+
+* **Gate CLEAR does not mean the loader has nothing left to check.** A row the gate cannot see
+  as a problem — a bare `ledger:balance:` spelling, a non-canonical JSON escape, a spelling that
+  decodes but is no Ed25519 point, a `cleared_volume` key with no currency delimiter, a body that
+  spells its account differently from its key — is refused by the loader. The gate is complete
+  over *principals across the directory*; the loader is complete over *this keyspace's grammar*.
+* **A loader refusal never contradicts the gate's disposition.** Wherever the gate refuses one
+  of these three keyspaces, the loader refuses the same rows: its collision unit is the same, and
+  every token the gate can delimit but not decode fails `Did::from_str` too. Neither layer asserts
+  a merge rule and neither normalizes a spelling away, so they cannot disagree about a survivor:
+  there is none.
+* **Where the gate is the stricter layer, that is a boundary, not a conflict.** Two cases. An
+  expired alias freeze is a collision to the gate, which must not read the value that would show
+  it lapsed, and is not state to the loader. A spelling the tokenizer cannot delimit is unreadable
+  to the gate and a legal account to the loader — a limit of the scan's tokenizer (§2.6), not of
+  the keyspace. In `icnd` the gate runs first, so in both cases the node does not start and the
+  loader's answer is never reached; it is observable only where `Ledger::new` runs with no gate in
+  front of it. Neither case involves a merge rule: the operator's remedy (§10.4) is to remove a
+  lapsed row the loader would not have adopted, or to take the tokenizer limit to the scanner.
+
+Neither layer replaces the other. The gate covers every principal-bearing keyspace in the
+directory — the loaders that still fold (§6.5) and any keyspace nobody registered included — and
+the loaders cover exactly three keyspaces with knowledge the gate must not have. Without the gate,
+§6.5's loaders run unguarded; without the loaders, every opener of a ledger store that is not
+`icnd`, and every row the gate cannot see, is unguarded.
+
+Evidence: `icn/crates/icn-ledger/tests/principal_keyed_rebuild.rs` — 30 fixtures on real sled
+stores, one per row of the table above and its one-fact-different control (§4.1), plus the
+`principal_rows` unit tests; `icn/crates/icn-store/tests/n2a_startup_gate.rs` for the gate
+(§10.5). Fixture evidence only.

@@ -28,6 +28,8 @@ ed25519-dalek.workspace = true
 
 [dev-dependencies]
 tempfile = "3.24"
+hex = "0.4"
+icn-time = { path = "../icn-time" }
 criterion = "0.5"
 rand = "0.9"
 # rand_core 0.6 OsRng for ed25519-dalek 2.x interop in benches (dalek pins rand_core 0.6)

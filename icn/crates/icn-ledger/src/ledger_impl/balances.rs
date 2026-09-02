@@ -18,6 +18,10 @@
 
 use crate::balance::compute_all_balances;
 use crate::ledger::{Ledger, BALANCE_PREFIX, CLEARED_VOLUME_PREFIX};
+use crate::principal_rows::{
+    refuse_unless_one_spelling_per_principal, PrincipalRowsRefusal, BALANCE_KEYSPACE,
+    CLEARED_VOLUME_KEYSPACE,
+};
 use crate::types::AccountBalances;
 use anyhow::Result;
 use icn_identity::Did;
@@ -147,9 +151,16 @@ pub(crate) fn recompute_balances(ledger: &mut Ledger) -> Result<()> {
         );
     }
 
-    // Safe to apply - journal hasn't changed during our computation
-    ledger.cached_balances = balances;
-    ledger.cleared_volume_index = cleared_volumes;
+    // Safe to apply - journal hasn't changed during our computation.
+    //
+    // The recomputed maps are keyed by the spelling the *journal entries*
+    // carry, which need not be the spelling the persisted row uses. Writing
+    // them straight back would put the same principal's state under a second
+    // key and strand the first row, manufacturing the collision the loader
+    // refuses. Adopt the stored spelling wherever the store already has one.
+    ledger.cached_balances = adopt_stored_balance_spellings(&ledger.cached_balances, balances);
+    ledger.cleared_volume_index =
+        adopt_stored_volume_spellings(&ledger.cleared_volume_index, cleared_volumes);
     save_cached_balances(ledger)?;
     save_cleared_volume_index(ledger)?;
 
@@ -210,8 +221,38 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
     let prefix = BALANCE_PREFIX.as_bytes();
     let pairs = ledger.store.scan(prefix)?;
 
-    for (_key, value) in pairs {
-        let balances: AccountBalances = serde_json::from_slice(&value)?;
+    // Read every row, and classify the whole keyspace, before one of them
+    // reaches `cached_balances`. `HashMap::insert` would otherwise collapse two
+    // spellings of one principal into a single entry whose key came from one
+    // row and whose value came from another — see `crate::principal_rows`.
+    let mut rows = Vec::with_capacity(pairs.len());
+    for (key, value) in &pairs {
+        let balances: AccountBalances = serde_json::from_slice(value)?;
+        rows.push((balance_key_spelling(key), balances));
+    }
+
+    refuse_unless_one_spelling_per_principal(
+        BALANCE_KEYSPACE,
+        rows.iter().map(|(spelling, _)| (spelling.as_str(), "")),
+    )?;
+
+    // A row whose key names the account differently from the row's own
+    // `account_id` is the residue of a rebuild that already collapsed two
+    // spellings and wrote the survivor's balances under the loser's key.
+    // Loading it would adopt one row's money under another row's name.
+    let strayed = rows
+        .iter()
+        .filter(|(spelling, balances)| balances.account_id.as_str() != spelling)
+        .count();
+    if strayed > 0 {
+        return Err(PrincipalRowsRefusal::KeyValueSpellingMismatch {
+            keyspace: BALANCE_KEYSPACE,
+            rows: strayed,
+        }
+        .into());
+    }
+
+    for (_spelling, balances) in rows {
         ledger
             .cached_balances
             .insert(balances.account_id.clone(), balances);
@@ -219,6 +260,58 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
 
     debug!("Loaded {} cached balances", ledger.cached_balances.len());
     Ok(())
+}
+
+/// Re-key a recomputed balance map onto the spellings the store already holds.
+///
+/// `HashMap::get_key_value` finds the entry by principal (I7 equality) and
+/// hands back the *stored* key, so the write-back that follows addresses the
+/// row that already exists instead of opening a second one. The row's own
+/// `account_id` is moved with it, because a row whose key and contents spell
+/// the account differently is exactly what `load_cached_balances` refuses.
+fn adopt_stored_balance_spellings(
+    stored: &HashMap<Did, AccountBalances>,
+    computed: HashMap<Did, AccountBalances>,
+) -> HashMap<Did, AccountBalances> {
+    computed
+        .into_iter()
+        .map(|(did, mut balances)| match stored.get_key_value(&did) {
+            Some((stored_did, _)) => {
+                balances.account_id = stored_did.clone();
+                (stored_did.clone(), balances)
+            }
+            None => (did, balances),
+        })
+        .collect()
+}
+
+/// The cleared-volume counterpart of [`adopt_stored_balance_spellings`].
+///
+/// The currency travels with the principal because it is part of the row
+/// identity, not part of the account.
+fn adopt_stored_volume_spellings(
+    stored: &HashMap<(Did, String), i64>,
+    computed: HashMap<(Did, String), i64>,
+) -> HashMap<(Did, String), i64> {
+    computed
+        .into_iter()
+        .map(|(key, volume)| match stored.get_key_value(&key) {
+            Some((stored_key, _)) => (stored_key.clone(), volume),
+            None => (key, volume),
+        })
+        .collect()
+}
+
+/// The DID spelling inside a `ledger:balance:` key.
+///
+/// `save_cached_balances` builds the key with `serde_json::to_string`, so the
+/// remainder is a JSON string. Anything that is not — a truncated or foreign
+/// key — is returned as-is so the guard classifies it as unreadable rather than
+/// this function silently deciding a row does not exist.
+fn balance_key_spelling(key: &[u8]) -> String {
+    let key = String::from_utf8_lossy(key);
+    let remainder = key.strip_prefix(BALANCE_PREFIX).unwrap_or(&key);
+    serde_json::from_str::<String>(remainder).unwrap_or_else(|_| remainder.to_string())
 }
 
 /// Save cached balances to storage
@@ -249,25 +342,36 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     let prefix = CLEARED_VOLUME_PREFIX.as_bytes();
     let pairs = ledger.store.scan(prefix)?;
 
-    for (key, value) in pairs {
-        // Key format: "ledger:cleared_volume:{did}:{currency}"
-        let key_str = String::from_utf8_lossy(&key);
-        if let Some(rest) = key_str.strip_prefix(CLEARED_VOLUME_PREFIX) {
-            // Parse the composite key - format is "did:currency"
-            // Use rfind to find the last colon, since DIDs can contain colons
-            if let Some(last_colon) = rest.rfind(':') {
-                let did_str = &rest[..last_colon];
-                let currency = &rest[last_colon + 1..];
+    // Split every key before adopting any row, so the keyspace is classified
+    // whole. A row that cannot be split is kept with an empty currency and an
+    // unusable spelling, which the guard reports as unreadable — the previous
+    // code dropped such rows silently, turning a corrupt key into an account
+    // with no cleared volume.
+    let mut rows = Vec::with_capacity(pairs.len());
+    for (key, value) in &pairs {
+        // Key format: "ledger:cleared_volume:{did}:{currency}". The DID itself
+        // contains colons, so the *last* colon is the currency separator.
+        let key_str = String::from_utf8_lossy(key);
+        let rest = key_str
+            .strip_prefix(CLEARED_VOLUME_PREFIX)
+            .unwrap_or(&key_str);
+        let (did_str, currency) = match rest.rfind(':') {
+            Some(last_colon) => (&rest[..last_colon], &rest[last_colon + 1..]),
+            None => (rest, ""),
+        };
+        rows.push((did_str.to_string(), currency.to_string(), value));
+    }
 
-                if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{did_str}\"")) {
-                    if let Ok(volume) = serde_json::from_slice::<i64>(&value) {
-                        ledger
-                            .cleared_volume_index
-                            .insert((did, currency.to_string()), volume);
-                    }
-                }
-            }
-        }
+    refuse_unless_one_spelling_per_principal(
+        CLEARED_VOLUME_KEYSPACE,
+        rows.iter()
+            .map(|(did_str, currency, _)| (did_str.as_str(), currency.as_str())),
+    )?;
+
+    for (did_str, currency, value) in rows {
+        let did: Did = serde_json::from_str(&format!("\"{did_str}\""))?;
+        let volume: i64 = serde_json::from_slice(value)?;
+        ledger.cleared_volume_index.insert((did, currency), volume);
     }
 
     debug!(

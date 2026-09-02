@@ -33,6 +33,7 @@
 //! assert!(!freeze_manager.is_frozen(&did));
 //! ```
 
+use crate::principal_rows::{refuse_unless_one_spelling_per_principal, FROZEN_KEYSPACE};
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
@@ -173,6 +174,10 @@ impl FreezeManager {
 
     /// Freeze a member
     pub fn freeze(&mut self, did: Did, reason: String, duration_seconds: Option<u64>) {
+        // Re-freezing a principal already on file must address the row the
+        // store has. A second spelling would write a second row and leave the
+        // first live, which is the collision `load_from_store` refuses.
+        let did = self.stored_spelling(&did);
         let record = FrozenMember::new(did.clone(), reason.clone(), duration_seconds);
 
         info!(
@@ -201,6 +206,8 @@ impl FreezeManager {
         proposal_id: Option<String>,
         frozen_by: Option<Did>,
     ) {
+        // Same row-identity rule as `freeze`.
+        let did = self.stored_spelling(&did);
         let mut record = FrozenMember::new(did.clone(), reason.clone(), duration_seconds);
         record.proposal_id = proposal_id;
         record.frozen_by = frozen_by;
@@ -224,7 +231,7 @@ impl FreezeManager {
 
     /// Unfreeze a member
     pub fn unfreeze(&mut self, did: &Did, reason: String) -> Option<FrozenMember> {
-        let removed = self.frozen.remove(did);
+        let removed = self.forget_frozen(did);
 
         if let Some(ref _record) = removed {
             info!(
@@ -242,13 +249,6 @@ impl FreezeManager {
                 unfrozen_by: None,
             };
             self.unfreeze_history.push(event);
-
-            // Remove from persistent store
-            if let Some(ref store) = self.store {
-                if let Err(e) = self.remove_frozen(did, store) {
-                    warn!(did = %did, error = %e, "Failed to remove frozen member from store");
-                }
-            }
         }
 
         removed
@@ -262,7 +262,7 @@ impl FreezeManager {
         proposal_id: Option<String>,
         unfrozen_by: Option<Did>,
     ) -> Option<FrozenMember> {
-        let removed = self.frozen.remove(did);
+        let removed = self.forget_frozen(did);
 
         if let Some(ref _record) = removed {
             info!(
@@ -280,12 +280,6 @@ impl FreezeManager {
                 unfrozen_by,
             };
             self.unfreeze_history.push(event);
-
-            if let Some(ref store) = self.store {
-                if let Err(e) = self.remove_frozen(did, store) {
-                    warn!(did = %did, error = %e, "Failed to remove frozen member from store");
-                }
-            }
         }
 
         removed
@@ -297,12 +291,7 @@ impl FreezeManager {
             if record.is_expired() {
                 // Auto-unfreeze expired records
                 info!(did = %did, "Auto-unfreezing expired member");
-                self.frozen.remove(did);
-
-                // Remove from persistent store
-                if let Some(ref store) = self.store {
-                    let _ = self.remove_frozen(did, store);
-                }
+                self.forget_frozen(did);
 
                 return false;
             }
@@ -332,10 +321,7 @@ impl FreezeManager {
             .collect();
 
         for did in expired {
-            self.frozen.remove(&did);
-            if let Some(ref store) = self.store {
-                let _ = self.remove_frozen(&did, store);
-            }
+            self.forget_frozen(&did);
         }
 
         self.frozen.values().collect()
@@ -364,10 +350,7 @@ impl FreezeManager {
 
         for did in expired {
             info!(did = %did, "Cleaning up expired freeze");
-            self.frozen.remove(&did);
-            if let Some(ref store) = self.store {
-                let _ = self.remove_frozen(&did, store);
-            }
+            self.forget_frozen(&did);
         }
 
         count
@@ -378,14 +361,64 @@ impl FreezeManager {
     fn load_from_store(&mut self) -> anyhow::Result<()> {
         if let Some(ref store) = self.store {
             let pairs = store.scan(FREEZE_PREFIX.as_bytes())?;
-            for (_, value) in pairs {
-                let record: FrozenMember = serde_json::from_slice(&value)?;
+
+            // Read and filter before adopting anything. Expired records are
+            // dropped first because an expired freeze is not state: two rows
+            // for one principal are only ambiguous when both still bind, and
+            // refusing on a lapsed alias row would block a start for nothing.
+            let mut live = Vec::with_capacity(pairs.len());
+            for (_, value) in &pairs {
+                let record: FrozenMember = serde_json::from_slice(value)?;
                 if !record.is_expired() {
-                    self.frozen.insert(record.did.clone(), record);
+                    live.push(record);
                 }
+            }
+
+            // Two live freezes for one principal disagree about reason and
+            // expiry, and `icn-ledger/frozen` carries
+            // `RuleBasis::AwaitingDomainSignOff` — the union rule written down
+            // in the migration gate is asserted, not authorized. Refuse.
+            refuse_unless_one_spelling_per_principal(
+                FROZEN_KEYSPACE,
+                live.iter().map(|r| (r.did.as_str(), "")),
+            )?;
+
+            for record in live {
+                self.frozen.insert(record.did.clone(), record);
             }
         }
         Ok(())
+    }
+
+    /// The spelling this manager already holds for `did`, if any.
+    ///
+    /// Persisted freeze keys are built from a spelling, so writing or deleting
+    /// under a second spelling of the same principal would leave the first row
+    /// live — a freeze that outlives its unfreeze. Every persistence call
+    /// therefore addresses the row identity the map already has.
+    fn stored_spelling(&self, did: &Did) -> Did {
+        self.frozen
+            .get_key_value(did)
+            .map(|(stored, _)| stored.clone())
+            .unwrap_or_else(|| did.clone())
+    }
+
+    /// Drop a principal's freeze from memory and from the store together.
+    ///
+    /// `HashMap::remove_entry` hands back the key the map actually held, which
+    /// is the spelling the persisted row uses. Deleting under the caller's
+    /// spelling instead would silently leave that row behind, and the next
+    /// `load_from_store` would re-freeze a member who had been released.
+    fn forget_frozen(&mut self, did: &Did) -> Option<FrozenMember> {
+        let (stored_did, record) = self.frozen.remove_entry(did)?;
+
+        if let Some(ref store) = self.store {
+            if let Err(e) = self.remove_frozen(&stored_did, store) {
+                warn!(did = %stored_did, error = %e, "Failed to remove frozen member from store");
+            }
+        }
+
+        Some(record)
     }
 
     fn persist_frozen(
