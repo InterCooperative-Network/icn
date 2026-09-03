@@ -383,16 +383,39 @@ impl FreezeManager {
             // `pairs` is consumed so each raw row is dropped once parsed; the
             // guard holds the parsed rows only.
             let mut live = Vec::with_capacity(pairs.len());
+            let mut unreadable = 0usize;
             for (key, value) in pairs {
-                let key_str = String::from_utf8_lossy(&key);
+                // The key is decoded strictly, never lossily. `persist_frozen`
+                // writes `FREEZE_PREFIX` followed by a `Did`'s `Display`, which
+                // is always UTF-8, so a key that is not is one the writer never
+                // produced. Normalizing it would be worse than refusing it: an
+                // invalid byte can normalize into a spelling the guard accepts
+                // and a body can match, while the row on disk keeps the raw
+                // key — and the later unfreeze would delete the normalized key
+                // and leave the raw row to freeze the member again.
+                let Ok(key_str) = std::str::from_utf8(&key) else {
+                    unreadable += 1;
+                    continue;
+                };
                 let spelling = key_str
                     .strip_prefix(FREEZE_PREFIX)
-                    .unwrap_or(&key_str)
+                    .unwrap_or(key_str)
                     .to_string();
                 let record: FrozenMember = serde_json::from_slice(&value)?;
                 if !record.is_expired() {
                     live.push((spelling, record));
                 }
+            }
+
+            // Reported before the guard runs: a key the writer could not have
+            // produced is evidence, and a classification computed without it
+            // proves nothing.
+            if unreadable > 0 {
+                return Err(PrincipalRowsRefusal::UnreadableKey {
+                    keyspace: FROZEN_KEYSPACE,
+                    rows: unreadable,
+                }
+                .into());
             }
 
             // Two live freezes for one principal disagree about reason and

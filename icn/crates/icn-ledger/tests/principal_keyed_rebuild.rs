@@ -649,6 +649,44 @@ fn refreezing_under_a_second_spelling_does_not_open_a_second_row() {
 }
 
 #[test]
+fn a_freeze_key_that_is_not_utf8_is_refused_not_normalized() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_frozen_row(&store, &a_principal(), "ordinary");
+
+    // A raw key with one invalid byte in an Identity-base body. Lossy UTF-8
+    // decoding turns that byte into U+FFFD (three bytes), so 29 ASCII bytes
+    // plus the bad byte normalize to a 32-byte identifier: a spelling the
+    // guard accepts and a body can match — but not the key that is on disk.
+    // A loader that adopted it would later delete the normalized key and
+    // leave the raw row to freeze the member again on the next start.
+    let mut raw_body: Vec<u8> = b"abcdefghijklmnopqrstuvwxyz012".to_vec();
+    assert_eq!(raw_body.len(), 29);
+    raw_body.push(0xff);
+    let normalized = loop {
+        let candidate = format!("did:icn:\u{0}{}", String::from_utf8_lossy(&raw_body));
+        if let Ok(did) = Did::from_str(&candidate) {
+            break did;
+        }
+        raw_body[28] += 1; // vary an ASCII byte until the payload is a point
+    };
+    assert_eq!(normalized.identifier_bytes().unwrap().len(), 32);
+
+    let mut key = FREEZE_PREFIX.as_bytes().to_vec();
+    key.extend(b"did:icn:\x00");
+    key.extend(&raw_body);
+    let record = FrozenMember::new(normalized.clone(), "tampered".to_string(), None);
+    store
+        .put(&key, &serde_json::to_vec(&record).unwrap())
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
+#[test]
 fn reopening_a_clean_store_is_idempotent() {
     let tmp = tempfile::tempdir().unwrap();
     let store = open_store(tmp.path());
