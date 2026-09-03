@@ -351,6 +351,16 @@ fn balance_key_spelling(key: &[u8]) -> Option<String> {
     if serde_json::to_string(&spelling).ok()? != remainder {
         return None;
     }
+    // The spelling must name a principal at the level the row's own value
+    // demands: `AccountBalances::account_id` is a `Did` that only ever
+    // deserializes through `Did::from_str`, and the row is adopted only if it
+    // spells the same as this key. A key that `Did::from_str` rejects can
+    // therefore never be adopted whatever its value holds, so it is decided
+    // here — before the value is read — rather than by a parse error from a
+    // value the loader had no business reading. (The `principal_rows` guard
+    // groups by identifier bytes, the scanner's rule; this stricter level is
+    // the writer's, and every row that passes here passes the guard's.)
+    Did::from_str(&spelling).ok()?;
     Some(spelling)
 }
 

@@ -286,6 +286,55 @@ fn an_unreadable_balance_key_with_a_malformed_value_is_the_typed_refusal() {
     ));
 }
 
+#[test]
+fn a_canonical_balance_key_naming_no_identifier_with_a_malformed_value_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_balance_row(&store, &a_principal(), "USD", 100);
+
+    // The envelope is exactly what the writer produces — a canonical JSON
+    // string — but the spelling inside names nothing. The key alone proves
+    // the row cannot belong to this keyspace, so the value must never be the
+    // thing that decides the error.
+    let spelling = "did:icn:zthis-names-no-identifier";
+    let envelope = serde_json::to_string(spelling).unwrap();
+    store
+        .put(
+            format!("{BALANCE_PREFIX}{envelope}").as_bytes(),
+            b"{not json",
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
+#[test]
+fn a_canonical_balance_key_that_decodes_but_is_no_principal_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_balance_row(&store, &a_principal(), "USD", 100);
+
+    // Decodes to 32 bytes but is not an Ed25519 point. The row's value carries
+    // an `account_id: Did` that only ever deserializes through `Did::from_str`
+    // and must spell the same as the key, so no value can ever make this row
+    // adoptable: the key alone settles it, before the value is read.
+    let envelope = serde_json::to_string(&identity_spelled_non_point()).unwrap();
+    store
+        .put(
+            format!("{BALANCE_PREFIX}{envelope}").as_bytes(),
+            b"{not json",
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
 // ── ledger:cleared_volume: ──────────────────────────────────────────────────
 
 #[test]
@@ -678,6 +727,45 @@ fn a_freeze_key_that_is_not_utf8_is_refused_not_normalized() {
     let record = FrozenMember::new(normalized.clone(), "tampered".to_string(), None);
     store
         .put(&key, &serde_json::to_vec(&record).unwrap())
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
+#[test]
+fn a_utf8_freeze_key_naming_no_principal_with_a_malformed_value_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_frozen_row(&store, &a_principal(), "ordinary");
+
+    // Valid UTF-8, carries the prefix, names nothing. `persist_frozen` writes
+    // a `Did`'s `Display`, and the body's `did` must spell the same key to be
+    // adopted, so the key alone proves the row cannot be one of this
+    // keyspace's rows — the value must not be parsed to find that out.
+    store
+        .put(format!("{FREEZE_PREFIX}not-a-did").as_bytes(), b"{not json")
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
+#[test]
+fn a_freeze_key_that_decodes_but_is_no_principal_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_frozen_row(&store, &a_principal(), "ordinary");
+
+    store
+        .put(
+            format!("{FREEZE_PREFIX}{}", identity_spelled_non_point()).as_bytes(),
+            b"{not json",
+        )
         .unwrap();
 
     assert!(matches!(

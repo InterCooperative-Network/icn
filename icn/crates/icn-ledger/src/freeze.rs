@@ -401,6 +401,18 @@ impl FreezeManager {
                     .strip_prefix(FREEZE_PREFIX)
                     .unwrap_or(key_str)
                     .to_string();
+                // The key must name a principal before the value is read.
+                // `persist_frozen` writes a `Did`'s `Display`, and a body is
+                // adopted only if its own `did` — which deserializes through
+                // `Did::from_str` — spells the same as the key, so a key that
+                // `Did::from_str` rejects can never be one of this keyspace's
+                // rows, whatever its value holds. It is counted here, and the
+                // value of such a row is never parsed, so a malformed value
+                // cannot turn the typed refusal into a parse error.
+                if Did::from_str(&spelling).is_err() {
+                    unreadable += 1;
+                    continue;
+                }
                 let record: FrozenMember = serde_json::from_slice(&value)?;
                 if !record.is_expired() {
                     live.push((spelling, record));
