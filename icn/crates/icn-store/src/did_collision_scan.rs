@@ -177,11 +177,16 @@ pub struct KeyspaceDescriptor {
     ///
     /// `/` is the only separator that is also a multibase body character, so
     /// where a spelling may be followed by one is a property of the individual
-    /// key layout — not something the scanner can infer. No registered keyspace
-    /// currently puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses
-    /// `:`; `trust/sequences/issuer/<did>` ends there), so every descriptor sets
-    /// this `false` and `<did>/junk` is correctly unreadable rather than a
-    /// readable principal with residual bytes the real loader would reject.
+    /// key layout — not something the scanner can infer. One registered
+    /// keyspace puts `/` immediately after a DID:
+    /// `federation/attestations/<did>/<source>`, whose loader rebuilds the key
+    /// from the value and so admits nothing but `/` there. Every other
+    /// descriptor sets this `false` (`trust/edges/<a>:<b>` uses `:`;
+    /// `trust/sequences/issuer/<did>` ends there), so for them `<did>/junk` is
+    /// correctly unreadable rather than a readable principal with residual
+    /// bytes the real loader would reject. The registry test
+    /// `only_the_keyspace_whose_parser_ends_a_did_at_a_slash_claims_it` pins
+    /// the set of claimants.
     pub slash_ends_did: bool,
     /// Why that rule, in one line — so a report explains itself.
     pub rationale: &'static str,
@@ -1368,6 +1373,27 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
                         Fail closed pending a governance-domain decision.",
         },
+        KeyspaceDescriptor {
+            name: "icn-federation/attestations",
+            prefix: b"federation/attestations/",
+            inventory_rows: &[27, 59],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            // `federation/attestations/<did>/<source_coop_id>`: the one registered
+            // layout that puts `/` immediately after the spelling. The store's own
+            // loader rebuilds the key from the value and rejects anything else, so
+            // `<did>junk` is unreadable here exactly as it is there.
+            slash_ends_did: true,
+            did_ends_key: false,
+            rationale: "Federated trust attestations keyed by (member principal, source \
+                        cooperative); the source stays in the canonical shape, so rows from \
+                        different cooperatives about one principal are the ordinary union and \
+                        never a group. Two rows from one cooperative about one principal can \
+                        only differ by disagreeing, and no federation-domain rule authorizes \
+                        choosing or combining them. The live store already refuses to read, \
+                        write or sweep over such a pair (#2703); a migration must not decide \
+                        it either.",
+        },
     ]
 }
 
@@ -2447,17 +2473,23 @@ mod tests {
     }
 
     #[test]
-    fn no_registered_keyspace_claims_a_slash_terminated_did() {
-        // Pins the registry: if a future keyspace does put `/` after a DID it
-        // must say so deliberately, rather than inheriting a permissive default
-        // that would make `<did>/junk` look readable.
-        for d in n2a_keyspaces() {
-            assert!(
-                !d.slash_ends_did,
-                "{} claims `/` ends a DID; confirm its parser really does",
-                d.name
-            );
-        }
+    fn only_the_keyspace_whose_parser_ends_a_did_at_a_slash_claims_it() {
+        // Pins the registry: a keyspace that puts `/` after a DID must say so
+        // deliberately, rather than inheriting a permissive default that would
+        // make `<did>/junk` look readable. Exactly one does today —
+        // `federation/attestations/<did>/<source>` — and its loader is the
+        // proof: it rebuilds the key from the value, so nothing but `/` can
+        // follow the spelling there.
+        let claimants: Vec<&str> = n2a_keyspaces()
+            .iter()
+            .filter(|d| d.slash_ends_did)
+            .map(|d| d.name)
+            .collect();
+        assert_eq!(
+            claimants,
+            vec!["icn-federation/attestations"],
+            "a new claimant must confirm its parser really ends a DID at `/`"
+        );
     }
 
     #[test]
@@ -2720,5 +2752,198 @@ mod tests {
         // The governance vote keyspace is behind the separate §7.5 gate.
         assert!(!names.iter().any(|n| n.contains("governance")));
         assert!(!names.iter().any(|n| n.contains("vote")));
+    }
+    // ----- federation/attestations (#2703) -----------------------------------
+    //
+    // Fixtures write the exact bytes `icn_federation::AttestationStore` writes:
+    // `federation/attestations/<did spelling>/<source_coop_id>`. They use the
+    // real registry rather than a test descriptor, so what they prove is what
+    // the shipped scan — and, through `audit_store`, the startup gate — does.
+
+    fn federation_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-federation/attestations")
+            .expect("federation/attestations/ is registered (#2703)")
+    }
+
+    fn attestation_key(spelling: &str, source: &str) -> String {
+        format!("federation/attestations/{spelling}/{source}")
+    }
+
+    #[test]
+    fn federation_alias_rows_from_one_source_are_a_blocking_collision() {
+        // The #2703 hazard: one principal, two spellings, one source
+        // cooperative. Two persisted claims that can only differ by disagreeing.
+        let (a, b) = two_spellings(61);
+        let store = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "food-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].rows.len(), 2);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert_eq!(report.disposition, MergeDisposition::FailClosed);
+        assert!(report.must_fail_closed(), "no rule may elect a survivor");
+
+        // And the whole-store verdict the gate consumes says the same.
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+        assert_eq!(
+            audit.uncovered_did_rows(),
+            0,
+            "the rows are classified, not merely unaccounted for"
+        );
+        assert_eq!(
+            audit
+                .report
+                .blocking_keyspaces()
+                .iter()
+                .map(|k| k.keyspace.as_str())
+                .collect::<Vec<_>>(),
+            vec!["icn-federation/attestations"]
+        );
+    }
+
+    #[test]
+    fn federation_alias_rows_from_different_sources_are_the_union_not_a_group() {
+        // Same principal, two spellings, two source cooperatives. The source
+        // stays in the canonical shape, so these are two different claims and
+        // the store treats them as its ordinary union.
+        let (a, b) = two_spellings(62);
+        let store = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "housing-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two (principal, source) tuples"
+        );
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn federation_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(63), multibase::Base::Base58Btc);
+        let two = spell(&principal(64), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&attestation_key(&one, "food-coop"), b"{}"),
+            (&attestation_key(&two, "food-coop"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn federation_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before registration a populated attestation row could only surface
+        // as an *uncovered* shape — blocking, but unclassified. Now it is a
+        // registered keyspace's row and appears nowhere else.
+        let one = spell(&principal(65), multibase::Base::Base58Btc);
+        let store = store_with(&[(&attestation_key(&one, "food-coop"), b"{}")]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.uncovered.is_empty(), "{:?}", audit.uncovered);
+        assert_eq!(audit.deferred_did_rows(), 0);
+        let ks = audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-federation/attestations")
+            .unwrap();
+        assert_eq!(ks.rows_scanned, 1);
+        assert_eq!(ks.rows_with_readable_did, 1);
+        assert_eq!(ks.inventory_rows, vec![27, 59]);
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn federation_source_after_the_slash_is_key_structure_not_a_bad_spelling() {
+        // The layout's `/` is the one remainder the descriptor explains. A
+        // source id made entirely of multibase-alphabet characters — every
+        // real one is — must not be swallowed into the spelling or turn the
+        // row unreadable.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+        ] {
+            let one = spell(&principal(66), base);
+            let store = store_with(&[(&attestation_key(&one, "abc123XYZ-_"), b"{}")]);
+            let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "{base:?}");
+            assert_eq!(report.rows_unreadable, 0, "{base:?}");
+            assert_eq!(report.distinct_principals, 1, "{base:?}");
+        }
+    }
+
+    #[test]
+    fn federation_malformed_spelling_is_unreadable_and_blocks() {
+        // Two ways a key can fail to name a principal: junk where the spelling
+        // goes, and a valid spelling with bytes glued on before the `/`. The
+        // store's loader rejects both; the scan must not report either as a
+        // readable principal, or the unreadable count that exists to fail
+        // closed would be quietly lowered.
+        let one = spell(&principal(67), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            ("federation/attestations/did:icn:!!!!/food-coop", b"{}"),
+            (
+                &format!("federation/attestations/{one}junk/food-coop"),
+                b"{}",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 2);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn federation_scan_order_pins_the_last_writer_survivor() {
+        // Reported so an operator can see which row an unguarded rebuild would
+        // have kept — and so the report is a function of the store, not of
+        // insertion order.
+        let (a, b) = two_spellings(68);
+        let forward = store_with(&[
+            (&attestation_key(&a, "food-coop"), b"{}"),
+            (&attestation_key(&b, "food-coop"), b"{}"),
+        ]);
+        let reversed = store_with(&[
+            (&attestation_key(&b, "food-coop"), b"{}"),
+            (&attestation_key(&a, "food-coop"), b"{}"),
+        ]);
+
+        let f = scan_keyspace(&forward, &federation_descriptor()).unwrap();
+        let r = scan_keyspace(&reversed, &federation_descriptor()).unwrap();
+        assert_eq!(
+            f, r,
+            "same rows, same report, whatever order they were written"
+        );
+        let survivor = f.collision_groups[0].last_writer_survivor().unwrap();
+        let mut sorted = [a.clone(), b.clone()];
+        sorted.sort();
+        assert_eq!(survivor.spellings, vec![sorted[1].clone()]);
     }
 }
