@@ -225,11 +225,14 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
     // reaches `cached_balances`. `HashMap::insert` would otherwise collapse two
     // spellings of one principal into a single entry whose key came from one
     // row and whose value came from another — see `crate::principal_rows`.
+    // `pairs` is consumed, not borrowed: each raw key and value is dropped as
+    // soon as it has been parsed into the classification representation, so
+    // the guard holds the parsed rows only, never a second copy of the scan.
     let mut rows = Vec::with_capacity(pairs.len());
     let mut unsplittable = 0usize;
-    for (key, value) in &pairs {
-        let balances: AccountBalances = serde_json::from_slice(value)?;
-        match balance_key_spelling(key) {
+    for (key, value) in pairs {
+        let balances: AccountBalances = serde_json::from_slice(&value)?;
+        match balance_key_spelling(&key) {
             Some(spelling) => rows.push((spelling, balances)),
             None => unsplittable += 1,
         }
@@ -418,10 +421,14 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     // counted and refused: the previous code adopted such a row under an
     // empty currency, turning a corrupt key into an account with a phantom
     // currency, and before that dropped it silently.
+    // `pairs` is consumed: the raw key is dropped once its spelling and
+    // currency have been copied out, and the value bytes are moved into the
+    // row rather than borrowed, so nothing keeps the whole scan alive. The
+    // value is still parsed after the guard, exactly as before.
     let mut rows = Vec::with_capacity(pairs.len());
     let mut unsplittable = 0usize;
-    for (key, value) in &pairs {
-        match split_cleared_volume_key(key) {
+    for (key, value) in pairs {
+        match split_cleared_volume_key(&key) {
             Some((did_str, currency)) => {
                 rows.push((did_str.to_string(), currency.to_string(), value))
             }
@@ -451,7 +458,7 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
         // spelling carries a raw NUL sigil, which JSON forbids inside a string
         // even though `Did::from_str` accepts it.
         let did = Did::from_str(did_str.as_str())?;
-        let volume: i64 = serde_json::from_slice(value)?;
+        let volume: i64 = serde_json::from_slice(&value)?;
         ledger.cleared_volume_index.insert((did, currency), volume);
     }
 

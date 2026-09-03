@@ -380,14 +380,16 @@ impl FreezeManager {
             // one spelling, find no collision, and adopt them under a single
             // map entry. The loser would then survive every unfreeze and
             // re-freeze the member on the next start.
+            // `pairs` is consumed so each raw row is dropped once parsed; the
+            // guard holds the parsed rows only.
             let mut live = Vec::with_capacity(pairs.len());
-            for (key, value) in &pairs {
-                let key_str = String::from_utf8_lossy(key);
+            for (key, value) in pairs {
+                let key_str = String::from_utf8_lossy(&key);
                 let spelling = key_str
                     .strip_prefix(FREEZE_PREFIX)
                     .unwrap_or(&key_str)
                     .to_string();
-                let record: FrozenMember = serde_json::from_slice(value)?;
+                let record: FrozenMember = serde_json::from_slice(&value)?;
                 if !record.is_expired() {
                     live.push((spelling, record));
                 }
