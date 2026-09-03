@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design surface for the N2-A tranche (#2627), which would make Did equality and hashing key equality rather than string equality (IDENTITY_SEMANTICS I7). Records the reproducible read-only collision scanner added in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, 17 fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the 63 principal-bearing rows deliberately left outside N2-A scope, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, re-verified partner-invariant designs for PeerId ordering, the CCL Value::Did Hash/Eq contract and the split String/Did peer maps, the nine-axis site taxonomy carried in from #2641, and the ordered migration sequence. DESIGN AND EVIDENCE ONLY: changes no Did semantics, migrates nothing, and does not discharge the separate section 7.5 membership/vote gate. States the tranche gate as IMPLEMENTATION STILL BLOCKED pending collision scans against live deployment data."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A — migration gate: collision scan, dispositions and partner invariants (#2627) | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design and evidence surface for the N2-A tranche (#2627): Did equality and hashing as key equality rather than string equality (IDENTITY_SEMANTICS I7), landed in #2686. Records the reproducible read-only collision scanner in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the principal-bearing rows deliberately deferred, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, the partner-invariant designs (PeerId ordering and CCL Value::Did Hash/Eq now landed; the split String/Did peer maps still open), the nine-axis site taxonomy carried in from #2641, the ordered migration sequence, and the in-binary startup gate (section 10): icnd audits every sled database beneath its data directory before opening the first one, refuses to start over an unruled alias collision, uncovered or unreadable principal row, unverifiable store or newer-generation receipt, records a payload-free receipt carrying the principal-identity generation, and reports but does not act on deferred vote and challenge collisions. Migrates nothing, does not discharge the separate section 7.5 membership/vote gate, and states cutover as INCOMPLETE: the load/rebuild/write-back audit, the weak-holder namespace split, the peer-map pair and fresh quiesced evidence remain open. Fixture evidence only; no deployment-readiness claim."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A — migration gate: collision scan, dispositions and partner invariants (#2627) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -35,23 +35,37 @@
   };
 
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
-</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>n2 a migration gate</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-08-29</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n2-a--migration-gate-collision-scan-dispositions-and-partner-invariants-2627">N2-A — migration gate: collision scan, dispositions and partner invariants (#2627)</h1>
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section docs-page" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <nav class="breadcrumb" aria-label="Breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>   <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span>  <span class="breadcrumb-sep" aria-hidden="true" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>n2 a migration gate</span> </nav>  <div class="doc-status" role="note" data-astro-cid-w3hnbhco><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Section</span><span class="doc-status-value" data-astro-cid-w3hnbhco>Current reference</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Status</span><span class="doc-status-value" data-astro-cid-w3hnbhco>living</span></span><span class="doc-status-item" data-astro-cid-w3hnbhco><span class="doc-status-key" data-astro-cid-w3hnbhco>Last reviewed</span><span class="doc-status-value" data-astro-cid-w3hnbhco>2026-09-02</span></span></div> <article class="prose" data-astro-cid-uadgga6g><h1 id="n2-a--migration-gate-collision-scan-dispositions-and-partner-invariants-2627">N2-A — migration gate: collision scan, dispositions and partner invariants (#2627)</h1>
 <p><strong>Status:</strong> living — design and evidence record for the N2-A tranche
 <strong>Truth class:</strong> descriptive
 <strong>Canonical:</strong> no — <code>docs/architecture/IDENTITY_SEMANTICS.md</code> owns the semantic contract and
 <code>docs/architecture/n2-a0-stored-key-inventory.md</code> owns the measured stored-key surface; this
 document owns only N2-A&#39;s <em>dispositions and design</em>
-<strong>Last reviewed:</strong> 2026-08-29
-<strong>Source basis:</strong> live <code>main</code> at <code>836825632ebb5b7b9d8d16354974503a7c576569</code>
+<strong>Last reviewed:</strong> 2026-09-02
+<strong>Source basis:</strong> live <code>main</code> at <code>5add7a48d7b055625480de3f044d1189903f9d1c</code>
 <strong>Gates:</strong> N2-A / #2627 (<code>Did</code> canonicalization, I7)
 <strong>Contract:</strong> IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (<code>N2-A</code>)</p>
 <hr>
-<p><strong>Tranche gate: IMPLEMENTATION STILL BLOCKED.</strong> <code>Did</code> <code>Eq</code>/<code>Hash</code> is unchanged and must stay
-unchanged until the gate below clears.</p>
-<p>This document is the design surface for N2-A. It does not change <code>Did</code>, migrate any store, or
-discharge the §7.5 membership/vote gate. It records what was measured, what was decided, and
-what is still missing — deliberately in separate sections, so a decision is never mistaken for
-evidence.</p>
+<p><strong>Tranche state, in three separate claims.</strong></p>
+<ol>
+<li><strong>I7 code has landed.</strong> <code>Did</code> <code>PartialEq</code>/<code>Eq</code>/<code>Hash</code> compare the decoded identifier bytes
+(#2686, <code>0defbde5</code>). The design in §6 was applied; <code>Display</code>/<code>as_str</code>/<code>Serialize</code> are
+byte-identical to before, and no persisted byte moved. The sentence this document carried
+until 2026-09-02 — <em>&quot;<code>Did</code> <code>Eq</code>/<code>Hash</code> is unchanged and must stay unchanged&quot;</em> — was stale from
+that merge onward and is corrected here.</li>
+<li><strong>The fail-closed check now lives inside the binary</strong> (§10). <code>icnd</code> runs the N2-A startup
+gate over every sled database beneath its data directory before it opens the first one, and
+refuses to start over an unruled alias collision, an uncovered principal row, an unreadable
+row, or a receipt from a newer generation. This discharges §3.5&#39;s consequence and §12.1 item 7
+of the inventory <em>for the binary</em>; it is not deployment evidence.</li>
+<li><strong>Cutover is not complete.</strong> The load/rebuild/write-back audit (§9 row 3), fresh point-in-time
+evidence on quiesced stores, the two unscanned deployments, the §5 decision-<strong>A</strong> namespace
+splits, and everything behind §7.5 remain open. Nothing here is a deployment-readiness claim.</li>
+</ol>
+<p>This document is the design and evidence surface for N2-A. It does not migrate any store or
+discharge the §7.5 membership/vote gate. It records what was measured, what was decided, what
+is enforced, and what is still missing — deliberately in separate sections, so a decision is
+never mistaken for evidence.</p>
 <p>Companion documents:</p>
 <ul>
 <li><code>docs/architecture/IDENTITY_SEMANTICS.md</code> — §11 I7, §14 DAG node N2-A. Owns the contract.</li>
@@ -164,9 +178,14 @@ states, and the verdict follows from that partition:</p>
 <li><strong>Covered</strong> — a registered keyspace interpreted it, so the collision result
 speaks for it.</li>
 <li><strong>Deferred</strong> — a <em>named gate</em> owns it: <code>n2a_deferred_namespaces</code> records the
-governance vote keyspace (§7.5) and the security namespace (dedicated
-workflow). Deferred is neither scanned nor cleared; it is a reviewed
-exclusion, reported separately and never folded into the scanned counts.</li>
+governance vote keyspace (§7.5), the auth-challenge namespace and the
+security namespace (dedicated workflow). Deferred is neither dispositioned
+nor cleared; it is a reviewed exclusion, reported separately and never folded
+into the scanned counts. Since 2026-09-02 a deferred namespace&#39;s rows are
+still <strong>grouped by principal</strong> — deferral names who owns the merge rule, and
+looking away from the data would let a collision reach the loader
+unexamined — and each deferral carries a <code>DeferredCollisionPosture</code> saying
+what a starting binary does about a collision there (§10.2).</li>
 <li><strong>Uncovered</strong> — nothing accounted for it, which <strong>blocks</strong>.</li>
 </ol>
 <p>State 3 is the point. A keyspace added after this tool was written, or simply
@@ -176,8 +195,10 @@ were live and unregistered (§3.4). Without the deferral registry the only safe
 verdict on any uncovered row would be &quot;blocked&quot;, which would make the gate
 unusable; with it, an accidental omission still blocks while a reviewed
 exclusion does not.</p>
-<p>A deferred namespace is <strong>never inspected</strong>. Only its existence, its owning
-gate, and its principal-bearing row count are recorded.</p>
+<p>A deferred namespace is <strong>never dispositioned</strong>: its report carries
+<code>FailClosed</code> / <code>AwaitingDomainSignOff</code> by construction, so nothing downstream
+can read a merge rule out of it. Its key shapes are grouped exactly as a
+registered keyspace&#39;s are; its values are never read.</p>
 <h3 id="24-a-plausible-merge-rule-is-not-an-authorized-one">2.4 A plausible merge rule is not an authorized one</h3>
 <p>The disposition table below distinguishes rules that are <em>established</em> from
 rules this document merely <em>asserts</em>. That distinction is now encoded, not just
@@ -187,10 +208,13 @@ written down: <code>KeyspaceDescriptor::basis</code> carries <code>RuleBasis::Es
 <p>This closes a real contradiction found in review. §4 row 5 said summing ledger
 balances still needed economics sign-off, while the code marked that keyspace
 <code>Sum</code> — so a generic storage crate would have authorized a merge of monetary
-state on nothing but its own say-so. Six keyspaces are currently
+state on nothing but its own say-so. Seven keyspaces are currently
 <code>AwaitingDomainSignOff</code>: <code>icn-ledger/{balance,cleared_volume,frozen}</code>,
-<code>icn-net/outgoing_seq</code>, <code>icn-trust/edges</code>, <code>trust-app/sequences_issuer</code>. A test
-pins that list against this document so the two cannot drift.</p>
+<code>icn-net/outgoing_seq</code>, <code>icn-trust/edges</code>, <code>trust-app/sequences_{issuer,receiver}</code>. A test
+pins that list against this document so the two cannot drift. <code>sequences_receiver</code> moved into
+this set on 2026-09-03: its max rule had been marked established &quot;by precedent&quot;, but precedent is
+not implementation — the receiver tracker reads and writes the exact spelling and folds nothing,
+so the gate now refuses a collision there rather than clearing it on a rule no loader performs.</p>
 <p>The basis only bites when there is something to merge; a keyspace with no
 collisions stays automatable whatever its basis.</p>
 <h3 id="25-what-a-clear-verdict-is-conditional-on">2.5 What a CLEAR verdict is conditional on</h3>
@@ -272,7 +296,9 @@ can copy:</p>
 # one database per domain — scan each, not the parent
 find ./deployment-data -name conf -printf &#39;%h\n&#39; | xargs ./target/debug/did-collision-scan
 </code></pre>
-<p>Exit status: <code>0</code> clear, <code>1</code> at least one keyspace must fail closed, <code>2</code> tool error.</p>
+<p>Exit status: <code>0</code> clear, <code>1</code> at least one keyspace or blocking deferred namespace must fail
+closed, <code>2</code> tool error. The verdict is <code>SledStoreAudit::is_clear</code> — the same computation the
+startup gate enforces (§10), so what the offline tool reports is what the binary will do.</p>
 <hr>
 <h2 id="3-scan-coverage-actually-achieved-evidence">3. Scan coverage actually achieved (evidence)</h2>
 <p><strong>This section records only what was measured.</strong></p>
@@ -476,7 +502,9 @@ store at migration time.</li>
 </ol>
 <p>Consequence for the migration design: the scan must be re-run <strong>immediately before</strong> the flip, and
 the fail-closed check belongs <em>in the binary</em> — a key-equality build should refuse to start against
-a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.</p>
+a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.
+<strong>Implemented</strong> as the startup gate (§10) on 2026-09-02; the point-in-time limits above still
+apply to any evidence gathered <em>outside</em> the binary.</p>
 <h2 id="4-keyspace-dispositions-decisions">4. Keyspace dispositions (decisions)</h2>
 <p>Merge rules are stated per keyspace and encoded in the scanner registry
 (<code>did_collision_scan::n2a_keyspaces</code>), so a scan reports the rule alongside the collision. No rule
@@ -715,13 +743,13 @@ rule authorizes choosing or combining them, the disposition is <strong>fail clos
 <td><code>Display</code></td>
 <td>0 in 3 scanned</td>
 <td>max</td>
-<td><strong>yes</strong> — same replay-floor family as <code>replay_max_seq</code></td>
+<td><strong>no</strong> — asserted by precedent; <code>SequenceTracker</code> reads and writes the exact spelling and implements no fold</td>
 <td>yes</td>
 <td>no</td>
 <td>4</td>
 <td>safe</td>
 <td>N2-A</td>
-<td>rule established by precedent</td>
+<td><strong>rule needs a trust-domain loader that folds; fail closed at the gate until then</strong></td>
 </tr>
 <tr>
 <td>17</td>
@@ -961,8 +989,9 @@ the old equality.</li>
 <li><strong>Membership and vote migration stay behind §7.5</strong> and are not part of N2-A.</li>
 </ol>
 <hr>
-<h2 id="9-remaining-implementation-blockers">9. Remaining implementation blockers</h2>
-<p>Implementation may begin only when <strong>all</strong> of the following hold.</p>
+<h2 id="9-remaining-cutover-blockers">9. Remaining cutover blockers</h2>
+<p>The equality flip (§8 step 6) has landed. What follows is what still stands between that code
+and a cutover anyone may rely on, re-stated against <code>main</code> at <code>5add7a48</code> plus the startup gate.</p>
 <table>
 <thead>
 <tr>
@@ -988,25 +1017,25 @@ the old equality.</li>
 <td>3</td>
 <td>Every required keyspace migration has a safe sequence</td>
 <td><strong>PARTIAL</strong></td>
-<td>with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed</td>
+<td>with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed; the <code>AttestationStore</code> cache/prefix mismatch recorded on #2627 belongs to it</td>
 </tr>
 <tr>
 <td>4</td>
 <td>Namespace splits created by principal equality resolved</td>
 <td><strong>OPEN</strong></td>
-<td><code>icn-commons</code> weak-holder id decision stated (§5) but unimplemented</td>
+<td><code>icn-commons</code> weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it</td>
 </tr>
 <tr>
 <td>5</td>
 <td><code>PeerId</code> ordering</td>
-<td><strong>OPEN</strong></td>
-<td>design complete (§6.1), unimplemented</td>
+<td><strong>DONE</strong></td>
+<td>#2684 — <code>Ord</code> over identifier bytes, non-interleaving classes</td>
 </tr>
 <tr>
 <td>6</td>
 <td>CCL <code>Value::Did</code> <code>Hash</code>/<code>Eq</code></td>
-<td><strong>OPEN</strong></td>
-<td>design complete (§6.2), unimplemented — a violated std contract post-flip</td>
+<td><strong>DONE</strong></td>
+<td>#2681 — hash over identifier bytes; #2685 consolidated the code hash</td>
 </tr>
 <tr>
 <td>7</td>
@@ -1018,20 +1047,182 @@ the old equality.</li>
 <td>8</td>
 <td>No §7.5 migration smuggled in</td>
 <td><strong>HELD</strong></td>
-<td>32 <code>gov:vote:</code> rows and the <code>icn-coop</code> membership row are excluded, not migrated</td>
+<td><code>gov:vote:</code> rows and the <code>icn-coop</code> membership row are excluded, not migrated; the startup gate reports vote collisions and does not act on them (§10.2)</td>
 </tr>
 <tr>
 <td>9</td>
 <td>Broad discriminating tests for the flip</td>
-<td><strong>OPEN</strong></td>
-<td>the scanner has them; the equality change has none, because it does not exist</td>
+<td><strong>DONE</strong></td>
+<td>#2686 — fifteen tests flipped, three re-scoped; #2627 records the count</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Fail-closed check inside the key-equality binary</td>
+<td><strong>DONE</strong></td>
+<td>§10 — <code>icnd</code> refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 28 fixture tests plus the scanner&#39;s</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Persisted principal-identity generation boundary</td>
+<td><strong>DONE (generation 1)</strong></td>
+<td>§10.3 — the receipt records the generation; a newer generation&#39;s receipt is refused. Generation 2 (any re-key) is <em>not</em> designed</td>
 </tr>
 </tbody></table>
-<p>Blockers <strong>4–7 and 9 are independent of collision evidence</strong> and would each block the flip even if
-every deployment scanned clean. They are the shortest path forward.</p>
+<p>Blockers <strong>3, 4 and 7 are independent of collision evidence</strong> and would each remain even if every
+deployment scanned clean. They are the shortest path forward. Row 10 changes their consequence
+rather than their status: until they are done, a store that trips one of them <strong>refuses to
+start</strong> instead of merging silently.</p>
 <p>The evidence gate (#1) has moved from <em>no evidence</em> to <em>no collisions in three deployments</em>, which
-is real but bounded: it does not license the flip on its own, and §3.5 explains why a
-point-in-time clean scan cannot.</p>
+is real but bounded, and §3.5 explains why a point-in-time clean scan cannot license anything on
+its own. Row 10 is what makes that acceptable: the binding check runs at the moment it matters.</p>
+<hr>
+<h2 id="10-the-startup-gate-implemented-2026-09-02">10. The startup gate (implemented 2026-09-02)</h2>
+<p><code>icn_store::n2a_startup_gate::enforce</code> runs in <code>icnd</code> after the data directory exists and
+<strong>before the first store is opened</strong> — the ledger, trust and parameter stores the daemon builds
+in <code>main</code>, then everything the supervisor opens. It is the fail-closed check §3.5 and inventory
+§12.1 item 7 call for, placed where those documents say it belongs.</p>
+<h3 id="101-what-it-does-in-order">10.1 What it does, in order</h3>
+<ol>
+<li><p>Reads <code>&lt;data_dir&gt;/n2a-startup-gate.json</code> if present. A receipt it cannot parse, or one whose
+<code>generation</code> exceeds the binary&#39;s, <strong>refuses</strong> — and is left untouched.</p>
+</li>
+<li><p>Finds every sled database beneath the data directory by its <code>conf</code> file (<code>find_sled_roots</code>):
+one per domain under <code>store/</code>, plus the data-directory-level databases a deployment keeps
+(<code>commons.sled</code>, …). A directory that is not a database is never opened, because <code>sled::open</code>
+would create one. A database added after this document was written is found the same way —
+there is no list to fall out of date.</p>
+<p><strong>The sweep is all-or-nothing.</strong> An unreadable directory, an unreadable entry, a symlink, or
+the depth bound each <strong>refuse</strong> rather than returning a shorter list. Review found the original
+walk swallowed all four: a directory that is searchable but not readable — the daemon can still
+open <code>…/store/ledger</code> by path while being unable to enumerate <code>…/store</code> — made an existing
+database look absent, and the gate would then have written a CLEAR receipt over a store it never
+audited. A caller cannot distinguish a partial list from a complete one, so the function must
+not produce one. A symlink is refused rather than followed or skipped: following lets the sweep
+leave the intended subtree, and skipping omits a database the daemon can still reach through it.</p>
+</li>
+<li><p>Opens each database, runs <code>audit_sled_store</code> — the <strong>same</strong> computation <code>did-collision-scan</code>
+renders — and closes it so the daemon&#39;s own open can take the lock.</p>
+</li>
+<li><p>Writes the receipt atomically (sibling temporary, <code>fsync</code>, rename) <strong>once a verdict exists</strong> —
+for <code>clear</code> and for <code>refused</code>. The refusals that occur before any store is audited (an
+unreadable or newer-generation receipt, a missing data directory, an incomplete sweep, an
+unverifiable store) return without recording anything: there is no verdict yet to record, and
+overwriting a prior receipt would destroy the last one that meant something.</p>
+</li>
+<li><p>Returns the receipt on <code>clear</code>; otherwise a <code>GateRefusal</code> that <code>icnd</code> turns into a non-zero
+exit with the payload-free summary in §10.4.</p>
+</li>
+</ol>
+<p>It <strong>never writes to a domain store</strong>. The only mutation while it runs is sled&#39;s own recovery on
+open, which the daemon would perform moments later regardless.</p>
+<h3 id="102-what-refuses-and-what-only-reports">10.2 What refuses, and what only reports</h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Effect</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Collision in a registered keyspace whose rule is <code>Established</code> and automatable (<code>replay_max_seq</code>, <code>replay_finalized</code>, <code>journal</code>)</td>
+<td><strong>clear</strong>, group recorded</td>
+<td>the live loader already implements the merge (§1.1, §4)</td>
+</tr>
+<tr>
+<td>Collision in a registered keyspace whose rule is <code>AwaitingDomainSignOff</code> (§2.4&#39;s seven, including <code>sequences_receiver</code>)</td>
+<td><strong>refuse</strong></td>
+<td>a plausible rule is not an authorized one, and a rule written down by precedent is not one a loader performs</td>
+</tr>
+<tr>
+<td>Collision in a <code>FailClosed</code> keyspace (<code>replay_sender_regime</code>, <code>icn-coop/member</code>)</td>
+<td><strong>refuse</strong></td>
+<td>no rule exists</td>
+</tr>
+<tr>
+<td>Unreadable principal row in a registered keyspace</td>
+<td><strong>refuse</strong></td>
+<td>cannot be classified, so cannot be merged on its own recognizance</td>
+</tr>
+<tr>
+<td>Principal-bearing row under no registered keyspace and no named gate</td>
+<td><strong>refuse</strong>, masked shape reported</td>
+<td>a keyspace nobody classified is the one that collapses unexamined</td>
+</tr>
+<tr>
+<td>Principal-bearing row in a named tree</td>
+<td><strong>refuse</strong></td>
+<td><code>Store::scan</code> cannot examine it</td>
+</tr>
+<tr>
+<td>Collision or unreadable row in <code>security:*</code></td>
+<td><strong>refuse</strong></td>
+<td><code>DeferredCollisionPosture::BlockStartup</code> — <code>MisbehaviorDetector::load_from_store</code> folds alias rows into principal-keyed maps and <code>save_to_store</code> at shutdown orphans the losers (#2676)</td>
+</tr>
+<tr>
+<td>Collision in <code>gov:vote:*</code></td>
+<td><strong>report only</strong></td>
+<td><code>ReportOnly</code> — votes are read per proposal, tallied through <code>VoteTally::try_from_votes</code> which fails closed on conflicting rows (#2641/#2677), and nothing at startup writes vote rows back. Deciding this is §7.5&#39;s business</td>
+</tr>
+<tr>
+<td>Collision in <code>auth:challenge:*</code></td>
+<td><strong>report only</strong></td>
+<td><code>ReportOnly</code> — a TTL-bounded nonce; collapse drops an in-flight challenge the client re-requests, nothing is written back, and blocking would trap the daemon that alone expires the rows</td>
+</tr>
+<tr>
+<td>A store that cannot be opened (held elsewhere, corrupt) or read completely</td>
+<td><strong>refuse</strong></td>
+<td>a store nothing can be said about is not one to start over</td>
+</tr>
+</tbody></table>
+<p>The postures are recorded on each <code>DeferredNamespace</code> with a one-line rationale citing the loader
+behaviour they rest on, and a test pins that every deferral carries one. They are statements about
+the load paths <strong>in this checkout</strong>; a loader that changes must revisit its posture.</p>
+<h3 id="103-the-receipt-and-the-generation">10.3 The receipt and the generation</h3>
+<p><code>n2a-startup-gate.json</code> is a <strong>record, not a skip token</strong>. The audit runs at every start whatever
+the receipt says; a test inserts an alias row after a clear receipt and proves the next start
+refuses. The receipt exists so an operator can see what was inspected, which keyspace refused and
+why, and when — and so a later generation has a boundary this one detects.</p>
+<p><code>PRINCIPAL_IDENTITY_GENERATION = 1</code> means I7: principal-byte equality, spelling-preserving
+persistence, no row re-keyed. A receipt carrying a higher generation was written by a binary that
+may have re-keyed rows; a generation-1 binary refuses to open that data directory rather than
+guess, and does not overwrite the receipt. A lower or absent generation simply means the audit has
+not been recorded under generation 1 yet.</p>
+<p><strong>Rollback.</strong> A pre-gate binary knows nothing of the receipt and ignores it; I7 moved no byte, so
+it reads the same rows. A generation-1 binary rolled forward again re-audits. What no binary can
+retroactively enforce is the interval in which a pre-gate binary ran over a store that has since
+acquired alias rows — which is exactly why the audit is unconditional.</p>
+<p><strong>Crash safety.</strong> An interrupted receipt write leaves only <code>n2a-startup-gate.json.tmp</code>, which is
+never read as a receipt; the next start audits and replaces it.</p>
+<h3 id="104-what-an-operator-does-with-a-refusal">10.4 What an operator does with a refusal</h3>
+<p>The daemon exits non-zero with one line per blocker, of the form</p>
+<pre><code class="language-text">&lt;store&gt;: keyspace icn-ledger/balance (sum, awaiting-domain-sign-off): 1 collision group(s) over 2 row(s), 0 unreadable; principals [1a2b3c4d]
+</code></pre>
+<p>carrying the keyspace, the rule and its authority status, counts, and eight-hex principal
+fingerprints — never a stored value and never a full identifier. Then:</p>
+<ol>
+<li>run <code>did-collision-scan &lt;store&gt;</code> for the full report, including which spelling a last-writer
+rebuild would keep;</li>
+<li>take the disposition to the domain that owns the keyspace (§4): economics for the ledger sums
+and freezes, trust for the edge union and issuer sequence, governance for membership, the
+security workflow for <code>security:*</code>;</li>
+<li>apply that disposition to the rows by hand, or flip the descriptor&#39;s <code>RuleBasis</code> to
+<code>Established</code> with the approval cited, and restart.</li>
+</ol>
+<p>There is <strong>no bypass flag</strong>, by design: the alternative to refusing is the silent merge the whole
+tranche exists to prevent.</p>
+<h3 id="105-evidence">10.5 Evidence</h3>
+<p><code>icn/crates/icn-store/tests/n2a_startup_gate.rs</code> — 28 fixtures on real sled databases: every
+row of §10.2 with its one-fact-different control (same spelling twice, two different principals,
+a single security row, an uncovered row without a principal); the fixture guard that the two
+spellings are distinct strings and <code>==</code> as <code>Did</code> with equal hashes; unreadable and
+newer-generation receipts refused and preserved; older-generation receipt superseded; the
+record-not-token property in both directions; idempotence with every store&#39;s rows byte-identical
+across runs; a stale <code>.tmp</code> not read; no database created where none existed; a store held open
+elsewhere unverifiable and nothing recorded; the receipt and the refusal message carrying neither
+payload nor identifier. <code>icn/crates/icn-store/src/did_collision_scan.rs</code> adds eight tests on the
+deferred postures and the shared audit. All fixture evidence; no deployment was scanned by the
+gate.</p>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/n2-a-migration-gate.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
 </a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
