@@ -1109,9 +1109,16 @@ independently of canonical agreement state.*
   spelling that names no principal, a value naming a different agreement than the key — is
   *malformed*: every operation that interprets the projection refuses with
   `AgreementPartyIndexMalformed { rows, first_reason }` (every row is classified before refusing;
-  no spelling or payload travels in the error). An unreadable canonical row refuses every
-  operation that needs it with `AgreementStoreUnreadable`, including `list_agreements`, which no
-  longer skips it.
+  no spelling or payload travels in the error). Canonical evidence is held to the same standard:
+  an unreadable canonical row refuses every operation that needs it with
+  `AgreementStoreUnreadable`, including `list_agreements`, which no longer skips it; and a
+  canonical row that deserializes but carries a *different agreement's id than its key names* is
+  attributed to neither agreement and refuses with `AgreementStoreKeyValueMismatch` — such a row
+  is one row's value under another row's key, and using it would let a replacement retire the
+  other agreement's projection rows, a rebuild call the named agreement's real rows stale, or a
+  lookup report a party absent from a row it never read. Every mutating path (`store_agreement`,
+  `delete_agreement`, `rebuild_party_index`) reads canonical evidence before it moves a byte, so
+  both refusals leave the store byte-for-byte unchanged.
 * **Writes keep the projection a superset of the truth, never a subset.** `store_agreement`
   writes the new party rows, then the canonical row, then retires the rows the previous canonical
   version implied and the new one does not (a removed party, or a party the new version spells
