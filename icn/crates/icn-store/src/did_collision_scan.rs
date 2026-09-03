@@ -1106,9 +1106,15 @@ pub fn audit_sled_store(store: &crate::SledStore) -> anyhow::Result<SledStoreAud
 /// Collect every sled database root beneath `dir`, in path order.
 ///
 /// A directory is a root when it holds sled's `conf` file, which sled writes
-/// on creation for every database, empty or not. Roots are not descended into
-/// — a database's own `blobs/` directory is not another database — and the
-/// walk is bounded in depth so a stray symlink cycle cannot make it endless.
+/// on creation for every database, empty or not. A root is recorded **and**
+/// walked through, because a database can hold databases: `icnctl init-coop`
+/// opens `<data_dir>/store` itself as a database, while `icnd` keeps
+/// `store/ledger`, `store/trust`, `store/cooperative`, … beneath it. Stopping
+/// at the first `conf` would leave every nested domain database unaudited and
+/// let a CLEAR receipt be written over a blocker the daemon opens moments
+/// later. Sled's own subdirectory (`blobs/`) carries no `conf`, so nothing
+/// inside a database is mistaken for one, and the walk is bounded in depth so
+/// a stray cycle cannot make it endless.
 ///
 /// **The sweep is all-or-nothing.** An unreadable directory, an unreadable
 /// entry, a symlink, or the depth bound each return an error rather than a
@@ -1169,11 +1175,13 @@ pub fn find_sled_roots(dir: &std::path::Path) -> anyhow::Result<Vec<std::path::P
                 continue;
             }
 
+            // Record a database and keep walking beneath it: a root can hold
+            // roots (see the doc comment), and a database's own subdirectories
+            // hold no `conf`, so descending never lists one twice.
             if child.join("conf").is_file() {
-                out.push(child);
-            } else {
-                walk(&child, depth + 1, out)?;
+                out.push(child.clone());
             }
+            walk(&child, depth + 1, out)?;
         }
         Ok(())
     }
@@ -1181,9 +1189,8 @@ pub fn find_sled_roots(dir: &std::path::Path) -> anyhow::Result<Vec<std::path::P
     let mut out = Vec::new();
     if dir.join("conf").is_file() {
         out.push(dir.to_path_buf());
-    } else {
-        walk(dir, 0, &mut out)?;
     }
+    walk(dir, 0, &mut out)?;
     // Deterministic order: a receipt that lists stores must list them the same
     // way on every run, whatever order the filesystem returned them in.
     out.sort();
@@ -1320,12 +1327,21 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/sequences/receiver/",
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
-            basis: RuleBasis::Established,
+            // Asserted by precedent, not implemented: `SequenceTracker`
+            // (`apps/trust-app/src/sequence.rs`) reads and writes the exact
+            // spelling and folds nothing, so two spellings of one issuer are
+            // two independent replay floors and the issuer may submit under
+            // whichever is lower. `replay_max_seq` earns `Established` because
+            // its loader performs the fold (#2644); this one does not, so a
+            // collision here must refuse until a trust-domain loader does.
+            basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
-                        survivor accepts stale attestations, so the merge keeps the maximum, \
-                        matching the established replay_max_seq precedent.",
+                        survivor accepts stale attestations, so the merge would keep the \
+                        maximum, as replay_max_seq does; but the receiver tracker reads and \
+                        writes the exact spelling and implements no fold, so the rule is \
+                        asserted, not established.",
         },
         KeyspaceDescriptor {
             name: "trust-app/sequences_issuer",
@@ -2060,12 +2076,18 @@ mod tests {
             "icn-net/outgoing_seq",
             "icn-trust/edges",
             "trust-app/sequences_issuer",
+            "trust-app/sequences_receiver",
         ] {
             assert!(
                 pending.contains(&expected),
                 "{expected} has no domain sign-off and must not be automatable"
             );
         }
+        assert_eq!(
+            pending.len(),
+            7,
+            "the sign-off set is pinned exactly: {pending:?}"
+        );
     }
 
     #[test]
@@ -2318,13 +2340,19 @@ mod tests {
     }
 
     #[test]
-    fn find_sled_roots_finds_databases_at_any_level_and_never_descends_into_one() {
+    fn find_sled_roots_finds_databases_at_any_level_including_inside_one() {
         let base = tempfile::tempdir().unwrap();
         let data_dir = base.path();
 
-        // One database under store/, one at the data-dir level, one directory
-        // that is not a database, and a database nested inside a non-database.
-        for rel in ["store/ledger", "commons.sled", "store/deeper/nested"] {
+        // `store/` is itself a database (as `icnctl init-coop` leaves it), and
+        // holds a database, a non-database directory, and a database nested
+        // inside a non-database; one more database sits at the data-dir level.
+        for rel in [
+            "store",
+            "store/ledger",
+            "commons.sled",
+            "store/deeper/nested",
+        ] {
             let path = data_dir.join(rel);
             std::fs::create_dir_all(&path).unwrap();
             let db = sled::open(&path).unwrap();
@@ -2342,9 +2370,19 @@ mod tests {
 
         assert_eq!(
             rel,
-            vec!["commons.sled", "store/deeper/nested", "store/ledger"],
+            vec![
+                "commons.sled",
+                "store",
+                "store/deeper/nested",
+                "store/ledger"
+            ],
             "path-ordered; a non-database directory is walked through, not listed; \
-             a database's own subdirectories are never listed as databases"
+             a database inside a database is listed; a database's own \
+             subdirectories (`blobs/`) are never listed as databases"
+        );
+        assert!(
+            data_dir.join("store/blobs").is_dir(),
+            "the fixture must exercise sled's own subdirectory"
         );
     }
 

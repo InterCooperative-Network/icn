@@ -224,6 +224,128 @@ fn an_alias_collision_under_a_rule_live_in_tree_does_not_block_but_is_recorded()
 }
 
 // ---------------------------------------------------------------------------
+// Discovery completeness: a database can hold databases.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_database_nested_inside_another_database_is_audited_not_omitted() {
+    // `icnctl init-coop` opens `<data_dir>/store` itself as a sled database,
+    // and `icnd` keeps `store/ledger`, `store/trust`, `store/cooperative`, …
+    // beneath it. Discovery that records the parent and stops there leaves
+    // every nested domain database unaudited: the parent is clean, the gate
+    // writes a CLEAR receipt, and the daemon then opens a blocker unexamined.
+    let dir = tempfile::tempdir().unwrap();
+    let parent = dir.path().join("store");
+    make_store(&parent, &[("unrelated:key".to_string(), b"v")]);
+    let (a, b) = two_spellings(21);
+    let nested = store_root(dir.path(), "cooperative");
+    make_store(
+        &nested,
+        &[
+            (format!("member:coop-a:{a}"), b"m"),
+            (format!("member:coop-a:{b}"), b"m"),
+        ],
+    );
+    let before = rows_of(&nested);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let paths: Vec<&str> = receipt.stores.iter().map(|s| s.path.as_str()).collect();
+    assert!(
+        paths.iter().any(|p| p.ends_with("/store")),
+        "the parent database is audited: {paths:?}"
+    );
+    assert!(
+        paths.iter().any(|p| p.ends_with("store/cooperative")),
+        "the database nested inside it is audited too: {paths:?}"
+    );
+    let blockers = blockers_for(&receipt, "store/cooperative");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, .. } if keyspace == "icn-coop/member"),
+        "{blockers:?}"
+    );
+    assert_eq!(rows_of(&nested), before, "the gate moved a byte");
+}
+
+#[test]
+fn control_a_clean_database_holding_a_clean_database_is_clear_and_lists_both() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &dir.path().join("store"),
+        &[("unrelated:key".to_string(), b"v")],
+    );
+    make_store(
+        &store_root(dir.path(), "cooperative"),
+        &[(format!("member:coop-a:{}", canonical(21)), b"m")],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert_eq!(receipt.stores.len(), 2, "both databases are on the receipt");
+}
+
+// ---------------------------------------------------------------------------
+// A documented merge rule is not an implemented one.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_alias_collision_in_the_receiver_sequence_keyspace_refuses_because_nothing_folds_it() {
+    // `trust/sequences/receiver/<issuer>` is a replay floor, and the migration
+    // record wrote down a max-monotonic merge for it "by precedent". But
+    // `apps/trust-app/src/sequence.rs` reads and writes the exact spelling and
+    // folds nothing, so two spellings of one issuer are two independent floors
+    // and the issuer can submit under whichever is lower. Until a loader
+    // implements the fold, the gate must refuse rather than clear.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(22);
+    let root = store_root(dir.path(), "trust");
+    make_store(
+        &root,
+        &[
+            (format!("trust/sequences/receiver/{a}"), b"5"),
+            (format!("trust/sequences/receiver/{b}"), b"9"),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/trust");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, basis, disposition, collision_groups, .. }
+            if keyspace == "trust-app/sequences_receiver"
+                && basis == "awaiting-domain-sign-off"
+                && disposition == "max-monotonic"
+                && *collision_groups == 1),
+        "{blockers:?}"
+    );
+    assert_eq!(rows_of(&root), before, "the gate moved a byte");
+}
+
+#[test]
+fn control_two_issuers_receiver_sequences_are_clear() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &store_root(dir.path(), "trust"),
+        &[
+            (format!("trust/sequences/receiver/{}", canonical(22)), b"5"),
+            (format!("trust/sequences/receiver/{}", canonical(23)), b"9"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let seq = receipt.stores[0]
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "trust-app/sequences_receiver")
+        .unwrap();
+    assert_eq!(seq.collision_groups, 0);
+}
+
+// ---------------------------------------------------------------------------
 // Refusals, each with its one-fact-different control.
 // ---------------------------------------------------------------------------
 

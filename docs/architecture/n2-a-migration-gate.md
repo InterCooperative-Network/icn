@@ -145,10 +145,13 @@ written down: `KeyspaceDescriptor::basis` carries `RuleBasis::Established` or
 This closes a real contradiction found in review. §4 row 5 said summing ledger
 balances still needed economics sign-off, while the code marked that keyspace
 `Sum` — so a generic storage crate would have authorized a merge of monetary
-state on nothing but its own say-so. Six keyspaces are currently
+state on nothing but its own say-so. Seven keyspaces are currently
 `AwaitingDomainSignOff`: `icn-ledger/{balance,cleared_volume,frozen}`,
-`icn-net/outgoing_seq`, `icn-trust/edges`, `trust-app/sequences_issuer`. A test
-pins that list against this document so the two cannot drift.
+`icn-net/outgoing_seq`, `icn-trust/edges`, `trust-app/sequences_{issuer,receiver}`. A test
+pins that list against this document so the two cannot drift. `sequences_receiver` moved into
+this set on 2026-09-03: its max rule had been marked established "by precedent", but precedent is
+not implementation — the receiver tracker reads and writes the exact spelling and folds nothing,
+so the gate now refuses a collision there rather than clearing it on a rule no loader performs.
 
 The basis only bites when there is something to merge; a keyspace with no
 collisions stays automatable whatever its basis.
@@ -394,7 +397,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 13 | `icn-commons` weak-holder id (#65) | SHA-256 of spelling | I7 *creates* the split | — | no | **no** | — | before 6 | n/a | N2-A | **namespace decision — see §5** |
 | 14 | `VectorClock` (#45), snapshot `vector_clock` (#54) | serialized map | **0 in 3 scanned** | max | yes — `VectorClockProjection::from_entries` | yes | no | 4 | safe | N2-A | rule established |
 | 15 | snapshot `peer_connections` (#57) | serialized map | **0 in 3 scanned** | **fail closed** | no | no | — | 4 | safe | N2-A | **no authorized rule** |
-| 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **yes** — same replay-floor family as `replay_max_seq` | yes | no | 4 | safe | N2-A | rule established by precedent |
+| 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **no** — asserted by precedent; `SequenceTracker` reads and writes the exact spelling and implements no fold | yes | no | 4 | safe | N2-A | **rule needs a trust-domain loader that folds; fail closed at the gate until then** |
 | 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
@@ -633,8 +636,8 @@ open, which the daemon would perform moments later regardless.
 
 | Condition | Effect | Why |
 |---|---|---|
-| Collision in a registered keyspace whose rule is `Established` and automatable (`replay_max_seq`, `replay_finalized`, `sequences_receiver`, `journal`) | **clear**, group recorded | the live loader already implements the merge (§1.1, §4) |
-| Collision in a registered keyspace whose rule is `AwaitingDomainSignOff` (§2.4's six) | **refuse** | a plausible rule is not an authorized one |
+| Collision in a registered keyspace whose rule is `Established` and automatable (`replay_max_seq`, `replay_finalized`, `journal`) | **clear**, group recorded | the live loader already implements the merge (§1.1, §4) |
+| Collision in a registered keyspace whose rule is `AwaitingDomainSignOff` (§2.4's seven, including `sequences_receiver`) | **refuse** | a plausible rule is not an authorized one, and a rule written down by precedent is not one a loader performs |
 | Collision in a `FailClosed` keyspace (`replay_sender_regime`, `icn-coop/member`) | **refuse** | no rule exists |
 | Unreadable principal row in a registered keyspace | **refuse** | cannot be classified, so cannot be merged on its own recognizance |
 | Principal-bearing row under no registered keyspace and no named gate | **refuse**, masked shape reported | a keyspace nobody classified is the one that collapses unexamined |
