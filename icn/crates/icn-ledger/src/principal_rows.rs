@@ -131,23 +131,67 @@ pub enum PrincipalRowsRefusal {
     },
 }
 
-/// Render colliding groups for the error text: fingerprint, discriminator and
-/// spelling count only.
+/// Longest discriminator shown in a refusal, in characters after escaping.
+///
+/// A currency is not validated against a charset or a length anywhere in this
+/// crate, so the discriminator is persisted, externally supplied text. It is
+/// shown because it is what tells two groups of one principal apart, and it
+/// is escaped and bounded because a refusal is the operator's evidence for a
+/// deliberate failed start and must survive being logged whatever the row
+/// held.
+const DISCRIMINATOR_ERROR_CAP: usize = 32;
+
+/// Most colliding groups listed in one refusal. The true count is always
+/// stated; only the listing is cut, and the cut is stated too.
+const GROUPS_ERROR_CAP: usize = 16;
+
+/// Escape untrusted text for a one-line diagnostic and bound what is shown.
+///
+/// Every character goes through `char::escape_default`, so control characters
+/// (newline, carriage return, tab, ANSI escape), quotes and non-ASCII become
+/// escape sequences and the result cannot end the line or repaint a terminal.
+/// The cap counts shown characters and is applied per source character, so a
+/// cut never lands inside an escape sequence; a cut is marked with `…`.
+fn escaped_bounded(text: &str, cap: usize) -> String {
+    let mut out = String::new();
+    let mut shown = 0usize;
+    for c in text.chars() {
+        let escaped: String = c.escape_default().collect();
+        let width = escaped.chars().count();
+        if shown + width > cap {
+            out.push('…');
+            return out;
+        }
+        shown += width;
+        out.push_str(&escaped);
+    }
+    out
+}
+
+/// Render colliding groups for the error text: fingerprint, escaped and
+/// bounded discriminator, and spelling count only. At most
+/// [`GROUPS_ERROR_CAP`] groups are listed; the remainder is counted.
 fn describe_groups(groups: &[AliasGroup]) -> String {
-    groups
+    let mut listed: Vec<String> = groups
         .iter()
+        .take(GROUPS_ERROR_CAP)
         .map(|g| {
             if g.discriminator.is_empty() {
                 format!("{}×{}", g.principal_fingerprint, g.spellings)
             } else {
                 format!(
                     "{}[{}]×{}",
-                    g.principal_fingerprint, g.discriminator, g.spellings
+                    g.principal_fingerprint,
+                    escaped_bounded(&g.discriminator, DISCRIMINATOR_ERROR_CAP),
+                    g.spellings
                 )
             }
         })
-        .collect::<Vec<_>>()
-        .join(", ")
+        .collect();
+    if groups.len() > GROUPS_ERROR_CAP {
+        listed.push(format!("and {} more", groups.len() - GROUPS_ERROR_CAP));
+    }
+    listed.join(", ")
 }
 
 /// Decide whether a keyspace's stored keys name each principal exactly once.
@@ -339,5 +383,93 @@ mod tests {
         assert!(!text.contains(a.as_str()), "refusal leaked a spelling");
         assert!(!text.contains(alias.as_str()), "refusal leaked a spelling");
         assert!(text.contains(BALANCE_KEYSPACE));
+    }
+
+    #[test]
+    fn a_hostile_currency_cannot_forge_or_split_the_refusal_line() {
+        // `ledger:cleared_volume:` carries the currency as the discriminator,
+        // and nothing validates a currency against a charset, so an alias
+        // collision can arrive wearing whatever text was persisted: a newline
+        // that ends the log line, a forged entry after it, an ANSI escape that
+        // repaints the terminal, and enough length to swamp the message.
+        let a = a_principal();
+        let alias = alternate_spelling(&a);
+        let mut hostile = String::from("USD\n[ERROR] ledger clean, proceeding\r\x1b[31m\t");
+        hostile.extend(std::iter::repeat_n('X', 600));
+        let rows = vec![
+            (a.as_str(), hostile.as_str()),
+            (alias.as_str(), hostile.as_str()),
+        ];
+
+        let refusal = refuse_unless_one_spelling_per_principal(CLEARED_VOLUME_KEYSPACE, rows)
+            .expect_err("the collision must still refuse");
+        assert!(matches!(
+            refusal,
+            PrincipalRowsRefusal::AliasCollision { .. }
+        ));
+        let text = refusal.to_string();
+
+        assert!(text.contains(CLEARED_VOLUME_KEYSPACE), "names the keyspace");
+        assert!(
+            text.contains("1 persisted row group"),
+            "names the collision fact"
+        );
+        assert!(
+            !text.chars().any(|c| c.is_control()),
+            "a control character reached the diagnostic: {text:?}"
+        );
+        assert_eq!(text.lines().count(), 1, "one logical log line: {text:?}");
+        assert!(
+            !text
+                .lines()
+                .any(|line| line.trim_start().starts_with("[ERROR]")),
+            "the forged entry must not begin a line: {text:?}"
+        );
+        assert!(
+            text.contains("USD\\n[ERROR]"),
+            "the forged entry stays glued to the escaped newline: {text}"
+        );
+        assert!(
+            text.contains("USD\\n"),
+            "escaped rather than dropped: {text}"
+        );
+        assert!(!text.contains(a.as_str()) && !text.contains(alias.as_str()));
+        assert!(
+            text.chars().count() < 400,
+            "bounded: {} chars for a 600-char discriminator",
+            text.chars().count()
+        );
+    }
+
+    #[test]
+    fn many_colliding_groups_still_render_as_one_bounded_line() {
+        // A store can hold an alias pair for every account it has; the
+        // refusal must stay a bounded line and still state the true count.
+        let rows: Vec<(Did, Did)> = (0..40)
+            .map(|_| {
+                let a = a_principal();
+                let alias = alternate_spelling(&a);
+                (a, alias)
+            })
+            .collect();
+        let flat: Vec<(&str, &str)> = rows
+            .iter()
+            .flat_map(|(a, alias)| [(a.as_str(), "USD"), (alias.as_str(), "USD")])
+            .collect();
+
+        let text = refuse_unless_one_spelling_per_principal(CLEARED_VOLUME_KEYSPACE, flat)
+            .expect_err("must refuse")
+            .to_string();
+        assert!(text.contains("40 persisted row group"), "{text}");
+        assert_eq!(text.lines().count(), 1);
+        assert!(
+            text.chars().count() < 1200,
+            "bounded: {} chars",
+            text.chars().count()
+        );
+        assert!(
+            text.contains("more"),
+            "the cut is stated, not silent: {text}"
+        );
     }
 }

@@ -604,4 +604,62 @@ mod tests {
         let indefinite = FrozenMember::new(test_did("test2"), "Indefinite".to_string(), None);
         assert!(indefinite.remaining_seconds().is_none());
     }
+
+    /// A second, equally valid textual encoding of the principal `did` names.
+    fn alternate_spelling(did: &Did) -> Did {
+        let bytes = did.identifier_bytes().unwrap();
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+        assert_ne!(did.as_str(), alias.as_str(), "the spellings must differ");
+        assert_eq!(&alias, did, "and name one principal");
+        alias
+    }
+
+    #[test]
+    fn unfreeze_audit_names_the_stored_row_not_the_callers_spelling() {
+        // Persistence action and audit fact must refer to the same stored row
+        // identity. A release named under an alias deletes the stored spelling's
+        // row, so the history entry must name that spelling too — an event
+        // naming a DID string that was never a persisted key cannot be
+        // reconciled with the store.
+        let store: Arc<dyn Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let stored = test_did("stored");
+        let alias = alternate_spelling(&stored);
+        let mut manager = FreezeManager::with_store(store.clone()).unwrap();
+
+        manager.freeze(stored.clone(), "hold".to_string(), None);
+        let removed = manager
+            .unfreeze(&alias, "released".to_string())
+            .expect("the principal was frozen under another spelling");
+        assert_eq!(removed.did.as_str(), stored.as_str());
+        let event = manager.unfreeze_history().last().unwrap();
+        assert_eq!(
+            event.did.as_str(),
+            stored.as_str(),
+            "the audit names the row that was deleted, not the alias the caller typed"
+        );
+        assert_ne!(event.did.as_str(), alias.as_str());
+        assert!(store.scan(FREEZE_PREFIX.as_bytes()).unwrap().is_empty());
+
+        // The metadata path follows the same rule.
+        manager.freeze_with_metadata(
+            stored.clone(),
+            "hold".to_string(),
+            None,
+            Some("prop-1".to_string()),
+            None,
+        );
+        let removed = manager
+            .unfreeze_with_metadata(
+                &alias,
+                "released".to_string(),
+                Some("prop-2".to_string()),
+                Some(alias.clone()),
+            )
+            .expect("the principal was frozen under another spelling");
+        assert_eq!(removed.did.as_str(), stored.as_str());
+        let event = manager.unfreeze_history().last().unwrap();
+        assert_eq!(event.did.as_str(), stored.as_str());
+        assert_eq!(event.proposal_id.as_deref(), Some("prop-2"));
+        assert!(store.scan(FREEZE_PREFIX.as_bytes()).unwrap().is_empty());
+    }
 }
