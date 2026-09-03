@@ -50,20 +50,54 @@ pub enum FederationError {
     #[error("Attestation rate limit exceeded")]
     AttestationRateLimitExceeded,
 
-    #[error("Unreadable persisted row in federation/attestations: {reason}")]
-    AttestationStoreUnreadable { reason: String },
-
+    /// A persisted `federation/attestations` row could not be attributed to a
+    /// principal (N2-A, #2703). Carries the error class and position, never the
+    /// value: the `Did` deserializer echoes the spelling it rejected.
     #[error(
-        "Persisted federation/attestations key disagrees with its value for source {source_coop_id}"
+        "Unreadable persisted federation/attestations row ({key_len}-byte key, {value_len}-byte value): {reason}"
     )]
-    AttestationStoreKeyValueMismatch { source_coop_id: String },
+    AttestationStoreUnreadable {
+        key_len: usize,
+        value_len: usize,
+        reason: String,
+    },
 
+    /// A persisted `federation/attestations` key is not the key its own value
+    /// implies, so the row cannot be attributed to a principal.
     #[error(
-        "Ambiguous federation/attestations rows for one principal from source {source_coop_id}: {row_count} rows"
+        "Persisted federation/attestations key ({key_len} bytes) disagrees with its value: principal {principal_fingerprint}…, source {source_coop_id}"
+    )]
+    AttestationStoreKeyValueMismatch {
+        principal_fingerprint: String,
+        source_coop_id: String,
+        key_len: usize,
+    },
+
+    /// Two persisted `federation/attestations` rows name one principal from one
+    /// source cooperative under different spellings. No federation-domain rule
+    /// authorizes choosing or combining them, so the operation that would have
+    /// interpreted them fails closed. `principal_fingerprint` is eight hex
+    /// characters of the identifier — the N2-A scanner's rule — and
+    /// `colliding_pairs` counts every such pair the operation saw.
+    #[error(
+        "Ambiguous federation/attestations rows: {row_count} rows for principal {principal_fingerprint}… from source {source_coop_id} ({colliding_pairs} colliding pair(s)); no federation merge rule is authorized"
     )]
     AttestationStorePrincipalCollision {
+        principal_fingerprint: String,
         source_coop_id: String,
         row_count: usize,
+        colliding_pairs: usize,
+    },
+
+    /// A write would have persisted a second spelling of a
+    /// `(principal, source_coop_id)` pair that is already stored — the
+    /// collision above, one write early.
+    #[error(
+        "Refusing federation/attestations write: principal {principal_fingerprint}… from source {source_coop_id} is already persisted under another spelling"
+    )]
+    AttestationStoreAliasWriteRefused {
+        principal_fingerprint: String,
+        source_coop_id: String,
     },
 
     // Clearing errors
