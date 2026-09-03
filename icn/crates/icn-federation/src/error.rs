@@ -203,6 +203,22 @@ pub enum FederationError {
         reason: String,
     },
 
+    /// A persisted `federation/agreements/` row deserializes, but the agreement
+    /// it carries is not the agreement its key names. The key locates the row;
+    /// the value must be that agreement. A row that says otherwise is one
+    /// row's value under another row's key — the fingerprint of a collapsed
+    /// rebuild's write-back, or of raw tampering — and it is attributed to
+    /// neither agreement: every operation that needs it refuses before moving
+    /// a byte. `key_agreement_id` is the id from the key (the locator an
+    /// operator must inspect), bounded; the value's contents never travel.
+    #[error(
+        "Persisted federation/agreements row for {key_agreement_id} carries a value naming a different agreement ({value_len}-byte value); refusing to attribute it"
+    )]
+    AgreementStoreKeyValueMismatch {
+        key_agreement_id: String,
+        value_len: usize,
+    },
+
     /// `idx_agreement_party/` holds rows the agreement store could never have
     /// written: a key that does not parse as
     /// `idx_agreement_party/<did>/<agreement id>`, a spelling that names no

@@ -89,6 +89,24 @@ fn unreadable_reason(err: &serde_json::Error) -> String {
     )
 }
 
+/// Longest agreement id echoed from a canonical key into an error, in characters.
+const KEY_ID_ERROR_CAP: usize = 64;
+
+/// The agreement id a canonical key names, bounded for an error message.
+///
+/// Taken from the key, never from the value: the key is the locator an
+/// operator must inspect, and the value is the untrusted half of the pair.
+fn bounded_key_id(key: &[u8]) -> String {
+    let id = key.strip_prefix(AGREEMENT_PREFIX).unwrap_or(key);
+    let id = String::from_utf8_lossy(id);
+    if id.chars().count() <= KEY_ID_ERROR_CAP {
+        return id.into_owned();
+    }
+    let mut out: String = id.chars().take(KEY_ID_ERROR_CAP).collect();
+    out.push('…');
+    out
+}
+
 /// One parsed projection row, attributed to a principal and an agreement.
 struct PartyIndexRow {
     key: Vec<u8>,
@@ -240,15 +258,32 @@ impl AgreementStore {
             .put(agreement.id.clone(), agreement.clone());
     }
 
-    /// Decode one canonical row, surfacing an unreadable one without its bytes.
+    /// Decode one canonical row and check that it is the agreement its key
+    /// names.
+    ///
+    /// The key locates the row; the value must be that agreement. A value that
+    /// deserializes but carries another agreement's id is one row's value
+    /// under another row's key — the fingerprint of a collapsed rebuild's
+    /// write-back, or of raw tampering. It is attributed to neither agreement:
+    /// returning it would let a replacement retire the *other* agreement's
+    /// projection rows, a rebuild call the named agreement's real rows stale,
+    /// and a lookup report a party absent from an agreement it never read.
+    /// An unreadable value is surfaced without its bytes.
     fn decode_canonical(key: &[u8], value: &[u8]) -> Result<Agreement> {
-        serde_json::from_slice::<Agreement>(value).map_err(|err| {
+        let agreement = serde_json::from_slice::<Agreement>(value).map_err(|err| {
             FederationError::AgreementStoreUnreadable {
                 key_len: key.len(),
                 value_len: value.len(),
                 reason: unreadable_reason(&err),
             }
-        })
+        })?;
+        if Self::agreement_key(&agreement.id) != key {
+            return Err(FederationError::AgreementStoreKeyValueMismatch {
+                key_agreement_id: bounded_key_id(key),
+                value_len: value.len(),
+            });
+        }
+        Ok(agreement)
     }
 
     /// Read one canonical row from the backend, bypassing the cache.
@@ -1942,5 +1977,123 @@ mod tests {
                 .unwrap();
             assert!(row_delete > canonical_delete);
         }
+    }
+
+    // ----- canonical key/value identity (#2707 review) ---------------------------
+
+    /// Store `other`'s serialized value under `victim`'s canonical key: one
+    /// row's value under another row's key, the shape a collapsed rebuild's
+    /// write-back leaves behind, and the shape an adversary with raw store
+    /// access would choose to make one agreement wear another's identity.
+    fn misfile(raw: &icn_store::SledStore, victim: &AgreementId, other: &Agreement) {
+        raw.put(
+            &AgreementStore::agreement_key(victim),
+            &serde_json::to_vec(other).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_canonical_row_whose_value_names_another_agreement_is_attributed_to_neither() {
+        let (raw, warm) = open_pair();
+        let a = test_did();
+        let b = test_did();
+        let c = test_did();
+        let victim = two_party_agreement(&a, &b);
+        let other = two_party_agreement(&c, &test_did());
+        warm.store_agreement(&victim).unwrap();
+        warm.store_agreement(&other).unwrap();
+        misfile(&raw, &victim.id, &other);
+        // A cold handle, so the warm cache cannot mask what is on disk.
+        let store = AgreementStore::new(raw.clone() as Arc<dyn Store>);
+
+        assert!(
+            matches!(
+                store.get_agreement(&victim.id),
+                Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+            ),
+            "the row is neither `victim` nor `other`; it is unusable"
+        );
+        assert!(matches!(
+            store.list_agreements(),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        // A party lookup that must load the row fails closed rather than
+        // reporting the party absent from an agreement it cannot read.
+        assert!(matches!(
+            store.list_agreements_for_party(&a),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        // A lookup that does not need the row still answers, from its own
+        // intact canonical row.
+        assert_eq!(store.list_agreements_for_party(&c).unwrap()[0].id, other.id);
+        assert_eq!(
+            store.get_agreement(&other.id).unwrap().unwrap().id,
+            other.id
+        );
+        // The refusal carries no stored bytes.
+        let text = store.get_agreement(&victim.id).unwrap_err().to_string();
+        assert!(
+            !text.contains(a.as_str()) && !text.contains(c.as_str()),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_canonical_key_value_disagreement_refuses_every_mutation_before_a_byte_moves() {
+        let (raw, store) = open_pair();
+        let a = test_did();
+        let b = test_did();
+        let c = test_did();
+        let mut victim = two_party_agreement(&a, &b);
+        let other = two_party_agreement(&c, &test_did());
+        store.store_agreement(&victim).unwrap();
+        store.store_agreement(&other).unwrap();
+        misfile(&raw, &victim.id, &other);
+        let snapshot = raw.scan(b"").unwrap();
+
+        // Replacement would otherwise take `other`'s parties as the previous
+        // party set and retire `other`'s projection rows.
+        victim.parties.retain(|p| p.did != b);
+        assert!(matches!(
+            store.store_agreement(&victim),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        assert_eq!(
+            raw.scan(b"").unwrap(),
+            snapshot,
+            "store_agreement moved a byte"
+        );
+
+        // Deletion would otherwise destroy the evidence.
+        assert!(matches!(
+            store.delete_agreement(&victim.id),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        assert_eq!(
+            raw.scan(b"").unwrap(),
+            snapshot,
+            "delete_agreement moved a byte"
+        );
+
+        // Rebuild would otherwise derive the expected set from `other` twice,
+        // call `victim`'s real rows stale, and remove them.
+        assert!(matches!(
+            store.rebuild_party_index(),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        assert_eq!(
+            raw.scan(b"").unwrap(),
+            snapshot,
+            "rebuild_party_index moved a byte"
+        );
+
+        // An agreement that does not touch the row can still be written.
+        let fresh = two_party_agreement(&test_did(), &test_did());
+        store.store_agreement(&fresh).unwrap();
+        assert_eq!(
+            store.get_agreement(&fresh.id).unwrap().unwrap().id,
+            fresh.id
+        );
     }
 }
