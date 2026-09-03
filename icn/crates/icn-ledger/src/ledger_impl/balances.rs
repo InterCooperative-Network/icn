@@ -24,7 +24,7 @@ use crate::principal_rows::{
 };
 use crate::types::AccountBalances;
 use anyhow::Result;
-use icn_identity::Did;
+use icn_identity::{identifier_bytes_of_spelling, Did};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -362,44 +362,44 @@ pub(crate) fn save_cached_balances(ledger: &Ledger) -> Result<()> {
     Ok(())
 }
 
-/// The multibase Identity sigil: the identifier body that follows it is the
-/// raw 32 identifier bytes, unencoded.
-const MULTIBASE_IDENTITY_SIGIL: u8 = 0x00;
-
 /// Split a `ledger:cleared_volume:<did>:<currency>` key into its spelling and
 /// currency, exactly, or `None` for a key the writer could not have produced.
 ///
 /// `save_cleared_volume_index` writes `{did}:{currency}` with `Display`, and a
 /// currency is not validated against a charset anywhere in this crate, so the
 /// currency may hold anything — including `:`. The boundary is therefore found
-/// from the DID side. A `did:icn:` spelling is the scheme followed by one
-/// multibase sigil and a body, and every accepted base has a colon-free
-/// alphabet **except** the Identity base, whose body is the raw 32 identifier
-/// bytes and may contain any byte. So: after the scheme, an Identity sigil
-/// means the spelling is exactly `8 + 1 + 32` bytes long; any other sigil means
-/// the spelling ends at the first `:`. In both cases the byte at the boundary
-/// must be the `:` the writer put there — a key that ends at the spelling, or
-/// whose spelling or currency is not UTF-8, is not this keyspace's shape and is
-/// handed back as unreadable rather than adopted under an invented currency.
-/// The parse is byte-identical to the old first-colon split for every
-/// non-Identity spelling, so existing rows re-read unchanged.
+/// from the DID side, and it is found by **decoding**, not by an alphabet: a
+/// `did:icn:` spelling is the scheme, one multibase sigil and a body, and some
+/// accepted bodies contain `:` themselves (the Identity base is unencoded;
+/// Base45's alphabet includes `:`; a future base may too). So every `:` after
+/// the scheme is tried in order, and the spelling ends at the first one whose
+/// prefix decodes to a 32-byte identifier — the same decode `Did` equality and
+/// the N2-A scanner use. An earlier colon inside the body leaves a prefix that
+/// decodes to fewer bytes or not at all; a later colon inside the currency is
+/// never reached because the true boundary comes first; and a key with no
+/// boundary at all — one that ends at the spelling, or whose spelling or
+/// currency is not UTF-8 — is not this keyspace's shape and is handed back as
+/// unreadable rather than adopted under an invented currency. For every
+/// spelling whose base has a colon-free alphabet this is the first-colon split
+/// the previous implementation performed, so existing rows re-read unchanged.
 pub(crate) fn split_cleared_volume_key(key: &[u8]) -> Option<(&str, &str)> {
     const DID_SCHEME: &[u8] = b"did:icn:";
-    const IDENTIFIER_BYTES: usize = 32;
 
     let rest = key.strip_prefix(CLEARED_VOLUME_PREFIX.as_bytes())?;
-    let body = rest.strip_prefix(DID_SCHEME)?;
-    let body_len = match body.first()? {
-        &MULTIBASE_IDENTITY_SIGIL => 1 + IDENTIFIER_BYTES,
-        _ => body.iter().position(|&b| b == b':')?,
-    };
-    let split = DID_SCHEME.len() + body_len;
-    if rest.get(split) != Some(&b':') {
-        return None;
+    rest.strip_prefix(DID_SCHEME)?;
+
+    let mut search_from = DID_SCHEME.len();
+    while let Some(offset) = rest[search_from..].iter().position(|&b| b == b':') {
+        let split = search_from + offset;
+        if let Ok(spelling) = std::str::from_utf8(&rest[..split]) {
+            if identifier_bytes_of_spelling(spelling).is_ok() {
+                let currency = std::str::from_utf8(&rest[split + 1..]).ok()?;
+                return Some((spelling, currency));
+            }
+        }
+        search_from = split + 1;
     }
-    let spelling = std::str::from_utf8(&rest[..split]).ok()?;
-    let currency = std::str::from_utf8(&rest[split + 1..]).ok()?;
-    Some((spelling, currency))
+    None
 }
 
 /// Load cleared volume index from storage
@@ -483,64 +483,66 @@ pub(crate) fn save_cleared_volume_index(ledger: &Ledger) -> Result<()> {
 #[cfg(test)]
 mod key_shape_tests {
     use super::*;
+    use icn_identity::KeyPair;
 
     fn key(rest: &str) -> Vec<u8> {
         format!("{CLEARED_VOLUME_PREFIX}{rest}").into_bytes()
     }
 
+    /// A real base58 spelling: the boundary is found by decoding, so a
+    /// made-up string that decodes to the wrong length would never split.
+    fn spelling() -> String {
+        KeyPair::generate().unwrap().did().as_str().to_string()
+    }
+
+    /// Identity base: the sigil is NUL and the body is the raw identifier,
+    /// which here contains colons.
+    const IDENTITY_BODY: &str = "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv";
+
     #[test]
     fn an_ordinary_spelling_splits_at_the_currency_delimiter() {
-        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:USD");
-        let (spelling, currency) = split_cleared_volume_key(&k).unwrap();
-        assert_eq!(
-            spelling,
-            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-        );
+        let did = spelling();
+        let k = key(&format!("{did}:USD"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, did);
         assert_eq!(currency, "USD");
     }
 
     #[test]
     fn a_colon_bearing_currency_keeps_its_colons() {
-        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:USD:SPOT:T+2");
-        let (_, currency) = split_cleared_volume_key(&k).unwrap();
+        let did = spelling();
+        let k = key(&format!("{did}:USD:SPOT:T+2"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, did);
         assert_eq!(currency, "USD:SPOT:T+2");
     }
 
     #[test]
     fn an_identity_base_body_containing_colons_is_split_after_its_32_bytes() {
-        // Identity base: the sigil is NUL and the body is the raw identifier.
-        let body = "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv";
-        assert_eq!(body.len(), 32);
-        let k = key(&format!("did:icn:\u{0}{body}:EUR:SPOT"));
-        let (spelling, currency) = split_cleared_volume_key(&k).unwrap();
-        assert_eq!(spelling, format!("did:icn:\u{0}{body}"));
+        assert_eq!(IDENTITY_BODY.len(), 32);
+        let k = key(&format!("did:icn:\u{0}{IDENTITY_BODY}:EUR:SPOT"));
+        let (found, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(found, format!("did:icn:\u{0}{IDENTITY_BODY}"));
         assert_eq!(currency, "EUR:SPOT");
     }
 
     #[test]
     fn a_key_that_ends_at_the_spelling_is_not_this_keyspaces_shape() {
-        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK");
-        assert!(split_cleared_volume_key(&k).is_none());
-        let identity = key(&format!(
-            "did:icn:\u{0}{}",
-            "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv"
-        ));
+        assert!(split_cleared_volume_key(&key(&spelling())).is_none());
+        let identity = key(&format!("did:icn:\u{0}{IDENTITY_BODY}"));
         assert!(split_cleared_volume_key(&identity).is_none());
     }
 
     #[test]
     fn an_identity_body_not_followed_by_the_delimiter_is_not_split() {
-        let k = key(&format!(
-            "did:icn:\u{0}{}",
-            "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uvXUSD"
-        ));
+        let k = key(&format!("did:icn:\u{0}{IDENTITY_BODY}XUSD"));
         assert!(split_cleared_volume_key(&k).is_none());
     }
 
     #[test]
     fn a_key_without_the_scheme_or_with_invalid_utf8_is_not_split() {
         assert!(split_cleared_volume_key(&key("garbage:USD")).is_none());
-        let mut bad_currency = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:");
+        let mut bad_currency = key(&format!("{}:", spelling()));
         bad_currency.extend([0xff, 0xfe]);
         assert!(split_cleared_volume_key(&bad_currency).is_none());
     }
