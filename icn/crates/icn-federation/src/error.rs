@@ -189,6 +189,34 @@ pub enum FederationError {
     #[error("Not initialized: {0}")]
     NotInitialized(String),
 
+    // ----- Agreement store: canonical rows and the party-index projection (N2-A, #2627) -----
+    /// A persisted `federation/agreements/` row could not be read as an
+    /// `Agreement`. Carries the error class and position, never the value: the
+    /// `Did` deserializer echoes the spelling it rejected. Every operation that
+    /// needs the row fails with this rather than treating it as absent.
+    #[error(
+        "Unreadable persisted federation/agreements row ({key_len}-byte key, {value_len}-byte value): {reason}"
+    )]
+    AgreementStoreUnreadable {
+        key_len: usize,
+        value_len: usize,
+        reason: String,
+    },
+
+    /// `idx_agreement_party/` holds rows the agreement store could never have
+    /// written: a key that does not parse as
+    /// `idx_agreement_party/<did>/<agreement id>`, a spelling that names no
+    /// principal, or a value naming a different agreement than the key. Such a
+    /// row cannot be attributed to any canonical fact, so operations that
+    /// interpret the projection refuse rather than read around it. `rows`
+    /// counts every such row; `first_reason` describes one without its bytes.
+    /// The remedy is `AgreementStore::rebuild_party_index`, which recomputes
+    /// the projection from the canonical rows.
+    #[error(
+        "Malformed idx_agreement_party/ projection: {rows} row(s) cannot be attributed ({first_reason}); rebuild the party index from the canonical agreement rows"
+    )]
+    AgreementPartyIndexMalformed { rows: usize, first_reason: String },
+
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
 }

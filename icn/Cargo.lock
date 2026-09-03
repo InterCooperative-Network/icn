@@ -3225,6 +3225,7 @@ dependencies = [
  "icn-trust",
  "lru",
  "metrics",
+ "multibase",
  "rand 0.9.4",
  "rand_core 0.6.4",
  "reqwest 0.13.1",
