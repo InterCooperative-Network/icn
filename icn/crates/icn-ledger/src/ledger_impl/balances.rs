@@ -331,6 +331,46 @@ pub(crate) fn save_cached_balances(ledger: &Ledger) -> Result<()> {
     Ok(())
 }
 
+/// The multibase Identity sigil: the identifier body that follows it is the
+/// raw 32 identifier bytes, unencoded.
+const MULTIBASE_IDENTITY_SIGIL: u8 = 0x00;
+
+/// Split a `ledger:cleared_volume:<did>:<currency>` key into its spelling and
+/// currency, exactly, or `None` for a key the writer could not have produced.
+///
+/// `save_cleared_volume_index` writes `{did}:{currency}` with `Display`, and a
+/// currency is not validated against a charset anywhere in this crate, so the
+/// currency may hold anything — including `:`. The boundary is therefore found
+/// from the DID side. A `did:icn:` spelling is the scheme followed by one
+/// multibase sigil and a body, and every accepted base has a colon-free
+/// alphabet **except** the Identity base, whose body is the raw 32 identifier
+/// bytes and may contain any byte. So: after the scheme, an Identity sigil
+/// means the spelling is exactly `8 + 1 + 32` bytes long; any other sigil means
+/// the spelling ends at the first `:`. In both cases the byte at the boundary
+/// must be the `:` the writer put there — a key that ends at the spelling, or
+/// whose spelling or currency is not UTF-8, is not this keyspace's shape and is
+/// handed back as unreadable rather than adopted under an invented currency.
+/// The parse is byte-identical to the old first-colon split for every
+/// non-Identity spelling, so existing rows re-read unchanged.
+pub(crate) fn split_cleared_volume_key(key: &[u8]) -> Option<(&str, &str)> {
+    const DID_SCHEME: &[u8] = b"did:icn:";
+    const IDENTIFIER_BYTES: usize = 32;
+
+    let rest = key.strip_prefix(CLEARED_VOLUME_PREFIX.as_bytes())?;
+    let body = rest.strip_prefix(DID_SCHEME)?;
+    let body_len = match body.first()? {
+        &MULTIBASE_IDENTITY_SIGIL => 1 + IDENTIFIER_BYTES,
+        _ => body.iter().position(|&b| b == b':')?,
+    };
+    let split = DID_SCHEME.len() + body_len;
+    if rest.get(split) != Some(&b':') {
+        return None;
+    }
+    let spelling = std::str::from_utf8(&rest[..split]).ok()?;
+    let currency = std::str::from_utf8(&rest[split + 1..]).ok()?;
+    Some((spelling, currency))
+}
+
 /// Load cleared volume index from storage
 ///
 /// # Arguments
@@ -343,46 +383,30 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     let pairs = ledger.store.scan(prefix)?;
 
     // Split every key before adopting any row, so the keyspace is classified
-    // whole. A row that cannot be split is kept with an empty currency and an
-    // unusable spelling, which the guard reports as unreadable — the previous
-    // code dropped such rows silently, turning a corrupt key into an account
-    // with no cleared volume.
+    // whole. A key that cannot be split into the shape the writer produces is
+    // counted and refused: the previous code adopted such a row under an
+    // empty currency, turning a corrupt key into an account with a phantom
+    // currency, and before that dropped it silently.
     let mut rows = Vec::with_capacity(pairs.len());
+    let mut unsplittable = 0usize;
     for (key, value) in &pairs {
-        // Key format: "ledger:cleared_volume:{did}:{currency}", where the DID
-        // itself contains colons.
-        //
-        // The separator is found from the DID side, not with `rfind`. A
-        // currency is not validated against a charset anywhere in this crate,
-        // so one containing a colon is persistable — and `rfind` would then
-        // fold part of the currency into the DID, leaving a key that decodes to
-        // no principal. That would let a node write an entry successfully and
-        // refuse to start ever after.
-        //
-        // A `did:icn:` spelling is the scheme followed by multibase, and no
-        // multibase alphabet contains a colon, so the spelling ends at the
-        // first colon *after* the scheme. That parse is exact whatever the
-        // currency holds, and it is byte-identical to the old one for every
-        // colon-free currency, so it re-reads existing rows unchanged.
-        let key_str = String::from_utf8_lossy(key);
-        let rest = key_str
-            .strip_prefix(CLEARED_VOLUME_PREFIX)
-            .unwrap_or(&key_str);
-        const DID_SCHEME: &str = "did:icn:";
-        let (did_str, currency) = match rest
-            .strip_prefix(DID_SCHEME)
-            .and_then(|after_scheme| after_scheme.find(':'))
-        {
-            Some(offset) => {
-                let split = DID_SCHEME.len() + offset;
-                (&rest[..split], &rest[split + 1..])
+        match split_cleared_volume_key(key) {
+            Some((did_str, currency)) => {
+                rows.push((did_str.to_string(), currency.to_string(), value))
             }
-            // No scheme, or a spelling with no currency after it: hand the whole
-            // remainder to the guard, which reports it as naming no principal
-            // rather than this function deciding the row does not exist.
-            None => (rest, ""),
-        };
-        rows.push((did_str.to_string(), currency.to_string(), value));
+            None => unsplittable += 1,
+        }
+    }
+
+    // Reported before the guard runs: a keyspace holding a row the writer
+    // could not have produced is evidence of corruption or tampering, and a
+    // classification computed without that row proves nothing.
+    if unsplittable > 0 {
+        return Err(PrincipalRowsRefusal::UnreadableKey {
+            keyspace: CLEARED_VOLUME_KEYSPACE,
+            rows: unsplittable,
+        }
+        .into());
     }
 
     refuse_unless_one_spelling_per_principal(
@@ -392,7 +416,10 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     )?;
 
     for (did_str, currency, value) in rows {
-        let did: Did = serde_json::from_str(&format!("\"{did_str}\""))?;
+        // Parsed directly, not through a JSON round trip: an Identity-base
+        // spelling carries a raw NUL sigil, which JSON forbids inside a string
+        // even though `Did::from_str` accepts it.
+        let did = Did::from_str(did_str.as_str())?;
         let volume: i64 = serde_json::from_slice(value)?;
         ledger.cleared_volume_index.insert((did, currency), volume);
     }
@@ -420,4 +447,70 @@ pub(crate) fn save_cleared_volume_index(ledger: &Ledger) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod key_shape_tests {
+    use super::*;
+
+    fn key(rest: &str) -> Vec<u8> {
+        format!("{CLEARED_VOLUME_PREFIX}{rest}").into_bytes()
+    }
+
+    #[test]
+    fn an_ordinary_spelling_splits_at_the_currency_delimiter() {
+        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:USD");
+        let (spelling, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(
+            spelling,
+            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+        );
+        assert_eq!(currency, "USD");
+    }
+
+    #[test]
+    fn a_colon_bearing_currency_keeps_its_colons() {
+        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:USD:SPOT:T+2");
+        let (_, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(currency, "USD:SPOT:T+2");
+    }
+
+    #[test]
+    fn an_identity_base_body_containing_colons_is_split_after_its_32_bytes() {
+        // Identity base: the sigil is NUL and the body is the raw identifier.
+        let body = "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv";
+        assert_eq!(body.len(), 32);
+        let k = key(&format!("did:icn:\u{0}{body}:EUR:SPOT"));
+        let (spelling, currency) = split_cleared_volume_key(&k).unwrap();
+        assert_eq!(spelling, format!("did:icn:\u{0}{body}"));
+        assert_eq!(currency, "EUR:SPOT");
+    }
+
+    #[test]
+    fn a_key_that_ends_at_the_spelling_is_not_this_keyspaces_shape() {
+        let k = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK");
+        assert!(split_cleared_volume_key(&k).is_none());
+        let identity = key(&format!(
+            "did:icn:\u{0}{}",
+            "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uv"
+        ));
+        assert!(split_cleared_volume_key(&identity).is_none());
+    }
+
+    #[test]
+    fn an_identity_body_not_followed_by_the_delimiter_is_not_split() {
+        let k = key(&format!(
+            "did:icn:\u{0}{}",
+            "ab:cd:ef:gh:ij:kl:mn:op:qr:st:uvXUSD"
+        ));
+        assert!(split_cleared_volume_key(&k).is_none());
+    }
+
+    #[test]
+    fn a_key_without_the_scheme_or_with_invalid_utf8_is_not_split() {
+        assert!(split_cleared_volume_key(&key("garbage:USD")).is_none());
+        let mut bad_currency = key("did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK:");
+        bad_currency.extend([0xff, 0xfe]);
+        assert!(split_cleared_volume_key(&bad_currency).is_none());
+    }
 }

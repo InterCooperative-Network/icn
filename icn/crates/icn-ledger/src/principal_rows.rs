@@ -96,15 +96,19 @@ pub enum PrincipalRowsRefusal {
         groups: Vec<AliasGroup>,
     },
 
-    /// A stored key does not name a principal at all.
+    /// A stored key cannot be read as one of this keyspace's rows: it names
+    /// no principal, or it is not the key shape the keyspace's writer produces
+    /// (a `ledger:cleared_volume:` key with no currency delimiter, say).
     ///
     /// Refused rather than skipped: were the unreadable row the only one for an
-    /// account, skipping it would rebuild a balance that silently omits it. An
-    /// unreadable row is evidence, not absence (§2.6).
+    /// account, skipping it would rebuild a balance that silently omits it, and
+    /// adopting it under an invented shape would rebuild state the writer never
+    /// wrote. An unreadable row is evidence, not absence (§2.6).
     #[error(
-        "{keyspace}: {rows} persisted row key(s) name no principal (not a \
-         decodable did:icn: identifier); refusing to rebuild, because skipping \
-         a row would turn unreadable state into absent state."
+        "{keyspace}: {rows} persisted row key(s) cannot be read as this \
+         keyspace's principal-keyed rows (no decodable did:icn: identifier, or \
+         not the key shape the writer produces); refusing to rebuild, because \
+         skipping a row would turn unreadable state into absent state."
     )]
     UnreadableKey {
         /// Registry name of the keyspace.

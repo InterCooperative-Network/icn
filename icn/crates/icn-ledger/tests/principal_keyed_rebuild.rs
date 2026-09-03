@@ -278,6 +278,68 @@ fn a_currency_containing_a_colon_still_loads() {
     Ledger::new(store).expect("a colon in a currency is not an unreadable principal");
 }
 
+#[test]
+fn a_cleared_volume_key_without_a_currency_delimiter_refuses() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let account = a_principal();
+    put_cleared_volume_row(&store, &account, "USD", 500);
+
+    // `save_cleared_volume_index` always writes `<did>:<currency>`, so a key
+    // that ends at the spelling is one the writer never produced. Adopting it
+    // as an empty-currency row would turn corrupted state into an account
+    // with a phantom currency.
+    store
+        .put(
+            format!("{CLEARED_VOLUME_PREFIX}{account}").as_bytes(),
+            &serde_json::to_vec(&42i64).unwrap(),
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
+/// A `Did` spelled in the multibase Identity base, whose body is the raw
+/// identifier bytes and here contains `:`.
+///
+/// The body must be a valid Ed25519 point for `Did::from_str` to accept it;
+/// about half of all 32-byte strings are, so a few tweaks of the last byte
+/// find one. No private key is needed: a persisted account id is only ever
+/// validated as a public point.
+fn identity_spelled_did_containing_a_colon() -> Did {
+    let mut body = *b"ab:cd:ef:gh:ij:kl:mn:op:qr:st:u0";
+    for last in b'0'..=b'z' {
+        body[31] = last;
+        let spelling = format!("did:icn:\u{0}{}", std::str::from_utf8(&body).unwrap());
+        if let Ok(did) = Did::from_str(&spelling) {
+            assert_eq!(did.identifier_bytes().unwrap(), body);
+            return did;
+        }
+    }
+    panic!("no ASCII body in the search range decompressed to a point");
+}
+
+#[test]
+fn an_identity_spelled_account_whose_bytes_contain_a_colon_still_loads() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let account = identity_spelled_did_containing_a_colon();
+
+    // Every multibase alphabet the parser assumed colon-free is, except the
+    // Identity base, whose payload is unencoded. A first-colon split cuts
+    // inside this spelling, the truncated remainder names no principal, and
+    // the node refuses to start for good after having accepted the entry.
+    put_cleared_volume_row(&store, &account, "USD", 500);
+    put_cleared_volume_row(&store, &account, "EUR:SPOT", 700);
+
+    let ledger = Ledger::new(store).expect("an Identity-base spelling is a readable principal");
+    assert_eq!(ledger.total_cleared_by(&account, "USD").unwrap(), 500);
+    assert_eq!(ledger.total_cleared_by(&account, "EUR:SPOT").unwrap(), 700);
+}
+
 // ── ledger:frozen: ──────────────────────────────────────────────────────────
 
 #[test]
