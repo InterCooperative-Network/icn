@@ -226,9 +226,24 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
     // spellings of one principal into a single entry whose key came from one
     // row and whose value came from another — see `crate::principal_rows`.
     let mut rows = Vec::with_capacity(pairs.len());
+    let mut unsplittable = 0usize;
     for (key, value) in &pairs {
         let balances: AccountBalances = serde_json::from_slice(value)?;
-        rows.push((balance_key_spelling(key), balances));
+        match balance_key_spelling(key) {
+            Some(spelling) => rows.push((spelling, balances)),
+            None => unsplittable += 1,
+        }
+    }
+
+    // A key that is not the shape `save_cached_balances` writes is evidence
+    // of corruption or tampering, and a classification computed without it
+    // proves nothing; refuse before the guard runs.
+    if unsplittable > 0 {
+        return Err(PrincipalRowsRefusal::UnreadableKey {
+            keyspace: BALANCE_KEYSPACE,
+            rows: unsplittable,
+        }
+        .into());
     }
 
     refuse_unless_one_spelling_per_principal(
@@ -302,16 +317,20 @@ fn adopt_stored_volume_spellings(
         .collect()
 }
 
-/// The DID spelling inside a `ledger:balance:` key.
+/// The DID spelling inside a `ledger:balance:` key, or `None` for a key the
+/// writer could not have produced.
 ///
 /// `save_cached_balances` builds the key with `serde_json::to_string`, so the
-/// remainder is a JSON string. Anything that is not — a truncated or foreign
-/// key — is returned as-is so the guard classifies it as unreadable rather than
-/// this function silently deciding a row does not exist.
-fn balance_key_spelling(key: &[u8]) -> String {
-    let key = String::from_utf8_lossy(key);
-    let remainder = key.strip_prefix(BALANCE_PREFIX).unwrap_or(&key);
-    serde_json::from_str::<String>(remainder).unwrap_or_else(|_| remainder.to_string())
+/// remainder is exactly one JSON string. A remainder that is not — a bare
+/// spelling without the quotes, a truncated or foreign key — is not this
+/// keyspace's shape. It used to be handed back as-is so the guard would call
+/// it unreadable, but a bare spelling *decodes*, so the guard would have
+/// adopted a row nothing in this crate wrote; the caller now counts it and
+/// refuses instead.
+fn balance_key_spelling(key: &[u8]) -> Option<String> {
+    let remainder = key.strip_prefix(BALANCE_PREFIX.as_bytes())?;
+    let remainder = std::str::from_utf8(remainder).ok()?;
+    serde_json::from_str::<String>(remainder).ok()
 }
 
 /// Save cached balances to storage

@@ -204,6 +204,32 @@ fn a_row_whose_key_and_contents_disagree_refuses() {
     ));
 }
 
+#[test]
+fn an_unquoted_balance_key_is_not_the_writers_shape_and_refuses() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let account = a_principal();
+    put_balance_row(&store, &account, "USD", 100);
+
+    // `save_cached_balances` keys a row by the JSON-quoted spelling. A key that
+    // carries the bare spelling decodes to a principal, so a lenient parser
+    // adopts it; but it is a shape the writer never produced, and adopting it
+    // would rebuild an account from a row nothing in this crate wrote.
+    let other = a_principal();
+    let balances = AccountBalances::new(other.clone());
+    store
+        .put(
+            format!("{BALANCE_PREFIX}{other}").as_bytes(),
+            &serde_json::to_vec(&balances).unwrap(),
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
 // ── ledger:cleared_volume: ──────────────────────────────────────────────────
 
 #[test]
