@@ -6,14 +6,14 @@
 `docs/architecture/n2-a0-stored-key-inventory.md` owns the measured stored-key surface; this
 document owns only N2-A's *dispositions and design*
 **Last reviewed:** 2026-09-04
-**Source basis:** live `main` at `ceec48200cd2f99021befab90b308a052df62336` (§1 baseline rows
+**Source basis:** live `main` at `40c1deb952547559a3310e32ef3fe9fa315dcacb` (§1 baseline rows
 still cite the `83682563` measurement they were taken at)
 **Gates:** N2-A / #2627 (`Did` canonicalization, I7)
 **Contract:** IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (`N2-A`)
 
 ---
 
-**Tranche state, in four separate claims.**
+**Tranche state, in five separate claims.**
 
 1. **I7 code has landed.** `Did` `PartialEq`/`Eq`/`Hash` compare the decoded identifier bytes
    (#2686, `0defbde5`). The design in §6 was applied; `Display`/`as_str`/`Serialize` are
@@ -31,10 +31,20 @@ still cite the `83682563` measurement they were taken at)
    collapse two spellings of one account, whether or not the startup gate ran in front of them.
    That is the `icn-ledger` half of §9 row 3. It authorizes no merge rule; §10.6 states how the
    gate and the loaders divide the work.
-4. **Cutover is not complete.** The rest of the load/rebuild/write-back audit (§9 row 3: the
-   loaders in §6.5), fresh point-in-time evidence on quiesced stores, the two unscanned
-   deployments, the §5 decision-**A** namespace splits, the peer-map pair (§6.3) and everything
-   behind §7.5 remain open. Nothing here is a deployment-readiness claim.
+4. **The first derived projection is dispositioned as a projection, and the remaining
+   boundaries are classified by the mechanism that proves them** (§11). The `icn-federation`
+   agreement party index (`idx_agreement_party/`, §4 row 20) is written only from the canonical
+   `federation/agreements/` rows, and since #2707 its store answers a party lookup from canonical
+   membership under `Did` equality, retires superseded rows, refuses what it cannot attribute and
+   can rebuild the projection — so a two-spelling pair there is registered `Equivalent`, a
+   redundancy and not an authoritative conflict, and the startup gate clears it under the same
+   descriptor. §11.1 states the persistence-boundary classes P1–P5 that keep that case apart from
+   the attestation store's fail-closed rows and the ledger's guarded folds; §11.4 dispositions the
+   rest of the inventory by class. Nothing in §11 authorizes a merge rule for authoritative state.
+5. **Cutover is not complete.** The rest of the load/rebuild/write-back audit (§9 row 3: the
+   loaders in §6.5 and the boundaries in §11.4), fresh point-in-time evidence on quiesced stores,
+   the two unscanned deployments, the §5 decision-**A** namespace splits, the peer-map pair (§6.3)
+   and everything behind §7.5 remain open. Nothing here is a deployment-readiness claim.
 
 This document is the design and evidence surface for N2-A. It does not migrate any store or
 discharge the §7.5 membership/vote gate. It records what was measured, what was decided, what
@@ -319,9 +329,12 @@ local stores were independently checked for `did:icn:` byte occurrences (zero) t
 empty store from a failed read.
 
 **Registry scope at the time of this scan.** The registry then held twelve keyspaces.
-`federation/attestations/` (§4 row 19, #2703) was registered afterwards and is not represented in
-these figures; any attestation row present would have counted under *uncovered* (§2.3), and none
-did. See the row-19 note in §4 for what that does and does not show.
+`federation/attestations/` (§4 row 19, #2703) and `idx_agreement_party/` (§4 row 20, #2707) were
+registered afterwards and are not represented in these figures; any row of either present then
+would have counted under *uncovered* (§2.3), and none did. See the row-19 and row-20 notes in §4
+for what that does and does not show. A registry expansion does not retroactively enlarge this
+evidence: the historical scan scope is what was registered then, and the current registry scope
+is what is registered now.
 
 ### 3.3 Principal-bearing rows behind a named gate — 63
 
@@ -415,6 +428,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
 | 19 | `icn-federation` `federation/attestations/` (#27, #59) | `as_str` + `/` + source coop | **not measured** — outside the registry when §3 was scanned (#2703) | **fail closed** | yes — the live store refuses to read, write or sweep over such a pair, and revokes one atomically (#2704); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **merge rule awaits a federation-domain decision** |
+| 20 | `icn-federation` `idx_agreement_party/` (#28) | `as_str` + `/` + agreement id | **not measured** — outside the registry when §3 was scanned (#2707) | **equivalent** (projection) | **yes** — the rows are derived from `federation/agreements/` and the store proves membership from the canonical row, retires superseded rows, refuses what it cannot attribute and can rebuild the projection (§11.3) | yes | no | — | safe (no byte moves) | N2-A | registered `Equivalent`/`Established` in code **and at the gate**; **projection, not authority** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
@@ -457,6 +471,32 @@ attestation row in a store scanned
 but unclassified. §3.3 reported zero uncovered rows across the three scanned deployments, which is
 consistent with those stores holding no attestations at the time and is not a measurement of this
 keyspace. The first scan that includes it yields new evidence, not a regression.
+
+Row 20 (`icn-federation` agreement party index, inventory #28, #2707) is the first keyspace
+dispositioned as a **projection** rather than as authoritative state, and the distinction is the
+point of §11. Its key is `idx_agreement_party/<party-did spelling>/<agreement id>` and its value
+repeats the agreement id; every row is written from the canonical `Agreement.parties` vector and
+from nothing else, so two spellings of one party for one agreement are two derivations of one
+canonical fact. `Equivalent` is the existing vocabulary for exactly that ("the rows are equivalent
+by construction; keeping any one loses nothing") and no new disposition was invented for it. The
+rule is `Established` because the live store now enforces it: a party lookup reads the whole
+projection, keeps the rows whose spelling names the queried principal, and returns only agreements
+whose canonical `parties` contain that principal under `Did` equality — so an index row can never
+create, omit, preserve or alter membership on its own. What the scanner sees under this prefix is
+a redundancy, never a contradiction, which is why a collision here is automatable.
+
+The descriptor is the attestation layout's shape under the opposite disposition: the party spelling
+is anchored immediately after the prefix and ends at the `/`, and the agreement id after it is an
+opaque discriminator compared byte-for-byte — an identifier the agreement's creator chose, which
+the registry does not own and the scan never parses, so an id that contains or is a `did:icn:`
+spelling is still just an id, and no agreement id is normalized. The collision unit is therefore
+**(party principal, exact agreement-id bytes)**: one party in two agreements is two shapes and
+never a group; only two spellings of one party for one agreement group, as an `Equivalent`,
+automatable pair. The startup gate (§10) consumes the same descriptor, so such a pair is recorded
+and the start is clear, an unreadable party spelling refuses, and no row is moved, rewritten,
+normalized or deleted; the fixtures are in `icn/crates/icn-store/tests/n2a_startup_gate.rs`. A
+CLEAR there means this spelling collision is safe under the registered projection disposition. It
+does not mean the projection is complete, current or authoritative — §11.2.
 
 Rows 14–15 hold DIDs inside serialized *values*, not keys, so they are not prefix-scannable and
 are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
@@ -971,3 +1011,205 @@ Evidence: `icn/crates/icn-ledger/tests/principal_keyed_rebuild.rs` — 30 fixtur
 stores, one per row of the table above and its one-fact-different control (§4.1), plus the
 `principal_rows` unit tests; `icn/crates/icn-store/tests/n2a_startup_gate.rs` for the gate
 (§10.5). Fixture evidence only.
+
+---
+
+## 11. Persistence-boundary classes — what the common scanner proves, and what it cannot
+
+Three N2-A fixes in a row — the ledger balance fold (#2701), the federation attestation store
+(#2703/#2704) and the agreement party index (§11.3) — failed by three *different* mechanisms, and a
+fix copied from one would have been wrong for the next. Patching one prefix at a time therefore does
+not converge. This section classifies every persisted principal boundary by the **mechanism that
+proves it safe**, so the remaining inventory (§11.4) is finite: each boundary is dispositioned by its
+class, and a boundary's class can be re-checked from three facts a reviewer can read off the code —
+*how the principal is represented at rest, what the loader does with it, and whether the row is
+authoritative or derived*.
+
+The labels are `P1`–`P5`, deliberately not the inventory's `A`–`E`. The inventory's letters (§3 of
+`n2-a0-stored-key-inventory.md`) describe *what I7 moves* — ephemeral, reconstructed, serialized,
+durable key, wire round-trip. The classes below describe *how a boundary is proven*. One keyspace
+can carry an inventory letter and several `P` classes at once, and conflating the two alphabets is
+how a `SILENT-MERGE RISK` row came to be treated as though a scanner pass had cleared it.
+
+### 11.1 The classes
+
+| Class | Mechanism at rest | What proves the boundary safe | What the common scanner can say |
+|---|---|---|---|
+| **P1 — spelling-visible key** | The persisted key retains a `did:icn:` spelling (`as_str`, `Display`, JSON-quoted) | A registered descriptor with an authorized disposition (§4), **plus** a loader that either never folds by `Did` or folds under a P4 guard. The startup gate (§10, #2700) refuses an unruled alias pair at every start | Can group rows by principal and prove *no alias rows exist today* under the prefix. That is evidence about the rows, not about the loader |
+| **P2 — derived / opaque key** | The key is a function of the spelling the scanner cannot reverse: `hash(did.as_str())`, `EntityId::from_did` (scheme-stripped), `StewardId::from_did` (SHA-256 over the spelling), the weak-holder id | Divergence must be prevented *before* derivation — derive from identifier bytes (§5 decision **A**) with a de-duplication/migration step for rows already split — or a higher-level loader must fail closed on two derived ids that resolve to one principal. Nothing else is evidence | **Nothing.** These keys hold no `did:icn:` literal, so the scanner does not count them as principal-bearing at all: they are absent from the covered, deferred *and* uncovered totals. A CLEAR verdict over a store full of them is silence, not safety |
+| **P3 — value-carried principal** | The key names no principal; the serialized value carries a `Did`, a `Did`-keyed map or set, or a spelling `String` | A value-aware audit or the loader's own interpretation of the value under `Did` equality; the merge rule for a decode that collapses aliasing keys must be chosen before decode (§4 rows 14–15) | **Nothing** — the scanner never reads a value (§2.2, payload-free) |
+| **P4 — principal-fold boundary** | Spelling-keyed rows are loaded into `HashMap<Did, _>`, `HashSet<Did>` or `Vec<Did>::contains`, and the result is written back | Classification of every row **before** any reaches the map, refusing an ambiguous keyspace whole (the `principal_rows` shape of #2701); a P1 scan is necessary evidence but cannot see the fold | Sees the rows, not the fold: it can say two spellings exist, and cannot say that the loader will collapse them, orphan the loser on write-back and make the survivor attacker-selectable (§2.7) |
+| **P5 — derived projection / secondary index** | Rows are a deterministic function of a canonical object stored elsewhere — `idx_*`, `by_did/`, `*_owner:` indexes | A source-of-truth declaration; reads that prove the fact from the canonical row rather than from the index; superseded-row cleanup on replacement; deletion of every spelling on delete; a deterministic rebuild from canonical rows; and a rule that malformed projection rows are surfaced, never read around. The projection is never authority | Sees the rows. A collision under a projection prefix is a redundancy, not a contradiction, so its disposition is `Equivalent` once the loader is projection-correct — and *only* then |
+
+A boundary may carry several classes. `commons/holders/by_did/` is P1 + P5 over a P2 canonical
+row; `ledger:treasury:` is P1 + P3 + P4. The class of the **canonical** row decides the
+disposition; projection classes add consistency machinery but never a merge rule of their own.
+
+### 11.2 "Scanner clear" is not "persistence boundary proven safe"
+
+The two claims must never be written as one. Precisely:
+
+* **Scanner clear** means: among rows under *registered* prefixes whose key contains a decodable
+  `did:icn:` spelling, no two rows share a principal-canonical shape; every registered keyspace
+  with a collision carries an `Established`, automatable rule; and every `did:icn:`-bearing row in
+  the store is either covered or behind a named deferral (§2.3). It is a statement about P1 rows on
+  the day of the scan (§2.5, §3.5).
+* **Persistence boundary proven safe** means: the boundary's class is stated, the mechanism that
+  class requires is implemented in the live loader/store, and discriminating tests exist for it —
+  including the mutation check that the tests fail with the mechanism removed.
+
+The scanner discharges the P1 evidence obligation and nothing else. It cannot see P2 keys, P3
+values or P4 folds, cannot tell a projection from an authoritative row, and cannot speak for a
+store it did not scan. Any sentence of the form "keyspace X is safe" must therefore name the class
+and the mechanism; a scan verdict alone is never that sentence.
+
+### 11.3 Disposition of `idx_agreement_party/` — P5, `Equivalent` / `Established`
+
+**Finding: derived, not authoritative.** `AgreementStore::store_agreement` writes one
+`idx_agreement_party/<party-did spelling>/<agreement id>` row per entry of the canonical
+`Agreement.parties` vector, valued by the agreement id; nothing else writes under the prefix and
+the row carries no fact the canonical `federation/agreements/<id>` row does not already state.
+Every membership decision in the federation crate — proposer checks, signature admission, gossip
+`is_party_to`, suspension, termination, amendment rights — reads `agreement.parties` under `Did`
+equality; none reads the index. The index is therefore a P5 projection and the correct disposition
+is to prove and maintain it as one, not to treat two index spellings as two competing facts.
+
+**Defects verified against `main` before the fix** (all reproduced by tests that failed on the
+unchanged code):
+
+1. a lookup under an alternate spelling of a party found nothing — the projection *omitted*
+   membership canonical state contains;
+2. replacing an agreement whose party set shrank (a ratified `RemoveParty` amendment, or a gossip
+   sync replacement) never retired the old row — the projection *preserved* membership canonical
+   state no longer contains, and the lookup returned it;
+3. a well-formed index row naming a non-party returned that agreement — the projection could
+   *create* membership;
+4. an index row whose value named a different agreement than its key was read by the value;
+5. malformed index rows were silently skipped, and so were malformed canonical rows in
+   `list_agreements`;
+6. deletion removed only the rows the current party set implied, leaving alias rows behind;
+7. two rows for one `(principal, agreement)` would have produced the agreement twice once
+   lookups became principal-wide.
+
+**Fix (PR for this section).** Persisted encodings are unchanged; no row is re-keyed, merged or
+normalized. The store now holds one invariant: *the party index may accelerate discovery of
+canonical agreements and may never create, omit, preserve or alter agreement-party membership
+independently of canonical agreement state.*
+
+* **Reads prove membership from canonical rows.** `list_agreements_for_party` reads the whole
+  projection, keeps every row whose spelling decodes to the queried principal (the same decode
+  `Did` equality uses), de-duplicates by agreement id, loads each canonical row once, and returns
+  only agreements whose `parties` contain the principal under `Did` equality. The answer is the
+  same under every spelling, in either insertion order, from a warm or a cold handle, and after
+  reopen; results are ordered by `(created_at desc, id)` so order is a function of the data.
+* **Two kinds of inconsistency are told apart, by whether the write protocol can produce them.** A
+  row pointing at a missing agreement, or at one that no longer lists the principal, is *stale*: the
+  protocol below can leave it behind, so reads filter it and the rebuild removes it. A row the store
+  could never have written — a key that does not parse as `idx_agreement_party/<spelling>/<id>`, a
+  spelling that names no principal, a value naming a different agreement than the key — is
+  *malformed*: every operation that interprets the projection refuses with
+  `AgreementPartyIndexMalformed { rows, first_reason }` (every row is classified before refusing;
+  no spelling or payload travels in the error). An unreadable canonical row refuses every
+  operation that needs it with `AgreementStoreUnreadable`, including `list_agreements`, which no
+  longer skips it.
+* **Writes keep the projection a superset of the truth, never a subset.** `store_agreement`
+  writes the new party rows, then the canonical row, then retires the rows the previous canonical
+  version implied and the new one does not (a removed party, or a party the new version spells
+  differently). `delete_agreement` removes the canonical row and then every projection row naming
+  that agreement under any spelling. A crash at any point leaves extra rows, which reads filter,
+  and never a canonical row without its rows. Writers are serialized per store, so two concurrent
+  replacements of one agreement cannot interleave their cleanup and strand a canonical party.
+* **The projection can be recomputed.** `AgreementStore::rebuild_party_index` derives the expected
+  rows from every canonical row and makes the projection equal to them, reporting rows kept, added,
+  removed as stale and removed as malformed. It refuses before mutating anything if any canonical
+  row is unreadable. No canonical byte is touched.
+* **The scanner registers the prefix** as `icn-federation/agreement_party_index`, `Equivalent`,
+  `Established`, with `slash_ends_did` (the spelling is followed by `/`; the loader anchors the
+  split on the agreement id its value names, so nothing else may follow the spelling). A
+  federation-side test pins the registration and a scanner-side fixture proves the alias pair is
+  one automatable group and the rows are covered rather than uncovered.
+
+**What this does not claim.** A legacy store whose index was left incomplete by an old torn write
+is made complete by `rebuild_party_index`, not by reads; wiring that rebuild into daemon start is
+deliberately not done here (the startup gate of §10 is read-only by design). The `Equivalent` disposition is correct *because* the loader is now
+projection-correct; on a binary without this fix the same scan verdict would have been meaningless,
+which is §11.2 in one sentence.
+
+### 11.4 Remaining N2-A boundaries, by class and disposition (classification pass of 2026-09-03)
+
+A bounded adversarial pass over the boundaries the inventory and the #2703 audit had left open,
+re-verified against `main` at `5add7a48`. *Live* means a production binary constructs the store;
+*dormant* means only library code or tests do. None of these is fixed here; each is dispositioned
+by mechanism so it can be closed by the proof its class requires. The scanner registry on `main`
+covers none of the prefixes in this table.
+
+**P5 projections over a P1 or P3 canonical row — close with the §11.3 mechanism (source-of-truth
+declaration, canonical-membership reads, superseded-row cleanup, every-spelling delete, rebuild):**
+
+| Boundary | Reach | Canonical row | Consumer today | Notes |
+|---|---|---|---|---|
+| `apps/governance` `action_item_by_assignee:<did>:<domain>:<item>` | live | the action-item row (`assignee: Option<Did>`) | spelling prefix scan, stale rows skipped | **regressed by I7**: `save` decides stale-index removal with `existing.assignee != item.assignee`, now principal equality, so re-saving under another spelling leaks the old row. Actionable now |
+| `icn-gateway` `adr0014:grant:by_grantee:` and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee misses alias rows |
+| `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
+| `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
+| `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
+| `icn-commons` `commons/{anchors,holders,stewards}/by_did/` (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
+| `icn-ledger` `asset_owner:<did>:<asset>` | dormant | `asset:<id>` | read re-checks `owner_did` by `Did`; `transfer_custody` authorizes by `Did` and removes the index by the caller's spelling — an orphan the read re-check then hides | the §7 *partial principalization* pattern, verbatim |
+| `icn-ledger` `obligation_creditor:` / `obligation_debtor:` | dormant | `obligation:<id>` | prefix scan, no re-check, no delete path | |
+| `icn-identity` `personhood/by_did/` (dormant) and `commons/by_did/` (dead) | — | `personhood/anchors/<id>` / `commons/holders/<id>` | exact-key | delete the dead store; rebuild rule for the dormant one |
+| `icn-governance` `index:delegations:from:` / `index:delegations:to:` (dormant, write-only) and `steward/by_did/` / `steward/by_holder/` (dormant, no persistent backend) | — | `delegation:<id>` / `steward/records/<hex>` | none / exact-key | delete-dead-code candidates; live twins exist |
+
+**P2 derived / opaque keys — scanner-blind; close only by canonical derivation (§5 decision A)
+plus de-duplication, or by a fail-closed loader:**
+
+| Boundary | Reach | Derivation | Consumer today | Disposition |
+|---|---|---|---|---|
+| `icn-entity` `entity:<EntityId>`, `membership:<parent>:<member>`, `member_count:`, and the `member_of:` / `type:` projections | live (icnd `init_entity`; gateway `api/entity.rs`) | `EntityId::from_did` = `"entity:icn:individual:" ‖ spelling with `did:icn:` stripped` | `EntityId` **string** equality throughout; `add_membership` refuses only the exact key | one principal, two `EntityId`s: duplicate individuals, doubled membership and `member_count`, a self-removal that misses. Absent from every scanner total. Needs derivation over identifier bytes and a de-dup step — a data-format change, not a merge rule |
+| `icn-commons` `commons/stewards/<hex(StewardId)>` | live | `StewardId::from_did` = SHA-256(`"steward:"` ‖ spelling) | spelling lookup through `by_did/`; no `delete_steward` | two independent steward records with independent bonds and sanctions; a suspended steward attests under the alias. Fail-closed loader guard now; derivation fix with migration later. Independent defect: the index is written from `holder_did` and queried by `steward_did` |
+| `icn-commons` `commons/holders/<hex>` (weak-holder path) | live; authorization consumer (`require_membership_in_jurisdiction`, `require_office_in_jurisdiction`) | SHA-256(`did.to_string()`) as the holder/anchor id | spelling lookup | the §5 decision-A prerequisite, unchanged: I7 *creates* this split. A member enrolled under one spelling fails the standing gate under another |
+
+**P4 folds over P1 rows — close with the #2701 `principal_rows` guard shape (classify every row
+before the map, refuse ambiguity whole):**
+
+| Boundary | Reach | Fold | Why the existing guards do not catch it |
+|---|---|---|---|
+| `icn-ledger` `ledger:treasury:<did>` (+ `ledger:treasury:idx:coop:<coop>` valued by a spelling) | live (`apps/ledger-app` init) | `load_from_store` folds every row into `HashMap<Did, Treasury>` plus `Did`-keyed budget/rule maps; `persist_treasury` writes back under the survivor's `Display` | the two fail-closed hydration guards compare `existing_did != treasury.treasury_did` — principal equality since I7 — so two spellings of one treasury are *not* an inconsistency to them and collapse silently at insert, last in scan order winning (attacker-selectable, §2.7). **Highest severity in this pass; the next bounded target** |
+| `icn-governance` bare `vote:<proposal>:<voter>` and `index:votes:<proposal>` (P3 value of spellings) | dormant (`#[allow(dead_code)]`; live twin is `gov:vote:`) | `store_vote` resolves the writer's `VotingPrincipal`, walks the index and deletes alias rows in one batch | correct as a duplicate-act guard, but the prefix `vote:` does not match the `gov:vote:` deferral, so any such row is *uncovered*. Add a second `DeferredNamespace` under the §7.5 gate, or delete the dormant store |
+
+**P1 authoritative rows awaiting a disposition — close by registering with the rule the owning
+domain authorizes (or `FailClosed` until it does):**
+
+| Boundary | Reach | Consumer today | Proposed rule | Owner |
+|---|---|---|---|---|
+| `icn-gateway` `did_doc:<did>` | live | exact key behind a `String`-keyed LRU; `revoke_device` mutates only the caller's spelling; no delete | `FailClosed` / `Established` — merging two key sets decides who may sign | identity |
+| `icn-ledger` `membership:since:<did>` | live | write-once-if-absent; an alias re-registers tenure at today | `FailClosed` until credit policy speaks — `MaxMonotonic` is the *wrong* rule (max = latest join = tenure loss) and the safe rule (min) is not in the vocabulary | ledger credit policy |
+| `icn-ledger` `patronage:account:` / `patronage:entry:` | dormant | exact key; the entry de-dup is spelling-scoped | `AwaitingDomainSignOff` (plausibly sum / union) | cooperative finance |
+| `icn-core` `federation:provenance:<raw coop_did String>` | service live; durable store wired only in tests | `String` map lookup; leave under one spelling does not delete the other | validate `coop_did` as a `Did` at the boundary first; `FailClosed` if registered — two records name two governance decisions | federation |
+| `icn-trust` `sybil:verification:<did>` and `sybil:flag:<did>:<ts>:<type>` (P3 values) | dormant, absent from the inventory | exact key / spelling prefix; `clear` deletes one spelling | delete-dead-code, else `FailClosed` — `Revoked` versus `Verified` under two spellings is contradictory by construction, and a permissive rule would weaken an anti-sybil control | trust |
+
+Three of these findings are **regressions introduced by I7 itself** rather than legacy rot: the
+action-item stale-index condition, the treasury hydration guards, and the asset-transfer index
+removal. Each is the §7 *partial principalization* pattern — one half of a computation became
+principal-aware while its partner still counts, deletes or keys by spelling.
+
+### 11.5 Non-claims, and what this document owes the open PRs
+
+* **N2-A is not complete.** §9 stands. This section makes the remaining work finite; it closes one
+  boundary.
+* **No merge rule was invented.** Row 20 uses the existing `Equivalent` disposition because the
+  rows are derivations of one canonical fact; nothing here authorizes a merge of authoritative
+  state anywhere else.
+* **Registry scope.** `n2a_keyspaces()` on `main` now holds thirteen descriptors. The §3 evidence
+  was gathered with twelve and is not re-stated here.
+* **After #2700 merges:** add the gate-level fixture proving that a store with an
+  `idx_agreement_party/` alias pair is *clear* (automatable, covered) and one with an unreadable
+  party-index spelling *refuses*; consider wiring `rebuild_party_index` where the daemon opens the
+  agreement store, since the gate itself must stay read-only.
+* **After #2701 merges:** the treasury fold (§11.4) reuses `principal_rows`; do not re-implement
+  the guard.
+* **After #2704 merges:** both PRs append variants to `icn-federation/src/error.rs`, both insert a
+  §4 row (19 and 20) and a §3.2 registry-scope note, and both rewrite the scanner's `slash_ends_did`
+  claimant test — the reconciled test pins **both** `icn-federation/attestations` and
+  `icn-federation/agreement_party_index`, in registry order. The attestation store stays
+  fail-closed (authoritative rows); the party index stays `Equivalent` (projection). They are
+  different classes and must not be made to look alike.
