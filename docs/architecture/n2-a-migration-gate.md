@@ -318,6 +318,11 @@ total row count and per-tree count were reported alongside, and the raw sled fil
 local stores were independently checked for `did:icn:` byte occurrences (zero) to distinguish an
 empty store from a failed read.
 
+**Registry scope at the time of this scan.** The registry then held twelve keyspaces.
+`federation/attestations/` (§4 row 19, #2703) was registered afterwards and is not represented in
+these figures; any attestation row present would have counted under *uncovered* (§2.3), and none
+did. See the row-19 note in §4 for what that does and does not show.
+
 ### 3.3 Principal-bearing rows behind a named gate — 63
 
 A per-keyspace zero only speaks for the rows that keyspace matched. Reconciling *all* DID-bearing
@@ -409,6 +414,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **no** — asserted by precedent; `SequenceTracker` reads and writes the exact spelling and implements no fold | yes | no | 4 | safe | N2-A | **rule needs a trust-domain loader that folds; fail closed at the gate until then** |
 | 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
+| 19 | `icn-federation` `federation/attestations/` (#27, #59) | `as_str` + `/` + source coop | **not measured** — outside the registry when §3 was scanned (#2703) | **fail closed** | yes — the live store refuses to read, write or sweep over such a pair (#2704); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code; **merge rule awaits a federation-domain decision** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
@@ -420,6 +426,27 @@ decides **who is a member of an institution**, which no identity-layer rule auth
 next to the §7.5 membership gate without the inventory having placed it there. It is therefore
 **fail closed** pending an explicit governance-domain decision about which side of the §7.5
 boundary it falls on. N2-A must not resolve that by default.
+
+Row 19 (`icn-federation` federated trust attestations, #2703) was outside the registry when the
+§3 evidence was gathered, so the three-deployment result says nothing about it. Its key is
+`federation/attestations/<member-did spelling>/<source_coop_id>` and its collision unit is
+**(member principal, source cooperative)**, because the source stays in the canonical shape: rows
+from different cooperatives about one principal are the federation's ordinary union and never a
+group, while two rows from one cooperative about one principal can only differ by disagreeing. No
+federation-domain rule authorizes choosing or combining such a pair, and this document authorizes
+none: the disposition is **fail closed**. Since #2704 the store itself enforces that posture — it
+reads the whole namespace by `Did` equality rather than by spelling prefix, refuses any operation
+that would interpret or mutate an ambiguous pair (a lookup for that principal, a listing for that
+source, a write to that pair, the expiry sweep), surfaces an unreadable or key/value-inconsistent
+row as a typed error instead of skipping it, and revokes every alias row a removal names. It
+re-keys, merges and normalizes nothing; persisted bytes are unchanged. The startup gate (#2700)
+consumes the same `n2a_keyspaces()` registry, so once it lands a federation alias pair refuses the
+node start exactly as any `FailClosed` keyspace does; the gate-level fixture proving that is the
+one verification step owed after #2700 merges. A populated attestation row in a store scanned
+*before* this registration could only have surfaced as an **uncovered** shape (§2.3) — blocking,
+but unclassified. §3.3 reported zero uncovered rows across the three scanned deployments, which is
+consistent with those stores holding no attestations at the time and is not a measurement of this
+keyspace. The first scan that includes it yields new evidence, not a regression.
 
 Rows 14–15 hold DIDs inside serialized *values*, not keys, so they are not prefix-scannable and
 are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
