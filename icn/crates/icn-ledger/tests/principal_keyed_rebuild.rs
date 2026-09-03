@@ -230,6 +230,40 @@ fn an_unquoted_balance_key_is_not_the_writers_shape_and_refuses() {
     ));
 }
 
+#[test]
+fn a_non_canonical_json_balance_key_is_refused_not_merged() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    let account = a_principal();
+    put_balance_row(&store, &account, "USD", 100);
+
+    // JSON admits more than one encoding of one string. `save_cached_balances`
+    // writes exactly `serde_json::to_string(&did)`; a key that escapes the
+    // colons as `:` decodes to the same spelling, so a parser that keeps
+    // only the decoded spelling would show the guard one spelling for two
+    // byte rows, and the map would silently keep one balance while the other
+    // row survived every write-back.
+    let escaped = format!("\"{}\"", account.as_str().replace(':', "\\u003a"));
+    assert_eq!(
+        serde_json::from_str::<String>(&escaped).unwrap(),
+        account.as_str(),
+        "the fixture key must decode to the stored spelling"
+    );
+    let mut conflicting = AccountBalances::new(account.clone());
+    conflicting.balances.insert("USD".to_string(), 999);
+    store
+        .put(
+            format!("{BALANCE_PREFIX}{escaped}").as_bytes(),
+            &serde_json::to_vec(&conflicting).unwrap(),
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
 // ── ledger:cleared_volume: ──────────────────────────────────────────────────
 
 #[test]

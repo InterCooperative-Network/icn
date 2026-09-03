@@ -321,16 +321,28 @@ fn adopt_stored_volume_spellings(
 /// writer could not have produced.
 ///
 /// `save_cached_balances` builds the key with `serde_json::to_string`, so the
-/// remainder is exactly one JSON string. A remainder that is not — a bare
-/// spelling without the quotes, a truncated or foreign key — is not this
-/// keyspace's shape. It used to be handed back as-is so the guard would call
-/// it unreadable, but a bare spelling *decodes*, so the guard would have
-/// adopted a row nothing in this crate wrote; the caller now counts it and
-/// refuses instead.
+/// remainder is exactly that one encoding of one JSON string. Two things are
+/// therefore not this keyspace's shape and are refused rather than adopted:
+///
+/// * a remainder that is not a JSON string at all — a bare spelling without
+///   the quotes, a truncated or foreign key. A bare spelling *decodes*, so a
+///   lenient parser would have handed the guard a row nothing in this crate
+///   wrote;
+/// * a remainder that decodes but is not the canonical encoding — JSON admits
+///   `\u003a` for `:`, say. Such a key is a second *byte row* for the same
+///   spelling: the guard, which groups by spelling, would see one row where
+///   the store holds two with possibly conflicting balances, the map would
+///   keep one, and the non-canonical row would survive every write-back. The
+///   row identity here is the byte key, so the decoded spelling must
+///   re-encode to exactly the bytes that were read.
 fn balance_key_spelling(key: &[u8]) -> Option<String> {
     let remainder = key.strip_prefix(BALANCE_PREFIX.as_bytes())?;
     let remainder = std::str::from_utf8(remainder).ok()?;
-    serde_json::from_str::<String>(remainder).ok()
+    let spelling = serde_json::from_str::<String>(remainder).ok()?;
+    if serde_json::to_string(&spelling).ok()? != remainder {
+        return None;
+    }
+    Some(spelling)
 }
 
 /// Save cached balances to storage
