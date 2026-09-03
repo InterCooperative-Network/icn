@@ -92,18 +92,34 @@ fn unreadable_reason(err: &serde_json::Error) -> String {
 /// Longest agreement id echoed from a canonical key into an error, in characters.
 const KEY_ID_ERROR_CAP: usize = 64;
 
-/// The agreement id a canonical key names, bounded for an error message.
+/// The agreement id a canonical key names, escaped and bounded for an error
+/// message.
 ///
 /// Taken from the key, never from the value: the key is the locator an
-/// operator must inspect, and the value is the untrusted half of the pair.
+/// operator must inspect. It is still untrusted — this function runs only for
+/// rows the store did not write — so every character is escaped
+/// (`char::escape_default`: control characters, quotes and non-ASCII become
+/// escape sequences) before the cap is applied. The cap counts shown
+/// characters and never cuts inside an escape sequence, so what reaches a log
+/// is one line, bounded, and lossless for any id the store itself would mint.
 fn bounded_key_id(key: &[u8]) -> String {
     let id = key.strip_prefix(AGREEMENT_PREFIX).unwrap_or(key);
-    let id = String::from_utf8_lossy(id);
-    if id.chars().count() <= KEY_ID_ERROR_CAP {
-        return id.into_owned();
+    let mut out = String::new();
+    let mut shown = 0usize;
+    let mut truncated = false;
+    for c in String::from_utf8_lossy(id).chars() {
+        let escaped: String = c.escape_default().collect();
+        let width = escaped.chars().count();
+        if shown + width > KEY_ID_ERROR_CAP {
+            truncated = true;
+            break;
+        }
+        shown += width;
+        out.push_str(&escaped);
     }
-    let mut out: String = id.chars().take(KEY_ID_ERROR_CAP).collect();
-    out.push('…');
+    if truncated {
+        out.push('…');
+    }
     out
 }
 
@@ -580,17 +596,24 @@ impl AgreementStoreOps for AgreementStore {
     }
 
     fn list_agreements_for_party(&self, party_did: &Did) -> Result<Vec<Agreement>> {
+        // The projection is read and attributed before the query is even
+        // looked at, so a malformed row is refused whatever is asked: refusal
+        // is a property of the persisted state, not of the query.
+        let rows = self.load_party_index()?;
+
         // A `Did` that names no principal is equal only to its own spelling,
         // and every attributed projection row names a principal, so it can
-        // match none of them — the same answer `Did` equality gives.
+        // match none of them — the same answer `Did` equality gives. No `Did`
+        // a caller can construct reaches this arm (`from_str`, `from_public_key`
+        // and deserialization all validate); it is kept so the arm states its
+        // own answer rather than relying on that.
         let Ok(wanted) = party_did.identifier_bytes() else {
             return Ok(Vec::new());
         };
 
         // Candidates: every projection row whose spelling names the principal,
         // under any spelling, de-duplicated by agreement id.
-        let candidates: BTreeSet<String> = self
-            .load_party_index()?
+        let candidates: BTreeSet<String> = rows
             .into_iter()
             .filter(|row| row.identifier == wanted)
             .map(|row| row.agreement_id.as_str().to_string())
@@ -1579,6 +1602,12 @@ mod tests {
         .unwrap();
         raw.put(b"idx_agreement_party/garbage", b"agr-1").unwrap();
 
+        // Refusal is a property of the persisted state, not of the query:
+        // a principal that matches no row is refused exactly the same way.
+        assert!(matches!(
+            store.list_agreements_for_party(&test_did()),
+            Err(FederationError::AgreementPartyIndexMalformed { .. })
+        ));
         let err = store.list_agreements_for_party(&a).unwrap_err();
         match &err {
             FederationError::AgreementPartyIndexMalformed { rows, first_reason } => {
@@ -2094,6 +2123,39 @@ mod tests {
         assert_eq!(
             store.get_agreement(&fresh.id).unwrap().unwrap().id,
             fresh.id
+        );
+    }
+
+    #[test]
+    fn a_tampered_canonical_key_is_echoed_escaped_and_bounded() {
+        let (raw, store) = open_pair();
+        let other = two_party_agreement(&test_did(), &test_did());
+        store.store_agreement(&other).unwrap();
+
+        // A key an adversary with raw access chose: control characters, a
+        // fake log line, and far more bytes than any agreement id has.
+        let mut key = AGREEMENT_PREFIX.to_vec();
+        key.extend(b"agr-evil\n[ERROR] forged line\r\x1b[31m");
+        key.extend(std::iter::repeat_n(b'x', 500));
+        raw.put(&key, &serde_json::to_vec(&other).unwrap()).unwrap();
+
+        let text = store.list_agreements().unwrap_err().to_string();
+        assert!(matches!(
+            store.list_agreements(),
+            Err(FederationError::AgreementStoreKeyValueMismatch { .. })
+        ));
+        assert!(
+            !text.chars().any(|c| c.is_control()),
+            "control characters must not reach a loggable error: {text:?}"
+        );
+        assert!(
+            text.contains("agr-evil\\n[ERROR]"),
+            "escaped, not dropped: {text}"
+        );
+        assert!(
+            text.chars().count() < 400,
+            "bounded: {} chars",
+            text.chars().count()
         );
     }
 }
