@@ -264,6 +264,28 @@ fn a_non_canonical_json_balance_key_is_refused_not_merged() {
     ));
 }
 
+#[test]
+fn an_unreadable_balance_key_with_a_malformed_value_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_balance_row(&store, &a_principal(), "USD", 100);
+
+    // A row the writer never produced, on both sides. The key decides the
+    // row's fate, so the refusal must be the typed, counted one — not a
+    // parse error from a value the loader had no business reading.
+    store
+        .put(
+            format!("{BALANCE_PREFIX}foreign-key").as_bytes(),
+            b"{not json",
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
+}
+
 // ── ledger:cleared_volume: ──────────────────────────────────────────────────
 
 #[test]
@@ -398,6 +420,47 @@ fn an_identity_spelled_account_whose_bytes_contain_a_colon_still_loads() {
     let ledger = Ledger::new(store).expect("an Identity-base spelling is a readable principal");
     assert_eq!(ledger.total_cleared_by(&account, "USD").unwrap(), 500);
     assert_eq!(ledger.total_cleared_by(&account, "EUR:SPOT").unwrap(), 700);
+}
+
+/// An Identity-base spelling whose 32 bytes decode but are not an Ed25519
+/// point: readable to the identifier decoder, unparseable as a `Did`.
+fn identity_spelled_non_point() -> String {
+    let mut body = *b"ab:cd:ef:gh:ij:kl:mn:op:qr:st:u0";
+    for last in b'0'..=b'z' {
+        body[31] = last;
+        let spelling = format!("did:icn:\u{0}{}", std::str::from_utf8(&body).unwrap());
+        if Did::from_str(&spelling).is_err() {
+            assert!(icn_identity::identifier_bytes_of_spelling(&spelling).is_ok());
+            return spelling;
+        }
+    }
+    panic!("every ASCII body in the search range decompressed to a point");
+}
+
+#[test]
+fn a_cleared_volume_spelling_that_decodes_but_is_no_principal_is_the_typed_refusal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = open_store(tmp.path());
+    put_cleared_volume_row(&store, &a_principal(), "USD", 500);
+
+    // The boundary search accepts any prefix that decodes to 32 bytes; the
+    // loader must still refuse a spelling it cannot rebuild as a `Did`, and
+    // must do so as the typed, counted refusal before the guard runs.
+    store
+        .put(
+            format!(
+                "{CLEARED_VOLUME_PREFIX}{}:USD",
+                identity_spelled_non_point()
+            )
+            .as_bytes(),
+            &serde_json::to_vec(&42i64).unwrap(),
+        )
+        .unwrap();
+
+    assert!(matches!(
+        refusal_of(Ledger::new(store)),
+        PrincipalRowsRefusal::UnreadableKey { rows: 1, .. }
+    ));
 }
 
 // ── ledger:frozen: ──────────────────────────────────────────────────────────

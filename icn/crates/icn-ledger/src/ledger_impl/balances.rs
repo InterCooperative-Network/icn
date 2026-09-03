@@ -231,9 +231,15 @@ pub(crate) fn load_cached_balances(ledger: &mut Ledger) -> Result<()> {
     let mut rows = Vec::with_capacity(pairs.len());
     let mut unsplittable = 0usize;
     for (key, value) in pairs {
-        let balances: AccountBalances = serde_json::from_slice(&value)?;
+        // The key decides the row's fate first: a row whose key is not the
+        // writer's shape is refused as such, and its value is never read, so
+        // a malformed value beside an unreadable key cannot turn the typed
+        // refusal into a parse error.
         match balance_key_spelling(&key) {
-            Some(spelling) => rows.push((spelling, balances)),
+            Some(spelling) => {
+                let balances: AccountBalances = serde_json::from_slice(&value)?;
+                rows.push((spelling, balances));
+            }
             None => unsplittable += 1,
         }
     }
@@ -428,10 +434,20 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     let mut rows = Vec::with_capacity(pairs.len());
     let mut unsplittable = 0usize;
     for (key, value) in pairs {
-        match split_cleared_volume_key(&key) {
-            Some((did_str, currency)) => {
-                rows.push((did_str.to_string(), currency.to_string(), value))
-            }
+        // The boundary search accepts any prefix that decodes to 32 bytes —
+        // the identifier the guard groups by. Rebuilding the `Did` is stricter
+        // (an Ed25519 point), so it is done here, before the guard: a spelling
+        // that decodes but cannot be rebuilt is a row the loader cannot adopt
+        // and is counted as unreadable rather than surfacing later as an
+        // untyped parse error. Parsed directly, not through a JSON round trip:
+        // an Identity-base spelling carries a raw NUL sigil, which JSON forbids
+        // inside a string even though `Did::from_str` accepts it.
+        match split_cleared_volume_key(&key).and_then(|(did_str, currency)| {
+            Did::from_str(did_str)
+                .ok()
+                .map(|did| (did, currency.to_string()))
+        }) {
+            Some((did, currency)) => rows.push((did, currency, value)),
             None => unsplittable += 1,
         }
     }
@@ -450,14 +466,10 @@ pub(crate) fn load_cleared_volume_index(ledger: &mut Ledger) -> Result<()> {
     refuse_unless_one_spelling_per_principal(
         CLEARED_VOLUME_KEYSPACE,
         rows.iter()
-            .map(|(did_str, currency, _)| (did_str.as_str(), currency.as_str())),
+            .map(|(did, currency, _)| (did.as_str(), currency.as_str())),
     )?;
 
-    for (did_str, currency, value) in rows {
-        // Parsed directly, not through a JSON round trip: an Identity-base
-        // spelling carries a raw NUL sigil, which JSON forbids inside a string
-        // even though `Did::from_str` accepts it.
-        let did = Did::from_str(did_str.as_str())?;
+    for (did, currency, value) in rows {
         let volume: i64 = serde_json::from_slice(&value)?;
         ledger.cleared_volume_index.insert((did, currency), volume);
     }
