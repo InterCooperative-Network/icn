@@ -5,20 +5,33 @@
 **Canonical:** no — `docs/architecture/IDENTITY_SEMANTICS.md` owns the semantic contract and
 `docs/architecture/n2-a0-stored-key-inventory.md` owns the measured stored-key surface; this
 document owns only N2-A's *dispositions and design*
-**Last reviewed:** 2026-08-29
-**Source basis:** live `main` at `836825632ebb5b7b9d8d16354974503a7c576569`
+**Last reviewed:** 2026-09-02
+**Source basis:** live `main` at `5add7a48d7b055625480de3f044d1189903f9d1c`
 **Gates:** N2-A / #2627 (`Did` canonicalization, I7)
 **Contract:** IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (`N2-A`)
 
 ---
 
-**Tranche gate: IMPLEMENTATION STILL BLOCKED.** `Did` `Eq`/`Hash` is unchanged and must stay
-unchanged until the gate below clears.
+**Tranche state, in three separate claims.**
 
-This document is the design surface for N2-A. It does not change `Did`, migrate any store, or
-discharge the §7.5 membership/vote gate. It records what was measured, what was decided, and
-what is still missing — deliberately in separate sections, so a decision is never mistaken for
-evidence.
+1. **I7 code has landed.** `Did` `PartialEq`/`Eq`/`Hash` compare the decoded identifier bytes
+   (#2686, `0defbde5`). The design in §6 was applied; `Display`/`as_str`/`Serialize` are
+   byte-identical to before, and no persisted byte moved. The sentence this document carried
+   until 2026-09-02 — *"`Did` `Eq`/`Hash` is unchanged and must stay unchanged"* — was stale from
+   that merge onward and is corrected here.
+2. **The fail-closed check now lives inside the binary** (§10). `icnd` runs the N2-A startup
+   gate over every sled database beneath its data directory before it opens the first one, and
+   refuses to start over an unruled alias collision, an uncovered principal row, an unreadable
+   row, or a receipt from a newer generation. This discharges §3.5's consequence and §12.1 item 7
+   of the inventory *for the binary*; it is not deployment evidence.
+3. **Cutover is not complete.** The load/rebuild/write-back audit (§9 row 3), fresh point-in-time
+   evidence on quiesced stores, the two unscanned deployments, the §5 decision-**A** namespace
+   splits, and everything behind §7.5 remain open. Nothing here is a deployment-readiness claim.
+
+This document is the design and evidence surface for N2-A. It does not migrate any store or
+discharge the §7.5 membership/vote gate. It records what was measured, what was decided, what
+is enforced, and what is still missing — deliberately in separate sections, so a decision is
+never mistaken for evidence.
 
 Companion documents:
 
@@ -98,9 +111,14 @@ states, and the verdict follows from that partition:
 1. **Covered** — a registered keyspace interpreted it, so the collision result
    speaks for it.
 2. **Deferred** — a *named gate* owns it: `n2a_deferred_namespaces` records the
-   governance vote keyspace (§7.5) and the security namespace (dedicated
-   workflow). Deferred is neither scanned nor cleared; it is a reviewed
-   exclusion, reported separately and never folded into the scanned counts.
+   governance vote keyspace (§7.5), the auth-challenge namespace and the
+   security namespace (dedicated workflow). Deferred is neither dispositioned
+   nor cleared; it is a reviewed exclusion, reported separately and never folded
+   into the scanned counts. Since 2026-09-02 a deferred namespace's rows are
+   still **grouped by principal** — deferral names who owns the merge rule, and
+   looking away from the data would let a collision reach the loader
+   unexamined — and each deferral carries a `DeferredCollisionPosture` saying
+   what a starting binary does about a collision there (§10.2).
 3. **Uncovered** — nothing accounted for it, which **blocks**.
 
 State 3 is the point. A keyspace added after this tool was written, or simply
@@ -111,8 +129,10 @@ verdict on any uncovered row would be "blocked", which would make the gate
 unusable; with it, an accidental omission still blocks while a reviewed
 exclusion does not.
 
-A deferred namespace is **never inspected**. Only its existence, its owning
-gate, and its principal-bearing row count are recorded.
+A deferred namespace is **never dispositioned**: its report carries
+`FailClosed` / `AwaitingDomainSignOff` by construction, so nothing downstream
+can read a merge rule out of it. Its key shapes are grouped exactly as a
+registered keyspace's are; its values are never read.
 
 ### 2.4 A plausible merge rule is not an authorized one
 
@@ -125,10 +145,13 @@ written down: `KeyspaceDescriptor::basis` carries `RuleBasis::Established` or
 This closes a real contradiction found in review. §4 row 5 said summing ledger
 balances still needed economics sign-off, while the code marked that keyspace
 `Sum` — so a generic storage crate would have authorized a merge of monetary
-state on nothing but its own say-so. Six keyspaces are currently
+state on nothing but its own say-so. Seven keyspaces are currently
 `AwaitingDomainSignOff`: `icn-ledger/{balance,cleared_volume,frozen}`,
-`icn-net/outgoing_seq`, `icn-trust/edges`, `trust-app/sequences_issuer`. A test
-pins that list against this document so the two cannot drift.
+`icn-net/outgoing_seq`, `icn-trust/edges`, `trust-app/sequences_{issuer,receiver}`. A test
+pins that list against this document so the two cannot drift. `sequences_receiver` moved into
+this set on 2026-09-03: its max rule had been marked established "by precedent", but precedent is
+not implementation — the receiver tracker reads and writes the exact spelling and folds nothing,
+so the gate now refuses a collision there rather than clearing it on a rule no loader performs.
 
 The basis only bites when there is something to merge; a keyspace with no
 collisions stays automatable whatever its basis.
@@ -231,7 +254,9 @@ kubectl cp <namespace>/<pod>:/data ./deployment-data
 find ./deployment-data -name conf -printf '%h\n' | xargs ./target/debug/did-collision-scan
 ```
 
-Exit status: `0` clear, `1` at least one keyspace must fail closed, `2` tool error.
+Exit status: `0` clear, `1` at least one keyspace or blocking deferred namespace must fail
+closed, `2` tool error. The verdict is `SledStoreAudit::is_clear` — the same computation the
+startup gate enforces (§10), so what the offline tool reports is what the binary will do.
 
 ---
 
@@ -345,6 +370,8 @@ scanned deployments, and no malformed or unreachable principal rows exist there 
 Consequence for the migration design: the scan must be re-run **immediately before** the flip, and
 the fail-closed check belongs *in the binary* — a key-equality build should refuse to start against
 a store whose rows alias under an unruled keyspace, rather than trusting a scan run earlier.
+**Implemented** as the startup gate (§10) on 2026-09-02; the point-in-time limits above still
+apply to any evidence gathered *outside* the binary.
 
 ## 4. Keyspace dispositions (decisions)
 
@@ -370,7 +397,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 13 | `icn-commons` weak-holder id (#65) | SHA-256 of spelling | I7 *creates* the split | — | no | **no** | — | before 6 | n/a | N2-A | **namespace decision — see §5** |
 | 14 | `VectorClock` (#45), snapshot `vector_clock` (#54) | serialized map | **0 in 3 scanned** | max | yes — `VectorClockProjection::from_entries` | yes | no | 4 | safe | N2-A | rule established |
 | 15 | snapshot `peer_connections` (#57) | serialized map | **0 in 3 scanned** | **fail closed** | no | no | — | 4 | safe | N2-A | **no authorized rule** |
-| 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **yes** — same replay-floor family as `replay_max_seq` | yes | no | 4 | safe | N2-A | rule established by precedent |
+| 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **no** — asserted by precedent; `SequenceTracker` reads and writes the exact spelling and implements no fold | yes | no | 4 | safe | N2-A | **rule needs a trust-domain loader that folds; fail closed at the gate until then** |
 | 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
@@ -537,25 +564,146 @@ not a follow-up).
 
 ---
 
-## 9. Remaining implementation blockers
+## 9. Remaining cutover blockers
 
-Implementation may begin only when **all** of the following hold.
+The equality flip (§8 step 6) has landed. What follows is what still stands between that code
+and a cutover anyone may rely on, re-stated against `main` at `5add7a48` plus the startup gate.
 
 | # | Blocker | State | Evidence |
 |---|---|---|---|
 | 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
 | 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed |
-| 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented |
-| 5 | `PeerId` ordering | **OPEN** | design complete (§6.1), unimplemented |
-| 6 | CCL `Value::Did` `Hash`/`Eq` | **OPEN** | design complete (§6.2), unimplemented — a violated std contract post-flip |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments; the load/rebuild write-back audit (§8 step 4) has not been performed; the `AttestationStore` cache/prefix mismatch recorded on #2627 belongs to it |
+| 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it |
+| 5 | `PeerId` ordering | **DONE** | #2684 — `Ord` over identifier bytes, non-interleaving classes |
+| 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | #2681 — hash over identifier bytes; #2685 consolidated the code hash |
 | 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented |
-| 8 | No §7.5 migration smuggled in | **HELD** | 32 `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated |
-| 9 | Broad discriminating tests for the flip | **OPEN** | the scanner has them; the equality change has none, because it does not exist |
+| 8 | No §7.5 migration smuggled in | **HELD** | `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated; the startup gate reports vote collisions and does not act on them (§10.2) |
+| 9 | Broad discriminating tests for the flip | **DONE** | #2686 — fifteen tests flipped, three re-scoped; #2627 records the count |
+| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 28 fixture tests plus the scanner's |
+| 11 | Persisted principal-identity generation boundary | **DONE (generation 1)** | §10.3 — the receipt records the generation; a newer generation's receipt is refused. Generation 2 (any re-key) is *not* designed |
 
-Blockers **4–7 and 9 are independent of collision evidence** and would each block the flip even if
-every deployment scanned clean. They are the shortest path forward.
+Blockers **3, 4 and 7 are independent of collision evidence** and would each remain even if every
+deployment scanned clean. They are the shortest path forward. Row 10 changes their consequence
+rather than their status: until they are done, a store that trips one of them **refuses to
+start** instead of merging silently.
 
 The evidence gate (#1) has moved from *no evidence* to *no collisions in three deployments*, which
-is real but bounded: it does not license the flip on its own, and §3.5 explains why a
-point-in-time clean scan cannot.
+is real but bounded, and §3.5 explains why a point-in-time clean scan cannot license anything on
+its own. Row 10 is what makes that acceptable: the binding check runs at the moment it matters.
+
+---
+
+## 10. The startup gate (implemented 2026-09-02)
+
+`icn_store::n2a_startup_gate::enforce` runs in `icnd` after the data directory exists and
+**before the first store is opened** — the ledger, trust and parameter stores the daemon builds
+in `main`, then everything the supervisor opens. It is the fail-closed check §3.5 and inventory
+§12.1 item 7 call for, placed where those documents say it belongs.
+
+### 10.1 What it does, in order
+
+1. Reads `<data_dir>/n2a-startup-gate.json` if present. A receipt it cannot parse, or one whose
+   `generation` exceeds the binary's, **refuses** — and is left untouched.
+2. Finds every sled database beneath the data directory by its `conf` file (`find_sled_roots`):
+   one per domain under `store/`, plus the data-directory-level databases a deployment keeps
+   (`commons.sled`, …). A directory that is not a database is never opened, because `sled::open`
+   would create one. A database added after this document was written is found the same way —
+   there is no list to fall out of date.
+
+   **The sweep is all-or-nothing.** An unreadable directory, an unreadable entry, a symlink, or
+   the depth bound each **refuse** rather than returning a shorter list. Review found the original
+   walk swallowed all four: a directory that is searchable but not readable — the daemon can still
+   open `…/store/ledger` by path while being unable to enumerate `…/store` — made an existing
+   database look absent, and the gate would then have written a CLEAR receipt over a store it never
+   audited. A caller cannot distinguish a partial list from a complete one, so the function must
+   not produce one. A symlink is refused rather than followed or skipped: following lets the sweep
+   leave the intended subtree, and skipping omits a database the daemon can still reach through it.
+3. Opens each database, runs `audit_sled_store` — the **same** computation `did-collision-scan`
+   renders — and closes it so the daemon's own open can take the lock.
+4. Writes the receipt atomically (sibling temporary, `fsync`, rename) **once a verdict exists** —
+   for `clear` and for `refused`. The refusals that occur before any store is audited (an
+   unreadable or newer-generation receipt, a missing data directory, an incomplete sweep, an
+   unverifiable store) return without recording anything: there is no verdict yet to record, and
+   overwriting a prior receipt would destroy the last one that meant something.
+5. Returns the receipt on `clear`; otherwise a `GateRefusal` that `icnd` turns into a non-zero
+   exit with the payload-free summary in §10.4.
+
+It **never writes to a domain store**. The only mutation while it runs is sled's own recovery on
+open, which the daemon would perform moments later regardless.
+
+### 10.2 What refuses, and what only reports
+
+| Condition | Effect | Why |
+|---|---|---|
+| Collision in a registered keyspace whose rule is `Established` and automatable (`replay_max_seq`, `replay_finalized`, `journal`) | **clear**, group recorded | the live loader already implements the merge (§1.1, §4) |
+| Collision in a registered keyspace whose rule is `AwaitingDomainSignOff` (§2.4's seven, including `sequences_receiver`) | **refuse** | a plausible rule is not an authorized one, and a rule written down by precedent is not one a loader performs |
+| Collision in a `FailClosed` keyspace (`replay_sender_regime`, `icn-coop/member`) | **refuse** | no rule exists |
+| Unreadable principal row in a registered keyspace | **refuse** | cannot be classified, so cannot be merged on its own recognizance |
+| Principal-bearing row under no registered keyspace and no named gate | **refuse**, masked shape reported | a keyspace nobody classified is the one that collapses unexamined |
+| Principal-bearing row in a named tree | **refuse** | `Store::scan` cannot examine it |
+| Collision or unreadable row in `security:*` | **refuse** | `DeferredCollisionPosture::BlockStartup` — `MisbehaviorDetector::load_from_store` folds alias rows into principal-keyed maps and `save_to_store` at shutdown orphans the losers (#2676) |
+| Collision in `gov:vote:*` | **report only** | `ReportOnly` — votes are read per proposal, tallied through `VoteTally::try_from_votes` which fails closed on conflicting rows (#2641/#2677), and nothing at startup writes vote rows back. Deciding this is §7.5's business |
+| Collision in `auth:challenge:*` | **report only** | `ReportOnly` — a TTL-bounded nonce; collapse drops an in-flight challenge the client re-requests, nothing is written back, and blocking would trap the daemon that alone expires the rows |
+| A store that cannot be opened (held elsewhere, corrupt) or read completely | **refuse** | a store nothing can be said about is not one to start over |
+
+The postures are recorded on each `DeferredNamespace` with a one-line rationale citing the loader
+behaviour they rest on, and a test pins that every deferral carries one. They are statements about
+the load paths **in this checkout**; a loader that changes must revisit its posture.
+
+### 10.3 The receipt and the generation
+
+`n2a-startup-gate.json` is a **record, not a skip token**. The audit runs at every start whatever
+the receipt says; a test inserts an alias row after a clear receipt and proves the next start
+refuses. The receipt exists so an operator can see what was inspected, which keyspace refused and
+why, and when — and so a later generation has a boundary this one detects.
+
+`PRINCIPAL_IDENTITY_GENERATION = 1` means I7: principal-byte equality, spelling-preserving
+persistence, no row re-keyed. A receipt carrying a higher generation was written by a binary that
+may have re-keyed rows; a generation-1 binary refuses to open that data directory rather than
+guess, and does not overwrite the receipt. A lower or absent generation simply means the audit has
+not been recorded under generation 1 yet.
+
+**Rollback.** A pre-gate binary knows nothing of the receipt and ignores it; I7 moved no byte, so
+it reads the same rows. A generation-1 binary rolled forward again re-audits. What no binary can
+retroactively enforce is the interval in which a pre-gate binary ran over a store that has since
+acquired alias rows — which is exactly why the audit is unconditional.
+
+**Crash safety.** An interrupted receipt write leaves only `n2a-startup-gate.json.tmp`, which is
+never read as a receipt; the next start audits and replaces it.
+
+### 10.4 What an operator does with a refusal
+
+The daemon exits non-zero with one line per blocker, of the form
+
+```text
+<store>: keyspace icn-ledger/balance (sum, awaiting-domain-sign-off): 1 collision group(s) over 2 row(s), 0 unreadable; principals [1a2b3c4d]
+```
+
+carrying the keyspace, the rule and its authority status, counts, and eight-hex principal
+fingerprints — never a stored value and never a full identifier. Then:
+
+1. run `did-collision-scan <store>` for the full report, including which spelling a last-writer
+   rebuild would keep;
+2. take the disposition to the domain that owns the keyspace (§4): economics for the ledger sums
+   and freezes, trust for the edge union and issuer sequence, governance for membership, the
+   security workflow for `security:*`;
+3. apply that disposition to the rows by hand, or flip the descriptor's `RuleBasis` to
+   `Established` with the approval cited, and restart.
+
+There is **no bypass flag**, by design: the alternative to refusing is the silent merge the whole
+tranche exists to prevent.
+
+### 10.5 Evidence
+
+`icn/crates/icn-store/tests/n2a_startup_gate.rs` — 28 fixtures on real sled databases: every
+row of §10.2 with its one-fact-different control (same spelling twice, two different principals,
+a single security row, an uncovered row without a principal); the fixture guard that the two
+spellings are distinct strings and `==` as `Did` with equal hashes; unreadable and
+newer-generation receipts refused and preserved; older-generation receipt superseded; the
+record-not-token property in both directions; idempotence with every store's rows byte-identical
+across runs; a stale `.tmp` not read; no database created where none existed; a store held open
+elsewhere unverifiable and nothing recorded; the receipt and the refusal message carrying neither
+payload nor identifier. `icn/crates/icn-store/src/did_collision_scan.rs` adds eight tests on the
+deferred postures and the shared audit. All fixture evidence; no deployment was scanned by the
+gate.

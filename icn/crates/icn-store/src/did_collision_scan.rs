@@ -46,6 +46,7 @@
 //! sort after every ASCII one, so the survivor is attacker-selectable. The
 //! ordinals are preserved so a reader can see which row would win.
 
+use anyhow::Context as _;
 use std::collections::BTreeMap;
 
 /// The identity of a principal-canonical shape.
@@ -131,6 +132,16 @@ pub enum RuleBasis {
     /// state has not signed off. A collision here **fails closed** regardless of
     /// the disposition: a plausible rule is not an authorized one.
     AwaitingDomainSignOff,
+}
+
+impl RuleBasis {
+    /// A short stable label for reports.
+    pub fn label(self) -> &'static str {
+        match self {
+            RuleBasis::Established => "established",
+            RuleBasis::AwaitingDomainSignOff => "awaiting-domain-sign-off",
+        }
+    }
 }
 
 /// One durable keyspace to scan.
@@ -655,6 +666,38 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
     })
 }
 
+/// What a collision inside a deferred namespace does to a key-equality
+/// binary that is about to start.
+///
+/// Deferral says who owns the *merge rule*. It says nothing about whether the
+/// binary's own load path is lossy, and that is a fact about the loader, not a
+/// judgement about the domain: a loader that folds alias rows into one
+/// principal-keyed map and writes the survivor back has already merged them,
+/// whoever was supposed to decide. So each deferral records, separately from
+/// its gate, whether an observed collision may be started over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeferredCollisionPosture {
+    /// The runtime tolerates alias rows without loss: it reads them on demand,
+    /// refuses conflicting acts at the point of use, and writes no merged
+    /// survivor back. A collision is reported so the owning gate sees it, and
+    /// does not block startup.
+    ReportOnly,
+    /// The load path collapses alias rows into one in-memory entry and a later
+    /// write-back orphans the losers. No rule authorizes that merge, so a
+    /// collision must stop the binary before its loader runs.
+    BlockStartup,
+}
+
+impl DeferredCollisionPosture {
+    /// A short stable label for reports.
+    pub fn label(self) -> &'static str {
+        match self {
+            DeferredCollisionPosture::ReportOnly => "report-only",
+            DeferredCollisionPosture::BlockStartup => "block-startup",
+        }
+    }
+}
+
 /// A namespace deliberately left outside this tranche, behind a named gate.
 ///
 /// Deferral is not coverage and it is not a clean result. It is a recorded
@@ -664,8 +707,12 @@ pub fn store_overview(store: &dyn Store) -> anyhow::Result<StoreOverview> {
 /// "blocked", and the gate would be unusable; with it, an accidental omission
 /// still blocks while a reviewed exclusion does not.
 ///
-/// A deferred namespace is **never inspected**: only the fact that it exists,
-/// how many principal-bearing rows it holds, and which gate owns it.
+/// A deferred namespace is **never dispositioned** here: no merge rule is
+/// asserted for it. Its rows are still grouped by principal, because whether
+/// two stored rows name one principal is a fact about the data that the owning
+/// gate needs to see, and looking away from it would let the collision reach
+/// the loader unexamined. The [`DeferredCollisionPosture`] says what the
+/// binary does with that fact.
 #[derive(Debug, Clone)]
 pub struct DeferredNamespace {
     /// Stable identifier used in reports.
@@ -676,13 +723,20 @@ pub struct DeferredNamespace {
     pub gate: &'static str,
     /// Inventory rows this namespace corresponds to.
     pub inventory_rows: &'static [u32],
+    /// What an observed collision does to a starting key-equality binary.
+    pub posture: DeferredCollisionPosture,
+    /// Why that posture, in one line, citing the loader behaviour it rests on.
+    pub posture_rationale: &'static str,
 }
 
-/// The namespaces N2-A deliberately does not scan, each behind a named gate.
+/// The namespaces N2-A deliberately does not disposition, each behind a named
+/// gate.
 ///
-/// Both entries are decisions recorded elsewhere, not judgements made here:
+/// The entries are decisions recorded elsewhere, not judgements made here:
 /// governance votes are behind the §7.5 membership/vote migration gate, and the
-/// security namespace belongs to its own dedicated workflow.
+/// security and auth-challenge namespaces belong to the dedicated security
+/// workflow. The posture on each is a statement about that namespace's *load
+/// path* in this checkout, and cites it.
 pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
     vec![
         DeferredNamespace {
@@ -690,20 +744,109 @@ pub fn n2a_deferred_namespaces() -> Vec<DeferredNamespace> {
             prefix: b"gov:vote:",
             gate: "IDENTITY_SEMANTICS §7.5 membership/vote migration gate",
             inventory_rows: &[23],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "Votes are read per proposal on demand and tallied through \
+                                VoteTally::try_from_votes, which fails closed on conflicting \
+                                rows for one principal (#2641/#2677); nothing at startup \
+                                rebuilds or writes vote rows back, so alias rows survive intact \
+                                for the §7.5 gate to disposition.",
         },
         DeferredNamespace {
             name: "rpc/auth-challenges",
             prefix: b"auth:challenge:",
             gate: "dedicated security workflow (TTL-bounded; contents not inspected)",
             inventory_rows: &[29],
+            posture: DeferredCollisionPosture::ReportOnly,
+            posture_rationale: "A challenge row is a TTL-bounded nonce, not durable state. \
+                                Collapsing two spellings at load drops an in-flight nonce, which \
+                                the client re-requests; nothing is written back. Blocking here \
+                                would also trap a daemon that alone expires these rows.",
         },
         DeferredNamespace {
             name: "security/misbehavior",
             prefix: b"security:",
             gate: "dedicated security workflow (contents not inspected)",
             inventory_rows: &[5, 6, 7, 8, 38],
+            posture: DeferredCollisionPosture::BlockStartup,
+            posture_rationale: "MisbehaviorDetector::load_from_store inserts every row into \
+                                principal-keyed maps, so under key-equality Did the later \
+                                spelling's reputation, ban, quarantine and violation rows \
+                                overwrite the earlier one's, and save_to_store at shutdown \
+                                writes the survivor back and orphans the losers. No domain rule \
+                                authorizes that merge (#2676).",
         },
     ]
+}
+
+/// One deferred namespace's rows, grouped by principal, with its posture.
+///
+/// The embedded [`KeyspaceReport`] carries [`MergeDisposition::FailClosed`] and
+/// [`RuleBasis::AwaitingDomainSignOff`] by construction: that is the honest
+/// statement of a namespace nobody has dispositioned, and it keeps the report's
+/// own `must_fail_closed` from ever reading as authority this scan does not
+/// have. Whether the namespace *blocks* is decided by [`DeferredReport::blocks`]
+/// from the posture, not from the report's disposition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredReport {
+    pub name: String,
+    pub gate: String,
+    pub posture: DeferredCollisionPosture,
+    pub posture_rationale: String,
+    pub report: KeyspaceReport,
+}
+
+impl DeferredReport {
+    /// Whether this namespace holds something a starting binary may not open.
+    ///
+    /// Only a `BlockStartup` posture can block, and it blocks on exactly what a
+    /// registered keyspace would: a principal named by more than one row, or a
+    /// row whose principal cannot be read at all.
+    pub fn blocks(&self) -> bool {
+        self.posture == DeferredCollisionPosture::BlockStartup
+            && (!self.report.collision_groups.is_empty() || self.report.rows_unreadable > 0)
+    }
+
+    /// Principal-bearing rows under this namespace, readable or not.
+    pub fn did_bearing_rows(&self) -> usize {
+        self.report.rows_with_readable_did + self.report.rows_unreadable
+    }
+}
+
+/// Group every deferred namespace's rows by principal. Read-only.
+///
+/// Uses the same engine as a registered keyspace, so a group here is exactly a
+/// group the key-equality `Did` would form — the point being that "deferred"
+/// must never come to mean "unexamined".
+pub fn scan_deferred(
+    store: &dyn Store,
+    deferrals: &[DeferredNamespace],
+) -> anyhow::Result<Vec<DeferredReport>> {
+    let mut out = Vec::with_capacity(deferrals.len());
+    for d in deferrals {
+        let descriptor = KeyspaceDescriptor {
+            name: d.name,
+            prefix: d.prefix,
+            inventory_rows: d.inventory_rows,
+            // No rule is asserted for a deferred namespace, and none may be
+            // inferred from this report.
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::AwaitingDomainSignOff,
+            // The scan does not own these grammars, so it is permissive about
+            // what follows a spelling; a spelling that does not decode is still
+            // unreadable, whatever follows it.
+            slash_ends_did: false,
+            did_ends_key: false,
+            rationale: d.gate,
+        };
+        out.push(DeferredReport {
+            name: d.name.to_string(),
+            gate: d.gate.to_string(),
+            posture: d.posture,
+            posture_rationale: d.posture_rationale.to_string(),
+            report: scan_keyspace(store, &descriptor)?,
+        });
+    }
+    Ok(out)
 }
 
 /// Principal-bearing rows per deferred namespace. Counts only.
@@ -828,6 +971,9 @@ pub struct CoverageAudit {
     pub overview: StoreOverview,
     /// Principal-bearing rows per deliberately deferred namespace.
     pub deferred: Vec<(String, usize)>,
+    /// Every deferred namespace's rows grouped by principal, with the posture
+    /// that says what a starting binary does about a collision there.
+    pub deferred_reports: Vec<DeferredReport>,
     /// Principal-bearing rows under no registered keyspace and no named gate.
     pub uncovered: BTreeMap<String, usize>,
     /// Principal-bearing rows in named trees `Store::scan` cannot reach.
@@ -840,14 +986,23 @@ impl CoverageAudit {
         self.uncovered.values().sum()
     }
 
-    /// Rows a named gate defers. Deferred is neither scanned nor cleared.
+    /// Rows a named gate defers. Deferred is neither dispositioned nor cleared.
     pub fn deferred_did_rows(&self) -> usize {
         self.deferred.iter().map(|(_, n)| *n).sum()
     }
 
+    /// Deferred namespaces whose posture forbids starting over what they hold.
+    pub fn blocking_deferred(&self) -> Vec<&DeferredReport> {
+        self.deferred_reports
+            .iter()
+            .filter(|d| d.blocks())
+            .collect()
+    }
+
     /// The store is clear only when every principal-bearing row it holds was
-    /// accounted for, and every keyspace that accounted for one can be migrated
-    /// without a human deciding an outcome.
+    /// accounted for, every keyspace that accounted for one can be migrated
+    /// without a human deciding an outcome, and no deferred namespace holds a
+    /// collision its own loader would silently merge.
     ///
     /// A principal-bearing row is accounted for in exactly one of three ways,
     /// and there is deliberately no fourth:
@@ -855,7 +1010,9 @@ impl CoverageAudit {
     /// 1. a registered keyspace interpreted it, so the collision result speaks
     ///    for it;
     /// 2. a named gate defers it — [`n2a_deferred_namespaces`] says which, and
-    ///    that exclusion was reviewed;
+    ///    that exclusion was reviewed — but its rows are still grouped, and a
+    ///    collision under a `BlockStartup` posture blocks exactly as an unruled
+    ///    collision in a registered keyspace does;
     /// 3. nothing did, which **blocks** — a row nobody has classified is
     ///    precisely the row that collapses unexamined on the first start of a
     ///    key-equality binary.
@@ -866,7 +1023,10 @@ impl CoverageAudit {
     /// exists to prevent, and one that already happened once (§5 rows #71 and
     /// #36 were live and unregistered).
     pub fn is_clear(&self) -> bool {
-        self.report.is_clear() && self.unreachable_did_rows == 0 && self.uncovered_did_rows() == 0
+        self.report.is_clear()
+            && self.unreachable_did_rows == 0
+            && self.uncovered_did_rows() == 0
+            && self.blocking_deferred().is_empty()
     }
 }
 
@@ -884,9 +1044,157 @@ pub fn audit_store(
         report: scan_store(store, descriptors)?,
         overview: store_overview(store)?,
         deferred: deferred_did_row_counts(store, deferrals)?,
+        deferred_reports: scan_deferred(store, deferrals)?,
         uncovered: uncovered_did_key_shapes(store, descriptors, deferrals)?,
         unreachable_did_rows,
     })
+}
+
+/// One sled database's full audit: the coverage audit plus the per-tree facts
+/// that established whether every principal-bearing row was reachable.
+///
+/// This is the unit both the offline `did-collision-scan` tool and the
+/// in-process startup gate ([`crate::n2a_startup_gate`]) render. They share it
+/// so that the verdict an operator reads from a scan and the verdict a binary
+/// enforces at startup are one computation, not two that can drift.
+#[derive(Debug, Clone)]
+pub struct SledStoreAudit {
+    pub audit: CoverageAudit,
+    /// Row count per sled tree, including the default tree.
+    pub trees: Vec<(String, usize)>,
+    /// Rows per tree whose key embeds a `did:icn:` spelling.
+    pub did_rows: Vec<(String, usize)>,
+}
+
+impl SledStoreAudit {
+    /// The gate. Not recomputed by any renderer.
+    pub fn is_clear(&self) -> bool {
+        self.audit.is_clear()
+    }
+}
+
+/// Audit one opened sled database against the canonical N2-A registries.
+/// Read-only.
+///
+/// [`Store::scan`] reads only sled's default tree, so every tree is counted as
+/// well: a principal-bearing row in a named tree is one the scan could not
+/// examine, and it is reported as *unreachable* — which blocks — rather than
+/// as absent.
+pub fn audit_sled_store(store: &crate::SledStore) -> anyhow::Result<SledStoreAudit> {
+    let trees = store.tree_row_counts()?;
+    let did_rows = store.did_bearing_rows_per_tree()?;
+    let unreachable: usize = did_rows
+        .iter()
+        .filter(|(name, _)| name != "__sled__default")
+        .map(|(_, n)| *n)
+        .sum();
+
+    let audit = audit_store(
+        store as &dyn Store,
+        &n2a_keyspaces(),
+        &n2a_deferred_namespaces(),
+        unreachable,
+    )?;
+
+    Ok(SledStoreAudit {
+        audit,
+        trees,
+        did_rows,
+    })
+}
+
+/// Collect every sled database root beneath `dir`, in path order.
+///
+/// A directory is a root when it holds sled's `conf` file, which sled writes
+/// on creation for every database, empty or not. A root is recorded **and**
+/// walked through, because a database can hold databases: `icnctl init-coop`
+/// opens `<data_dir>/store` itself as a database, while `icnd` keeps
+/// `store/ledger`, `store/trust`, `store/cooperative`, … beneath it. Stopping
+/// at the first `conf` would leave every nested domain database unaudited and
+/// let a CLEAR receipt be written over a blocker the daemon opens moments
+/// later. Sled's own subdirectory (`blobs/`) carries no `conf`, so nothing
+/// inside a database is mistaken for one, and the walk is bounded in depth so
+/// a stray cycle cannot make it endless.
+///
+/// **The sweep is all-or-nothing.** An unreadable directory, an unreadable
+/// entry, a symlink, or the depth bound each return an error rather than a
+/// shorter list. A caller cannot tell a partial list from a complete one, and
+/// the startup gate treats the list as the full set of databases: a directory
+/// that is searchable but not readable would otherwise let an omitted database
+/// pass as absent and earn a CLEAR receipt, which is precisely the lossy merge
+/// the gate exists to prevent.
+///
+/// This is how a caller finds the databases a deployment actually keeps, rather
+/// than the ones it expected: a deployment holds one database per domain under
+/// its store directory plus several at the data-directory level, and any store
+/// added after this list was written is found the same way. Enumerating by
+/// `conf` also means a directory that is *not* a database is never opened,
+/// because `sled::open` on such a directory creates one.
+pub fn find_sled_roots(dir: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
+    const MAX_DEPTH: usize = 4;
+
+    fn walk(
+        dir: &std::path::Path,
+        depth: usize,
+        out: &mut Vec<std::path::PathBuf>,
+    ) -> anyhow::Result<()> {
+        if depth > MAX_DEPTH {
+            // Silently stopping here would report the databases found so far as
+            // if they were all of them.
+            anyhow::bail!(
+                "sled discovery hit its depth bound of {MAX_DEPTH} at {}; the sweep is \
+                 incomplete and its result cannot be treated as the full set",
+                dir.display()
+            );
+        }
+
+        let entries = std::fs::read_dir(dir)
+            .with_context(|| format!("cannot enumerate {}", dir.display()))?;
+
+        for entry in entries {
+            let entry =
+                entry.with_context(|| format!("cannot read an entry of {}", dir.display()))?;
+            let child = entry.path();
+
+            // `file_type` does not follow symlinks, unlike `Path::is_dir`. A
+            // symlinked directory is refused rather than skipped or followed:
+            // following it lets the walk leave the intended subtree, and
+            // skipping it would omit a database the daemon can still open —
+            // which is the fail-open this whole function must not have.
+            let file_type = entry
+                .file_type()
+                .with_context(|| format!("cannot stat {}", child.display()))?;
+            if file_type.is_symlink() {
+                anyhow::bail!(
+                    "sled discovery found a symlink at {}; refusing to decide whether it \
+                     names a database inside or outside this data directory",
+                    child.display()
+                );
+            }
+            if !file_type.is_dir() {
+                continue;
+            }
+
+            // Record a database and keep walking beneath it: a root can hold
+            // roots (see the doc comment), and a database's own subdirectories
+            // hold no `conf`, so descending never lists one twice.
+            if child.join("conf").is_file() {
+                out.push(child.clone());
+            }
+            walk(&child, depth + 1, out)?;
+        }
+        Ok(())
+    }
+
+    let mut out = Vec::new();
+    if dir.join("conf").is_file() {
+        out.push(dir.to_path_buf());
+    }
+    walk(dir, 0, &mut out)?;
+    // Deterministic order: a receipt that lists stores must list them the same
+    // way on every run, whatever order the filesystem returned them in.
+    out.sort();
+    Ok(out)
 }
 
 /// The non-security-sensitive durable keyspaces N2-A must clear before `Did`
@@ -1019,12 +1327,21 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             prefix: b"trust/sequences/receiver/",
             inventory_rows: &[71],
             disposition: MergeDisposition::MaxMonotonic,
-            basis: RuleBasis::Established,
+            // Asserted by precedent, not implemented: `SequenceTracker`
+            // (`apps/trust-app/src/sequence.rs`) reads and writes the exact
+            // spelling and folds nothing, so two spellings of one issuer are
+            // two independent replay floors and the issuer may submit under
+            // whichever is lower. `replay_max_seq` earns `Established` because
+            // its loader performs the fold (#2644); this one does not, so a
+            // collision here must refuse until a trust-domain loader does.
+            basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
-                        survivor accepts stale attestations, so the merge keeps the maximum, \
-                        matching the established replay_max_seq precedent.",
+                        survivor accepts stale attestations, so the merge would keep the \
+                        maximum, as replay_max_seq does; but the receiver tracker reads and \
+                        writes the exact spelling and implements no fold, so the rule is \
+                        asserted, not established.",
         },
         KeyspaceDescriptor {
             name: "trust-app/sequences_issuer",
@@ -1759,12 +2076,18 @@ mod tests {
             "icn-net/outgoing_seq",
             "icn-trust/edges",
             "trust-app/sequences_issuer",
+            "trust-app/sequences_receiver",
         ] {
             assert!(
                 pending.contains(&expected),
                 "{expected} has no domain sign-off and must not be automatable"
             );
         }
+        assert_eq!(
+            pending.len(),
+            7,
+            "the sign-off set is pinned exactly: {pending:?}"
+        );
     }
 
     #[test]
@@ -1778,7 +2101,8 @@ mod tests {
         assert!(names.contains(&"rpc/auth-challenges"));
 
         // Every deferral must name the gate that owns it, so the exclusion is
-        // auditable rather than merely convenient.
+        // auditable rather than merely convenient — and must say what a
+        // starting binary does about a collision there, and why.
         for d in n2a_deferred_namespaces() {
             assert!(!d.gate.is_empty(), "{} must name its gate", d.name);
             assert!(
@@ -1786,7 +2110,280 @@ mod tests {
                 "{} must cite inventory",
                 d.name
             );
+            assert!(
+                !d.posture_rationale.is_empty(),
+                "{} must justify its collision posture",
+                d.name
+            );
         }
+    }
+
+    #[test]
+    fn a_collision_in_a_block_startup_deferred_namespace_blocks() {
+        // The security namespace is deferred for *disposition*, not for
+        // detection: its loader folds alias rows into one principal-keyed map
+        // and its shutdown save writes the survivor back. A collision there is
+        // exactly the silent merge the gate exists to stop.
+        let (a, b) = two_spellings(131);
+        let store = store_with(&[
+            (&format!("security:reputation:{a}"), b"v"),
+            (&format!("security:reputation:{b}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        assert_eq!(a_.uncovered_did_rows(), 0, "deferred is not uncovered");
+        assert_eq!(a_.deferred_did_rows(), 2);
+        let blocking = a_.blocking_deferred();
+        assert_eq!(blocking.len(), 1);
+        assert_eq!(blocking[0].name, "security/misbehavior");
+        assert_eq!(blocking[0].report.collision_groups.len(), 1);
+        assert!(!a_.is_clear(), "a lossy loader's collision must block");
+    }
+
+    #[test]
+    fn a_block_startup_deferred_namespace_without_collisions_does_not_block() {
+        // Control: the posture blocks on a collision, not on the namespace's
+        // mere presence. Two different principals under the security prefix
+        // are two rows, not a group.
+        let one = spell(&principal(132), multibase::Base::Base58Btc);
+        let two = spell(&principal(133), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("security:banned:{one}"), b"v"),
+            (&format!("security:banned:{two}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        assert_eq!(a_.deferred_did_rows(), 2);
+        assert!(a_.blocking_deferred().is_empty());
+        assert!(a_.is_clear());
+    }
+
+    #[test]
+    fn a_collision_in_a_report_only_deferred_namespace_is_visible_but_does_not_block() {
+        // Votes stay behind §7.5 and their loader writes nothing back, so a
+        // collision is reported for that gate to see and does not stop the
+        // binary. "Reported" is the load-bearing word: it must appear in the
+        // audit, not vanish into a row count.
+        let (a, b) = two_spellings(134);
+        let store = store_with(&[
+            (&format!("gov:vote:proposal-1:{a}"), b"v"),
+            (&format!("gov:vote:proposal-1:{b}"), b"v"),
+        ]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        let votes = a_
+            .deferred_reports
+            .iter()
+            .find(|d| d.name == "governance/votes")
+            .expect("vote namespace is reported");
+        assert_eq!(votes.posture, DeferredCollisionPosture::ReportOnly);
+        assert_eq!(
+            votes.report.collision_groups.len(),
+            1,
+            "the collision is visible in the deferred report"
+        );
+        assert!(!votes.blocks());
+        assert!(a_.blocking_deferred().is_empty());
+        assert!(a_.is_clear());
+    }
+
+    #[test]
+    fn an_unreadable_row_in_a_block_startup_deferred_namespace_blocks() {
+        // A row whose principal cannot be read cannot be classified, so it
+        // blocks under a blocking posture exactly as it would in a registered
+        // keyspace.
+        let store = store_with(&[("security:quarantine:did:icn:zNOTAKEY", b"v")]);
+
+        let a_ = audit(
+            &store,
+            &[descriptor(MergeDisposition::Sum)],
+            &n2a_deferred_namespaces(),
+        );
+
+        let security = a_
+            .deferred_reports
+            .iter()
+            .find(|d| d.name == "security/misbehavior")
+            .expect("security namespace is reported");
+        assert_eq!(security.report.rows_unreadable, 1);
+        assert!(security.blocks());
+        assert!(!a_.is_clear());
+    }
+
+    #[test]
+    fn deferred_reports_assert_no_merge_rule() {
+        // A deferred report must never read as authority: whatever a renderer
+        // does with its disposition, it says FAIL-CLOSED and unsigned-off.
+        let one = spell(&principal(135), multibase::Base::Base58Btc);
+        let store = store_with(&[(&format!("auth:challenge:{one}"), b"v")]);
+
+        for d in scan_deferred(&store, &n2a_deferred_namespaces()).unwrap() {
+            assert_eq!(
+                d.report.disposition,
+                MergeDisposition::FailClosed,
+                "{}",
+                d.name
+            );
+            assert_eq!(
+                d.report.basis,
+                RuleBasis::AwaitingDomainSignOff,
+                "{}",
+                d.name
+            );
+        }
+    }
+
+    #[test]
+    fn sled_discovery_refuses_an_unreadable_directory_rather_than_shortening() {
+        // The failure this pins: a directory that is searchable but not
+        // readable. `read_dir` fails, and a walker that returned what it had so
+        // far would report the databases it did find as if they were all of
+        // them — so the startup gate would audit a subset, find it clean, and
+        // write a CLEAR receipt over a store it never opened.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let visible = data_dir.join("visible");
+        std::fs::create_dir_all(&visible).unwrap();
+        std::fs::write(visible.join("conf"), b"x").unwrap();
+
+        let hidden = data_dir.join("hidden");
+        std::fs::create_dir_all(hidden.join("db")).unwrap();
+        std::fs::write(hidden.join("db").join("conf"), b"x").unwrap();
+
+        // Searchable but not readable: `hidden/db` can still be opened by path,
+        // which is exactly why omitting it is unsafe rather than harmless.
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o111)).unwrap();
+
+        let result = find_sled_roots(data_dir);
+
+        // Restore before asserting, so a failure cannot leave an unreadable
+        // directory behind for the tempdir cleanup to trip over.
+        std::fs::set_permissions(&hidden, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let err = result.expect_err("an unreadable directory must refuse, not shorten the list");
+        assert!(
+            format!("{err:#}").contains("cannot enumerate"),
+            "the refusal must name the enumeration failure, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn sled_discovery_refuses_a_symlink_rather_than_following_or_skipping_it() {
+        // Following would let the sweep leave the data directory; skipping
+        // would omit a database the daemon can still open through the link.
+        // Neither is safe, so the sweep declines to decide.
+        let tmp = tempfile::tempdir().unwrap();
+        let data_dir = tmp.path();
+
+        let real = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join("conf"), b"x").unwrap();
+
+        std::os::unix::fs::symlink(&real, data_dir.join("linked")).unwrap();
+
+        let err = find_sled_roots(data_dir).expect_err("a symlink must refuse");
+        assert!(
+            format!("{err:#}").contains("symlink"),
+            "the refusal must name the symlink, got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn audit_sled_store_uses_the_canonical_registries_and_every_tree() {
+        // The shared entry point both the offline tool and the startup gate
+        // render: it must consult the real registries, and a principal row in
+        // a named tree must surface as unreachable rather than as absent.
+        let (a, b) = two_spellings(136);
+        let store = store_with(&[
+            (&format!("ledger:balance:\"{a}\""), b"v"),
+            (&format!("ledger:balance:\"{b}\""), b"v"),
+        ]);
+        let named = store.db().open_tree(b"aside").unwrap();
+        named
+            .insert(format!("x:{a}").as_bytes(), b"v".as_slice())
+            .unwrap();
+
+        let audit = audit_sled_store(&store).unwrap();
+
+        let balance = audit
+            .audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-ledger/balance")
+            .expect("registry keyspace scanned");
+        assert_eq!(balance.collision_groups.len(), 1);
+        assert!(balance.must_fail_closed(), "balance rule is not signed off");
+        assert_eq!(audit.audit.unreachable_did_rows, 1);
+        assert!(audit
+            .trees
+            .iter()
+            .any(|(name, n)| name == "aside" && *n == 1));
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn find_sled_roots_finds_databases_at_any_level_including_inside_one() {
+        let base = tempfile::tempdir().unwrap();
+        let data_dir = base.path();
+
+        // `store/` is itself a database (as `icnctl init-coop` leaves it), and
+        // holds a database, a non-database directory, and a database nested
+        // inside a non-database; one more database sits at the data-dir level.
+        for rel in [
+            "store",
+            "store/ledger",
+            "commons.sled",
+            "store/deeper/nested",
+        ] {
+            let path = data_dir.join(rel);
+            std::fs::create_dir_all(&path).unwrap();
+            let db = sled::open(&path).unwrap();
+            db.insert(b"k", b"v").unwrap();
+            db.flush().unwrap();
+        }
+        std::fs::create_dir_all(data_dir.join("store/not-a-db")).unwrap();
+        std::fs::write(data_dir.join("identity.age"), b"not a database").unwrap();
+
+        let roots = find_sled_roots(data_dir).expect("a readable fixture tree enumerates");
+        let rel: Vec<String> = roots
+            .iter()
+            .map(|r| r.strip_prefix(data_dir).unwrap().display().to_string())
+            .collect();
+
+        assert_eq!(
+            rel,
+            vec![
+                "commons.sled",
+                "store",
+                "store/deeper/nested",
+                "store/ledger"
+            ],
+            "path-ordered; a non-database directory is walked through, not listed; \
+             a database inside a database is listed; a database's own \
+             subdirectories (`blobs/`) are never listed as databases"
+        );
+        assert!(
+            data_dir.join("store/blobs").is_dir(),
+            "the fixture must exercise sled's own subdirectory"
+        );
     }
 
     #[test]

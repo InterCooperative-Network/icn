@@ -713,6 +713,35 @@ async fn main() -> Result<()> {
     std::fs::create_dir_all(&config.data_dir)?;
 
     tracing::info!("Data directory: {:?}", config.data_dir);
+
+    // N2-A startup gate (#2627). `Did` equality now names the principal, not
+    // the spelling (I7), so the first start of this binary over a store holding
+    // alias-spelled rows of one principal would fold them together and orphan
+    // the losers on write-back. This is the fail-closed check the migration
+    // record places *inside the binary*: it runs before the first store is
+    // opened — the ledger, trust and parameter stores below, then everything
+    // the supervisor opens — and refuses to start rather than trust a scan run
+    // earlier. It writes nothing to any store; its receipt lives beside them.
+    // There is no bypass flag: a refusal names the store and keyspace, and the
+    // disposition belongs to the domain that owns it.
+    {
+        let data_dir = config.data_dir.clone();
+        let receipt = tokio::task::spawn_blocking(move || {
+            icn_store::n2a_startup_gate::enforce(&data_dir, std::time::SystemTime::now())
+        })
+        .await
+        .context("N2-A startup gate task failed")?
+        // `anyhow::Error::new` keeps `GateRefusal` recoverable by `downcast_ref`
+        // and preserves its source chain; formatting it into a string discarded
+        // both, leaving an operator with prose where a typed refusal had been.
+        .map_err(anyhow::Error::new)?;
+        tracing::info!(
+            generation = receipt.generation,
+            stores = receipt.stores.len(),
+            "N2-A startup gate: clear; receipt at {}",
+            icn_store::n2a_startup_gate::receipt_path(&config.data_dir).display()
+        );
+    }
     tracing::info!("Log level: {}", config.observability.log_level);
 
     if config.gateway.enabled {
