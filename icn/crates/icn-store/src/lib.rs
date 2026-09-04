@@ -320,6 +320,39 @@ pub trait Store: Send + Sync {
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
     /// Delete a key
     fn delete(&self, key: &[u8]) -> Result<()>;
+
+    /// Delete several keys as one indivisible unit.
+    ///
+    /// Deleting `n` keys with `n` calls to [`Store::delete`] has `n - 1`
+    /// boundaries a crash or an I/O error can stop at, and each one leaves a
+    /// state the caller never asked for. Where the surviving rows are alias
+    /// spellings of one principal that is not merely untidy: the survivor is
+    /// no longer ambiguous, so the next read *accepts* it — a deletion that
+    /// makes the state it was removing look valid (icn#2704).
+    ///
+    /// Implementations must guarantee that at every boundary from which the
+    /// persisted state is read again — a crash and recovery, a reopen, a
+    /// restart — either every key in `keys` is gone or none of them is.
+    /// Durability is not required: a deletion lost whole is the "none of them"
+    /// case, and the caller's remedy is the same in both, which is to ask
+    /// again. A *partial* outcome is what may not happen.
+    ///
+    /// There is deliberately **no default implementation**. A default could
+    /// only loop over [`Store::delete`], which is exactly the behaviour this
+    /// method exists to replace, and a new backend would inherit the defect
+    /// silently.
+    ///
+    /// This is not a second atomicity mechanism. [`TransactionalStore`]
+    /// already provides these semantics; its `transaction` is generic and
+    /// therefore not dyn-compatible, so an `Arc<dyn Store>` — which is how
+    /// every domain store holds its backend — could never reach it. This
+    /// method is the dyn-compatible way in, and a backend that has a
+    /// transaction should implement it with one.
+    ///
+    /// An empty `keys` is a successful no-op: nothing to remove is not a
+    /// failure, and it must not become an empty write.
+    fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()>;
+
     /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
@@ -929,6 +962,27 @@ impl Store for SledStore {
     fn delete(&self, key: &[u8]) -> Result<()> {
         self.db.remove(key)?;
         Ok(())
+    }
+
+    /// Delegates to this store's own transaction rather than reimplementing
+    /// atomicity: sled stages a transaction's writes and applies them under a
+    /// pinned log reservation that is sealed only once every one of them has
+    /// been written, and recovery replays such a group only when it finds that
+    /// seal. An interrupted commit is therefore discarded whole.
+    ///
+    /// Removing a key that is not there is not an error and repeating a
+    /// removal changes nothing, so the closure is safe under the retry
+    /// [`TransactionalStore`] documents.
+    fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+        if keys.is_empty() {
+            return Ok(());
+        }
+        self.transaction(|tx| {
+            for key in keys {
+                tx.delete(key)?;
+            }
+            Ok(())
+        })
     }
 
     fn flush(&self) -> Result<()> {
@@ -2187,6 +2241,50 @@ mod tests {
         let fed_hashes = store.list_scoped_replica_hashes(ScopeLevel::Federation)?;
         assert!(fed_hashes.is_empty());
 
+        Ok(())
+    }
+
+    // ----- Store::delete_atomic (icn#2704) ---------------------------------
+
+    #[test]
+    fn delete_atomic_removes_every_named_key_and_leaves_the_rest() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let store = SledStore::open(dir.path())?;
+        store.put(b"keep:1", b"1")?;
+        store.put(b"drop:1", b"1")?;
+        store.put(b"drop:2", b"2")?;
+
+        store.delete_atomic(&[b"drop:1".to_vec(), b"drop:2".to_vec()])?;
+
+        assert!(store.get(b"drop:1")?.is_none());
+        assert!(store.get(b"drop:2")?.is_none());
+        assert_eq!(store.get(b"keep:1")?.as_deref(), Some(b"1".as_slice()));
+
+        // Reopened from disk: the removals are what the next process reads,
+        // not merely what this handle remembers.
+        Store::flush(&store)?;
+        drop(store);
+        let reopened = SledStore::open(dir.path())?;
+        assert!(reopened.get(b"drop:1")?.is_none());
+        assert!(reopened.get(b"drop:2")?.is_none());
+        assert_eq!(reopened.get(b"keep:1")?.as_deref(), Some(b"1".as_slice()));
+        Ok(())
+    }
+
+    #[test]
+    fn delete_atomic_is_a_no_op_for_nothing_and_for_absent_keys() -> Result<()> {
+        // Both matter for retry. Nothing to remove must not become an empty
+        // write, and repeating a removal that already happened must not turn
+        // a converged state into an error.
+        let store = SledStore::temporary()?;
+        store.put(b"present", b"1")?;
+
+        store.delete_atomic(&[])?;
+        assert_eq!(store.get(b"present")?.as_deref(), Some(b"1".as_slice()));
+
+        store.delete_atomic(&[b"present".to_vec(), b"never-existed".to_vec()])?;
+        store.delete_atomic(&[b"present".to_vec()])?;
+        assert!(store.get(b"present")?.is_none());
         Ok(())
     }
 }
