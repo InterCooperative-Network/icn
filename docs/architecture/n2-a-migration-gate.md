@@ -883,7 +883,7 @@ wherever they observe the same thing, and differ only where they do not:
 | Merge rule | none asserted; a collision under `AwaitingDomainSignOff` refuses (§10.2) | none asserted; a collision is `PrincipalRowsRefusal::AliasCollision`. No sum, union, latest-wins, normalization, re-key or de-duplication |
 | Readable spelling | one the layout-independent tokenizer can delimit and decode to 32 identifier bytes (§2.6); any other `did:icn:` token is an unreadable row and refuses | the writer's grammar plus `Did::from_str`, which also requires an Ed25519 point. Within the alphabets the tokenizer walks the loader is the stricter: a spelling that decodes but is no principal is `UnreadableKey` here and readable there. A spelling the tokenizer cannot delimit at all — an Identity-base body, whose sigil and raw bytes fall outside those alphabets — is unreadable to the gate and parses in the loader (§4.1's Identity fixture) |
 | Physical shape | prefix match plus the spelling; `did_ends_key` for `frozen` only. A key under `ledger:balance:` with no `did:icn:` in it is a row without a principal and does not block | the writer's exact shape: canonical JSON quoting for `balance` (a bare or non-canonically escaped key is `UnreadableKey`), a currency delimiter after the spelling for `cleared_volume`, strict UTF-8 for `frozen`; anything else refuses |
-| Values | never read | read only after the key is accepted; a `balance` or `frozen` body whose spelling disagrees with its own key is `KeyBodyMismatch` |
+| Values | never read | read only after the key is accepted; a `balance` or `frozen` body whose spelling disagrees with its own key is `KeyValueSpellingMismatch` |
 | Expired freeze rows | not distinguishable without reading the value, so two spellings of one principal under `ledger:frozen:` are a collision whatever their expiry | dropped before grouping: an expired row is not live state, so a lapsed alias does not block a start |
 | Write-back | none — the gate writes to no domain store | keeps the stored row identity (`HashMap::get_key_value`, `remove_entry`); no spelling is normalized and no row is re-keyed, so `PRINCIPAL_IDENTITY_GENERATION` stays 1 |
 | Diagnostic | store, keyspace, rule and its authority, counts, four-byte (eight-hex) principal fingerprints (§10.4) | keyspace, counts, eight-byte principal fingerprints, and for `cleared_volume` an escaped and bounded currency discriminator; never a spelling, never a value |
@@ -895,11 +895,12 @@ Three consequences follow, each deliberate:
   decodes but is no Ed25519 point, a `cleared_volume` key with no currency delimiter, a body that
   spells its account differently from its key — is refused by the loader. The gate is complete
   over *principals across the directory*; the loader is complete over *this keyspace's grammar*.
-* **A loader refusal never contradicts the gate's disposition.** Wherever the gate refuses one
-  of these three keyspaces, the loader refuses the same rows: its collision unit is the same, and
-  every token the gate can delimit but not decode fails `Did::from_str` too. Neither layer asserts
-  a merge rule and neither normalizes a spelling away, so they cannot disagree about a survivor:
-  there is none.
+* **A loader refusal never contradicts the gate's disposition.** The loader's collision unit is
+  the gate's, and every token the gate can *delimit* but not decode fails `Did::from_str` too, so
+  a row the gate refuses as a collision or as an undecodable spelling is one the loader refuses as
+  well — with the two exceptions below, where the gate refuses and the loader does not, never the
+  reverse. Neither layer asserts a merge rule and neither normalizes a spelling away, so they
+  cannot disagree about a survivor: there is none.
 * **Where the gate is the stricter layer, that is a boundary, not a conflict.** Two cases. An
   expired alias freeze is a collision to the gate, which must not read the value that would show
   it lapsed, and is not state to the loader. A spelling the tokenizer cannot delimit is unreadable
