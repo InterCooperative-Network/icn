@@ -147,10 +147,17 @@ impl RuleBasis {
 /// One durable keyspace to scan.
 ///
 /// A descriptor names the prefix to read and the disposition that applies to a
-/// collision found under it. It deliberately does **not** describe how to parse
-/// the key beyond its prefix: DID spellings are located by scanning for the
-/// `did:icn:` scheme, which is layout-independent and so cannot drift out of
-/// step with a keyspace that changes its separator.
+/// collision found under it. By default it describes no more of the key than
+/// that: DID spellings are located by scanning for the `did:icn:` scheme, which
+/// is layout-independent and so cannot drift out of step with a keyspace that
+/// changes its separator.
+///
+/// That default holds wherever every key component is protocol-generated. It
+/// fails where a key carries an identifier another domain chose, because the
+/// scheme scan cannot tell a principal-bearing component from an opaque one
+/// that merely contains the same text. [`KeyspaceDescriptor::principal_region`]
+/// is the narrow exception: a layout may state where its principal lives, and
+/// nothing more.
 #[derive(Debug, Clone)]
 pub struct KeyspaceDescriptor {
     /// Stable identifier used in reports, e.g. `icn-net/replay_max_seq`.
@@ -180,16 +187,20 @@ pub struct KeyspaceDescriptor {
     ///
     /// `/` is the only separator that is also a multibase body character, so
     /// where a spelling may be followed by one is a property of the individual
-    /// key layout — not something the scanner can infer. No registered keyspace
-    /// currently puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses
-    /// `:`; `trust/sequences/issuer/<did>` ends there), so every descriptor sets
-    /// this `false` and `<did>/junk` is correctly unreadable rather than a
-    /// readable principal with residual bytes the real loader would reject.
+    /// key layout — not something the scanner can infer.
     ///
-    /// Read only under [`PrincipalRegion::WholeKey`]. An anchored region gets
-    /// its terminator from the region itself, so this field would have nothing
-    /// to say there; `a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off`
-    /// pins that such descriptors leave it `false`.
+    /// Read only under [`PrincipalRegion::WholeKey`], and no whole-key keyspace
+    /// puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses `:`;
+    /// `trust/sequences/issuer/<did>` ends there), so every descriptor sets this
+    /// `false` and `<did>/junk` is correctly unreadable rather than a readable
+    /// principal with residual bytes the real loader would reject.
+    ///
+    /// `federation/attestations/<did>/<source>` does put `/` after a spelling,
+    /// and is not an exception to that: it declares an anchored region, which
+    /// takes its terminator from the region itself. Saying it here as well
+    /// would be two owners for one fact, so
+    /// `a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off`
+    /// pins that anchored descriptors leave this `false`.
     pub slash_ends_did: bool,
     /// Which part of a key of this layout may carry a principal spelling.
     pub principal_region: PrincipalRegion,
@@ -681,8 +692,13 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
         };
 
         // The keyspace says its keys end with the DID, so anything after the
-        // last spelling is material its own parser would refuse.
-        if descriptor.did_ends_key {
+        // last spelling is material its own parser would refuse. Read only for
+        // a whole-key scan: an anchored region already decided where its one
+        // spelling ends and what may follow it, and consulting a second rule
+        // there would make the descriptor answer the same question twice.
+        if matches!(descriptor.principal_region, PrincipalRegion::WholeKey)
+            && descriptor.did_ends_key
+        {
             if let Some(last) = embedded.last() {
                 if last.end != key.len() {
                     rows_unreadable += 1;
@@ -2663,10 +2679,10 @@ mod tests {
 
     #[test]
     fn a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off() {
-        // `slash_ends_did` and `did_ends_key` describe a whole-key scan and are
-        // not read under an anchored region. A descriptor that set one anyway
-        // would be asserting something nothing enforces, which is how a
-        // registry starts lying.
+        // `slash_ends_did` and `did_ends_key` describe a whole-key scan, and
+        // `build_report` reads neither under an anchored region. A descriptor
+        // that set one anyway would be asserting something nothing acts on,
+        // which is how a registry starts lying.
         for d in n2a_keyspaces() {
             if matches!(d.principal_region, PrincipalRegion::WholeKey) {
                 continue;
@@ -3282,11 +3298,57 @@ mod tests {
         assert_eq!(report.rows_with_readable_did, 1);
     }
 
+    /// A seed whose `Base64` spelling actually contains `/`.
+    ///
+    /// Searched rather than hard-coded so the hard case is *exercised*: a test
+    /// that merely says "Base64 bodies can contain `/`" proves nothing if the
+    /// one spelling it happens to build does not.
+    fn seed_whose_base64_spelling_contains_a_slash() -> u8 {
+        (0u8..=255)
+            .find(|s| spell(&principal(*s), multibase::Base::Base64).contains('/'))
+            .expect("some seed's Base64 body contains `/`")
+    }
+
+    #[test]
+    fn a_member_spelling_containing_the_terminator_still_ends_at_the_right_slash() {
+        // The case an alphabet alone cannot decide. A `Base64` body legally
+        // contains `/`, so the first `/` after the prefix is not the end of the
+        // spelling — only decoding says where it ends. Getting this wrong would
+        // cut a real spelling in half and report a principal nobody wrote.
+        let one = spell(
+            &principal(seed_whose_base64_spelling_contains_a_slash()),
+            multibase::Base::Base64,
+        );
+        assert!(
+            one[8..].contains('/'),
+            "fixture guard: this spelling must contain `/`"
+        );
+
+        for source in ["food-coop", "a/b", "did:icn:zzz", ""] {
+            let store = store_with(&[(&attestation_key(&one, source), b"{}")]);
+            let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "source {source:?}");
+            assert_eq!(report.rows_unreadable, 0, "source {source:?}");
+            assert_eq!(report.distinct_principals, 1, "source {source:?}");
+        }
+
+        // And the spelling ended where the source began, not somewhere inside
+        // it: two rows differing only in the source are two tuples, and the
+        // same source twice under one spelling is one row.
+        let store = store_with(&[
+            (&attestation_key(&one, "food-coop"), b"{}"),
+            (&attestation_key(&one, "housing-coop"), b"{}"),
+        ]);
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
     #[test]
     fn the_scanner_and_the_store_agree_on_where_the_member_spelling_ends() {
-        // Every base the production parser accepts, including the two whose
-        // bodies contain `/`. The boundary is decided by decoding, so a `/`
-        // inside the spelling does not end it and the `/` after it does.
+        // Every base the production parser accepts. The `/`-in-the-body case
+        // has its own fixture above, which searches for a spelling that really
+        // contains one rather than assuming this seed's does.
         for base in [
             multibase::Base::Base58Btc,
             multibase::Base::Base16Lower,

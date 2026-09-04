@@ -44,7 +44,9 @@
 //!   were read from the store or built for the caller's own value.
 //! * **Errors carry no payload.** A refusal names the keyspace, a truncated
 //!   principal fingerprint, a bounded source identifier and counts — never a
-//!   full spelling and never a stored attestation.
+//!   spelling of the attested principal and never a stored attestation. The
+//!   source identifier is echoed on purpose; see [`bounded_source_id`] for
+//!   what that does and does not expose.
 //!
 //! The N2-A collision scanner registers this namespace under the same prefix
 //! (`icn_store::did_collision_scan::n2a_keyspaces`, `icn-federation/attestations`)
@@ -115,6 +117,21 @@ fn fingerprint(did: &Did) -> String {
 }
 
 /// A source-cooperative identifier bounded for an error message.
+///
+/// Deliberately echoed rather than fingerprinted, unlike the member principal.
+/// A refusal has to name which `(principal, source)` pair stopped the
+/// operation, and the source is the half an operator can act on: it is
+/// federation key structure a cooperative chose and publishes in order to be
+/// attributed at all, not a subject's identity. The attested principal — the
+/// half a report must not reconstruct — is always a truncated fingerprint.
+///
+/// One consequence is worth stating rather than discovering: nothing in the
+/// federation domain forbids a `source_coop_id` that *is* a `did:icn:`
+/// spelling, and this store must not invent a grammar that does (#2704). Such
+/// an id therefore appears in a refusal in full, within the cap. That is the
+/// source cooperative's own published identifier, never the attested member's.
+/// Redacting it would be a federation-domain diagnostics decision, and it
+/// would cost the refusal the one field that makes it actionable.
 fn bounded_source_id(source_coop_id: &str) -> String {
     if source_coop_id.chars().count() <= SOURCE_ID_ERROR_CAP {
         return source_coop_id.to_string();
