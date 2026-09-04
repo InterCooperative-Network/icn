@@ -1388,7 +1388,7 @@ re-verified against `main` at `5add7a48`. *Live* means a production binary const
 *dormant* means only library code or tests do. None of these is fixed here; each is dispositioned
 by mechanism so it can be closed by the proof its class requires. At the time of the pass the
 scanner registry covered none of the prefixes in this table; `adr0014:grant:by_grantee:` has since
-been registered and closed (§11.5), and the rest are unchanged.
+been registered and closed (§11.6), and the rest are unchanged.
 
 **P5 projections over a P1 or P3 canonical row — close with the §11.3 mechanism (source-of-truth
 declaration, canonical-membership reads, superseded-row cleanup, every-spelling delete, rebuild):**
@@ -1396,7 +1396,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 | Boundary | Reach | Canonical row | Consumer today | Notes |
 |---|---|---|---|---|
 | `apps/governance` `action_item_by_assignee:<did>:<domain>:<item>` | live | the action-item row (`assignee: Option<Did>`) | spelling prefix scan, stale rows skipped | **regressed by I7**: `save` decides stale-index removal with `existing.assignee != item.assignee`, now principal equality, so re-saving under another spelling leaks the old row. Actionable now |
-| ~~`icn-gateway` `adr0014:grant:by_grantee:`~~ **closed in M2, §11.5** and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.5 and registered; the meeting-attendance pair index is untouched and remains open |
+| ~~`icn-gateway` `adr0014:grant:by_grantee:`~~ **closed in M2, §11.6** and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.6 and registered; the meeting-attendance pair index is untouched and remains open |
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
 | `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
 | `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
@@ -1465,7 +1465,7 @@ principal-aware while its partner still counts, deletes or keys by spelling.
   `Equivalent` (derived projection, P5). They are different classes and are deliberately not made
   to look alike. #2704's non-snapshot-scan finding is applied here as the namespace lock (§11.3).
 
-### 11.5 Disposition of `adr0014:grant:by_grantee:` — P5, `Equivalent` / `Established` (#2627 M2)
+### 11.6 Disposition of `adr0014:grant:by_grantee:` — P5, `Equivalent` / `Established` (#2627 M2)
 
 **The authority model.** ADR-0014 grant storage is three keyspaces, and only one of them is
 authority:

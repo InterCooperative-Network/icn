@@ -1215,17 +1215,20 @@ impl ReceiptStore {
         let (_valid_from, id_bytes) = suffix
             .split_at_checked(8)
             .ok_or(GranteeIndexReason::SuffixShape)?;
-        // The width is checked before parsing, not left to the parser.
-        // `Uuid::parse_str` also accepts the simple (32), braced (38) and URN
-        // (45) forms, so without this a suffix of some other length whose
-        // tail happened to spell one of those would be read as a grant id —
-        // a shape `grant_by_grantee_key` cannot write. 36 bytes admits only
-        // the hyphenated form it does write.
+        // The width bounds the parse, and the round trip pins the encoding.
+        // `Uuid::parse_str` accepts the simple (32), braced (38), URN (45) and
+        // upper-case forms too, so a suffix spelling any of those would
+        // otherwise be read as a grant id — a shape `grant_by_grantee_key`
+        // cannot write. Requiring the bytes to equal the id's own hyphenated
+        // rendering admits exactly the encoding the writer emits.
         if id_bytes.len() != GRANT_ID_HYPHENATED_LEN {
             return Err(GranteeIndexReason::SuffixShape);
         }
         let id_str = std::str::from_utf8(id_bytes).map_err(|_| GranteeIndexReason::SuffixShape)?;
         let uuid = uuid::Uuid::parse_str(id_str).map_err(|_| GranteeIndexReason::SuffixShape)?;
+        if id_str != uuid.hyphenated().to_string() {
+            return Err(GranteeIndexReason::SuffixShape);
+        }
 
         let (tag, body) = region.split_first().ok_or(GranteeIndexReason::Truncated)?;
         let grantee = match *tag {
@@ -3679,6 +3682,24 @@ mod tests {
         assert!(
             err.contains("reason=suffix_shape"),
             "wrong class for an off-width suffix; got {err}"
+        );
+
+        // Right width, wrong encoding: an upper-case hyphenated id is 36
+        // bytes and parses, but is not what this writer emits.
+        let upper = id.0.hyphenated().to_string().to_uppercase();
+        assert_eq!(upper.len(), GRANT_ID_HYPHENATED_LEN);
+        let mut ukey = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        ukey.extend_from_slice(&(canon.len() as u32).to_be_bytes());
+        ukey.extend_from_slice(&canon);
+        ukey.extend_from_slice(&1_000u64.to_be_bytes());
+        ukey.extend_from_slice(upper.as_bytes());
+
+        let store = ReceiptStore::new(temp_db());
+        let err = refusal_class_for(&store, &ukey, upper.as_bytes(), &a)
+            .expect("an upper-case id is not an encoding this writer emits");
+        assert!(
+            err.contains("reason=suffix_shape"),
+            "wrong class for an off-encoding suffix; got {err}"
         );
     }
 
