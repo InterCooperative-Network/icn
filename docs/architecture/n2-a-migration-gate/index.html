@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design and evidence surface for the N2-A tranche (#2627): Did equality and hashing as key equality rather than string equality (IDENTITY_SEMANTICS I7), landed in #2686. Records the reproducible read-only collision scanner in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the principal-bearing rows deliberately deferred, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, the partner-invariant designs (PeerId ordering and CCL Value::Did Hash/Eq now landed; the split String/Did peer maps still open), the nine-axis site taxonomy carried in from #2641, the migration sequence as planned (section 8.1) and the live post-flip cutover order (section 8.2), the in-binary startup gate (section 10): icnd audits every sled database beneath its data directory before opening the first one, refuses to start over an unruled alias collision, uncovered or unreadable principal row, unverifiable store or newer-generation receipt, records a payload-free receipt carrying the principal-identity generation, and reports but does not act on deferred vote and challenge collisions; and the load/rebuild/write-back audit of the principal-keyed loaders: section 4.1 for the icn-ledger balance, cleared-volume and freeze rebuilds, which now classify their whole keyspace and refuse through icn_ledger::principal_rows before adopting a row, section 10.6 for how that loader refusal and the startup gate divide the work, section 4 row 19 plus section 6.5 for the icn-federation attestation keyspace, registered in #2703/#2704 as a fail-closed keyspace whose collision unit is (member principal, source cooperative), enforced by the AttestationStore itself and by the startup gate over the same descriptor, with revocation of an ambiguous pair made atomic so no failure can elect an alias survivor; and section 6.5 for the icn-security misbehaviour detector and icn-net peer-map findings that remain unfixed. The three-deployment evidence predates the attestation registration and does not speak for that keyspace. Authorizes no merge rule: the seven AwaitingDomainSignOff keyspaces are unchanged. Migrates nothing, does not discharge the separate section 7.5 membership/vote gate, and states cutover as INCOMPLETE: the remaining loader audits, the weak-holder namespace split, the peer-map pair and fresh quiesced evidence remain open. Fixture evidence only; no deployment-readiness claim. Section 11 (2026-09-04, #2707) adds the persistence-boundary classes P1-P5 that classify every persisted principal boundary by the mechanism that proves it safe, states precisely what a scanner CLEAR verdict does and does not establish, dispositions the federation agreement party index (section 4 row 20) as a derived projection registered Equivalent under the anchored-principal descriptor and consumed by the startup gate with the same (party principal, exact agreement id) collision unit, records the projection store's canonical-membership reads, write protocol, rebuild and namespace serialization, and maps the remaining N2-A boundaries by class; it authorizes no merge rule for authoritative state. Section 4.2 (2026-09-04, #2627 M1) records the treasury loader: the primary ledger:treasury:<did> row (section 4 row 21) is classified through icn_ledger::principal_rows before any in-memory map is touched, key/body spelling identity is byte-exact rather than Did equality, the write-only idx:coop projection is validated against the primary rows and given no authority, unreadable primary rows refuse rather than vanish (which makes the anchor-derived read-path defect of inventory section 10.1 visible without repairing it), the row is registered fail closed in the scanner with a prefix that claims only the primary rows and is consumed by the startup gate, and the audit and budget-index siblings that embed a spelling remain uncovered as the next follow-up; no merge rule is authorized."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A — migration gate: collision scan, dispositions and partner invariants (#2627) | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Design and evidence surface for the N2-A tranche (#2627): Did equality and hashing as key equality rather than string equality (IDENTITY_SEMANTICS I7), landed in #2686. Records the reproducible read-only collision scanner in icn-store (engine, runner binary, grouping by principal-canonical shape, per-tree coverage reporting, fixture tests plus mutation-based discrimination evidence), the collision evidence measured against three live deployments (94 sled databases, 24 registered principal-bearing rows, zero collision groups) together with the two deployments that could not be attached and the principal-bearing rows deliberately deferred, a per-keyspace disposition table with merge rules and fail-closed cases, explicit per-namespace decisions for the namespaces I7 does not move, the partner-invariant designs (PeerId ordering and CCL Value::Did Hash/Eq now landed; the split String/Did peer maps still open), the nine-axis site taxonomy carried in from #2641, the migration sequence as planned (section 8.1) and the live post-flip cutover order (section 8.2), the in-binary startup gate (section 10): icnd audits every sled database beneath its data directory before opening the first one, refuses to start over an unruled alias collision, uncovered or unreadable principal row, unverifiable store or newer-generation receipt, records a payload-free receipt carrying the principal-identity generation, and reports but does not act on deferred vote and challenge collisions; and the load/rebuild/write-back audit of the principal-keyed loaders: section 4.1 for the icn-ledger balance, cleared-volume and freeze rebuilds, which now classify their whole keyspace and refuse through icn_ledger::principal_rows before adopting a row, section 10.6 for how that loader refusal and the startup gate divide the work, section 4 row 19 plus section 6.5 for the icn-federation attestation keyspace, registered in #2703/#2704 as a fail-closed keyspace whose collision unit is (member principal, source cooperative), enforced by the AttestationStore itself and by the startup gate over the same descriptor, with revocation of an ambiguous pair made atomic so no failure can elect an alias survivor; and section 6.5 for the icn-security misbehaviour detector and icn-net peer-map findings that remain unfixed. The three-deployment evidence predates the attestation registration and does not speak for that keyspace. Authorizes no merge rule: the seven AwaitingDomainSignOff keyspaces are unchanged. Migrates nothing, does not discharge the separate section 7.5 membership/vote gate, and states cutover as INCOMPLETE: the remaining loader audits, the weak-holder namespace split, the peer-map pair and fresh quiesced evidence remain open. Fixture evidence only; no deployment-readiness claim. Section 11 (2026-09-04, #2707) adds the persistence-boundary classes P1-P5 that classify every persisted principal boundary by the mechanism that proves it safe, states precisely what a scanner CLEAR verdict does and does not establish, dispositions the federation agreement party index (section 4 row 20) as a derived projection registered Equivalent under the anchored-principal descriptor and consumed by the startup gate with the same (party principal, exact agreement id) collision unit, records the projection store's canonical-membership reads, write protocol, rebuild and namespace serialization, and maps the remaining N2-A boundaries by class; it authorizes no merge rule for authoritative state. Section 4.2 (2026-09-04, #2627 M1) records the treasury loader: the primary ledger:treasury:<did> row (section 4 row 21) is classified through icn_ledger::principal_rows before any in-memory map is touched, key/body spelling identity is byte-exact rather than Did equality, the write-only idx:coop projection is validated against the primary rows and given no authority, unreadable primary rows refuse rather than vanish (which makes the anchor-derived read-path defect of inventory section 10.1 visible without repairing it), the row is registered fail closed in the scanner with a prefix that claims only the primary rows and is consumed by the startup gate, and the audit and budget-index siblings that embed a spelling remain uncovered as the next follow-up; no merge rule is authorized. Section 11.6 (2026-09-04, #2627 M2) records the ADR-0014 by-grantee projection (section 4 row 25): the primary adr0014:grant:<uuid> record is the authority and the by-grantee rows are a lookup projection, a Person grantee is enumerated by decoded Principal rather than by persisted spelling and every candidate is proven against its primary before it is returned, de-duplication is by AuthorityGrantId so a principal may still hold several distinct grants, Entity grantees keep exact string identity and are never principalized, malformed projection rows refuse rather than vanish while stale rows are filtered, no writer-side guard and no namespace lock were needed because the projection is append-only, and the keyspace is registered Equivalent/Established under a third structural descriptor (length-prefixed, tag-discriminated) because neither existing region can read a binary key - one would refuse every row and the other would silently form no group at all. It records the pre-fix defects reproduced on main: alias-spelled enumeration returned nothing, an accepted alias-spelled RevokeAuthority decision left the grant active, the MandateGate domain path returned a false NoMandate, a forged projection row returned another principal's grant, and one ordinary Person grant row made icnd refuse to start. No row is re-keyed, no rebuild is added and no merge rule is authorized."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>N2-A — migration gate: collision scan, dispositions and partner invariants (#2627) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -1975,8 +1975,9 @@ above is fixture evidence.</p>
 <p>A bounded adversarial pass over the boundaries the inventory and the #2703 audit had left open,
 re-verified against <code>main</code> at <code>5add7a48</code>. <em>Live</em> means a production binary constructs the store;
 <em>dormant</em> means only library code or tests do. None of these is fixed here; each is dispositioned
-by mechanism so it can be closed by the proof its class requires. The scanner registry covers
-none of the prefixes in this table.</p>
+by mechanism so it can be closed by the proof its class requires. At the time of the pass the
+scanner registry covered none of the prefixes in this table; <code>adr0014:grant:by_grantee:</code> has since
+been registered and closed (§11.6), and the rest are unchanged.</p>
 <p><strong>P5 projections over a P1 or P3 canonical row — close with the §11.3 mechanism (source-of-truth
 declaration, canonical-membership reads, superseded-row cleanup, every-spelling delete, rebuild):</strong></p>
 <table>
@@ -1997,11 +1998,11 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 <td><strong>regressed by I7</strong>: <code>save</code> decides stale-index removal with <code>existing.assignee != item.assignee</code>, now principal equality, so re-saving under another spelling leaks the old row. Actionable now</td>
 </tr>
 <tr>
-<td><code>icn-gateway</code> <code>adr0014:grant:by_grantee:</code> and <code>receipt:meeting_attendance:by_pair:</code></td>
+<td><del><code>icn-gateway</code> <code>adr0014:grant:by_grantee:</code></del> <strong>closed in M2, §11.6</strong> and <code>receipt:meeting_attendance:by_pair:</code></td>
 <td>live</td>
 <td><code>adr0014:grant:&lt;uuid&gt;</code> / <code>receipt:meeting_attendance:rec:&lt;hash&gt;</code></td>
 <td>spelling prefix scan; the rebuild write-back adds and never deletes</td>
-<td>authorization enumeration by grantee misses alias rows</td>
+<td>authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.6 and registered; the meeting-attendance pair index is untouched and remains open</td>
 </tr>
 <tr>
 <td><code>icn-gateway</code> <code>idx_device_owner:</code> and <code>idx_notif_recipient:</code></td>
@@ -2196,6 +2197,131 @@ order. The attestation store stays fail-closed (authoritative rows, P1); the par
 <code>Equivalent</code> (derived projection, P5). They are different classes and are deliberately not made
 to look alike. #2704&#39;s non-snapshot-scan finding is applied here as the namespace lock (§11.3).</li>
 </ul>
+<h3 id="116-disposition-of-adr0014grantby_grantee--p5-equivalent--established-2627-m2">11.6 Disposition of <code>adr0014:grant:by_grantee:</code> — P5, <code>Equivalent</code> / <code>Established</code> (#2627 M2)</h3>
+<p><strong>The authority model.</strong> ADR-0014 grant storage is three keyspaces, and only one of them is
+authority:</p>
+<pre><code class="language-text">adr0014:grant:&lt;uuid&gt;            = the AuthorityGrant. Canonical authority fact.
+adr0014:grant:by_decision:...   = derived lookup projection.
+adr0014:grant:by_grantee:...    = derived lookup projection.
+</code></pre>
+<p>A <strong>Person</strong> grantee&#39;s semantic key is the decoded Principal — the same relation <code>Did</code> equality
+itself defines (§11 I7). An <strong>Entity</strong> grantee&#39;s semantic key is the exact entity string under
+current semantics; nothing here changes that, and the two are not collapsed into one rule.</p>
+<p><strong>Defects verified against <code>main</code> @ <code>10fafafc</code> before the fix</strong>, each reproduced by a test that
+failed on the unchanged code:</p>
+<ol>
+<li>a grant issued to <code>Person(A)</code> was invisible to a query for <code>Person(B)</code> when A and B are two
+accepted spellings of one principal — <code>grant_by_grantee_scan_prefix</code> builds its scan boundary
+from <code>did.as_str()</code>, so it selects one spelling of a principal that has many. The control
+under the issuing spelling returned the grant, so the projection <em>omitted</em> authority the
+canonical record states;</li>
+<li>an accepted <code>RevokeAuthority</code> decision naming that principal under the other spelling <strong>left
+the grant active</strong>. This is the consequence that matters: the SDIS payloads carry a DID and
+never a grant id, so <code>revoke_active_grants_for_person</code> can only find its targets by
+enumeration. Alias-issued authority survived alias-spelled revocation;</li>
+<li>the live <code>MandateGate</code> domain-target path, which resolves actor-first through the same
+enumeration, returned <code>MandateRejection::NoMandate</code> for an actor spelled otherwise than the
+grant was issued to. This is a <strong>false negative</strong> — authority that exists is not found — not a
+privilege escalation;</li>
+<li>neither reader checked that the primary record it loaded actually named the grantee asked
+for. A projection row naming <code>Person(A)</code> but pointing at a grant whose canonical record names
+a different principal returned that grant to A: the projection could <em>create</em> authority;</li>
+<li>a single ordinary Person grant row made <code>icnd</code> <strong>refuse to start</strong>. The row carries a
+<code>did:icn:</code> literal, the prefix was in no scanner descriptor and no deferral, and an uncovered
+principal row is a startup blocker (§10). The gateway opens its store at
+<code>&lt;data_dir&gt;/gateway_store</code>, inside the tree the gate audits.</li>
+</ol>
+<p><strong>Fix (#2627 M2).</strong> Persisted encodings are unchanged; no row is re-keyed, merged, normalized or
+deleted, and no preferred spelling is chosen. The store now holds one invariant: <em>the by-grantee
+projection may accelerate discovery of canonical grants and may never create, hide or alter
+authority independently of the canonical <code>AuthorityGrant</code> records.</em></p>
+<ul>
+<li><strong>Reads prove authority from canonical rows.</strong> A Person query reads the whole projection,
+structurally parses every row, decodes each Person-tagged spelling with the production parser,
+keeps every row naming the requested principal under <code>Did</code> equality, de-duplicates by
+<code>AuthorityGrantId</code>, loads each canonical record, and returns only grants whose primary
+<code>grantee</code> is that principal. An Entity query keeps the exact-prefix scan — Entity identity is
+the exact string, the region is length-framed so no id can be a prefix of another, and no alias
+relation exists to miss — and is verified against the primary identically. Liveness still comes
+from the primary&#39;s <code>revoked_at</code>, as it always did. Order is <code>(valid_from, grant id)</code>, so the
+reinstatement seam&#39;s &quot;most recent revoked grant&quot; is a function of the data and not of scan
+order.</li>
+<li><strong>Distinct grants stay distinct.</strong> The de-duplication unit is the canonical <code>AuthorityGrantId</code>,
+never the grantee. A principal may legitimately hold several grants, and two ids are two
+grants; only rows naming <em>one</em> id collapse.</li>
+<li><strong>Stale and malformed evidence are told apart by whether the write protocol can produce them.</strong>
+A row pointing at a missing primary, or at a primary naming another grantee, is <em>stale</em>: reads
+filter it and it confers nothing. Filtering cannot hide a real grant — the only grant such a row
+could name is the one its own id names, whose canonical record does not exist or does not name
+this grantee, and every other row is judged on its own primary; a live grant can never present
+this shape, because row and primary are written in one transaction and no path deletes a grant
+primary. A row this writer could never have produced — framing that
+does not parse, a length field overrunning the key, a suffix that is not
+<code>valid_from ‖ grant id</code>, an undefined variant tag, a Person region naming no principal, or a
+value naming a different grant than its own key — is <em>malformed</em>, and every read refuses with
+<code>grant_by_grantee_index_malformed: rows=&lt;n&gt; reason=&lt;class&gt;</code>. Refusing is the only answer that
+neither invents authority nor hides it: an uninterpretable row cannot be attributed to a
+principal, so it cannot be ruled out as the row naming the one being asked about, and dropping
+it would answer &quot;no authority exists&quot; on evidence never read. No spelling, entity id or grant
+payload travels in the error.</li>
+<li><strong>No writer-side guard was needed, and the reason was reproduced rather than assumed.</strong> The
+projection is append-only: <code>put_authority_grant</code> and <code>put_mandate_with_grants_atomic</code> insert
+primary and index in one transaction, the startup backfill derives its key from the primary&#39;s
+own grantee and so cannot introduce a spelling the primary does not carry, and revocation
+touches the primary alone. Equivalent duplicate rows for one canonical grant are therefore
+harmless after verification and de-duplication, which a fixture pins.</li>
+<li><strong>No new lock, for a stated reason.</strong> <code>sled</code>&#39;s scan is not a snapshot, but because nothing
+deletes or re-keys a projection row, a straddling enumeration can only miss rows written after
+it began and never lose one written before — and every row it sees is proven against its own
+primary. That is precisely the guarantee #2704 and #2707 needed a namespace lock to obtain,
+because those projections retire rows on replacement and a scan could miss the old row and its
+replacement both. A behavioural fixture holds the property under concurrent writes. What remains
+is a <em>subset</em> read — a scan racing the multi-grant atomic commit may return a set matching no
+single committed state. <strong>This read is not a linearizable snapshot of a grantee&#39;s grant set and
+is not claimed to be.</strong> What is claimed: authority is never invented, because each returned
+grant was loaded from its own primary and checked there; and every outcome reachable under a
+subset read is also reachable by reordering the concurrent commits. The gate only becomes more
+restrictive. Revocation can miss a grant minted concurrently — the schedule where it ran first —
+and can never miss one committed before it began. Reinstatement&#39;s <code>has_active_in_domain</code>
+precheck is the one consumer a subset read makes more <em>permissive</em>: it can mint where it would
+have declined, which is the same two active grants two concurrently accepted minting decisions
+produce with no race at all, and the precheck is best-effort against a duplicate proposal rather
+than mutual exclusion. None of this is new — the pre-M2 reader scanned and loaded each primary
+with the same absence of a snapshot. M2 changes which rows are discovered and adds the
+primary-grantee check; it touches snapshot semantics not at all, and removes the part that was
+representation-dependent.</li>
+<li><strong>The scanner registers the prefix</strong> as <code>icn-gateway/adr0014_grant_by_grantee</code>, <code>Equivalent</code>,
+<code>Established</code>, under a <strong>third</strong> structural descriptor,
+<code>PrincipalRegion::LengthPrefixedTagged { principal_tag: 0x01 }</code>. Neither existing
+layout can read this key. <code>AnchoredThenOpaque</code> looks for a terminator byte, and here the
+spelling is preceded by a binary length field and followed by an arbitrary <code>u64</code>, so no
+terminator names the boundary — every row would be unreadable and the gate would refuse
+unconditionally. <code>WholeKey</code> is worse than a refusal: the canonical shape would carry the <code>u32</code>
+length prefix verbatim, and that field is <em>derived from the spelling</em>, so two aliases of one
+principal would differ in it, land in different shapes and form no collision group at all — a
+silent false-clear. The new variant therefore replaces the region <em>including its own framing</em>,
+which is derivable from the spelling, while the <code>valid_from</code> and grant id after it are carried
+byte-for-byte and never parsed. The descriptor learns no ADR-0014 authority semantics: it
+knows a big-endian <code>u32</code> length field, a tag value, a principal subregion and an opaque tail.
+The width is fixed rather than a descriptor field: one layout declares this region and it frames
+with a <code>u32</code>, so a configurable width would buy a hand-rolled accumulator — and its silent
+truncation above eight bytes — for no present caller. <code>principal_tag</code> stays a parameter because
+it is the discrimination that keeps an entity id spelling <code>did:icn:</code> from being read as a
+principal. The
+collision unit is <strong>(grantee principal, exact <code>valid_from</code>, exact grant id)</strong>, so two spellings
+for one grant are one group and two grants for one principal are two shapes — <em>not</em> an
+assertion that a principal holds one grant, which would be false. An Entity-tagged region names
+no principal and is reported principal-free rather than unreadable; a region whose framing does
+not parse is unreadable and blocks, as the gate&#39;s fail-closed rule requires.</li>
+</ul>
+<p><strong>What this does not claim.</strong> The <code>Equivalent</code> disposition is correct <em>because</em> the reader is now
+projection-correct; on a binary without this fix the same scan verdict would be meaningless
+(§11.2). No live store was scanned or repaired. No rebuild for this projection is added: the
+existing <code>backfill_grant_by_grantee_index</code> remains an additive recovery for pre-index databases,
+not a reconciliation, and a verified read path is sufficient for software closure — retiring
+historical rows, if it is ever wanted, is a separate explicit operation. Every claim here is
+fixture evidence. No merge rule is authorized for authoritative state, and no grant body or
+projection row was re-keyed.</p>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/n2-a-migration-gate.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
 </a> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>
