@@ -815,7 +815,7 @@ the flip itself.
 |---|---|---|---|
 | 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
 | 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); `icn-federation`'s `AttestationStore` is audited to the same standard and now refuses rather than fold (§6.5, #2704); the remaining §6.5 loaders — `icn-security`'s misbehaviour detector and the `icn-net` peer maps — have not been |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); `icn-federation`'s `AttestationStore` is audited to the same standard and now refuses rather than fold (§6.5, #2704); the `icn-federation` agreement party index is proven a derived projection and its store answers from canonical membership (§11.3, #2707); the remaining §6.5 loaders — `icn-security`'s misbehaviour detector and the `icn-net` peer maps — have not been |
 | 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it |
 | 5 | `PeerId` ordering | **DONE** | `Ord` over identifier bytes, non-interleaving classes, landed with the flip in #2686 (`icn-net/src/topology.rs`); #2684 had added the `peerid_i7_ordering_tripwire` that pins it |
 | 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | hash over identifier bytes in #2681, before the flip; #2686 pins the contract in `value_did_hash` |
@@ -880,7 +880,7 @@ open, which the daemon would perform moments later regardless.
 
 | Condition | Effect | Why |
 |---|---|---|
-| Collision in a registered keyspace whose rule is `Established` and automatable (`replay_max_seq`, `replay_finalized`, `journal`) | **clear**, group recorded | the live loader already implements the merge (§1.1, §4) |
+| Collision in a registered keyspace whose rule is `Established` and automatable (`replay_max_seq`, `replay_finalized`, `journal`, `agreement_party_index`) | **clear**, group recorded | the live loader already implements the merge (§1.1, §4) — or, for the party index, proves membership from the canonical row on every read, so the group is a redundancy and not a decision (§11.3) |
 | Collision in a registered keyspace whose rule is `AwaitingDomainSignOff` (§2.4's seven, including `sequences_receiver`) | **refuse** | a plausible rule is not an authorized one, and a rule written down by precedent is not one a loader performs |
 | Collision in a `FailClosed` keyspace (`replay_sender_regime`, `icn-coop/member`) | **refuse** | no rule exists |
 | Unreadable principal row in a registered keyspace | **refuse** | cannot be classified, so cannot be merged on its own recognizance |
@@ -940,7 +940,9 @@ tranche exists to prevent.
 
 ### 10.5 Evidence
 
-`icn/crates/icn-store/tests/n2a_startup_gate.rs` — 28 fixtures on real sled databases: every
+`icn/crates/icn-store/tests/n2a_startup_gate.rs` — 42 fixtures on real sled databases (32 with
+#2700, five more for the attestation keyspace with #2704, five for the agreement party index with
+#2707, §11.3): every
 row of §10.2 with its one-fact-different control (same spelling twice, two different principals,
 a single security row, an uncovered row without a principal); the fixture guard that the two
 spellings are distinct strings and `==` as `Did` with equal hashes; unreadable and
@@ -1091,7 +1093,7 @@ unchanged code):
 7. two rows for one `(principal, agreement)` would have produced the agreement twice once
    lookups became principal-wide.
 
-**Fix (PR for this section).** Persisted encodings are unchanged; no row is re-keyed, merged or
+**Fix (#2707).** Persisted encodings are unchanged; no row is re-keyed, merged or
 normalized. The store now holds one invariant: *the party index may accelerate discovery of
 canonical agreements and may never create, omit, preserve or alter agreement-party membership
 independently of canonical agreement state.*
@@ -1124,31 +1126,82 @@ independently of canonical agreement state.*
   version implied and the new one does not (a removed party, or a party the new version spells
   differently). `delete_agreement` removes the canonical row and then every projection row naming
   that agreement under any spelling. A crash at any point leaves extra rows, which reads filter,
-  and never a canonical row without its rows. Writers are serialized per store, so two concurrent
-  replacements of one agreement cannot interleave their cleanup and strand a canonical party.
+  and never a canonical row without its rows. Reads and writes of the namespace are serialized in-process — a process-wide `RwLock`, the
+  #2704 pattern: writers exclude each other, so two concurrent replacements of one agreement
+  cannot interleave their cleanup and strand a canonical party, and a party lookup holds the
+  namespace across its projection scan *and* its canonical loads, because `Store::scan` on sled
+  is not a snapshot (the concurrency note below).
 * **The projection can be recomputed.** `AgreementStore::rebuild_party_index` derives the expected
   rows from every canonical row and makes the projection equal to them, reporting rows kept, added,
   removed as stale and removed as malformed. It refuses before mutating anything if any canonical
   row is unreadable. No canonical byte is touched.
 * **The scanner registers the prefix** as `icn-federation/agreement_party_index`, `Equivalent`,
-  `Established`, with `slash_ends_did` (the spelling is followed by `/`; the loader anchors the
-  split on the agreement id its value names, so nothing else may follow the spelling). A
-  federation-side test pins the registration and a scanner-side fixture proves the alias pair is
-  one automatable group and the rows are covered rather than uncovered.
+  `Established`, under the structural descriptor #2704 made canonical:
+  `PrincipalRegion::AnchoredThenOpaque { terminator: b'/' }`. The party spelling is anchored
+  immediately after the prefix and ends at the `/`; the agreement id after it is an opaque
+  discriminator carried into the canonical shape byte-for-byte and never parsed — an identifier
+  the agreement's creator chose, which the registry does not own, so an id that contains or is a
+  `did:icn:` spelling is still just an id and no id is normalized. The collision unit is **(party
+  principal, exact agreement-id bytes)**. `slash_ends_did` is claimed by no descriptor: the
+  anchored region ends the spelling by construction, and the registry pins that. A federation-side
+  test pins the registration to the store's own separator; scanner fixtures prove the alias pair
+  is one automatable group, that different agreement ids never group, that an id containing a
+  DID spelling stays an id, and that the rows are covered rather than uncovered; and registry pins
+  fix the anchored layouts as exactly the two federation keyspaces in registry order and the
+  whole-key layouts as the twelve pre-existing ones, unchanged.
 
-**What this does not claim.** A legacy store whose index was left incomplete by an old torn write
-is made complete by `rebuild_party_index`, not by reads; wiring that rebuild into daemon start is
-deliberately not done here (the startup gate of §10 is read-only by design). The `Equivalent` disposition is correct *because* the loader is now
-projection-correct; on a binary without this fix the same scan verdict would have been meaningless,
-which is §11.2 in one sentence.
+**Startup gate (added on integration onto #2700).** `icn/crates/icn-store/tests/n2a_startup_gate.rs`
+carries five party-index fixtures on real sled databases: an alias pair for one agreement is
+classified as one `Equivalent` group and the start is **clear**, with every row byte-identical
+afterwards; the same two spellings across two agreements are two shapes and no group; a party
+spelling that names no principal **refuses**; an agreement id containing a DID spelling does not
+refuse; and a party-index row is never reported uncovered. The fixtures discriminate on exactly
+the two facts they exist to pin: with the disposition changed to `FailClosed` the alias-pair
+fixture refuses, and with the region changed to `WholeKey` the alias-pair and opaque-id fixtures
+turn unreadable. A CLEAR from the gate means this spelling collision is safe under the registered
+projection disposition. It does not mean the projection is complete, current or authoritative
+(§11.2).
+
+**Rebuild stays an explicit operation.** The gate is read-only (§10.1) and the daemon has no
+post-open repair hook; none is introduced. `rebuild_party_index` is a domain projection-repair
+operation invoked deliberately, never a startup step, so no silent migration runs on daemon
+start. A legacy store whose index was left incomplete by an old torn write is made complete by
+the rebuild, not by reads.
+
+**Concurrency (found on integration onto #2704).** #2704 established that `Store::scan` on sled
+is not a snapshot: its iterator takes its read lock once per item, so a mutation that commits
+partway through a namespace read is visible to the rows not yet visited and invisible to the ones
+already collected. The write protocol above keeps the projection a superset of canonical
+membership at every instant, but a view assembled half before and half after a commit is a
+superset of nothing. The one shape that bites is a replacement that only *re-spells* a party: it
+writes `idx/<new>/X`, writes the canonical row, retires `idx/<old>/X`; a scan that had passed the
+new row's position before the write and reaches the old row's position after it collects neither,
+and canonical verification cannot recover a row the scan never saw — the lookup would report the
+party absent from an agreement it belongs to before, during and after, an answer no valid state
+gives. The `[a] → [b]` replacement and the delete have no such hybrid: every candidate is checked
+against the canonical row, and both the pre- and the post-state answer are valid. The per-store
+writer mutex the branch originally carried could not close this — it coordinated no reader, and
+nothing between two handles — so the store now holds a process-wide `RwLock` in the #2704 pattern:
+writers exclusive; party lookups shared, and held across the scan and the canonical loads; the
+rebuild exclusive from its first read to its last write. Deterministic tests in `agreement::store`
+model the straddling iterator with a `Store` double paused at a barrier and read whether the
+namespace is held from the lock itself, never from timing; the re-spelling fixture fails with the
+read guard removed. `icnd` constructs one `AgreementStore` over a dedicated sled database, so the
+process-wide lock is equivalent to a per-instance one there and stricter only where several
+handles share a backend. Production behaviour of the store changed in exactly this respect.
+
+**What this does not claim.** The `Equivalent` disposition is correct *because* the loader is now
+projection-correct; on a binary without this fix the same scan verdict would have been
+meaningless, which is §11.2 in one sentence. No live store was scanned or repaired; every claim
+above is fixture evidence.
 
 ### 11.4 Remaining N2-A boundaries, by class and disposition (classification pass of 2026-09-03)
 
 A bounded adversarial pass over the boundaries the inventory and the #2703 audit had left open,
 re-verified against `main` at `5add7a48`. *Live* means a production binary constructs the store;
 *dormant* means only library code or tests do. None of these is fixed here; each is dispositioned
-by mechanism so it can be closed by the proof its class requires. The scanner registry on `main`
-covers none of the prefixes in this table.
+by mechanism so it can be closed by the proof its class requires. The scanner registry covers
+none of the prefixes in this table.
 
 **P5 projections over a P1 or P3 canonical row — close with the §11.3 mechanism (source-of-truth
 declaration, canonical-membership reads, superseded-row cleanup, every-spelling delete, rebuild):**
@@ -1175,8 +1228,8 @@ plus de-duplication, or by a fail-closed loader:**
 | `icn-commons` `commons/stewards/<hex(StewardId)>` | live | `StewardId::from_did` = SHA-256(`"steward:"` ‖ spelling) | spelling lookup through `by_did/`; no `delete_steward` | two independent steward records with independent bonds and sanctions; a suspended steward attests under the alias. Fail-closed loader guard now; derivation fix with migration later. Independent defect: the index is written from `holder_did` and queried by `steward_did` |
 | `icn-commons` `commons/holders/<hex>` (weak-holder path) | live; authorization consumer (`require_membership_in_jurisdiction`, `require_office_in_jurisdiction`) | SHA-256(`did.to_string()`) as the holder/anchor id | spelling lookup | the §5 decision-A prerequisite, unchanged: I7 *creates* this split. A member enrolled under one spelling fails the standing gate under another |
 
-**P4 folds over P1 rows — close with the #2701 `principal_rows` guard shape (classify every row
-before the map, refuse ambiguity whole):**
+**P4 folds over P1 rows — close by reusing `icn_ledger::principal_rows` (#2701, merged): classify
+every row before the map, refuse ambiguity whole:**
 
 | Boundary | Reach | Fold | Why the existing guards do not catch it |
 |---|---|---|---|
@@ -1199,24 +1252,26 @@ action-item stale-index condition, the treasury hydration guards, and the asset-
 removal. Each is the §7 *partial principalization* pattern — one half of a computation became
 principal-aware while its partner still counts, deletes or keys by spelling.
 
-### 11.5 Non-claims, and what this document owes the open PRs
+### 11.5 Non-claims, and reconciliation with the merged gate, ledger and attestation work
 
 * **N2-A is not complete.** §9 stands. This section makes the remaining work finite; it closes one
   boundary.
 * **No merge rule was invented.** Row 20 uses the existing `Equivalent` disposition because the
   rows are derivations of one canonical fact; nothing here authorizes a merge of authoritative
-  state anywhere else.
-* **Registry scope.** `n2a_keyspaces()` on `main` now holds thirteen descriptors. The §3 evidence
-  was gathered with twelve and is not re-stated here.
-* **After #2700 merges:** add the gate-level fixture proving that a store with an
-  `idx_agreement_party/` alias pair is *clear* (automatable, covered) and one with an unreadable
-  party-index spelling *refuses*; consider wiring `rebuild_party_index` where the daemon opens the
-  agreement store, since the gate itself must stay read-only.
-* **After #2701 merges:** the treasury fold (§11.4) reuses `principal_rows`; do not re-implement
-  the guard.
-* **After #2704 merges:** both PRs append variants to `icn-federation/src/error.rs`, both insert a
-  §4 row (19 and 20) and a §3.2 registry-scope note, and both rewrite the scanner's `slash_ends_did`
-  claimant test — the reconciled test pins **both** `icn-federation/attestations` and
-  `icn-federation/agreement_party_index`, in registry order. The attestation store stays
-  fail-closed (authoritative rows); the party index stays `Equivalent` (projection). They are
-  different classes and must not be made to look alike.
+  state anywhere else, and the seven `AwaitingDomainSignOff` keyspaces are unchanged.
+* **Registry scope.** `n2a_keyspaces()` now holds fourteen descriptors: the twelve whole-key
+  keyspaces the §3 evidence was gathered with, plus the two anchored federation layouts (§4 rows
+  19 and 20). The §3 figures are not re-stated: a registry expansion does not enlarge old
+  evidence (§3.2).
+* **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
+  `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
+  descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
+  exists or is introduced.
+* **#2701 (ledger loaders, merged).** Nothing copied; the treasury fold (§11.4) is to reuse
+  `icn_ledger::principal_rows` rather than re-implement the guard.
+* **#2704 (attestation store, merged).** Both sets of `FederationError` variants coexist; §4
+  carries rows 19 and 20; `slash_ends_did` is claimed by no descriptor — both federation layouts
+  declare anchored regions, and a registry pin fixes them as the two anchored layouts in registry
+  order. The attestation store stays fail-closed (authoritative rows, P1); the party index stays
+  `Equivalent` (derived projection, P5). They are different classes and are deliberately not made
+  to look alike. #2704's non-snapshot-scan finding is applied here as the namespace lock (§11.3).
