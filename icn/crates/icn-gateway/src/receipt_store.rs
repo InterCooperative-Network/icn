@@ -98,6 +98,8 @@ const GRANTEE_TAG_ENTITY: u8 = 0x02;
 /// Stable sentinel prefixing every by-grantee projection refusal, so
 /// callers and tests can recognise the class without matching on wording.
 const GRANT_BY_GRANTEE_MALFORMED: &str = "grant_by_grantee_index_malformed";
+/// Byte length of the hyphenated grant id every by-grantee key ends with.
+const GRANT_ID_HYPHENATED_LEN: usize = 36;
 
 /// Why a by-grantee projection row could not be interpreted.
 ///
@@ -1213,6 +1215,15 @@ impl ReceiptStore {
         let (_valid_from, id_bytes) = suffix
             .split_at_checked(8)
             .ok_or(GranteeIndexReason::SuffixShape)?;
+        // The width is checked before parsing, not left to the parser.
+        // `Uuid::parse_str` also accepts the simple (32), braced (38) and URN
+        // (45) forms, so without this a suffix of some other length whose
+        // tail happened to spell one of those would be read as a grant id —
+        // a shape `grant_by_grantee_key` cannot write. 36 bytes admits only
+        // the hyphenated form it does write.
+        if id_bytes.len() != GRANT_ID_HYPHENATED_LEN {
+            return Err(GranteeIndexReason::SuffixShape);
+        }
         let id_str = std::str::from_utf8(id_bytes).map_err(|_| GranteeIndexReason::SuffixShape)?;
         let uuid = uuid::Uuid::parse_str(id_str).map_err(|_| GranteeIndexReason::SuffixShape)?;
 
@@ -3641,6 +3652,34 @@ mod tests {
             );
             assert!(!err.contains("did:icn:"), "no spelling may travel: {err}");
         }
+    }
+
+    #[test]
+    fn a_suffix_of_the_wrong_width_is_refused_even_if_its_tail_parses_as_a_uuid() {
+        // `Uuid::parse_str` accepts the simple, braced and URN forms as well
+        // as the hyphenated one this writer emits. A suffix that is not
+        // exactly `valid_from ‖ 36` must be refused on its width, before the
+        // parser gets a chance to be generous about the form.
+        let (a, _b) = alias_pair();
+        let id = AuthorityGrantId::new();
+        let simple = id.0.simple().to_string(); // 32 chars, no hyphens
+        assert_eq!(simple.len(), 32);
+
+        let mut key = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let mut canon = vec![GRANTEE_TAG_PERSON];
+        canon.extend_from_slice(a.as_str().as_bytes());
+        key.extend_from_slice(&(canon.len() as u32).to_be_bytes());
+        key.extend_from_slice(&canon);
+        key.extend_from_slice(&1_000u64.to_be_bytes());
+        key.extend_from_slice(simple.as_bytes());
+
+        let store = ReceiptStore::new(temp_db());
+        let err = refusal_class_for(&store, &key, simple.as_bytes(), &a)
+            .expect("a 32-byte simple-form tail is not a suffix this writer can produce");
+        assert!(
+            err.contains("reason=suffix_shape"),
+            "wrong class for an off-width suffix; got {err}"
+        );
     }
 
     #[test]
