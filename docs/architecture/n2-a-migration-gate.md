@@ -1386,8 +1386,9 @@ above is fixture evidence.
 A bounded adversarial pass over the boundaries the inventory and the #2703 audit had left open,
 re-verified against `main` at `5add7a48`. *Live* means a production binary constructs the store;
 *dormant* means only library code or tests do. None of these is fixed here; each is dispositioned
-by mechanism so it can be closed by the proof its class requires. The scanner registry covers
-none of the prefixes in this table.
+by mechanism so it can be closed by the proof its class requires. At the time of the pass the
+scanner registry covered none of the prefixes in this table; `adr0014:grant:by_grantee:` has since
+been registered and closed (§11.6), and the rest are unchanged.
 
 **P5 projections over a P1 or P3 canonical row — close with the §11.3 mechanism (source-of-truth
 declaration, canonical-membership reads, superseded-row cleanup, every-spelling delete, rebuild):**
@@ -1395,7 +1396,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 | Boundary | Reach | Canonical row | Consumer today | Notes |
 |---|---|---|---|---|
 | `apps/governance` `action_item_by_assignee:<did>:<domain>:<item>` | live | the action-item row (`assignee: Option<Did>`) | spelling prefix scan, stale rows skipped | **regressed by I7**: `save` decides stale-index removal with `existing.assignee != item.assignee`, now principal equality, so re-saving under another spelling leaks the old row. Actionable now |
-| `icn-gateway` `adr0014:grant:by_grantee:` and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee misses alias rows |
+| ~~`icn-gateway` `adr0014:grant:by_grantee:`~~ **closed in M2, §11.6** and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.6 and registered; the meeting-attendance pair index is untouched and remains open |
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
 | `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
 | `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
@@ -1463,3 +1464,134 @@ principal-aware while its partner still counts, deletes or keys by spelling.
   order. The attestation store stays fail-closed (authoritative rows, P1); the party index stays
   `Equivalent` (derived projection, P5). They are different classes and are deliberately not made
   to look alike. #2704's non-snapshot-scan finding is applied here as the namespace lock (§11.3).
+
+### 11.6 Disposition of `adr0014:grant:by_grantee:` — P5, `Equivalent` / `Established` (#2627 M2)
+
+**The authority model.** ADR-0014 grant storage is three keyspaces, and only one of them is
+authority:
+
+```text
+adr0014:grant:<uuid>            = the AuthorityGrant. Canonical authority fact.
+adr0014:grant:by_decision:...   = derived lookup projection.
+adr0014:grant:by_grantee:...    = derived lookup projection.
+```
+
+A **Person** grantee's semantic key is the decoded Principal — the same relation `Did` equality
+itself defines (§11 I7). An **Entity** grantee's semantic key is the exact entity string under
+current semantics; nothing here changes that, and the two are not collapsed into one rule.
+
+**Defects verified against `main` @ `10fafafc` before the fix**, each reproduced by a test that
+failed on the unchanged code:
+
+1. a grant issued to `Person(A)` was invisible to a query for `Person(B)` when A and B are two
+   accepted spellings of one principal — `grant_by_grantee_scan_prefix` builds its scan boundary
+   from `did.as_str()`, so it selects one spelling of a principal that has many. The control
+   under the issuing spelling returned the grant, so the projection *omitted* authority the
+   canonical record states;
+2. an accepted `RevokeAuthority` decision naming that principal under the other spelling **left
+   the grant active**. This is the consequence that matters: the SDIS payloads carry a DID and
+   never a grant id, so `revoke_active_grants_for_person` can only find its targets by
+   enumeration. Alias-issued authority survived alias-spelled revocation;
+3. the live `MandateGate` domain-target path, which resolves actor-first through the same
+   enumeration, returned `MandateRejection::NoMandate` for an actor spelled otherwise than the
+   grant was issued to. This is a **false negative** — authority that exists is not found — not a
+   privilege escalation;
+4. neither reader checked that the primary record it loaded actually named the grantee asked
+   for. A projection row naming `Person(A)` but pointing at a grant whose canonical record names
+   a different principal returned that grant to A: the projection could *create* authority;
+5. a single ordinary Person grant row made `icnd` **refuse to start**. The row carries a
+   `did:icn:` literal, the prefix was in no scanner descriptor and no deferral, and an uncovered
+   principal row is a startup blocker (§10). The gateway opens its store at
+   `<data_dir>/gateway_store`, inside the tree the gate audits.
+
+**Fix (#2627 M2).** Persisted encodings are unchanged; no row is re-keyed, merged, normalized or
+deleted, and no preferred spelling is chosen. The store now holds one invariant: *the by-grantee
+projection may accelerate discovery of canonical grants and may never create, hide or alter
+authority independently of the canonical `AuthorityGrant` records.*
+
+* **Reads prove authority from canonical rows.** A Person query reads the whole projection,
+  structurally parses every row, decodes each Person-tagged spelling with the production parser,
+  keeps every row naming the requested principal under `Did` equality, de-duplicates by
+  `AuthorityGrantId`, loads each canonical record, and returns only grants whose primary
+  `grantee` is that principal. An Entity query keeps the exact-prefix scan — Entity identity is
+  the exact string, the region is length-framed so no id can be a prefix of another, and no alias
+  relation exists to miss — and is verified against the primary identically. Liveness still comes
+  from the primary's `revoked_at`, as it always did. Order is `(valid_from, grant id)`, so the
+  reinstatement seam's "most recent revoked grant" is a function of the data and not of scan
+  order.
+* **Distinct grants stay distinct.** The de-duplication unit is the canonical `AuthorityGrantId`,
+  never the grantee. A principal may legitimately hold several grants, and two ids are two
+  grants; only rows naming *one* id collapse.
+* **Stale and malformed evidence are told apart by whether the write protocol can produce them.**
+  A row pointing at a missing primary, or at a primary naming another grantee, is *stale*: reads
+  filter it and it confers nothing. Filtering cannot hide a real grant — the only grant such a row
+  could name is the one its own id names, whose canonical record does not exist or does not name
+  this grantee, and every other row is judged on its own primary; a live grant can never present
+  this shape, because row and primary are written in one transaction and no path deletes a grant
+  primary. A row this writer could never have produced — framing that
+  does not parse, a length field overrunning the key, a suffix that is not
+  `valid_from ‖ grant id`, an undefined variant tag, a Person region naming no principal, or a
+  value naming a different grant than its own key — is *malformed*, and every read refuses with
+  `grant_by_grantee_index_malformed: rows=<n> reason=<class>`. Refusing is the only answer that
+  neither invents authority nor hides it: an uninterpretable row cannot be attributed to a
+  principal, so it cannot be ruled out as the row naming the one being asked about, and dropping
+  it would answer "no authority exists" on evidence never read. No spelling, entity id or grant
+  payload travels in the error.
+* **No writer-side guard was needed, and the reason was reproduced rather than assumed.** The
+  projection is append-only: `put_authority_grant` and `put_mandate_with_grants_atomic` insert
+  primary and index in one transaction, the startup backfill derives its key from the primary's
+  own grantee and so cannot introduce a spelling the primary does not carry, and revocation
+  touches the primary alone. Equivalent duplicate rows for one canonical grant are therefore
+  harmless after verification and de-duplication, which a fixture pins.
+* **No new lock, for a stated reason.** `sled`'s scan is not a snapshot, but because nothing
+  deletes or re-keys a projection row, a straddling enumeration can only miss rows written after
+  it began and never lose one written before — and every row it sees is proven against its own
+  primary. That is precisely the guarantee #2704 and #2707 needed a namespace lock to obtain,
+  because those projections retire rows on replacement and a scan could miss the old row and its
+  replacement both. A behavioural fixture holds the property under concurrent writes. What remains
+  is a *subset* read — a scan racing the multi-grant atomic commit may return a set matching no
+  single committed state. **This read is not a linearizable snapshot of a grantee's grant set and
+  is not claimed to be.** What is claimed: authority is never invented, because each returned
+  grant was loaded from its own primary and checked there; and every outcome reachable under a
+  subset read is also reachable by reordering the concurrent commits. The gate only becomes more
+  restrictive. Revocation can miss a grant minted concurrently — the schedule where it ran first —
+  and can never miss one committed before it began. Reinstatement's `has_active_in_domain`
+  precheck is the one consumer a subset read makes more *permissive*: it can mint where it would
+  have declined, which is the same two active grants two concurrently accepted minting decisions
+  produce with no race at all, and the precheck is best-effort against a duplicate proposal rather
+  than mutual exclusion. None of this is new — the pre-M2 reader scanned and loaded each primary
+  with the same absence of a snapshot. M2 changes which rows are discovered and adds the
+  primary-grantee check; it touches snapshot semantics not at all, and removes the part that was
+  representation-dependent.
+* **The scanner registers the prefix** as `icn-gateway/adr0014_grant_by_grantee`, `Equivalent`,
+  `Established`, under a **third** structural descriptor,
+  `PrincipalRegion::LengthPrefixedTagged { principal_tag: 0x01 }`. Neither existing
+  layout can read this key. `AnchoredThenOpaque` looks for a terminator byte, and here the
+  spelling is preceded by a binary length field and followed by an arbitrary `u64`, so no
+  terminator names the boundary — every row would be unreadable and the gate would refuse
+  unconditionally. `WholeKey` is worse than a refusal: the canonical shape would carry the `u32`
+  length prefix verbatim, and that field is *derived from the spelling*, so two aliases of one
+  principal would differ in it, land in different shapes and form no collision group at all — a
+  silent false-clear. The new variant therefore replaces the region *including its own framing*,
+  which is derivable from the spelling, while the `valid_from` and grant id after it are carried
+  byte-for-byte and never parsed. The descriptor learns no ADR-0014 authority semantics: it
+  knows a big-endian `u32` length field, a tag value, a principal subregion and an opaque tail.
+  The width is fixed rather than a descriptor field: one layout declares this region and it frames
+  with a `u32`, so a configurable width would buy a hand-rolled accumulator — and its silent
+  truncation above eight bytes — for no present caller. `principal_tag` stays a parameter because
+  it is the discrimination that keeps an entity id spelling `did:icn:` from being read as a
+  principal. The
+  collision unit is **(grantee principal, exact `valid_from`, exact grant id)**, so two spellings
+  for one grant are one group and two grants for one principal are two shapes — *not* an
+  assertion that a principal holds one grant, which would be false. An Entity-tagged region names
+  no principal and is reported principal-free rather than unreadable; a region whose framing does
+  not parse is unreadable and blocks, as the gate's fail-closed rule requires.
+
+**What this does not claim.** The `Equivalent` disposition is correct *because* the reader is now
+projection-correct; on a binary without this fix the same scan verdict would be meaningless
+(§11.2). No live store was scanned or repaired. No rebuild for this projection is added: the
+existing `backfill_grant_by_grantee_index` remains an additive recovery for pre-index databases,
+not a reconciliation, and a verified read path is sufficient for software closure — retiring
+historical rows, if it is ever wanted, is a separate explicit operation. Every claim here is
+fixture evidence. No merge rule is authorized for authoritative state, and no grant body or
+projection row was re-keyed.
