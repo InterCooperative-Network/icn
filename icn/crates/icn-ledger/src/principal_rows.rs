@@ -49,6 +49,15 @@ pub const CLEARED_VOLUME_KEYSPACE: &str = "icn-ledger/cleared_volume";
 /// Registry name of the `ledger:frozen:` keyspace.
 pub const FROZEN_KEYSPACE: &str = "icn-ledger/frozen";
 
+/// Registry name of the primary `ledger:treasury:<did>` keyspace (#2627 M1).
+///
+/// The treasury loader (`crate::treasury`) classifies its primary rows through
+/// [`refuse_unless_one_spelling_per_principal`] exactly as the three rebuilds
+/// above do; the scanner descriptor of the same name claims only the primary
+/// rows, never the budget, rule, audit, index or velocity-limit subspaces that
+/// share the lexical parent `ledger:treasury:`.
+pub const TREASURY_KEYSPACE: &str = "icn-ledger/treasury";
+
 /// How many identifier bytes a fingerprint shows.
 ///
 /// Eight bytes correlate a refusal with a `did-collision-scan` report without
