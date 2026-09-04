@@ -1418,6 +1418,7 @@ fn an_unreadable_treasury_spelling_refuses() {
     let receipt = expect_blocked(enforce(dir.path(), now()));
 
     let blockers = blockers_for(&receipt, "store/ledger");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
     assert!(
         matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, collision_groups, .. }
             if keyspace == "icn-ledger/treasury"
