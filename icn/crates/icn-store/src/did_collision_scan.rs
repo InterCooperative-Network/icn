@@ -172,24 +172,72 @@ pub struct KeyspaceDescriptor {
     /// `replay_max_seq:<did>:junk` looked like a clean spelling plus residual
     /// key material. Stating it per keyspace keeps the scanner from having to
     /// reimplement each grammar while still catching the case.
+    ///
+    /// Read only under [`PrincipalRegion::WholeKey`], for the same reason as
+    /// [`KeyspaceDescriptor::slash_ends_did`].
     pub did_ends_key: bool,
     /// Whether this keyspace's own parser treats `/` as ending a DID.
     ///
     /// `/` is the only separator that is also a multibase body character, so
     /// where a spelling may be followed by one is a property of the individual
-    /// key layout — not something the scanner can infer. One registered
-    /// keyspace puts `/` immediately after a DID:
-    /// `federation/attestations/<did>/<source>`, whose loader rebuilds the key
-    /// from the value and so admits nothing but `/` there. Every other
-    /// descriptor sets this `false` (`trust/edges/<a>:<b>` uses `:`;
-    /// `trust/sequences/issuer/<did>` ends there), so for them `<did>/junk` is
-    /// correctly unreadable rather than a readable principal with residual
-    /// bytes the real loader would reject. The registry test
-    /// `only_the_keyspace_whose_parser_ends_a_did_at_a_slash_claims_it` pins
-    /// the set of claimants.
+    /// key layout — not something the scanner can infer. No registered keyspace
+    /// currently puts `/` immediately after a DID (`trust/edges/<a>:<b>` uses
+    /// `:`; `trust/sequences/issuer/<did>` ends there), so every descriptor sets
+    /// this `false` and `<did>/junk` is correctly unreadable rather than a
+    /// readable principal with residual bytes the real loader would reject.
+    ///
+    /// Read only under [`PrincipalRegion::WholeKey`]. An anchored region gets
+    /// its terminator from the region itself, so this field would have nothing
+    /// to say there; `a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off`
+    /// pins that such descriptors leave it `false`.
     pub slash_ends_did: bool,
+    /// Which part of a key of this layout may carry a principal spelling.
+    pub principal_region: PrincipalRegion,
     /// Why that rule, in one line — so a report explains itself.
     pub rationale: &'static str,
+}
+
+/// Where in a stored key a keyspace's principal spellings can appear.
+///
+/// The scan locates spellings by their `did:icn:` scheme, which is
+/// layout-independent — and therefore cannot tell a principal-bearing key
+/// component from a domain identifier that merely *contains* that text. For
+/// most keyspaces every component is protocol-generated and the distinction
+/// does not arise. Where a key ends in an opaque identifier chosen by another
+/// domain it does, and getting it wrong is not cosmetic: a scan that
+/// canonicalized a DID inside such an identifier would group two rows the
+/// owning store holds apart, and would call a row unreadable that the store
+/// reads without difficulty. The scan and the store would then disagree about
+/// what a collision *is* (icn#2704).
+///
+/// This describes key structure, not federation behaviour: any layout of the
+/// same shape can declare it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrincipalRegion {
+    /// Every `did:icn:` occurrence anywhere in the key names a principal.
+    ///
+    /// Correct wherever the whole key is built from protocol-generated
+    /// components, which is every registered keyspace but one.
+    WholeKey,
+    /// Exactly one spelling, starting immediately after
+    /// [`KeyspaceDescriptor::prefix`] and ending at the first `terminator`
+    /// that leaves a decodable spelling behind. Everything from that
+    /// terminator onward is an opaque discriminator: it is carried into the
+    /// canonical shape byte-for-byte and never parsed, so two discriminators
+    /// are the same one only when their bytes are equal.
+    ///
+    /// The spelling may itself contain the terminator — `Base64` bodies
+    /// contain `/` — so the boundary is decided by decoding, not by finding
+    /// the first occurrence.
+    ///
+    /// A row whose anchor does not hold a decodable spelling is **unreadable**
+    /// rather than principal-free: the layout says one belongs there, so its
+    /// absence is a row no migration can classify, exactly as the owning
+    /// store cannot read it.
+    AnchoredThenOpaque {
+        /// The byte that must follow the spelling.
+        terminator: u8,
+    },
 }
 
 /// A DID spelling found inside a stored key.
@@ -388,18 +436,7 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
         }
 
         let start = i;
-        let mut limit = i + needle.len();
-        // Bounded, because backtracking retries the decode once per byte
-        // removed. A 32-byte identifier is longest in `Base2` — one character
-        // per bit, 256 plus a sigil — so nothing beyond this can decode to one,
-        // and without the bound a single key carrying tens of thousands of
-        // base58 characters would make the audit quadratic in a length the
-        // writer of that row chose.
-        const MAX_IDENTIFIER_CHARS: usize = 300;
-        let ceiling = key.len().min(limit + MAX_IDENTIFIER_CHARS);
-        while limit < ceiling && is_multibase_body_byte(key[limit]) {
-            limit += 1;
-        }
+        let limit = munch(key, i + needle.len());
 
         // Maximal munch, then validate and back off.
         //
@@ -416,7 +453,8 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
         // contains, while a spelling followed by `/suffix` still terminates at
         // the spelling. Only if nothing decodes is the whole run reported as
         // one unreadable token — a fact the scan must surface, never skip.
-        let (end, identifier) = resolve_spelling(key, start, limit, slash_ends_did);
+        let (end, identifier) =
+            resolve_spelling(key, start, limit, Remainder::WholeKeyRun { slash_ends_did });
 
         let spelling = String::from_utf8_lossy(&key[start..end]).into_owned();
         found.push(EmbeddedDid {
@@ -432,8 +470,111 @@ pub fn find_embedded_dids_with(key: &[u8], slash_ends_did: bool) -> Vec<Embedded
     found
 }
 
+/// The longest run of multibase body bytes starting at `from`, bounded.
+///
+/// Bounded because backtracking retries the decode once per byte removed. A
+/// 32-byte identifier is longest in `Base2` — one character per bit, 256 plus
+/// a sigil — so nothing beyond this can decode to one, and without the bound a
+/// single key carrying tens of thousands of base58 characters would make the
+/// audit quadratic in a length the writer of that row chose.
+fn munch(key: &[u8], from: usize) -> usize {
+    const MAX_IDENTIFIER_CHARS: usize = 300;
+    let ceiling = key.len().min(from + MAX_IDENTIFIER_CHARS);
+    let mut limit = from;
+    while limit < ceiling && is_multibase_body_byte(key[limit]) {
+        limit += 1;
+    }
+    limit
+}
+
+/// The one spelling a [`PrincipalRegion::AnchoredThenOpaque`] layout carries.
+///
+/// The spelling starts at `start` — immediately after the keyspace prefix —
+/// and ends at the first `terminator` that leaves a decodable spelling behind.
+/// Everything after that is the discriminator, and is never searched: a
+/// `did:icn:` occurrence inside it belongs to the domain that chose the
+/// identifier, not to this keyspace's key structure.
+///
+/// Always returns one token. A row of this layout that carries no readable
+/// spelling at its anchor is unreadable, not principal-free — the layout says
+/// one belongs there.
+fn anchored_spelling(key: &[u8], start: usize, terminator: u8) -> EmbeddedDid {
+    // Where an unreadable token ends: the first terminator after the anchor,
+    // or the end of the key. Reported so the row is accounted for; an
+    // unreadable row never reaches the shape that would use these bounds.
+    let opaque_at = || {
+        key[start.min(key.len())..]
+            .iter()
+            .position(|b| *b == terminator)
+            .map_or(key.len(), |off| start + off)
+    };
+    let unreadable = |end: usize| EmbeddedDid {
+        offset: start,
+        end,
+        spelling: String::from_utf8_lossy(&key[start.min(key.len())..end]).into_owned(),
+        identifier: None,
+    };
+
+    if start >= key.len() || !key[start..].starts_with(DID_PREFIX.as_bytes()) {
+        return unreadable(opaque_at());
+    }
+
+    let body = start + DID_PREFIX.len();
+    let (end, identifier) = resolve_spelling(
+        key,
+        start,
+        munch(key, body),
+        Remainder::Terminated(terminator),
+    );
+    match identifier {
+        Some(bytes) => EmbeddedDid {
+            offset: start,
+            end,
+            spelling: String::from_utf8_lossy(&key[start..end]).into_owned(),
+            identifier: Some(bytes),
+        },
+        None => unreadable(opaque_at()),
+    }
+}
+
+/// The principal spellings `descriptor`'s own key structure puts in `key`.
+fn principal_spellings(descriptor: &KeyspaceDescriptor, key: &[u8]) -> Vec<EmbeddedDid> {
+    match descriptor.principal_region {
+        PrincipalRegion::WholeKey => find_embedded_dids_with(key, descriptor.slash_ends_did),
+        PrincipalRegion::AnchoredThenOpaque { terminator } => {
+            // The scan reads this keyspace by prefix, so the anchor is always
+            // in place. A key that somehow is not under the prefix cannot be
+            // parsed by this layout's rule, and saying so is the fail-closed
+            // answer.
+            let start = if key.starts_with(descriptor.prefix) {
+                descriptor.prefix.len()
+            } else {
+                key.len()
+            };
+            vec![anchored_spelling(key, start, terminator)]
+        }
+    }
+}
+
+/// What a layout permits immediately after a spelling.
+///
+/// The candidate run is always the longest sequence of multibase body bytes,
+/// because the alphabet alone cannot say where a spelling ends. What differs
+/// between layouts is which shorter-than-maximal match is legitimate, and that
+/// is a statement about the key structure rather than about the alphabet.
+#[derive(Debug, Clone, Copy)]
+enum Remainder {
+    /// The spelling runs to the end of the candidate run, or — where this
+    /// layout's own parser says so — up to a `/`.
+    WholeKeyRun { slash_ends_did: bool },
+    /// The spelling must be followed by exactly this byte. Nothing else is a
+    /// spelling of this layout, including running to the end of the key.
+    Terminated(u8),
+}
+
 /// Find the longest prefix of `key[start..limit]` that decodes to a 32-byte
-/// identifier, returning its end offset and the bytes.
+/// identifier and leaves a remainder `remainder` permits, returning its end
+/// offset and the bytes.
 ///
 /// When nothing decodes, the full run is returned with `None` so the caller
 /// reports one unreadable token rather than silently dropping the row.
@@ -441,7 +582,7 @@ fn resolve_spelling(
     key: &[u8],
     start: usize,
     limit: usize,
-    slash_ends_did: bool,
+    remainder: Remainder,
 ) -> (usize, Option<[u8; 32]>) {
     let mut end = limit;
     while end > start {
@@ -461,7 +602,17 @@ fn resolve_spelling(
                 // identifier and reject it, so calling the prefix readable would
                 // report a principal for a row the real loader cannot read, and
                 // quietly lower the unreadable count that exists to fail closed.
-                if end < limit && !(slash_ends_did && key.get(end) == Some(&b'/')) {
+                let permitted = match remainder {
+                    Remainder::WholeKeyRun { slash_ends_did } => {
+                        end == limit || (slash_ends_did && key.get(end) == Some(&b'/'))
+                    }
+                    // An anchored spelling is followed by its discriminator, so
+                    // running to the end of the key is not a spelling of this
+                    // layout either — the owning store could not have written
+                    // it, and a migration cannot classify what it finds.
+                    Remainder::Terminated(byte) => key.get(end) == Some(&byte),
+                };
+                if !permitted {
                     return (limit, None);
                 }
                 return (end, Some(bytes));
@@ -505,7 +656,7 @@ fn build_report(descriptor: &KeyspaceDescriptor, rows: Vec<(Vec<u8>, usize)>) ->
     let rows_scanned = rows.len();
 
     for (scan_ordinal, (key, value_len)) in rows.into_iter().enumerate() {
-        let embedded = find_embedded_dids_with(&key, descriptor.slash_ends_did);
+        let embedded = principal_spellings(descriptor, &key);
 
         if embedded.is_empty() {
             rows_without_did += 1;
@@ -841,6 +992,7 @@ pub fn scan_deferred(
             // unreadable, whatever follows it.
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: d.gate,
         };
         out.push(DeferredReport {
@@ -1235,6 +1387,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Replay floor. A lower survivor weakens the guard, so the merge keeps the \
                         maximum, which can only reject more than any single row did.",
         },
@@ -1246,6 +1399,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Finalized-sequence set. Dropping a spelling's rows would re-open replay \
                         for the sequences it recorded, so the merge is a union.",
         },
@@ -1257,6 +1411,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Two rows can assert different regimes for one sender, which is a \
                         contradiction no domain rule resolves. The live loader already declines \
                         to collapse these (#2644); a migration must not decide it either.",
@@ -1269,6 +1424,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Outgoing sequence high-water for a (sender, recipient) pair. A lower \
                         survivor is a nonce regression, so the merge keeps the maximum.",
         },
@@ -1280,6 +1436,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Accumulated balances. Overwriting drops a spelling's recorded position \
                         entirely, so the merge sums rather than elects a survivor.",
         },
@@ -1291,6 +1448,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Accumulated cleared volume per (account, currency). Currency stays in the \
                         canonical shape, so only same-currency rows merge, and they sum.",
         },
@@ -1302,6 +1460,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Freeze records. Unfreeze deletes one spelling only, so electing a \
                         survivor can fail open; the merge is a union of the freezes.",
         },
@@ -1313,6 +1472,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Trust edges keyed by (source, target). A dropped spelling takes its edges \
                         with it, so the merge unions the edge sets.",
         },
@@ -1324,6 +1484,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Journal entries are content-addressed by entry hash; DIDs appear inside \
                         the value, not the key. Scanned to confirm the key carries no spelling.",
         },
@@ -1342,6 +1503,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Last-seen attestation sequence per issuer — a replay floor. A lower \
                         survivor accepts stale attestations, so the merge would keep the \
                         maximum, as replay_max_seq does; but the receiver tracker reads and \
@@ -1356,6 +1518,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::AwaitingDomainSignOff,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "This node's own outgoing attestation sequence. A lower survivor re-issues \
                         a sequence number already used, which the uniqueness invariant forbids, \
                         so the merge keeps the maximum.",
@@ -1368,6 +1531,7 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             basis: RuleBasis::Established,
             slash_ends_did: false,
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "Cooperative membership. Merging two rows decides who is a member of an \
                         institution, which is an institutional judgement no identity-layer rule \
                         authorizes; it is also adjacent to the separate §7.5 membership gate. \
@@ -1379,12 +1543,17 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             inventory_rows: &[27, 59],
             disposition: MergeDisposition::FailClosed,
             basis: RuleBasis::Established,
-            // `federation/attestations/<did>/<source_coop_id>`: the one registered
-            // layout that puts `/` immediately after the spelling. The store's own
-            // loader rebuilds the key from the value and rejects anything else, so
-            // `<did>junk` is unreadable here exactly as it is there.
-            slash_ends_did: true,
+            // `federation/attestations/<member-did>/<source_coop_id>`. The
+            // member spelling is anchored right after the prefix; the source is
+            // a federation-domain identifier this crate does not own and must
+            // not parse. Nothing constrains a cooperative from choosing an id
+            // that contains `did:icn:`, and `AttestationStore` compares source
+            // ids as exact strings — so a whole-key scan would both group rows
+            // the store holds apart and call rows unreadable that it reads
+            // fine (#2704 review). The whole-key flags below say nothing here.
+            slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b'/' },
             rationale: "Federated trust attestations keyed by (member principal, source \
                         cooperative); the source stays in the canonical shape, so rows from \
                         different cooperatives about one principal are the ordinary union and \
@@ -1433,6 +1602,7 @@ mod tests {
             basis,
             slash_ends_did: false,
             did_ends_key: false,
+            principal_region: PrincipalRegion::WholeKey,
             rationale: "test fixture",
         }
     }
@@ -2473,23 +2643,41 @@ mod tests {
     }
 
     #[test]
-    fn only_the_keyspace_whose_parser_ends_a_did_at_a_slash_claims_it() {
-        // Pins the registry: a keyspace that puts `/` after a DID must say so
-        // deliberately, rather than inheriting a permissive default that would
-        // make `<did>/junk` look readable. Exactly one does today —
-        // `federation/attestations/<did>/<source>` — and its loader is the
-        // proof: it rebuilds the key from the value, so nothing but `/` can
-        // follow the spelling there.
-        let claimants: Vec<&str> = n2a_keyspaces()
-            .iter()
-            .filter(|d| d.slash_ends_did)
-            .map(|d| d.name)
-            .collect();
-        assert_eq!(
-            claimants,
-            vec!["icn-federation/attestations"],
-            "a new claimant must confirm its parser really ends a DID at `/`"
-        );
+    fn no_registered_keyspace_claims_a_slash_terminated_did() {
+        // Pins the registry: if a future keyspace does put `/` after a DID it
+        // must say so deliberately, rather than inheriting a permissive default
+        // that would make `<did>/junk` look readable.
+        //
+        // `federation/attestations/` does put `/` after a spelling, and does
+        // *not* appear here: it declares an anchored region instead, which
+        // ends the spelling at the terminator by construction. Saying it twice
+        // would be two owners for one fact.
+        for d in n2a_keyspaces() {
+            assert!(
+                !d.slash_ends_did,
+                "{} claims `/` ends a DID; confirm its parser really does",
+                d.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off() {
+        // `slash_ends_did` and `did_ends_key` describe a whole-key scan and are
+        // not read under an anchored region. A descriptor that set one anyway
+        // would be asserting something nothing enforces, which is how a
+        // registry starts lying.
+        for d in n2a_keyspaces() {
+            if matches!(d.principal_region, PrincipalRegion::WholeKey) {
+                continue;
+            }
+            assert!(
+                !d.slash_ends_did && !d.did_ends_key,
+                "{} declares an anchored region; the whole-key flags do not \
+                 apply and must stay false",
+                d.name
+            );
+        }
     }
 
     #[test]
@@ -2665,6 +2853,7 @@ mod tests {
         let one = spell(&principal(171), multibase::Base::Base58Btc);
         let strict = KeyspaceDescriptor {
             did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
             ..descriptor(MergeDisposition::Sum)
         };
 
@@ -2945,5 +3134,191 @@ mod tests {
         let mut sorted = [a.clone(), b.clone()];
         sorted.sort();
         assert_eq!(survivor.spellings, vec![sorted[1].clone()]);
+    }
+
+    // ----- the source is a discriminator, not a spelling (#2704 review, P2) --
+    //
+    // `AttestationStore` compares `source_coop_id` as exact bytes, and nothing
+    // in the federation domain forbids a cooperative identifier that contains
+    // `did:icn:`. A scan that canonicalized inside the source would disagree
+    // with the store in both directions at once: grouping rows the store holds
+    // apart, and calling rows unreadable that the store reads without trouble.
+
+    #[test]
+    fn a_source_id_containing_two_spellings_of_one_did_is_still_two_sources() {
+        // Two source identifiers that are different strings are two claims,
+        // even when the text inside them names one principal. Only the
+        // federation domain could say otherwise, and it has not.
+        let member = spell(&principal(70), multibase::Base::Base58Btc);
+        let (source_a, source_b) = two_spellings(71);
+        let store = store_with(&[
+            (
+                &attestation_key(&member, &format!("coop-{source_a}")),
+                b"{}",
+            ),
+            (
+                &attestation_key(&member, &format!("coop-{source_b}")),
+                b"{}",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "one member, two source ids — two (principal, source) tuples"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would be a source-id normalization rule nobody wrote"
+        );
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_source_id_that_is_itself_a_valid_spelling_is_still_just_a_source() {
+        let member = spell(&principal(72), multibase::Base::Base58Btc);
+        let (source_a, source_b) = two_spellings(73);
+        let store = store_with(&[
+            (&attestation_key(&member, &source_a), b"{}"),
+            (&attestation_key(&member, &source_b), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn a_malformed_did_inside_a_source_id_leaves_the_row_readable() {
+        // The store reads this row: it rebuilds the key from the value and
+        // compares bytes. Reporting it unreadable would refuse a start over a
+        // store that is fine — a scan stricter than the loader it stands for.
+        let member = spell(&principal(74), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&attestation_key(&member, "did:icn:!!!!"), b"{}"),
+            (&attestation_key(&member, "coop/did:icn:zzz"), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0, "the source is never parsed");
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn the_same_member_and_the_same_exact_source_collide_however_the_source_reads() {
+        // The collision unit is unchanged by any of the above: one principal,
+        // one *byte-identical* source, two spellings of the member.
+        let (a, b) = two_spellings(75);
+        let source = format!("coop-{}", spell(&principal(76), multibase::Base::Base58Btc));
+        let store = store_with(&[
+            (&attestation_key(&a, &source), b"{}"),
+            (&attestation_key(&b, &source), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(
+            report.collision_groups[0].representation_counts,
+            vec![2],
+            "two spellings at the one principal position"
+        );
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn a_member_segment_that_names_no_principal_is_unreadable_not_absent() {
+        // Three ways the anchor fails, and none of them is "this row has no
+        // principal": the layout says one belongs there, and `AttestationStore`
+        // refuses every one of these rows. Counting them as principal-free
+        // would be non-blocking — a start over state nobody can classify.
+        let one = spell(&principal(77), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            ("federation/attestations/did:icn:!!!!/food-coop", b"{}"),
+            (
+                &format!("federation/attestations/{one}junk/food-coop"),
+                b"{}",
+            ),
+            ("federation/attestations/not-a-did-at-all/food-coop", b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_without_did, 0, "no row here lacks a principal");
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn a_member_spelling_with_no_source_after_it_is_unreadable() {
+        // `AttestationStore` always writes the terminator and a source, so a
+        // key that stops at the spelling is one no revocation, lookup or sweep
+        // could attribute to a source cooperative.
+        let one = spell(&principal(78), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("federation/attestations/{one}"), b"{}"),
+            (&attestation_key(&one, ""), b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(
+            report.rows_unreadable, 1,
+            "the terminated row is readable; the bare spelling is not"
+        );
+        assert_eq!(report.rows_with_readable_did, 1);
+    }
+
+    #[test]
+    fn the_scanner_and_the_store_agree_on_where_the_member_spelling_ends() {
+        // Every base the production parser accepts, including the two whose
+        // bodies contain `/`. The boundary is decided by decoding, so a `/`
+        // inside the spelling does not end it and the `/` after it does.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+            multibase::Base::Base32Lower,
+        ] {
+            for source in ["food-coop", "a/b", "did:icn:zzz", ""] {
+                let one = spell(&principal(79), base);
+                let store = store_with(&[(&attestation_key(&one, source), b"{}")]);
+                let report = scan_keyspace(&store, &federation_descriptor()).unwrap();
+                assert_eq!(
+                    report.rows_with_readable_did, 1,
+                    "{base:?} spelling with source {source:?}"
+                );
+                assert_eq!(report.rows_unreadable, 0, "{base:?} / {source:?}");
+                assert_eq!(report.distinct_principals, 1, "{base:?} / {source:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_row_that_is_not_under_the_prefix_cannot_be_parsed_by_this_layout() {
+        // `scan_keyspace` reads by prefix so this cannot arise there. The rule
+        // is stated anyway: an anchored parser handed a key it does not
+        // describe reports an unreadable row, never a confident one.
+        let one = spell(&principal(80), multibase::Base::Base58Btc);
+        let report = build_report(
+            &federation_descriptor(),
+            vec![(format!("elsewhere/{one}/food-coop").into_bytes(), 2)],
+        );
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
     }
 }
