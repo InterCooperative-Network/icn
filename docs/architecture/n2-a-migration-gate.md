@@ -1524,7 +1524,11 @@ authority independently of the canonical `AuthorityGrant` records.*
   grants; only rows naming *one* id collapse.
 * **Stale and malformed evidence are told apart by whether the write protocol can produce them.**
   A row pointing at a missing primary, or at a primary naming another grantee, is *stale*: reads
-  filter it and it confers nothing. A row this writer could never have produced — framing that
+  filter it and it confers nothing. Filtering cannot hide a real grant — the only grant such a row
+  could name is the one its own id names, whose canonical record does not exist or does not name
+  this grantee, and every other row is judged on its own primary; a live grant can never present
+  this shape, because row and primary are written in one transaction and no path deletes a grant
+  primary. A row this writer could never have produced — framing that
   does not parse, a length field overrunning the key, a suffix that is not
   `valid_from ‖ grant id`, an undefined variant tag, a Person region naming no principal, or a
   value naming a different grant than its own key — is *malformed*, and every read refuses with
@@ -1544,10 +1548,16 @@ authority independently of the canonical `AuthorityGrant` records.*
   it began and never lose one written before — and every row it sees is proven against its own
   primary. That is precisely the guarantee #2704 and #2707 needed a namespace lock to obtain,
   because those projections retire rows on replacement and a scan could miss the old row and its
-  replacement both. A behavioural fixture holds the property under concurrent writes.
+  replacement both. A behavioural fixture holds the property under concurrent writes. What remains
+  is a *subset* read — a scan racing the multi-grant atomic commit may return a set matching no
+  single committed state — and it is safe in the only directions that matter: authority is never
+  invented, because each returned grant was loaded from its own primary and checked there; the
+  omission is fail-closed for every consumer; and the window is identical under every spelling, so
+  it cannot make an outcome representation-dependent. Linearizability is not claimed and is not
+  what this projection owes.
 * **The scanner registers the prefix** as `icn-gateway/adr0014_grant_by_grantee`, `Equivalent`,
   `Established`, under a **third** structural descriptor,
-  `PrincipalRegion::LengthPrefixedTagged { len_width: 4, principal_tag: 0x01 }`. Neither existing
+  `PrincipalRegion::LengthPrefixedTagged { principal_tag: 0x01 }`. Neither existing
   layout can read this key. `AnchoredThenOpaque` looks for a terminator byte, and here the
   spelling is preceded by a binary length field and followed by an arbitrary `u64`, so no
   terminator names the boundary — every row would be unreadable and the gate would refuse
@@ -1557,7 +1567,12 @@ authority independently of the canonical `AuthorityGrant` records.*
   silent false-clear. The new variant therefore replaces the region *including its own framing*,
   which is derivable from the spelling, while the `valid_from` and grant id after it are carried
   byte-for-byte and never parsed. The descriptor learns no ADR-0014 authority semantics: it
-  knows a length-field width, a tag value, a principal subregion and an opaque tail. The
+  knows a big-endian `u32` length field, a tag value, a principal subregion and an opaque tail.
+  The width is fixed rather than a descriptor field: one layout declares this region and it frames
+  with a `u32`, so a configurable width would buy a hand-rolled accumulator — and its silent
+  truncation above eight bytes — for no present caller. `principal_tag` stays a parameter because
+  it is the discrimination that keeps an entity id spelling `did:icn:` from being read as a
+  principal. The
   collision unit is **(grantee principal, exact `valid_from`, exact grant id)**, so two spellings
   for one grant are one group and two grants for one principal are two shapes — *not* an
   assertion that a principal holds one grant, which would be false. An Entity-tagged region names

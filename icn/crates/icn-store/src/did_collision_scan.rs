@@ -252,12 +252,12 @@ pub enum PrincipalRegion {
         terminator: u8,
     },
     /// Exactly one **length-framed, tag-discriminated** region, starting
-    /// immediately after [`KeyspaceDescriptor::prefix`]: a big-endian length
-    /// field of `len_width` bytes, then that many bytes of region, then an
-    /// opaque tail. The region's first byte is a variant tag; only
-    /// `principal_tag` introduces a principal spelling, and the spelling is
-    /// the rest of the region exactly — its extent is stated by the length
-    /// field, not inferred from the alphabet.
+    /// immediately after [`KeyspaceDescriptor::prefix`]: a big-endian `u32`
+    /// length field, then that many bytes of region, then an opaque tail. The
+    /// region's first byte is a variant tag; only `principal_tag` introduces a
+    /// principal spelling, and the spelling is the rest of the region exactly —
+    /// its extent is stated by the length field, not inferred from the
+    /// alphabet.
     ///
     /// Two facts make this layout need its own rule rather than reuse of the
     /// two above. Searching for a terminator byte would run through the
@@ -281,9 +281,10 @@ pub enum PrincipalRegion {
     /// **unreadable** rather than principal-free: the layout says a principal
     /// belongs there, so its absence is a row no migration can classify.
     LengthPrefixedTagged {
-        /// Width in bytes of the big-endian length field introducing the region.
-        len_width: u8,
-        /// The tag under which the region holds a principal spelling.
+        /// The tag under which the region holds a principal spelling. Every
+        /// other tag names a value some other domain chose, which this
+        /// registry does not decode — the discrimination that keeps an
+        /// entity id spelling `did:icn:` from being read as a principal.
         principal_tag: u8,
     },
 }
@@ -601,13 +602,9 @@ fn principal_spellings(descriptor: &KeyspaceDescriptor, key: &[u8]) -> Vec<Embed
             };
             vec![anchored_spelling(key, start, terminator)]
         }
-        PrincipalRegion::LengthPrefixedTagged {
-            len_width,
-            principal_tag,
-        } => length_prefixed_tagged_spelling(
+        PrincipalRegion::LengthPrefixedTagged { principal_tag } => length_prefixed_tagged_spelling(
             key,
             descriptor.prefix.len(),
-            len_width as usize,
             principal_tag,
             key.starts_with(descriptor.prefix),
         ),
@@ -624,10 +621,15 @@ fn principal_spellings(descriptor: &KeyspaceDescriptor, key: &[u8]) -> Vec<Embed
 fn length_prefixed_tagged_spelling(
     key: &[u8],
     start: usize,
-    len_width: usize,
     principal_tag: u8,
     under_prefix: bool,
 ) -> Vec<EmbeddedDid> {
+    /// Width of the big-endian length field. Fixed rather than a descriptor
+    /// field: one layout declares this region, it frames with a `u32`, and a
+    /// configurable width would buy a hand-rolled accumulator — and its
+    /// silent truncation above eight bytes — for no present caller.
+    const LEN_WIDTH: usize = 4;
+
     // The region spans its own framing: the length field is derived from the
     // spelling, so it must be replaced along with it or two spellings of one
     // principal would never share a canonical shape.
@@ -646,14 +648,16 @@ fn length_prefixed_tagged_spelling(
     let Some(rest) = key.get(start..) else {
         return unreadable(key.len());
     };
-    let Some(len_bytes) = rest.get(..len_width) else {
+    let Some(len_bytes) = rest
+        .get(..LEN_WIDTH)
+        .and_then(|b| <[u8; 4]>::try_from(b).ok())
+    else {
         return unreadable(key.len());
     };
-    // Big-endian, whatever the declared width.
-    let region_len = len_bytes
-        .iter()
-        .fold(0usize, |acc, b| (acc << 8) | usize::from(*b));
-    let region_start = start + len_width;
+    // A `u32` length can never overflow `usize` on any target this builds for,
+    // so the region end is computed without a widening step to get wrong.
+    let region_len = u32::from_be_bytes(len_bytes) as usize;
+    let region_start = start + LEN_WIDTH;
     let Some(region_end) = region_start.checked_add(region_len) else {
         return unreadable(key.len());
     };
@@ -1741,7 +1745,6 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             slash_ends_did: false,
             did_ends_key: false,
             principal_region: PrincipalRegion::LengthPrefixedTagged {
-                len_width: 4,
                 principal_tag: 0x01,
             },
             rationale: "Secondary index projected from the canonical \
@@ -2949,13 +2952,12 @@ mod tests {
         // field into the canonical shape and so groups nothing. A second such
         // layout must be added here deliberately, with its framing and its
         // disposition argued (#2627 M2).
-        let framed: Vec<(&str, u8, u8, MergeDisposition)> = n2a_keyspaces()
+        let framed: Vec<(&str, u8, MergeDisposition)> = n2a_keyspaces()
             .iter()
             .filter_map(|d| match d.principal_region {
-                PrincipalRegion::LengthPrefixedTagged {
-                    len_width,
-                    principal_tag,
-                } => Some((d.name, len_width, principal_tag, d.disposition)),
+                PrincipalRegion::LengthPrefixedTagged { principal_tag } => {
+                    Some((d.name, principal_tag, d.disposition))
+                }
                 PrincipalRegion::WholeKey | PrincipalRegion::AnchoredThenOpaque { .. } => None,
             })
             .collect();
@@ -2963,7 +2965,6 @@ mod tests {
             framed,
             vec![(
                 "icn-gateway/adr0014_grant_by_grantee",
-                4,
                 0x01,
                 MergeDisposition::Equivalent
             )]
@@ -4446,6 +4447,60 @@ mod tests {
         let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
         assert_eq!(report.rows_unreadable, 0);
         assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    #[test]
+    fn every_framing_boundary_is_classified_and_none_panics() {
+        // The region is consumed from binary framing, so each way the framing
+        // can be wrong gets its own row. None may panic or slice unchecked,
+        // and a broken Person region must never fall through to being read as
+        // another tag's opaque value.
+        let pfx = b"adr0014:grant:by_grantee:";
+
+        // No length field at all.
+        let no_len = pfx.to_vec();
+        // A length field one byte short of its width.
+        let mut short_len = pfx.to_vec();
+        short_len.extend_from_slice(&[0u8, 0, 0]);
+        // A zero-length region: framed, but not even a tag inside.
+        let mut zero_len = pfx.to_vec();
+        zero_len.extend_from_slice(&0u32.to_be_bytes());
+        zero_len.extend_from_slice(&1_000u64.to_be_bytes());
+        zero_len.extend_from_slice(GRANT_A.as_bytes());
+        // Person tag with an empty body.
+        let mut empty_person = pfx.to_vec();
+        empty_person.extend_from_slice(&1u32.to_be_bytes());
+        empty_person.push(0x01);
+        empty_person.extend_from_slice(&1_000u64.to_be_bytes());
+        empty_person.extend_from_slice(GRANT_A.as_bytes());
+        // Person tag whose body is not UTF-8.
+        let mut bad_utf8 = pfx.to_vec();
+        bad_utf8.extend_from_slice(&4u32.to_be_bytes());
+        bad_utf8.extend_from_slice(&[0x01, 0xff, 0xfe, 0xfd]);
+        bad_utf8.extend_from_slice(&1_000u64.to_be_bytes());
+        bad_utf8.extend_from_slice(GRANT_A.as_bytes());
+        // A length field claiming the whole address space.
+        let mut huge = pfx.to_vec();
+        huge.extend_from_slice(&u32::MAX.to_be_bytes());
+        huge.push(0x01);
+
+        for (label, key) in [
+            ("no length field", no_len),
+            ("short length field", short_len),
+            ("zero-length region", zero_len),
+            ("empty person body", empty_person),
+            ("non-utf8 person body", bad_utf8),
+            ("huge declared length", huge),
+        ] {
+            let store = store_with_raw(&[(key, GRANT_A.as_bytes())]);
+            let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+            assert_eq!(report.rows_scanned, 1, "{label}");
+            assert_eq!(
+                report.rows_unreadable, 1,
+                "{label} must be unreadable, not silently principal-free"
+            );
+            assert_eq!(report.rows_with_readable_did, 0, "{label}");
+        }
     }
 
     #[test]

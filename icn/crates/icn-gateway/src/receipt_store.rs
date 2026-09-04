@@ -1327,6 +1327,13 @@ impl ReceiptStore {
     /// different grantee, is stale evidence and is dropped — it cannot
     /// manufacture authority the canonical record does not state.
     ///
+    /// Dropping such a row cannot hide a real grant. The only grant it
+    /// could name is the one its own id names, and that grant's canonical
+    /// record does not exist or does not name this grantee; every other
+    /// row is judged on its own primary. A *live* grant can never present
+    /// this shape, because its row and its primary are written in one
+    /// transaction and no path deletes a grant primary.
+    ///
     /// Ordering is oldest-first by `valid_from`, tie-broken by grant id,
     /// so the answer is a function of the data rather than of scan order.
     /// The reinstatement seam reads the last revoked grant off this order.
@@ -3411,6 +3418,20 @@ mod tests {
         // #2707 needed a namespace lock to obtain, because those projections
         // retire rows on replacement and a scan could miss the old row and the
         // new one both. This one cannot.
+        //
+        // What remains is a *subset* read: a scan racing
+        // `put_mandate_with_grants_atomic`, which commits several grants at
+        // once, may pass one grant's key position before that transaction
+        // lands and so return a set matching no single committed state. That
+        // is safe in the only direction that matters. Authority is never
+        // invented, because every returned grant was loaded from its own
+        // primary and checked there; the omission is fail-closed for each
+        // consumer (the gate refuses an act whose authorizing grant is still
+        // being minted, the revocation seam skips a grant minted after the
+        // decision it is executing, reinstatement picks an older real
+        // template); and the window is identical under every spelling, so it
+        // cannot make an outcome representation-dependent, which is the
+        // property M2 owns.
         use std::sync::Arc;
         let store = Arc::new(ReceiptStore::new(temp_db()));
         let (a, b) = alias_pair();
@@ -3452,6 +3473,159 @@ mod tests {
         }
 
         writer.join().unwrap();
+    }
+
+    #[test]
+    fn the_by_grantee_key_layout_is_exactly_what_the_scanner_descriptor_declares() {
+        // `icn-store` registers this keyspace under
+        // `PrincipalRegion::LengthPrefixedTagged { principal_tag: 0x01 }` and
+        // reproduces the layout by hand in its own fixtures, because a kernel
+        // crate cannot depend on the gateway. This pins the writer so that
+        // side cannot drift away from the descriptor unnoticed: change the
+        // layout and this fails, naming the registry that must change with it.
+        let did = Did::from_str("did:icn:zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV").unwrap();
+        let id = AuthorityGrantId(uuid::Uuid::nil());
+        let key = ReceiptStore::grant_by_grantee_key(&Grantee::Person(did.clone()), 1_000, &id);
+
+        let rest = key
+            .strip_prefix(AUTHORITY_GRANT_BY_GRANTEE_PREFIX)
+            .expect("prefix");
+        let region_len = u32::from_be_bytes(rest[..4].try_into().unwrap()) as usize;
+        assert_eq!(region_len, 1 + did.as_str().len(), "u32 BE region length");
+        assert_eq!(
+            rest[4], GRANTEE_TAG_PERSON,
+            "Person tag introduces the region"
+        );
+        assert_eq!(&rest[5..4 + region_len], did.as_str().as_bytes());
+        let suffix = &rest[4 + region_len..];
+        assert_eq!(
+            suffix.len(),
+            8 + 36,
+            "u64 valid_from then a hyphenated uuid"
+        );
+        assert_eq!(u64::from_be_bytes(suffix[..8].try_into().unwrap()), 1_000);
+        assert_eq!(&suffix[8..], id.0.hyphenated().to_string().as_bytes());
+
+        // And the Entity tag differs, so the two grantee kinds cannot alias.
+        let ekey = ReceiptStore::grant_by_grantee_key(
+            &Grantee::Entity(did.as_str().to_string()),
+            1_000,
+            &id,
+        );
+        let erest = ekey
+            .strip_prefix(AUTHORITY_GRANT_BY_GRANTEE_PREFIX)
+            .expect("prefix");
+        assert_eq!(erest[4], GRANTEE_TAG_ENTITY);
+        assert_ne!(key, ekey, "the tag byte keeps the two key-spaces apart");
+    }
+
+    #[test]
+    fn the_remaining_malformed_binary_boundaries_are_classified_not_reinterpreted() {
+        // Boundary cases the class table above does not reach. None may panic,
+        // slice unchecked, or be quietly re-read as an opaque Entity value.
+        let (a, _b) = alias_pair();
+        let id = AuthorityGrantId::new();
+        let id_bytes = id.0.hyphenated().to_string().into_bytes();
+        let pfx = AUTHORITY_GRANT_BY_GRANTEE_PREFIX;
+
+        // Prefix only: the length field is entirely absent.
+        let no_len = pfx.to_vec();
+
+        // A zero-length region: framed, but holding not even a tag.
+        let mut zero_len = pfx.to_vec();
+        zero_len.extend_from_slice(&0u32.to_be_bytes());
+        zero_len.extend_from_slice(&1_000u64.to_be_bytes());
+        zero_len.extend_from_slice(&id_bytes);
+
+        // Person tag with an empty body: no spelling at all.
+        let mut empty_person = pfx.to_vec();
+        empty_person.extend_from_slice(&1u32.to_be_bytes());
+        empty_person.push(GRANTEE_TAG_PERSON);
+        empty_person.extend_from_slice(&1_000u64.to_be_bytes());
+        empty_person.extend_from_slice(&id_bytes);
+
+        // Person tag whose body is not UTF-8 at all.
+        let mut bad_utf8_person = pfx.to_vec();
+        let body = [0xffu8, 0xfe, 0xfd];
+        bad_utf8_person.extend_from_slice(&((1 + body.len()) as u32).to_be_bytes());
+        bad_utf8_person.push(GRANTEE_TAG_PERSON);
+        bad_utf8_person.extend_from_slice(&body);
+        bad_utf8_person.extend_from_slice(&1_000u64.to_be_bytes());
+        bad_utf8_person.extend_from_slice(&id_bytes);
+
+        // Entity tag whose body is not UTF-8 — an entity id is written from a
+        // `String`, so this is a shape this writer cannot produce either.
+        let mut bad_utf8_entity = pfx.to_vec();
+        bad_utf8_entity.extend_from_slice(&((1 + body.len()) as u32).to_be_bytes());
+        bad_utf8_entity.push(GRANTEE_TAG_ENTITY);
+        bad_utf8_entity.extend_from_slice(&body);
+        bad_utf8_entity.extend_from_slice(&1_000u64.to_be_bytes());
+        bad_utf8_entity.extend_from_slice(&id_bytes);
+
+        // A suffix one byte short of `valid_from ‖ uuid`.
+        let mut short_suffix = pfx.to_vec();
+        let mut canon = vec![GRANTEE_TAG_PERSON];
+        canon.extend_from_slice(a.as_str().as_bytes());
+        short_suffix.extend_from_slice(&(canon.len() as u32).to_be_bytes());
+        short_suffix.extend_from_slice(&canon);
+        short_suffix.extend_from_slice(&1_000u64.to_be_bytes());
+        short_suffix.extend_from_slice(&id_bytes[..35]);
+
+        let cases: [(&str, Vec<u8>); 6] = [
+            ("truncated", no_len),
+            ("truncated", zero_len),
+            ("unreadable_person_spelling", empty_person),
+            ("unreadable_person_spelling", bad_utf8_person),
+            ("unreadable_entity_bytes", bad_utf8_entity),
+            ("suffix_shape", short_suffix),
+        ];
+
+        for (expected, key) in cases {
+            let store = ReceiptStore::new(temp_db());
+            let err = refusal_class_for(&store, &key, &id_bytes, &a)
+                .unwrap_or_else(|| panic!("{expected}: expected a refusal, got a result"));
+            assert!(
+                err.contains(&format!("reason={expected}")),
+                "wrong class; wanted {expected}, got {err}"
+            );
+            assert!(!err.contains("did:icn:"), "no spelling may travel: {err}");
+        }
+    }
+
+    #[test]
+    fn control_an_entity_id_that_is_a_valid_did_stays_an_entity() {
+        // A DID-looking entity string is well-formed data, not a malformed
+        // row: it must be readable, returned to its own Entity query, and
+        // invisible to the Person query for that same spelling.
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+        let g = AuthorityGrant {
+            grantee: Grantee::Entity(a.as_str().to_string()),
+            ..make_grant([0xd8u8; 32], 1_000)
+        };
+        store.put_authority_grant(&g).unwrap();
+
+        assert_eq!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Entity(a.as_str().to_string()))
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(a))
+                .unwrap()
+                .is_empty(),
+            "an entity id is never a Person, however it is spelled"
+        );
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(b))
+                .unwrap()
+                .is_empty(),
+            "nor under an alias of the principal its bytes happen to name"
+        );
     }
 
     #[test]
