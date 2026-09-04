@@ -74,6 +74,7 @@ pub mod merge;
 pub mod obligation;
 pub mod oracle;
 pub mod patronage;
+pub mod principal_rows;
 pub mod progressive_limits;
 pub mod quarantine;
 pub mod settlement;

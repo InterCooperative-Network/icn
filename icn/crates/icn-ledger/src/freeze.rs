@@ -33,6 +33,9 @@
 //! assert!(!freeze_manager.is_frozen(&did));
 //! ```
 
+use crate::principal_rows::{
+    refuse_unless_one_spelling_per_principal, PrincipalRowsRefusal, FROZEN_KEYSPACE,
+};
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
@@ -173,6 +176,10 @@ impl FreezeManager {
 
     /// Freeze a member
     pub fn freeze(&mut self, did: Did, reason: String, duration_seconds: Option<u64>) {
+        // Re-freezing a principal already on file must address the row the
+        // store has. A second spelling would write a second row and leave the
+        // first live, which is the collision `load_from_store` refuses.
+        let did = self.stored_spelling(&did);
         let record = FrozenMember::new(did.clone(), reason.clone(), duration_seconds);
 
         info!(
@@ -201,6 +208,8 @@ impl FreezeManager {
         proposal_id: Option<String>,
         frozen_by: Option<Did>,
     ) {
+        // Same row-identity rule as `freeze`.
+        let did = self.stored_spelling(&did);
         let mut record = FrozenMember::new(did.clone(), reason.clone(), duration_seconds);
         record.proposal_id = proposal_id;
         record.frozen_by = frozen_by;
@@ -224,31 +233,27 @@ impl FreezeManager {
 
     /// Unfreeze a member
     pub fn unfreeze(&mut self, did: &Did, reason: String) -> Option<FrozenMember> {
-        let removed = self.frozen.remove(did);
+        let removed = self.forget_frozen(did);
 
-        if let Some(ref _record) = removed {
+        if let Some(ref record) = removed {
             info!(
-                did = %did,
+                did = %record.did,
                 reason = %reason,
                 "Unfreezing member"
             );
 
-            // Record unfreeze event
+            // The audit trail names the spelling that was actually stored and
+            // deleted, not the one the caller happened to type. Under I7 those
+            // can differ, and a history entry naming a DID string that was
+            // never a persisted key cannot be reconciled with the store.
             let event = UnfreezeEvent {
-                did: did.clone(),
+                did: record.did.clone(),
                 reason,
                 unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id: None,
                 unfrozen_by: None,
             };
             self.unfreeze_history.push(event);
-
-            // Remove from persistent store
-            if let Some(ref store) = self.store {
-                if let Err(e) = self.remove_frozen(did, store) {
-                    warn!(did = %did, error = %e, "Failed to remove frozen member from store");
-                }
-            }
         }
 
         removed
@@ -262,30 +267,25 @@ impl FreezeManager {
         proposal_id: Option<String>,
         unfrozen_by: Option<Did>,
     ) -> Option<FrozenMember> {
-        let removed = self.frozen.remove(did);
+        let removed = self.forget_frozen(did);
 
-        if let Some(ref _record) = removed {
+        if let Some(ref record) = removed {
             info!(
-                did = %did,
+                did = %record.did,
                 reason = %reason,
                 proposal = ?proposal_id,
                 "Unfreezing member with metadata"
             );
 
+            // Same rule as `unfreeze`: the stored spelling is the audit fact.
             let event = UnfreezeEvent {
-                did: did.clone(),
+                did: record.did.clone(),
                 reason,
                 unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id,
                 unfrozen_by,
             };
             self.unfreeze_history.push(event);
-
-            if let Some(ref store) = self.store {
-                if let Err(e) = self.remove_frozen(did, store) {
-                    warn!(did = %did, error = %e, "Failed to remove frozen member from store");
-                }
-            }
         }
 
         removed
@@ -297,12 +297,7 @@ impl FreezeManager {
             if record.is_expired() {
                 // Auto-unfreeze expired records
                 info!(did = %did, "Auto-unfreezing expired member");
-                self.frozen.remove(did);
-
-                // Remove from persistent store
-                if let Some(ref store) = self.store {
-                    let _ = self.remove_frozen(did, store);
-                }
+                self.forget_frozen(did);
 
                 return false;
             }
@@ -332,10 +327,7 @@ impl FreezeManager {
             .collect();
 
         for did in expired {
-            self.frozen.remove(&did);
-            if let Some(ref store) = self.store {
-                let _ = self.remove_frozen(&did, store);
-            }
+            self.forget_frozen(&did);
         }
 
         self.frozen.values().collect()
@@ -364,10 +356,7 @@ impl FreezeManager {
 
         for did in expired {
             info!(did = %did, "Cleaning up expired freeze");
-            self.frozen.remove(&did);
-            if let Some(ref store) = self.store {
-                let _ = self.remove_frozen(&did, store);
-            }
+            self.forget_frozen(&did);
         }
 
         count
@@ -378,14 +367,128 @@ impl FreezeManager {
     fn load_from_store(&mut self) -> anyhow::Result<()> {
         if let Some(ref store) = self.store {
             let pairs = store.scan(FREEZE_PREFIX.as_bytes())?;
-            for (_, value) in pairs {
+
+            // Read and filter before adopting anything. Expired records are
+            // dropped first because an expired freeze is not state: two rows
+            // for one principal are only ambiguous when both still bind, and
+            // refusing on a lapsed alias row would block a start for nothing.
+            //
+            // The stored **key** is what the guard groups by, not the spelling
+            // inside the record. The key is the row's identity — it is what a
+            // later `persist_frozen` or `remove_frozen` addresses — so a guard
+            // reading only the body would see two keyed rows whose bodies reuse
+            // one spelling, find no collision, and adopt them under a single
+            // map entry. The loser would then survive every unfreeze and
+            // re-freeze the member on the next start.
+            // `pairs` is consumed so each raw row is dropped once parsed; the
+            // guard holds the parsed rows only.
+            let mut live = Vec::with_capacity(pairs.len());
+            let mut unreadable = 0usize;
+            for (key, value) in pairs {
+                // The key is decoded strictly, never lossily. `persist_frozen`
+                // writes `FREEZE_PREFIX` followed by a `Did`'s `Display`, which
+                // is always UTF-8, so a key that is not is one the writer never
+                // produced. Normalizing it would be worse than refusing it: an
+                // invalid byte can normalize into a spelling the guard accepts
+                // and a body can match, while the row on disk keeps the raw
+                // key — and the later unfreeze would delete the normalized key
+                // and leave the raw row to freeze the member again.
+                let Ok(key_str) = std::str::from_utf8(&key) else {
+                    unreadable += 1;
+                    continue;
+                };
+                let spelling = key_str
+                    .strip_prefix(FREEZE_PREFIX)
+                    .unwrap_or(key_str)
+                    .to_string();
+                // The key must name a principal before the value is read.
+                // `persist_frozen` writes a `Did`'s `Display`, and a body is
+                // adopted only if its own `did` — which deserializes through
+                // `Did::from_str` — spells the same as the key, so a key that
+                // `Did::from_str` rejects can never be one of this keyspace's
+                // rows, whatever its value holds. It is counted here, and the
+                // value of such a row is never parsed, so a malformed value
+                // cannot turn the typed refusal into a parse error.
+                if Did::from_str(&spelling).is_err() {
+                    unreadable += 1;
+                    continue;
+                }
                 let record: FrozenMember = serde_json::from_slice(&value)?;
                 if !record.is_expired() {
-                    self.frozen.insert(record.did.clone(), record);
+                    live.push((spelling, record));
                 }
+            }
+
+            // Reported before the guard runs: a key the writer could not have
+            // produced is evidence, and a classification computed without it
+            // proves nothing.
+            if unreadable > 0 {
+                return Err(PrincipalRowsRefusal::UnreadableKey {
+                    keyspace: FROZEN_KEYSPACE,
+                    rows: unreadable,
+                }
+                .into());
+            }
+
+            // Two live freezes for one principal disagree about reason and
+            // expiry, and `icn-ledger/frozen` carries
+            // `RuleBasis::AwaitingDomainSignOff` — the union rule written down
+            // in the migration gate is asserted, not authorized. Refuse.
+            refuse_unless_one_spelling_per_principal(
+                FROZEN_KEYSPACE,
+                live.iter().map(|(spelling, _)| (spelling.as_str(), "")),
+            )?;
+
+            // A record whose body spells the member differently from its own
+            // key cannot be addressed by the key the map would derive from it.
+            let strayed = live
+                .iter()
+                .filter(|(spelling, record)| record.did.as_str() != spelling)
+                .count();
+            if strayed > 0 {
+                return Err(PrincipalRowsRefusal::KeyValueSpellingMismatch {
+                    keyspace: FROZEN_KEYSPACE,
+                    rows: strayed,
+                }
+                .into());
+            }
+
+            for (_spelling, record) in live {
+                self.frozen.insert(record.did.clone(), record);
             }
         }
         Ok(())
+    }
+
+    /// The spelling this manager already holds for `did`, if any.
+    ///
+    /// Persisted freeze keys are built from a spelling, so writing or deleting
+    /// under a second spelling of the same principal would leave the first row
+    /// live — a freeze that outlives its unfreeze. Every persistence call
+    /// therefore addresses the row identity the map already has.
+    fn stored_spelling(&self, did: &Did) -> Did {
+        self.frozen
+            .get_key_value(did)
+            .map(|(stored, _)| stored.clone())
+            .unwrap_or_else(|| did.clone())
+    }
+
+    /// Drop a principal's freeze from memory and from the store together.
+    ///
+    /// `HashMap::remove_entry` hands back the key the map actually held, which
+    /// is the spelling the persisted row uses. Deleting under the caller's
+    /// spelling instead would silently leave that row behind, and the next
+    /// `load_from_store` would re-freeze a member who had been released.
+    fn forget_frozen(&mut self, did: &Did) -> Option<FrozenMember> {
+        let (stored_did, record) = self.frozen.remove_entry(did)?;
+
+        if let Some(ref store) = self.store {
+            if let Err(e) = self.remove_frozen(&stored_did, store) {
+                warn!(did = %stored_did, error = %e, "Failed to remove frozen member from store");
+            }
+        }
+
+        Some(record)
     }
 
     fn persist_frozen(
@@ -537,5 +640,63 @@ mod tests {
         // Indefinite freeze has no remaining time
         let indefinite = FrozenMember::new(test_did("test2"), "Indefinite".to_string(), None);
         assert!(indefinite.remaining_seconds().is_none());
+    }
+
+    /// A second, equally valid textual encoding of the principal `did` names.
+    fn alternate_spelling(did: &Did) -> Did {
+        let bytes = did.identifier_bytes().unwrap();
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+        assert_ne!(did.as_str(), alias.as_str(), "the spellings must differ");
+        assert_eq!(&alias, did, "and name one principal");
+        alias
+    }
+
+    #[test]
+    fn unfreeze_audit_names_the_stored_row_not_the_callers_spelling() {
+        // Persistence action and audit fact must refer to the same stored row
+        // identity. A release named under an alias deletes the stored spelling's
+        // row, so the history entry must name that spelling too — an event
+        // naming a DID string that was never a persisted key cannot be
+        // reconciled with the store.
+        let store: Arc<dyn Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let stored = test_did("stored");
+        let alias = alternate_spelling(&stored);
+        let mut manager = FreezeManager::with_store(store.clone()).unwrap();
+
+        manager.freeze(stored.clone(), "hold".to_string(), None);
+        let removed = manager
+            .unfreeze(&alias, "released".to_string())
+            .expect("the principal was frozen under another spelling");
+        assert_eq!(removed.did.as_str(), stored.as_str());
+        let event = manager.unfreeze_history().last().unwrap();
+        assert_eq!(
+            event.did.as_str(),
+            stored.as_str(),
+            "the audit names the row that was deleted, not the alias the caller typed"
+        );
+        assert_ne!(event.did.as_str(), alias.as_str());
+        assert!(store.scan(FREEZE_PREFIX.as_bytes()).unwrap().is_empty());
+
+        // The metadata path follows the same rule.
+        manager.freeze_with_metadata(
+            stored.clone(),
+            "hold".to_string(),
+            None,
+            Some("prop-1".to_string()),
+            None,
+        );
+        let removed = manager
+            .unfreeze_with_metadata(
+                &alias,
+                "released".to_string(),
+                Some("prop-2".to_string()),
+                Some(alias.clone()),
+            )
+            .expect("the principal was frozen under another spelling");
+        assert_eq!(removed.did.as_str(), stored.as_str());
+        let event = manager.unfreeze_history().last().unwrap();
+        assert_eq!(event.did.as_str(), stored.as_str());
+        assert_eq!(event.proposal_id.as_deref(), Some("prop-2"));
+        assert!(store.scan(FREEZE_PREFIX.as_bytes()).unwrap().is_empty());
     }
 }
