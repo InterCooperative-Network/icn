@@ -59,7 +59,7 @@ use crate::metrics;
 use icn_identity::Did;
 use icn_store::Store;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::{debug, info};
 
 /// Storage key prefix.
@@ -79,22 +79,45 @@ const SOURCE_ID_ERROR_CAP: usize = 64;
 /// this store writes (`scanner_registry_names_this_keyspace` pins it).
 const SOURCE_SEPARATOR: u8 = b'/';
 
-/// Serializes every mutation of the namespace within this process.
+/// Serializes every read and every mutation of the namespace within this
+/// process.
+///
+/// Two separate reasons, and both are needed.
 ///
 /// A write is a check-then-put: it reads the rows for `(principal, source)` and
 /// refuses if a second spelling would result. Two concurrent writers that each
 /// saw the other's row absent would otherwise both succeed and persist exactly
-/// the collision the check exists to prevent. The lock is process-wide rather
-/// than per instance because callers construct a store per request over one
-/// shared backend (`icn-rpc`), and a sled database admits one process at a
-/// time, so a process-wide lock covers every writer there is.
-static WRITE_LOCK: Mutex<()> = Mutex::new(());
+/// the collision the check exists to prevent.
+///
+/// A read needs it because [`Store::scan`] is not a snapshot. sled's iterator
+/// takes its read lock once per item rather than once per scan, so a mutation
+/// that commits partway through a namespace read is visible to the rest of that
+/// read but not to the part already collected. For an alias pair that is the
+/// whole hazard again by another route: a reader can collect one alias row, an
+/// atomic revocation of the pair commits, the reader never sees the partner,
+/// and `ensure_unambiguous` is handed a pair of one — which is not a collision,
+/// so the read returns the attestation the revocation just removed. Making the
+/// revocation atomic removed the *durable* half of that hazard; only
+/// serializing the read removes this half.
+///
+/// Readers share, so ordinary concurrent lookups do not queue behind each
+/// other. The lock is process-wide rather than per instance because callers
+/// construct a store per request over one shared backend (`icn-rpc`), and a
+/// sled database admits one process at a time, so a process-wide lock covers
+/// every reader and writer there is.
+static NAMESPACE_LOCK: RwLock<()> = RwLock::new(());
 
-fn write_guard() -> MutexGuard<'static, ()> {
-    // A writer that panicked while holding the lock has not left the store in
-    // a state this lock protects against; later writers re-read before acting.
-    WRITE_LOCK
-        .lock()
+fn write_guard() -> RwLockWriteGuard<'static, ()> {
+    // A caller that panicked while holding the lock has not left the store in
+    // a state this lock protects against; later callers re-read before acting.
+    NAMESPACE_LOCK
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn read_guard() -> RwLockReadGuard<'static, ()> {
+    NAMESPACE_LOCK
+        .read()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
@@ -306,6 +329,8 @@ impl AttestationStore {
     /// The result is the same whichever spelling of the principal is asked
     /// for, and does not depend on what was asked before.
     pub fn get_attestations_for(&self, member: &Did) -> Result<Vec<FederatedTrustAttestation>> {
+        let _guard = read_guard();
+
         let rows = self.load_checked_rows()?;
         let mine: Vec<StoredAttestation> = rows
             .into_iter()
@@ -318,6 +343,8 @@ impl AttestationStore {
 
     /// Get attestations from a specific cooperative
     pub fn get_attestations_from(&self, coop_id: &str) -> Result<Vec<FederatedTrustAttestation>> {
+        let _guard = read_guard();
+
         let rows = self.load_checked_rows()?;
         let theirs: Vec<StoredAttestation> = rows
             .into_iter()
@@ -365,6 +392,11 @@ impl AttestationStore {
     }
 
     /// Get valid (non-expired) attestations for a member
+    ///
+    /// Takes no guard of its own: it delegates to
+    /// [`AttestationStore::get_attestations_for`], which holds one for the
+    /// whole read. Acquiring a second would be a re-entrant read, which
+    /// deadlocks against a writer already queued between the two.
     pub fn get_valid_attestations_for(
         &self,
         member: &Did,
@@ -424,6 +456,8 @@ impl AttestationStore {
 
     /// Count total attestations
     pub fn count(&self) -> Result<usize> {
+        let _guard = read_guard();
+
         let entries = self.store.scan(ATTESTATION_PREFIX)?;
         Ok(entries.len())
     }
@@ -1447,5 +1481,115 @@ mod tests {
             .unwrap();
 
         assert_eq!(counted.mutations(), 0);
+    }
+
+    #[test]
+    fn a_namespace_read_holds_the_lock_a_mutation_needs() {
+        // `Store::scan` is not a snapshot: sled's iterator takes its read lock
+        // once per item, so a revocation committing partway through a namespace
+        // read is visible to the rest of that read and not to the part already
+        // collected. A reader could then hold one alias row, miss its partner,
+        // and be handed a pair of one — which is not a collision, so the read
+        // would return the attestation the revocation just removed. Making the
+        // deletion atomic closed the durable half of that; this closes the
+        // other half.
+        //
+        // Deterministic by construction rather than by racing: the reader is
+        // parked *inside* `scan`, so if reads take the namespace lock, no
+        // writer can acquire it at that moment. No sleeps, no interleaving to
+        // get lucky with.
+        struct ParkInScan {
+            inner: Arc<SledStore>,
+            entered: std::sync::mpsc::SyncSender<()>,
+            release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+            park_next: AtomicUsize,
+        }
+
+        impl Store for ParkInScan {
+            fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+                self.inner.get(key)
+            }
+            fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+                self.inner.put(key, value)
+            }
+            fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+                self.inner.delete(key)
+            }
+            fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+                self.inner.delete_atomic(keys)
+            }
+            fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+                // Park the first scan only, and park before delegating — the
+                // caller's read guard is already held by then.
+                if self.park_next.swap(0, Ordering::SeqCst) == 1 {
+                    self.entered.send(()).unwrap();
+                    self.release.lock().unwrap().recv().unwrap();
+                }
+                self.inner.scan(prefix)
+            }
+            fn get_replica_metadata(
+                &self,
+                hash: &icn_store::ContentHash,
+            ) -> anyhow::Result<Option<icn_store::ReplicaMetadata>> {
+                self.inner.get_replica_metadata(hash)
+            }
+            fn put_replica_metadata(
+                &self,
+                meta: &icn_store::ReplicaMetadata,
+            ) -> anyhow::Result<()> {
+                self.inner.put_replica_metadata(meta)
+            }
+            fn list_replica_hashes(&self) -> anyhow::Result<Vec<icn_store::ContentHash>> {
+                self.inner.list_replica_hashes()
+            }
+        }
+
+        let raw = Arc::new(SledStore::temporary().unwrap());
+        let member = test_did();
+        let alias = alias_spelling(&member);
+        put_raw(
+            &raw,
+            &member,
+            &attestation("food-coop", member.clone(), 0.85),
+        );
+        put_raw(&raw, &alias, &attestation("food-coop", alias.clone(), 0.25));
+
+        let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let parking = Arc::new(ParkInScan {
+            inner: raw.clone(),
+            entered: entered_tx,
+            release: std::sync::Mutex::new(release_rx),
+            park_next: AtomicUsize::new(1),
+        });
+
+        let reader_store = AttestationStore::new(parking.clone() as Arc<dyn Store>);
+        let reader_member = member.clone();
+        let reader = std::thread::spawn(move || {
+            // An ambiguous pair, so this refuses — what matters is that it
+            // holds the lock for the whole read while it decides.
+            reader_store.get_attestations_for(&reader_member).is_err()
+        });
+
+        entered_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the reader must reach its namespace scan");
+
+        assert!(
+            NAMESPACE_LOCK.try_write().is_err(),
+            "a namespace read must hold the lock a mutation needs; a revocation \
+             could otherwise commit inside this scan and leave the reader with \
+             a pair of one"
+        );
+
+        release_tx.send(()).unwrap();
+        assert!(
+            reader.join().unwrap(),
+            "the ambiguous pair must still refuse"
+        );
+
+        // And once the read is done the lock is free again, so a revocation is
+        // not blocked for longer than the read it had to wait for.
+        assert!(NAMESPACE_LOCK.try_write().is_ok());
     }
 }
