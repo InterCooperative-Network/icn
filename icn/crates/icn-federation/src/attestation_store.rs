@@ -31,10 +31,14 @@
 //!   otherwise elect a survivor by expiry and destroy the evidence an operator
 //!   needs). A lookup for an unrelated principal is unaffected, because its
 //!   answer does not depend on the pair.
-//! * **Revocation removes every row it names.** [`AttestationStore::remove_attestation`]
-//!   deletes each stored key it read whose `(principal, source_coop_id)`
-//!   matches, so a revocation under one spelling cannot leave the attestation
-//!   live under another. It never elects a survivor.
+//! * **Revocation removes every row it names, atomically.**
+//!   [`AttestationStore::remove_attestation`] deletes the stored keys it read
+//!   whose `(principal, source_coop_id)` matches, so a revocation under one
+//!   spelling cannot leave the attestation live under another. The deletes go
+//!   as one unit, because a revocation interrupted between two alias rows
+//!   would leave a lone row that is no longer ambiguous and therefore
+//!   *acceptable* — revocation would have made its own evidence valid. It
+//!   never elects a survivor, by failure or otherwise.
 //! * **Nothing is re-keyed, merged or normalized.** Persisted bytes change only
 //!   through the explicit `put`/`delete` the caller asked for, under keys that
 //!   were read from the store or built for the caller's own value.
@@ -64,6 +68,14 @@ pub const ATTESTATION_PREFIX: &[u8] = b"federation/attestations/";
 
 /// Longest source-cooperative identifier echoed into an error, in characters.
 const SOURCE_ID_ERROR_CAP: usize = 64;
+
+/// The byte between the member spelling and the source-cooperative identifier.
+///
+/// Named because the N2-A descriptor declares the same byte as the terminator
+/// of its anchored principal segment, and a key builder that disagreed with
+/// the descriptor would be a scan that reads a different keyspace than the one
+/// this store writes (`scanner_registry_names_this_keyspace` pins it).
+const SOURCE_SEPARATOR: u8 = b'/';
 
 /// Serializes every mutation of the namespace within this process.
 ///
@@ -141,7 +153,7 @@ impl AttestationStore {
     fn attestation_key(member_did: &Did, source_coop_id: &str) -> Vec<u8> {
         let mut key = ATTESTATION_PREFIX.to_vec();
         key.extend(member_did.as_str().as_bytes());
-        key.push(b'/');
+        key.push(SOURCE_SEPARATOR);
         key.extend(source_coop_id.as_bytes());
         key
     }
@@ -305,6 +317,14 @@ impl AttestationStore {
     /// unambiguous first: deleting the expired half of a colliding pair would
     /// elect the other half as survivor and destroy the evidence an operator
     /// needs to disposition the pair. A refused sweep deletes nothing.
+    ///
+    /// The deletes are therefore *not* one atomic unit, and need not be: past
+    /// that refusal no two rows share a `(principal, source_coop_id)`, so
+    /// there is no alias survivor for an interrupted sweep to elect. A sweep
+    /// that stops partway has removed some expired rows and left others, which
+    /// is the state a sweep that had not run yet was already in. That is the
+    /// difference from [`AttestationStore::remove_attestation`], which acts on
+    /// a pair that may be ambiguous by construction.
     pub fn remove_expired(&self) -> Result<usize> {
         let _guard = write_guard();
 
@@ -345,23 +365,42 @@ impl AttestationStore {
     /// Removal is principal-wide for this source. Deleting only the caller's
     /// spelling would make revocation representation-dependent: the attestation
     /// would stay live under any other spelling already persisted. This path
-    /// reads and validates every row, then deletes each exact key it read whose
+    /// reads and validates every row, then deletes the exact keys it read whose
     /// `(principal, source_coop_id)` matches. If that pair happens to be
     /// ambiguous, every row of it goes — revocation is the one operation for
     /// which removing more can never be the unsafe direction. It does not
     /// merge, re-key, or choose one value to keep.
+    ///
+    /// The deletion is **one atomic unit**, not one per row. Deleting alias
+    /// rows separately would put a failure boundary between them, and the
+    /// state on the far side of that boundary is the dangerous one: a lone
+    /// surviving row is no longer ambiguous, so the next read accepts the
+    /// exact attestation the revocation was called to remove. Revoking must
+    /// not be able to elect a survivor, so [`icn_store::Store::delete_atomic`]
+    /// carries the whole pair or none of it, and a failure leaves the pair as
+    /// it was — still ambiguous, still refused, and still there as the
+    /// evidence an operator needs.
+    ///
+    /// Retry is the remedy for a failure and is safe: a revocation that did
+    /// not happen leaves nothing to undo, and one that did leaves nothing to
+    /// match, so a repeat is a no-op rather than an error.
     pub fn remove_attestation(&self, member: &Did, source_coop_id: &str) -> Result<()> {
         let _guard = write_guard();
 
-        let rows = self.load_checked_rows()?;
+        let doomed: Vec<Vec<u8>> = self
+            .load_checked_rows()?
+            .into_iter()
+            .filter(|row| {
+                row.attestation.member_did == *member
+                    && row.attestation.source_coop_id == source_coop_id
+            })
+            .map(|row| row.key)
+            .collect();
 
-        for row in rows {
-            if row.attestation.member_did == *member
-                && row.attestation.source_coop_id == source_coop_id
-            {
-                self.store.delete(&row.key)?;
-            }
+        if doomed.is_empty() {
+            return Ok(());
         }
+        self.store.delete_atomic(&doomed)?;
 
         Ok(())
     }
@@ -379,6 +418,7 @@ mod tests {
     use crate::attestation::TrustContext;
     use icn_identity::KeyPair;
     use icn_store::{SledStore, Store};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn test_did() -> Did {
         KeyPair::generate().unwrap().did().clone()
@@ -1037,22 +1077,23 @@ mod tests {
     #[test]
     fn scanner_registry_names_this_keyspace() {
         // The N2-A collision scanner must scan exactly the bytes this store
-        // writes, with the layout this store uses: the spelling is followed by
-        // `/` and the source, and a collision is one `(principal, source)`.
-        use icn_store::did_collision_scan::{n2a_keyspaces, MergeDisposition};
+        // writes, with the layout this store uses: the member spelling is
+        // anchored right after the prefix and ends at the `/`, the source is
+        // an opaque discriminator this store compares as exact bytes and the
+        // scan must not parse, and a collision is one `(principal, source)`.
+        use icn_store::did_collision_scan::{n2a_keyspaces, MergeDisposition, PrincipalRegion};
 
         let descriptor = n2a_keyspaces()
             .into_iter()
             .find(|d| d.prefix == ATTESTATION_PREFIX)
             .expect("federation/attestations/ must be a registered N2-A keyspace (#2703)");
         assert_eq!(descriptor.name, "icn-federation/attestations");
-        assert!(
-            descriptor.slash_ends_did,
-            "the key puts `/` after the spelling"
-        );
-        assert!(
-            !descriptor.did_ends_key,
-            "the source cooperative follows the spelling"
+        assert_eq!(
+            descriptor.principal_region,
+            PrincipalRegion::AnchoredThenOpaque {
+                terminator: SOURCE_SEPARATOR
+            },
+            "the scan must read the member segment and nothing else"
         );
         assert_eq!(descriptor.disposition, MergeDisposition::FailClosed);
     }
@@ -1106,5 +1147,288 @@ mod tests {
             att_store.get_attestations_for(&member),
             Err(FederationError::AttestationStorePrincipalCollision { .. })
         ));
+    }
+
+    // ----- revocation atomicity (#2704 review, P1) --------------------------
+    //
+    // A revocation that deleted one alias row and then failed would leave the
+    // other row as the only row for its `(principal, source)` pair — and a
+    // pair of one is not a collision, so the next read would *accept* the
+    // exact attestation the revocation was called to remove. These fixtures
+    // interrupt a revocation where a crash or an I/O error would interrupt it
+    // and then reopen the database from disk, because the property is about
+    // persisted state and an in-process handle cannot speak for it.
+
+    /// A store that hands every call to a real sled database but fails the
+    /// `fail_on`-th mutation, and counts how many mutations it was asked for.
+    ///
+    /// Counting matters as much as failing: "the revocation is atomic" is the
+    /// claim that there is no boundary *between* two mutations to be
+    /// interrupted at, and a count of one is what proves the boundary is gone.
+    struct InterruptAfter {
+        inner: Arc<SledStore>,
+        mutations: AtomicUsize,
+        fail_on: usize,
+    }
+
+    impl InterruptAfter {
+        /// Fail the `fail_on`-th mutation (1-based); `usize::MAX` never fails.
+        fn new(inner: Arc<SledStore>, fail_on: usize) -> Self {
+            Self {
+                inner,
+                mutations: AtomicUsize::new(0),
+                fail_on,
+            }
+        }
+
+        fn mutations(&self) -> usize {
+            self.mutations.load(Ordering::SeqCst)
+        }
+
+        /// Record one mutation and say whether this is the one that fails.
+        fn arm(&self) -> anyhow::Result<()> {
+            if self.mutations.fetch_add(1, Ordering::SeqCst) + 1 == self.fail_on {
+                anyhow::bail!("injected storage failure");
+            }
+            Ok(())
+        }
+    }
+
+    impl Store for InterruptAfter {
+        fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            self.inner.get(key)
+        }
+
+        fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+            self.arm()?;
+            self.inner.put(key, value)
+        }
+
+        fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+            self.arm()?;
+            self.inner.delete(key)
+        }
+
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            self.arm()?;
+            self.inner.delete_atomic(keys)
+        }
+
+        fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            self.inner.scan(prefix)
+        }
+
+        fn flush(&self) -> anyhow::Result<()> {
+            Store::flush(self.inner.as_ref())
+        }
+
+        fn get_replica_metadata(
+            &self,
+            hash: &icn_store::ContentHash,
+        ) -> anyhow::Result<Option<icn_store::ReplicaMetadata>> {
+            self.inner.get_replica_metadata(hash)
+        }
+
+        fn put_replica_metadata(&self, meta: &icn_store::ReplicaMetadata) -> anyhow::Result<()> {
+            self.inner.put_replica_metadata(meta)
+        }
+
+        fn list_replica_hashes(&self) -> anyhow::Result<Vec<icn_store::ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+    }
+
+    /// Write an alias pair for one `(principal, source)` into a database at
+    /// `root`, plus a second source that must survive, then close it.
+    fn seed_alias_pair(root: &std::path::Path, member: &Did, alias: &Did) {
+        let raw = SledStore::open(root).unwrap();
+        put_raw(
+            &raw,
+            member,
+            &attestation("food-coop", member.clone(), 0.85),
+        );
+        put_raw(&raw, alias, &attestation("food-coop", alias.clone(), 0.25));
+        put_raw(
+            &raw,
+            alias,
+            &attestation("housing-coop", alias.clone(), 0.7),
+        );
+        raw.flush().unwrap();
+    }
+
+    /// Open `root` afresh and answer both questions a later start would ask.
+    fn reopen_and_classify(
+        root: &std::path::Path,
+        member: &Did,
+    ) -> (usize, Result<Vec<FederatedTrustAttestation>>) {
+        let raw = Arc::new(SledStore::open(root).unwrap());
+        let rows = raw.scan(ATTESTATION_PREFIX).unwrap().len();
+        let att_store = AttestationStore::new(raw.clone() as Arc<dyn Store>);
+        (rows, att_store.get_attestations_for(member))
+    }
+
+    #[test]
+    fn an_interrupted_revocation_never_elects_an_alias_survivor() {
+        // The defect this fixture was written for. Interrupt the revocation
+        // where a per-row loop has its boundary: after the first row is gone.
+        // A loop leaves the second row as the only row for
+        // `(principal, food-coop)` — and a pair of one is not a collision, so
+        // a fresh store hands that attestation back as valid. One atomic
+        // deletion has no such boundary: there is no second mutation to fail.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("federation");
+        let member = test_did();
+        let alias = alias_spelling(&member);
+        seed_alias_pair(&root, &member, &alias);
+
+        let mutations = {
+            let inner = Arc::new(SledStore::open(&root).unwrap());
+            let faulty = Arc::new(InterruptAfter::new(inner.clone(), 2));
+            let att_store = AttestationStore::new(faulty.clone() as Arc<dyn Store>);
+
+            att_store
+                .remove_attestation(&alias, "food-coop")
+                .expect("a two-row revocation must not have a second mutation to fail at");
+            inner.flush().unwrap();
+            faulty.mutations()
+        };
+        assert_eq!(
+            mutations, 1,
+            "a two-row revocation must ask the store for exactly one mutation"
+        );
+
+        // Reopened from disk, so nothing an in-process handle remembered can
+        // stand in for what was actually persisted.
+        let (rows, lookup) = reopen_and_classify(&root, &member);
+        assert_eq!(rows, 1, "both food-coop rows are gone");
+        assert_eq!(
+            sources_of(&lookup.unwrap()),
+            vec!["housing-coop"],
+            "a surviving food-coop row would be the revoked attestation, \
+             accepted because it no longer has an alias to collide with"
+        );
+    }
+
+    #[test]
+    fn a_failed_revocation_leaves_the_pair_intact_and_still_refused() {
+        // The other side of the invariant. When the one mutation does fail,
+        // the persisted state is the state revocation started from: both alias
+        // rows present and still ambiguous, so nothing has become acceptable.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("federation");
+        let member = test_did();
+        let alias = alias_spelling(&member);
+        seed_alias_pair(&root, &member, &alias);
+
+        {
+            let inner = Arc::new(SledStore::open(&root).unwrap());
+            let faulty = Arc::new(InterruptAfter::new(inner.clone(), 1));
+            let att_store = AttestationStore::new(faulty.clone() as Arc<dyn Store>);
+
+            let err = att_store
+                .remove_attestation(&alias, "food-coop")
+                .expect_err("the injected failure must surface, not be swallowed");
+            assert!(
+                matches!(&err, FederationError::Internal(m) if m.contains("injected")),
+                "expected the storage failure to propagate, got {err:?}"
+            );
+            assert_eq!(faulty.mutations(), 1);
+            inner.flush().unwrap();
+        }
+
+        let (rows, lookup) = reopen_and_classify(&root, &member);
+        assert_eq!(rows, 3, "a refused revocation deletes nothing");
+        assert!(
+            matches!(
+                lookup,
+                Err(FederationError::AttestationStorePrincipalCollision { .. })
+            ),
+            "the pair must still be ambiguous: {lookup:?}"
+        );
+    }
+
+    #[test]
+    fn retrying_an_interrupted_revocation_converges() {
+        // A revocation that failed is a revocation that did not happen, so the
+        // caller's remedy is to ask again. The retry must be ordinary: same
+        // arguments, same outcome as if the first attempt had never run.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("federation");
+        let member = test_did();
+        let alias = alias_spelling(&member);
+        seed_alias_pair(&root, &member, &alias);
+
+        {
+            let inner = Arc::new(SledStore::open(&root).unwrap());
+            let faulty = Arc::new(InterruptAfter::new(inner.clone(), 1));
+            let att_store = AttestationStore::new(faulty as Arc<dyn Store>);
+            att_store
+                .remove_attestation(&member, "food-coop")
+                .unwrap_err();
+
+            // Same handle, no injected failure this time.
+            let att_store = AttestationStore::new(inner.clone() as Arc<dyn Store>);
+            att_store.remove_attestation(&member, "food-coop").unwrap();
+            // And a third call over an already-revoked pair is a no-op, not an
+            // error: retry must be safe to repeat.
+            att_store.remove_attestation(&member, "food-coop").unwrap();
+            inner.flush().unwrap();
+        }
+
+        let (rows, lookup) = reopen_and_classify(&root, &member);
+        assert_eq!(rows, 1, "both food-coop rows are gone");
+        assert_eq!(
+            sources_of(&lookup.unwrap()),
+            vec!["housing-coop"],
+            "the other source's attestation is untouched"
+        );
+    }
+
+    #[test]
+    fn an_ordinary_single_row_revocation_still_removes_exactly_its_row() {
+        // The atomic path must not need an alias pair to work: one row is the
+        // ordinary case, and it is still one mutation.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("federation");
+        let member = test_did();
+
+        {
+            let raw = Arc::new(SledStore::open(&root).unwrap());
+            let att_store = AttestationStore::new(raw.clone() as Arc<dyn Store>);
+            att_store
+                .store_attestation(attestation("food-coop", member.clone(), 0.85))
+                .unwrap();
+            att_store
+                .store_attestation(attestation("housing-coop", member.clone(), 0.7))
+                .unwrap();
+
+            let counted = Arc::new(InterruptAfter::new(raw.clone(), usize::MAX));
+            let counting_store = AttestationStore::new(counted.clone() as Arc<dyn Store>);
+            counting_store
+                .remove_attestation(&member, "food-coop")
+                .unwrap();
+            assert_eq!(counted.mutations(), 1);
+            raw.flush().unwrap();
+        }
+
+        let (rows, lookup) = reopen_and_classify(&root, &member);
+        assert_eq!(rows, 1);
+        assert_eq!(sources_of(&lookup.unwrap()), vec!["housing-coop"]);
+    }
+
+    #[test]
+    fn revoking_a_pair_that_is_not_there_asks_the_store_for_nothing() {
+        // Nothing to delete must not become an empty mutation: a store that
+        // was handed a batch would have a write to fail at, and there is no
+        // revocation here to make durable.
+        let raw = Arc::new(SledStore::temporary().unwrap());
+        let counted = Arc::new(InterruptAfter::new(raw.clone(), 1));
+        let att_store = AttestationStore::new(counted.clone() as Arc<dyn Store>);
+
+        att_store
+            .remove_attestation(&test_did(), "food-coop")
+            .unwrap();
+
+        assert_eq!(counted.mutations(), 0);
     }
 }
