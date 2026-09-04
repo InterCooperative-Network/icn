@@ -1536,3 +1536,222 @@ fn treasury_siblings_that_embed_a_spelling_stay_uncovered_not_misclassified() {
     assert_eq!(treasury.rows_scanned, 1);
     assert_eq!(treasury.collision_groups, 0);
 }
+
+// ---------------------------------------------------------------------------
+// ADR-0014 by-grantee projection (#2627 M2)
+//
+// The gateway opens its store at `<data_dir>/gateway_store`, beside the
+// per-domain databases under `store/`, so the gate finds it the same way. Its
+// by-grantee rows are binary: length-framed and tag-discriminated. Before this
+// tranche registered them, one ordinary Person grant produced an uncovered
+// shape and refused the start.
+// ---------------------------------------------------------------------------
+
+/// Create a sled database at `root` holding raw-byte rows, flushed and closed.
+fn make_store_raw(root: &Path, rows: &[(Vec<u8>, &[u8])]) {
+    std::fs::create_dir_all(root).unwrap();
+    let store = SledStore::open(root).unwrap();
+    for (key, value) in rows {
+        store.put(key, value).unwrap();
+    }
+    store.flush().unwrap();
+}
+
+/// Reproduce `ReceiptStore::grant_by_grantee_key` byte-for-byte.
+fn grant_by_grantee_row(tag: u8, body: &[u8], valid_from: u64, grant_id: &str) -> Vec<u8> {
+    let mut region = vec![tag];
+    region.extend_from_slice(body);
+    let mut key = b"adr0014:grant:by_grantee:".to_vec();
+    key.extend_from_slice(&(region.len() as u32).to_be_bytes());
+    key.extend_from_slice(&region);
+    key.extend_from_slice(&valid_from.to_be_bytes());
+    key.extend_from_slice(grant_id.as_bytes());
+    key
+}
+
+fn person_grant_row(spelling: &str, valid_from: u64, grant_id: &str) -> Vec<u8> {
+    grant_by_grantee_row(0x01, spelling.as_bytes(), valid_from, grant_id)
+}
+
+const GATE_GRANT_A: &str = "11111111-1111-4111-8111-111111111111";
+const GATE_GRANT_B: &str = "22222222-2222-4222-8222-222222222222";
+
+#[test]
+fn one_ordinary_person_grant_no_longer_refuses_the_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("gateway_store");
+    make_store_raw(
+        &root,
+        &[(
+            person_grant_row(&canonical(50), 1_000, GATE_GRANT_A),
+            GATE_GRANT_A.as_bytes(),
+        )],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert!(
+        blockers_for(&receipt, "gateway_store").is_empty(),
+        "an ordinary Person grant must not block a start"
+    );
+    let ks = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("gateway_store"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-gateway/adr0014_grant_by_grantee")
+        .expect("the gate consumes the registered by-grantee descriptor");
+    assert_eq!(ks.rows_scanned, 1);
+    assert_eq!(ks.distinct_principals, 1);
+    assert_eq!(ks.rows_unreadable, 0);
+}
+
+#[test]
+fn an_alias_pair_for_one_grant_is_clear_and_untouched() {
+    // One principal, two spellings, one canonical grant: equivalent derived
+    // evidence. The gate classifies the group, clears, and moves no byte.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(51);
+    let root = dir.path().join("gateway_store");
+    make_store_raw(
+        &root,
+        &[
+            (
+                person_grant_row(&a, 1_000, GATE_GRANT_A),
+                GATE_GRANT_A.as_bytes(),
+            ),
+            (
+                person_grant_row(&b, 1_000, GATE_GRANT_A),
+                GATE_GRANT_A.as_bytes(),
+            ),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let ks = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("gateway_store"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-gateway/adr0014_grant_by_grantee")
+        .unwrap();
+    assert_eq!(ks.rows_scanned, 2);
+    assert_eq!(ks.distinct_principals, 1);
+    assert_eq!(ks.collision_groups, 1, "the alias group is classified");
+    assert_eq!(ks.rows_in_collisions, 2);
+    assert_eq!(ks.disposition, "equivalent");
+    assert_eq!(ks.basis, "established");
+    assert!(blockers_for(&receipt, "gateway_store").is_empty());
+    assert_eq!(rows_of(&root), before, "the gate re-keyed or dropped a row");
+}
+
+#[test]
+fn control_two_grants_for_one_principal_are_two_shapes() {
+    // Differs in exactly one fact from the fixture above: the grant id. A
+    // principal may hold several distinct grants, so these must not group —
+    // otherwise the alias fixture would pass by grouping everything.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(52);
+    make_store_raw(
+        &dir.path().join("gateway_store"),
+        &[
+            (
+                person_grant_row(&a, 1_000, GATE_GRANT_A),
+                GATE_GRANT_A.as_bytes(),
+            ),
+            (
+                person_grant_row(&b, 2_000, GATE_GRANT_B),
+                GATE_GRANT_B.as_bytes(),
+            ),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let ks = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("gateway_store"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-gateway/adr0014_grant_by_grantee")
+        .unwrap();
+    assert_eq!(ks.distinct_principals, 2);
+    assert_eq!(ks.collision_groups, 0);
+}
+
+#[test]
+fn control_an_entity_grantee_row_that_spells_a_did_names_no_principal() {
+    // Tag 0x02 carries an entity id the granting domain chose. The registry
+    // must not principalize it merely because its bytes look like a DID.
+    let dir = tempfile::tempdir().unwrap();
+    make_store_raw(
+        &dir.path().join("gateway_store"),
+        &[(
+            grant_by_grantee_row(0x02, canonical(53).as_bytes(), 1_000, GATE_GRANT_A),
+            GATE_GRANT_A.as_bytes(),
+        )],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let ks = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("gateway_store"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-gateway/adr0014_grant_by_grantee")
+        .unwrap();
+    assert_eq!(ks.rows_scanned, 1);
+    assert_eq!(ks.distinct_principals, 0, "an entity id is not a principal");
+    assert_eq!(ks.rows_unreadable, 0, "and it is not unreadable either");
+}
+
+#[test]
+fn a_person_grant_row_whose_spelling_names_no_principal_refuses() {
+    // A row this writer could not have produced. It cannot be classified, so
+    // it cannot be ruled out as one that hides a real grant.
+    let dir = tempfile::tempdir().unwrap();
+    make_store_raw(
+        &dir.path().join("gateway_store"),
+        &[(
+            person_grant_row("did:icn:not-a-spelling!!", 1_000, GATE_GRANT_A),
+            GATE_GRANT_A.as_bytes(),
+        )],
+    );
+
+    let err = enforce(dir.path(), now()).unwrap_err();
+    assert!(
+        matches!(err, GateRefusal::Blocked { .. }),
+        "an unreadable principal row must refuse; got {err:?}"
+    );
+}
+
+#[test]
+fn broken_binary_framing_in_a_grantee_row_refuses() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut overrun = b"adr0014:grant:by_grantee:".to_vec();
+    overrun.extend_from_slice(&u32::MAX.to_be_bytes());
+    overrun.extend_from_slice(b"\x01did:icn:z");
+    make_store_raw(
+        &dir.path().join("gateway_store"),
+        &[(overrun, GATE_GRANT_A.as_bytes())],
+    );
+
+    let err = enforce(dir.path(), now()).unwrap_err();
+    assert!(
+        matches!(err, GateRefusal::Blocked { .. }),
+        "a length field that overruns the key must refuse; got {err:?}"
+    );
+}

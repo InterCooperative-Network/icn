@@ -15,6 +15,7 @@ use icn_governance::{
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
 use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
 use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
+use icn_identity::Did;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
 use sled::transaction::{ConflictableTransactionError, TransactionError};
@@ -89,6 +90,70 @@ const AUTHORITY_GRANT_BY_DECISION_PREFIX: &[u8] = b"adr0014:grant:by_decision:";
 /// entity IDs are unconstrained strings that may contain `:`, and Person
 /// DIDs and Entity IDs share this index under distinct tag bytes.
 const AUTHORITY_GRANT_BY_GRANTEE_PREFIX: &[u8] = b"adr0014:grant:by_grantee:";
+
+/// Variant tag for a Person grantee inside the by-grantee grantee region.
+const GRANTEE_TAG_PERSON: u8 = 0x01;
+/// Variant tag for an Entity grantee inside the by-grantee grantee region.
+const GRANTEE_TAG_ENTITY: u8 = 0x02;
+/// Stable sentinel prefixing every by-grantee projection refusal, so
+/// callers and tests can recognise the class without matching on wording.
+const GRANT_BY_GRANTEE_MALFORMED: &str = "grant_by_grantee_index_malformed";
+
+/// Why a by-grantee projection row could not be interpreted.
+///
+/// Every variant names a shape [`ReceiptStore::grant_by_grantee_key`]
+/// cannot produce. Encountering one is evidence of corruption or of a
+/// writer that is not this store — not of an ordinary state a reader
+/// should absorb. Only the discriminant travels, so no spelling, entity
+/// id or grant payload can reach a log line or an error string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GranteeIndexReason {
+    /// The key is shorter than its own framing requires.
+    Truncated,
+    /// The `u32` length field runs past the end of the key.
+    LengthOverrun,
+    /// The bytes after the grantee region are not `valid_from ‖ grant id`.
+    SuffixShape,
+    /// The grantee region carries a variant tag this layout does not define.
+    UnknownTag,
+    /// A Person region whose bytes are not a `Did` this binary accepts.
+    UnreadablePersonSpelling,
+    /// An Entity region whose bytes are not the UTF-8 string one is written from.
+    UnreadableEntityBytes,
+    /// The row's value is not the grant id its own key ends with.
+    ValueKeyMismatch,
+}
+
+impl GranteeIndexReason {
+    /// A stable, payload-free class name for diagnostics and tests.
+    fn class(self) -> &'static str {
+        match self {
+            Self::Truncated => "truncated",
+            Self::LengthOverrun => "length_overrun",
+            Self::SuffixShape => "suffix_shape",
+            Self::UnknownTag => "unknown_tag",
+            Self::UnreadablePersonSpelling => "unreadable_person_spelling",
+            Self::UnreadableEntityBytes => "unreadable_entity_bytes",
+            Self::ValueKeyMismatch => "value_key_mismatch",
+        }
+    }
+}
+
+/// The grantee a projection row names, as that row spells it.
+///
+/// A Person row is decoded to a [`Did`] so it can be compared under the
+/// same principal equality every other consumer of `Did` uses; an Entity
+/// row keeps its exact string, because Entity identity is the string.
+enum RowGrantee {
+    Person(Did),
+    Entity(String),
+}
+
+/// One structurally parsed by-grantee projection row.
+struct GranteeIndexRow {
+    grantee: RowGrantee,
+    grant_id: AuthorityGrantId,
+}
 
 /// One-shot migration sentinels. Set after a successful pass converts
 /// legacy raw-colon `{proposal_id}:{…}` secondary index keys into the
@@ -1103,6 +1168,198 @@ impl ReceiptStore {
         prefix
     }
 
+    /// Structurally parse one physical by-grantee projection row.
+    ///
+    /// The layout is the one [`Self::grant_by_grantee_key`] writes:
+    ///
+    /// ```text
+    /// AUTHORITY_GRANT_BY_GRANTEE_PREFIX
+    ///   ‖ u32 big-endian length of the grantee region
+    ///   ‖ grantee region: variant tag ‖ grantee bytes
+    ///   ‖ u64 big-endian valid_from
+    ///   ‖ 36-byte hyphenated grant id
+    /// ```
+    ///
+    /// The length field, not a delimiter, says where the grantee region
+    /// ends — a textual scan for a separator would run through the binary
+    /// length bytes and through a `valid_from` whose bytes are arbitrary.
+    /// The tag, not the look of the bytes, says whether the region names a
+    /// Principal: an `Entity` id is a caller-chosen string, and one that
+    /// spells `did:icn:…` is still an entity id.
+    fn parse_grant_by_grantee_row(
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<GranteeIndexRow, GranteeIndexReason> {
+        let rest = key
+            .strip_prefix(AUTHORITY_GRANT_BY_GRANTEE_PREFIX)
+            .ok_or(GranteeIndexReason::Truncated)?;
+        let (len_bytes, after_len) = rest
+            .split_at_checked(4)
+            .ok_or(GranteeIndexReason::Truncated)?;
+        // `split_at_checked(4)` above guarantees the array conversion.
+        let region_len = u32::from_be_bytes(
+            len_bytes
+                .try_into()
+                .map_err(|_| GranteeIndexReason::Truncated)?,
+        ) as usize;
+        let (region, suffix) = after_len
+            .split_at_checked(region_len)
+            .ok_or(GranteeIndexReason::LengthOverrun)?;
+
+        // The suffix is fixed-width by construction: 8 bytes of `valid_from`
+        // and a 36-byte hyphenated UUID. Anything else is a shape this
+        // writer cannot produce, including a region length that swallowed
+        // part of the suffix and still left a plausible remainder.
+        let (_valid_from, id_bytes) = suffix
+            .split_at_checked(8)
+            .ok_or(GranteeIndexReason::SuffixShape)?;
+        let id_str = std::str::from_utf8(id_bytes).map_err(|_| GranteeIndexReason::SuffixShape)?;
+        let uuid = uuid::Uuid::parse_str(id_str).map_err(|_| GranteeIndexReason::SuffixShape)?;
+
+        let (tag, body) = region.split_first().ok_or(GranteeIndexReason::Truncated)?;
+        let grantee = match *tag {
+            GRANTEE_TAG_PERSON => {
+                let spelling = std::str::from_utf8(body)
+                    .map_err(|_| GranteeIndexReason::UnreadablePersonSpelling)?;
+                // Decoded with the production parser so enumeration compares
+                // exactly what `Did` equality compares — this reader never
+                // reimplements principal identity.
+                let did = Did::from_str(spelling)
+                    .map_err(|_| GranteeIndexReason::UnreadablePersonSpelling)?;
+                RowGrantee::Person(did)
+            }
+            GRANTEE_TAG_ENTITY => {
+                let id = std::str::from_utf8(body)
+                    .map_err(|_| GranteeIndexReason::UnreadableEntityBytes)?;
+                RowGrantee::Entity(id.to_string())
+            }
+            _ => return Err(GranteeIndexReason::UnknownTag),
+        };
+
+        // The value repeats the grant id the key already names. A row where
+        // they disagree is one row's value under another row's key; reading
+        // it either way would attribute a grant to a projection that does
+        // not name it.
+        if value != id_str.as_bytes() {
+            return Err(GranteeIndexReason::ValueKeyMismatch);
+        }
+
+        Ok(GranteeIndexRow {
+            grantee,
+            grant_id: AuthorityGrantId(uuid),
+        })
+    }
+
+    /// The canonical grant ids a `grantee` query must consider.
+    ///
+    /// **Person** grantees are discovered by reading the whole projection
+    /// and keeping every row whose decoded spelling names the requested
+    /// Principal. A prefix scan cannot do this: the scan boundary is built
+    /// from `did.as_str()`, so it selects one spelling of a principal that
+    /// `Did` equality says has many (IDENTITY_SEMANTICS §11 I7). The cost
+    /// is one scan of the grant projection rather than of one grantee's
+    /// rows; the callers are governance decision seams and the act-time
+    /// mandate gate, not a hot loop.
+    ///
+    /// **Entity** grantees keep the exact-prefix scan. Entity identity is
+    /// the exact string under current semantics, the region is
+    /// length-prefixed so no entity id can be a prefix of another, and no
+    /// alias relation exists to miss.
+    ///
+    /// Rows this writer could not have produced are refused rather than
+    /// skipped: an uninterpretable row cannot be attributed to a principal,
+    /// so it cannot be ruled out as the row that names the one being asked
+    /// about, and silently dropping it would answer "no authority exists"
+    /// on the strength of evidence that was never read.
+    fn grant_ids_for_grantee(&self, grantee: &Grantee) -> Result<Vec<AuthorityGrantId>, String> {
+        let scan: &[u8] = match grantee {
+            Grantee::Person(_) => AUTHORITY_GRANT_BY_GRANTEE_PREFIX,
+            Grantee::Entity(_) => &Self::grant_by_grantee_scan_prefix(grantee),
+        };
+        let owned_scan = scan.to_vec();
+
+        let mut malformed = 0usize;
+        let mut first_reason: Option<GranteeIndexReason> = None;
+        let mut ids: Vec<AuthorityGrantId> = Vec::new();
+
+        for entry in self.db.scan_prefix(&owned_scan) {
+            let (key, value) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
+            let row = match Self::parse_grant_by_grantee_row(&key, &value) {
+                Ok(row) => row,
+                Err(reason) => {
+                    malformed += 1;
+                    first_reason.get_or_insert(reason);
+                    continue;
+                }
+            };
+            let names_requested = match (&row.grantee, grantee) {
+                // Principal equality, the same relation every other `Did`
+                // consumer uses.
+                (RowGrantee::Person(row_did), Grantee::Person(want)) => row_did == want,
+                // Entity identity is exact under current semantics.
+                (RowGrantee::Entity(row_id), Grantee::Entity(want)) => row_id == want,
+                // The tag discriminates: a Person row never answers an
+                // Entity query, whatever the bytes look like.
+                _ => false,
+            };
+            if names_requested {
+                ids.push(row.grant_id);
+            }
+        }
+
+        if let Some(reason) = first_reason {
+            return Err(format!(
+                "{GRANT_BY_GRANTEE_MALFORMED}: rows={malformed} reason={}",
+                reason.class()
+            ));
+        }
+
+        ids.sort_unstable_by_key(|id| id.0);
+        ids.dedup_by_key(|id| id.0);
+        Ok(ids)
+    }
+
+    /// Load the canonical grants for `ids` that actually name `grantee`.
+    ///
+    /// This is where authority is decided. A projection row is a claim
+    /// that a grant exists; the primary `AuthorityGrant` record is the
+    /// grant. A row whose primary is missing, or whose primary names a
+    /// different grantee, is stale evidence and is dropped — it cannot
+    /// manufacture authority the canonical record does not state.
+    ///
+    /// Ordering is oldest-first by `valid_from`, tie-broken by grant id,
+    /// so the answer is a function of the data rather than of scan order.
+    /// The reinstatement seam reads the last revoked grant off this order.
+    fn load_verified_grants(
+        &self,
+        ids: &[AuthorityGrantId],
+        grantee: &Grantee,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            let primary = Self::grant_primary_key(id);
+            let Some(bytes) = self
+                .db
+                .get(&primary)
+                .map_err(|e| format!("sled get grant primary: {e}"))?
+            else {
+                tracing::warn!("authority grant by-grantee projection skew: primary missing");
+                continue;
+            };
+            let grant: AuthorityGrant = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
+            if grant.grantee != *grantee {
+                tracing::warn!(
+                    "authority grant by-grantee projection skew: primary names another grantee"
+                );
+                continue;
+            }
+            out.push(grant);
+        }
+        out.sort_by(|a, b| a.valid_from.cmp(&b.valid_from).then(a.id.0.cmp(&b.id.0)));
+        Ok(out)
+    }
+
     /// Persist a mandate with its proposal and decision secondary indexes
     /// in a single sled transaction.
     ///
@@ -1345,88 +1602,48 @@ impl ReceiptStore {
     /// "Active" is defined by [`AuthorityGrant::is_active_at`]: not
     /// revoked at or before `now`, `now >= valid_from`, and (if
     /// `valid_until` is set) `now < valid_until`. Ordering is oldest-first
-    /// by `valid_from` (the secondary-index sort order).
+    /// by `valid_from`, tie-broken by grant id.
     ///
-    /// Uses the by-grantee secondary index written at grant-creation
-    /// time. Iteration is `O(grants_for_grantee)` — bounded by the
-    /// number of grants ever issued to this grantee, not by the total
-    /// grant count.
+    /// The by-grantee rows are a **projection**, not the authority. They
+    /// say where to look; the primary `AuthorityGrant` record says who
+    /// holds what. Every returned grant is loaded from its primary and
+    /// proven to name the requested grantee — for a Person, under the
+    /// principal equality `Did` itself defines, so the answer is the same
+    /// under every accepted spelling of one principal.
+    ///
+    /// Cost: one scan of the grant projection for a Person grantee (the
+    /// spelling-keyed prefix cannot enclose a principal's rows), and
+    /// `O(rows_for_grantee)` for an Entity grantee.
     pub fn list_active_authority_grants_by_grantee(
         &self,
         grantee: &Grantee,
         now: Timestamp,
     ) -> Result<Vec<AuthorityGrant>, String> {
-        let scan = Self::grant_by_grantee_scan_prefix(grantee);
-        let mut out = Vec::new();
-        for entry in self.db.scan_prefix(&scan) {
-            let (_k, v) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
-            let id_str =
-                std::str::from_utf8(&v).map_err(|e| format!("grant index value not UTF-8: {e}"))?;
-            let uuid = uuid::Uuid::parse_str(id_str)
-                .map_err(|e| format!("grant index value not a UUID: {e}"))?;
-            let primary = Self::grant_primary_key(&AuthorityGrantId(uuid));
-            let Some(bytes) = self
-                .db
-                .get(&primary)
-                .map_err(|e| format!("sled get grant primary: {e}"))?
-            else {
-                tracing::warn!(
-                    id = %id_str,
-                    "authority grant by-grantee index skew: primary missing"
-                );
-                continue;
-            };
-            let grant: AuthorityGrant = serde_json::from_slice(&bytes)
-                .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
-            // Filter-on-read: the grantee index is authoritative for
-            // grantee-keyed lookup, but the canonical answer to "is this
-            // still active?" lives on the primary record (its
-            // `revoked_at` may have been updated since the index was
-            // written). `is_active_at` consults that canonical state.
-            if grant.is_active_at(now) {
-                out.push(grant);
-            }
-        }
-        Ok(out)
+        let ids = self.grant_ids_for_grantee(grantee)?;
+        let mut grants = self.load_verified_grants(&ids, grantee)?;
+        // Liveness, like grantee identity, is read off the canonical
+        // record: `revoked_at` may have moved since the projection row was
+        // written, and the projection is never rewritten on revocation.
+        grants.retain(|g| g.is_active_at(now));
+        Ok(grants)
     }
 
     /// List **all** authority grants ever issued to a grantee, including
-    /// revoked and expired ones, ordered oldest-first by `valid_from`.
+    /// revoked and expired ones, ordered oldest-first by `valid_from` and
+    /// tie-broken by grant id.
     ///
-    /// Uses the same by-grantee secondary index as
-    /// [`Self::list_active_authority_grants_by_grantee`] but omits the
-    /// `is_active_at` filter. Used by the reinstatement seam to locate
+    /// Discovers and verifies exactly as
+    /// [`Self::list_active_authority_grants_by_grantee`] does, but omits
+    /// the `is_active_at` filter. Used by the reinstatement seam to locate
     /// the most-recent revoked grant as a template for the fresh grant
-    /// that reinstatement mints.
+    /// that reinstatement mints — which is why the order must be a
+    /// function of the data and not of scan order.
     pub fn list_authority_grants_by_grantee(
         &self,
         grantee: &Grantee,
     ) -> Result<Vec<AuthorityGrant>, String> {
-        let scan = Self::grant_by_grantee_scan_prefix(grantee);
-        let mut out = Vec::new();
-        for entry in self.db.scan_prefix(&scan) {
-            let (_k, v) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
-            let id_str =
-                std::str::from_utf8(&v).map_err(|e| format!("grant index value not UTF-8: {e}"))?;
-            let uuid = uuid::Uuid::parse_str(id_str)
-                .map_err(|e| format!("grant index value not a UUID: {e}"))?;
-            let primary = Self::grant_primary_key(&AuthorityGrantId(uuid));
-            let Some(bytes) = self
-                .db
-                .get(&primary)
-                .map_err(|e| format!("sled get grant primary: {e}"))?
-            else {
-                tracing::warn!(
-                    id = %id_str,
-                    "authority grant by-grantee index skew: primary missing"
-                );
-                continue;
-            };
-            let grant: AuthorityGrant = serde_json::from_slice(&bytes)
-                .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
-            out.push(grant);
-        }
-        Ok(out)
+        let ids = self.grant_ids_for_grantee(grantee)?;
+        self.load_verified_grants(&ids, grantee)
     }
 
     /// Revoke an authority grant by stamping `revoked_at` on its primary
@@ -2446,6 +2663,7 @@ impl GovernanceReceiptBackend for ReceiptStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_identity::Did;
     use icn_kernel_api::ScopeLevel;
 
     fn temp_db() -> Db {
@@ -2872,6 +3090,392 @@ mod tests {
             valid_until: Some(valid_from + 3_600),
             revoked_at: None,
         }
+    }
+
+    // ---- M2 (#2627): Person-grantee enumeration follows the Principal ----
+    //
+    // The by-grantee rows are a projection of the canonical
+    // `adr0014:grant:<uuid>` records. These fixtures hold one invariant: the
+    // projection may accelerate discovery of canonical grants and may never
+    // create, hide or alter authority independently of them.
+
+    /// Two accepted spellings of one principal: the canonical base58btc form
+    /// a keypair emits, and the base16 form of the same identifier bytes.
+    fn alias_pair() -> (Did, Did) {
+        let canonical = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let bytes = canonical.identifier_bytes().unwrap();
+        let alias = Did::from_str(&format!("did:icn:f{}", hex::encode(bytes))).unwrap();
+        assert_ne!(canonical.as_str(), alias.as_str(), "spellings must differ");
+        assert_eq!(canonical, alias, "one principal, two spellings");
+        (canonical, alias)
+    }
+
+    fn person_grant(did: &Did, seed: [u8; 32], valid_from: u64) -> AuthorityGrant {
+        AuthorityGrant {
+            grantee: Grantee::Person(did.clone()),
+            ..make_grant(seed, valid_from)
+        }
+    }
+
+    #[test]
+    fn a_person_grant_is_found_under_every_spelling_of_its_principal() {
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+        let g = person_grant(&a, [0xd1u8; 32], 1_000);
+        store.put_authority_grant(&g).unwrap();
+
+        for (label, spelling) in [("issuing", &a), ("alias", &b)] {
+            let all = store
+                .list_authority_grants_by_grantee(&Grantee::Person(spelling.clone()))
+                .unwrap();
+            assert_eq!(all.len(), 1, "{label} spelling must see the grant");
+            assert_eq!(all[0].id, g.id);
+
+            let active = store
+                .list_active_authority_grants_by_grantee(&Grantee::Person(spelling.clone()), 1_500)
+                .unwrap();
+            assert_eq!(active.len(), 1, "{label} spelling, active lookup");
+            assert_eq!(active[0].id, g.id);
+        }
+    }
+
+    #[test]
+    fn control_two_distinct_principals_stay_distinct() {
+        let store = ReceiptStore::new(temp_db());
+        let (a, _b) = alias_pair();
+        let c = icn_identity::KeyPair::generate().unwrap().did().clone();
+        store
+            .put_authority_grant(&person_grant(&a, [0xd2u8; 32], 1_000))
+            .unwrap();
+
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(c))
+                .unwrap()
+                .is_empty(),
+            "a different principal holds no grant here"
+        );
+    }
+
+    #[test]
+    fn two_grants_for_one_principal_stay_two_grants() {
+        // Deduplication is by canonical grant id, never by grantee: a
+        // principal may legitimately hold several distinct grants, and
+        // collapsing them would erase authority.
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+        let g1 = person_grant(&a, [0xd4u8; 32], 1_000);
+        let g2 = person_grant(&b, [0xd4u8; 32], 1_500);
+        store.put_authority_grant(&g1).unwrap();
+        store.put_authority_grant(&g2).unwrap();
+
+        let all = store
+            .list_authority_grants_by_grantee(&Grantee::Person(b))
+            .unwrap();
+        assert_eq!(all.len(), 2, "two distinct grant ids remain two grants");
+        assert_eq!(all[0].id, g1.id, "oldest-first by valid_from");
+        assert_eq!(all[1].id, g2.id);
+    }
+
+    #[test]
+    fn alias_projection_rows_for_one_grant_yield_one_grant() {
+        // Equivalent derived evidence, not competing grants: both rows name
+        // one principal and one canonical grant id.
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+        let g = person_grant(&a, [0xd5u8; 32], 1_000);
+        store.put_authority_grant(&g).unwrap();
+
+        // A second projection row under the other spelling of one principal.
+        let extra =
+            ReceiptStore::grant_by_grantee_key(&Grantee::Person(b.clone()), g.valid_from, &g.id);
+        store
+            .db
+            .insert(&extra, g.id.0.hyphenated().to_string().as_bytes())
+            .unwrap();
+
+        let all = store
+            .list_authority_grants_by_grantee(&Grantee::Person(b))
+            .unwrap();
+        assert_eq!(
+            all.len(),
+            1,
+            "one canonical grant, however many rows name it"
+        );
+        assert_eq!(all[0].id, g.id);
+    }
+
+    #[test]
+    fn an_entity_grantee_is_never_decoded_as_a_person() {
+        // The tag byte carries the semantics. An entity id that happens to
+        // spell a DID is still an entity id, and must not answer a Person
+        // query — nor may a Person row answer an Entity query.
+        let store = ReceiptStore::new(temp_db());
+        let (a, _b) = alias_pair();
+        let entity = Grantee::Entity(a.as_str().to_string());
+
+        let eg = AuthorityGrant {
+            grantee: entity.clone(),
+            ..make_grant([0xd6u8; 32], 1_000)
+        };
+        let pg = person_grant(&a, [0xd6u8; 32], 1_200);
+        store.put_authority_grant(&eg).unwrap();
+        store.put_authority_grant(&pg).unwrap();
+
+        let as_entity = store.list_authority_grants_by_grantee(&entity).unwrap();
+        assert_eq!(as_entity.len(), 1);
+        assert_eq!(
+            as_entity[0].id, eg.id,
+            "entity query returns the entity grant"
+        );
+
+        let as_person = store
+            .list_authority_grants_by_grantee(&Grantee::Person(a))
+            .unwrap();
+        assert_eq!(as_person.len(), 1);
+        assert_eq!(
+            as_person[0].id, pg.id,
+            "person query returns the person grant"
+        );
+    }
+
+    #[test]
+    fn a_projection_row_cannot_manufacture_authority() {
+        // A row naming principal A but pointing at a grant whose canonical
+        // record names principal C must not authorize A.
+        let store = ReceiptStore::new(temp_db());
+        let (a, _b) = alias_pair();
+        let c = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let g = person_grant(&c, [0xd3u8; 32], 1_000);
+        store.put_authority_grant(&g).unwrap();
+
+        let forged =
+            ReceiptStore::grant_by_grantee_key(&Grantee::Person(a.clone()), g.valid_from, &g.id);
+        store
+            .db
+            .insert(&forged, g.id.0.hyphenated().to_string().as_bytes())
+            .unwrap();
+
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(a))
+                .unwrap()
+                .is_empty(),
+            "the primary record decides authority, not the projection"
+        );
+        assert_eq!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(c))
+                .unwrap()
+                .len(),
+            1,
+            "and the real holder still holds it"
+        );
+    }
+
+    #[test]
+    fn a_row_pointing_at_a_missing_primary_is_stale_not_authority() {
+        let store = ReceiptStore::new(temp_db());
+        let (a, _b) = alias_pair();
+        let orphan_id = AuthorityGrantId::new();
+        let key =
+            ReceiptStore::grant_by_grantee_key(&Grantee::Person(a.clone()), 1_000, &orphan_id);
+        store
+            .db
+            .insert(&key, orphan_id.0.hyphenated().to_string().as_bytes())
+            .unwrap();
+
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(a))
+                .unwrap()
+                .is_empty(),
+            "a projection row without a canonical grant confers nothing"
+        );
+    }
+
+    /// Insert a raw projection row and return the refusal class the readers
+    /// produce for it, or `None` if they accepted the store.
+    fn refusal_class_for(
+        store: &ReceiptStore,
+        key: &[u8],
+        value: &[u8],
+        who: &Did,
+    ) -> Option<String> {
+        store.db.insert(key, value).unwrap();
+        store
+            .list_authority_grants_by_grantee(&Grantee::Person(who.clone()))
+            .err()
+    }
+
+    #[test]
+    fn every_malformed_projection_shape_refuses_with_its_own_class() {
+        // A row this writer could not have produced cannot be attributed to
+        // any principal, so it cannot be ruled out as the row that names the
+        // one being asked about. Refusing is the only answer that neither
+        // invents authority nor hides it.
+        let (a, _b) = alias_pair();
+        let id = AuthorityGrantId::new();
+        let id_bytes = id.0.hyphenated().to_string().into_bytes();
+        let well_formed =
+            ReceiptStore::grant_by_grantee_key(&Grantee::Person(a.clone()), 1_000, &id);
+
+        // Truncated: prefix only, no length field.
+        let mut truncated = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        truncated.extend_from_slice(&[0u8, 0u8]);
+
+        // Length field claiming more than the key holds.
+        let mut overrun = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        overrun.extend_from_slice(&u32::MAX.to_be_bytes());
+        overrun.extend_from_slice(b"\x01did:icn:z");
+
+        // Well-formed framing, but the suffix is not valid_from ‖ uuid.
+        let mut bad_suffix = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let canon = {
+            let mut c = vec![0x01u8];
+            c.extend_from_slice(a.as_str().as_bytes());
+            c
+        };
+        bad_suffix.extend_from_slice(&(canon.len() as u32).to_be_bytes());
+        bad_suffix.extend_from_slice(&canon);
+        bad_suffix.extend_from_slice(b"too-short");
+
+        // A tag this layout does not define.
+        let mut unknown_tag = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let mut c9 = vec![0x09u8];
+        c9.extend_from_slice(a.as_str().as_bytes());
+        unknown_tag.extend_from_slice(&(c9.len() as u32).to_be_bytes());
+        unknown_tag.extend_from_slice(&c9);
+        unknown_tag.extend_from_slice(&1_000u64.to_be_bytes());
+        unknown_tag.extend_from_slice(&id_bytes);
+
+        // Person-tagged bytes that name no principal.
+        let mut bad_person = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let mut cb = vec![0x01u8];
+        cb.extend_from_slice(b"did:icn:not-a-multibase-spelling!!");
+        bad_person.extend_from_slice(&(cb.len() as u32).to_be_bytes());
+        bad_person.extend_from_slice(&cb);
+        bad_person.extend_from_slice(&1_000u64.to_be_bytes());
+        bad_person.extend_from_slice(&id_bytes);
+
+        let cases: [(&str, Vec<u8>, Vec<u8>); 6] = [
+            ("truncated", truncated, id_bytes.clone()),
+            ("length_overrun", overrun, id_bytes.clone()),
+            ("suffix_shape", bad_suffix, id_bytes.clone()),
+            ("unknown_tag", unknown_tag, id_bytes.clone()),
+            ("unreadable_person_spelling", bad_person, id_bytes.clone()),
+            // Value naming a different grant than the key ends with.
+            (
+                "value_key_mismatch",
+                well_formed,
+                AuthorityGrantId::new()
+                    .0
+                    .hyphenated()
+                    .to_string()
+                    .into_bytes(),
+            ),
+        ];
+
+        for (expected, key, value) in cases {
+            let store = ReceiptStore::new(temp_db());
+            let err = refusal_class_for(&store, &key, &value, &a)
+                .unwrap_or_else(|| panic!("{expected}: expected a refusal, got a result"));
+            assert!(
+                err.starts_with(GRANT_BY_GRANTEE_MALFORMED),
+                "{expected}: refusal must carry the stable sentinel; got {err}"
+            );
+            assert!(
+                err.contains(&format!("reason={expected}")),
+                "{expected}: wrong class; got {err}"
+            );
+            assert!(
+                !err.contains("did:icn:"),
+                "{expected}: no spelling may travel in a diagnostic; got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn enumeration_never_loses_a_grant_committed_before_it_started() {
+        // Concurrency note. `sled::Db::scan_prefix` is not a snapshot, so this
+        // reader's projection scan and its canonical loads can straddle a
+        // concurrent write. No lock is needed here, and the reason is a
+        // property of the namespace rather than of timing: **the by-grantee
+        // projection is append-only**. `put_authority_grant` and
+        // `put_mandate_with_grants_atomic` only insert, the backfill only
+        // inserts, and revocation touches the primary alone — nothing anywhere
+        // deletes or re-keys a projection row. A straddling scan can therefore
+        // only ever *miss* rows written after it began, never lose one written
+        // before; and every row it does see is proven against its own primary
+        // before it becomes an answer. That is exactly the guarantee #2704 and
+        // #2707 needed a namespace lock to obtain, because those projections
+        // retire rows on replacement and a scan could miss the old row and the
+        // new one both. This one cannot.
+        use std::sync::Arc;
+        let store = Arc::new(ReceiptStore::new(temp_db()));
+        let (a, b) = alias_pair();
+
+        // Committed before any reader starts.
+        let settled: Vec<AuthorityGrantId> = (0..8u8)
+            .map(|i| {
+                let g = person_grant(&a, [0xc0u8; 32], 1_000 + u64::from(i));
+                store.put_authority_grant(&g).unwrap();
+                g.id
+            })
+            .collect();
+
+        let writer = {
+            let s = Arc::clone(&store);
+            let a = a.clone();
+            std::thread::spawn(move || {
+                for i in 0..32u8 {
+                    let g = person_grant(&a, [0xc1u8; 32], 5_000 + u64::from(i));
+                    s.put_authority_grant(&g).unwrap();
+                }
+            })
+        };
+
+        for _ in 0..32 {
+            let seen = store
+                .list_authority_grants_by_grantee(&Grantee::Person(b.clone()))
+                .expect("a concurrent write must not make the reader refuse");
+            for id in &settled {
+                assert!(
+                    seen.iter().any(|g| g.id == *id),
+                    "a grant committed before the read began must never vanish"
+                );
+            }
+            // Every returned grant is one the canonical record names.
+            assert!(seen.iter().all(|g| g.grantee == Grantee::Person(a.clone())));
+            // Order is a function of the data, not of scan timing.
+            assert!(seen.windows(2).all(|w| w[0].valid_from <= w[1].valid_from));
+        }
+
+        writer.join().unwrap();
+    }
+
+    #[test]
+    fn control_a_well_formed_store_does_not_refuse() {
+        // The refusals above must not be reachable by refusing everything.
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+        store
+            .put_authority_grant(&person_grant(&a, [0xd7u8; 32], 1_000))
+            .unwrap();
+        store
+            .put_authority_grant(&AuthorityGrant {
+                grantee: Grantee::Entity("svc:neighbour".into()),
+                ..make_grant([0xd7u8; 32], 1_000)
+            })
+            .unwrap();
+
+        assert_eq!(
+            store
+                .list_authority_grants_by_grantee(&Grantee::Person(b))
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]

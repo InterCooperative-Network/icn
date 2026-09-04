@@ -251,6 +251,41 @@ pub enum PrincipalRegion {
         /// The byte that must follow the spelling.
         terminator: u8,
     },
+    /// Exactly one **length-framed, tag-discriminated** region, starting
+    /// immediately after [`KeyspaceDescriptor::prefix`]: a big-endian length
+    /// field of `len_width` bytes, then that many bytes of region, then an
+    /// opaque tail. The region's first byte is a variant tag; only
+    /// `principal_tag` introduces a principal spelling, and the spelling is
+    /// the rest of the region exactly — its extent is stated by the length
+    /// field, not inferred from the alphabet.
+    ///
+    /// Two facts make this layout need its own rule rather than reuse of the
+    /// two above. Searching for a terminator byte would run through the
+    /// binary length field and through an opaque tail whose bytes are
+    /// arbitrary, so no terminator names the boundary. And treating the whole
+    /// key as principal-bearing would carry the length field into the
+    /// canonical shape verbatim — a field *derived from the spelling*, so two
+    /// spellings of one principal would differ in it, land in different
+    /// shapes, and form no collision group at all. That is a silent
+    /// false-clear, which is worse than a refusal.
+    ///
+    /// The region including its own framing is therefore what the canonical
+    /// shape replaces: the length field and tag are derivable from the
+    /// spelling and are not discriminators, while the tail after the region
+    /// is carried byte-for-byte and never parsed.
+    ///
+    /// A region under any other tag names **no principal** — it holds a value
+    /// some other domain chose, and one that happens to spell `did:icn:` is
+    /// still that domain's value. A row whose framing does not parse, or
+    /// whose `principal_tag` region holds no decodable spelling, is
+    /// **unreadable** rather than principal-free: the layout says a principal
+    /// belongs there, so its absence is a row no migration can classify.
+    LengthPrefixedTagged {
+        /// Width in bytes of the big-endian length field introducing the region.
+        len_width: u8,
+        /// The tag under which the region holds a principal spelling.
+        principal_tag: u8,
+    },
 }
 
 /// A DID spelling found inside a stored key.
@@ -566,6 +601,88 @@ fn principal_spellings(descriptor: &KeyspaceDescriptor, key: &[u8]) -> Vec<Embed
             };
             vec![anchored_spelling(key, start, terminator)]
         }
+        PrincipalRegion::LengthPrefixedTagged {
+            len_width,
+            principal_tag,
+        } => length_prefixed_tagged_spelling(
+            key,
+            descriptor.prefix.len(),
+            len_width as usize,
+            principal_tag,
+            key.starts_with(descriptor.prefix),
+        ),
+    }
+}
+
+/// The principal a [`PrincipalRegion::LengthPrefixedTagged`] key carries, if
+/// its tag says it carries one.
+///
+/// Returns an empty vector when the region is well-formed under another tag —
+/// that row genuinely names no principal — and a single unreadable
+/// [`EmbeddedDid`] when the framing does not parse or the principal-tagged
+/// region holds no decodable spelling.
+fn length_prefixed_tagged_spelling(
+    key: &[u8],
+    start: usize,
+    len_width: usize,
+    principal_tag: u8,
+    under_prefix: bool,
+) -> Vec<EmbeddedDid> {
+    // The region spans its own framing: the length field is derived from the
+    // spelling, so it must be replaced along with it or two spellings of one
+    // principal would never share a canonical shape.
+    let unreadable = |end: usize| {
+        vec![EmbeddedDid {
+            offset: start.min(key.len()),
+            end,
+            spelling: String::from_utf8_lossy(&key[start.min(key.len())..end]).into_owned(),
+            identifier: None,
+        }]
+    };
+
+    if !under_prefix {
+        return unreadable(key.len());
+    }
+    let Some(rest) = key.get(start..) else {
+        return unreadable(key.len());
+    };
+    let Some(len_bytes) = rest.get(..len_width) else {
+        return unreadable(key.len());
+    };
+    // Big-endian, whatever the declared width.
+    let region_len = len_bytes
+        .iter()
+        .fold(0usize, |acc, b| (acc << 8) | usize::from(*b));
+    let region_start = start + len_width;
+    let Some(region_end) = region_start.checked_add(region_len) else {
+        return unreadable(key.len());
+    };
+    let Some(region) = key.get(region_start..region_end) else {
+        return unreadable(key.len());
+    };
+    let Some((tag, body)) = region.split_first() else {
+        return unreadable(region_end);
+    };
+    if *tag != principal_tag {
+        // Another variant's value. The layout does not claim a principal here,
+        // so the row is principal-free rather than unreadable.
+        return Vec::new();
+    }
+
+    // The length field says exactly where the spelling ends, so there is no
+    // maximal-munch backtracking to do: the bytes either decode whole or the
+    // row is unreadable.
+    let identifier = std::str::from_utf8(body)
+        .ok()
+        .and_then(|s| identifier_bytes_of_spelling(s).ok());
+    match identifier {
+        Some(bytes) => vec![EmbeddedDid {
+            offset: start,
+            end: region_end,
+            spelling: String::from_utf8_lossy(body).into_owned(),
+            identifier: Some(bytes),
+        }],
+        None => unreadable(region_end),
     }
 }
 
@@ -1606,6 +1723,39 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         two spellings of one party for one agreement are two derivations of one \
                         canonical fact and keeping any one loses nothing. A projection row can \
                         never create, omit, preserve or alter membership on its own.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-gateway/adr0014_grant_by_grantee",
+            prefix: b"adr0014:grant:by_grantee:",
+            inventory_rows: &[25],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            // `adr0014:grant:by_grantee:` ‖ u32-BE len ‖ tag ‖ grantee bytes
+            // ‖ u64-BE valid_from ‖ 36-byte grant id. The length field, not a
+            // delimiter, ends the grantee region — a terminator search would
+            // run through the binary length bytes and through a `valid_from`
+            // whose bytes are arbitrary. The tag, not the look of the bytes,
+            // says whether a principal is there: tag 0x02 is an `Entity` id
+            // the granting domain chose, and one that spells `did:icn:` is
+            // still an entity id. The whole-key flags say nothing here.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::LengthPrefixedTagged {
+                len_width: 4,
+                principal_tag: 0x01,
+            },
+            rationale: "Secondary index projected from the canonical \
+                        adr0014:grant:<uuid> records: key = (grantee region, valid_from, grant \
+                        id), value = grant id. valid_from and the grant id stay in the canonical \
+                        shape, so one principal holding two grants is two shapes and never a \
+                        group — a principal may legitimately hold several. Two spellings of one \
+                        principal for one grant are two derivations of one canonical fact: \
+                        ReceiptStore answers a grantee lookup by reading the whole projection, \
+                        decoding every Person-tagged spelling to its principal, and proving each \
+                        candidate against the primary AuthorityGrant record before returning it \
+                        (#2627 M2), so keeping any one row loses nothing. A projection row can \
+                        never create or hide authority on its own. Entity-tagged rows carry no \
+                        principal and are outside the I7 boundary.",
         },
         KeyspaceDescriptor {
             name: "icn-ledger/treasury",
@@ -2770,7 +2920,7 @@ mod tests {
                 PrincipalRegion::AnchoredThenOpaque { terminator } => {
                     Some((d.name, terminator, d.disposition))
                 }
-                PrincipalRegion::WholeKey => None,
+                PrincipalRegion::WholeKey | PrincipalRegion::LengthPrefixedTagged { .. } => None,
             })
             .collect();
         assert_eq!(
@@ -2787,6 +2937,36 @@ mod tests {
                     MergeDisposition::Equivalent
                 ),
             ]
+        );
+    }
+
+    #[test]
+    fn the_length_prefixed_layout_is_the_one_adr0014_projection() {
+        // Pins the third layout the registry knows: a length-framed,
+        // tag-discriminated region. It exists because neither of the other two
+        // can read a binary key — a terminator search runs through the length
+        // bytes, and a whole-key scan carries the spelling-derived length
+        // field into the canonical shape and so groups nothing. A second such
+        // layout must be added here deliberately, with its framing and its
+        // disposition argued (#2627 M2).
+        let framed: Vec<(&str, u8, u8, MergeDisposition)> = n2a_keyspaces()
+            .iter()
+            .filter_map(|d| match d.principal_region {
+                PrincipalRegion::LengthPrefixedTagged {
+                    len_width,
+                    principal_tag,
+                } => Some((d.name, len_width, principal_tag, d.disposition)),
+                PrincipalRegion::WholeKey | PrincipalRegion::AnchoredThenOpaque { .. } => None,
+            })
+            .collect();
+        assert_eq!(
+            framed,
+            vec![(
+                "icn-gateway/adr0014_grant_by_grantee",
+                4,
+                0x01,
+                MergeDisposition::Equivalent
+            )]
         );
     }
 
@@ -4088,5 +4268,198 @@ mod tests {
         let group = &report.collision_groups[0];
         assert_eq!(group.rows.len(), 2);
         assert_eq!(group.last_writer_survivor().unwrap().spellings, vec![z]);
+    }
+
+    // ---- ADR-0014 by-grantee projection (#2627 M2) ----
+    //
+    // Same shape as the party index above — a projection whose alias rows are
+    // equivalent derivations of one canonical row — but a *binary* layout: the
+    // grantee region is length-framed and tag-discriminated, so neither the
+    // whole-key tokenizer nor a terminator search can read it. These fixtures
+    // pin the structural rule, not ADR-0014's authority semantics.
+
+    fn grant_by_grantee_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-gateway/adr0014_grant_by_grantee")
+            .expect("adr0014:grant:by_grantee: is registered (#2627 row #25)")
+    }
+
+    fn store_with_raw(rows: &[(Vec<u8>, &[u8])]) -> SledStore {
+        let store = SledStore::temporary().unwrap();
+        for (key, value) in rows {
+            store.put(key, value).unwrap();
+        }
+        store
+    }
+
+    /// Reproduce `ReceiptStore::grant_by_grantee_key` byte-for-byte.
+    fn grantee_key(tag: u8, body: &[u8], valid_from: u64, grant_id: &str) -> Vec<u8> {
+        let mut region = vec![tag];
+        region.extend_from_slice(body);
+        let mut key = b"adr0014:grant:by_grantee:".to_vec();
+        key.extend_from_slice(&(region.len() as u32).to_be_bytes());
+        key.extend_from_slice(&region);
+        key.extend_from_slice(&valid_from.to_be_bytes());
+        key.extend_from_slice(grant_id.as_bytes());
+        key
+    }
+
+    fn person_key(spelling: &str, valid_from: u64, grant_id: &str) -> Vec<u8> {
+        grantee_key(0x01, spelling.as_bytes(), valid_from, grant_id)
+    }
+
+    const GRANT_A: &str = "11111111-1111-4111-8111-111111111111";
+    const GRANT_B: &str = "22222222-2222-4222-8222-222222222222";
+
+    #[test]
+    fn a_person_grant_row_is_readable_through_its_binary_framing() {
+        // The length field ends the spelling and the 8-byte `valid_from` plus
+        // 36-byte grant id after it are never parsed. A whole-key scan would
+        // swallow part of that tail into the candidate run.
+        let one = spell(&principal(91), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes())]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 1);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn grantee_alias_rows_for_one_grant_are_equivalent_and_automatable() {
+        // One principal, two spellings, one grant: two derivations of one
+        // canonical `adr0014:grant:<uuid>` record. The varying u32 length
+        // field must not keep them apart — that is what the region-spanning
+        // canonical shape buys.
+        let (a, b) = two_spellings(92);
+        let store = store_with_raw(&[
+            (person_key(&a, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&b, 1_000, GRANT_A), GRANT_A.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(
+            report.is_automatable(),
+            "an equivalent projection pair needs no human to resolve"
+        );
+    }
+
+    #[test]
+    fn control_two_grants_for_one_principal_are_two_shapes_not_a_collision() {
+        // A principal may legitimately hold several distinct grants. The grant
+        // id stays in the canonical shape, so this must never group.
+        let (a, b) = two_spellings(93);
+        let store = store_with_raw(&[
+            (person_key(&a, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&b, 2_000, GRANT_B), GRANT_B.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "two grants for one principal are two grants"
+        );
+    }
+
+    #[test]
+    fn control_two_principals_stay_separate() {
+        let one = spell(&principal(94), multibase::Base::Base58Btc);
+        let two = spell(&principal(95), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[
+            (person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes()),
+            (person_key(&two, 1_000, GRANT_A), GRANT_A.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn an_entity_row_that_spells_a_did_is_not_a_principal() {
+        // Tag 0x02 is an entity id the granting domain chose. Its bytes are
+        // not this registry's to decode, however much they look like a DID.
+        let looks_like = spell(&principal(96), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(
+            grantee_key(0x02, looks_like.as_bytes(), 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(
+            report.rows_with_readable_did, 0,
+            "an entity id is not a principal"
+        );
+        assert_eq!(report.rows_unreadable, 0, "and it is not unreadable either");
+        assert_eq!(report.distinct_principals, 0);
+    }
+
+    #[test]
+    fn a_person_row_whose_spelling_names_no_principal_is_unreadable() {
+        let store = store_with_raw(&[(
+            person_key("did:icn:not-a-spelling!!", 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    #[test]
+    fn broken_binary_framing_is_unreadable_not_principal_free() {
+        // A truncated length field, a length that overruns the key, and an
+        // unknown tag are three different ways to be a row this writer could
+        // not have produced. The first two cannot be classified at all; the
+        // third names no principal by the layout's own rule.
+        let one = spell(&principal(97), multibase::Base::Base58Btc);
+
+        let mut truncated = b"adr0014:grant:by_grantee:".to_vec();
+        truncated.extend_from_slice(&[0u8, 0u8]);
+
+        let mut overrun = b"adr0014:grant:by_grantee:".to_vec();
+        overrun.extend_from_slice(&u32::MAX.to_be_bytes());
+        overrun.extend_from_slice(b"\x01did:icn:z");
+
+        for (label, key) in [("truncated", truncated), ("overrun", overrun)] {
+            let store = store_with_raw(&[(key, GRANT_A.as_bytes())]);
+            let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+            assert_eq!(report.rows_unreadable, 1, "{label} must be unreadable");
+        }
+
+        // An undefined tag is well-framed and simply carries no principal.
+        let store = store_with_raw(&[(
+            grantee_key(0x09, one.as_bytes(), 1_000, GRANT_A),
+            GRANT_A.as_bytes(),
+        )]);
+        let report = scan_keyspace(&store, &grant_by_grantee_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    #[test]
+    fn a_person_grant_row_is_never_reported_as_uncovered() {
+        // Before registration a single ordinary Person grant produced an
+        // uncovered shape, which the startup gate treats as a blocker.
+        let one = spell(&principal(98), multibase::Base::Base58Btc);
+        let store = store_with_raw(&[(person_key(&one, 1_000, GRANT_A), GRANT_A.as_bytes())]);
+
+        let shapes =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "the registered prefix must claim this row; got {shapes:?}"
+        );
     }
 }
