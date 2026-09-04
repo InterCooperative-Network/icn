@@ -1075,3 +1075,199 @@ fn a_federation_attestation_row_is_never_reported_as_uncovered() {
         "an attestation row must be classified, not merely unaccounted for"
     );
 }
+
+// ---------------------------------------------------------------------------
+// idx_agreement_party/ (#2627 row 28, #2707)
+//
+// The gate and `icn_federation::agreement::AgreementStore` read the same rows
+// through two different doors. The layout is the attestation layout's shape —
+// one anchored party spelling, `/`, an agreement id the scan never parses —
+// under the opposite disposition: the rows are a projection of the canonical
+// `federation/agreements/` rows, which the store proves membership from on
+// every read, so an alias pair for one agreement is two derivations of one
+// fact and the start is clear, where an attestation pair is two claims and
+// refuses. These fixtures write the exact bytes the store writes and assert
+// the gate's side of that agreement.
+// ---------------------------------------------------------------------------
+
+/// A row exactly as `AgreementStore` keys it.
+fn party_index_row(spelling: &str, agreement_id: &str) -> String {
+    format!("idx_agreement_party/{spelling}/{agreement_id}")
+}
+
+#[test]
+fn an_alias_pair_in_the_agreement_party_index_for_one_agreement_is_clear_and_untouched() {
+    // One party, two spellings, one agreement: two projection rows derived
+    // from one canonical membership fact. The registered disposition is
+    // `Equivalent`, so the gate records the group and clears the start — and,
+    // being read-only, moves no row. A CLEAR here says only that this spelling
+    // collision is safe under the projection disposition; whether the
+    // projection is complete or current is the store's business, proven by
+    // its canonical-membership reads and its explicit rebuild, not the gate's.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(40);
+    let root = store_root(dir.path(), "agreements");
+    make_store(
+        &root,
+        &[
+            (party_index_row(&a, "agr-1"), b"agr-1"),
+            (party_index_row(&b, "agr-1"), b"agr-1"),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let party_index = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("store/agreements"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-federation/agreement_party_index")
+        .expect("the gate consumes the registered party-index descriptor");
+    assert_eq!(party_index.rows_scanned, 2);
+    assert_eq!(party_index.distinct_principals, 1);
+    assert_eq!(
+        party_index.collision_groups, 1,
+        "the alias group is classified, not ignored"
+    );
+    assert_eq!(party_index.rows_in_collisions, 2);
+    assert_eq!(party_index.rows_unreadable, 0);
+    assert_eq!(party_index.disposition, "equivalent");
+    assert_eq!(party_index.basis, "established");
+    assert!(!party_index.must_fail_closed);
+    assert!(blockers_for(&receipt, "store/agreements").is_empty());
+
+    // The gate reports; it never repairs. Both spellings survive byte-for-byte:
+    // retiring one is the store's `rebuild_party_index`, an explicit
+    // projection-repair operation and not a startup step.
+    assert_eq!(rows_of(&root), before, "the gate re-keyed or dropped a row");
+    assert_eq!(before.len(), 2);
+}
+
+#[test]
+fn control_one_party_under_two_spellings_in_two_agreements_is_two_shapes() {
+    // The same two spellings, differing in exactly one fact: the agreement id.
+    // One party in two agreements is two canonical facts, so the rows must not
+    // group — otherwise the fixture above would pass by grouping everything
+    // one principal ever touched.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(41);
+    make_store(
+        &store_root(dir.path(), "agreements"),
+        &[
+            (party_index_row(&a, "agr-1"), b"agr-1"),
+            (party_index_row(&b, "agr-2"), b"agr-2"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let party_index = receipt.stores[0]
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-federation/agreement_party_index")
+        .unwrap();
+    assert_eq!(party_index.rows_scanned, 2);
+    assert_eq!(
+        party_index.distinct_principals, 2,
+        "two (party, agreement) tuples"
+    );
+    assert_eq!(party_index.collision_groups, 0);
+    assert_eq!(party_index.rows_unreadable, 0);
+}
+
+#[test]
+fn a_party_index_row_whose_spelling_names_no_principal_refuses() {
+    // The layout puts a principal at the anchor, so a row without one is a row
+    // nobody can classify — and `AgreementStore` refuses it too, as a
+    // malformed projection row, before any operation reads around it.
+    let dir = tempfile::tempdir().unwrap();
+    let one = canonical(42);
+    let root = store_root(dir.path(), "agreements");
+    make_store(
+        &root,
+        &[
+            (party_index_row("did:icn:!!!!", "agr-1"), b"agr-1"),
+            (party_index_row(&format!("{one}junk"), "agr-1"), b"agr-1"),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/agreements");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, collision_groups, .. }
+            if keyspace == "icn-federation/agreement_party_index"
+                && *rows_unreadable == 2
+                && *collision_groups == 0),
+        "{blockers:?}"
+    );
+    assert_eq!(receipt.verdict, Verdict::Refused);
+    assert_eq!(rows_of(&root), before, "the gate re-keyed or dropped a row");
+}
+
+#[test]
+fn an_agreement_id_containing_a_did_does_not_refuse_the_start() {
+    // `AgreementId::new` accepts any string and `AgreementStore` compares ids
+    // as exact bytes, anchoring its own parse on the id the row's value names,
+    // so nothing forbids an agreement id that contains — or is — a `did:icn:`
+    // spelling. A gate that parsed inside the id would group rows the store
+    // holds apart and refuse a start over a store the running node reads
+    // without difficulty.
+    let dir = tempfile::tempdir().unwrap();
+    let party = canonical(43);
+    let (other_a, other_b) = two_spellings(44);
+    let id_a = format!("agr-{other_a}");
+    let id_b = format!("agr-{other_b}");
+    make_store(
+        &store_root(dir.path(), "agreements"),
+        &[
+            (party_index_row(&party, &id_a), id_a.as_bytes()),
+            (party_index_row(&party, &id_b), id_b.as_bytes()),
+            (party_index_row(&party, "did:icn:!!!!"), b"did:icn:!!!!"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let party_index = receipt.stores[0]
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-federation/agreement_party_index")
+        .unwrap();
+    assert_eq!(party_index.rows_scanned, 3);
+    assert_eq!(
+        party_index.distinct_principals, 3,
+        "one party, three agreement ids the scan never parses"
+    );
+    assert_eq!(party_index.rows_unreadable, 0);
+    assert_eq!(party_index.collision_groups, 0);
+}
+
+#[test]
+fn an_agreement_party_row_is_never_reported_as_uncovered() {
+    // Before #2707 registered this prefix a populated party-index row could
+    // only surface as an uncovered shape: blocking, but unclassified. The
+    // registration is what turns it into a keyspace the gate can speak about.
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &store_root(dir.path(), "agreements"),
+        &[(party_index_row(&canonical(45), "agr-1"), b"agr-1")],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert!(
+        !receipt_text(dir.path()).contains("UNCOVERED"),
+        "a party-index row must be classified, not merely unaccounted for"
+    );
+}

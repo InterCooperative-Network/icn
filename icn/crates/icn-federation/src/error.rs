@@ -189,6 +189,62 @@ pub enum FederationError {
     #[error("Not initialized: {0}")]
     NotInitialized(String),
 
+    // ----- Agreement store: canonical rows and the party-index projection (N2-A, #2627) -----
+    /// A persisted `federation/agreements/` row could not be read as an
+    /// `Agreement`. Carries the error class and position, never the value: the
+    /// `Did` deserializer echoes the spelling it rejected. Every operation that
+    /// needs the row fails with this rather than treating it as absent.
+    #[error(
+        "Unreadable persisted federation/agreements row ({key_len}-byte key, {value_len}-byte value): {reason}"
+    )]
+    AgreementStoreUnreadable {
+        key_len: usize,
+        value_len: usize,
+        reason: String,
+    },
+
+    /// A persisted `federation/agreements/` row deserializes, but the agreement
+    /// it carries is not the agreement its key names. The key locates the row;
+    /// the value must be that agreement. A row that says otherwise is one
+    /// row's value under another row's key — the fingerprint of a collapsed
+    /// rebuild's write-back, or of raw tampering — and it is attributed to
+    /// neither agreement: every operation that needs it refuses before moving
+    /// a byte. `key_agreement_id` is the id from the key (the locator an
+    /// operator must inspect), bounded; the value's contents never travel.
+    #[error(
+        "Persisted federation/agreements row for {key_agreement_id} carries a value naming a different agreement ({value_len}-byte value); refusing to attribute it"
+    )]
+    AgreementStoreKeyValueMismatch {
+        key_agreement_id: String,
+        value_len: usize,
+    },
+
+    /// An agreement whose id is empty cannot be persisted. The party-index
+    /// projection names an agreement by its id after the `/`, so an empty id
+    /// would make the store write a row its own projection parser refuses —
+    /// after which every lookup and delete would fail closed with no in-band
+    /// repair, and a rebuild would oscillate between removing the rows as
+    /// malformed and re-deriving them from the canonical row. Refused before
+    /// any byte moves. Carries nothing: an empty id has no bytes to echo.
+    #[error("Refusing to persist an agreement with an empty id: the party index cannot name it")]
+    AgreementIdEmpty,
+
+    /// `idx_agreement_party/` holds rows the agreement store could never have
+    /// written: a key that does not parse as
+    /// `idx_agreement_party/<did>/<agreement id>`, a spelling that names no
+    /// principal, or a value naming a different agreement than the key. Such a
+    /// row cannot be attributed to any canonical fact, so operations that
+    /// interpret the projection refuse rather than read around it. `rows`
+    /// counts every such row; `first_reason` describes one without its bytes.
+    /// The remedy is `AgreementStore::rebuild_party_index`, which recomputes
+    /// the projection from the canonical rows — provided every canonical row
+    /// is sound; a canonical row carrying an empty id is refused as unreadable
+    /// instead, so the rebuild cannot oscillate over it.
+    #[error(
+        "Malformed idx_agreement_party/ projection: {rows} row(s) cannot be attributed ({first_reason}); rebuild the party index from the canonical agreement rows"
+    )]
+    AgreementPartyIndexMalformed { rows: usize, first_reason: String },
+
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
 }

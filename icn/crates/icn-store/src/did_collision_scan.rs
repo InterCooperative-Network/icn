@@ -195,8 +195,9 @@ pub struct KeyspaceDescriptor {
     /// `false` and `<did>/junk` is correctly unreadable rather than a readable
     /// principal with residual bytes the real loader would reject.
     ///
-    /// `federation/attestations/<did>/<source>` does put `/` after a spelling,
-    /// and is not an exception to that: it declares an anchored region, which
+    /// `federation/attestations/<did>/<source>` and
+    /// `idx_agreement_party/<did>/<agreement id>` do put `/` after a spelling,
+    /// and are not exceptions to that: each declares an anchored region, which
     /// takes its terminator from the region itself. Saying it here as well
     /// would be two owners for one fact, so
     /// `a_descriptor_with_an_anchored_region_leaves_the_whole_key_flags_off`
@@ -228,7 +229,8 @@ pub enum PrincipalRegion {
     /// Every `did:icn:` occurrence anywhere in the key names a principal.
     ///
     /// Correct wherever the whole key is built from protocol-generated
-    /// components, which is every registered keyspace but one.
+    /// components, which is every registered keyspace but the two federation
+    /// layouts that end in an identifier another domain chose.
     WholeKey,
     /// Exactly one spelling, starting immediately after
     /// [`KeyspaceDescriptor::prefix`] and ending at the first `terminator`
@@ -1579,6 +1581,32 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         write or sweep over such a pair (#2703); a migration must not decide \
                         it either.",
         },
+        KeyspaceDescriptor {
+            name: "icn-federation/agreement_party_index",
+            prefix: b"idx_agreement_party/",
+            inventory_rows: &[28],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            // `idx_agreement_party/<party-did>/<agreement id>`: the attestation
+            // layout's shape. The party spelling is anchored right after the
+            // prefix and ends at the `/`; the agreement id is an identifier the
+            // agreement's creator chose (`AgreementId::new` takes any string),
+            // which this crate does not own and must not parse, and which
+            // `AgreementStore` compares as exact bytes — its own parser anchors
+            // the split on the id the row's value names (#2707). The whole-key
+            // flags below say nothing here.
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b'/' },
+            rationale: "Secondary index projected from the canonical federation/agreements/ rows: \
+                        key = (party spelling, agreement id), value = agreement id. The id stays \
+                        in the canonical shape, so one party in two agreements is two shapes and \
+                        never a group. The store answers a party lookup from the canonical \
+                        parties under Did equality and can recompute the projection (#2707), so \
+                        two spellings of one party for one agreement are two derivations of one \
+                        canonical fact and keeping any one loses nothing. A projection row can \
+                        never create, omit, preserve or alter membership on its own.",
+        },
     ]
 }
 
@@ -1586,6 +1614,21 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
 mod tests {
     use super::*;
     use crate::SledStore;
+
+    const WHOLE_KEY_NAMES: [&str; 12] = [
+        "icn-net/replay_max_seq",
+        "icn-net/replay_finalized",
+        "icn-net/replay_sender_regime",
+        "icn-net/outgoing_seq",
+        "icn-ledger/balance",
+        "icn-ledger/cleared_volume",
+        "icn-ledger/frozen",
+        "icn-trust/edges",
+        "icn-ledger/journal",
+        "trust-app/sequences_receiver",
+        "trust-app/sequences_issuer",
+        "icn-coop/member",
+    ];
 
     /// Build a `did:icn:` spelling of `bytes` in the given multibase base.
     fn spell(bytes: &[u8; 32], base: multibase::Base) -> String {
@@ -2664,10 +2707,10 @@ mod tests {
         // must say so deliberately, rather than inheriting a permissive default
         // that would make `<did>/junk` look readable.
         //
-        // `federation/attestations/` does put `/` after a spelling, and does
-        // *not* appear here: it declares an anchored region instead, which
-        // ends the spelling at the terminator by construction. Saying it twice
-        // would be two owners for one fact.
+        // `federation/attestations/` and `idx_agreement_party/` do put `/`
+        // after a spelling, and do *not* appear here: each declares an anchored
+        // region instead, which ends the spelling at the terminator by
+        // construction. Saying it twice would be two owners for one fact.
         for d in n2a_keyspaces() {
             assert!(
                 !d.slash_ends_did,
@@ -2675,6 +2718,56 @@ mod tests {
                 d.name
             );
         }
+    }
+
+    #[test]
+    fn the_anchored_layouts_are_the_two_federation_keyspaces_in_registry_order() {
+        // Pins which registered layouts end their one spelling at a terminator
+        // and carry the remainder as an opaque discriminator. Both are
+        // federation keyspaces of the shape `<prefix><did>/<domain id>`, and
+        // they are pinned together because they differ in exactly the fact
+        // the disposition records: an attestation pair is two claims and fails
+        // closed; a party-index pair is two derivations of one canonical
+        // agreement row and is equivalent. A new anchored layout must be added
+        // here deliberately, with its own disposition argued (#2704, #2707).
+        let anchored: Vec<(&str, u8, MergeDisposition)> = n2a_keyspaces()
+            .iter()
+            .filter_map(|d| match d.principal_region {
+                PrincipalRegion::AnchoredThenOpaque { terminator } => {
+                    Some((d.name, terminator, d.disposition))
+                }
+                PrincipalRegion::WholeKey => None,
+            })
+            .collect();
+        assert_eq!(
+            anchored,
+            vec![
+                (
+                    "icn-federation/attestations",
+                    b'/',
+                    MergeDisposition::FailClosed
+                ),
+                (
+                    "icn-federation/agreement_party_index",
+                    b'/',
+                    MergeDisposition::Equivalent
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_whole_key_layouts_are_the_pre_existing_keyspaces_unchanged() {
+        // The anchored region is an addition, not a reinterpretation: every
+        // keyspace registered before it still scans its whole key, in the
+        // order it always had, so no existing descriptor's semantics moved
+        // when the two federation layouts were added.
+        let whole_key: Vec<&str> = n2a_keyspaces()
+            .iter()
+            .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
+            .map(|d| d.name)
+            .collect();
+        assert_eq!(whole_key, WHOLE_KEY_NAMES);
     }
 
     #[test]
@@ -3382,5 +3475,374 @@ mod tests {
         );
         assert_eq!(report.rows_unreadable, 1);
         assert_eq!(report.rows_with_readable_did, 0);
+    }
+
+    // ----- idx_agreement_party/ (#2627 row #28, #2707) -----------------------
+    //
+    // Fixtures write the exact bytes `icn_federation::agreement::AgreementStore`
+    // writes: `idx_agreement_party/<did spelling>/<agreement id>` valued by the
+    // agreement id. They use the real registry entry rather than a test
+    // descriptor, so what they prove is what the shipped scan — and, through
+    // `audit_store`, the startup gate — does.
+    //
+    // The layout has the attestation layout's shape — one anchored spelling,
+    // the terminator, an opaque discriminator another domain chose — under the
+    // opposite disposition. An attestation pair is two persisted claims and
+    // fails closed; a party-index pair for one agreement is two derivations of
+    // one canonical `federation/agreements/` row, which the store proves
+    // membership from on every read, so keeping any one loses nothing.
+
+    fn party_index_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-federation/agreement_party_index")
+            .expect("idx_agreement_party/ is registered (#2627 row #28)")
+    }
+
+    fn party_index_key(spelling: &str, agreement_id: &str) -> String {
+        format!("idx_agreement_party/{spelling}/{agreement_id}")
+    }
+
+    #[test]
+    fn party_index_rows_are_readable_through_their_agreement_id_suffix() {
+        // `/` follows the spelling and a generated agreement id
+        // (`agr-<uuid>`) is made entirely of multibase body bytes. A whole-key
+        // scan of this layout would swallow the id into the candidate run and
+        // report the row unreadable; the anchored region ends the spelling at
+        // the terminator and never reads what follows.
+        let one = spell(&principal(81), multibase::Base::Base58Btc);
+        let store = store_with(&[(
+            &party_index_key(&one, "agr-0b1a4c1e-6b0d-4c1c-9a1d-3f6e2d1c0b9a"),
+            b"agr-0b1a4c1e-6b0d-4c1c-9a1d-3f6e2d1c0b9a",
+        )]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 1);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn party_index_alias_rows_for_one_agreement_are_equivalent_and_automatable() {
+        // One party, two spellings, one agreement: two derivations of one
+        // canonical fact. The scan sees the group; the registry says it needs
+        // no human to resolve; the whole-store verdict the gate consumes is
+        // clear with the rows classified rather than unaccounted for.
+        let (a, b) = two_spellings(82);
+        let store = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].rows.len(), 2);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert_eq!(report.disposition, MergeDisposition::Equivalent);
+        assert_eq!(report.basis, RuleBasis::Established);
+        assert!(
+            report.is_automatable(),
+            "a projection collision needs no adjudication"
+        );
+        assert!(!report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(
+            audit.is_clear(),
+            "an equivalent group does not block a start"
+        );
+        assert_eq!(
+            audit.uncovered_did_rows(),
+            0,
+            "the rows are classified, not unaccounted for"
+        );
+        assert!(audit.report.blocking_keyspaces().is_empty());
+    }
+
+    #[test]
+    fn party_index_rows_for_different_agreements_never_group() {
+        // The agreement id stays in the canonical shape: one party in two
+        // agreements is two facts, not a collision — under one spelling or
+        // under two.
+        let one = spell(&principal(83), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&one, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two (party, agreement) tuples"
+        );
+        assert!(report.collision_groups.is_empty());
+
+        // Same principal, alternate spellings, different agreements: the one
+        // fact that differs from the alias-pair fixture is the discriminator,
+        // and that is enough to keep them apart.
+        let (a, b) = two_spellings(84);
+        let store = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would erase which agreement each row belongs to"
+        );
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn party_index_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(85), multibase::Base::Base58Btc);
+        let two = spell(&principal(86), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&two, "agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn party_index_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before registration a populated party-index row could only surface
+        // as an *uncovered* shape — blocking, but unclassified. Now it is a
+        // registered keyspace's row and appears nowhere else.
+        let one = spell(&principal(87), multibase::Base::Base58Btc);
+        let store = store_with(&[(&party_index_key(&one, "agr-1"), b"agr-1")]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.uncovered.is_empty(), "{:?}", audit.uncovered);
+        assert_eq!(audit.deferred_did_rows(), 0);
+        let ks = audit
+            .report
+            .keyspaces
+            .iter()
+            .find(|k| k.keyspace == "icn-federation/agreement_party_index")
+            .unwrap();
+        assert_eq!(ks.rows_scanned, 1);
+        assert_eq!(ks.rows_with_readable_did, 1);
+        assert_eq!(ks.inventory_rows, vec![28]);
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn a_party_segment_that_names_no_principal_is_unreadable_not_absent() {
+        // Three ways the anchor fails, and none of them is "this row has no
+        // principal": the layout says one belongs there, and `AgreementStore`
+        // refuses every one of these rows as malformed. The scan must not
+        // lower the unreadable count — which exists to fail closed — by
+        // calling `<did>junk` a readable prefix plus residue.
+        let one = spell(&principal(88), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (
+                &party_index_key("did:icn:zthisnamesnoprincipal", "agr-1"),
+                b"agr-1",
+            ),
+            (&party_index_key("did:icn:!!!!", "agr-1"), b"agr-1"),
+            (&format!("idx_agreement_party/{one}junk/agr-1"), b"agr-1"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_without_did, 0, "no row here lacks a principal");
+        assert!(report.must_fail_closed());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(!audit.is_clear());
+    }
+
+    #[test]
+    fn a_party_spelling_with_no_agreement_id_after_it_is_unreadable() {
+        // `AgreementStore` always writes the terminator and the agreement id,
+        // so a key that stops at the spelling is one no lookup, replacement or
+        // rebuild could attribute to an agreement. A terminated key with an
+        // empty id is readable to the scan — the anchor holds a spelling and
+        // the terminator follows it — and is refused by the store, whose
+        // parser knows the id may not be empty: the loader is the stricter
+        // layer there, exactly as §10.6 of the migration gate describes for
+        // the ledger.
+        let one = spell(&principal(89), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("idx_agreement_party/{one}"), b"agr-1"),
+            (&party_index_key(&one, ""), b""),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(
+            report.rows_unreadable, 1,
+            "the terminated row is readable; the bare spelling is not"
+        );
+        assert_eq!(report.rows_with_readable_did, 1);
+    }
+
+    // ----- the agreement id is a discriminator, not a spelling ----------------
+    //
+    // `AgreementId::new` accepts any string and `AgreementStore` compares ids
+    // as exact bytes, anchoring its own parse on the id the row's value names.
+    // Nothing in the federation domain forbids an id that contains — or is —
+    // a `did:icn:` spelling. A scan that canonicalized inside the id would
+    // disagree with the store in both directions at once: grouping rows the
+    // store holds apart, and calling rows unreadable that the store reads.
+
+    #[test]
+    fn an_agreement_id_containing_a_did_spelling_is_a_discriminator_not_a_principal() {
+        let party = spell(&principal(90), multibase::Base::Base58Btc);
+        let (other_a, other_b) = two_spellings(91);
+        let store = store_with(&[
+            (
+                &party_index_key(&party, &format!("agr-{other_a}")),
+                format!("agr-{other_a}").as_bytes(),
+            ),
+            (
+                &party_index_key(&party, &format!("agr-{other_b}")),
+                format!("agr-{other_b}").as_bytes(),
+            ),
+            (&party_index_key(&party, &other_a), other_a.as_bytes()),
+            (&party_index_key(&party, "did:icn:!!!!"), b"did:icn:!!!!"),
+            (&party_index_key(&party, "a/b"), b"a/b"),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 5);
+        assert_eq!(
+            report.rows_unreadable, 0,
+            "the agreement id is never parsed"
+        );
+        assert_eq!(report.rows_with_readable_did, 5);
+        assert_eq!(
+            report.distinct_principals, 5,
+            "one party, five agreement ids — five (party, agreement) tuples"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "grouping these would be an agreement-id normalization rule nobody wrote"
+        );
+        assert!(report.is_automatable());
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn the_same_party_and_the_same_exact_agreement_id_collide_however_the_id_reads() {
+        // The collision unit is unchanged by any of the above: one principal,
+        // one *byte-identical* agreement id, two spellings of the party — and,
+        // unlike the attestation layout, the group is equivalent.
+        let (a, b) = two_spellings(92);
+        let id = format!("agr-{}", spell(&principal(93), multibase::Base::Base58Btc));
+        let store = store_with(&[
+            (&party_index_key(&a, &id), id.as_bytes()),
+            (&party_index_key(&b, &id), id.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(
+            report.collision_groups[0].representation_counts,
+            vec![2],
+            "two spellings at the one principal position"
+        );
+        assert_eq!(report.disposition, MergeDisposition::Equivalent);
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_party_spelling_containing_the_terminator_still_ends_at_the_right_slash() {
+        // A `Base64` body legally contains `/`, so the first `/` after the
+        // prefix is not the end of the spelling — only decoding says where it
+        // ends. This is the case the store's own parser handles by anchoring
+        // on the id its value names, and the scan must agree with it.
+        let one = spell(
+            &principal(seed_whose_base64_spelling_contains_a_slash()),
+            multibase::Base::Base64,
+        );
+        assert!(
+            one[8..].contains('/'),
+            "fixture guard: this spelling must contain `/`"
+        );
+
+        for id in ["agr-1", "a/b", "did:icn:zzz", ""] {
+            let store = store_with(&[(&party_index_key(&one, id), id.as_bytes())]);
+            let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+            assert_eq!(report.rows_with_readable_did, 1, "agreement id {id:?}");
+            assert_eq!(report.rows_unreadable, 0, "agreement id {id:?}");
+            assert_eq!(report.distinct_principals, 1, "agreement id {id:?}");
+        }
+
+        let store = store_with(&[
+            (&party_index_key(&one, "agr-1"), b"agr-1"),
+            (&party_index_key(&one, "agr-2"), b"agr-2"),
+        ]);
+        let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+    }
+
+    #[test]
+    fn the_scanner_and_the_store_agree_on_where_the_party_spelling_ends() {
+        // Every base the production parser accepts, against ids of every shape
+        // the store admits. The `/`-in-the-body case has its own fixture above.
+        for base in [
+            multibase::Base::Base58Btc,
+            multibase::Base::Base16Lower,
+            multibase::Base::Base64,
+            multibase::Base::Base64Url,
+            multibase::Base::Base32Lower,
+        ] {
+            for id in ["agr-1", "a/b", "did:icn:zzz", ""] {
+                let one = spell(&principal(94), base);
+                let store = store_with(&[(&party_index_key(&one, id), id.as_bytes())]);
+                let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
+                assert_eq!(
+                    report.rows_with_readable_did, 1,
+                    "{base:?} spelling with agreement id {id:?}"
+                );
+                assert_eq!(report.rows_unreadable, 0, "{base:?} / {id:?}");
+                assert_eq!(report.distinct_principals, 1, "{base:?} / {id:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn party_index_scan_order_does_not_change_the_report() {
+        // The report is a function of the store, not of insertion order — and
+        // for an equivalent group the survivor is reported, never elected.
+        let (a, b) = two_spellings(95);
+        let forward = store_with(&[
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+        ]);
+        let reversed = store_with(&[
+            (&party_index_key(&b, "agr-1"), b"agr-1"),
+            (&party_index_key(&a, "agr-1"), b"agr-1"),
+        ]);
+
+        let f = scan_keyspace(&forward, &party_index_descriptor()).unwrap();
+        let r = scan_keyspace(&reversed, &party_index_descriptor()).unwrap();
+        assert_eq!(
+            f, r,
+            "same rows, same report, whatever order they were written"
+        );
+        assert_eq!(f.collision_groups.len(), 1);
+        assert!(f.is_automatable());
     }
 }
