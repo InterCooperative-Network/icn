@@ -318,6 +318,11 @@ total row count and per-tree count were reported alongside, and the raw sled fil
 local stores were independently checked for `did:icn:` byte occurrences (zero) to distinguish an
 empty store from a failed read.
 
+**Registry scope at the time of this scan.** The registry then held twelve keyspaces.
+`federation/attestations/` (§4 row 19, #2703) was registered afterwards and is not represented in
+these figures; any attestation row present would have counted under *uncovered* (§2.3), and none
+did. See the row-19 note in §4 for what that does and does not show.
+
 ### 3.3 Principal-bearing rows behind a named gate — 63
 
 A per-keyspace zero only speaks for the rows that keyspace matched. Reconciling *all* DID-bearing
@@ -409,6 +414,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **no** — asserted by precedent; `SequenceTracker` reads and writes the exact spelling and implements no fold | yes | no | 4 | safe | N2-A | **rule needs a trust-domain loader that folds; fail closed at the gate until then** |
 | 17 | `trust-app` `trust/sequences/issuer/` (#71) | `Display` | 0 in 3 scanned | max | no — asserted here | yes | no | 4 | safe | N2-A | **rule needs trust-domain confirmation** |
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
+| 19 | `icn-federation` `federation/attestations/` (#27, #59) | `as_str` + `/` + source coop | **not measured** — outside the registry when §3 was scanned (#2703) | **fail closed** | yes — the live store refuses to read, write or sweep over such a pair, and revokes one atomically (#2704); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **merge rule awaits a federation-domain decision** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
@@ -420,6 +426,37 @@ decides **who is a member of an institution**, which no identity-layer rule auth
 next to the §7.5 membership gate without the inventory having placed it there. It is therefore
 **fail closed** pending an explicit governance-domain decision about which side of the §7.5
 boundary it falls on. N2-A must not resolve that by default.
+
+Row 19 (`icn-federation` federated trust attestations, #2703) was outside the registry when the
+§3 evidence was gathered, so the three-deployment result says nothing about it. Its key is
+`federation/attestations/<member-did spelling>/<source_coop_id>` and its collision unit is
+**(member principal, source cooperative)**, because the source stays in the canonical shape: rows
+from different cooperatives about one principal are the federation's ordinary union and never a
+group, while two rows from one cooperative about one principal can only differ by disagreeing. No
+federation-domain rule authorizes choosing or combining such a pair, and this document authorizes
+none: the disposition is **fail closed**. Since #2704 the store itself enforces that posture — it
+reads the whole namespace by `Did` equality rather than by spelling prefix, refuses any operation
+that would interpret or mutate an ambiguous pair (a lookup for that principal, a listing for that
+source, a write to that pair, the expiry sweep), surfaces an unreadable or key/value-inconsistent
+row as a typed error instead of skipping it, and revokes every alias row a removal names in one
+atomic deletion, so an interrupted revocation cannot leave a lone alias row that the next read
+would accept. It re-keys, merges and normalizes nothing; persisted bytes are unchanged.
+
+The startup gate (#2700, merged) consumes the same `n2a_keyspaces()` registry, so a federation
+alias pair refuses the node start exactly as any `FailClosed` keyspace does; the gate fixtures
+proving it are in `icn/crates/icn-store/tests/n2a_startup_gate.rs`, with a one-fact-different
+control in which the two spellings carry different source cooperatives and the start is clear.
+The descriptor states the key structure rather than letting the scan guess it: the member spelling
+is anchored immediately after the prefix and ends at the `/`, and everything after that `/` is an
+opaque discriminator compared byte-for-byte. The source is a federation-domain identifier this
+registry does not own, nothing forbids one that contains `did:icn:`, and the store compares source
+ids as exact strings — so a scan that canonicalized inside the source would group rows the store
+holds apart and call rows unreadable that the store reads without difficulty. A populated
+attestation row in a store scanned
+*before* this registration could only have surfaced as an **uncovered** shape (§2.3) — blocking,
+but unclassified. §3.3 reported zero uncovered rows across the three scanned deployments, which is
+consistent with those stores holding no attestations at the time and is not a measurement of this
+keyspace. The first scan that includes it yields new evidence, not a regression.
 
 Rows 14–15 hold DIDs inside serialized *values*, not keys, so they are not prefix-scannable and
 are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
@@ -574,24 +611,38 @@ The §4.1 audit was run across the other principal-keyed loaders at the same tim
 **findings, not fixes** — no code below has been changed, and each is stated so the next slice
 starts from evidence rather than from a re-derivation.
 
-**`icn-federation` `AttestationStore` — an unregistered keyspace, and order-dependent reads.**
-`federation/attestations/<did-spelling>/<coop>` appears in **no** row of §4 and in no descriptor of
-`n2a_keyspaces`, so the scanner cannot report a collision there at all: §3.2's "zero collisions"
-never covered it. To the startup gate a principal-bearing row under a prefix nothing registered is
-*uncovered*, and it refuses the start rather than classify it (§10.2) — but only for a database
-beneath `icnd`'s data directory and only at `icnd`'s start; nothing in this store's own reads
-changed. The live defect does not need a migration to appear. The in-memory cache is
-`LruCache<Did, _>` and therefore principal-keyed, while `member_prefix` scans `did.as_str()` and is
-therefore spelling-keyed, so looking up spelling A then spelling B of one principal returns **A's
-attestations for B**, and the opposite order returns the opposite answer — the first non-empty
-lookup latches until eviction or invalidation. Long-lived instances (`icn-gateway`'s
-`federation_mgr`) are exposed; the RPC handlers construct a fresh store per call and are not.
-Separately, `remove_attestation` deletes one spelling's row, so a revocation naming the other
-spelling leaves the attestation live, and every read path drops an undecodable row with
-`if let Ok(..)`, turning a corrupt attestation into an absent one. The domain answer is not in
-doubt — an attestation is a claim about a **principal** — so the fix direction is a
-principal-consistent read, not a re-keying, with two rows for one `(principal, source_coop)`
-refused because that pair can only differ by disagreeing.
+**`icn-federation` `AttestationStore` — closed by #2704.** This finding is recorded as history
+because the paragraph above says these are findings, not fixes, and this one is now the exception.
+The defect was four things at once: `federation/attestations/<did-spelling>/<coop>` appeared in no
+row of §4 and in no descriptor of `n2a_keyspaces`, so the scanner could not report a collision
+there and §3.2's "zero collisions" never covered it; the in-memory cache was `LruCache<Did, _>` and
+therefore principal-keyed while `member_prefix` scanned `did.as_str()` and was therefore
+spelling-keyed, so looking up spelling A then spelling B of one principal returned **A's
+attestations for B** and the opposite order returned the opposite answer; `remove_attestation`
+deleted one spelling's row, so a revocation naming the other spelling left the attestation live;
+and every read path dropped an undecodable row with `if let Ok(..)`, turning a corrupt attestation
+into an absent one. None of it needed a migration to appear.
+
+The domain answer was never in doubt — an attestation is a claim about a **principal** — so the fix
+is a principal-consistent read, not a re-keying. Since #2704 the store reads the whole namespace,
+validates that every row's key is exactly the key its own value implies, groups by `Did` equality,
+and refuses any operation that would interpret or mutate an ambiguous `(principal, source_coop)`
+pair; the cache is gone rather than re-keyed; an unreadable or key/value-inconsistent row is a
+typed refusal instead of an absence; and a revocation names the semantic pair, removing every
+spelling of it in **one atomic deletion** (`Store::delete_atomic`), so no crash or I/O failure can
+leave one alias row behind as an unambiguous — and therefore acceptable — survivor. The keyspace is
+registered as `icn-federation/attestations` (§4 row 19) and **fail closed**: it authorizes no merge
+rule, and neither does this document.
+
+Registration is also what puts the keyspace in front of the gate. Before it, a principal-bearing
+row under an unregistered prefix was *uncovered* to the gate, which refuses rather than classify
+(§10.2) — blocking, but with nothing to say about what it found. The gate now reads this keyspace
+through the same descriptor the store's own refusals agree with, so both layers use one collision
+unit: **(member principal, exact `source_coop_id` bytes)**. The source is a federation-domain
+identifier this crate does not own and does not parse, so two source ids are the same source only
+when their bytes are equal — including when both happen to contain spellings of one DID. §10.6's
+division of labour is unchanged by any of this: the gate answers whether the node may open the
+state, the store answers whether an operation may interpret it, and neither answer is a merge rule.
 
 **`icn-security` `MisbehaviorDetector` (#2676) — the survivor is attacker-selectable.** Four
 spelling-keyed keyspaces (`security:{reputation,banned,quarantine,violation}:`) load independently
@@ -724,7 +775,7 @@ the flip itself.
 |---|---|---|---|
 | 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
 | 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); the loaders in §6.5 — the `AttestationStore` cache/prefix mismatch recorded on #2627 among them — have not been audited to that standard |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); `icn-federation`'s `AttestationStore` is audited to the same standard and now refuses rather than fold (§6.5, #2704); the remaining §6.5 loaders — `icn-security`'s misbehaviour detector and the `icn-net` peer maps — have not been |
 | 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it |
 | 5 | `PeerId` ordering | **DONE** | `Ord` over identifier bytes, non-interleaving classes, landed with the flip in #2686 (`icn-net/src/topology.rs`); #2684 had added the `peerid_i7_ordering_tripwire` that pins it |
 | 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | hash over identifier bytes in #2681, before the flip; #2686 pins the contract in `value_did_hash` |

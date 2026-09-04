@@ -4655,6 +4655,14 @@ mod tests {
             self.data.lock().unwrap().remove(key);
             Ok(())
         }
+        /// Atomic by construction: one lock, one map, no failure point inside.
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+            let mut data = self.data.lock().unwrap();
+            for key in keys {
+                data.remove(key.as_slice());
+            }
+            Ok(())
+        }
         fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
             Ok(self
                 .data
@@ -7953,6 +7961,19 @@ mod respelled_identity_tests {
             self.data.lock().unwrap().remove(key);
             Ok(())
         }
+        /// Atomic by construction: one lock, one map, no failure point inside.
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+            let mut data = self.data.lock().unwrap();
+            for key in keys {
+                self.deletes.fetch_add(1, Ordering::SeqCst);
+                self.ops
+                    .lock()
+                    .unwrap()
+                    .push(format!("delete:{}", String::from_utf8_lossy(key)));
+                data.remove(key.as_slice());
+            }
+            Ok(())
+        }
         fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
             if self.fail_scan {
                 anyhow::bail!("simulated unreadable replay keyspace");
@@ -9106,6 +9127,14 @@ mod respelled_identity_tests {
         }
         fn delete(&self, key: &[u8]) -> Result<()> {
             self.data.lock().unwrap().remove(key);
+            Ok(())
+        }
+        /// Atomic by construction: one lock, one map, no failure point inside.
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+            let mut data = self.data.lock().unwrap();
+            for key in keys {
+                data.remove(key.as_slice());
+            }
             Ok(())
         }
         fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
@@ -12691,6 +12720,12 @@ mod respelled_identity_tests {
         fn delete(&self, key: &[u8]) -> Result<()> {
             self.check("delete")?;
             self.inner.delete(key)
+        }
+        /// The injected failure is decided before anything is delegated, so the
+        /// wrapper never manufactures a partial outcome of its own.
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> Result<()> {
+            self.check("delete")?;
+            self.inner.delete_atomic(keys)
         }
         fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
             self.inner.scan(prefix)
