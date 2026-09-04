@@ -2641,10 +2641,12 @@ mod tests {
     fn a_party_lookup_holds_the_namespace_across_its_scan_and_its_canonical_loads() {
         // Read from the lock itself, at both pause points: while a lookup is
         // inside its scan, or between its scan and its canonical loads, a
-        // writer cannot take the namespace; once it returns, one can.
-        // (Readers share by construction of `RwLock::read`; that is not
-        // asserted here, because a writer queued by another test makes a
-        // probe of it spurious.)
+        // writer cannot take the namespace; once it returns, one can. A probe
+        // cannot tell this lookup's hold from another test's momentary one,
+        // so the discriminating evidence is the re-spelling fixture above;
+        // this test states where the hold begins and ends. (Readers share by
+        // construction of `RwLock::read`; not asserted, because a writer
+        // queued by another test would make that probe spurious.)
         for pause_at in [PauseAt::ProjectionScan, PauseAt::CanonicalGet] {
             let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
             let p = test_did();
@@ -2675,25 +2677,28 @@ mod tests {
     #[test]
     fn a_rebuild_holds_the_namespace_exclusively_across_its_scans_and_its_writes() {
         // A rebuild reads every canonical row, then the whole projection, then
-        // writes. A replacement or a lookup landing between any two of those
-        // steps would either be answered from a projection mid-repair or leave
-        // the rebuild retiring a row the new canonical version implies. It
-        // holds the namespace exclusively from its first read to its last
-        // write, and the projection it leaves is exactly the implied one.
+        // writes. A replacement landing between the two reads would be a
+        // canonical row the rebuild never saw whose fresh projection rows the
+        // rebuild *does* see — and would retire as stale, leaving a canonical
+        // row without its projection: the exact state the write protocol
+        // exists to rule out. The rebuild therefore holds the namespace
+        // exclusively from its first read to its last write. Proven
+        // behaviourally, not by probing the lock (another test's writer can
+        // make a probe read "held"): a concurrent `store_agreement` of a new
+        // agreement must find its rows intact afterwards, whichever side of
+        // the rebuild it lands on.
         let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
         let p = test_did();
-        let agreement = two_party_agreement(&p, &test_did());
+        let x = two_party_agreement(&p, &test_did());
+        let y = two_party_agreement(&test_did(), &test_did());
         AgreementStore::new(raw.clone() as Arc<dyn Store>)
-            .store_agreement(&agreement)
+            .store_agreement(&x)
             .unwrap();
         // Two rows the protocol could have left behind: a duplicate alias row
         // and a row for an agreement that no longer exists.
         raw.put(
-            &AgreementStore::party_index_key(
-                &respell(&p, multibase::Base::Base16Lower),
-                &agreement.id,
-            ),
-            agreement.id.as_str().as_bytes(),
+            &AgreementStore::party_index_key(&respell(&p, multibase::Base::Base16Lower), &x.id),
+            x.id.as_str().as_bytes(),
         )
         .unwrap();
         raw.put(
@@ -2702,31 +2707,43 @@ mod tests {
         )
         .unwrap();
 
+        // Pivot below every key: the paused scan observes the whole projection
+        // as it is *after* the pause, which is what a rebuild that let a write
+        // through would have seen.
         let double = StraddlingStore::new(raw.clone(), PauseAt::ProjectionScan, &[]);
-        let store = Arc::new(AgreementStore::new(double.clone() as Arc<dyn Store>));
-        let rebuild = {
-            let store = store.clone();
-            pause(&double, move || store.rebuild_party_index().unwrap())
-        };
-        let reader_blocked = NAMESPACE_LOCK.try_read().is_err();
-        let writer_blocked = NAMESPACE_LOCK.try_write().is_err();
-        double.rendezvous.resume();
-        let report = rebuild.join().unwrap();
+        let rebuilder = AgreementStore::new(double.clone() as Arc<dyn Store>);
+        let writer = AgreementStore::new(double.clone() as Arc<dyn Store>);
+        let y_for_writer = y.clone();
+        let report = interleave(
+            &double,
+            move || rebuilder.rebuild_party_index().unwrap(),
+            move || writer.store_agreement(&y_for_writer).unwrap(),
+        );
         namespace_is_released();
 
-        assert!(reader_blocked, "a lookup must wait for the rebuild");
-        assert!(writer_blocked, "a replacement must wait for the rebuild");
+        // The rebuild saw one canonical agreement and repaired its projection.
         assert_eq!(report.agreements, 1);
         assert_eq!(report.rows_kept, 2);
         assert_eq!(report.rows_added, 0);
         assert_eq!(report.rows_removed_stale, 2);
         assert_eq!(report.rows_removed_malformed, 0);
+        // And the concurrent write kept every row its canonical row implies:
+        // the projection is exactly what both canonical rows imply.
         let mut keys = index_keys(&raw);
         keys.sort();
+        let mut expected = implied_keys(&x);
+        expected.extend(implied_keys(&y));
+        expected.sort();
         assert_eq!(
-            keys,
-            implied_keys(&agreement),
-            "the projection equals what canonical rows imply"
+            keys, expected,
+            "a rebuild that admitted a write between its reads would have retired the new agreement's rows as stale"
         );
+        let store = AgreementStore::new(raw.clone() as Arc<dyn Store>);
+        for party in &y.parties {
+            assert_eq!(
+                ids_of(&store.list_agreements_for_party(&party.did).unwrap()),
+                vec![y.id.as_str().to_string()]
+            );
+        }
     }
 }
