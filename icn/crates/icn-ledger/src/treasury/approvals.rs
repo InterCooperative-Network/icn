@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
 
-use super::{uuid_simple, SPENDING_RULE_PREFIX, TREASURY_PREFIX};
+use super::{uuid_simple, SPENDING_RULE_PREFIX, VELOCITY_LIMIT_PREFIX};
 
 /// Spending rule for treasury operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -458,7 +458,7 @@ impl super::TreasuryManager {
         limit: &VelocityLimit,
         store: &Arc<dyn Store>,
     ) -> Result<()> {
-        let key = format!("{}vlimit:{}", TREASURY_PREFIX, limit.id);
+        let key = format!("{}{}", VELOCITY_LIMIT_PREFIX, limit.id);
         let value = serde_json::to_vec(limit)?;
         store.put(key.as_bytes(), &value)?;
         Ok(())

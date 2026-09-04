@@ -1607,6 +1607,37 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         canonical fact and keeping any one loses nothing. A projection row can \
                         never create, omit, preserve or alter membership on its own.",
         },
+        KeyspaceDescriptor {
+            name: "icn-ledger/treasury",
+            // `ledger:treasury:<did>` is the authoritative treasury record and
+            // the only row beneath `ledger:treasury:` keyed by the treasury
+            // principal alone. The lexical parent is shared with the budget,
+            // rule, audit, index and velocity-limit subspaces, whose keys
+            // carry no treasury principal in this position (two of them —
+            // `audit:` and `idx:budgets:` — embed the spelling as key
+            // structure further along), so the registered prefix runs through
+            // the DID scheme and claims only the primary rows: a sibling row
+            // is outside this descriptor, not a member of it, and a sibling
+            // that carries a spelling stays *uncovered* until its own
+            // disposition is argued. The whole-key tokenizer finds the one
+            // spelling at the prefix boundary; `did_ends_key` says nothing
+            // may follow it, which is the writer's exact shape (#2627 M1).
+            prefix: b"ledger:treasury:did:icn:",
+            inventory_rows: &[10, 41],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Authoritative treasury record keyed by the treasury principal. Two rows for \
+                        one principal are two treasury records that can disagree about every \
+                        field — cooperative, currency, creator, activity — and no economics rule \
+                        authorizes choosing, summing or combining them. The live loader classifies \
+                        every primary row and refuses to hydrate over such a pair \
+                        (icn_ledger::principal_rows, #2627 M1); a migration must not decide it \
+                        either.",
+        },
     ]
 }
 
@@ -1615,7 +1646,9 @@ mod tests {
     use super::*;
     use crate::SledStore;
 
-    const WHOLE_KEY_NAMES: [&str; 12] = [
+    /// The whole-key layouts in registry order: the twelve the §3 evidence was
+    /// gathered with, unchanged, then the treasury primary rows (#2627 M1).
+    const WHOLE_KEY_NAMES: [&str; 13] = [
         "icn-net/replay_max_seq",
         "icn-net/replay_finalized",
         "icn-net/replay_sender_regime",
@@ -1628,6 +1661,7 @@ mod tests {
         "trust-app/sequences_receiver",
         "trust-app/sequences_issuer",
         "icn-coop/member",
+        "icn-ledger/treasury",
     ];
 
     /// Build a `did:icn:` spelling of `bytes` in the given multibase base.
@@ -2761,7 +2795,9 @@ mod tests {
         // The anchored region is an addition, not a reinterpretation: every
         // keyspace registered before it still scans its whole key, in the
         // order it always had, so no existing descriptor's semantics moved
-        // when the two federation layouts were added.
+        // when the two federation layouts were added — nor when the treasury
+        // primary rows were registered after them as the thirteenth
+        // whole-key layout (#2627 M1).
         let whole_key: Vec<&str> = n2a_keyspaces()
             .iter()
             .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
@@ -3006,6 +3042,7 @@ mod tests {
             "trust-app/sequences_issuer",
             "trust-app/sequences_receiver",
             "icn-coop/member",
+            "icn-ledger/treasury", // `ledger:treasury:<did>`, nothing after
         ] {
             assert_eq!(ends(n), Some(true), "{n} keys end with the DID");
         }
@@ -3844,5 +3881,212 @@ mod tests {
         );
         assert_eq!(f.collision_groups.len(), 1);
         assert!(f.is_automatable());
+    }
+
+    // ----- ledger:treasury:<did> (#2627 M1) ----------------------------------
+    //
+    // Fixtures write the exact bytes `TreasuryManager::persist_treasury`
+    // writes: `ledger:treasury:<did spelling>`, nothing after. They use the
+    // real registry descriptor, so what they prove is what the shipped scan —
+    // and, through `audit_store`, the startup gate — does. The loader-side
+    // pin, against the ledger's own prefix constants, is in `icn-ledger`
+    // (`treasury.rs` tests); the loader fixtures are
+    // `icn-ledger/tests/treasury_principal_rows.rs`.
+
+    fn treasury_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-ledger/treasury")
+            .expect("the treasury keyspace is registered")
+    }
+
+    fn treasury_row(spelling: &str) -> String {
+        format!("ledger:treasury:{spelling}")
+    }
+
+    const TREASURY_SIBLING_PREFIXES: [&str; 6] = [
+        "ledger:treasury:budget:",
+        "ledger:treasury:rule:",
+        "ledger:treasury:audit:",
+        "ledger:treasury:idx:coop:",
+        "ledger:treasury:idx:budgets:",
+        "ledger:treasury:vlimit:",
+    ];
+
+    #[test]
+    fn the_treasury_descriptor_runs_through_the_did_scheme_and_claims_no_sibling() {
+        // The registered prefix is the primary prefix plus the DID scheme, so
+        // it matches every key the writer produces and no key beneath any
+        // sibling subspace — a sibling prefix is neither inside nor around
+        // it. The authoritative version of this pin, against the ledger's own
+        // constants, is in `icn-ledger`; this one keeps the registry honest
+        // on its own.
+        let d = treasury_descriptor();
+        assert_eq!(d.prefix, b"ledger:treasury:did:icn:");
+        for sibling in TREASURY_SIBLING_PREFIXES {
+            assert!(
+                !sibling.as_bytes().starts_with(d.prefix)
+                    && !d.prefix.starts_with(sibling.as_bytes()),
+                "{sibling}"
+            );
+        }
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "nothing follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[10, 41]);
+    }
+
+    #[test]
+    fn treasury_alias_rows_are_a_blocking_collision() {
+        let (a, b) = two_spellings(50);
+        let store = store_with(&[(&treasury_row(&a), b"{}"), (&treasury_row(&b), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert_eq!(report.collision_groups[0].representation_counts, vec![2]);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn treasury_rows_for_distinct_principals_do_not_collide() {
+        let one = spell(&principal(51), multibase::Base::Base58Btc);
+        let two = spell(&principal(52), multibase::Base::Base16Lower);
+        let store = store_with(&[(&treasury_row(&one), b"{}"), (&treasury_row(&two), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty());
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn treasury_sibling_rows_are_outside_the_descriptor_not_members_of_it() {
+        // Every sibling subspace beneath the lexical parent, including the two
+        // that embed a spelling as key structure — spelled here as the *alias*
+        // of the primary row's principal, which is the strongest way to show
+        // the descriptor never reads them as a second spelling of that row.
+        let (a, b) = two_spellings(53);
+        let store = store_with(&[
+            (&treasury_row(&a), b"{}"),
+            ("ledger:treasury:budget:budget-1", b"{}"),
+            ("ledger:treasury:rule:rule-1", b"{}"),
+            ("ledger:treasury:idx:coop:food-coop", a.as_bytes()),
+            ("ledger:treasury:vlimit:vlimit-1", b"{}"),
+            (
+                &format!("ledger:treasury:audit:{b}:1700000000:audit-1"),
+                b"{}",
+            ),
+            (
+                &format!("ledger:treasury:idx:budgets:{b}:budget-1"),
+                b"budget-1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1, "only the primary row is a member");
+        assert_eq!(report.distinct_principals, 1);
+        assert!(
+            report.collision_groups.is_empty(),
+            "a sibling's spelling is key structure there, never a treasury alias"
+        );
+
+        // The two siblings that carry a spelling are what they were before
+        // M1 — principal-bearing rows under no registered keyspace. The
+        // descriptor does not claim a disposition it has not argued; they
+        // stay uncovered until their own registration (follow-up).
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert_eq!(uncovered.len(), 2, "{uncovered:?}");
+        assert_eq!(
+            uncovered.get("ledger:treasury:audit:<did>:1700000000:audit-1"),
+            Some(&1)
+        );
+        assert_eq!(
+            uncovered.get("ledger:treasury:idx:budgets:<did>:budget-1"),
+            Some(&1)
+        );
+    }
+
+    #[test]
+    fn a_did_looking_coop_id_in_the_treasury_index_is_not_a_treasury_spelling() {
+        // Opaque-discriminator control. The cooperative index is keyed by a
+        // coop id the ledger never validates, so one can be a DID spelling —
+        // even an alias of the primary row's principal. To this descriptor it
+        // is not a member (one row scanned, no group). Carrying a spelling
+        // under no registered prefix, it surfaces as uncovered — unclassified,
+        // exactly as before M1 — and never as a treasury collision.
+        let (a, b) = two_spellings(54);
+        let store = store_with(&[
+            (&treasury_row(&a), b"{}"),
+            (&format!("ledger:treasury:idx:coop:{b}"), a.as_bytes()),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert!(report.collision_groups.is_empty());
+
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert_eq!(uncovered.get("ledger:treasury:idx:coop:<did>"), Some(&1));
+        assert_eq!(uncovered.len(), 1);
+    }
+
+    #[test]
+    fn a_treasury_key_with_material_after_the_spelling_is_unreadable() {
+        // `did_ends_key`: the writer puts nothing after the spelling, and the
+        // loader's `Did::from_str` consumes the whole remainder, so trailing
+        // material is a row neither can read.
+        let one = spell(&principal(55), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&format!("ledger:treasury:{one}junk"), b"{}"),
+            (&format!("ledger:treasury:{one}:x"), b"{}"),
+            ("ledger:treasury:did:icn:zNOTAKEY", b"{}"),
+        ]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 3);
+        assert_eq!(report.rows_unreadable, 3);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn treasury_rows_are_covered_by_the_registry_not_reported_as_uncovered() {
+        // Before this registration an ordinary treasury row could only
+        // surface as an uncovered shape — blocking, and unclassified.
+        let one = spell(&principal(56), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&treasury_row(&one), b"{}"),
+            ("ledger:treasury:idx:coop:food-coop", one.as_bytes()),
+        ]);
+
+        let uncovered =
+            uncovered_did_key_shapes(&store, &n2a_keyspaces(), &n2a_deferred_namespaces()).unwrap();
+        assert!(uncovered.is_empty(), "{uncovered:?}");
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(audit.is_clear());
+    }
+
+    #[test]
+    fn treasury_scan_order_pins_the_last_writer_survivor() {
+        // What the pre-M1 loader elected: `Store::scan` is lexicographic, so
+        // the base58 (`z`) row scans after the base16 (`f`) row whichever was
+        // written first, and its value was the one that survived the fold.
+        let (z, f) = two_spellings(57);
+        let store = store_with(&[(&treasury_row(&z), b"{}"), (&treasury_row(&f), b"{}")]);
+
+        let report = scan_keyspace(&store, &treasury_descriptor()).unwrap();
+        let group = &report.collision_groups[0];
+        assert_eq!(group.rows.len(), 2);
+        assert_eq!(group.last_writer_survivor().unwrap().spellings, vec![z]);
     }
 }

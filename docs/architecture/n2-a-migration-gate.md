@@ -6,7 +6,7 @@
 `docs/architecture/n2-a0-stored-key-inventory.md` owns the measured stored-key surface; this
 document owns only N2-A's *dispositions and design*
 **Last reviewed:** 2026-09-04
-**Source basis:** live `main` at `40c1deb952547559a3310e32ef3fe9fa315dcacb` (§1 baseline rows
+**Source basis:** live `main` at `2f9def5d5aca40c8b2c357df9abd2a731f542cc7` (§1 baseline rows
 still cite the `83682563` measurement they were taken at)
 **Gates:** N2-A / #2627 (`Did` canonicalization, I7)
 **Contract:** IDENTITY_SEMANTICS §3, §7.5, §11 (I7), §14 (`N2-A`)
@@ -41,7 +41,16 @@ still cite the `83682563` measurement they were taken at)
    descriptor. §11.1 states the persistence-boundary classes P1–P5 that keep that case apart from
    the attestation store's fail-closed rows and the ledger's guarded folds; §11.4 dispositions the
    rest of the inventory by class. Nothing in §11 authorizes a merge rule for authoritative state.
-5. **Cutover is not complete.** The rest of the load/rebuild/write-back audit (§9 row 3: the
+5. **The treasury loader classifies before it adopts** (§4.2, #2627 M1). `TreasuryManager::with_store`
+   classifies every primary `ledger:treasury:<did>` row through the same `icn_ledger::principal_rows`
+   guard, proves the key spelling and the body spelling are the same bytes, checks the persisted
+   cooperative index against the primary rows, and refuses with a typed error before the first
+   in-memory map is touched — whether or not the startup gate ran in front of it (`icnctl` opens
+   the same store with no gate). The primary row is registered in the scanner as
+   `icn-ledger/treasury`, fail closed, so the gate refuses the same alias pair and an ordinary
+   treasury row is no longer *uncovered*; the audit and budget-index siblings that embed a
+   spelling remain uncovered and are the next treasury follow-up. It authorizes no merge rule.
+6. **Cutover is not complete.** The rest of the load/rebuild/write-back audit (§9 row 3: the
    loaders in §6.5 and the boundaries in §11.4), fresh point-in-time evidence on quiesced stores,
    the two unscanned deployments, the §5 decision-**A** namespace splits, the peer-map pair (§6.3)
    and everything behind §7.5 remain open. Nothing here is a deployment-readiness claim.
@@ -329,10 +338,11 @@ local stores were independently checked for `did:icn:` byte occurrences (zero) t
 empty store from a failed read.
 
 **Registry scope at the time of this scan.** The registry then held twelve keyspaces.
-`federation/attestations/` (§4 row 19, #2703) and `idx_agreement_party/` (§4 row 20, #2707) were
-registered afterwards and are not represented in these figures; any row of either present then
-would have counted under *uncovered* (§2.3), and none did. See the row-19 and row-20 notes in §4
-for what that does and does not show. A registry expansion does not retroactively enlarge this
+`federation/attestations/` (§4 row 19, #2703), `idx_agreement_party/` (§4 row 20, #2707) and the
+primary `ledger:treasury:<did>` row (§4 row 21, #2627 M1) were registered afterwards and are not
+represented in these figures; any row of any of them present then would have counted under
+*uncovered* (§2.3), and none did. See the row-19, row-20 and row-21 notes in §4 for what that does
+and does not show. A registry expansion does not retroactively enlarge this
 evidence: the historical scan scope is what was registered then, and the current registry scope
 is what is registered now.
 
@@ -429,6 +439,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 18 | `icn-coop` `member:` (#36) | `Display` | 0 in 3 scanned | **fail closed** | no | n/a | — | — | safe | N2-A / §7.5 boundary | **institutional decision required** |
 | 19 | `icn-federation` `federation/attestations/` (#27, #59) | `as_str` + `/` + source coop | **not measured** — outside the registry when §3 was scanned (#2703) | **fail closed** | yes — the live store refuses to read, write or sweep over such a pair, and revokes one atomically (#2704); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **merge rule awaits a federation-domain decision** |
 | 20 | `icn-federation` `idx_agreement_party/` (#28) | `as_str` + `/` + agreement id | **not measured** — outside the registry when §3 was scanned (#2707) | **equivalent** (projection) | **yes** — the rows are derived from `federation/agreements/` and the store proves membership from the canonical row, retires superseded rows, refuses what it cannot attribute and can rebuild the projection (§11.3) | yes | no | — | safe (no byte moves) | N2-A | registered `Equivalent`/`Established` in code **and at the gate**; **projection, not authority** |
+| 21 | `icn-ledger` `ledger:treasury:<did>` (#10, #41) | `Display` | **not measured** — outside the registry when §3 was scanned (#2627 M1) | **fail closed** | yes — the loader classifies every primary row and refuses an alias pair, an unreadable key or value, a key/body spelling disagreement and a disagreeing cooperative index before adopting anything (§4.2); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **no merge rule authorized** |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
@@ -498,6 +509,18 @@ normalized or deleted; the fixtures are in `icn/crates/icn-store/tests/n2a_start
 CLEAR there means this spelling collision is safe under the registered projection disposition. It
 does not mean the projection is complete, current or authoritative — §11.2.
 
+Row 21 (`icn-ledger` treasury record, inventory #10 and #41, #2627 M1) is the first P4 fold
+(§11.1) closed after §11.4 named it the highest-severity open boundary. Its key is
+`ledger:treasury:<treasury-did spelling>` with nothing after the spelling, and its collision unit
+is the treasury principal alone. Two rows for one principal are two treasury records that can
+disagree about every field; no economics rule authorizes choosing, summing or combining them, and
+this document authorizes none: the disposition is **fail closed**, `Established` because the
+loader implements it. The descriptor's prefix runs through the DID scheme
+(`ledger:treasury:did:icn:`) so that it claims exactly the primary rows and none of the budget,
+rule, audit, index or velocity-limit siblings that share the lexical parent — two of which embed
+the spelling as key structure and remain uncovered until dispositioned on their own. §4.2 records
+the loader, the key/body rule, the cooperative-index rule and the gate agreement.
+
 Rows 14–15 hold DIDs inside serialized *values*, not keys, so they are not prefix-scannable and
 are not covered by the scanner registry. Their merge rule must be chosen before decode collapses
 them (§12.1 item 4-ii).
@@ -548,6 +571,162 @@ under another row's name.
 This discharges the `icn-ledger` half of blocker 3 (§9). It authorizes **no** merge rule: rows 5–7
 stay `AwaitingDomainSignOff`, and a test that asserted a sum or a union would be asserting an
 economic decision no domain owner has made.
+
+### 4.2 The treasury loader classifies before it adopts (#2627 M1)
+
+§11.4 classified `ledger:treasury:<did>` as a P4 fold over P1 rows and the highest-severity open
+boundary: `TreasuryManager::load_from_store` folded every row into `HashMap<Did, Treasury>` plus
+the `Did`-keyed coop, entity, budget and rule indexes, and its two fail-closed hydration guards
+compared `Did`s — principal equality since I7 — so two spellings of one treasury were not an
+inconsistency to them. The defect was reproduced on unchanged `main` before it was fixed, with a
+real sled store holding `ledger:treasury:<A>` and `ledger:treasury:<B>` for one principal, each
+row individually valid and naming the same cooperative:
+
+* hydration **succeeded**, and one semantic entry survived;
+* the surviving *value* was always the scan-last row — `z…` over `f…`, `f…` over `F…` — so
+  `Store::scan` order, which whoever writes the second row chooses, elected it;
+* the coop index collapsed to one entry naming that survivor, and both spellings answered
+  `is_treasury_account`;
+* a later write-back through the public `populate_entity_id_at_creation` seam rewrote only the
+  survivor's row; the loser stayed on disk, stale, to be read again on the next start.
+
+**Mechanism.** The loader now reads everything before it adopts anything:
+
+```text
+physical rows beneath ledger:treasury:
+→ classify every key by shape: primary / sibling subspace / unreadable
+→ read a value only behind a key that names a treasury principal
+→ prove one spelling per principal            (icn_ledger::principal_rows, unchanged)
+→ prove key spelling == body spelling, as bytes
+→ prove one treasury per coop_id and per entity_id
+→ check every ledger:treasury:idx:coop: row against the classified primaries
+→ only then adopt into the Did-keyed maps
+```
+
+Every refusal is typed and payload-free — `PrincipalRowsRefusal::{AliasCollision, UnreadableKey,
+KeyValueSpellingMismatch}` for what the treasury shares with the three §4.1 keyspaces, and a
+treasury-local `TreasuryHydrationRefusal::{UnreadablePrimaryValue, DuplicateCoopId,
+DuplicateEntityId, CoopIndexUnreadable, CoopIndexSpellingMismatch}` for what it does not — and
+every refusal is raised before the first map mutation, so a failure on row *N* never leaves the
+maps hydrated from rows 1..*N*−1 (pinned in-module against the private maps; every scan, the
+sibling subspaces included, completes before adoption begins). `principal_rows` itself gained
+one constant, `TREASURY_KEYSPACE`; its guard and its three existing callers are unchanged.
+
+**Key/body identity is physical, not semantic.** `persist_treasury` derives the key from
+`treasury.treasury_did`'s `Display`, so the row the writer claims to have written is the one whose
+key bytes equal its body's spelling bytes. The comparison is `as_str() != key_spelling`, never
+`Did` equality — under I7 `key A, body B` for one principal compares equal, and accepting it would
+adopt a row every later `persist_treasury` addresses under the *other* spelling, opening a second
+row while the first stayed on disk. A single such row refuses; its control (key `f`, body `f`)
+loads, because a non-base58 spelling is a legal stored spelling and nothing canonicalizes.
+
+**Unreadable primary rows refuse; they do not vanish.** A key beneath the parent that is neither a
+registered sibling prefix nor a `Did::from_str`-valid spelling is `UnreadableKey`; a primary row
+whose value does not deserialize is `UnreadablePrimaryValue`; both are reported before the alias
+classification, because a classification over an incomplete view proves nothing. One consequence
+deserves its own sentence: an anchor-derived cooperative treasury whose 32 bytes are no Ed25519
+point — about half of them, inventory §10.1 — fails `Did::from_str` at the key and `Deserialize`
+at the value. Before M1 the loader skipped such a row with `if let Ok(..)` and the treasury
+silently dropped out of the maps on every reload; after M1 hydration **refuses** it, and a node
+holding such a row does not start. M1 makes that state visible; it does not repair it, and the
+read-path fix stays with #2628 (N2-B).
+
+**Sibling subspaces are classified by key shape, never by whether a value parses.** The lexical
+parent is shared with `budget:`, `rule:`, `audit:`, `idx:coop:`, `idx:budgets:` and `vlimit:`
+rows. The last was missing from the loader's old skip list and survived only because a velocity
+limit does not deserialize as a `Treasury`; it is now named, and a `vlimit:` row whose value
+*does* parse as a treasury record is still a sibling. A key beneath the parent that begins with
+none of the six is a primary row and must name a principal, so an unnamed subspace refuses
+hydration rather than being tolerated by accident. The sibling loaders themselves are unchanged
+and still skip a row that does not parse — pre-existing permissiveness, recorded here as
+follow-up and not absorbed.
+
+**`ledger:treasury:idx:coop:<coop_id>` is a write-only projection, and M1 gives it no
+authority.** `persist_coop_index` writes it at registration; hydration rebuilds the coop map from
+the primary rows and nothing reads the index. It is still persisted evidence that can preserve a
+representation disagreement, so before adoption every index row must decode as a treasury
+principal spelling (else `CoopIndexUnreadable`) and must agree byte-for-byte with the physical key
+spelling of the primary row it names — whether it names it through the coop id it is filed under
+or through the principal its value decodes to (else `CoopIndexSpellingMismatch`). The fixture the
+reassessment required — primary `A`, index → `B`, one principal — refuses; its control (index →
+`A`) loads; an index pointing at a different registered treasury refuses by the same byte
+comparison; an orphan index naming no known coop and no known principal is tolerated, adopted
+from nowhere, and grants nothing. The order in which the rows were written changes no outcome.
+
+**The write path cannot open an alias pair.** Reproduced before concluding: with one treasury
+hydrated, `register_treasury` and `register_treasury_with_entity` under the other spelling — with
+the same coop id or a new one — are refused by the existing `contains_key` check, which is
+principal equality, and write no row; `populate_treasury_entity_id_for_did` locates the row by
+principal and persists under the record's own spelling, so addressing it by the alias rewrites
+exactly the stored row. No writer-side guard was needed and none was added.
+
+**Startup gate.** The primary row is registered as `icn-ledger/treasury` (§4 row 21):
+`FailClosed`, `Established` — the disposition the loader implements — `PrincipalRegion::WholeKey`
+with `did_ends_key`, and prefix `ledger:treasury:did:icn:`. The prefix runs through the DID scheme
+deliberately: it matches every key `persist_treasury` writes and no key beneath any sibling
+subspace, so the descriptor claims exactly the primary rows and says nothing about the two
+siblings that embed a spelling as key structure. Those — `audit:<did>:<ts>:<id>` (inventory #70)
+and `idx:budgets:<did>:<budget>` — keep the status they had before M1: **uncovered** to the gate,
+which refuses a store that holds them until each is registered under its own argued disposition.
+That is the honest boundary, not a regression, and it is the next treasury follow-up: a store with
+a registered treasury and its cooperative index is clear at the gate; a store in which a budget
+has been created — `create_budget` writes `idx:budgets:<did>:<budget>` beside the principal-free
+`budget:<id>` row, and it is the index row that is uncovered — or an audit record has been
+recorded is not, exactly as before. A bare `budget:`, `rule:`, `idx:coop:` or `vlimit:` row
+carries no principal in its key and blocks nothing. A DID-looking `coop_id` in an `idx:coop:`
+key is likewise uncovered and never a treasury spelling. Registry pins hold the descriptor to this shape from both
+sides — in `icn-store` against literal sibling prefixes, in `icn-ledger` against the ledger's own
+prefix constants — so the two cannot drift apart silently.
+
+**Division of labour**, extending §10.6:
+
+```text
+startup gate        — can the node safely open this persisted namespace?
+                      keys only; alias pair → refuse; unreadable spelling → refuse;
+                      sibling rows outside the descriptor; never a survivor
+TreasuryManager     — can this loader safely adopt these exact rows?
+                      keys and values; the same alias unit; key/body bytes; institutional
+                      duplicates; refuses before any map mutation; never a survivor
+idx:coop validation — does the persisted projection agree with primary physical evidence?
+                      value must decode and equal the primary row's key bytes; no authority
+```
+
+Where the two layers differ they differ in the direction §10.6 already allows — the loader is the
+stricter: a spelling that decodes but is no Ed25519 point is readable to the gate and
+`UnreadableKey` to the loader; a key beneath the parent with no `did:icn:` in it at all is a row
+without a principal to the gate and `UnreadableKey` to the loader. Neither layer asserts a merge
+rule and neither normalizes a spelling, so they cannot disagree about a survivor.
+
+**Reach.** `TreasuryManager::with_store` is constructed in production by `apps/ledger-app` init
+(inside `icnd`, behind the gate) and by the `icnctl treasury` maintenance commands
+(`treasury_entity_backfill_report` and its apply path), which open the ledger store with no gate
+in front of them. Both reach the guarded loader; `icnctl`'s gate policy is unchanged and is a
+separate maintainer decision.
+
+**Non-goals.** No merge rule — `Sum`, `Union`, `Max`, `Latest`, canonical-wins and every
+equivalent stay unauthorized, and `RuleBasis::Established` here records only that fail-closed is
+implemented; no re-key, no normalization, no deletion, no repair of observed rows; no change to
+the audit, budget, rule, labor-share, bond or allocation loaders beyond naming their prefixes; no
+`icnctl` gate policy change; nothing of M2–M4 or §7.5.
+
+**Mutation evidence** — each mutation applied alone to the committed tree, the focused suites
+run, and both files restored byte-exactly (sha256-checked); every other test in the run stayed
+green. Observed, not hypothetical:
+
+| Mutation | Applied | Observed failures |
+|---|---|---|
+| A — bypass the principal-row alias guard | the `refuse_unless_one_spelling_per_principal` call removed | 5 loader fixtures (the alias pair, the pair under two coop ids, three spellings, every insertion/scan order, scanner-and-loader agreement) and the in-module no-partial-adoption pin; 27 + 69 others pass |
+| B — compare key and body as `Did` (principal equality) | `Did::from_str(key).is_ok_and(\|k\| k != body)` in place of the byte comparison | exactly one: the key-`f`/body-`z` fixture; its control and every other test (31 + 70) pass |
+| C — skip `idx:coop` spelling integrity | the index scan replaced by an empty vector | 5 loader fixtures (alias value, alias under another coop id, different registered treasury, undecodable value, write order) and the two in-module index pins |
+| D — scanner disposition `FailClosed` → `Equivalent` | the treasury descriptor's disposition only | the scanner's descriptor pin and alias-blocking fixture; the gate's alias-pair fixture; the loader-side agreement fixture and the in-module registry pin |
+| E — descriptor prefix widened to `ledger:treasury:` | the prefix only | three scanner fixtures (siblings outside, DID-looking coop id, descriptor pin); four gate fixtures (single-row clear-and-covered, DID-looking coop id, siblings not misread, spelling-bearing siblings uncovered); two loader-side fixtures and the in-module pin |
+
+Evidence: `icn/crates/icn-ledger/tests/treasury_principal_rows.rs` — 32 fixtures on real sled
+stores, each refusal with its one-fact-different control; six in-module tests in `treasury.rs`
+(the no-partial-adoption pin against the private maps, the key classifier, the sibling list, the
+registry agreement pin, and the payload-free diagnostics); eight scanner fixtures and the
+registry pins in `did_collision_scan.rs`; seven startup-gate fixtures (§10.5). Fixture evidence
+only.
 
 ---
 
@@ -815,14 +994,14 @@ the flip itself.
 |---|---|---|---|
 | 1 | Collision scans run against live deployment data | **PARTIAL** | 3 of 5 deployments scanned, 94 sled DBs, 24 registered rows, **0 collisions**. `alpha` and `icn-daemon` unscanned (`CrashLoopBackOff`); sample is small and point-in-time (§3.5) |
 | 2 | Every observed collision group has an authorized disposition | **CLEARED (vacuously)** | zero collision groups observed. Vacuous truth — it does not validate any merge rule |
-| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); `icn-federation`'s `AttestationStore` is audited to the same standard and now refuses rather than fold (§6.5, #2704); the `icn-federation` agreement party index is proven a derived projection and its store answers from canonical membership (§11.3, #2707); the remaining §6.5 loaders — `icn-security`'s misbehaviour detector and the `icn-net` peer maps — have not been |
+| 3 | Every required keyspace migration has a safe sequence | **PARTIAL** | with zero collisions, step 4 is empty for the scanned deployments. The load/rebuild/write-back audit (§8.1 step 4) is done for the three `icn-ledger` keyspaces, whose loaders now refuse rather than collapse (§4.1); `icn-federation`'s `AttestationStore` is audited to the same standard and now refuses rather than fold (§6.5, #2704); the `icn-federation` agreement party index is proven a derived projection and its store answers from canonical membership (§11.3, #2707); the `icn-ledger` treasury loader classifies its primary rows, checks its cooperative index and refuses before adopting (§4.2, #2627 M1); the remaining §6.5 loaders — `icn-security`'s misbehaviour detector and the `icn-net` peer maps — have not been |
 | 4 | Namespace splits created by principal equality resolved | **OPEN** | `icn-commons` weak-holder id decision stated (§5) but unimplemented; #2627 correction 2 records that I7 opens a lower-privilege route to it |
 | 5 | `PeerId` ordering | **DONE** | `Ord` over identifier bytes, non-interleaving classes, landed with the flip in #2686 (`icn-net/src/topology.rs`); #2684 had added the `peerid_i7_ordering_tripwire` that pins it |
 | 6 | CCL `Value::Did` `Hash`/`Eq` | **DONE** | hash over identifier bytes in #2681, before the flip; #2686 pins the contract in `value_did_hash` |
 | 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented — `SessionManager.connections` is still keyed by the peer spelling (`icn-net/src/session.rs`) |
 | 8 | No §7.5 migration smuggled in | **HELD** | `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated; the startup gate reports vote collisions and does not act on them (§10.2) |
 | 9 | Broad discriminating tests for the flip | **DONE for the flip itself** | #2686 — `did_principal_equality`, fifteen tests flipped and three re-scoped (#2627 records the count), the `PeerId` tripwire; the ledger loaders carry the §4.1 fixtures. What remains untested is what remains unimplemented (rows 4 and 7) |
-| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 42 fixture tests plus the scanner's. Inside `icn-ledger`, the three loaders refuse again for their own keyspaces (§4.1; 30 fixtures) |
+| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 49 fixture tests plus the scanner's. Inside `icn-ledger`, the three loaders refuse again for their own keyspaces (§4.1; 30 fixtures), and the treasury loader for its primary rows and cooperative index (§4.2; 32 fixtures) |
 | 11 | Persisted principal-identity generation boundary | **DONE (generation 1)** | §10.3 — the receipt records the generation; a newer generation's receipt is refused. Generation 2 (any re-key) is *not* designed; the ledger loaders re-key nothing and leave it at 1 |
 
 Blockers **3, 4 and 7 are independent of collision evidence** and would each remain even if every
@@ -940,9 +1119,9 @@ tranche exists to prevent.
 
 ### 10.5 Evidence
 
-`icn/crates/icn-store/tests/n2a_startup_gate.rs` — 42 fixtures on real sled databases (32 with
+`icn/crates/icn-store/tests/n2a_startup_gate.rs` — 49 fixtures on real sled databases (32 with
 #2700, five more for the attestation keyspace with #2704, five for the agreement party index with
-#2707, §11.3): every
+#2707, §11.3, seven for the treasury primary rows with #2627 M1, §4.2): every
 row of §10.2 with its one-fact-different control (same spelling twice, two different principals,
 a single security row, an uncovered row without a principal); the fixture guard that the two
 spellings are distinct strings and `==` as `Did` with equal hashes; unreadable and
@@ -1005,14 +1184,16 @@ Three consequences follow, each deliberate:
 
 Neither layer replaces the other. The gate covers every principal-bearing keyspace in the
 directory — the loaders that still fold (§6.5) and any keyspace nobody registered included — and
-the loaders cover exactly three keyspaces with knowledge the gate must not have. Without the gate,
+the loaders cover exactly four keyspaces — the three above and, since M1, the treasury primary
+rows (§4.2) — with knowledge the gate must not have. Without the gate,
 §6.5's loaders run unguarded; without the loaders, every opener of a ledger store that is not
 `icnd`, and every row the gate cannot see, is unguarded.
 
 Evidence: `icn/crates/icn-ledger/tests/principal_keyed_rebuild.rs` — 30 fixtures on real sled
 stores, one per row of the table above and its one-fact-different control (§4.1), plus the
-`principal_rows` unit tests; `icn/crates/icn-store/tests/n2a_startup_gate.rs` for the gate
-(§10.5). Fixture evidence only.
+`principal_rows` unit tests; `icn/crates/icn-ledger/tests/treasury_principal_rows.rs` for the
+treasury loader (§4.2); `icn/crates/icn-store/tests/n2a_startup_gate.rs` for the gate (§10.5).
+Fixture evidence only.
 
 ---
 
@@ -1238,7 +1419,7 @@ every row before the map, refuse ambiguity whole:**
 
 | Boundary | Reach | Fold | Why the existing guards do not catch it |
 |---|---|---|---|
-| `icn-ledger` `ledger:treasury:<did>` (+ `ledger:treasury:idx:coop:<coop>` valued by a spelling) | live (`apps/ledger-app` init) | `load_from_store` folds every row into `HashMap<Did, Treasury>` plus `Did`-keyed budget/rule maps; `persist_treasury` writes back under the survivor's `Display` | the two fail-closed hydration guards compare `existing_did != treasury.treasury_did` — principal equality since I7 — so two spellings of one treasury are *not* an inconsistency to them and collapse silently at insert, last in scan order winning (attacker-selectable, §2.7). **Highest severity in this pass; the next bounded target** |
+| `icn-ledger` `ledger:treasury:<did>` (+ `ledger:treasury:idx:coop:<coop>` valued by a spelling) | live (`apps/ledger-app` init; `icnctl treasury` maintenance) | *was*: `load_from_store` folded every row into `HashMap<Did, Treasury>` plus `Did`-keyed budget/rule maps, and `persist_treasury` wrote back under the survivor's `Display`; the two hydration guards compared `existing_did != treasury.treasury_did`, principal equality since I7, so two spellings collapsed at insert with the scan-last row winning | **closed by M1 (§4.2, #2627)**, reproduced first: the loader classifies every primary row through `principal_rows`, proves key/body bytes, validates the index and refuses before any map mutation; registered as `icn-ledger/treasury`, fail closed, at the gate (§4 row 21). The `audit:` and `idx:budgets:` siblings that embed a spelling remain uncovered — the next treasury follow-up |
 | `icn-governance` bare `vote:<proposal>:<voter>` and `index:votes:<proposal>` (P3 value of spellings) | dormant (`#[allow(dead_code)]`; live twin is `gov:vote:`) | `store_vote` resolves the writer's `VotingPrincipal`, walks the index and deletes alias rows in one batch | correct as a duplicate-act guard, but the prefix `vote:` does not match the `gov:vote:` deferral, so any such row is *uncovered*. Add a second `DeferredNamespace` under the §7.5 gate, or delete the dormant store |
 
 **P1 authoritative rows awaiting a disposition — close by registering with the rule the owning
@@ -1253,27 +1434,29 @@ domain authorizes (or `FailClosed` until it does):**
 | `icn-trust` `sybil:verification:<did>` and `sybil:flag:<did>:<ts>:<type>` (P3 values) | dormant, absent from the inventory | exact key / spelling prefix; `clear` deletes one spelling | delete-dead-code, else `FailClosed` — `Revoked` versus `Verified` under two spellings is contradictory by construction, and a permissive rule would weaken an anti-sybil control | trust |
 
 Three of these findings are **regressions introduced by I7 itself** rather than legacy rot: the
-action-item stale-index condition, the treasury hydration guards, and the asset-transfer index
-removal. Each is the §7 *partial principalization* pattern — one half of a computation became
+action-item stale-index condition, the treasury hydration guards (closed by M1, §4.2), and the
+asset-transfer index removal. Each is the §7 *partial principalization* pattern — one half of a computation became
 principal-aware while its partner still counts, deletes or keys by spelling.
 
 ### 11.5 Non-claims, and reconciliation with the merged gate, ledger and attestation work
 
 * **N2-A is not complete.** §9 stands. This section makes the remaining work finite; it closes one
-  boundary.
+  boundary, and M1 (§4.2) closes a second.
 * **No merge rule was invented.** Row 20 uses the existing `Equivalent` disposition because the
   rows are derivations of one canonical fact; nothing here authorizes a merge of authoritative
   state anywhere else, and the seven `AwaitingDomainSignOff` keyspaces are unchanged.
-* **Registry scope.** `n2a_keyspaces()` now holds fourteen descriptors: the twelve whole-key
-  keyspaces the §3 evidence was gathered with, plus the two anchored federation layouts (§4 rows
-  19 and 20). The §3 figures are not re-stated: a registry expansion does not enlarge old
-  evidence (§3.2).
+* **Registry scope.** `n2a_keyspaces()` now holds fifteen descriptors: the twelve whole-key
+  keyspaces the §3 evidence was gathered with, the two anchored federation layouts (§4 rows 19
+  and 20), and the treasury primary rows (§4 row 21, #2627 M1) as the thirteenth whole-key
+  layout. The §3 figures are not re-stated: a registry expansion does not enlarge old evidence
+  (§3.2).
 * **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
   `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
   descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
   exists or is introduced.
-* **#2701 (ledger loaders, merged).** Nothing copied; the treasury fold (§11.4) is to reuse
-  `icn_ledger::principal_rows` rather than re-implement the guard.
+* **#2701 (ledger loaders, merged).** Nothing copied; the treasury fold reuses
+  `icn_ledger::principal_rows` as §11.4 required — done in M1 (§4.2), with one added constant
+  and no change to the guard or its three existing callers.
 * **#2704 (attestation store, merged).** Both sets of `FederationError` variants coexist; §4
   carries rows 19 and 20; `slash_ends_did` is claimed by no descriptor — both federation layouts
   declare anchored regions, and a registry pin fixes them as the two anchored layouts in registry

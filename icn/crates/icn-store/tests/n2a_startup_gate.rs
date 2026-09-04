@@ -1271,3 +1271,268 @@ fn an_agreement_party_row_is_never_reported_as_uncovered() {
         "a party-index row must be classified, not merely unaccounted for"
     );
 }
+
+// ---------------------------------------------------------------------------
+// ledger:treasury:<did> (#2627 rows 10/41, M1)
+//
+// The gate and `icn_ledger::TreasuryManager::with_store` read the same rows
+// through two different doors. The primary treasury row is keyed by the
+// treasury principal alone and nothing follows the spelling; the descriptor
+// claims it through the DID scheme, so the budget, rule, audit, index and
+// velocity-limit siblings beneath the same lexical parent are outside it.
+// The disposition is FAIL-CLOSED and established in the loader: an alias pair
+// refuses the start exactly as it refuses hydration, and neither layer
+// elects a survivor. The loader-side fixtures are
+// `icn-ledger/tests/treasury_principal_rows.rs`.
+// ---------------------------------------------------------------------------
+
+/// A row exactly as `TreasuryManager::persist_treasury` keys it.
+fn treasury_row(spelling: &str) -> String {
+    format!("ledger:treasury:{spelling}")
+}
+
+fn treasury_keyspace_receipt(
+    receipt: &GateReceipt,
+) -> &icn_store::n2a_startup_gate::KeyspaceReceipt {
+    receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("store/ledger"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-ledger/treasury")
+        .expect("the gate consumes the registered treasury descriptor")
+}
+
+#[test]
+fn an_alias_collision_in_the_treasury_keyspace_refuses() {
+    // Two persisted treasury records for one principal, spelled two ways.
+    // They can disagree about every field and no economics rule authorizes
+    // choosing between them, so the node must not open the store — exactly
+    // what `TreasuryManager::with_store` does with the same pair.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(50);
+    let root = store_root(dir.path(), "ledger");
+    make_store(
+        &root,
+        &[(treasury_row(&a), b"{}"), (treasury_row(&b), b"{}")],
+    );
+    let before = rows_of(&root);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/ledger");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, disposition, collision_groups, rows_in_collisions, rows_unreadable, .. }
+            if keyspace == "icn-ledger/treasury"
+                && disposition == "FAIL-CLOSED"
+                && *collision_groups == 1
+                && *rows_in_collisions == 2
+                && *rows_unreadable == 0),
+        "{blockers:?}"
+    );
+    assert_eq!(receipt.verdict, Verdict::Refused);
+
+    // The gate reports; it never repairs. Both physical spellings survive
+    // byte-for-byte: the evidence an operator needs is the pair itself.
+    assert_eq!(rows_of(&root), before, "the gate re-keyed or dropped a row");
+    assert_eq!(before.len(), 2);
+}
+
+#[test]
+fn control_a_single_treasury_row_is_clear_and_covered() {
+    // One registered treasury and its cooperative index — the rows an
+    // ordinary registration leaves. Before this registration the primary row
+    // could only surface as an uncovered shape, so a node holding one
+    // treasury refused to start; now the keyspace is classified and clear.
+    let dir = tempfile::tempdir().unwrap();
+    let one = canonical(51);
+    let root = store_root(dir.path(), "ledger");
+    make_store(
+        &root,
+        &[
+            (treasury_row(&one), b"{}"),
+            (
+                "ledger:treasury:idx:coop:food-coop".to_string(),
+                one.as_bytes(),
+            ),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let treasury = treasury_keyspace_receipt(&receipt);
+    assert_eq!(treasury.rows_scanned, 1);
+    assert_eq!(treasury.distinct_principals, 1);
+    assert_eq!(treasury.rows_unreadable, 0);
+    assert_eq!(treasury.collision_groups, 0);
+    assert!(!treasury.must_fail_closed);
+    assert!(
+        !receipt_text(dir.path()).contains("UNCOVERED"),
+        "a treasury row must be classified, not merely unaccounted for"
+    );
+}
+
+#[test]
+fn control_two_treasury_principals_are_clear() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = store_root(dir.path(), "ledger");
+    make_store(
+        &root,
+        &[
+            (treasury_row(&canonical(52)), b"{}"),
+            (treasury_row(&canonical(53)), b"{}"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let treasury = treasury_keyspace_receipt(&receipt);
+    assert_eq!(treasury.rows_scanned, 2);
+    assert_eq!(treasury.distinct_principals, 2);
+    assert_eq!(treasury.collision_groups, 0);
+}
+
+#[test]
+fn an_unreadable_treasury_spelling_refuses() {
+    // A row whose spelling does not decode, and one with material after a
+    // spelling that does: neither is a row the writer produces, and the
+    // loader refuses both as unreadable keys. The gate refuses rather than
+    // skips, because a skipped row would make the rest look unambiguous.
+    let dir = tempfile::tempdir().unwrap();
+    let one = canonical(54);
+    let root = store_root(dir.path(), "ledger");
+    make_store(
+        &root,
+        &[
+            ("ledger:treasury:did:icn:zNOTAKEY".to_string(), b"{}"),
+            (format!("ledger:treasury:{one}junk"), b"{}"),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/ledger");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, collision_groups, .. }
+            if keyspace == "icn-ledger/treasury"
+                && *rows_unreadable == 2
+                && *collision_groups == 0),
+        "{blockers:?}"
+    );
+    assert_eq!(rows_of(&root), before);
+}
+
+#[test]
+fn treasury_sibling_subspaces_are_not_misread_as_primary_rows() {
+    // One primary row plus one row of every sibling whose key carries no
+    // principal: budget, rule, cooperative index (its value is a spelling,
+    // which the gate never reads) and velocity limit. The start is clear and
+    // the treasury keyspace counts exactly one row — the siblings share the
+    // lexical parent, not the descriptor.
+    let dir = tempfile::tempdir().unwrap();
+    let one = canonical(55);
+    make_store(
+        &store_root(dir.path(), "ledger"),
+        &[
+            (treasury_row(&one), b"{}"),
+            ("ledger:treasury:budget:budget-1".to_string(), b"{}"),
+            ("ledger:treasury:rule:rule-1".to_string(), b"{}"),
+            (
+                "ledger:treasury:idx:coop:food-coop".to_string(),
+                one.as_bytes(),
+            ),
+            ("ledger:treasury:vlimit:vlimit-1".to_string(), b"{}"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let treasury = treasury_keyspace_receipt(&receipt);
+    assert_eq!(
+        treasury.rows_scanned, 1,
+        "siblings are outside the descriptor"
+    );
+    assert_eq!(treasury.collision_groups, 0);
+}
+
+#[test]
+fn a_did_looking_coop_id_in_the_treasury_index_is_never_a_treasury_spelling() {
+    // Opaque-discriminator control. The cooperative index is keyed by a coop
+    // id the ledger never validates, so one can be a DID spelling — here the
+    // alias of the primary row's own principal. The treasury descriptor must
+    // not read it as a second spelling of that row: no treasury collision.
+    // Carrying a spelling under no registered prefix, it surfaces as the one
+    // thing the gate can truthfully say about it — UNCOVERED, unclassified,
+    // exactly as before M1 — which is a different refusal for a different
+    // reason, and the loader (which reads the index's *value*, never its key)
+    // does not disagree about the primary row.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(56);
+    make_store(
+        &store_root(dir.path(), "ledger"),
+        &[
+            (treasury_row(&a), b"{}"),
+            (format!("ledger:treasury:idx:coop:{b}"), a.as_bytes()),
+        ],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/ledger");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
+    assert!(
+        matches!(&blockers[0], Blocker::Uncovered { shape, rows: 1 }
+            if shape == "ledger:treasury:idx:coop:<did>"),
+        "{blockers:?}"
+    );
+    let treasury = treasury_keyspace_receipt(&receipt);
+    assert_eq!(treasury.rows_scanned, 1);
+    assert_eq!(
+        treasury.collision_groups, 0,
+        "no treasury alias was inferred"
+    );
+}
+
+#[test]
+fn treasury_siblings_that_embed_a_spelling_stay_uncovered_not_misclassified() {
+    // The audit and budget-index subspaces embed the treasury spelling as key
+    // structure. M1 dispositions the primary row only; these keep the status
+    // they had before it — principal-bearing rows under no registered
+    // keyspace — and are never folded into the treasury keyspace's count or
+    // its collision groups, even when spelled as the primary row's alias.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(57);
+    make_store(
+        &store_root(dir.path(), "ledger"),
+        &[
+            (treasury_row(&a), b"{}"),
+            (
+                format!("ledger:treasury:audit:{b}:1700000000:audit-1"),
+                b"{}",
+            ),
+            (
+                format!("ledger:treasury:idx:budgets:{b}:budget-1"),
+                b"budget-1",
+            ),
+        ],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/ledger");
+    assert_eq!(blockers.len(), 2, "{blockers:?}");
+    assert!(blockers
+        .iter()
+        .all(|b| matches!(b, Blocker::Uncovered { .. })));
+    let treasury = treasury_keyspace_receipt(&receipt);
+    assert_eq!(treasury.rows_scanned, 1);
+    assert_eq!(treasury.collision_groups, 0);
+}

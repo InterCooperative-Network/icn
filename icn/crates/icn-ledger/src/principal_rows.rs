@@ -28,6 +28,11 @@
 //! economics owner has approved it. Storage code has no standing to settle an
 //! economic question by choosing a survivor, so this module detects and refuses.
 //!
+//! The treasury loader (`crate::treasury`, #2627 M1) is the fourth caller. Its
+//! keyspace is registered `FailClosed` with `RuleBasis::Established`: the
+//! refusal there is the established rule, not a wait for one, which is why the
+//! alias refusal names the keyspace and not a basis.
+//!
 //! Detection is complete before any row reaches an in-memory map, so an
 //! ambiguous keyspace is refused whole rather than half-applied.
 //!
@@ -48,6 +53,15 @@ pub const CLEARED_VOLUME_KEYSPACE: &str = "icn-ledger/cleared_volume";
 
 /// Registry name of the `ledger:frozen:` keyspace.
 pub const FROZEN_KEYSPACE: &str = "icn-ledger/frozen";
+
+/// Registry name of the primary `ledger:treasury:<did>` keyspace (#2627 M1).
+///
+/// The treasury loader (`crate::treasury`) classifies its primary rows through
+/// [`refuse_unless_one_spelling_per_principal`] exactly as the three rebuilds
+/// above do; the scanner descriptor of the same name claims only the primary
+/// rows, never the budget, rule, audit, index or velocity-limit subspaces that
+/// share the lexical parent `ledger:treasury:`.
+pub const TREASURY_KEYSPACE: &str = "icn-ledger/treasury";
 
 /// How many identifier bytes a fingerprint shows.
 ///
@@ -80,10 +94,16 @@ pub struct AliasGroup {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PrincipalRowsRefusal {
     /// Two or more spellings of one principal hold rows in the same keyspace.
+    ///
+    /// The text names the keyspace and leaves its rule basis to the registry:
+    /// the three `Ledger::new` rebuilds refuse under
+    /// `RuleBasis::AwaitingDomainSignOff`, while the treasury loader (#2627 M1)
+    /// refuses under `FailClosed`/`Established` — there the refusal *is* the
+    /// established rule. Asserting one basis here would misstate the other.
     #[error(
         "{keyspace}: {} persisted row group(s) name one principal under several \
-         did:icn: spellings, and this keyspace has no domain-authorized merge \
-         rule (RuleBasis::AwaitingDomainSignOff); refusing to rebuild. \
+         did:icn: spellings, and no domain-authorized merge rule exists for this \
+         keyspace (see its N2-A registry entry); refusing to rebuild. \
          Groups: {}. Run `did-collision-scan` on this data directory for the \
          row-level report.",
         .groups.len(),
