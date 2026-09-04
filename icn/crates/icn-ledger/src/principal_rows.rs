@@ -20,7 +20,7 @@
 //!
 //! # Why it refuses instead of merging
 //!
-//! `icn-ledger/{balance,cleared_volume,frozen}` are three of the six keyspaces
+//! `icn-ledger/{balance,cleared_volume,frozen}` are three of the seven keyspaces
 //! carrying `RuleBasis::AwaitingDomainSignOff` in the N2-A scanner registry
 //! (`icn_store::did_collision_scan::n2a_keyspaces`). Summing two balances or
 //! unioning two freezes is *plausible* and is written down in
