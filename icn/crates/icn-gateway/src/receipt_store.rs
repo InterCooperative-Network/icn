@@ -3300,6 +3300,44 @@ mod tests {
         );
     }
 
+    #[test]
+    fn an_orphan_row_cannot_suppress_a_real_grant() {
+        // Dropping a stale row is only safe because candidates are judged one
+        // canonical `AuthorityGrantId` at a time. If an orphan could abort or
+        // short-circuit the walk, a forged row would become a way to hide
+        // someone's authority — the mirror image of forging one to create it.
+        let store = ReceiptStore::new(temp_db());
+        let (a, b) = alias_pair();
+
+        let real = person_grant(&a, [0xd9u8; 32], 2_000);
+        store.put_authority_grant(&real).unwrap();
+
+        // Orphans on both sides of the real row in scan order: within one
+        // spelling the key sorts by `valid_from`, so these bracket it.
+        for (vf, spelling) in [(1_000u64, &a), (3_000u64, &b)] {
+            let orphan_id = AuthorityGrantId::new();
+            let key = ReceiptStore::grant_by_grantee_key(
+                &Grantee::Person(spelling.clone()),
+                vf,
+                &orphan_id,
+            );
+            store
+                .db
+                .insert(&key, orphan_id.0.hyphenated().to_string().as_bytes())
+                .unwrap();
+        }
+
+        let listed = store
+            .list_authority_grants_by_grantee(&Grantee::Person(b))
+            .unwrap();
+        assert_eq!(
+            listed.len(),
+            1,
+            "the real grant survives its orphan neighbours"
+        );
+        assert_eq!(listed[0].id, real.id);
+    }
+
     /// Insert a raw projection row and return the refusal class the readers
     /// produce for it, or `None` if they accepted the store.
     fn refusal_class_for(
@@ -3421,16 +3459,30 @@ mod tests {
         // What remains is a *subset* read: a scan racing
         // `put_mandate_with_grants_atomic`, which commits several grants at
         // once, may pass one grant's key position before that transaction
-        // lands and so return a set matching no single committed state. That
-        // is safe in the only direction that matters. Authority is never
-        // invented, because every returned grant was loaded from its own
-        // primary and checked there; the omission is fail-closed for each
-        // consumer (the gate refuses an act whose authorizing grant is still
-        // being minted, the revocation seam skips a grant minted after the
-        // decision it is executing, reinstatement picks an older real
-        // template); and the window is identical under every spelling, so it
-        // cannot make an outcome representation-dependent, which is the
-        // property M2 owns.
+        // lands and so return a set matching no single committed state. This
+        // read is therefore **not** a linearizable snapshot of a grantee's
+        // grant set, and is not claimed to be.
+        //
+        // What it does guarantee: authority is never invented, because every
+        // returned grant was loaded from its own primary and checked there;
+        // and every outcome reachable under a subset read is also reachable
+        // by reordering the concurrent commits. The gate only ever becomes
+        // more restrictive. The revocation seam can miss a grant minted
+        // concurrently, which equals the schedule where it ran first, and it
+        // can never miss one committed before it began. Reinstatement's
+        // `has_active_in_domain` precheck is the one consumer a subset read
+        // makes more *permissive* rather than less — it can mint where it
+        // would have declined — and that outcome is the same two active
+        // grants two concurrently accepted minting decisions produce with no
+        // race at all; the precheck is best-effort against a duplicate
+        // proposal, not mutual exclusion.
+        //
+        // None of this is new. The pre-M2 reader scanned and then loaded each
+        // primary with the same absence of a snapshot; M2 changes which rows
+        // are discovered and adds the primary-grantee check, and touches
+        // snapshot semantics not at all. What M2 does remove is the part that
+        // was representation-dependent: the window is now identical under
+        // every spelling of one principal.
         use std::sync::Arc;
         let store = Arc::new(ReceiptStore::new(temp_db()));
         let (a, b) = alias_pair();

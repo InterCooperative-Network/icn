@@ -1550,11 +1550,19 @@ authority independently of the canonical `AuthorityGrant` records.*
   because those projections retire rows on replacement and a scan could miss the old row and its
   replacement both. A behavioural fixture holds the property under concurrent writes. What remains
   is a *subset* read — a scan racing the multi-grant atomic commit may return a set matching no
-  single committed state — and it is safe in the only directions that matter: authority is never
-  invented, because each returned grant was loaded from its own primary and checked there; the
-  omission is fail-closed for every consumer; and the window is identical under every spelling, so
-  it cannot make an outcome representation-dependent. Linearizability is not claimed and is not
-  what this projection owes.
+  single committed state. **This read is not a linearizable snapshot of a grantee's grant set and
+  is not claimed to be.** What is claimed: authority is never invented, because each returned
+  grant was loaded from its own primary and checked there; and every outcome reachable under a
+  subset read is also reachable by reordering the concurrent commits. The gate only becomes more
+  restrictive. Revocation can miss a grant minted concurrently — the schedule where it ran first —
+  and can never miss one committed before it began. Reinstatement's `has_active_in_domain`
+  precheck is the one consumer a subset read makes more *permissive*: it can mint where it would
+  have declined, which is the same two active grants two concurrently accepted minting decisions
+  produce with no race at all, and the precheck is best-effort against a duplicate proposal rather
+  than mutual exclusion. None of this is new — the pre-M2 reader scanned and loaded each primary
+  with the same absence of a snapshot. M2 changes which rows are discovered and adds the
+  primary-grantee check; it touches snapshot semantics not at all, and removes the part that was
+  representation-dependent.
 * **The scanner registers the prefix** as `icn-gateway/adr0014_grant_by_grantee`, `Equivalent`,
   `Established`, under a **third** structural descriptor,
   `PrincipalRegion::LengthPrefixedTagged { principal_tag: 0x01 }`. Neither existing
