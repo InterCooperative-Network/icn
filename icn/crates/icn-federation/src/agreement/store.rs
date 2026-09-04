@@ -40,8 +40,14 @@
 //!   [`AgreementStoreOps::delete_agreement`] removes the canonical row and then
 //!   every projection row naming that agreement under any spelling. A crash at
 //!   any point leaves extra rows, which reads filter, and never a canonical row
-//!   without its rows. Writers are serialized per store so two replacements of
-//!   one agreement cannot interleave their cleanup.
+//!   without its rows.
+//! * **Reads and writes of the namespace are serialized in-process.** Writers
+//!   exclude each other so two replacements of one agreement cannot interleave
+//!   their cleanup, and a party lookup excludes writers because
+//!   [`Store::scan`] is not a snapshot: a replacement that commits partway
+//!   through the projection read could otherwise hide an agreement the party
+//!   belongs to before, during and after (see [`NAMESPACE_LOCK`]). Lookups
+//!   share the namespace with one another.
 //! * **The projection can be recomputed.**
 //!   [`AgreementStore::rebuild_party_index`] derives the expected rows from
 //!   every canonical row and makes the projection equal to them, reporting what
@@ -63,18 +69,74 @@ use icn_store::Store;
 use lru::LruCache;
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
-use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::{debug, warn};
 
 /// Storage key prefixes
 const AGREEMENT_PREFIX: &[u8] = b"federation/agreements/";
 /// Party-index prefix. The N2-A collision scanner scans exactly these bytes;
-/// keep the two in step (see `scanner_registry_names_this_keyspace` below).
+/// keep the two in step (see
+/// `scanner_registry_names_this_keyspace_as_an_equivalent_projection` below).
 const AGREEMENT_PARTY_INDEX: &[u8] = b"idx_agreement_party/";
+/// The byte between the party spelling and the agreement id in a projection
+/// row. Named because the N2-A descriptor declares the same byte as the
+/// terminator of its anchored principal segment, and a key builder that
+/// disagreed with the descriptor would be a scan that reads a different
+/// keyspace than the one this store writes.
+const PARTY_SEPARATOR: u8 = b'/';
 const AMENDMENT_PREFIX: &[u8] = b"federation/amendments/";
 
 /// Default cache size for agreements
 const DEFAULT_CACHE_SIZE: usize = 500;
+
+/// Serializes every projection read and every mutation of the agreement
+/// namespace within this process.
+///
+/// Two separate reasons, and both are needed.
+///
+/// A write is a read-then-write: a replacement reads the previous canonical
+/// row to learn which projection rows it supersedes, and two interleaved
+/// replacements of one agreement could otherwise each retire a row the other's
+/// canonical version still implies, leaving a canonical row without its
+/// projection.
+///
+/// A party lookup needs it because [`Store::scan`] is not a snapshot. sled's
+/// iterator takes its read lock once per item rather than once per scan, so a
+/// mutation that commits partway through the projection read is visible to the
+/// rows not yet visited and invisible to the ones already collected. The write
+/// protocol keeps the projection a superset of canonical membership at every
+/// instant, but a view assembled half before and half after a commit is a
+/// superset of nothing: a replacement that only re-spells a party writes the
+/// new row, writes the canonical row and retires the old row, and a scan that
+/// had passed the new row's position before the write and reaches the old
+/// row's position after it collects neither — so the lookup would report the
+/// party absent from an agreement it belongs to before, during and after, an
+/// answer no valid state gives (#2704's lesson, in this projection's shape).
+/// Canonical verification filters stale rows; it cannot recover a row the scan
+/// never saw. Holding the namespace across the scan and the canonical loads is
+/// what makes the answer one of the two valid ones.
+///
+/// Readers share, so ordinary concurrent lookups do not queue behind each
+/// other. The lock is process-wide rather than per instance so that it covers
+/// every handle over one backend: `icnd` constructs one `AgreementStore` over
+/// a dedicated sled database, but a per-instance lock would coordinate nothing
+/// between two handles, and a sled database admits one process at a time, so a
+/// process-wide lock covers every reader and writer there is.
+static NAMESPACE_LOCK: RwLock<()> = RwLock::new(());
+
+fn write_guard() -> RwLockWriteGuard<'static, ()> {
+    // A caller that panicked while holding the lock has not left the store in
+    // a state this lock protects against; later callers re-read before acting.
+    NAMESPACE_LOCK
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn read_guard() -> RwLockReadGuard<'static, ()> {
+    NAMESPACE_LOCK
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// Why a value failed to deserialize, without the value.
 ///
@@ -180,11 +242,6 @@ pub trait AgreementStoreOps: Send + Sync {
 pub struct AgreementStore {
     store: Arc<dyn Store>,
     cache: RwLock<LruCache<AgreementId, Agreement>>,
-    /// Serializes writers. A replacement reads the previous canonical row to
-    /// learn which projection rows it supersedes; two interleaved replacements
-    /// of one agreement could otherwise each retire a row the other's canonical
-    /// version still implies, leaving a canonical row without its projection.
-    write_lock: Mutex<()>,
 }
 
 impl AgreementStore {
@@ -195,7 +252,6 @@ impl AgreementStore {
         Self {
             store,
             cache: RwLock::new(LruCache::new(capacity)),
-            write_lock: Mutex::new(()),
         }
     }
 
@@ -206,17 +262,7 @@ impl AgreementStore {
         Self {
             store,
             cache: RwLock::new(LruCache::new(capacity)),
-            write_lock: Mutex::new(()),
         }
-    }
-
-    fn write_guard(&self) -> MutexGuard<'_, ()> {
-        // A writer that panicked while holding the lock has not left the store
-        // in a state the lock protects against; later writers re-read the
-        // canonical row before acting.
-        self.write_lock
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Get the storage key for an agreement
@@ -230,7 +276,7 @@ impl AgreementStore {
     fn party_index_key(party_did: &Did, agreement_id: &AgreementId) -> Vec<u8> {
         let mut key = AGREEMENT_PARTY_INDEX.to_vec();
         key.extend(party_did.as_str().as_bytes());
-        key.push(b'/');
+        key.push(PARTY_SEPARATOR);
         key.extend(agreement_id.as_str().as_bytes());
         key
     }
@@ -348,7 +394,7 @@ impl AgreementStore {
         }
         let spelling = rest
             .strip_suffix(id.as_bytes())
-            .and_then(|s| s.strip_suffix(b"/"))
+            .and_then(|s| s.strip_suffix(&[PARTY_SEPARATOR]))
             .ok_or_else(|| {
                 format!(
                     "{}-byte key does not end with the {}-byte agreement id its value names",
@@ -438,7 +484,7 @@ impl AgreementStore {
     /// before mutating anything if a canonical row is unreadable, because the
     /// expected set cannot then be known.
     pub fn rebuild_party_index(&self) -> Result<PartyIndexRebuild> {
-        let _guard = self.write_guard();
+        let _guard = write_guard();
 
         let agreements = self.load_all_canonical()?;
         let mut expected: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
@@ -495,7 +541,7 @@ impl AgreementStore {
 
 impl AgreementStoreOps for AgreementStore {
     fn store_agreement(&self, agreement: &Agreement) -> Result<()> {
-        let _guard = self.write_guard();
+        let _guard = write_guard();
 
         let key = Self::agreement_key(&agreement.id);
         let value = serde_json::to_vec(agreement)?;
@@ -555,7 +601,7 @@ impl AgreementStoreOps for AgreementStore {
     }
 
     fn delete_agreement(&self, id: &AgreementId) -> Result<()> {
-        let _guard = self.write_guard();
+        let _guard = write_guard();
 
         // An unreadable canonical row stops the delete before any byte moves:
         // deleting it would destroy the evidence an operator needs.
@@ -596,6 +642,12 @@ impl AgreementStoreOps for AgreementStore {
     }
 
     fn list_agreements_for_party(&self, party_did: &Did) -> Result<Vec<Agreement>> {
+        // Held across the projection scan *and* the canonical loads: the scan
+        // is not a snapshot, and a replacement committing between the two
+        // could otherwise hide an agreement this party belongs to throughout
+        // (see `NAMESPACE_LOCK`).
+        let _guard = read_guard();
+
         // The projection is read and attributed before the query is even
         // looked at, so a malformed row is refused whatever is asked: refusal
         // is a property of the persisted state, not of the query.
@@ -815,6 +867,7 @@ mod tests {
     use super::*;
     use crate::agreement::{AgreementParty, AgreementType, PartyRole};
     use icn_identity::KeyPair;
+    use std::sync::Mutex;
 
     fn test_did() -> Did {
         KeyPair::generate().unwrap().did().clone()
@@ -1856,7 +1909,16 @@ mod tests {
 
     #[test]
     fn scanner_registry_names_this_keyspace_as_an_equivalent_projection() {
-        use icn_store::did_collision_scan::{n2a_keyspaces, MergeDisposition, RuleBasis};
+        // The N2-A collision scanner must scan exactly the bytes this store
+        // writes, with the layout this store uses: the party spelling is
+        // anchored right after the prefix and ends at the `/`, the agreement
+        // id is an opaque discriminator this store compares as exact bytes and
+        // the scan must not parse, and a collision is one `(principal,
+        // agreement id)` — dispositioned as a redundancy, because the rows are
+        // derivations of one canonical agreement row (#2707).
+        use icn_store::did_collision_scan::{
+            n2a_keyspaces, MergeDisposition, PrincipalRegion, RuleBasis,
+        };
         let descriptor = n2a_keyspaces()
             .into_iter()
             .find(|d| d.prefix == AGREEMENT_PARTY_INDEX)
@@ -1864,10 +1926,16 @@ mod tests {
         assert_eq!(descriptor.name, "icn-federation/agreement_party_index");
         assert_eq!(descriptor.disposition, MergeDisposition::Equivalent);
         assert_eq!(descriptor.basis, RuleBasis::Established);
-        assert!(descriptor.slash_ends_did, "the spelling is followed by `/`");
+        assert_eq!(
+            descriptor.principal_region,
+            PrincipalRegion::AnchoredThenOpaque {
+                terminator: PARTY_SEPARATOR
+            },
+            "the scan must read the party segment and nothing else"
+        );
         assert!(
-            !descriptor.did_ends_key,
-            "the agreement id follows the spelling"
+            !descriptor.slash_ends_did && !descriptor.did_ends_key,
+            "the whole-key flags say nothing about an anchored layout"
         );
     }
 
@@ -1925,6 +1993,12 @@ mod tests {
         fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
             self.log.lock().unwrap().push(("delete", key.to_vec()));
             self.inner.delete(key)
+        }
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            for key in keys {
+                self.log.lock().unwrap().push(("delete", key.to_vec()));
+            }
+            self.inner.delete_atomic(keys)
         }
         fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
             self.inner.scan(prefix)
@@ -2156,6 +2230,503 @@ mod tests {
             text.chars().count() < 400,
             "bounded: {} chars",
             text.chars().count()
+        );
+    }
+
+    // ----- concurrency: the projection scan is not a snapshot (#2704, #2707) ----
+    //
+    // `Store::scan` on sled takes its read lock once per item, so a namespace
+    // read that straddles a commit returns a half-old, half-new view. These
+    // tests make that interleaving deterministic instead of probabilistic and
+    // ask what a party lookup, a replacement, a delete and a rebuild can
+    // observe of one another. No sleeps decide an outcome: a paused operation
+    // waits at a rendezvous, and whether the namespace is held is read from
+    // the lock. The only timeout is the one that turns a pause that never
+    // fires into a failed test instead of a hung test binary.
+
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Condvar;
+    use std::time::Duration;
+
+    /// Where a paused operation stops.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum PauseAt {
+        /// Inside the projection scan, between the rows below `pivot` and the
+        /// rows from `pivot` on — the two halves a sled iterator observes on
+        /// either side of a commit that landed while it was between them.
+        ProjectionScan,
+        /// Between the projection scan and the canonical load of an agreement.
+        CanonicalGet,
+    }
+
+    /// A two-party rendezvous: the paused thread `fire`s and waits until it
+    /// is `resume`d; the test thread `await_fired` (bounded) and `resume`s.
+    #[derive(Default)]
+    struct Rendezvous {
+        state: std::sync::Mutex<(bool, bool)>, // (fired, resumed)
+        changed: Condvar,
+    }
+
+    impl Rendezvous {
+        fn fire_and_wait(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.0 = true;
+            self.changed.notify_all();
+            while !state.1 {
+                state = self.changed.wait(state).unwrap();
+            }
+        }
+
+        /// True once the paused thread has fired; false if it never does
+        /// within the bound (the test is then wrong, not the store).
+        fn await_fired(&self) -> bool {
+            let deadline = std::time::Instant::now() + Duration::from_secs(60);
+            let mut state = self.state.lock().unwrap();
+            while !state.0 {
+                let now = std::time::Instant::now();
+                if now >= deadline {
+                    return false;
+                }
+                state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
+            }
+            true
+        }
+
+        fn resume(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.1 = true;
+            self.changed.notify_all();
+        }
+    }
+
+    /// A `Store` that models what `Store::scan` on sled is: not a snapshot.
+    ///
+    /// The first armed call at `pause_at` fires the rendezvous and waits to
+    /// be resumed; a paused projection scan then returns the rows below
+    /// `pivot` as they were before the pause and the rows from `pivot` on as
+    /// they are after it — exactly the view a real iterator returns when a
+    /// write commits while it is between those two keys. Everything else
+    /// passes straight through to the sled store beneath.
+    struct StraddlingStore {
+        inner: Arc<icn_store::SledStore>,
+        pause_at: PauseAt,
+        pivot: Vec<u8>,
+        rendezvous: Rendezvous,
+        armed: AtomicBool,
+    }
+
+    impl StraddlingStore {
+        fn new(inner: Arc<icn_store::SledStore>, pause_at: PauseAt, pivot: &[u8]) -> Arc<Self> {
+            Arc::new(Self {
+                inner,
+                pause_at,
+                pivot: pivot.to_vec(),
+                rendezvous: Rendezvous::default(),
+                armed: AtomicBool::new(false),
+            })
+        }
+
+        fn fires(&self, at: PauseAt) -> bool {
+            self.pause_at == at && self.armed.swap(false, Ordering::SeqCst)
+        }
+    }
+
+    impl Store for StraddlingStore {
+        fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            if key.starts_with(AGREEMENT_PREFIX) && self.fires(PauseAt::CanonicalGet) {
+                self.rendezvous.fire_and_wait();
+            }
+            self.inner.get(key)
+        }
+        fn put(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+            self.inner.put(key, value)
+        }
+        fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+            self.inner.delete(key)
+        }
+        fn delete_atomic(&self, keys: &[Vec<u8>]) -> anyhow::Result<()> {
+            self.inner.delete_atomic(keys)
+        }
+        fn scan(&self, prefix: &[u8]) -> anyhow::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            if !(prefix == AGREEMENT_PARTY_INDEX && self.fires(PauseAt::ProjectionScan)) {
+                return self.inner.scan(prefix);
+            }
+            let before = self.inner.scan(prefix)?;
+            self.rendezvous.fire_and_wait();
+            let after = self.inner.scan(prefix)?;
+            Ok(before
+                .into_iter()
+                .filter(|(k, _)| *k < self.pivot)
+                .chain(after.into_iter().filter(|(k, _)| *k >= self.pivot))
+                .collect())
+        }
+        fn get_replica_metadata(
+            &self,
+            content_hash: &icn_store::ContentHash,
+        ) -> anyhow::Result<Option<icn_store::ReplicaMetadata>> {
+            self.inner.get_replica_metadata(content_hash)
+        }
+        fn put_replica_metadata(
+            &self,
+            metadata: &icn_store::ReplicaMetadata,
+        ) -> anyhow::Result<()> {
+            self.inner.put_replica_metadata(metadata)
+        }
+        fn list_replica_hashes(&self) -> anyhow::Result<Vec<icn_store::ContentHash>> {
+            self.inner.list_replica_hashes()
+        }
+    }
+
+    /// Run `op` on its own thread, paused at the double's pause point, and
+    /// hand the test the moment it is paused. Nothing between the pause and
+    /// the resume may panic — a paused thread holds the namespace, and a test
+    /// that failed there would hang every other test behind it — so callers
+    /// record observations while paused and assert after `resume`.
+    fn pause<R: Send + 'static>(
+        double: &StraddlingStore,
+        op: impl FnOnce() -> R + Send + 'static,
+    ) -> std::thread::JoinHandle<R> {
+        double.armed.store(true, Ordering::SeqCst);
+        let handle = std::thread::spawn(op);
+        assert!(
+            double.rendezvous.await_fired(),
+            "the paused operation never reached {:?}; the fixture gives it nothing to pause on",
+            double.pause_at
+        );
+        handle
+    }
+
+    /// Run `read` paused at the double's pause point, run `write` while it is
+    /// paused, and return what the read answered.
+    ///
+    /// Whether the namespace is held across the read is read from the lock,
+    /// not guessed from timing. If it is held, `write` cannot land until the
+    /// read completes, so the read is resumed first and the write follows; if
+    /// it is not, `write` is run to completion inside the pause, so the
+    /// straddled view the double returns is exactly the one a real iterator
+    /// would have returned. Either way every step is a rendezvous or a join.
+    fn interleave<R: Send + 'static>(
+        double: &StraddlingStore,
+        read: impl FnOnce() -> R + Send + 'static,
+        write: impl FnOnce() + Send + 'static,
+    ) -> R {
+        let reader = pause(double, read);
+        let namespace_held = NAMESPACE_LOCK.try_write().is_err();
+        let mut writer = Some(std::thread::spawn(write));
+        let written_inside_the_pause = if namespace_held {
+            None
+        } else {
+            writer.take().map(|w| w.join())
+        };
+        double.rendezvous.resume();
+        let answer = reader.join().unwrap();
+        match written_inside_the_pause {
+            Some(result) => result.unwrap(),
+            None => writer.take().unwrap().join().unwrap(),
+        }
+        answer
+    }
+
+    /// Wait until the namespace is free, proving the paused operation let go
+    /// of it. Blocks rather than probes, so another test's momentary hold
+    /// cannot fail this spuriously; a namespace never released hangs here,
+    /// which is the failure it would be.
+    fn namespace_is_released() {
+        drop(
+            NAMESPACE_LOCK
+                .write()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        );
+    }
+
+    /// A key between every `did:icn:f…` (Base16Lower) spelling and every
+    /// `did:icn:z…` (Base58Btc) spelling under the projection prefix.
+    fn pivot_between_base16_and_base58() -> Vec<u8> {
+        let mut pivot = AGREEMENT_PARTY_INDEX.to_vec();
+        pivot.extend_from_slice(b"did:icn:m");
+        pivot
+    }
+
+    fn respell_party(agreement: &Agreement, from: &Did, to: &Did) -> Agreement {
+        let mut respelled = agreement.clone();
+        for party in &mut respelled.parties {
+            if party.did == *from {
+                party.did = to.clone();
+            }
+        }
+        respelled
+    }
+
+    fn implied_keys(agreement: &Agreement) -> Vec<Vec<u8>> {
+        let mut keys: Vec<Vec<u8>> = AgreementStore::implied_rows(agreement)
+            .into_keys()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    #[test]
+    fn a_replacement_that_respells_a_party_cannot_hide_the_agreement_from_a_concurrent_lookup() {
+        // #2704's lesson in this projection's shape. Re-spelling party `p`
+        // writes `idx/<f…>/X`, writes the canonical row, then retires
+        // `idx/<z…>/X`. A projection scan that had passed the `f…` position
+        // before the write and reaches the `z…` position after it collects
+        // neither row, and the lookup would answer "not a party" for an
+        // agreement `p` belongs to before, during and after — an answer no
+        // valid state gives. Canonical verification cannot recover a row the
+        // scan never saw; only holding the namespace across the read can.
+        let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let p = test_did();
+        let respelled = respell(&p, multibase::Base::Base16Lower);
+        let agreement = two_party_agreement(&p, &test_did());
+        let pivot = pivot_between_base16_and_base58();
+        assert!(
+            AgreementStore::party_index_key(&respelled, &agreement.id) < pivot,
+            "fixture: the new spelling must sort below the pivot"
+        );
+        assert!(
+            AgreementStore::party_index_key(&p, &agreement.id) > pivot,
+            "fixture: the old spelling must sort above the pivot"
+        );
+
+        let double = StraddlingStore::new(raw.clone(), PauseAt::ProjectionScan, &pivot);
+        let store = Arc::new(AgreementStore::new(double.clone() as Arc<dyn Store>));
+        store.store_agreement(&agreement).unwrap();
+        let replacement = respell_party(&agreement, &p, &respelled);
+
+        let (reader, writer) = (store.clone(), store.clone());
+        let queried = p.clone();
+        let answer = interleave(
+            &double,
+            move || reader.list_agreements_for_party(&queried).unwrap(),
+            move || writer.store_agreement(&replacement).unwrap(),
+        );
+
+        assert_eq!(
+            ids_of(&answer),
+            vec![agreement.id.as_str().to_string()],
+            "p is a party before and after the replacement; no valid state omits the agreement"
+        );
+        // Once the write has landed, either spelling finds it and the
+        // projection holds exactly the rows the new canonical row implies.
+        assert_eq!(store.list_agreements_for_party(&p).unwrap().len(), 1);
+        assert_eq!(
+            store.list_agreements_for_party(&respelled).unwrap().len(),
+            1
+        );
+        let mut keys = index_keys(&raw);
+        keys.sort();
+        assert_eq!(
+            keys,
+            implied_keys(&store.get_agreement(&agreement.id).unwrap().unwrap())
+        );
+    }
+
+    #[test]
+    fn two_handles_over_one_backend_are_serialized_by_the_namespace_not_by_the_handle() {
+        // `icnd` holds one handle; tests, and any per-request construction,
+        // hold several over one backend. A lock owned by the handle would
+        // coordinate nothing between them, so the guard is process-wide. This
+        // is the re-spelling case with the lookup on one cold handle and the
+        // replacement on another.
+        let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let p = test_did();
+        let respelled = respell(&p, multibase::Base::Base16Lower);
+        let agreement = two_party_agreement(&p, &test_did());
+        let pivot = pivot_between_base16_and_base58();
+        let double = StraddlingStore::new(raw.clone(), PauseAt::ProjectionScan, &pivot);
+        AgreementStore::new(double.clone() as Arc<dyn Store>)
+            .store_agreement(&agreement)
+            .unwrap();
+        let replacement = respell_party(&agreement, &p, &respelled);
+
+        let reader = AgreementStore::new(double.clone() as Arc<dyn Store>);
+        let writer = AgreementStore::new(double.clone() as Arc<dyn Store>);
+        let queried = p.clone();
+        let answer = interleave(
+            &double,
+            move || reader.list_agreements_for_party(&queried).unwrap(),
+            move || writer.store_agreement(&replacement).unwrap(),
+        );
+
+        assert_eq!(ids_of(&answer), vec![agreement.id.as_str().to_string()]);
+    }
+
+    #[test]
+    fn a_concurrent_party_replacement_answers_from_the_state_before_or_after_never_between() {
+        // X: parties [a, c] → [b, c], while Y: parties [b, c] stands still so
+        // that a reader for `b` has a canonical row to load in the pre-state
+        // too. A reader for `a` and a reader for `b`, each paused inside the
+        // projection scan and again between the scan and a canonical load,
+        // must answer with the pre-state answer or the post-state answer and
+        // nothing else. This shape has no hybrid even without the namespace
+        // held — every candidate is checked against its canonical row — and
+        // is recorded so the re-spelling case above is seen for what it is:
+        // the one shape where a row the scan never saw is a row canonical
+        // state implies.
+        for pause_at in [PauseAt::ProjectionScan, PauseAt::CanonicalGet] {
+            let a = test_did();
+            let b = respell(&test_did(), multibase::Base::Base16Lower);
+            let c = test_did();
+            let pivot = pivot_between_base16_and_base58();
+            let x = two_party_agreement(&a, &c);
+            let y = two_party_agreement(&b, &c);
+            let (xid, yid) = (x.id.as_str().to_string(), y.id.as_str().to_string());
+            let pre_post = [
+                (&a, vec![xid.clone()], vec![]),
+                (&b, vec![yid.clone()], vec![xid.clone(), yid.clone()]),
+            ];
+            for (queried, pre, post) in pre_post {
+                let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+                let double = StraddlingStore::new(raw.clone(), pause_at, &pivot);
+                let seed = AgreementStore::new(double.clone() as Arc<dyn Store>);
+                seed.store_agreement(&x).unwrap();
+                seed.store_agreement(&y).unwrap();
+                let replacement = respell_party(&x, &a, &b);
+
+                // A cold reader, so the canonical load reaches the backend
+                // rather than the handle's cache.
+                let reader = AgreementStore::new(double.clone() as Arc<dyn Store>);
+                let writer = AgreementStore::new(double.clone() as Arc<dyn Store>);
+                let queried = queried.clone();
+                let answer = ids_of(&interleave(
+                    &double,
+                    move || reader.list_agreements_for_party(&queried).unwrap(),
+                    move || writer.store_agreement(&replacement).unwrap(),
+                ));
+                let mut pre = pre.clone();
+                pre.sort();
+                let mut post = post.clone();
+                post.sort();
+                assert!(
+                    answer == pre || answer == post,
+                    "{pause_at:?}: {answer:?} is neither the pre-state {pre:?} nor the post-state {post:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_concurrent_delete_answers_from_the_state_before_or_after_never_between() {
+        for pause_at in [PauseAt::ProjectionScan, PauseAt::CanonicalGet] {
+            let a = test_did();
+            let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let double = StraddlingStore::new(raw.clone(), pause_at, &[]);
+            let agreement = two_party_agreement(&a, &test_did());
+            AgreementStore::new(double.clone() as Arc<dyn Store>)
+                .store_agreement(&agreement)
+                .unwrap();
+
+            let reader = AgreementStore::new(double.clone() as Arc<dyn Store>);
+            let writer = AgreementStore::new(double.clone() as Arc<dyn Store>);
+            let (queried, id) = (a.clone(), agreement.id.clone());
+            let answer = interleave(
+                &double,
+                move || reader.list_agreements_for_party(&queried).unwrap().len(),
+                move || writer.delete_agreement(&id).unwrap(),
+            );
+            assert!(answer <= 1, "{pause_at:?}: {answer}");
+            assert!(AgreementStore::new(double.clone() as Arc<dyn Store>)
+                .list_agreements_for_party(&a)
+                .unwrap()
+                .is_empty());
+            assert!(
+                index_keys(&raw).is_empty(),
+                "{pause_at:?}: the delete retired every row"
+            );
+        }
+    }
+
+    #[test]
+    fn a_party_lookup_holds_the_namespace_across_its_scan_and_its_canonical_loads() {
+        // Read from the lock itself, at both pause points: while a lookup is
+        // inside its scan, or between its scan and its canonical loads, a
+        // writer cannot take the namespace; once it returns, one can.
+        // (Readers share by construction of `RwLock::read`; that is not
+        // asserted here, because a writer queued by another test makes a
+        // probe of it spurious.)
+        for pause_at in [PauseAt::ProjectionScan, PauseAt::CanonicalGet] {
+            let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+            let p = test_did();
+            let agreement = two_party_agreement(&p, &test_did());
+            AgreementStore::new(raw.clone() as Arc<dyn Store>)
+                .store_agreement(&agreement)
+                .unwrap();
+            let double = StraddlingStore::new(raw.clone(), pause_at, &[]);
+            let cold = Arc::new(AgreementStore::new(double.clone() as Arc<dyn Store>));
+
+            let reader = {
+                let (cold, p) = (cold.clone(), p.clone());
+                pause(&double, move || cold.list_agreements_for_party(&p).unwrap())
+            };
+            let writer_blocked = NAMESPACE_LOCK.try_write().is_err();
+            double.rendezvous.resume();
+            let answer = reader.join().unwrap();
+            namespace_is_released();
+
+            assert!(
+                writer_blocked,
+                "{pause_at:?}: a writer must wait for the lookup"
+            );
+            assert_eq!(answer.len(), 1);
+        }
+    }
+
+    #[test]
+    fn a_rebuild_holds_the_namespace_exclusively_across_its_scans_and_its_writes() {
+        // A rebuild reads every canonical row, then the whole projection, then
+        // writes. A replacement or a lookup landing between any two of those
+        // steps would either be answered from a projection mid-repair or leave
+        // the rebuild retiring a row the new canonical version implies. It
+        // holds the namespace exclusively from its first read to its last
+        // write, and the projection it leaves is exactly the implied one.
+        let raw = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let p = test_did();
+        let agreement = two_party_agreement(&p, &test_did());
+        AgreementStore::new(raw.clone() as Arc<dyn Store>)
+            .store_agreement(&agreement)
+            .unwrap();
+        // Two rows the protocol could have left behind: a duplicate alias row
+        // and a row for an agreement that no longer exists.
+        raw.put(
+            &AgreementStore::party_index_key(
+                &respell(&p, multibase::Base::Base16Lower),
+                &agreement.id,
+            ),
+            agreement.id.as_str().as_bytes(),
+        )
+        .unwrap();
+        raw.put(
+            &AgreementStore::party_index_key(&p, &AgreementId::new("agr-gone")),
+            b"agr-gone",
+        )
+        .unwrap();
+
+        let double = StraddlingStore::new(raw.clone(), PauseAt::ProjectionScan, &[]);
+        let store = Arc::new(AgreementStore::new(double.clone() as Arc<dyn Store>));
+        let rebuild = {
+            let store = store.clone();
+            pause(&double, move || store.rebuild_party_index().unwrap())
+        };
+        let reader_blocked = NAMESPACE_LOCK.try_read().is_err();
+        let writer_blocked = NAMESPACE_LOCK.try_write().is_err();
+        double.rendezvous.resume();
+        let report = rebuild.join().unwrap();
+        namespace_is_released();
+
+        assert!(reader_blocked, "a lookup must wait for the rebuild");
+        assert!(writer_blocked, "a replacement must wait for the rebuild");
+        assert_eq!(report.agreements, 1);
+        assert_eq!(report.rows_kept, 2);
+        assert_eq!(report.rows_added, 0);
+        assert_eq!(report.rows_removed_stale, 2);
+        assert_eq!(report.rows_removed_malformed, 0);
+        let mut keys = index_keys(&raw);
+        keys.sort();
+        assert_eq!(
+            keys,
+            implied_keys(&agreement),
+            "the projection equals what canonical rows imply"
         );
     }
 }
