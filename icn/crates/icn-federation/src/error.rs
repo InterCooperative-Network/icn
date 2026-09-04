@@ -219,6 +219,16 @@ pub enum FederationError {
         value_len: usize,
     },
 
+    /// An agreement whose id is empty cannot be persisted. The party-index
+    /// projection names an agreement by its id after the `/`, so an empty id
+    /// would make the store write a row its own projection parser refuses —
+    /// after which every lookup and delete would fail closed with no in-band
+    /// repair, and a rebuild would oscillate between removing the rows as
+    /// malformed and re-deriving them from the canonical row. Refused before
+    /// any byte moves. Carries nothing: an empty id has no bytes to echo.
+    #[error("Refusing to persist an agreement with an empty id: the party index cannot name it")]
+    AgreementIdEmpty,
+
     /// `idx_agreement_party/` holds rows the agreement store could never have
     /// written: a key that does not parse as
     /// `idx_agreement_party/<did>/<agreement id>`, a spelling that names no
@@ -227,7 +237,9 @@ pub enum FederationError {
     /// interpret the projection refuse rather than read around it. `rows`
     /// counts every such row; `first_reason` describes one without its bytes.
     /// The remedy is `AgreementStore::rebuild_party_index`, which recomputes
-    /// the projection from the canonical rows.
+    /// the projection from the canonical rows — provided every canonical row
+    /// is sound; a canonical row carrying an empty id is refused as unreadable
+    /// instead, so the rebuild cannot oscillate over it.
     #[error(
         "Malformed idx_agreement_party/ projection: {rows} row(s) cannot be attributed ({first_reason}); rebuild the party index from the canonical agreement rows"
     )]

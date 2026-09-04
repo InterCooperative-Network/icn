@@ -822,7 +822,7 @@ the flip itself.
 | 7 | `String`/`Did` peer-map semantics | **OPEN** | design complete (§6.3), unimplemented — `SessionManager.connections` is still keyed by the peer spelling (`icn-net/src/session.rs`) |
 | 8 | No §7.5 migration smuggled in | **HELD** | `gov:vote:` rows and the `icn-coop` membership row are excluded, not migrated; the startup gate reports vote collisions and does not act on them (§10.2) |
 | 9 | Broad discriminating tests for the flip | **DONE for the flip itself** | #2686 — `did_principal_equality`, fifteen tests flipped and three re-scoped (#2627 records the count), the `PeerId` tripwire; the ledger loaders carry the §4.1 fixtures. What remains untested is what remains unimplemented (rows 4 and 7) |
-| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 28 fixture tests plus the scanner's. Inside `icn-ledger`, the three loaders refuse again for their own keyspaces (§4.1; 30 fixtures) |
+| 10 | Fail-closed check inside the key-equality binary | **DONE** | §10 — `icnd` refuses to start over an unruled collision, uncovered row, unreadable row, unverifiable store or newer-generation receipt; 42 fixture tests plus the scanner's. Inside `icn-ledger`, the three loaders refuse again for their own keyspaces (§4.1; 30 fixtures) |
 | 11 | Persisted principal-identity generation boundary | **DONE (generation 1)** | §10.3 — the receipt records the generation; a newer generation's receipt is refused. Generation 2 (any re-key) is *not* designed; the ledger loaders re-key nothing and leave it at 1 |
 
 Blockers **3, 4 and 7 are independent of collision evidence** and would each remain even if every
@@ -1120,7 +1120,12 @@ independently of canonical agreement state.*
   other agreement's projection rows, a rebuild call the named agreement's real rows stale, or a
   lookup report a party absent from a row it never read. Every mutating path (`store_agreement`,
   `delete_agreement`, `rebuild_party_index`) reads canonical evidence before it moves a byte, so
-  both refusals leave the store byte-for-byte unchanged.
+  both refusals leave the store byte-for-byte unchanged. An agreement id is never empty:
+  `store_agreement` refuses one before any byte moves (`AgreementIdEmpty`), and a canonical row
+  that carries one — a shape a pre-#2707 store could hold, and one the gossip handler would
+  otherwise accept from any peer — is unreadable canonical evidence, refused by every operation
+  that needs it including the rebuild, because the projection cannot encode it and a rebuild
+  over it would oscillate (integration review finding, generation 2).
 * **Writes keep the projection a superset of the truth, never a subset.** `store_agreement`
   writes the new party rows, then the canonical row, then retires the rows the previous canonical
   version implied and the new one does not (a removed party, or a party the new version spells

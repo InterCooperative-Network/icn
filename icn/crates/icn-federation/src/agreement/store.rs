@@ -339,6 +339,21 @@ impl AgreementStore {
                 reason: unreadable_reason(&err),
             }
         })?;
+        // The projection names an agreement by its id after the `/`, so a
+        // canonical row carrying an empty id — a shape a pre-#2707 store could
+        // hold, since nothing validated the id — is one whose projection rows
+        // this store's own parser must refuse, and a rebuild over it would
+        // oscillate between removing those rows as malformed and re-deriving
+        // them. It is canonical evidence this store cannot attribute, refused
+        // like any other unreadable row: every operation that needs it fails
+        // closed before a byte moves, the rebuild included (#2707 review).
+        if agreement.id.as_str().is_empty() {
+            return Err(FederationError::AgreementStoreUnreadable {
+                key_len: key.len(),
+                value_len: value.len(),
+                reason: "empty agreement id".to_string(),
+            });
+        }
         if Self::agreement_key(&agreement.id) != key {
             return Err(FederationError::AgreementStoreKeyValueMismatch {
                 key_agreement_id: bounded_key_id(key),
@@ -541,6 +556,12 @@ impl AgreementStore {
 
 impl AgreementStoreOps for AgreementStore {
     fn store_agreement(&self, agreement: &Agreement) -> Result<()> {
+        // The one id the projection cannot encode. Refused before any byte
+        // moves, and before the namespace is taken: nothing is read.
+        if agreement.id.as_str().is_empty() {
+            return Err(FederationError::AgreementIdEmpty);
+        }
+
         let _guard = write_guard();
 
         let key = Self::agreement_key(&agreement.id);
@@ -2233,6 +2254,76 @@ mod tests {
         );
     }
 
+    // ----- an empty agreement id (#2707 delta review, generation 2) -----------
+    //
+    // `AgreementId(pub String)` admits the empty string, and the gossip
+    // handler stores any well-formed proposal naming this node. The projection
+    // names an agreement by its id after the `/`, so an empty id is the one id
+    // it cannot encode: the store would write rows its own parser refuses.
+
+    #[test]
+    fn an_agreement_with_an_empty_id_is_refused_before_any_byte_moves() {
+        let (raw, store) = open_pair();
+        let sound = two_party_agreement(&test_did(), &test_did());
+        store.store_agreement(&sound).unwrap();
+        let before = raw.scan(b"").unwrap();
+
+        let mut poison = two_party_agreement(&test_did(), &test_did());
+        poison.id = AgreementId::new("");
+        assert!(matches!(
+            store.store_agreement(&poison),
+            Err(FederationError::AgreementIdEmpty)
+        ));
+
+        assert_eq!(raw.scan(b"").unwrap(), before, "the refusal moved a byte");
+        assert_eq!(store.list_agreements().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_canonical_row_with_an_empty_id_is_unreadable_and_the_rebuild_refuses() {
+        // The shape a pre-#2707 store could hold: `main` validated no id and
+        // wrote the canonical row plus a projection row per party, valued by
+        // the empty id. Every operation that needs the row fails closed, the
+        // rebuild included — a rebuild that removed the rows as malformed and
+        // re-derived them from the canonical row would never converge.
+        let (raw, store) = open_pair();
+        let p = test_did();
+        let sound = two_party_agreement(&p, &test_did());
+        store.store_agreement(&sound).unwrap();
+        let mut poison = two_party_agreement(&p, &test_did());
+        poison.id = AgreementId::new("");
+        raw.put(
+            &AgreementStore::agreement_key(&poison.id),
+            &serde_json::to_vec(&poison).unwrap(),
+        )
+        .unwrap();
+        for (key, value) in AgreementStore::implied_rows(&poison) {
+            raw.put(&key, &value).unwrap();
+        }
+        let before = raw.scan(b"").unwrap();
+        let cold = AgreementStore::new(raw.clone() as Arc<dyn Store>);
+
+        assert!(matches!(
+            cold.get_agreement(&poison.id),
+            Err(FederationError::AgreementStoreUnreadable { .. })
+        ));
+        assert!(matches!(
+            cold.list_agreements(),
+            Err(FederationError::AgreementStoreUnreadable { .. })
+        ));
+        assert!(matches!(
+            cold.rebuild_party_index(),
+            Err(FederationError::AgreementStoreUnreadable { .. })
+        ));
+        // The planted projection rows are malformed to the parser, so the
+        // lookup refuses as well, whatever is asked.
+        assert!(matches!(
+            cold.list_agreements_for_party(&p),
+            Err(FederationError::AgreementPartyIndexMalformed { .. })
+        ));
+        assert_eq!(raw.scan(b"").unwrap(), before, "a refusal moved a byte");
+    }
+
     // ----- concurrency: the projection scan is not a snapshot (#2704, #2707) ----
     //
     // `Store::scan` on sled takes its read lock once per item, so a namespace
@@ -2377,23 +2468,50 @@ mod tests {
         }
     }
 
+    /// An operation paused at the double's pause point.
+    ///
+    /// Dropping it resumes the rendezvous, so a test that panics after
+    /// pausing — `pause` itself included, when the pause never fires within
+    /// its bound — cannot leave the operation parked holding the namespace
+    /// and hang every other test behind it.
+    struct Paused<'a, R> {
+        double: &'a StraddlingStore,
+        handle: Option<std::thread::JoinHandle<R>>,
+    }
+
+    impl<R> Paused<'_, R> {
+        fn resume_and_join(mut self) -> R {
+            self.double.rendezvous.resume();
+            self.handle.take().unwrap().join().unwrap()
+        }
+    }
+
+    impl<R> Drop for Paused<'_, R> {
+        fn drop(&mut self) {
+            self.double.rendezvous.resume();
+        }
+    }
+
     /// Run `op` on its own thread, paused at the double's pause point, and
     /// hand the test the moment it is paused. Nothing between the pause and
     /// the resume may panic — a paused thread holds the namespace, and a test
     /// that failed there would hang every other test behind it — so callers
-    /// record observations while paused and assert after `resume`.
-    fn pause<R: Send + 'static>(
-        double: &StraddlingStore,
+    /// record observations while paused and assert after `resume_and_join`.
+    fn pause<'a, R: Send + 'static>(
+        double: &'a StraddlingStore,
         op: impl FnOnce() -> R + Send + 'static,
-    ) -> std::thread::JoinHandle<R> {
+    ) -> Paused<'a, R> {
         double.armed.store(true, Ordering::SeqCst);
-        let handle = std::thread::spawn(op);
+        let paused = Paused {
+            double,
+            handle: Some(std::thread::spawn(op)),
+        };
         assert!(
             double.rendezvous.await_fired(),
             "the paused operation never reached {:?}; the fixture gives it nothing to pause on",
             double.pause_at
         );
-        handle
+        paused
     }
 
     /// Run `read` paused at the double's pause point, run `write` while it is
@@ -2418,8 +2536,7 @@ mod tests {
         } else {
             writer.take().map(|w| w.join())
         };
-        double.rendezvous.resume();
-        let answer = reader.join().unwrap();
+        let answer = reader.resume_and_join();
         match written_inside_the_pause {
             Some(result) => result.unwrap(),
             None => writer.take().unwrap().join().unwrap(),
@@ -2662,8 +2779,7 @@ mod tests {
                 pause(&double, move || cold.list_agreements_for_party(&p).unwrap())
             };
             let writer_blocked = NAMESPACE_LOCK.try_write().is_err();
-            double.rendezvous.resume();
-            let answer = reader.join().unwrap();
+            let answer = reader.resume_and_join();
             namespace_is_released();
 
             assert!(
