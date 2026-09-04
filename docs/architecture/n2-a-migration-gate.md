@@ -669,9 +669,12 @@ siblings that embed a spelling as key structure. Those — `audit:<did>:<ts>:<id
 and `idx:budgets:<did>:<budget>` — keep the status they had before M1: **uncovered** to the gate,
 which refuses a store that holds them until each is registered under its own argued disposition.
 That is the honest boundary, not a regression, and it is the next treasury follow-up: a store with
-a registered treasury and its index is clear at the gate, a store with a budget or an audit
-record is not, exactly as before. A DID-looking `coop_id` in an `idx:coop:` key is likewise
-uncovered and never a treasury spelling. Registry pins hold the descriptor to this shape from both
+a registered treasury and its cooperative index is clear at the gate; a store in which a budget
+has been created — `create_budget` writes `idx:budgets:<did>:<budget>` beside the principal-free
+`budget:<id>` row, and it is the index row that is uncovered — or an audit record has been
+recorded is not, exactly as before. A bare `budget:`, `rule:`, `idx:coop:` or `vlimit:` row
+carries no principal in its key and blocks nothing. A DID-looking `coop_id` in an `idx:coop:`
+key is likewise uncovered and never a treasury spelling. Registry pins hold the descriptor to this shape from both
 sides — in `icn-store` against literal sibling prefixes, in `icn-ledger` against the ledger's own
 prefix constants — so the two cannot drift apart silently.
 
