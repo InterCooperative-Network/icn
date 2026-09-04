@@ -1272,17 +1272,16 @@ impl ReceiptStore {
     /// about, and silently dropping it would answer "no authority exists"
     /// on the strength of evidence that was never read.
     fn grant_ids_for_grantee(&self, grantee: &Grantee) -> Result<Vec<AuthorityGrantId>, String> {
-        let scan: &[u8] = match grantee {
-            Grantee::Person(_) => AUTHORITY_GRANT_BY_GRANTEE_PREFIX,
-            Grantee::Entity(_) => &Self::grant_by_grantee_scan_prefix(grantee),
+        let scan: Vec<u8> = match grantee {
+            Grantee::Person(_) => AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec(),
+            Grantee::Entity(_) => Self::grant_by_grantee_scan_prefix(grantee),
         };
-        let owned_scan = scan.to_vec();
 
         let mut malformed = 0usize;
         let mut first_reason: Option<GranteeIndexReason> = None;
         let mut ids: Vec<AuthorityGrantId> = Vec::new();
 
-        for entry in self.db.scan_prefix(&owned_scan) {
+        for entry in self.db.scan_prefix(&scan) {
             let (key, value) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
             let row = match Self::parse_grant_by_grantee_row(&key, &value) {
                 Ok(row) => row,
