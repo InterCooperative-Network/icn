@@ -902,3 +902,176 @@ fn the_refusal_message_is_actionable_and_payload_free() {
     assert!(!message.contains("SECRET-VALUE"), "{message}");
     assert!(!message.contains(&a[8..]), "{message}");
 }
+
+// ---------------------------------------------------------------------------
+// federation/attestations (#2703/#2704)
+//
+// The gate and `icn_federation::AttestationStore` read the same rows through
+// two different doors — one asks "may this node open this state?", the other
+// "may this operation interpret it?". They must agree on what a collision *is*
+// or the answer depends on which door you came through. These fixtures write
+// the exact bytes the store writes and assert the gate's side of that
+// agreement.
+// ---------------------------------------------------------------------------
+
+/// A row exactly as `AttestationStore` keys it.
+fn attestation_row(spelling: &str, source: &str) -> String {
+    format!("federation/attestations/{spelling}/{source}")
+}
+
+#[test]
+fn an_alias_collision_in_the_federation_attestation_keyspace_refuses() {
+    // Two persisted claims from one source cooperative about one principal,
+    // spelled two ways. They can only differ by disagreeing, and no
+    // federation-domain rule authorizes choosing between them, so the node
+    // must not open the store — exactly what `AttestationStore` does when a
+    // lookup, a listing, a write or the expiry sweep meets the same pair.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(30);
+    let root = store_root(dir.path(), "federation");
+    make_store(
+        &root,
+        &[
+            (attestation_row(&a, "food-coop"), b"{}"),
+            (attestation_row(&b, "food-coop"), b"{}"),
+        ],
+    );
+    let before = rows_of(&root);
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/federation");
+    assert_eq!(blockers.len(), 1, "{blockers:?}");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, disposition, collision_groups, rows_in_collisions, .. }
+            if keyspace == "icn-federation/attestations"
+                && disposition == "FAIL-CLOSED"
+                && *collision_groups == 1
+                && *rows_in_collisions == 2),
+        "{blockers:?}"
+    );
+    assert_eq!(receipt.verdict, Verdict::Refused);
+
+    // The gate reports; it never repairs. Both physical spellings survive
+    // byte-for-byte, because the evidence an operator needs to disposition the
+    // pair is the pair.
+    assert_eq!(rows_of(&root), before, "the gate re-keyed or dropped a row");
+    assert_eq!(before.len(), 2);
+}
+
+#[test]
+fn control_one_principal_under_two_spellings_from_two_sources_is_clear() {
+    // The same two spellings of the same principal, differing in exactly one
+    // fact: the source cooperative. Attestations from different cooperatives
+    // about one member are the federation's ordinary union, so this must not
+    // refuse — otherwise the fixture above would pass by blocking everything.
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(31);
+    make_store(
+        &store_root(dir.path(), "federation"),
+        &[
+            (attestation_row(&a, "food-coop"), b"{}"),
+            (attestation_row(&b, "housing-coop"), b"{}"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let federation = receipt
+        .stores
+        .iter()
+        .find(|s| s.path.ends_with("store/federation"))
+        .unwrap()
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-federation/attestations")
+        .expect("the gate consumes the registered federation descriptor");
+    assert_eq!(federation.rows_scanned, 2);
+    assert_eq!(federation.distinct_principals, 2);
+    assert_eq!(federation.rows_unreadable, 0);
+    assert_eq!(federation.collision_groups, 0);
+    assert!(!federation.must_fail_closed);
+}
+
+#[test]
+fn a_source_cooperative_id_containing_a_did_does_not_refuse_the_start() {
+    // Nothing in the federation domain forbids a cooperative identifier that
+    // contains `did:icn:`, and `AttestationStore` compares source ids as exact
+    // bytes. A gate that parsed inside the source would refuse a start over a
+    // store the running node reads without difficulty (#2704 review, P2).
+    let dir = tempfile::tempdir().unwrap();
+    let member = canonical(32);
+    let (source_a, source_b) = two_spellings(33);
+    make_store(
+        &store_root(dir.path(), "federation"),
+        &[
+            (attestation_row(&member, &format!("coop-{source_a}")), b"{}"),
+            (attestation_row(&member, &format!("coop-{source_b}")), b"{}"),
+            (attestation_row(&member, "did:icn:!!!!"), b"{}"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    let federation = receipt.stores[0]
+        .keyspaces
+        .iter()
+        .find(|k| k.keyspace == "icn-federation/attestations")
+        .unwrap();
+    assert_eq!(federation.rows_scanned, 3);
+    assert_eq!(
+        federation.distinct_principals, 3,
+        "one member, three source ids the scan never parses"
+    );
+    assert_eq!(federation.rows_unreadable, 0);
+    assert_eq!(federation.collision_groups, 0);
+}
+
+#[test]
+fn a_federation_row_whose_member_segment_names_no_principal_refuses() {
+    // The layout puts a principal at the anchor, so a row without one is a row
+    // nobody can classify — and `AttestationStore` refuses it too, because its
+    // loader rebuilds the key from the value and finds a mismatch.
+    let dir = tempfile::tempdir().unwrap();
+    let one = canonical(34);
+    make_store(
+        &store_root(dir.path(), "federation"),
+        &[
+            (attestation_row("did:icn:!!!!", "food-coop"), b"{}"),
+            (attestation_row(&format!("{one}junk"), "food-coop"), b"{}"),
+        ],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "store/federation");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, collision_groups, .. }
+            if keyspace == "icn-federation/attestations"
+                && *rows_unreadable == 2
+                && *collision_groups == 0),
+        "{blockers:?}"
+    );
+}
+
+#[test]
+fn a_federation_attestation_row_is_never_reported_as_uncovered() {
+    // Before #2703 registered this prefix a populated attestation row could
+    // only surface as an uncovered shape: blocking, but unclassified. The
+    // registration is what turns it into a keyspace the gate can speak about.
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &store_root(dir.path(), "federation"),
+        &[(attestation_row(&canonical(35), "food-coop"), b"{}")],
+    );
+
+    let receipt = enforce(dir.path(), now()).unwrap();
+
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert!(
+        !receipt_text(dir.path()).contains("UNCOVERED"),
+        "an attestation row must be classified, not merely unaccounted for"
+    );
+}
