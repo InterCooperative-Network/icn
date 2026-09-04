@@ -2742,7 +2742,11 @@ mod tests {
         assert_eq!(
             anchored,
             vec![
-                ("icn-federation/attestations", b'/', MergeDisposition::FailClosed),
+                (
+                    "icn-federation/attestations",
+                    b'/',
+                    MergeDisposition::FailClosed
+                ),
                 (
                     "icn-federation/agreement_party_index",
                     b'/',
@@ -3549,7 +3553,10 @@ mod tests {
         assert!(!report.must_fail_closed());
 
         let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
-        assert!(audit.is_clear(), "an equivalent group does not block a start");
+        assert!(
+            audit.is_clear(),
+            "an equivalent group does not block a start"
+        );
         assert_eq!(
             audit.uncovered_did_rows(),
             0,
@@ -3569,7 +3576,10 @@ mod tests {
             (&party_index_key(&one, "agr-2"), b"agr-2"),
         ]);
         let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
-        assert_eq!(report.distinct_principals, 2, "two (party, agreement) tuples");
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two (party, agreement) tuples"
+        );
         assert!(report.collision_groups.is_empty());
 
         // Same principal, alternate spellings, different agreements: the one
@@ -3712,7 +3722,10 @@ mod tests {
 
         let report = scan_keyspace(&store, &party_index_descriptor()).unwrap();
         assert_eq!(report.rows_scanned, 5);
-        assert_eq!(report.rows_unreadable, 0, "the agreement id is never parsed");
+        assert_eq!(
+            report.rows_unreadable, 0,
+            "the agreement id is never parsed"
+        );
         assert_eq!(report.rows_with_readable_did, 5);
         assert_eq!(
             report.distinct_principals, 5,
@@ -3825,7 +3838,10 @@ mod tests {
 
         let f = scan_keyspace(&forward, &party_index_descriptor()).unwrap();
         let r = scan_keyspace(&reversed, &party_index_descriptor()).unwrap();
-        assert_eq!(f, r, "same rows, same report, whatever order they were written");
+        assert_eq!(
+            f, r,
+            "same rows, same report, whatever order they were written"
+        );
         assert_eq!(f.collision_groups.len(), 1);
         assert!(f.is_automatable());
     }
