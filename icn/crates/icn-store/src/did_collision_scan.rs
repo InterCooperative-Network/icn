@@ -1836,9 +1836,11 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         anchor per PRINCIPAL. The durable index is rotation-blind, so no claim \
                         is made about one anchor per human, and none is made about the identity \
                         semantics of an anchor, which IDENTITY_SEMANTICS.md classifies as a \
-                        legacy and ambiguous carrier. Two rows pointing at ONE anchor id are \
-                        the ordinary healthy shape of this namespace, not a collision, and are \
-                        not refused. A migration must not decide the collision either. \
+                        legacy and ambiguous carrier. Every enrollment writes two rows that \
+                        reach one anchor id, and they are clear because their spellings decode \
+                        to two DIFFERENT principals — not because they share an anchor id, \
+                        which this scan never reads. Two rows naming ONE principal are grouped \
+                        and refused however they resolve. A migration must not decide the collision either. \
                         Already-derived duplicate anchors are not dispositioned here.",
         },
         KeyspaceDescriptor {

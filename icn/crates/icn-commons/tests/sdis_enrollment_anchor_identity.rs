@@ -18,12 +18,13 @@
 //! anchor_id"), two anchors are also two holders — the seam M3 (§11.7) left
 //! open at `commons/holders/by_did/`.
 //!
-//! The rule enforced is the repository's own, not one invented for N2-A:
-//! `api/sdis/recovery.rs` states recovery "allows rotating to a new KeyBundle
-//! while keeping the same Anchor", and `complete_enrollment` already refuses a
-//! repeat with "This identity has already been enrolled (VUI collision)" — on
-//! a VUI computed as `SHA-256(did.to_string())`, which is spelling-derived and
-//! so cannot see an alias at all.
+//! What authorizes refusing is narrow: `complete_enrollment` already refuses a
+//! repeat with "This identity has already been enrolled (VUI collision)" and
+//! fails to deliver it, because that VUI is `SHA-256(did.to_string())` —
+//! spelling-derived, so it cannot see an alias — and the whole check is skipped
+//! when no steward manager is configured. These fixtures pin the question that
+//! route already intends to ask; they decide nothing about the identity
+//! semantics of an anchor.
 
 // Test-only: assertions and fixture setup panic on failure by design.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

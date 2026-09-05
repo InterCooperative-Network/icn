@@ -1919,8 +1919,9 @@ planted pair without repairing it.
   own owners; neither is closed here.
 - **The same-spelling re-enrollment behaviour change is stated, not hidden.** A second enrollment
   of an already-enrolled principal now fails where it previously succeeded. That is a behaviour
-  change on a non-I7 defect, adopted because the principal-level question subsumes it and because
-  the domain's own recovery design and error message already say a repeat is invalid.
+  change on a non-I7 defect, adopted because the principal-level question subsumes a
+  spelling-level one that resubmitting the original spelling would defeat, and because the
+  enrollment route's own error message already says a repeat is invalid.
 - **Recovery rotation is not wired into this index.** A rotated principal has no row here, so the
   guard is Principal-scoped and rotation-blind. Not a regression — no row existed before M4a either
   — but it bounds the claim, and it is the identity owner's question whether the durable index

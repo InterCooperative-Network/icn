@@ -174,12 +174,13 @@ impl AnchorIndexDefect {
 /// spelling is unused. This states the difference so a caller cannot confuse
 /// "this spelling is unused" with "this principal has no anchor".
 ///
-/// The domain rule being enforced is the repository's own, not one invented
-/// here: `api/sdis/recovery.rs` states that recovery "allows rotating to a new
-/// KeyBundle while keeping the same Anchor", and the enrollment route already
-/// refuses a repeat with "This identity has already been enrolled (VUI
-/// collision)" — using a VUI derived from `SHA-256(did.to_string())`, which is
-/// spelling-derived and so cannot see an alias at all.
+/// What authorizes refusing is narrow, and is not an identity rule: the
+/// enrollment route already refuses a repeat with "This identity has already
+/// been enrolled (VUI collision)" and fails to deliver it, because that VUI is
+/// `SHA-256(did.to_string())` — spelling-derived, so it cannot see an alias —
+/// and the whole check is skipped when no steward manager is configured. This
+/// asks the question that route already intends to ask. It decides nothing
+/// about the identity semantics of an anchor.
 #[derive(Debug)]
 pub enum AnchorEnrollmentClassification {
     /// A row under this principal's exact textual spelling resolves to a
