@@ -735,10 +735,16 @@ pub struct SledListingsStore {
     /// the database file, so no second process — and no second `sled::open` in
     /// this one — can hold the same database open. `icn_gateway::server` builds
     /// exactly one `SledListingsStore`, owned by the one `ListingsManager` as a
-    /// `Box`, so that instance is the only writer. Constructing a second store
-    /// over a clone of the same `Arc<sled::Db>` would give it a second lock and
-    /// leave only the CAS between them; nothing in production does, and
-    /// `the_production_gateway_builds_one_listings_store` pins it.
+    /// `Box`, so that instance is the only writer.
+    ///
+    /// The bound of that, stated exactly: constructing a *second* store over a
+    /// clone of the same `Arc<sled::Db>` would give it a second lock and leave
+    /// only the CAS between the two, so the alias guard is instance-scoped
+    /// while the same-spelling guard is not. Nothing in production does — the
+    /// single construction site is `icn_gateway::server` — and the two facts
+    /// this rests on are pinned rather than asserted:
+    /// `sled_refuses_a_second_open_of_one_database` and
+    /// `two_store_instances_over_one_database_keep_the_cas_guarantee`.
     interest_uniqueness: std::sync::Mutex<()>,
 }
 
@@ -1114,11 +1120,20 @@ impl SledListingsStore {
     ///
     /// This function has a TOCTOU (time-of-check-time-of-use) race condition:
     /// between checking if an interest exists and removing the orphaned index,
-    /// another thread could insert a new interest. This is acceptable because:
+    /// another thread could insert a new interest. It does not take the
+    /// uniqueness lock, so the race is real. It is acceptable because:
     /// 1. This is a maintenance task meant for off-peak/quiescent periods
-    /// 2. Worst case: an index is removed for a just-created interest, which
-    ///    only affects duplicate detection (the interest data remains intact)
-    /// 3. The next express_interest call will recreate the index
+    /// 2. Worst case: an index row is removed for a just-created interest.
+    ///    Uniqueness is unaffected — the canonical `v1:interest:` row decides,
+    ///    and it is untouched here (#2627 M4b).
+    ///
+    /// What that costs is *evidence*, not safety: the row is not recreated. A
+    /// later `express_interest` for that principal is answered `AlreadyPresent`
+    /// from the canonical row and returns before reaching the CAS, so the
+    /// N2-A gate simply has one fewer uniqueness row to read for that pair.
+    /// Before M4b this pass could recognise no production row at all, so the
+    /// race was unreachable; it is reachable now, and recorded rather than
+    /// closed (migration gate §11.9).
     ///
     /// For production at scale, consider running this in a transaction or
     /// during scheduled maintenance windows when write traffic is minimal.

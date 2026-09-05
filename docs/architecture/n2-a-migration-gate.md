@@ -1999,6 +1999,11 @@ job, not a mutation path's. And a row that decodes cleanly to a *different* prin
 when unbacked: refusal is for evidence that cannot be proven *not* to name the caller, and one
 member's orphaned lock must not close a listing to everybody else.
 
+Every refusal carries a reason class and nothing else: `reason_class` returns a `&'static str` from
+a closed set and the defect enum holds no payload, so no DID spelling, interest message or offer can
+travel with it. It does not reach a client in any case — `GatewayError::InternalError` replaces the
+manager's text with a generic string — so the reason class is an operator-log fact.
+
 **Writer bytes unchanged.** The CAS is kept, unmoved, behind the classification: it remains the
 unconditional storage-level decider of the same-spelling race. `interest_index_key`,
 `interest_key`, the sentinel value, `ListingInterest.from_did` and the `Uuid::new_v4()` interest id
@@ -2045,7 +2050,9 @@ key, then the canonical row is written. A crash between them still leaves a lock
 row, and the affected principal is still refused until the maintenance pass clears it. M4b narrows
 that debt rather than closing it — the pass could not recognise such a row at all before, so the
 window was unbounded in practice and is now one scheduler interval — and introduces no transaction
-system. An `insert` that returns an error still rolls the lock row back, as before.
+system. An `insert` that returns an error still rolls the lock row back, as before. The *scope* of
+such a lock does widen: pre-M4b a principal could escape its own orphan by re-spelling, because the
+escape route was the defect itself. It is now refused under every spelling until the pass clears it.
 
 **Complexity.** Classification is O(interests for this listing) plus O(uniqueness rows for this
 listing), both bounded by the listing's own prefix rather than the global namespace, and
@@ -2073,6 +2080,19 @@ index was invented; that would be a new persisted key and therefore a migration.
   rather than fixed.
 - **One lockout class is narrowed, none is eliminated.** An orphaned lock still refuses its
   principal between the crash and the next maintenance pass.
+- **The uniqueness projection can now lose a row for a live pair, and is not self-healing.** The
+  maintenance pass's pre-existing TOCTOU — and `delete_interest_indexes` racing a write — can remove
+  the row for a (listing, principal) whose canonical interest survives. Uniqueness is unaffected,
+  because the canonical row decides and a later request is answered from it before reaching the CAS.
+  What is lost is *evidence*: the gate has one fewer uniqueness row to read for that pair. The race
+  predates M4b and its uniqueness consequence is strictly improved by it, but it was unreachable
+  while the pass recognised no production row, so M4b is what makes it reachable. Recorded, not
+  closed.
+- **`ListingsStoreBackend::add_interest` is not guarded.** It writes a canonical interest with no
+  uniqueness check and no index row, on both backends. It has no caller in the workspace and is not
+  reachable through `ListingsManager` or any route, so it is outside the M4b defect surface — but it
+  is the one remaining public way to construct the state this section exists to prevent, and closing
+  the trait is left open.
 - **Adjacent keyspaces are untouched.** `receipt:meeting_attendance:by_pair:`,
   `idx_device_owner:`, `idx_notif_recipient:`, the `apps/ledger-app` indexes and
   `action_item_by_assignee:` remain open in §11.4. M4b changes no listings economics, matching,

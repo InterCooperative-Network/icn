@@ -246,6 +246,14 @@ async fn a_third_spelling_of_one_principal_is_refused_as_well() {
 /// The client must not be able to tell an alias duplicate from an ordinary one:
 /// "this principal already holds an interest, under a different spelling" is an
 /// implementation detail about someone's identity.
+///
+/// Note what carries this. `GatewayError::InternalError` replaces the manager's
+/// text with a generic string before it reaches the body, so the two responses
+/// would match even if the messages differed — this test cannot discriminate
+/// between them, and is a regression guard on the sanitized surface rather than
+/// evidence about the reason strings. The reason classes stay operator-log-only
+/// by construction: `UniquenessEvidenceDefect::reason_class` returns a
+/// `&'static str` from a closed set and the enum carries no payload.
 #[actix_web::test]
 async fn an_alias_duplicate_is_indistinguishable_from_a_same_spelling_duplicate() {
     let mgr = sled_manager();
@@ -448,8 +456,14 @@ fn a_uniqueness_row_with_an_unrecognised_value_refuses() {
     );
 }
 
+/// A key under the listing's own prefix whose trailing component is not a
+/// spelling. Reached through `SpellingNamesNoPrincipal` rather than the framing
+/// arm — under this scan the prefix has already fixed a canonical listing UUID,
+/// so the framing arms are reachable only from cleanup's namespace-wide scan
+/// (`cleanup_skips_a_malformed_row_rather_than_deleting_it`). Either way the
+/// answer must be a refusal, never absence.
 #[test]
-fn a_uniqueness_key_whose_listing_framing_is_unparsable_refuses() {
+fn a_uniqueness_key_that_is_not_the_writers_layout_refuses() {
     let (mgr, db) = sled_manager_with_db();
     let listing = active_listing(&mgr, spelling_a(1), "bad framing").id;
     // Under the listing's own prefix, but with a second framing component that
@@ -925,6 +939,36 @@ fn concurrent_distinct_principals_both_succeed() {
 /// The alias guard is serialised per store instance, and that is a whole
 /// database because sled holds an exclusive lock on the file it opens. Pinned
 /// here because the guard's scope argument rests on it.
+/// Two stores over one database keep the same-spelling guarantee, because that
+/// one is sled's and not the lock's. This is the exact bound of the alias
+/// guard, pinned rather than left to the doc comment: the alias half is
+/// serialised per store instance, and production builds one.
+#[test]
+fn two_store_instances_over_one_database_keep_the_cas_guarantee() {
+    let db = Arc::new(sled::Config::new().temporary(true).open().unwrap());
+    let first = ListingsManager::with_sled(db.clone());
+    let second = ListingsManager::with_sled(db.clone());
+    let listing = active_listing(&first, spelling_a(1), "two instances").id;
+    let a = spelling_a(40);
+
+    assert!(first
+        .express_interest(
+            listing,
+            a.clone(),
+            "coop".to_string(),
+            "1".to_string(),
+            None
+        )
+        .is_ok());
+    assert!(
+        second
+            .express_interest(listing, a, "coop".to_string(), "2".to_string(), None)
+            .is_err(),
+        "the compare-and-swap decides the same spelling across store instances,          with no lock shared between them"
+    );
+    assert_eq!(primary_rows(&db, &listing).len(), 1);
+}
+
 #[test]
 fn sled_refuses_a_second_open_of_one_database() {
     let dir = tempfile::tempdir().unwrap();
