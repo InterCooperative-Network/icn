@@ -202,28 +202,50 @@ async fn a_proven_absent_spelling_derives_the_same_holder_id_as_before() {
     );
 }
 
-/// Two concurrent profile updates naming one principal under two spellings, on
-/// the production ownership path: `CommonsHandle` serializes every mutation
-/// through one write lock, so the guard the second caller runs sees the first
-/// caller's row.
+/// Two profile updates naming one principal under two spellings, issued from
+/// two independently scheduled tasks against the production ownership path.
+///
+/// What this does and does not establish. `CommonsHandle` serializes every
+/// mutation through one write lock, and `CommonsInner::update_display_name`
+/// contains no `.await` between classifying and writing — so once a task holds
+/// the guard it runs the check and the write to completion, and there is no
+/// interleaving window to close. The guard is concurrency-correct *because of
+/// that*, not because it defends a race.
+///
+/// So this fixture is an outcome check, not a race detector: under real
+/// multi-threaded scheduling and genuine lock contention (both tasks are
+/// spawned and released together by a barrier), exactly one of two
+/// same-Principal mints succeeds. It failed before the guard existed, but it
+/// failed for the plain alias reason the fixture above states — not because a
+/// race was observed. No new synchronization primitive was added for it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_alias_updates_mint_at_most_one_holder() {
     let handle = CommonsHandle::new_in_memory();
     let a = principal(6);
     let b = alternate_spelling(&a);
 
-    let (first, second) = tokio::join!(
-        {
-            let handle = handle.clone();
-            let a = a.clone();
-            async move { handle.update_display_name(&a, "A".to_string()).await }
-        },
-        {
-            let handle = handle.clone();
-            let b = b.clone();
-            async move { handle.update_display_name(&b, "B".to_string()).await }
+    // Both tasks are parked here until the other has also reached it, so the
+    // two `update_display_name` calls contend for the write lock rather than
+    // being serialized by the scheduler happening to start one much earlier.
+    let gate = Arc::new(tokio::sync::Barrier::new(2));
+
+    let first = tokio::spawn({
+        let (handle, a, gate) = (handle.clone(), a.clone(), gate.clone());
+        async move {
+            gate.wait().await;
+            handle.update_display_name(&a, "A".to_string()).await
         }
-    );
+    });
+    let second = tokio::spawn({
+        let (handle, b, gate) = (handle.clone(), b.clone(), gate.clone());
+        async move {
+            gate.wait().await;
+            handle.update_display_name(&b, "B".to_string()).await
+        }
+    });
+
+    let first = first.await.expect("the first task ran to completion");
+    let second = second.await.expect("the second task ran to completion");
 
     assert_eq!(
         [first.is_ok(), second.is_ok()]
@@ -231,7 +253,7 @@ async fn concurrent_alias_updates_mint_at_most_one_holder() {
             .filter(|ok| **ok)
             .count(),
         1,
-        "exactly one of two concurrent same-principal mints may succeed"
+        "exactly one of two same-principal mints may succeed"
     );
 
     let held_a = handle.get_holder_by_did(&a).await.unwrap();

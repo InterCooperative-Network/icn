@@ -1673,10 +1673,14 @@ opaque hex, carry no spelling in the key, and do not start with the registered p
 appearing in a sibling's stored *value* is not key material and is invisible to a key scan. Sibling
 isolation is pinned by fixture.
 
-**Gate and runtime agree.** Before registration the gate blocked an ordinary deployment holding a
-single weak holder, as `UNCOVERED` — and blocked two *distinct* principals for the same reason, a
-false refusal. Registered, one valid row and two distinct principals are clear, and the alias pair
-refuses as `icn-commons/holder_by_did` / `FAIL-CLOSED`. A fixture drives one real `commons.sled`
+**Gate and runtime agree.** Before registration the gate blocked a store holding a single weak
+holder, as `UNCOVERED` — and blocked two *distinct* principals for the same reason, a false
+refusal. Registered, one valid row and two distinct principals are clear, and the alias pair refuses
+as `icn-commons/holder_by_did` / `FAIL-CLOSED`. **This unblocks the `by_did` holder rows and nothing
+else:** a deployment whose holders came through enrollment also carries
+`commons/anchors/by_did/<anchor DID>` rows, which no descriptor covers, so such a store still
+refuses to start after M3. The fixtures build the anchorless weak-holder store the profile-update
+path produces; the anchor and steward indexes are M4's. A fixture drives one real `commons.sled`
 through both layers: the state the mint seam produces is a state the gate opens, the alias pair the
 gate refuses is the state the seam refuses to create, and the seam then refuses to add a third
 spelling to it. Both wrappers write sled's default tree, so the gate reads exactly the bytes Commons
@@ -1684,8 +1688,13 @@ wrote.
 
 **Concurrency, bounded honestly.** `CommonsHandle` owns commons state behind one
 `tokio::sync::RwLock` and every mutation takes the write lock; both gateway callers reach the seam
-only through it. Two concurrent alias-spelled updates therefore serialize, and exactly one mints —
-pinned by a multi-threaded fixture that failed before the guard (both succeeded). Production opens
+only through it. `CommonsInner::update_display_name` contains no `.await` between classifying and
+writing, so a task that holds the guard runs the check and the write to completion: **there is no
+interleaving window, and none was closed here.** The guard is concurrency-correct because of that
+ordering, not because it defends a race. A multi-threaded fixture spawns two same-Principal updates
+released together by a barrier and asserts exactly one mints — an outcome check under real lock
+contention, not a race detector. It did fail before the guard existed, for the plain alias reason
+above rather than because any interleaving was observed. Production opens
 `commons.sled` once: `icn_core::supervisor::lifecycle` creates the handle and injects it, and
 `icn_gateway::server` uses the injected handle rather than opening a second store; the standalone
 `with_sled_path` fallback runs only when no handle was injected, and sled holds an exclusive `flock`
@@ -1715,3 +1724,12 @@ consumers of that lookup — `authority.rs::require_office_in_jurisdiction`,
 identity is not Principal-transparent, and M3 does not claim it is. The sibling
 `commons/anchors/by_did/` and `commons/stewards/by_did/` indexes, the `StewardId` derivation and
 the spelling-derived holder id itself are untouched and remain as §11.4 records them.
+
+**The guard is at one seam, and only one.** `get_or_create_holder` →
+`create_holder_from_anchor_with_name`, reached from SDIS enrollment, also constructs a fresh holder
+(`Weak` when the anchor carries no attestations) and de-duplicates by **anchor**, not by principal.
+Two enrollments of one principal under two spellings therefore still produce two holders — exactly
+the state the new descriptor refuses at startup. That is a pre-existing behaviour and not a
+regression: before M3 this keyspace was `UNCOVERED` and blocked startup for *any* holder row. The
+claim is bounded accordingly — at most one newly-minted holder per decoded principal **at the
+profile-update seam** — and the enrollment seam is left for its own slice.

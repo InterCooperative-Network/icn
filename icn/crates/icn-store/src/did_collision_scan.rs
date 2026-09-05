@@ -1789,9 +1789,10 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         member's standing that no identity-layer rule answers. Two rows \
                         pointing at one holder id are refused on the same ground: no domain \
                         rule authorizes collapsing the spellings, and a rebuild must not pick. \
-                        The live mint seam refuses the same state before it can be created \
-                        (icn_commons::store::classify_holder_mint, #2627 M3); a migration must \
-                        not decide it either. Already-derived duplicate holders are not \
+                        The weak-holder mint reached by profile updates \
+                        refuses to create this state (icn_commons::store::classify_holder_mint, \
+                        #2627 M3); the anchor-keyed enrollment path is a separate seam and is not \
+                        guarded by it. A migration must not decide the collision either. Already-derived duplicate holders are not \
                         dispositioned here.",
         },
         KeyspaceDescriptor {

@@ -802,8 +802,17 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         // state its primary is in, the principal is already held here, and
         // adopting or re-keying that holder is not a rule M3 carries.
         for (key, _) in self.store.scan(HOLDER_BY_DID_PREFIX)? {
+            // A scanned key that does not carry the prefix it was scanned
+            // under is a backend contract this store cannot interpret. Both
+            // in-tree backends return whole keys, so this is unreachable
+            // today — but skipping such a row would be the one arm in this
+            // function that turns unreadable evidence back into inferred
+            // absence, which is the mistake the whole classification exists
+            // to prevent.
             let Some(suffix) = key.strip_prefix(HOLDER_BY_DID_PREFIX) else {
-                continue;
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::MalformedRow,
+                ));
             };
             let Ok(spelling) = std::str::from_utf8(suffix) else {
                 return Ok(HolderMintClassification::Unreadable(
