@@ -1630,6 +1630,7 @@ one principal both succeeded.
 
 ```text
 exact index row for this spelling?
+  value is not 64 lowercase hex digits            → REFUSE  holder_index_malformed
   primary proven, filed under this same spelling  → ordinary update
   primary cannot be resolved                      → REFUSE  holder_index_primary_missing
   primary filed under a different spelling        → REFUSE  holder_index_primary_mismatch
@@ -1643,6 +1644,11 @@ Absence of a *principal* is a claim about every spelling, so it is proven agains
 never inferred from the one key that missed. The exact-spelling read happens first so the ordinary
 case — one canonical spelling looked up by itself — does not pay for a scan; only the branch that
 is about to create durable identity reads the namespace.
+
+The value's shape is checked before the primary is looked up, because a value that is merely UTF-8
+would otherwise fail to resolve and be reported as a *stale* index whose primary is missing. Both
+refuse, so nothing is unsafe either way — but a dangling reference and an unreadable one are
+different defects with different remedies, and the classification must not conflate them.
 
 The exact-hit arm requires the primary to be filed under the **byte-identical** spelling, not merely
 to name the same principal. `get_holder_by_did` resolves an index row and loads the primary without

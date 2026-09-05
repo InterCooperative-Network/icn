@@ -455,22 +455,39 @@ async fn malformed_namespace_evidence_cannot_be_read_as_absence() {
 
 /// §13: a row under this principal's own spelling whose *value* is not a
 /// readable holder id is equally unreadable.
+///
+/// The value must be the shape `put_holder` writes — 64 lowercase hex digits.
+/// A value that is merely UTF-8 would otherwise fail to resolve and be reported
+/// as a *stale* index whose primary is missing, which is a different defect
+/// with a different remedy: a dangling reference is not an unreadable one.
 #[tokio::test]
 async fn a_malformed_holder_id_value_cannot_be_read_as_absence() {
-    let store = backend();
-    let inner = CommonsInner::new(store.clone());
-    let a = principal(12);
+    for (label, value) in [
+        ("invalid utf-8", vec![0xff, 0xfe]),
+        ("not hex at all", b"not-a-holder-id".to_vec()),
+        ("uppercase hex", "AB".repeat(32).into_bytes()),
+        ("hex, wrong length", "ab".repeat(16).into_bytes()),
+        ("empty", Vec::new()),
+    ] {
+        let store = backend();
+        let inner = CommonsInner::new(store.clone());
+        let a = principal(12);
 
-    plant_index_row(&store, a.to_string().as_bytes(), &[0xff, 0xfe]);
-    let before = all_holder_rows(&store);
+        plant_index_row(&store, a.to_string().as_bytes(), &value);
+        let before = all_holder_rows(&store);
 
-    let err = inner
-        .update_display_name(&a, "First".to_string())
-        .await
-        .expect_err("an unreadable holder id is not proof of absence");
+        let err = match inner.update_display_name(&a, "First".to_string()).await {
+            Err(err) => err,
+            Ok(()) => panic!("{label}: an unreadable holder id must refuse, not mint"),
+        };
 
-    assert_eq!(refusal_reason(&err), "holder_index_malformed");
-    assert_eq!(all_holder_rows(&store), before);
+        assert_eq!(
+            refusal_reason(&err),
+            "holder_index_malformed",
+            "{label}: an unreadable value is not a dangling reference"
+        );
+        assert_eq!(all_holder_rows(&store), before, "{label}: nothing written");
+    }
 }
 
 /// §27: every refusal is bounded and payload-free. A diagnostic that reproduced
@@ -500,16 +517,19 @@ async fn refusal_diagnostics_are_bounded_and_payload_free() {
         "reason class stays short: {}",
         reason.len()
     );
-    for leak in [
-        a.as_str(),
-        b.as_str(),
-        secret_name,
-        "did:icn:",
-        "commons/holders",
+    // The values are named rather than interpolated: an assertion message that
+    // printed the very thing it checks for absence would put that value into
+    // test output, which is the leak this test exists to rule out.
+    for (what, leak) in [
+        ("the requested spelling", a.as_str()),
+        ("the alias spelling", b.as_str()),
+        ("the display name", secret_name),
+        ("the DID scheme", "did:icn:"),
+        ("the physical key prefix", "commons/holders"),
     ] {
         assert!(
             !reason.contains(leak),
-            "diagnostic must not carry {leak:?}, got {reason:?}"
+            "the diagnostic must not carry {what}"
         );
     }
 }

@@ -38,6 +38,10 @@ pub const ANCHOR_BY_DID_PREFIX: &[u8] = b"commons/anchors/by_did/";
 pub const HOLDER_PREFIX: &[u8] = b"commons/holders/";
 pub const HOLDER_BY_DID_PREFIX: &[u8] = b"commons/holders/by_did/";
 pub const HOLDER_BY_ANCHOR_PREFIX: &[u8] = b"commons/holders/by_anchor/";
+/// Width of a `CommonsHolderRecord` id in bytes. Values under
+/// [`HOLDER_BY_DID_PREFIX`] are this many bytes hex-encoded, which is the shape
+/// [`CommonsStore::put_holder`] writes and the only shape a holder id can have.
+pub const HOLDER_ID_BYTES: usize = 32;
 pub const CHARTER_PREFIX: &[u8] = b"commons/charters/";
 pub const CHARTER_BY_DOMAIN_PREFIX: &[u8] = b"commons/charters/by_domain/";
 pub const STEWARD_PREFIX: &[u8] = b"commons/stewards/";
@@ -775,6 +779,23 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
                     HolderIndexDefect::MalformedRow,
                 ));
             };
+            // The value must be the shape `put_holder` writes — `hex::encode`
+            // of a 32-byte holder id, so 64 lowercase hex digits. Without this
+            // check a value that is UTF-8 but not a holder id at all simply
+            // fails to resolve, and the row would be reported as a stale index
+            // whose primary is missing. Both refuse, so nothing is unsafe
+            // either way; but they are different defects and an operator acts
+            // on them differently, so the classification must not conflate a
+            // dangling reference with an unreadable one.
+            if id.len() != 2 * HOLDER_ID_BYTES
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::MalformedRow,
+                ));
+            }
             let Some(holder) = self.get_holder(&id)? else {
                 return Ok(HolderMintClassification::Unreadable(
                     HolderIndexDefect::PrimaryMissing,
