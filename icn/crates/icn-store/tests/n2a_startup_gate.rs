@@ -1755,3 +1755,270 @@ fn broken_binary_framing_in_a_grantee_row_refuses() {
         "a length field that overruns the key must refuse; got {err:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// icn-commons `commons/holders/by_did/` — the weak-holder identity index
+// (#2627 M3)
+//
+// A weak `CommonsHolderRecord`'s durable id is `SHA-256` of the textual DID it
+// was minted from, so two spellings of one principal name two independent
+// holders with their own status, personhood level and rights. The gate must
+// refuse that state for the same reason the live mint seam refuses to create
+// it: choosing a survivor is a decision about a member's standing, and no
+// identity-layer rule makes it.
+//
+// The store is the real one: `commons.sled` sits at the data-directory level,
+// where `icn_core::supervisor::lifecycle` and `icn_gateway::server` open it.
+// ---------------------------------------------------------------------------
+
+fn commons_root(data_dir: &Path) -> PathBuf {
+    data_dir.join("commons.sled")
+}
+
+fn holder_by_did_key(spelling: &str) -> String {
+    format!("commons/holders/by_did/{spelling}")
+}
+
+/// A: one valid row is covered and clear.
+///
+/// Before registration this row blocked as `UNCOVERED` — an ordinary
+/// deployment holding a single weak holder could not start. Registration is
+/// what turns it into a dispositioned, passing row.
+#[test]
+fn a_single_holder_by_did_row_is_covered_and_clear() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &commons_root(dir.path()),
+        &[(holder_by_did_key(&canonical(20)), b"aa")],
+    );
+
+    let receipt = enforce(dir.path(), now()).expect("one spelling, one holder, nothing to decide");
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert!(
+        receipt
+            .stores
+            .iter()
+            .any(|s| s.path.ends_with("commons.sled")),
+        "the commons store is listed, not skipped: {:?}",
+        receipt.stores.iter().map(|s| &s.path).collect::<Vec<_>>()
+    );
+}
+
+/// B: two spellings of one principal naming two different holders refuses.
+#[test]
+fn an_alias_pair_of_holder_by_did_rows_refuses() {
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(21);
+    make_store(
+        &commons_root(dir.path()),
+        &[
+            (holder_by_did_key(&a), b"aa"),
+            (holder_by_did_key(&b), b"bb"),
+        ],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+
+    let blockers = blockers_for(&receipt, "commons.sled");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, disposition, collision_groups, .. }
+            if keyspace == "icn-commons/holder_by_did"
+                && disposition == "FAIL-CLOSED"
+                && *collision_groups == 1),
+        "{blockers:?}"
+    );
+
+    // Nothing is repaired on the way past: the gate reports, it does not merge.
+    assert_eq!(
+        rows_of(&commons_root(dir.path())).len(),
+        2,
+        "both rows survive the refusal untouched"
+    );
+}
+
+/// C: two spellings pointing at *one* holder id still refuses.
+///
+/// It looks like the benign case, and it is not one this tranche may wave
+/// through: nothing in the registry authorizes collapsing two spellings, and
+/// the equal values would make a rebuild's choice look free. `Equivalent` is a
+/// claim about derivation that only the owning domain can make.
+#[test]
+fn an_alias_pair_pointing_at_one_holder_still_refuses() {
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = two_spellings(22);
+    make_store(
+        &commons_root(dir.path()),
+        &[
+            (holder_by_did_key(&a), b"aa"),
+            (holder_by_did_key(&b), b"aa"),
+        ],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+    let blockers = blockers_for(&receipt, "commons.sled");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, disposition, .. }
+            if keyspace == "icn-commons/holder_by_did" && disposition == "FAIL-CLOSED"),
+        "{blockers:?}"
+    );
+}
+
+/// D: two distinct principals are not a collision. Before registration this
+/// state blocked too, as uncovered — a false refusal.
+#[test]
+fn control_two_distinct_principals_hold_two_holders_and_are_clear() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &commons_root(dir.path()),
+        &[
+            (holder_by_did_key(&canonical(23)), b"aa"),
+            (holder_by_did_key(&canonical(24)), b"cc"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now()).expect("two principals, two holders, no collision");
+    assert_eq!(receipt.verdict, Verdict::Clear);
+}
+
+/// E: a suffix that carries the DID scheme but no readable principal is
+/// unreadable evidence, not a principal-free row.
+#[test]
+fn a_malformed_holder_by_did_suffix_refuses_as_unreadable() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &commons_root(dir.path()),
+        &[(holder_by_did_key("did:icn:zzz!!!not-multibase"), b"aa")],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+    let blockers = blockers_for(&receipt, "commons.sled");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, .. }
+            if keyspace == "icn-commons/holder_by_did" && *rows_unreadable == 1),
+        "{blockers:?}"
+    );
+}
+
+/// E, second form: `did_ends_key` states the writer's shape, so a spelling with
+/// anything appended is a row the real loader would never produce and cannot be
+/// read as a clean principal.
+#[test]
+fn a_holder_by_did_row_with_bytes_after_the_spelling_refuses_as_unreadable() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &commons_root(dir.path()),
+        &[(
+            format!("{}:trailing", holder_by_did_key(&canonical(25))),
+            b"aa",
+        )],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+    let blockers = blockers_for(&receipt, "commons.sled");
+    assert!(
+        matches!(&blockers[0], Blocker::Keyspace { keyspace, rows_unreadable, .. }
+            if keyspace == "icn-commons/holder_by_did" && *rows_unreadable == 1),
+        "{blockers:?}"
+    );
+}
+
+/// F: sibling isolation. The primary holder record and the by-anchor index live
+/// under the same lexical parent and are keyed by opaque hex, not by a
+/// spelling. Neither is claimed by this descriptor, and a `did:icn:` that
+/// appears in a sibling's stored *value* is not key material.
+#[test]
+fn the_holder_primary_and_by_anchor_siblings_are_outside_this_descriptor() {
+    let dir = tempfile::tempdir().unwrap();
+    let opaque = hex::encode(principal(26));
+    let spelling = canonical(26);
+    make_store(
+        &commons_root(dir.path()),
+        &[
+            // The two siblings, under two spellings' worth of opaque ids.
+            (format!("commons/holders/{opaque}"), b"{}"),
+            (
+                format!("commons/holders/{}", hex::encode(principal(27))),
+                b"{}",
+            ),
+            (format!("commons/holders/by_anchor/{opaque}"), b"aa"),
+            // A sibling whose *value* spells a DID.
+            (
+                format!("commons/holders/by_anchor/{}", hex::encode(principal(27))),
+                spelling.as_bytes(),
+            ),
+            // One real index row, so the descriptor is exercised at the same
+            // time and the clear verdict is not vacuous.
+            (holder_by_did_key(&spelling), b"aa"),
+        ],
+    );
+
+    let receipt = enforce(dir.path(), now())
+        .expect("opaque sibling keys carry no spelling and are not this keyspace");
+    assert_eq!(receipt.verdict, Verdict::Clear);
+    assert_eq!(
+        rows_of(&commons_root(dir.path())).len(),
+        5,
+        "every planted row is still there"
+    );
+}
+
+/// §20, behaviourally: a sibling row whose *key* happens to carry a spelling
+/// must not be read as a holder-by-DID row.
+///
+/// The two siblings are keyed by hex and cannot spell `did:icn:` when the
+/// writer produces them, so this row is durable bytes no writer makes — which
+/// is exactly the case a gate exists for. Under the registered prefix it is
+/// outside every keyspace and blocks as `UNCOVERED`. Under a prefix widened to
+/// the lexical parent it would fall inside this descriptor, be read as one more
+/// index row, form no collision on its own, and clear the start silently.
+#[test]
+fn a_by_anchor_key_carrying_a_spelling_is_uncovered_not_read_as_an_index_row() {
+    let dir = tempfile::tempdir().unwrap();
+    make_store(
+        &commons_root(dir.path()),
+        &[(
+            format!("commons/holders/by_anchor/{}", canonical(28)),
+            b"aa",
+        )],
+    );
+
+    let receipt = expect_blocked(enforce(dir.path(), now()));
+    let blockers = blockers_for(&receipt, "commons.sled");
+    assert!(
+        matches!(&blockers[0], Blocker::Uncovered { shape, rows }
+            if shape.contains("by_anchor") && *rows == 1),
+        "a spelling under the by-anchor prefix belongs to no registered keyspace \
+         and must be reported as such, not cleared: {blockers:?}"
+    );
+}
+
+/// The descriptor claims the index prefix and nothing lexically near it.
+#[test]
+fn the_holder_by_did_descriptor_claims_only_the_index_prefix() {
+    let d = icn_store::did_collision_scan::n2a_keyspaces()
+        .into_iter()
+        .find(|d| d.name == "icn-commons/holder_by_did")
+        .expect("the holder-by-DID index is registered (#2627 M3)");
+
+    assert_eq!(d.prefix, b"commons/holders/by_did/");
+    assert_eq!(d.inventory_rows, &[67]);
+    assert!(
+        !d.disposition.is_automatable(),
+        "the disposition must stay fail-closed: no rule chooses a surviving holder"
+    );
+    assert!(d.did_ends_key, "the writer appends the spelling and stops");
+    assert!(!d.slash_ends_did);
+
+    // The two siblings are not merely uncollected — they do not start with the
+    // registered prefix, so no scan of it can reach them.
+    for sibling in [
+        &b"commons/holders/deadbeef"[..],
+        &b"commons/holders/by_anchor/deadbeef"[..],
+    ] {
+        assert!(
+            !sibling.starts_with(d.prefix),
+            "{} is inside the descriptor and must not be",
+            String::from_utf8_lossy(sibling)
+        );
+    }
+}

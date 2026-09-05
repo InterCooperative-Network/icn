@@ -29,7 +29,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::store::{CommonsStore, CommonsStoreBackend};
+use crate::store::{CommonsStore, CommonsStoreBackend, HolderMintClassification};
 
 /// CommonsInner holds all substrate-type operations for the commons layer.
 ///
@@ -345,19 +345,60 @@ impl CommonsInner {
 
     /// Update the display name for a holder identified by DID.
     /// If no holder record exists yet, creates a minimal holder record directly.
+    ///
+    /// The creation half classifies before it mints (#2627 M3). A weak holder's
+    /// durable id is derived from the *textual* spelling it is created from,
+    /// while the gates that authorize a profile update compare principals
+    /// (I7) — so an alternate spelling of an enrolled member arrives here
+    /// legitimately, and answering "does this holder exist?" with one exact key
+    /// would mint a second durable holder for one member. Absence is therefore
+    /// proven against the whole holder-by-DID namespace, and anything short of
+    /// a proof refuses.
+    ///
+    /// Refusal is the whole of the remedy. No spelling is preferred, no holder
+    /// is adopted, re-keyed or merged, and no row is rewritten or removed: this
+    /// stops a *new* duplicate from being created and leaves the disposition of
+    /// any already-derived duplicate to the migration that owns it.
     pub async fn update_display_name(&self, did: &Did, display_name: String) -> Result<()> {
-        let did_str = did.to_string();
-        if let Some(mut holder) = self.store.get_holder_by_did(&did_str)? {
-            holder.set_display_name(display_name);
-            self.store.put_holder(&holder)?;
-        } else {
-            // Create a minimal holder record directly (no anchor required).
-            // This is used for demo seeding where members don't go through
-            // full SDIS enrollment but still need display names.
-            let anchor_bytes: [u8; 32] = Sha256::digest(did_str.as_bytes()).into();
-            let mut holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), POPLevel::Weak);
-            holder.set_display_name(display_name);
-            self.store.put_holder(&holder)?;
+        match self.store.classify_holder_mint(did)? {
+            HolderMintClassification::Held(mut holder) => {
+                holder.set_display_name(display_name);
+                self.store.put_holder(&holder)?;
+            }
+            HolderMintClassification::ProvenAbsent => {
+                // Create a minimal holder record directly (no anchor required).
+                // This is used for demo seeding where members don't go through
+                // full SDIS enrollment but still need display names.
+                //
+                // The derivation below is unchanged by M3: altering it would
+                // re-key every weak holder already persisted, which is a
+                // migration and not a guard.
+                let anchor_bytes: [u8; 32] = Sha256::digest(did.to_string().as_bytes()).into();
+                let mut holder =
+                    CommonsHolderRecord::new(anchor_bytes, did.clone(), POPLevel::Weak);
+                holder.set_display_name(display_name);
+                self.store.put_holder(&holder)?;
+            }
+            HolderMintClassification::SamePrincipalOtherSpelling => {
+                warn!(
+                    target: "commons_audit",
+                    action = "holder_weak_mint_refused",
+                    reason = "holder_principal_already_indexed",
+                    "Refusing to mint a second weak holder for a principal already \
+                     named in the holder-by-DID namespace"
+                );
+                bail!("holder_principal_already_indexed");
+            }
+            HolderMintClassification::Unreadable(defect) => {
+                warn!(
+                    target: "commons_audit",
+                    action = "holder_weak_mint_refused",
+                    reason = defect.reason_class(),
+                    "Refusing to mint a weak holder: the holder-by-DID namespace \
+                     cannot be read as proof that this principal is absent"
+                );
+                bail!("{}", defect.reason_class());
+            }
         }
         Ok(())
     }
