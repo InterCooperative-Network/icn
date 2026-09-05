@@ -143,9 +143,12 @@ pub enum AnchorIndexDefect {
     ///
     /// The evidence that an anchor exists is real; the record it names cannot
     /// be proven. Enrolling here would mint a second personhood anchor over
-    /// durable evidence this layer has no authority to discard — and because
-    /// `delete_anchor` removes only the anchor's own derived-DID row, a
-    /// dangling enrollment row is a state the shipped code can already produce.
+    /// durable evidence this layer has no authority to discard. Refusing does
+    /// not depend on the state being reachable today: `delete_anchor` is the
+    /// shape that would produce it — it removes only the anchor's own
+    /// derived-DID row and leaves any enrollment row dangling — but it has no
+    /// caller in the workspace, so this arm is a guard against a wiring that
+    /// does not exist yet rather than a defect observed in a shipped path.
     PrimaryMissing,
 }
 

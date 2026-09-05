@@ -389,11 +389,13 @@ async fn an_index_value_that_is_not_an_anchor_id_is_malformed_not_dangling() {
 
 /// A well-formed index row whose primary is absent is a dangling reference.
 ///
-/// This is not a hypothetical: `delete_anchor` removes only the anchor's own
-/// derived-DID row, so any row written by `put_anchor_did_index` survives the
-/// deletion of the anchor it names. The shipped code can already produce this
-/// state, and enrolling over it would mint a replacement for durable evidence
-/// this layer has no authority to discard.
+/// `delete_anchor` is the shape that produces it — it removes only the anchor's
+/// own derived-DID row, so any row written by `put_anchor_did_index` survives
+/// the deletion of the anchor it names — but `delete_anchor` has no caller in
+/// the workspace, so this is a guard against a wiring that does not exist yet,
+/// not a defect observed in a shipped path. It is pinned anyway: enrolling over
+/// unprovable evidence would mint a replacement for a durable record this layer
+/// has no authority to discard, whichever path later produces it.
 #[tokio::test]
 async fn a_dangling_index_row_refuses_and_is_distinguished_from_malformed() {
     let store = backend();
@@ -462,4 +464,103 @@ async fn the_held_arm_names_the_anchor_it_proved() {
         }
         other => panic!("expected Held, got {other:?}"),
     }
+}
+
+// ============================================================================
+// The two lockouts the guard creates, pinned deliberately rather than by
+// accident. Both were raised independently by review; neither is repaired here.
+// ============================================================================
+
+/// The guard is **status-blind**, and that is the correct outcome for a
+/// revoked anchor.
+///
+/// `classify_anchor_enrollment` asks only whether a primary resolves; it never
+/// reads `AnchorStatus`. So a principal whose anchor was revoked cannot enrol
+/// again under that key — and `PersonhoodAnchor::reinstate` refuses a revoked
+/// anchor outright ("Cannot reinstate a revoked anchor"), so there is no path
+/// back. That is a real, permanent lockout.
+///
+/// It is pinned rather than carved out because the alternative is worse: if
+/// revocation released the principal to mint a fresh, clean anchor, revocation
+/// would mean nothing. `revoke` is documented "(permanent)" and this keeps it
+/// so. What M4a does *not* claim is that this was designed here — the guard
+/// acquired the property by asking a status-free question, and this fixture
+/// exists so a later change cannot silently drop it.
+#[tokio::test]
+async fn a_revoked_anchor_still_blocks_re_enrollment_and_that_is_deliberate() {
+    let store = backend();
+    let inner = CommonsInner::new(store.clone());
+    let did = principal(71);
+
+    let anchor = inner
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .unwrap();
+    let anchor_id = hex::encode(anchor.id());
+    inner
+        .update_anchor_status(
+            &anchor_id,
+            icn_identity::AnchorStatus::Revoked {
+                reason: "test".into(),
+                revoked_at: 0,
+                evidence: Vec::new(),
+                authority: principal(72),
+            },
+        )
+        .await
+        .expect("an anchor can be revoked");
+
+    let err = inner
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .expect_err("a revoked principal must not mint a fresh clean anchor");
+    assert_eq!(err.to_string(), "anchor_principal_already_enrolled");
+    assert_eq!(primary_rows(&store, ANCHOR_PREFIX).len(), 1);
+}
+
+/// A retry after a *partial* enrollment is refused, and the anchor is not
+/// rolled back.
+///
+/// `complete_enrollment` is deliberately fail-closed after the anchor write, so
+/// a later failure — the holder, the jurisdiction join, the membership approval
+/// — aborts with the anchor already durable. The session pins the ephemeral DID
+/// from level 1, so the retry presents the same principal, reaches `Held`, and
+/// is refused: that ceremony cannot complete.
+///
+/// This is not repaired here. On the steward-manager configuration the retry
+/// was already refused one step earlier by the VUI reservation, so the lockout
+/// is pre-existing there; M4a extends it to the steward-less configuration,
+/// which is exactly the configuration that previously had no duplicate check at
+/// all and "recovered" by minting a second anchor. Rolling the anchor back, or
+/// letting a retry adopt it, are both writes M4a does not authorize.
+#[tokio::test]
+async fn a_retry_after_a_partial_enrollment_is_refused_and_nothing_is_rolled_back() {
+    let store = backend();
+    let inner = CommonsInner::new(store.clone());
+    let did = principal(73);
+
+    // The partial state: anchor written, no holder derived from it.
+    let anchor = inner
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .unwrap();
+    assert!(primary_rows(&store, HOLDER_PREFIX).is_empty());
+
+    let err = inner
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .expect_err("the retry presents the same principal and is refused");
+    assert_eq!(err.to_string(), "anchor_principal_already_enrolled");
+
+    // The anchor survives, and the classification names it — so a caller that
+    // is later authorized to adopt a partial enrollment has a proven id to
+    // adopt rather than a miss to mint over.
+    let commons = CommonsStore::new(store.clone());
+    match commons.classify_anchor_enrollment(&did).unwrap() {
+        AnchorEnrollmentClassification::Held { anchor_id } => {
+            assert_eq!(anchor_id, hex::encode(anchor.id()));
+        }
+        other => panic!("expected Held, got {other:?}"),
+    }
+    assert_eq!(primary_rows(&store, ANCHOR_PREFIX).len(), 1);
 }

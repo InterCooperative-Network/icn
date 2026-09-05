@@ -1452,8 +1452,9 @@ principal-aware while its partner still counts, deletes or keys by spelling.
   rows 19 and 20), and the treasury primary rows (§4 row 21, #2627 M1) as the thirteenth whole-key
   layout. Two have been added since — the length-prefixed tag-discriminated grant-by-grantee
   projection (#2627 M2, §11.6) and the Commons holder-by-DID index (§4 row 22, #2627 M3, §11.7) as
-  the fourteenth whole-key layout — for **seventeen**. The §3 figures are not re-stated in either
-  case: a registry expansion does not enlarge old evidence (§3.2).
+  the fourteenth whole-key layout — and the Commons anchor-by-DID index (§4 row 66, #2627 M4a,
+  §11.8) as the fifteenth, for **eighteen**. The §3 figures are not re-stated in any of these
+  cases: a registry expansion does not enlarge old evidence (§3.2).
 * **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
   `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
   descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
@@ -1799,20 +1800,23 @@ destructive half, because two distinct spellings land on two distinct keys and t
 nothing. A guard that refused only the alias would be defeated by resubmitting the original
 spelling, so the question asked is the principal-level one, which subsumes both.
 
-**The rule is the repository's, not one invented here.** `api/sdis/recovery.rs` states that
-recovery *"allows rotating to a new KeyBundle while keeping the same Anchor"* — the domain treats
-the anchor as the stable root a person keeps across key changes — and the enrollment route already
-refuses a repeat in words. M4a makes the refusal actually reachable; it does not introduce a new
-identity rule.
+**What authorizes the refusal, stated narrowly.** The enrollment route already refuses a repeat
+in words — *"This identity has already been enrolled (VUI collision)"* — so refusing a second
+enrollment is not a behaviour this slice invents; it is one the route already intends and fails to
+deliver, because the VUI is spelling-derived and the whole check is skipped without a steward
+manager. That is the whole of the authority claimed. `api/sdis/recovery.rs` is **not** cited as a
+rule: its `complete_recovery` is a stub whose own comment lists steps 1–5 as unimplemented and
+which fabricates a UUID-hex DID that `Did::from_str` would reject, so its module doc-comment is a
+statement of intent about unwritten code and cannot establish anything. An earlier draft of this
+section cited it as authority; that was an overclaim and is corrected here.
 
 **What is enforced is one anchor per _Principal_, which is narrower than one anchor per human, and
-the difference is recorded rather than papered over.** A recovery rotation issues the person a
-**new DID** (`recovery.rs:12`, *"Client receives new DID (same Anchor, new keys)"*) and writes
-nothing to `commons/anchors/by_did/` — recovery does not touch the Commons store at all. So after a
-rotation the same human is a different decoded Principal with no row, and
-`classify_anchor_enrollment` would return `ProvenAbsent` for them. This index is **rotation-blind**,
-and M4a makes no claim about one anchor per human. Wiring rotation into the durable index is a
-question for the identity owner, not for this slice; it is listed in the non-claims below.
+the difference is recorded rather than papered over.** Enrollment identity is a per-ceremony device
+key, so a second device is a second Principal; and a recovery rotation, when it is implemented,
+issues the person a new DID. Either way the same human can present as a Principal with no row here,
+and `classify_anchor_enrollment` returns `ProvenAbsent` for them. This index is **rotation-blind and
+device-blind**, and M4a claims neither. The authority that would own "one anchor per human" is the
+VUI threshold-PRF in the SDIS ceremony and its reservation registry, not this namespace.
 
 **What M4a establishes.** Classification before the first durable write, and nothing else:
 
@@ -1877,9 +1881,42 @@ planted pair without repairing it.
   derived-DID row, so a row written by `put_anchor_did_index` survives the deletion of the anchor
   it names. M4a classifies that state (`anchor_index_primary_missing`) and refuses to enrol over
   it; it does not clean it up. Pre-existing, not I7-caused.
-- **The crash-partial window is pre-existing debt.** `put_anchor` writes the primary and the
-  derived index row, then `put_anchor_did_index` writes the enrollment row, in three separate
-  operations with no transaction. M4a narrows nothing here and closes nothing here.
+- **The crash-partial window is pre-existing debt, and it defeats the invariant.** `put_anchor`
+  writes the primary and the derived index row, then `put_anchor_did_index` writes the enrollment
+  row, in three separate operations with no transaction. Say the process dies between them: the
+  surviving state is an anchor primary plus its *derived* row only. A later enrollment of the same
+  spelling finds no exact row, scans, sees one row naming the anchor-derived principal — a
+  different principal by construction — classifies `ProvenAbsent`, and mints a second anchor. The
+  gate agrees, because two derived rows are two distinct principals. **So a crash-interrupted
+  enrollment still yields two anchors for one Principal, invisible to both layers.** M4a narrows
+  nothing here and closes nothing here; the guard is complete only modulo durability, and this is
+  said explicitly so a reader cannot take it for more.
+- **Two lockouts are created, and both are pinned rather than repaired.** The guard reads only
+  whether a primary resolves, never `AnchorStatus`, so (a) a principal whose anchor was **revoked**
+  cannot enrol again under that key, and `PersonhoodAnchor::reinstate` refuses a revoked anchor
+  outright, so there is no path back; and (b) a **retry after a partial enrollment** — a completion
+  that failed after the anchor write, which `complete_enrollment` is deliberately fail-closed
+  enough to produce — presents the same principal, reaches `Held`, and cannot complete. Both are
+  fixtured (`sdis_enrollment_anchor_identity.rs`). Neither is newly introduced on the
+  steward-manager configuration, where the VUI reservation already refused the repeat one step
+  earlier; M4a extends them to the steward-less configuration, which is exactly the configuration
+  that previously had no duplicate check at all and "recovered" by minting the duplicate this slice
+  exists to prevent. Rolling an anchor back, releasing a revoked principal, and letting a retry
+  adopt an existing anchor are all writes M4a does not authorize.
+- **No claim is made about the identity semantics of an anchor.** `IDENTITY_SEMANTICS.md` — the
+  registered owner — states nothing about anchor or holder uniqueness and classifies `Anchor` as a
+  legacy, ambiguous carrier that "serve[s] four different semantic classes from one constructor".
+  What M4a enforces is a store-integrity property of one namespace: a constructor whose existence
+  check tested an id it had just randomized now asks a question it can actually answer.
+  `RuleBasis::Established` records only that fail-closed is what that constructor implements — the
+  M1 formula (§4.2) — and nothing about whether a person is one person.
+- **Forward dependency, recorded so it is findable from both sides.** The healthy-state model here
+  — two rows per anchor naming two different principals — rests on `Did::from_anchor_id`, which
+  §11 I8 / N2-B schedules for removal. And `api/sdis/recovery.rs` lists "Update anchor → DID
+  mapping" as step 4 of an unimplemented block (`recovery.rs:295-300`); when that lands, a rotation
+  will write a row here for a *new* Principal pointing at an *existing* anchor — a state this
+  descriptor clears and `classify_anchor_enrollment` reads as `ProvenAbsent`. Both belong to their
+  own owners; neither is closed here.
 - **The same-spelling re-enrollment behaviour change is stated, not hidden.** A second enrollment
   of an already-enrolled principal now fails where it previously succeeded. That is a behaviour
   change on a non-I7 defect, adopted because the principal-level question subsumes it and because

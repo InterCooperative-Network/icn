@@ -1821,26 +1821,25 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             slash_ends_did: false,
             did_ends_key: true,
             principal_region: PrincipalRegion::WholeKey,
-            rationale: "Anchor-by-DID index over the personhood-anchor identity contract. A \
-                        PersonhoodAnchor is the root of a human identity here — the Commons \
-                        holder id is the anchor id verbatim — and its own id is \
+            rationale:
+                "Anchor-by-DID index over the PersonhoodAnchor namespace. An anchor's id is \
                         SHA-256(\"icn-anchor-v1\" || vui || genesis) over a fresh random \
-                        genesis, so two enrollments of one principal produce two independent \
-                        anchors with their own status, attestations, POP level and derived \
-                        holder. Merging the index rows that reach them would first have to \
-                        decide which anchor survives, which is a question about whether a \
-                        person is one person that no identity-layer rule answers; the domain \
-                        treats the anchor as the stable root a person keeps across key changes \
-                        (api/sdis/recovery.rs rotates to a new KeyBundle under the same anchor), \
-                        so electing a survivor here would contradict it. What this refuses is \
-                        one anchor per PRINCIPAL, which is narrower: a recovery rotation issues \
-                        a new DID and writes no row here, so the index is rotation-blind and no \
-                        claim is made about one anchor per human. Two rows pointing at one \
-                        anchor id are refused on the same ground. \
-                        The enrollment constructor refuses to create this state \
-                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a). A \
-                        migration must not decide the collision either. Already-derived \
-                        duplicate anchors are not dispositioned here.",
+                        genesis, and the Commons holder id is that anchor id verbatim, so two \
+                        enrollments of one principal produce two independent anchors with their \
+                        own status, attestations and POP level, and two independent holders. \
+                        Merging the index rows that reach them would first have to decide which \
+                        anchor survives, and no rule in the repository decides that. \
+                        RuleBasis::Established here records only that fail closed is what the \
+                        enrollment constructor implements \
+                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a); no merge \
+                        rule is authorized and none is proposed. What is refused is a second \
+                        anchor per PRINCIPAL. The durable index is rotation-blind, so no claim \
+                        is made about one anchor per human, and none is made about the identity \
+                        semantics of an anchor, which IDENTITY_SEMANTICS.md classifies as a \
+                        legacy and ambiguous carrier. Two rows pointing at ONE anchor id are \
+                        the ordinary healthy shape of this namespace, not a collision, and are \
+                        not refused. A migration must not decide the collision either. \
+                        Already-derived duplicate anchors are not dispositioned here.",
         },
         KeyspaceDescriptor {
             name: "icn-ledger/treasury",
