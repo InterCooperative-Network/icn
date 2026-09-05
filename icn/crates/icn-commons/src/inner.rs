@@ -29,7 +29,9 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::store::{CommonsStore, CommonsStoreBackend, HolderMintClassification};
+use crate::store::{
+    AnchorEnrollmentClassification, CommonsStore, CommonsStoreBackend, HolderMintClassification,
+};
 
 /// CommonsInner holds all substrate-type operations for the commons layer.
 ///
@@ -78,6 +80,55 @@ impl CommonsInner {
         did: &Did,
         steward_did: Option<&Did>,
     ) -> Result<PersonhoodAnchor> {
+        // Classify before deriving anything. Every value below this point is a
+        // durable identity artifact or a function of one — the pseudo-VUI and
+        // the placeholder key are derived from the textual spelling, and the
+        // anchor id from a fresh random `genesis` — so an existence question
+        // asked after them cannot be answered without first minting the thing
+        // it is asking about. Refusing here also avoids the orphan the obvious
+        // alternative produces: creating the anchor, discovering the principal
+        // at the holder step, and leaving a `PersonhoodAnchor` plus two
+        // `commons/anchors/by_did/` rows behind with no holder to reach them.
+        //
+        // Refusal is the whole of the remedy. No spelling is preferred, no
+        // anchor is adopted, re-keyed or merged, and no row is rewritten or
+        // removed: this stops a *new* duplicate from being created and leaves
+        // the disposition of any already-derived duplicate to the migration
+        // that owns it.
+        match self.store.classify_anchor_enrollment(did)? {
+            AnchorEnrollmentClassification::ProvenAbsent => {}
+            AnchorEnrollmentClassification::Held { .. } => {
+                warn!(
+                    target: "commons_audit",
+                    action = "anchor_enrollment_refused",
+                    reason = "anchor_principal_already_enrolled",
+                    "Refusing to enrol a principal that already holds a personhood \
+                     anchor under this spelling"
+                );
+                bail!("anchor_principal_already_enrolled");
+            }
+            AnchorEnrollmentClassification::SamePrincipalOtherSpelling => {
+                warn!(
+                    target: "commons_audit",
+                    action = "anchor_enrollment_refused",
+                    reason = "anchor_principal_already_enrolled",
+                    "Refusing to enrol a principal already anchored here under another \
+                     textual spelling"
+                );
+                bail!("anchor_principal_already_enrolled");
+            }
+            AnchorEnrollmentClassification::Unreadable(defect) => {
+                warn!(
+                    target: "commons_audit",
+                    action = "anchor_enrollment_refused",
+                    reason = defect.reason_class(),
+                    "Refusing to enrol: the anchor-by-DID namespace cannot be read as \
+                     proof that this principal is absent"
+                );
+                bail!("{}", defect.reason_class());
+            }
+        }
+
         // Generate pseudo-VUI from DID (in real SDIS, this comes from ceremony)
         let mut hasher = Sha256::new();
         hasher.update(b"gateway-enrollment-vui:");

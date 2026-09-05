@@ -13,7 +13,7 @@ still cite the `83682563` measurement they were taken at)
 
 ---
 
-**Tranche state, in five separate claims.**
+**Tranche state, in six separate claims.**
 
 1. **I7 code has landed.** `Did` `PartialEq`/`Eq`/`Hash` compare the decoded identifier bytes
    (#2686, `0defbde5`). The design in §6 was applied; `Display`/`as_str`/`Serialize` are
@@ -1401,7 +1401,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
 | `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
 | `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
-| `icn-commons` `commons/{anchors,holders,stewards}/by_did/` — the **holders** third is **registered and mint-guarded in M3, §11.7**; anchors and stewards are untouched (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
+| `icn-commons` `commons/{anchors,holders,stewards}/by_did/` — the **holders** third is **registered and mint-guarded in M3, §11.7**; the **anchors** third is **registered and enrollment-guarded in M4a, §11.8**; stewards are untouched (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
 | `icn-ledger` `asset_owner:<did>:<asset>` | dormant | `asset:<id>` | read re-checks `owner_did` by `Did`; `transfer_custody` authorizes by `Did` and removes the index by the caller's spelling — an orphan the read re-check then hides | the §7 *partial principalization* pattern, verbatim |
 | `icn-ledger` `obligation_creditor:` / `obligation_debtor:` | dormant | `obligation:<id>` | prefix scan, no re-check, no delete path | |
 | `icn-identity` `personhood/by_did/` (dormant) and `commons/by_did/` (dead) | — | `personhood/anchors/<id>` / `commons/holders/<id>` | exact-key | delete the dead store; rebuild rule for the dormant one |
@@ -1728,8 +1728,9 @@ caller presenting spelling B still fails to find a holder indexed only as A, and
 consumers of that lookup — `authority.rs::require_office_in_jurisdiction`,
 `api/membership/mod.rs`, `api/steward/mod.rs` — remain fail-closed exactly as before. Commons
 identity is not Principal-transparent, and M3 does not claim it is. The sibling
-`commons/anchors/by_did/` and `commons/stewards/by_did/` indexes, the `StewardId` derivation and
-the spelling-derived holder id itself are untouched and remain as §11.4 records them.
+`commons/anchors/by_did/` index is closed separately in §11.8 (M4a); the
+`commons/stewards/by_did/` index, the `StewardId` derivation and the spelling-derived holder id
+itself are untouched and remain as §11.4 records them.
 
 **The guard is at one seam, and only one.** `get_or_create_holder` →
 `create_holder_from_anchor_with_name`, reached from SDIS enrollment, also constructs a fresh holder
@@ -1738,4 +1739,139 @@ Two enrollments of one principal under two spellings therefore still produce two
 the state the new descriptor refuses at startup. That is a pre-existing behaviour and not a
 regression: before M3 this keyspace was `UNCOVERED` and blocked startup for *any* holder row. The
 claim is bounded accordingly — at most one newly-minted holder per decoded principal **at the
-profile-update seam** — and the enrollment seam is left for its own slice.
+profile-update seam** — and the enrollment seam is left for its own slice. **That slice is
+M4a (§11.8), which closes it one layer earlier, at the anchor the holder is derived from.**
+
+### 11.8 Disposition of `commons/anchors/by_did/` — P5 index over a P2 root, `FailClosed` / `Established` (#2627 M4a)
+
+**The defect is in the constructor, not at a seam.** M3 (§11.7) closed the profile-update mint and
+recorded that `get_or_create_holder` → `create_holder_from_anchor_with_name`, reached from SDIS
+enrollment, de-duplicates by **anchor** rather than by principal. Tracing that path to its root
+shows the holder step is not where the defect lives. `CommonsHolderRecord::new` sets
+`holder_id = anchor_id` verbatim (`icn-identity/src/commons.rs`, *"Holder ID is derived from
+anchor_id (they're the same for now)"*), so holder identity is **anchor-owned**: one holder per
+anchor holds by construction, and no "one holder per principal" invariant exists anywhere in the
+type, in `IDENTITY_SEMANTICS.md`, or in the consumers. Duplicate holders on this path are a
+*symptom*. The duplicate anchors above them are the fact.
+
+`CommonsInner::create_anchor_from_enrollment` decided existence with:
+
+```text
+anchor.id = SHA-256("icn-anchor-v1" ‖ vui ‖ genesis)      genesis = fresh random per call
+if store.get_anchor(hex(anchor.id)).is_some() { bail }    ← an id it just randomized
+```
+
+The check can never fire. Its two production callers — `complete_enrollment`
+(`api/sdis/simple_enrollment.rs`) and the dev standing bootstrap (`api/commons/mod.rs`) — decide
+existence with `get_anchor_by_did`, a single exact-key `get` that proves only that one spelling is
+unused. (`icn-core`'s SDIS service and `commons_mgr` also call it, but both call sites are inside
+`#[cfg(test)]` modules; the `commons_restart_helper` binary ships without a `required-features`
+gate but is driven only by `commons_persistence.rs`.) The dev-bootstrap caller states in a comment that
+*"`create_anchor_from_enrollment` errors on a duplicate anchor"*; it does not, and that caller was
+relying on a guarantee the constructor never provided.
+
+The one mechanism that does refuse a repeat is the VUI reservation in `complete_enrollment`, which
+returns *"This identity has already been enrolled (VUI collision)"*. It is defeated twice over:
+`compute_temporary_vui` is `SHA-256(did.to_string())`, so two spellings of one principal reserve
+two different VUIs; and the whole block is `if let Some(ref mgr) = steward_mgr.as_ref()` with no
+`else`, so a deployment without a steward handle performs no duplicate check at all.
+
+**Reproduced on `99556959` before any fix**, through `CommonsInner`, the seam both production
+callers reach:
+
+```text
+enrol A               →  1 anchor primary, 2 anchors/by_did rows, 1 holder, 1 holders/by_did
+enrol B (alias of A)  →  2 anchor primaries, 4 anchors/by_did rows, 2 holders, 2 holders/by_did
+```
+
+and — the finding that decided the guard's shape — the same is true of a **repeat of the identical
+spelling**:
+
+```text
+enrol A               →  1 anchor, 1 holder
+enrol A again         →  2 anchors, 2 holders; and both by_did rows silently RE-POINTED
+                         at the new records, orphaning the first anchor and holder
+```
+
+So the uniqueness defect here is not "principal alias only". It is a **re-enrollment / anchor
+identity** defect of which the alias case is a strict subset — and the subset is the *less*
+destructive half, because two distinct spellings land on two distinct keys and therefore overwrite
+nothing. A guard that refused only the alias would be defeated by resubmitting the original
+spelling, so the question asked is the principal-level one, which subsumes both.
+
+**The rule is the repository's, not one invented here.** `api/sdis/recovery.rs` states that
+recovery *"allows rotating to a new KeyBundle while keeping the same Anchor"* — one anchor per
+human, keys rotate beneath it — and the enrollment route already refuses a repeat in words. M4a
+makes the refusal actually reachable; it does not introduce a new identity rule.
+
+**What M4a establishes.** Classification before the first durable write, and nothing else:
+
+```text
+exact index row for this spelling?
+  value is not 64 lowercase hex digits            → REFUSE  anchor_index_malformed
+  anchor id does not resolve to a primary         → REFUSE  anchor_index_primary_missing
+  primary resolves                                → REFUSE  anchor_principal_already_enrolled
+no exact row → read the whole anchor-by-DID namespace
+  a row under any spelling names this principal   → REFUSE  anchor_principal_already_enrolled
+  a row names no ICN principal at all             → REFUSE  anchor_index_malformed
+  every row read, none names this principal       → enrol, byte-for-byte as before
+```
+
+`classify_anchor_enrollment` runs **before** the pseudo-VUI, the genesis draw and the placeholder
+key, because every value below that point is a durable identity artifact or a function of one: an
+existence question asked after them cannot be answered without first minting the thing it asks
+about. Refusing there also avoids the orphan the obvious alternative produces — create the anchor,
+discover the principal at the holder step, and leave a `PersonhoodAnchor` plus two index rows
+behind with no holder to reach them.
+
+**Two differences from M3 that are load-bearing, and were found by the fixtures.**
+
+1. **There is no `PrimaryMismatch` arm, and there must not be.** A holder index row agrees with its
+   primary by construction, because `put_holder` derives the key from `holder.holder_did`; a
+   disagreement is a defect. An anchor index row carries no such relation. `put_anchor` files an
+   anchor under `anchor.to_did()`, while `put_anchor_did_index` files the *same* anchor under the
+   enrollment spelling, which appears nowhere in the anchor body. A key/body disagreement is the
+   **normal, intended shape** of this namespace. Copying M3's check would refuse every enrollment
+   row ever written.
+
+2. **Rows are compared by decoded identifier bytes, never by parsing each suffix into a `Did`.**
+   `Did::from_anchor_id` builds its DID with `new_unchecked` over a SHA-256 anchor id, which is not
+   a valid Ed25519 point roughly half the time, so `Did::from_str` *rejects* it. A classifier built
+   on `from_str` reports healthy anchor-derived rows as unreadable evidence and then refuses every
+   subsequent enrollment on the node — observed, in the first version of this guard.
+   `icn_identity::identifier_bytes_of_spelling` is the decode `Did` itself delegates to and the one
+   the collision scanner groups by, so the runtime refusal and the startup gate read these bytes
+   the same way **by construction** rather than by coincidence.
+
+**The descriptor, and why a healthy store still clears.** `commons/anchors/by_did/` is registered
+`FailClosed` / `Established`, `PrincipalRegion::WholeKey`, `did_ends_key`, as the fifteenth
+whole-key layout and the eighteenth descriptor. The sibling `commons/anchors/<hex anchor id>` is
+outside the prefix rather than a member of it and is not cleared by this registration.
+
+A healthy store holds **two rows per anchor** and that is not a collision: the enrollment spelling
+and the anchor-derived DID name two *different* principals, because the anchor-derived one is a
+function of a random anchor id. They land in different collision groups. What the descriptor
+refuses is two rows naming **one** principal. `anchor_enrollment_gate_runtime_agreement.rs` pins
+both directions against one real `commons.sled` — the state the seam produces is `Verdict::Clear`,
+including at ten distinct enrollments; the state it refuses to create blocks the start with
+`icn-commons/anchor_by_did` FAIL-CLOSED; and the seam then refuses to add a third spelling to the
+planted pair without repairing it.
+
+**What M4a does not claim.**
+
+- **No merge rule, no survivor, no repair.** Refusal is the whole of the remedy. Already-derived
+  duplicate anchors and holders are not dispositioned, re-keyed, deleted or merged.
+- **`get_anchor_by_did` is not made alias-transparent.** Reads stay fail-closed per spelling. A
+  caller presenting spelling B still fails to find an anchor indexed only as A.
+- **The dangling-row leak is recorded, not fixed.** `delete_anchor` removes only the anchor's own
+  derived-DID row, so a row written by `put_anchor_did_index` survives the deletion of the anchor
+  it names. M4a classifies that state (`anchor_index_primary_missing`) and refuses to enrol over
+  it; it does not clean it up. Pre-existing, not I7-caused.
+- **The crash-partial window is pre-existing debt.** `put_anchor` writes the primary and the
+  derived index row, then `put_anchor_did_index` writes the enrollment row, in three separate
+  operations with no transaction. M4a narrows nothing here and closes nothing here.
+- **The same-spelling re-enrollment behaviour change is stated, not hidden.** A second enrollment
+  of an already-enrolled principal now fails where it previously succeeded. That is a behaviour
+  change on a non-I7 defect, adopted because the principal-level question subsumes it and because
+  the domain's own recovery design and error message already say a repeat is invalid.
+- **`commons/stewards/by_did/` and the `StewardId` derivation remain untouched**, as §11.4 records.

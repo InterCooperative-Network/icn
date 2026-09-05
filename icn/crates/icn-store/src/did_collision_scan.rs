@@ -1791,9 +1791,52 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         rule authorizes collapsing the spellings, and a rebuild must not pick. \
                         The weak-holder mint reached by profile updates \
                         refuses to create this state (icn_commons::store::classify_holder_mint, \
-                        #2627 M3); the anchor-keyed enrollment path is a separate seam and is not \
-                        guarded by it. A migration must not decide the collision either. Already-derived duplicate holders are not \
-                        dispositioned here.",
+                        #2627 M3), and the anchor-keyed enrollment path is refused one layer \
+                        earlier, before any anchor exists to derive a holder from \
+                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a). A migration \
+                        must not decide the collision either. Already-derived duplicate holders \
+                        are not dispositioned here.",
+        },
+        KeyspaceDescriptor {
+            name: "icn-commons/anchor_by_did",
+            // `commons/anchors/by_did/<spelling>` is the whole key: both
+            // writers append the DID and nothing else, so `did_ends_key`
+            // states their exact shape. The sibling anchor subspace
+            // `commons/anchors/<hex anchor id>` is outside this prefix rather
+            // than a member of it — it is keyed by opaque hex and carries no
+            // spelling in the key at all, so it cannot be swallowed by this
+            // descriptor and is not cleared by it.
+            //
+            // A healthy store holds TWO rows per anchor and that is not a
+            // collision: `put_anchor` files it under `anchor.to_did()`, which
+            // is a function of the random anchor id, and
+            // `put_anchor_did_index` files the same anchor under the
+            // enrollment spelling. Those two DIDs name different principals,
+            // so they land in different collision groups. What this descriptor
+            // refuses is two rows naming ONE principal.
+            prefix: b"commons/anchors/by_did/",
+            inventory_rows: &[66],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale: "Anchor-by-DID index over the personhood-anchor identity contract. A \
+                        PersonhoodAnchor is the root of a human identity here — the Commons \
+                        holder id is the anchor id verbatim — and its own id is \
+                        SHA-256(\"icn-anchor-v1\" || vui || genesis) over a fresh random \
+                        genesis, so two enrollments of one principal produce two independent \
+                        anchors with their own status, attestations, POP level and derived \
+                        holder. Merging the index rows that reach them would first have to \
+                        decide which anchor survives, which is a question about whether a \
+                        person is one person that no identity-layer rule answers; the domain's \
+                        own recovery design keeps ONE anchor and rotates keys under it \
+                        (api/sdis/recovery.rs), so electing a survivor here would contradict \
+                        it. Two rows pointing at one anchor id are refused on the same ground. \
+                        The enrollment constructor refuses to create this state \
+                        (icn_commons::store::classify_anchor_enrollment, #2627 M4a). A \
+                        migration must not decide the collision either. Already-derived \
+                        duplicate anchors are not dispositioned here.",
         },
         KeyspaceDescriptor {
             name: "icn-ledger/treasury",
@@ -1836,7 +1879,7 @@ mod tests {
 
     /// The whole-key layouts in registry order: the twelve the §3 evidence was
     /// gathered with, unchanged, then the treasury primary rows (#2627 M1).
-    const WHOLE_KEY_NAMES: [&str; 14] = [
+    const WHOLE_KEY_NAMES: [&str; 15] = [
         "icn-net/replay_max_seq",
         "icn-net/replay_finalized",
         "icn-net/replay_sender_regime",
@@ -1850,6 +1893,7 @@ mod tests {
         "trust-app/sequences_issuer",
         "icn-coop/member",
         "icn-commons/holder_by_did",
+        "icn-commons/anchor_by_did",
         "icn-ledger/treasury",
     ];
 
@@ -3015,7 +3059,9 @@ mod tests {
         // when the two federation layouts were added — nor when the treasury
         // primary rows were registered after them as the thirteenth
         // whole-key layout (#2627 M1), nor when the Commons holder-by-DID
-        // index joined them as the fourteenth (#2627 M3).
+        // index joined them as the fourteenth (#2627 M3), nor when the
+        // Commons anchor-by-DID index joined them as the fifteenth
+        // (#2627 M4a).
         let whole_key: Vec<&str> = n2a_keyspaces()
             .iter()
             .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
@@ -4130,6 +4176,95 @@ mod tests {
         "ledger:treasury:idx:budgets:",
         "ledger:treasury:vlimit:",
     ];
+
+    fn anchor_by_did_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-commons/anchor_by_did")
+            .expect("the Commons anchor-by-DID keyspace is registered")
+    }
+
+    #[test]
+    fn the_anchor_index_descriptor_claims_the_index_and_not_the_anchor_primaries() {
+        // `commons/anchors/` is a lexical PREFIX of `commons/anchors/by_did/`,
+        // so a descriptor registered one segment too short would claim the
+        // opaque-hex anchor primaries as well. Those keys carry no spelling,
+        // so widening produces no collision and no CLEAR/BLOCK difference —
+        // the behavioural fixtures cannot see it. It is still wrong: a
+        // descriptor must claim only the bytes it structurally owns, or the
+        // registry stops describing the store. This pins the width directly.
+        let d = anchor_by_did_descriptor();
+        assert_eq!(d.prefix, b"commons/anchors/by_did/");
+
+        let primary = b"commons/anchors/".as_slice();
+        assert!(
+            d.prefix.starts_with(primary) && d.prefix != primary,
+            "the index prefix must run strictly past the anchor primary prefix"
+        );
+        // A primary row is not claimed by this descriptor.
+        let primary_row = format!("commons/anchors/{}", hex::encode([7u8; 32]));
+        assert!(
+            !primary_row.as_bytes().starts_with(d.prefix),
+            "an anchor primary must fall outside the index descriptor"
+        );
+        // An index row is.
+        let index_row = format!(
+            "commons/anchors/by_did/{}",
+            spell(&principal(7), multibase::Base::Base58Btc)
+        );
+        assert!(index_row.as_bytes().starts_with(d.prefix));
+
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "nothing follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[66]);
+    }
+
+    fn anchor_index_row(spelling: &str) -> String {
+        format!("commons/anchors/by_did/{spelling}")
+    }
+
+    #[test]
+    fn two_anchor_index_rows_for_one_principal_are_a_blocking_collision() {
+        let (a, b) = two_spellings(66);
+        let store = store_with(&[
+            (&anchor_index_row(&a), b"00"),
+            (&anchor_index_row(&b), b"01"),
+        ]);
+
+        let report = scan_keyspace(&store, &anchor_by_did_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn the_two_rows_one_healthy_enrollment_writes_are_not_a_collision() {
+        // The control the whole descriptor depends on: `put_anchor` files an
+        // anchor under `Did::from_anchor_id`, a function of the random anchor
+        // id, and `put_anchor_did_index` files the same anchor under the
+        // enrollment spelling. Those name different principals. If the scanner
+        // grouped them, every enrolled node would refuse to start.
+        let enrolment = spell(&principal(66), multibase::Base::Base58Btc);
+        let derived = spell(&principal(200), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&anchor_index_row(&enrolment), b"00"),
+            (&anchor_index_row(&derived), b"00"),
+        ]);
+
+        let report = scan_keyspace(&store, &anchor_by_did_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
 
     #[test]
     fn the_treasury_descriptor_runs_through_the_did_scheme_and_claims_no_sibling() {
