@@ -21,7 +21,9 @@
 
 use anyhow::{Context, Result};
 use icn_governance::{Amendment, Appeal, Charter, StewardRecord};
-use icn_identity::{CommonsHolderRecord, Did, PersonhoodAnchor, RevocationRecord};
+use icn_identity::{
+    identifier_bytes_of_spelling, CommonsHolderRecord, Did, PersonhoodAnchor, RevocationRecord,
+};
 use lru::LruCache;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::BTreeMap;
@@ -42,6 +44,11 @@ pub const HOLDER_BY_ANCHOR_PREFIX: &[u8] = b"commons/holders/by_anchor/";
 /// [`HOLDER_BY_DID_PREFIX`] are this many bytes hex-encoded, which is the shape
 /// [`CommonsStore::put_holder`] writes and the only shape a holder id can have.
 pub const HOLDER_ID_BYTES: usize = 32;
+/// Width of a `PersonhoodAnchor` id in bytes. Values under
+/// [`ANCHOR_BY_DID_PREFIX`] are this many bytes hex-encoded, which is the shape
+/// both [`CommonsStore::put_anchor`] and [`CommonsStore::put_anchor_did_index`]
+/// write and the only shape an anchor id can have.
+pub const ANCHOR_ID_BYTES: usize = 32;
 pub const CHARTER_PREFIX: &[u8] = b"commons/charters/";
 pub const CHARTER_BY_DOMAIN_PREFIX: &[u8] = b"commons/charters/by_domain/";
 pub const STEWARD_PREFIX: &[u8] = b"commons/stewards/";
@@ -99,6 +106,97 @@ impl HolderIndexDefect {
             HolderIndexDefect::PrimaryMismatch => "holder_index_primary_mismatch",
         }
     }
+}
+
+/// Why the durable anchor-by-DID namespace could not be read as evidence about
+/// one principal.
+///
+/// Carried as a class and never as content, for the same reason
+/// [`HolderIndexDefect`] is: a diagnostic that reproduced the spelling or the
+/// stored anchor id would put the enrolling identity into logs and error bodies
+/// that the refusal exists to protect.
+///
+/// This enum deliberately has **no** `PrimaryMismatch` arm, and that absence is
+/// the one place the anchor namespace must not be reasoned about like the
+/// holder namespace. A holder index row always agrees with its primary by
+/// construction — `put_holder` derives the key from `holder.holder_did` — so a
+/// disagreement there is a defect. An anchor index row carries no such
+/// relation: [`CommonsStore::put_anchor`] files an anchor under the DID the
+/// anchor itself derives (`anchor.to_did()`), while
+/// [`CommonsStore::put_anchor_did_index`] files the *same* anchor under the
+/// enrollment spelling, which appears nowhere in the anchor body. A row whose
+/// key spelling differs from its primary's own DID is therefore the normal,
+/// intended shape of this namespace, not evidence of corruption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnchorIndexDefect {
+    /// A physical key under the prefix carries a suffix that is not UTF-8, is
+    /// empty, or does not parse as a DID; or its value is not the hex anchor id
+    /// the layout requires.
+    ///
+    /// The layout says a spelling belongs there, so such a row names *some*
+    /// principal this scan cannot identify — and therefore cannot rule out as
+    /// the one being asked about. It is unreadable evidence, not absent
+    /// evidence.
+    MalformedRow,
+    /// An index row names this principal, but the anchor id it carries does not
+    /// resolve to a primary record.
+    ///
+    /// The evidence that an anchor exists is real; the record it names cannot
+    /// be proven. Enrolling here would mint a second personhood anchor over
+    /// durable evidence this layer has no authority to discard. Refusing does
+    /// not depend on the state being reachable today: `delete_anchor` is the
+    /// shape that would produce it — it removes only the anchor's own
+    /// derived-DID row and leaves any enrollment row dangling — but it has no
+    /// caller in the workspace, so this arm is a guard against a wiring that
+    /// does not exist yet rather than a defect observed in a shipped path.
+    PrimaryMissing,
+}
+
+impl AnchorIndexDefect {
+    /// A stable, payload-free reason class for diagnostics.
+    pub fn reason_class(self) -> &'static str {
+        match self {
+            AnchorIndexDefect::MalformedRow => "anchor_index_malformed",
+            AnchorIndexDefect::PrimaryMissing => "anchor_index_primary_missing",
+        }
+    }
+}
+
+/// What the durable anchor-by-DID namespace proves about one principal, decided
+/// before any enrollment artifact is derived or written.
+///
+/// `create_anchor_from_enrollment` mints a `PersonhoodAnchor` whose id is
+/// `SHA-256("icn-anchor-v1" ‖ vui ‖ genesis)` with a *fresh random* `genesis`,
+/// so the id differs on every call and the constructor's own
+/// `get_anchor(anchor_id)` existence check can never fire. Existence was
+/// therefore decided nowhere: not by that check, and not by the callers, whose
+/// `get_anchor_by_did` is a single exact-key `get` that proves only that one
+/// spelling is unused. This states the difference so a caller cannot confuse
+/// "this spelling is unused" with "this principal has no anchor".
+///
+/// What authorizes refusing is narrow, and is not an identity rule: the
+/// enrollment route already refuses a repeat with "This identity has already
+/// been enrolled (VUI collision)" and fails to deliver it, because that VUI is
+/// `SHA-256(did.to_string())` — spelling-derived, so it cannot see an alias —
+/// and the whole check is skipped when no steward manager is configured. This
+/// asks the question that route already intends to ask. It decides nothing
+/// about the identity semantics of an anchor.
+#[derive(Debug)]
+pub enum AnchorEnrollmentClassification {
+    /// A row under this principal's exact textual spelling resolves to a
+    /// primary anchor. The principal is already enrolled under the very
+    /// spelling being presented.
+    Held { anchor_id: String },
+    /// A row under a *different* textual spelling of this principal exists.
+    ///
+    /// M4 authorizes no rule that adopts, re-keys or merges that anchor, so a
+    /// caller about to enrol must stop rather than choose.
+    SamePrincipalOtherSpelling,
+    /// No physical row names this principal, and every row in the namespace was
+    /// readable enough for that to be a proof rather than a guess.
+    ProvenAbsent,
+    /// The namespace cannot be read as evidence about this principal.
+    Unreadable(AnchorIndexDefect),
 }
 
 /// What the durable holder-by-DID namespace proves about one principal, decided
@@ -623,6 +721,123 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let did_key = Self::make_key(ANCHOR_BY_DID_PREFIX, did);
         self.store.put(&did_key, anchor_id.as_bytes())?;
         Ok(())
+    }
+
+    /// What the durable anchor-by-DID namespace proves about one principal.
+    ///
+    /// The question an enrollment must ask — "does this *principal* already
+    /// have a personhood anchor?" — is not the question
+    /// [`Self::get_anchor_by_did`] answers. That is one exact-key `get`, so a
+    /// miss proves only that one spelling is unused. Absence of the principal
+    /// is a claim about *every* spelling, so it is established by reading the
+    /// namespace, never inferred from the single key that missed.
+    ///
+    /// This is deliberately *not* a change to [`Self::get_anchor_by_did`]:
+    /// reads stay fail-closed per spelling. It answers only the question an
+    /// enrollment must ask.
+    ///
+    /// A healthy store holds *two* rows per anchor — one under
+    /// `anchor.to_did()` from [`Self::put_anchor`] and one under the enrollment
+    /// spelling from [`Self::put_anchor_did_index`] — and those two DIDs name
+    /// different principals, because the anchor-derived one is a function of a
+    /// random anchor id. Two rows for one anchor are therefore normal and are
+    /// not a collision; two rows for one *principal* are the defect.
+    pub fn classify_anchor_enrollment(&self, did: &Did) -> Result<AnchorEnrollmentClassification> {
+        // The exact spelling. A hit here is also where the row's value is
+        // proven to be an anchor id that resolves: `get_anchor_by_did` maps an
+        // unresolvable value to `Ok(None)`, which an enrollment would read as
+        // permission to mint over durable evidence.
+        let did_key = Self::make_key(ANCHOR_BY_DID_PREFIX, &did.to_string());
+        if let Some(id_bytes) = self.store.get(&did_key)? {
+            let Ok(id) = String::from_utf8(id_bytes) else {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::MalformedRow,
+                ));
+            };
+            // The value must be the shape both anchor writers emit —
+            // `hex::encode` of a 32-byte anchor id, so 64 lowercase hex digits.
+            // Without this check a value that is UTF-8 but not an anchor id at
+            // all simply fails to resolve, and the row would be reported as a
+            // dangling reference whose primary is missing. Both refuse, so
+            // nothing is unsafe either way; but they are different defects and
+            // an operator acts on them differently.
+            if id.len() != 2 * ANCHOR_ID_BYTES
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::MalformedRow,
+                ));
+            }
+            if self.get_anchor(&id)?.is_none() {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::PrimaryMissing,
+                ));
+            }
+            // Note the absence of a key/body agreement check here. For a
+            // holder that check is sound because `put_holder` derives the key
+            // from the body; for an anchor it would refuse every row
+            // `put_anchor_did_index` writes, which is the namespace working as
+            // designed. See [`AnchorIndexDefect`].
+            return Ok(AnchorEnrollmentClassification::Held { anchor_id: id });
+        }
+
+        // No row under this spelling. Absence of the *principal* is a claim
+        // about every spelling, so it is established by reading the namespace —
+        // never inferred from the single key that missed. A row that names this
+        // principal under another spelling is decisive on its own: whatever
+        // state its primary is in, the principal is already anchored here, and
+        // adopting or re-keying that anchor is not a rule M4 carries.
+        //
+        // Rows are compared by decoded identifier bytes, not by parsing each
+        // suffix into a `Did`. That is not an optimisation, it is the only
+        // correct reading of this namespace: `put_anchor` files an anchor under
+        // `Did::from_anchor_id`, whose 32 bytes are a SHA-256 anchor id and so
+        // are not a valid Ed25519 point — `Did::from_str` rejects it. Half the
+        // rows in a *healthy* store are therefore unparseable as a validated
+        // `Did`, and a classifier built on `from_str` would report every one of
+        // them as unreadable evidence and refuse every enrollment.
+        // `identifier_bytes_of_spelling` is the decode `Did` itself delegates
+        // to, and the one the collision scanner groups by, so the runtime
+        // refusal and the startup gate read these bytes the same way by
+        // construction rather than by coincidence.
+        let want = identifier_bytes_of_spelling(did.as_str())
+            .context("the enrolling DID names no ICN principal")?;
+        for (key, _) in self.store.scan(ANCHOR_BY_DID_PREFIX)? {
+            // A scanned key that does not carry the prefix it was scanned
+            // under is a backend contract this store cannot interpret. Both
+            // in-tree backends return whole keys, so this is unreachable
+            // today — but skipping such a row would be the one arm in this
+            // function that turns unreadable evidence back into inferred
+            // absence, which is the mistake the whole classification exists
+            // to prevent.
+            let Some(suffix) = key.strip_prefix(ANCHOR_BY_DID_PREFIX) else {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::MalformedRow,
+                ));
+            };
+            let Ok(spelling) = std::str::from_utf8(suffix) else {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::MalformedRow,
+                ));
+            };
+            // An `Err` here means the suffix names no ICN principal at all —
+            // not that it names a different one. The layout says a spelling
+            // belongs there, so such a row cannot be ruled out as this
+            // principal, and skipping it would turn unreadable evidence back
+            // into inferred absence.
+            let Ok(row_bytes) = identifier_bytes_of_spelling(spelling) else {
+                return Ok(AnchorEnrollmentClassification::Unreadable(
+                    AnchorIndexDefect::MalformedRow,
+                ));
+            };
+            if row_bytes == want {
+                return Ok(AnchorEnrollmentClassification::SamePrincipalOtherSpelling);
+            }
+        }
+
+        Ok(AnchorEnrollmentClassification::ProvenAbsent)
     }
 
     /// Delete an anchor
