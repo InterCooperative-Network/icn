@@ -1829,10 +1829,14 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         anchors with their own status, attestations, POP level and derived \
                         holder. Merging the index rows that reach them would first have to \
                         decide which anchor survives, which is a question about whether a \
-                        person is one person that no identity-layer rule answers; the domain's \
-                        own recovery design keeps ONE anchor and rotates keys under it \
-                        (api/sdis/recovery.rs), so electing a survivor here would contradict \
-                        it. Two rows pointing at one anchor id are refused on the same ground. \
+                        person is one person that no identity-layer rule answers; the domain \
+                        treats the anchor as the stable root a person keeps across key changes \
+                        (api/sdis/recovery.rs rotates to a new KeyBundle under the same anchor), \
+                        so electing a survivor here would contradict it. What this refuses is \
+                        one anchor per PRINCIPAL, which is narrower: a recovery rotation issues \
+                        a new DID and writes no row here, so the index is rotation-blind and no \
+                        claim is made about one anchor per human. Two rows pointing at one \
+                        anchor id are refused on the same ground. \
                         The enrollment constructor refuses to create this state \
                         (icn_commons::store::classify_anchor_enrollment, #2627 M4a). A \
                         migration must not decide the collision either. Already-derived \
@@ -1878,7 +1882,12 @@ mod tests {
     use crate::SledStore;
 
     /// The whole-key layouts in registry order: the twelve the §3 evidence was
-    /// gathered with, unchanged, then the treasury primary rows (#2627 M1).
+    /// gathered with, unchanged, then the Commons holder-by-DID index
+    /// (#2627 M3), the Commons anchor-by-DID index (#2627 M4a) and the
+    /// treasury primary rows (#2627 M1). Registry order is not merge order —
+    /// treasury registered first but sits last here — so this list is the
+    /// order itself, pinned, and every addition appends to the tail of the
+    /// registry rather than reordering what preceded it.
     const WHOLE_KEY_NAMES: [&str; 15] = [
         "icn-net/replay_max_seq",
         "icn-net/replay_finalized",

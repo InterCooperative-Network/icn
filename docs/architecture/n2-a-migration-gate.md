@@ -1800,9 +1800,19 @@ nothing. A guard that refused only the alias would be defeated by resubmitting t
 spelling, so the question asked is the principal-level one, which subsumes both.
 
 **The rule is the repository's, not one invented here.** `api/sdis/recovery.rs` states that
-recovery *"allows rotating to a new KeyBundle while keeping the same Anchor"* — one anchor per
-human, keys rotate beneath it — and the enrollment route already refuses a repeat in words. M4a
-makes the refusal actually reachable; it does not introduce a new identity rule.
+recovery *"allows rotating to a new KeyBundle while keeping the same Anchor"* — the domain treats
+the anchor as the stable root a person keeps across key changes — and the enrollment route already
+refuses a repeat in words. M4a makes the refusal actually reachable; it does not introduce a new
+identity rule.
+
+**What is enforced is one anchor per _Principal_, which is narrower than one anchor per human, and
+the difference is recorded rather than papered over.** A recovery rotation issues the person a
+**new DID** (`recovery.rs:12`, *"Client receives new DID (same Anchor, new keys)"*) and writes
+nothing to `commons/anchors/by_did/` — recovery does not touch the Commons store at all. So after a
+rotation the same human is a different decoded Principal with no row, and
+`classify_anchor_enrollment` would return `ProvenAbsent` for them. This index is **rotation-blind**,
+and M4a makes no claim about one anchor per human. Wiring rotation into the durable index is a
+question for the identity owner, not for this slice; it is listed in the non-claims below.
 
 **What M4a establishes.** Classification before the first durable write, and nothing else:
 
@@ -1874,4 +1884,8 @@ planted pair without repairing it.
   of an already-enrolled principal now fails where it previously succeeded. That is a behaviour
   change on a non-I7 defect, adopted because the principal-level question subsumes it and because
   the domain's own recovery design and error message already say a repeat is invalid.
+- **Recovery rotation is not wired into this index.** A rotated principal has no row here, so the
+  guard is Principal-scoped and rotation-blind. Not a regression — no row existed before M4a either
+  — but it bounds the claim, and it is the identity owner's question whether the durable index
+  should follow a rotation.
 - **`commons/stewards/by_did/` and the `StewardId` derivation remain untouched**, as §11.4 records.
