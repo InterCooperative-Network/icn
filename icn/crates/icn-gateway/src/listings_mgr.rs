@@ -1063,8 +1063,12 @@ impl SledListingsStore {
             return Ok(false);
         }
 
-        // Use an index key to track which DIDs have expressed interest
-        // This allows atomic CAS without scanning all interests
+        // The index key claims this exact spelling. It is no longer what avoids
+        // a scan — the classification above reads the listing's canonical rows,
+        // because a spelling-keyed lookup cannot answer a question about a
+        // principal. What it still does, and what nothing else here can, is
+        // settle the same-spelling race in one atomic storage operation, below
+        // whatever serialises the classification (#2627 M4b).
         let index_key = Self::interest_index_key(&listing_id, from_did);
 
         // Atomically try to set the index key (only succeeds if not present)
