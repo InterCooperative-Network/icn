@@ -431,7 +431,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 10 | `icn-security` misbehavior | `Display` | **not inspected** | — | — | — | — | — | — | **security workflow** | deferred; migration dependency preserved |
 | 11 | `icn-rpc` auth challenges | `Display` | **not inspected** | — | — | — | — | — | — | **security workflow** | deferred; TTL-bounded |
 | 12 | `apps/governance` votes (#23) | `Display` | **0 in 3 scanned** | §7.5 re-key | n/a | n/a | **required** | after N2-A | n/a | **§7.5 gate** | not N2-A |
-| 13 | `icn-commons` weak-holder id (#65) | SHA-256 of spelling | I7 *creates* the split | — | no | **no** | — | before 6 | n/a | N2-A | **namespace decision — see §5** |
+| 13 | `icn-commons` weak-holder id (#65) | SHA-256 of spelling | I7 *creates* the split | — | no | **no** | — | before 6 | n/a | N2-A | **namespace decision — see §5**; the *mint* is guarded before persistence and the derivation is unchanged (§11.7, #2627 M3) — existing derived ids are not migrated |
 | 14 | `VectorClock` (#45), snapshot `vector_clock` (#54) | serialized map | **0 in 3 scanned** | max | yes — `VectorClockProjection::from_entries` | yes | no | 4 | safe | N2-A | rule established |
 | 15 | snapshot `peer_connections` (#57) | serialized map | **0 in 3 scanned** | **fail closed** | no | no | — | 4 | safe | N2-A | **no authorized rule** |
 | 16 | `trust-app` `trust/sequences/receiver/` (#71) | `Display` | 0 in 3 scanned | max | **no** — asserted by precedent; `SequenceTracker` reads and writes the exact spelling and implements no fold | yes | no | 4 | safe | N2-A | **rule needs a trust-domain loader that folds; fail closed at the gate until then** |
@@ -440,6 +440,7 @@ rule authorizes choosing or combining them, the disposition is **fail closed**.
 | 19 | `icn-federation` `federation/attestations/` (#27, #59) | `as_str` + `/` + source coop | **not measured** — outside the registry when §3 was scanned (#2703) | **fail closed** | yes — the live store refuses to read, write or sweep over such a pair, and revokes one atomically (#2704); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **merge rule awaits a federation-domain decision** |
 | 20 | `icn-federation` `idx_agreement_party/` (#28) | `as_str` + `/` + agreement id | **not measured** — outside the registry when §3 was scanned (#2707) | **equivalent** (projection) | **yes** — the rows are derived from `federation/agreements/` and the store proves membership from the canonical row, retires superseded rows, refuses what it cannot attribute and can rebuild the projection (§11.3) | yes | no | — | safe (no byte moves) | N2-A | registered `Equivalent`/`Established` in code **and at the gate**; **projection, not authority** |
 | 21 | `icn-ledger` `ledger:treasury:<did>` (#10, #41) | `Display` | **not measured** — outside the registry when §3 was scanned (#2627 M1) | **fail closed** | yes — the loader classifies every primary row and refuses an alias pair, an unreadable key or value, a key/body spelling disagreement and a disagreeing cooperative index before adopting anything (§4.2); the merge rule itself is undecided | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **no merge rule authorized** |
+| 22 | `icn-commons` `commons/holders/by_did/` (#67) | `Display` | **not measured** — outside the registry when §3 was scanned (#2627 M3) | **fail closed** | yes — two spellings reach two independent `CommonsHolderRecord`s with their own status, personhood level and rights, so a merge decides a member's standing; the live mint seam refuses the same state before it can be created (§11.7) | n/a | no | — | safe (no byte moves) | N2-A | fail-closed in code **and at the gate**; **no merge rule authorized**, existing duplicates not dispositioned |
 | — | `CompressedVectorClock` (#46) | dormant | n/a | derive-shape fix | n/a | yes | no | 3 | safe | N2-A | no data step |
 
 Rows 10 and 11 are security-specific namespaces. Their **existence and migration dependency are
@@ -1400,7 +1401,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
 | `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
 | `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
-| `icn-commons` `commons/{anchors,holders,stewards}/by_did/` (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
+| `icn-commons` `commons/{anchors,holders,stewards}/by_did/` — the **holders** third is **registered and mint-guarded in M3, §11.7**; anchors and stewards are untouched (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
 | `icn-ledger` `asset_owner:<did>:<asset>` | dormant | `asset:<id>` | read re-checks `owner_did` by `Did`; `transfer_custody` authorizes by `Did` and removes the index by the caller's spelling — an orphan the read re-check then hides | the §7 *partial principalization* pattern, verbatim |
 | `icn-ledger` `obligation_creditor:` / `obligation_debtor:` | dormant | `obligation:<id>` | prefix scan, no re-check, no delete path | |
 | `icn-identity` `personhood/by_did/` (dormant) and `commons/by_did/` (dead) | — | `personhood/anchors/<id>` / `commons/holders/<id>` | exact-key | delete the dead store; rebuild rule for the dormant one |
@@ -1446,11 +1447,13 @@ principal-aware while its partner still counts, deletes or keys by spelling.
 * **No merge rule was invented.** Row 20 uses the existing `Equivalent` disposition because the
   rows are derivations of one canonical fact; nothing here authorizes a merge of authoritative
   state anywhere else, and the seven `AwaitingDomainSignOff` keyspaces are unchanged.
-* **Registry scope.** `n2a_keyspaces()` now holds fifteen descriptors: the twelve whole-key
-  keyspaces the §3 evidence was gathered with, the two anchored federation layouts (§4 rows 19
-  and 20), and the treasury primary rows (§4 row 21, #2627 M1) as the thirteenth whole-key
-  layout. The §3 figures are not re-stated: a registry expansion does not enlarge old evidence
-  (§3.2).
+* **Registry scope.** At this pass `n2a_keyspaces()` held fifteen descriptors: the twelve
+  whole-key keyspaces the §3 evidence was gathered with, the two anchored federation layouts (§4
+  rows 19 and 20), and the treasury primary rows (§4 row 21, #2627 M1) as the thirteenth whole-key
+  layout. Two have been added since — the length-prefixed tag-discriminated grant-by-grantee
+  projection (#2627 M2, §11.6) and the Commons holder-by-DID index (§4 row 22, #2627 M3, §11.7) as
+  the fourteenth whole-key layout — for **seventeen**. The §3 figures are not re-stated in either
+  case: a registry expansion does not enlarge old evidence (§3.2).
 * **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
   `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
   descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
@@ -1595,3 +1598,120 @@ not a reconciliation, and a verified read path is sufficient for software closur
 historical rows, if it is ever wanted, is a separate explicit operation. Every claim here is
 fixture evidence. No merge rule is authorized for authoritative state, and no grant body or
 projection row was re-keyed.
+
+### 11.7 Disposition of `commons/holders/by_did/` — P5 index over a P2 row, `FailClosed` / `Established` (#2627 M3)
+
+**The defect, at the seam rather than in either half.** A member's profile update reaches
+`CommonsInner::update_display_name` through two gateway callers —
+`api/members.rs::update_member_profile` (`PUT /v1/members/{coop_id}/{did}/profile`, self-service)
+and `api/coops.rs`'s member-add, which sets a display name best-effort. Both authorization checks
+on the first route compare `Did`s, and since I7 that is *principal* equality: the self-service
+check `caller_did != did` and the membership check `coop.members.iter().any(|m| m.did == did)` both
+correctly accept a second textual spelling of an enrolled member. Immediately below them the mint
+decided existence with a single exact-key `get` on `commons/holders/by_did/<spelling>` and, on a
+miss, derived the new holder's permanent id as `SHA-256(did.to_string())`. Neither half is wrong on
+its own. Composed, they are:
+
+```text
+principal-level authorization
++ spelling-level existence test
++ spelling-derived durable identity
+= a second durable Commons holder for one principal
+```
+
+Reproduced on `12902244` before any fix, through the production route: the alias-spelled request
+returned **`200 OK`** — not `403`, not `404`, so both gates did accept it — the
+`commons/holders/by_did/` row count went **1 → 2**, two primary holder records existed, their ids
+differed, and the first holder survived with its display name intact. This is not a failed lookup
+whose damage is a missing read; it is a **created fact**. Two concurrent alias-spelled updates for
+one principal both succeeded.
+
+**What M3 establishes.** Classification before mint, and nothing else:
+
+```text
+exact index row for this spelling?
+  primary proven, filed under this same spelling  → ordinary update
+  primary cannot be resolved                      → REFUSE  holder_index_primary_missing
+  primary filed under a different spelling        → REFUSE  holder_index_primary_mismatch
+no exact row → read the whole holder-by-DID namespace
+  a row under any spelling names this principal   → REFUSE  holder_principal_already_indexed
+  a row cannot be parsed as a spelling at all     → REFUSE  holder_index_malformed
+  every row read, none names this principal       → mint, byte-for-byte as before
+```
+
+Absence of a *principal* is a claim about every spelling, so it is proven against the namespace and
+never inferred from the one key that missed. The exact-spelling read happens first so the ordinary
+case — one canonical spelling looked up by itself — does not pay for a scan; only the branch that
+is about to create durable identity reads the namespace.
+
+The exact-hit arm requires the primary to be filed under the **byte-identical** spelling, not merely
+to name the same principal. `get_holder_by_did` resolves an index row and loads the primary without
+re-checking it, so a crossed row would otherwise have handed one principal's caller another
+principal's record to mutate; and a primary carrying the same principal under a *different* spelling
+would, on write-back, have filed a second index row under the body's spelling — a normalization no
+rule here authorizes. Every row `put_holder` writes agrees with its body by construction, so no
+healthy row reaches that arm.
+
+**Writer bytes unchanged.** A proven-absent spelling still derives
+`anchor_bytes = holder_id = SHA-256(did.to_string())`, `holder_did = Did(spelling)`,
+`personhood_level = Weak`. Changing that derivation would re-key every weak holder already
+persisted, which is a migration and not a guard. It is pinned by a regression fixture precisely so
+M3 cannot smuggle one in.
+
+**Registration.** `commons/holders/by_did/<spelling>` is registered in `n2a_keyspaces` as
+`icn-commons/holder_by_did`, `FailClosed` / `Established`, `PrincipalRegion::WholeKey` with
+`did_ends_key` — the writer appends the spelling and stops — as the fourteenth whole-key layout.
+Fail-closed is the disposition because two spellings reach two independent `CommonsHolderRecord`s
+with their own status, personhood level, affiliations and baseline rights: merging them decides
+which holder is a member in good standing, and no identity-layer rule decides that. Two rows naming
+one holder id are refused on the same ground — the equal values make a rebuild's choice *look* free,
+and `Equivalent` is a claim about derivation only the owning domain can make.
+
+The prefix claims the index subspace and nothing lexically near it. The two siblings —
+`commons/holders/<hex holder id>` and `commons/holders/by_anchor/<hex anchor id>` — are keyed by
+opaque hex, carry no spelling in the key, and do not start with the registered prefix; a `did:icn:`
+appearing in a sibling's stored *value* is not key material and is invisible to a key scan. Sibling
+isolation is pinned by fixture.
+
+**Gate and runtime agree.** Before registration the gate blocked an ordinary deployment holding a
+single weak holder, as `UNCOVERED` — and blocked two *distinct* principals for the same reason, a
+false refusal. Registered, one valid row and two distinct principals are clear, and the alias pair
+refuses as `icn-commons/holder_by_did` / `FAIL-CLOSED`. A fixture drives one real `commons.sled`
+through both layers: the state the mint seam produces is a state the gate opens, the alias pair the
+gate refuses is the state the seam refuses to create, and the seam then refuses to add a third
+spelling to it. Both wrappers write sled's default tree, so the gate reads exactly the bytes Commons
+wrote.
+
+**Concurrency, bounded honestly.** `CommonsHandle` owns commons state behind one
+`tokio::sync::RwLock` and every mutation takes the write lock; both gateway callers reach the seam
+only through it. Two concurrent alias-spelled updates therefore serialize, and exactly one mints —
+pinned by a multi-threaded fixture that failed before the guard (both succeeded). Production opens
+`commons.sled` once: `icn_core::supervisor::lifecycle` creates the handle and injects it, and
+`icn_gateway::server` uses the injected handle rather than opening a second store; the standalone
+`with_sled_path` fallback runs only when no handle was injected, and sled holds an exclusive `flock`
+on the database directory, so a second process cannot open it. **M3 therefore claims serialization
+within the one handle production constructs, and claims nothing about hypothetical independent
+handles over one path — that configuration is not production-reachable, and no new lock was added.**
+
+**Crash ordering — a nonclaim.** `put_holder` writes the primary, then the by-DID index, then the
+by-anchor index as three separate durable operations. A crash between the first and second leaves a
+primary record that this by-DID guard cannot discover, so a later mint under another spelling would
+not see it. That is **pre-existing crash-partial persistence debt**, not something M3 introduces or
+repairs, and no transaction layer is added here. The claim M3 makes is therefore the narrow one:
+
+> An I7 alternate spelling can no longer cause a second weak-holder mint through a coherent
+> holder-by-DID namespace.
+
+It is **not** the claim that two holders for one principal are impossible under every failure model.
+
+**What this does not do.** No holder is merged, adopted, re-keyed or deleted; no alias row is
+removed or renamed; no index is rebuilt; no DID spelling is preferred; no weak holder is migrated.
+Existing duplicate holders are not dispositioned — where the registered index proves the collision
+the gate refuses and runtime mutation refuses, and choosing among already-derived duplicate holder
+ids stays a separate domain decision. `get_holder_by_did` is **not** made alias-transparent: a
+caller presenting spelling B still fails to find a holder indexed only as A, and the authorization
+consumers of that lookup — `authority.rs::require_office_in_jurisdiction`,
+`api/membership/mod.rs`, `api/steward/mod.rs` — remain fail-closed exactly as before. Commons
+identity is not Principal-transparent, and M3 does not claim it is. The sibling
+`commons/anchors/by_did/` and `commons/stewards/by_did/` indexes, the `StewardId` derivation and
+the spelling-derived holder id itself are untouched and remain as §11.4 records them.

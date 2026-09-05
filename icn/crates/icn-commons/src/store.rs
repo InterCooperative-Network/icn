@@ -21,7 +21,7 @@
 
 use anyhow::{Context, Result};
 use icn_governance::{Amendment, Appeal, Charter, StewardRecord};
-use icn_identity::{CommonsHolderRecord, PersonhoodAnchor, RevocationRecord};
+use icn_identity::{CommonsHolderRecord, Did, PersonhoodAnchor, RevocationRecord};
 use lru::LruCache;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::BTreeMap;
@@ -46,6 +46,83 @@ pub const AMENDMENT_PREFIX: &[u8] = b"commons/amendments/";
 pub const APPEAL_PREFIX: &[u8] = b"commons/appeals/";
 pub const REVOCATION_PREFIX: &[u8] = b"commons/revocations/";
 // Note: ceremony and enrollment session storage stays in icn-gateway (gateway-local types).
+
+// ============================================================================
+// Weak-holder mint classification (#2627 M3)
+// ============================================================================
+
+/// Why the holder-by-DID namespace could not be read as evidence about one
+/// principal.
+///
+/// Carried as a class and never as content. A diagnostic that reproduced the
+/// spelling, the stored holder id or the row bytes would put the member
+/// identity into logs and error bodies that the refusal exists to protect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HolderIndexDefect {
+    /// A physical key under the prefix carries a suffix that is not UTF-8, is
+    /// empty, or does not parse as a DID.
+    ///
+    /// The layout says a spelling belongs there, so such a row names *some*
+    /// principal this scan cannot identify — and therefore cannot rule out as
+    /// the one being asked about. It is unreadable evidence, not absent
+    /// evidence.
+    MalformedRow,
+    /// An index row names this principal, but the holder id it carries does not
+    /// resolve to a primary record.
+    ///
+    /// The evidence that a holder exists is real; the record it names cannot be
+    /// proven. Minting here would write a replacement over durable evidence
+    /// this layer has no authority to discard.
+    PrimaryMissing,
+    /// An index row resolves to a primary record filed under a different
+    /// spelling than the row's own suffix.
+    ///
+    /// Two derivations of one identity disagree, and that is true whether the
+    /// primary names another principal outright or the same principal spelled
+    /// another way. Neither is absence, and neither authorizes adoption: a
+    /// projection must never manufacture the identity its primary denies, and
+    /// re-filing the row under the body's spelling would be a normalization no
+    /// rule here permits.
+    PrimaryMismatch,
+}
+
+impl HolderIndexDefect {
+    /// A stable, payload-free reason class for diagnostics.
+    pub fn reason_class(self) -> &'static str {
+        match self {
+            HolderIndexDefect::MalformedRow => "holder_index_malformed",
+            HolderIndexDefect::PrimaryMissing => "holder_index_primary_missing",
+            HolderIndexDefect::PrimaryMismatch => "holder_index_primary_mismatch",
+        }
+    }
+}
+
+/// What the durable holder-by-DID namespace proves about one principal, decided
+/// before anything is written.
+///
+/// The weak-holder mint derives a holder's permanent id from the *textual* DID
+/// it is handed, while every gate upstream of it compares principals (I7). A
+/// single exact-key miss therefore proves only that one spelling is unused — it
+/// is not evidence that the principal has no holder, and treating it as such
+/// minted a second durable holder for one member (inventory rows #65, #67).
+/// This states the difference so a caller cannot accidentally confuse them.
+#[derive(Debug)]
+pub enum HolderMintClassification {
+    /// A row under this principal's exact textual spelling resolves to a
+    /// primary record that carries this principal. Boxed because it is much
+    /// larger than the other three answers.
+    Held(Box<CommonsHolderRecord>),
+    /// A row under a *different* textual spelling of this principal exists.
+    ///
+    /// M3 authorizes no rule that adopts, re-keys or merges that holder, so a
+    /// caller about to mint must stop rather than choose.
+    SamePrincipalOtherSpelling,
+    /// No physical row names this principal, and every row in the namespace was
+    /// readable enough for that to be a proof rather than a guess.
+    ProvenAbsent,
+    /// The namespace cannot be read as evidence about this principal.
+    Unreadable(HolderIndexDefect),
+}
 
 // ============================================================================
 // Storage Backend Trait
@@ -665,6 +742,85 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
             return self.get_holder(&id);
         }
         Ok(None)
+    }
+
+    /// Classify what the holder-by-DID namespace proves about `did`, before any
+    /// weak holder is minted for it (#2627 M3).
+    ///
+    /// A weak holder's durable id is `SHA-256` of the *textual* spelling it was
+    /// created from, so two spellings of one principal produce two ids and two
+    /// primary records. The gates that authorize a profile update compare
+    /// principals, so an alias reaches this seam legitimately. Deciding
+    /// existence with the one exact key would therefore answer a question about
+    /// *this spelling* and let the caller act on it as if it were an answer
+    /// about *this principal*.
+    ///
+    /// So absence is proven, never inferred: the exact spelling is read first
+    /// because the ordinary case is one canonical spelling looked up by itself
+    /// and must not pay for a scan, and only a miss — the one case that is
+    /// about to create durable identity — reads the whole namespace.
+    ///
+    /// This is deliberately *not* a change to [`Self::get_holder_by_did`]:
+    /// reads stay fail-closed per spelling. It answers only the question a mint
+    /// must ask.
+    pub fn classify_holder_mint(&self, did: &Did) -> Result<HolderMintClassification> {
+        // The exact spelling. A hit here is also where the primary is proven to
+        // carry the principal its index row claims: `get_holder_by_did` does
+        // not re-check that, so a crossed row would otherwise hand this
+        // principal's caller another principal's record to mutate.
+        let did_key = Self::make_key(HOLDER_BY_DID_PREFIX, &did.to_string());
+        if let Some(id_bytes) = self.store.get(&did_key)? {
+            let Ok(id) = String::from_utf8(id_bytes) else {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::MalformedRow,
+                ));
+            };
+            let Some(holder) = self.get_holder(&id)? else {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::PrimaryMissing,
+                ));
+            };
+            // Byte-identical, not merely the same principal. A primary filed
+            // under one spelling but carrying another is an index/body
+            // disagreement whichever principal it names, and writing it back
+            // would file a *second* index row under the body's spelling —
+            // silently normalizing a row M3 has no authority to rewrite. Every
+            // row `put_holder` writes agrees with its body by construction, so
+            // no healthy row reaches this arm.
+            if holder.holder_did.as_str() != did.as_str() {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::PrimaryMismatch,
+                ));
+            }
+            return Ok(HolderMintClassification::Held(Box::new(holder)));
+        }
+
+        // No row under this spelling. Absence of the *principal* is a claim
+        // about every spelling, so it is established by reading the namespace —
+        // never inferred from the single key that missed. A row that names this
+        // principal under another spelling is decisive on its own: whatever
+        // state its primary is in, the principal is already held here, and
+        // adopting or re-keying that holder is not a rule M3 carries.
+        for (key, _) in self.store.scan(HOLDER_BY_DID_PREFIX)? {
+            let Some(suffix) = key.strip_prefix(HOLDER_BY_DID_PREFIX) else {
+                continue;
+            };
+            let Ok(spelling) = std::str::from_utf8(suffix) else {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::MalformedRow,
+                ));
+            };
+            let Ok(row_did) = Did::from_str(spelling) else {
+                return Ok(HolderMintClassification::Unreadable(
+                    HolderIndexDefect::MalformedRow,
+                ));
+            };
+            if row_did == *did {
+                return Ok(HolderMintClassification::SamePrincipalOtherSpelling);
+            }
+        }
+
+        Ok(HolderMintClassification::ProvenAbsent)
     }
 
     /// Get holder by anchor ID

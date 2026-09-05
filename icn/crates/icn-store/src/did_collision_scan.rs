@@ -1761,6 +1761,40 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         principal and are outside the I7 boundary.",
         },
         KeyspaceDescriptor {
+            name: "icn-commons/holder_by_did",
+            // `commons/holders/by_did/<spelling>` is the whole key: the writer
+            // appends the DID and nothing else (`CommonsStore::put_holder`), so
+            // `did_ends_key` states the writer's exact shape. The two sibling
+            // holder subspaces are outside this prefix rather than members of
+            // it — `commons/holders/<hex holder id>` and
+            // `commons/holders/by_anchor/<hex anchor id>` are both keyed by
+            // opaque hex and carry no spelling in the key at all, so neither
+            // can be swallowed by this descriptor and neither is cleared by it.
+            // A `did:icn:` that appears in a sibling's stored *value* is not
+            // key material and is invisible to a key scan.
+            prefix: b"commons/holders/by_did/",
+            inventory_rows: &[67],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Holder-by-DID index over the weak-holder identity contract. A weak holder's \
+                        durable id is SHA-256 of the textual spelling it was minted from, so two \
+                        spellings of one principal name two independent CommonsHolderRecords \
+                        with their own status, personhood level, affiliations and baseline \
+                        rights — and the index rows that reach them cannot be merged without \
+                        first deciding which holder survives, which is a question about a \
+                        member's standing that no identity-layer rule answers. Two rows \
+                        pointing at one holder id are refused on the same ground: no domain \
+                        rule authorizes collapsing the spellings, and a rebuild must not pick. \
+                        The live mint seam refuses the same state before it can be created \
+                        (icn_commons::store::classify_holder_mint, #2627 M3); a migration must \
+                        not decide it either. Already-derived duplicate holders are not \
+                        dispositioned here.",
+        },
+        KeyspaceDescriptor {
             name: "icn-ledger/treasury",
             // `ledger:treasury:<did>` is the authoritative treasury record and
             // the only row beneath `ledger:treasury:` keyed by the treasury
@@ -1801,7 +1835,7 @@ mod tests {
 
     /// The whole-key layouts in registry order: the twelve the §3 evidence was
     /// gathered with, unchanged, then the treasury primary rows (#2627 M1).
-    const WHOLE_KEY_NAMES: [&str; 13] = [
+    const WHOLE_KEY_NAMES: [&str; 14] = [
         "icn-net/replay_max_seq",
         "icn-net/replay_finalized",
         "icn-net/replay_sender_regime",
@@ -1814,6 +1848,7 @@ mod tests {
         "trust-app/sequences_receiver",
         "trust-app/sequences_issuer",
         "icn-coop/member",
+        "icn-commons/holder_by_did",
         "icn-ledger/treasury",
     ];
 
@@ -2978,7 +3013,8 @@ mod tests {
         // order it always had, so no existing descriptor's semantics moved
         // when the two federation layouts were added — nor when the treasury
         // primary rows were registered after them as the thirteenth
-        // whole-key layout (#2627 M1).
+        // whole-key layout (#2627 M1), nor when the Commons holder-by-DID
+        // index joined them as the fourteenth (#2627 M3).
         let whole_key: Vec<&str> = n2a_keyspaces()
             .iter()
             .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
