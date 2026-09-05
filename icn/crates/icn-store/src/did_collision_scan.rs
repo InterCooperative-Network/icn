@@ -1874,6 +1874,46 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         (icn_ledger::principal_rows, #2627 M1); a migration must not decide it \
                         either.",
         },
+        KeyspaceDescriptor {
+            name: "icn-gateway/listing_interest_uniqueness",
+            // `v1:interest_idx:<listing uuid>:<did spelling>`. The prefix stops
+            // at the namespace because the listing id varies, so it cannot run
+            // through the DID scheme the way `ledger:treasury:` does. It does
+            // not need to: `v1:interest:` and `v1:listing:` do not begin with
+            // `v1:interest_idx:`, so the sibling rows stay outside this
+            // descriptor rather than being claimed by it.
+            //
+            // The listing component is a `Uuid` rendered canonically — hex and
+            // hyphens — so it cannot spell `did:icn:`, and the whole-key
+            // tokenizer therefore finds exactly the one spelling that is
+            // actually a principal. Because the shape carries every non-DID
+            // byte verbatim, the listing id stays in the canonical shape and
+            // the collision unit is the pair (listing, principal): two
+            // spellings of one principal on ONE listing group, and the same
+            // principal on two listings does not.
+            prefix: b"v1:interest_idx:",
+            inventory_rows: &[26],
+            disposition: MergeDisposition::FailClosed,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            // The spelling is the last component: the writer appends the DID
+            // and nothing else, so anything trailing it is material the
+            // gateway's own parser would not have produced.
+            did_ends_key: true,
+            principal_region: PrincipalRegion::WholeKey,
+            rationale:
+                "Uniqueness rows for listing interests, keyed by (listing, DID spelling) with a \
+                        constant sentinel value. The row is not a lookup projection that a reader \
+                        could recompute and discard: a sled compare-and-swap on this key IS the \
+                        one-interest-per-member rule, so two spellings of one principal under one \
+                        listing are two independent permissions to create a canonical \
+                        `v1:interest:` row, and merging them would have to decide which of two \
+                        interests — each with its own message and offer — survives. No exchange \
+                        rule authorizes that choice. The live writer classifies the listing's \
+                        canonical interests by principal and refuses a second one \
+                        (icn_gateway::listings_mgr, #2627 M4b); a migration must not decide it \
+                        either. Already-persisted duplicate interests are not dispositioned here.",
+        },
     ]
 }
 
@@ -1884,12 +1924,13 @@ mod tests {
 
     /// The whole-key layouts in registry order: the twelve the §3 evidence was
     /// gathered with, unchanged, then the Commons holder-by-DID index
-    /// (#2627 M3), the Commons anchor-by-DID index (#2627 M4a) and the
-    /// treasury primary rows (#2627 M1). Registry order is not merge order —
-    /// treasury registered first but sits last here — so this list is the
-    /// order itself, pinned, and every addition appends to the tail of the
-    /// registry rather than reordering what preceded it.
-    const WHOLE_KEY_NAMES: [&str; 15] = [
+    /// (#2627 M3), the Commons anchor-by-DID index (#2627 M4a), the treasury
+    /// primary rows (#2627 M1) and the listing-interest uniqueness rows
+    /// (#2627 M4b). Registry order is not merge order — treasury registered
+    /// first but sits second-to-last here — so this list is the order itself,
+    /// pinned, and every addition appends to the tail of the registry rather
+    /// than reordering what preceded it.
+    const WHOLE_KEY_NAMES: [&str; 16] = [
         "icn-net/replay_max_seq",
         "icn-net/replay_finalized",
         "icn-net/replay_sender_regime",
@@ -1905,6 +1946,7 @@ mod tests {
         "icn-commons/holder_by_did",
         "icn-commons/anchor_by_did",
         "icn-ledger/treasury",
+        "icn-gateway/listing_interest_uniqueness",
     ];
 
     /// Build a `did:icn:` spelling of `bytes` in the given multibase base.
@@ -3071,7 +3113,8 @@ mod tests {
         // whole-key layout (#2627 M1), nor when the Commons holder-by-DID
         // index joined them as the fourteenth (#2627 M3), nor when the
         // Commons anchor-by-DID index joined them as the fifteenth
-        // (#2627 M4a).
+        // (#2627 M4a), nor when the listing-interest uniqueness rows joined
+        // them as the sixteenth (#2627 M4b).
         let whole_key: Vec<&str> = n2a_keyspaces()
             .iter()
             .filter(|d| matches!(d.principal_region, PrincipalRegion::WholeKey))
@@ -4697,6 +4740,241 @@ mod tests {
         assert!(
             shapes.is_empty(),
             "the registered prefix must claim this row; got {shapes:?}"
+        );
+    }
+    // ----- v1:interest_idx: (#2627 M4b) -------------------------------------
+    //
+    // Fixtures write the exact bytes `icn_gateway::listings_mgr` writes:
+    // `v1:interest_idx:<listing uuid>:<did spelling>` with the sentinel value.
+    // They use the real registry rather than a test descriptor, so what they
+    // prove is what the shipped scan — and, through `audit_store`, the startup
+    // gate — does.
+
+    fn interest_uniqueness_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-gateway/listing_interest_uniqueness")
+            .expect("the listing-interest uniqueness keyspace is registered (#2627 M4b)")
+    }
+
+    /// A listing id in the writer's rendering: a canonical `Uuid`, which is the
+    /// framing the key's structure relies on.
+    fn listing(n: u8) -> String {
+        format!("00000000-0000-4000-8000-0000000000{n:02x}")
+    }
+
+    fn interest_index_row(listing_id: &str, spelling: &str) -> String {
+        format!("v1:interest_idx:{listing_id}:{spelling}")
+    }
+
+    #[test]
+    fn the_interest_uniqueness_descriptor_claims_the_index_and_not_its_siblings() {
+        let d = interest_uniqueness_descriptor();
+        assert_eq!(d.prefix, b"v1:interest_idx:");
+        assert_eq!(d.disposition, MergeDisposition::FailClosed);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert!(d.did_ends_key, "the writer appends the spelling and stops");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(d.principal_region, PrincipalRegion::WholeKey));
+        assert_eq!(d.inventory_rows, &[26]);
+
+        // The canonical interest rows and the listing rows are lexical
+        // neighbours, not members. `v1:interest:` is a prefix of neither
+        // direction of this descriptor: it does not start with
+        // `v1:interest_idx:`, and widening the descriptor to `v1:interest`
+        // would swallow it.
+        let primary = format!("v1:interest:{}:{}", listing(1), listing(2));
+        let listing_row = format!("v1:listing:{}", listing(1));
+        for sibling in [&primary, &listing_row] {
+            assert!(
+                !sibling.as_bytes().starts_with(d.prefix),
+                "{sibling} must fall outside the uniqueness descriptor"
+            );
+        }
+        // And an index row is claimed.
+        let row = interest_index_row(
+            &listing(1),
+            &spell(&principal(1), multibase::Base::Base58Btc),
+        );
+        assert!(row.as_bytes().starts_with(d.prefix));
+    }
+
+    #[test]
+    fn two_spellings_of_one_principal_on_one_listing_are_a_blocking_collision() {
+        let (a, b) = two_spellings(26);
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, &a), b"1"),
+            (&interest_index_row(&l, &b), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(!report.is_automatable());
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn one_principal_on_two_listings_is_not_a_collision() {
+        // The control the collision unit depends on. Uniqueness is per listing,
+        // so a member acting on two listings is two facts. A descriptor that
+        // dropped the listing id from the canonical shape would group these and
+        // refuse to start every gateway holding an ordinary exchange.
+        let (a, b) = two_spellings(26);
+        let store = store_with(&[
+            (&interest_index_row(&listing(1), &a), b"1"),
+            (&interest_index_row(&listing(2), &b), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "the listing id stays in the canonical shape, so these are two shapes"
+        );
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn two_distinct_principals_on_one_listing_are_not_a_collision() {
+        let l = listing(1);
+        let store = store_with(&[
+            (
+                &interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+            (
+                &interest_index_row(&l, &spell(&principal(27), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+        assert!(report.is_automatable());
+    }
+
+    #[test]
+    fn a_malformed_spelling_makes_an_interest_uniqueness_row_unreadable() {
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, "did:icn:!!!not-multibase"), b"1"),
+            (
+                &interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc)),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(
+            report.must_fail_closed(),
+            "an unreadable row must block regardless of the collision count"
+        );
+    }
+
+    #[test]
+    fn material_after_the_spelling_makes_an_interest_uniqueness_row_unreadable() {
+        // The writer appends the spelling and stops, so trailing bytes are a
+        // key its own parser would not have produced. `did_ends_key` is what
+        // catches it: without that flag the tokenizer's candidate run would end
+        // at the separator and report a clean spelling with residual material.
+        let l = listing(1);
+        let spelling = spell(&principal(26), multibase::Base::Base58Btc);
+        let store = store_with(&[(
+            &format!("{}:trailing", interest_index_row(&l, &spelling)),
+            b"1",
+        )]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_unreadable, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert!(report.must_fail_closed());
+    }
+
+    #[test]
+    fn a_row_whose_listing_framing_is_not_a_uuid_still_scans_by_its_spelling() {
+        // The scan reads key structure, not the gateway's domain rules: it does
+        // not parse the listing component, so a row whose framing the gateway
+        // would reject is still grouped by whatever precedes the spelling,
+        // byte-for-byte. It therefore cannot be merged with a well-framed row —
+        // which is the property that matters here — and the gateway's own
+        // loader is what refuses the framing (#2627 M4b).
+        let spelling = spell(&principal(26), multibase::Base::Base58Btc);
+        let store = store_with(&[
+            (&interest_index_row("not-a-uuid", &spelling), b"1"),
+            (&interest_index_row(&listing(1), &spelling), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &interest_uniqueness_descriptor()).unwrap();
+
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(
+            report.distinct_principals, 2,
+            "different framing is a different shape, so no group forms"
+        );
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn an_unregistered_interest_uniqueness_row_would_be_uncovered() {
+        // What registration bought. Before this descriptor these rows carried a
+        // spelling under no registered prefix, so the gate blocked them as an
+        // uncovered shape; the descriptor is what turns that liveness wall into
+        // a proven boundary. With it registered, a healthy store clears.
+        let l = listing(1);
+        let row = interest_index_row(&l, &spell(&principal(26), multibase::Base::Base58Btc));
+        let store = store_with(&[(&row, b"1")]);
+
+        let unregistered: Vec<KeyspaceDescriptor> = n2a_keyspaces()
+            .into_iter()
+            .filter(|d| d.name != "icn-gateway/listing_interest_uniqueness")
+            .collect();
+        let shapes = uncovered_did_key_shapes(&store, &unregistered, &[]).unwrap();
+        assert_eq!(
+            shapes.values().sum::<usize>(),
+            1,
+            "without the descriptor the row is uncovered: {shapes:?}"
+        );
+
+        let shapes = uncovered_did_key_shapes(&store, &n2a_keyspaces(), &[]).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "with it registered the row is covered; got {shapes:?}"
+        );
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+        assert!(
+            audit.is_clear(),
+            "one healthy uniqueness row must not block startup: {audit:?}"
+        );
+    }
+
+    #[test]
+    fn an_alias_pair_on_one_listing_blocks_the_whole_store_audit() {
+        let (a, b) = two_spellings(26);
+        let l = listing(1);
+        let store = store_with(&[
+            (&interest_index_row(&l, &a), b"1"),
+            (&interest_index_row(&l, &b), b"1"),
+        ]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            !audit.is_clear(),
+            "two spellings of one principal on one listing must refuse startup"
         );
     }
 }

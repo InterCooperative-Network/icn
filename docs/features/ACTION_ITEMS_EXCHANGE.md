@@ -118,9 +118,15 @@ ListingInterest {
 **Sled Key Formats**:
 - Listings: `v1:listing:{id}`
 - Interests: `v1:interest:{listing_id}:{interest_id}`
-- Interest Index: `v1:interest_idx:{listing_id}:{from_did}` (for duplicate prevention)
+- Interest Index: `v1:interest_idx:{listing_id}:{from_did}` (uniqueness lock; the value is a
+  constant sentinel, not the interest id)
 
-The interest index enables atomic duplicate detection using Sled's compare-and-swap operation.
+The interest index is claimed with Sled's compare-and-swap, which decides the same-spelling race
+atomically. It does **not** decide duplication on its own: a `did:icn:` identifier has many accepted
+spellings of the same key bytes, so the index key answers "has this *spelling* claimed the listing".
+The duplicate decision is made against the canonical `v1:interest:` rows, whose `from_did` compares
+by principal, and the CAS is retained behind that check (#2627 M4b — see
+`docs/architecture/n2-a-migration-gate.md` §11.9).
 
 ### Authorization
 
@@ -150,7 +156,9 @@ let interest_counts = mgr.get_interest_counts(&owned_listing_ids);
 
 ### Race Condition Prevention
 
-Duplicate interest prevention uses atomic operations:
+Duplicate interest prevention is one interest per **principal** per listing. Both backends decide
+it by comparing `Did` values — principal equality, not spelling equality — and serialise the
+decision with the write:
 
 **In-Memory Store**: Check and insert under single write lock
 ```rust
@@ -163,8 +171,18 @@ existing.push(interest.clone());
 Ok(true)
 ```
 
-**Sled Store**: Compare-and-swap on index key
+**Sled Store**: Classify the principal, then compare-and-swap the spelling key. Both steps run
+under one lock, because proving a principal absent reads rows a concurrent alias-spelled request
+could add before either CAS lands, and no single Sled operation spans both:
 ```rust
+let _guard = self.interest_uniqueness.lock()?;
+
+// Decided against the canonical rows: `from_did` is a `Did`, so `==` is principal
+// equality. Evidence that cannot be decoded is refused, never skipped.
+if self.classify_principal_for_listing(&listing_id, from_did)? == AlreadyPresent {
+    return Ok(false); // Duplicate
+}
+
 let index_key = format!("v1:interest_idx:{}:{}", listing_id, from_did);
 let cas_result = db.compare_and_swap(index_key, None::<&[u8]>, Some(b"1"))?;
 if cas_result.is_err() {
@@ -172,6 +190,10 @@ if cas_result.is_err() {
 }
 // CAS succeeded, insert actual interest data
 ```
+
+The CAS and the interest insert are two operations, not one transaction: a crash between them
+leaves a lock with no interest, and the affected principal is refused until `Orphan Cleanup` runs.
+Interests already persisted for one principal under two spellings are not reconciled.
 
 ### Photo URL Security
 
@@ -294,6 +316,15 @@ pub fn delete(&self, id: &ListingId) -> Result<bool> {
     Ok(existed)
 }
 ```
+
+A separate scheduled pass, `cleanup_orphaned_interest_indexes`, removes uniqueness rows left by a
+crash between the compare-and-swap and the interest insert. It resolves each row's canonical
+interest by the **byte-identical** spelling the writer filed — the row's value is a sentinel, so
+there is no interest id to follow — and parses the key by the writer's framing: strip the
+`v1:interest_idx:` namespace, take the canonical `Uuid` up to the first `:`, and treat everything
+after it as the DID spelling, colons included. A row whose key or value the pass cannot read is
+skipped rather than deleted; refusing on unreadable evidence is the live write path's job, and the
+two are deliberately different (#2627 M4b).
 
 ## Frontend Integration
 

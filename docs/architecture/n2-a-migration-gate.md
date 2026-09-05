@@ -1399,7 +1399,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 | `apps/governance` `action_item_by_assignee:<did>:<domain>:<item>` | live | the action-item row (`assignee: Option<Did>`) | spelling prefix scan, stale rows skipped | **regressed by I7**: `save` decides stale-index removal with `existing.assignee != item.assignee`, now principal equality, so re-saving under another spelling leaks the old row. Actionable now |
 | ~~`icn-gateway` `adr0014:grant:by_grantee:`~~ **closed in M2, §11.6** and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.6 and registered; the meeting-attendance pair index is untouched and remains open |
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
-| `icn-gateway` `v1:interest_idx:<listing>:<did>` | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeats the de-dup; needs the guard on the canonical side, then the projection rule |
+| ~~`icn-gateway` `v1:interest_idx:<listing>:<did>`~~ **closed in M4b, §11.9** | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeated the de-dup. Dispositioned and registered in §11.9: the guard is on the canonical side, the projection is read as corroborating evidence rather than trusted, and the maintenance parser now follows the writer's framing. Historical duplicates are not reconciled |
 | `apps/ledger-app` `idx_owner:`, `idx_escrow_creator:`, `idx_escrow_beneficiary:`, `idx_budget_owner:` (constructed by the gateway) | live | `payment:<id>` / `escrow:<id>` / `budget:<id>` | `String` prefix scan against the raw JWT `sub` | the clearest `sub`-versus-stored-spelling surface; normalize `sub` through `Did` before index construction |
 | `icn-commons` `commons/{anchors,holders,stewards}/by_did/` — the **holders** third is **registered and mint-guarded in M3, §11.7**; the **anchors** third is **registered and enrollment-guarded in M4a, §11.8**; stewards are untouched (twin: `icn-gateway/src/commons_store.rs`, dead) | live | `commons/{anchors,holders,stewards}/<id>` — **P2 rows** | `String` lookup; `delete_holder` removes one spelling; the governance `FreezeMember` side-effect no-ops on an alias | the projection can be made correct, but the canonical id is hashed from the spelling: see the P2 group |
 | `icn-ledger` `asset_owner:<did>:<asset>` | dormant | `asset:<id>` | read re-checks `owner_did` by `Did`; `transfer_custody` authorizes by `Did` and removes the index by the caller's spelling — an orphan the read re-check then hides | the §7 *partial principalization* pattern, verbatim |
@@ -1453,8 +1453,10 @@ principal-aware while its partner still counts, deletes or keys by spelling.
   layout. Two have been added since — the length-prefixed tag-discriminated grant-by-grantee
   projection (#2627 M2, §11.6) and the Commons holder-by-DID index (§4 row 22, #2627 M3, §11.7) as
   the fourteenth whole-key layout — and the Commons anchor-by-DID index (§4 row 66, #2627 M4a,
-  §11.8) as the fifteenth, for **eighteen**. The §3 figures are not re-stated in any of these
-  cases: a registry expansion does not enlarge old evidence (§3.2).
+  §11.8) as the fifteenth, for **eighteen**. The listing-interest uniqueness rows (inventory
+  row 26, #2627 M4b, §11.9) have since been added as the sixteenth whole-key layout, for
+  **nineteen**. The §3 figures are not re-stated in any of these cases: a registry expansion
+  does not enlarge old evidence (§3.2).
 * **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
   `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
   descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
@@ -1927,3 +1929,155 @@ planted pair without repairing it.
   — but it bounds the claim, and it is the identity owner's question whether the durable index
   should follow a rotation.
 - **`commons/stewards/by_did/` and the `StewardId` derivation remain untouched**, as §11.4 records.
+
+### 11.9 Disposition of `v1:interest_idx:` — P5 uniqueness lock over a P1 canonical row, `FailClosed` / `Established` (#2627 M4b)
+
+**The defect is in the uniqueness mechanism itself, not at a seam.** `SledListingsStore` claims
+`v1:interest_idx:<listing uuid>:<did spelling>` with a sled `compare_and_swap` from `None` to a
+constant sentinel, and only writes the canonical `v1:interest:<listing>:<interest uuid>` row once
+that CAS succeeds. The CAS is genuinely atomic, and `docs/features/ACTION_ITEMS_EXCHANGE.md` was
+right that it is what prevents duplicates — but it is atomic *on the spelling it is handed*. The key
+is built from `ListingInterest.from_did` through `Display`, which after I7 still renders the
+original spelling, so one principal arriving under two of the twenty-three multibase spellings
+`Did::from_str` accepts reaches two different keys, wins two independent CASes, and gets two
+canonical interests. This is not a lookup projection whose loss a reader could recompute around: the
+row *is* the one-interest-per-member rule, so a second spelling is a second permission to write
+authoritative exchange state.
+
+**Reproduced on `35a4195fc5e5e064613e702d947b644dd79e850f` before any fix**, through the ordinary
+authenticated route (`POST /v1/listings/{id}/interest`, `coop:write`), not by manufacturing keys:
+
+```text
+POST as spelling A  -> 201 Created
+POST as spelling B  -> 201 Created          <- Did(A) == Did(B), A.as_str() != B.as_str()
+POST as spelling A  -> 500 (duplicate)      <- the same-spelling CAS worked all along
+
+v1:interest:<L>:*      2 rows      get_interests() -> 2 logical interests
+v1:interest_idx:<L>:*  2 rows      both values the sentinel "1"
+GET /interests (owner) -> 200, both interests listed, distinct messages preserved
+```
+
+The same run reproduced a second, independent defect in the maintenance pass.
+`cleanup_orphaned_interest_indexes` split the whole key on `':'` and required exactly four
+components, but a real key is `v1:interest_idx:<uuid>:did:icn:<multibase>` — six components,
+because a DID spelling carries its own colons. Every row the writer produces was therefore
+skipped, and `parts[3]` would have been the literal `"did"`, making the comparison below it
+unreachable. The pass returned `cleaned = 0` on a genuine orphan, and the orphaned lock kept the
+affected principal refused (`"You have already expressed interest in this listing"`) with no
+mechanism able to clear it.
+
+**What authorizes the refusal, stated narrowly.** Two rows naming one principal under one listing
+are two `ListingInterest` records that can differ in `message`, `offer`, `from_coop`, `id` and
+`created_at`. Choosing between them is choosing which approach to a cooperative offer the owner
+sees, and no exchange rule in this repository authorizes first, latest, oldest, lexicographic,
+highest-offer or non-empty-message as a survivor. That is `FailClosed`, and the basis is
+`Established` because the live writer now refuses to create the state
+(`icn_gateway::listings_mgr::SledListingsStore::classify_principal_for_listing`) rather than because
+this document proposes a rule.
+
+**What M4b establishes.** The decision is taken against the canonical rows, whose `from_did` is a
+real `Did` and therefore compares by principal — the rule
+`InMemoryListingsStore::add_interest_if_not_duplicate` already applied, so the two backends behind
+one trait now encode one domain rule instead of two:
+
+```text
+canonical v1:interest: row does not decode            -> REFUSE canonical-interest-unreadable
+canonical row filed here but names another listing    -> REFUSE canonical-interest-listing-mismatch
+canonical row's from_did == this principal             -> DUPLICATE
+uniqueness row value is not the writer's sentinel     -> REFUSE uniqueness-row-value-unrecognised
+uniqueness key is not UTF-8 / outside the namespace   -> REFUSE uniqueness-key-*
+uniqueness key's listing framing is not the writer's  -> REFUSE uniqueness-key-listing-framing-*
+uniqueness key's spelling names no principal          -> REFUSE uniqueness-key-names-no-principal
+uniqueness row decodes to this principal              -> DUPLICATE
+otherwise                                             -> proven absent; CAS the spelling, then write
+```
+
+Two asymmetries in that ladder are deliberate. A uniqueness row naming this principal is a
+`DUPLICATE` whether or not its canonical row survived, so a live write never reads a missing
+canonical row as absence and writes a replacement — repairing evidence is the maintenance pass's
+job, not a mutation path's. And a row that decodes cleanly to a *different* principal is clear even
+when unbacked: refusal is for evidence that cannot be proven *not* to name the caller, and one
+member's orphaned lock must not close a listing to everybody else.
+
+**Writer bytes unchanged.** The CAS is kept, unmoved, behind the classification: it remains the
+unconditional storage-level decider of the same-spelling race. `interest_index_key`,
+`interest_key`, the sentinel value, `ListingInterest.from_did` and the `Uuid::new_v4()` interest id
+are all byte-for-byte what they were. Nothing is re-keyed, no row is rewritten, and no canonical DID
+spelling is introduced — a binary reverted to the pre-M4b code reads exactly the rows this one
+writes.
+
+**Concurrency is load-bearing here, unlike M3 and M4a.** Proving a principal absent requires
+reading rows a concurrent alias-spelled request could add between the read and the CAS, and no
+single sled operation spans both — `sled::TransactionalTree` offers no range scan, so the check
+cannot be folded into the CAS. Classification and write are therefore serialised by a mutex on the
+store. The scope that mutex covers is one database: `sled::Config::open` takes an exclusive `flock`
+on the database file, so no second process — and no second `sled::open` in this one — can hold it,
+and `icn_gateway::server` builds exactly one `SledListingsStore`, owned by the one
+`ListingsManager` as a `Box`. Constructing a second store over a clone of the same `Arc<sled::Db>`
+would give it a second lock and leave only the CAS between them; nothing in production does. The
+sled lock fact is pinned as a test rather than asserted, because the scope argument rests on it.
+
+**Registration.** `n2a_keyspaces()` gains `icn-gateway/listing_interest_uniqueness` at prefix
+`v1:interest_idx:`, `PrincipalRegion::WholeKey`, `did_ends_key`, `FailClosed` / `Established`,
+inventory row 26 — the sixteenth whole-key layout. The prefix stops at the namespace because the
+listing id varies and so cannot be run through the DID scheme the way `ledger:treasury:` is; it does
+not need to be, because `v1:interest:` and `v1:listing:` do not begin with `v1:interest_idx:` and so
+stay outside the descriptor rather than being claimed by it. The listing component is a canonical
+`Uuid` — hex and hyphens — so it cannot spell `did:icn:`, and the whole-key tokenizer finds exactly
+the one spelling that is a principal.
+
+**The collision unit is the pair (listing, principal).** The canonical shape substitutes each
+spelling with its identifier bytes and carries every other key byte verbatim, so the listing id
+stays in the shape: two spellings of one principal on ONE listing group and refuse, while the same
+principal on two listings is two shapes and no group. That control is not cosmetic — a unit that
+dropped the listing would refuse to start every gateway holding an ordinary exchange, and it is
+pinned in both layers.
+
+**Gate and runtime agree.** `icn-gateway/tests/listing_interest_gate_runtime_agreement.rs` drives
+one real sled database at the data-directory level the gate discovers: the writer accepts one
+interest and refuses the alias, the gate calls the resulting store `Clear`, a raw alias row planted
+the way a pre-M4b binary would have written it makes the gate refuse fail-closed naming this
+keyspace, and the writer still refuses to add a third spelling to that state. Ten listings for one
+member and ten members on one listing both stay `Clear`. Neither layer repairs anything.
+
+**Crash ordering, recorded rather than fixed.** The order is unchanged: the CAS claims the spelling
+key, then the canonical row is written. A crash between them still leaves a lock with no canonical
+row, and the affected principal is still refused until the maintenance pass clears it. M4b narrows
+that debt rather than closing it — the pass could not recognise such a row at all before, so the
+window was unbounded in practice and is now one scheduler interval — and introduces no transaction
+system. An `insert` that returns an error still rolls the lock row back, as before.
+
+**Complexity.** Classification is O(interests for this listing) plus O(uniqueness rows for this
+listing), both bounded by the listing's own prefix rather than the global namespace, and
+`get_interests` already performs the same scan on every listing read. Cleanup remains O(total
+uniqueness rows) × O(interests per listing) and is unchanged in shape. No principal-hashed secondary
+index was invented; that would be a new persisted key and therefore a migration.
+
+**What M4b does not claim.**
+
+- **No merge rule was invented.** `FailClosed` is a refusal to decide, not a decision.
+- **Historical duplicates are not reconciled.** A store already holding two interests for one
+  principal keeps both; reads still return both; the gate refuses to start over the uniqueness rows
+  that accompany them. No survivor is chosen, and the canonical interests are never rewritten.
+- **The guard is not alias-transparent.** A member who already holds an interest under one spelling
+  and asks again under another is refused, not served the first interest.
+- **The canonical interest bodies are outside the key scanner.** `v1:interest:<listing>:<uuid>`
+  carries its principal in the *value*, not the key, so `uncovered_did_key_shapes` has never seen it
+  and does not see it now. Registering the uniqueness rows does not register the primaries: they are
+  runtime-guarded and scanner-blind, and their migration disposition is unresolved. This section
+  does not close it.
+- **A uniqueness row carrying no `did:icn:` at all is counted, not refused, by the scanner.** Such a
+  row is `rows_without_did` under a whole-key scan — the same invisibility it had before
+  registration, since the uncovered-shape reporter also skips keys with no spelling. The writer
+  cannot produce one, and the live path refuses it; the scanner's silence about it is stated here
+  rather than fixed.
+- **One lockout class is narrowed, none is eliminated.** An orphaned lock still refuses its
+  principal between the crash and the next maintenance pass.
+- **Adjacent keyspaces are untouched.** `receipt:meeting_attendance:by_pair:`,
+  `idx_device_owner:`, `idx_notif_recipient:`, the `apps/ledger-app` indexes and
+  `action_item_by_assignee:` remain open in §11.4. M4b changes no listings economics, matching,
+  offer or settlement semantics, and no account or resource identity.
+- **Behaviour change, stated.** A canonical interest row that does not decode now refuses new
+  interests on that listing where it previously did not. That listing's reads were already broken
+  — `get_interests` propagates the same decode error — so this makes the write path consistent with
+  the read path rather than introducing a new failure class.
