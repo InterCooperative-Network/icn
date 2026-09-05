@@ -903,15 +903,15 @@ commit and the fix is a later event.</p>
 <tr>
 <td>66</td>
 <td>icn-commons</td>
-<td><code>store.rs:37 ANCHOR_BY_DID_PREFIX</code> (<code>:480, :530, :557</code>)</td>
+<td><code>store.rs:39 ANCHOR_BY_DID_PREFIX</code> (<code>:655 put_anchor</code>, <code>:717 put_anchor_did_index</code>, <code>:705 get_anchor_by_did</code>, <code>:849 delete_anchor</code>)</td>
 <td><code>Store</code></td>
 <td>anchor id by DID</td>
-<td><code>&quot;commons/anchors/by_did/&quot; ‖ anchor.to_did().to_string()</code></td>
+<td><code>&quot;commons/anchors/by_did/&quot; ‖ &lt;spelling&gt;</code> — <strong>two writers, two row families per anchor</strong>: <code>put_anchor</code> files it under <code>anchor.to_did()</code> and <code>put_anchor_did_index</code> files the <em>same</em> anchor under the enrollment spelling, which appears nowhere in the anchor body</td>
 <td>D</td>
-<td>written from <code>Anchor::to_did()</code> (canonical spelling, ~50% unreadable §10.1); read with a wire-parsed <code>Did</code> (<code>commons_mgr.rs:113</code>, <code>api/commons/mod.rs:131</code>)</td>
+<td>the derived family is <code>Anchor::to_did()</code> (~50% unreadable as a validated <code>Did</code>, §10.1 — so this namespace must be grouped by <code>identifier_bytes_of_spelling</code>, never by <code>Did::from_str</code>); the enrollment family is a wire-parsed <code>Did</code>; read exact-spelling (<code>commons_mgr.rs:113</code>, <code>api/commons/mod.rs:131</code>); <code>delete_anchor</code> removes only the derived family, orphaning the enrollment row</td>
 <td>none (<code>LruCache&lt;String,_&gt;</code> keyed by hex id)</td>
 <td>live</td>
-<td><strong>SILENT-MERGE RISK</strong></td>
+<td><strong>SILENT-MERGE RISK</strong> — 2026-09-05 (#2627 M4a): <strong>COVERED</strong>. Registered <code>icn-commons/anchor_by_did</code>, <code>FailClosed</code> / <code>Established</code>, and the enrollment constructor now classifies the principal against the whole namespace before the first durable write (<code>classify_anchor_enrollment</code>, gate §11.8). Two rows per healthy anchor are <em>not</em> a collision — they name two different principals. Already-derived duplicate anchors, the dangling-row leak in <code>delete_anchor</code> and the three-write crash window are not dispositioned.</td>
 </tr>
 <tr>
 <td>67</td>
