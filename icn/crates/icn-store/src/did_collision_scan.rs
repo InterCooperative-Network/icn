@@ -1918,8 +1918,19 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
             name: "icn-governance-actor/action_item_by_assignee",
             // `action_item_by_assignee:<assignee spelling>:<domain id>:<item
             // uuid>`. The spelling is anchored immediately after the prefix and
-            // ends at the first `:` that leaves a decodable spelling behind;
-            // `:` is not a multibase body byte, so that boundary is exact.
+            // ends at the first `:` that leaves a decodable spelling behind.
+            //
+            // That boundary is exact for every spelling this keyspace may hold,
+            // which is not quite the same as every spelling `Did::from_str`
+            // accepts: the identity base (multibase code `\0`) passes its bytes
+            // through unmodified, so a principal whose identifier bytes are
+            // printable ASCII containing `:` has an accepted spelling no `:`
+            // framing can carry. This scan and the store agree to refuse it —
+            // the tokenizer admits neither `\0` nor `:` as body bytes, so such a
+            // row is unreadable here, and the store refuses to write one at all
+            // (`assignee_spelling_is_framable`, #2627 M4c). Agreement is the
+            // point: a row one layer reads and the other cannot is how a gate
+            // starts lying.
             //
             // The residual must be opaque rather than scanned, and the reason
             // is the same one #2704 established: the domain id is chosen by

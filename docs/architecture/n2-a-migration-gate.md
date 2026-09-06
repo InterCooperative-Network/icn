@@ -2239,14 +2239,40 @@ assignment independently of canonical action-item state.*
   `Equivalent`, `Established`, under `PrincipalRegion::AnchoredThenOpaque { terminator: b':' }` —
   the third anchored layout and the first whose terminator is `:` rather than `/`. The assignee
   spelling is anchored immediately after the prefix and ends at the first `:` that leaves a decodable
-  spelling behind (`:` is not a multibase body byte, so no accepted spelling contains one beyond the
-  `did:icn:` scheme). The residual must be opaque for the #2704 reason: a `GovernanceDomainId` wraps
+  spelling behind. The residual must be opaque for the #2704 reason: a `GovernanceDomainId` wraps
   any `String` filled from a `/domains/{domain_id}/…` path segment, so a domain id may contain `:`
   and may itself *be* a spelling — a whole-key scan would read it as a second principal, normalize
   it, and group two rows the store holds apart. The collision unit is therefore **(assignee
   principal, exact domain-id bytes, exact item-id bytes)**. The canonical `action_item:` rows are a
   lexical neighbour and not a member: the two prefixes diverge at their eleventh byte (`:` against
   `_`), and a structural pin fails if the prefix is widened to `action_item`.
+
+* **One accepted spelling this key layout cannot carry, refused at the write boundary.** The
+  framing above assumes no accepted spelling contains `:` beyond the `did:icn:` scheme. That is true
+  of base2 through base64 and base256emoji — every spelling ICN mints — and **false** in general:
+  `multibase` registers an *identity* base under code `\0` that passes its bytes through unmodified,
+  and `Did::from_str` restricts no base, so a principal whose 32 identifier bytes are printable ASCII
+  containing `:` has an accepted spelling. No private key is needed to produce one; searching
+  printable-ASCII candidates for one that decompresses to a valid Edwards point succeeded on the
+  fourth try. Reached through the ordinary authenticated route — `create_action_item` and
+  `update_action_item` pass `assignee` to `parse_did` and store it verbatim — such a row would parse
+  to no principal, and therefore **refuse every by-assignee lookup on the node**: `/gov/me/work` for
+  every person, and `/gov/digest` silently, because it swallows the error. It would also be
+  unrecoverable: `delete` and `delete_all` locate rows by parsed coordinates and never find it, and
+  the rebuild retires it as malformed and immediately re-derives the identical key from the canonical
+  row still backing it.
+
+  `SledActionItemStore::save` therefore refuses such an assignee before a byte moves, and the rebuild
+  refuses over a canonical row carrying one. This is a **representability** rule about this key
+  layout, not an identity rule: the spelling still names a principal, `Did` still accepts it, and
+  whether `Did::from_str` should accept identity-base spellings at all is an identity-layer question
+  left to #2627. Refusing at the write boundary is also what keeps the store and the gate agreeing —
+  the scanner's tokenizer admits neither `\0` nor `:` as body bytes, so it independently calls such a
+  row unreadable, and a row one layer reads and the other cannot is how a gate starts lying.
+
+  **This is a general caution, not a local one.** Any keyspace that frames a spelling with a
+  delimiter inherits the same assumption. `:`-framed and `/`-framed layouts elsewhere in the registry
+  are **not** audited here and are not claimed safe; that audit is left open.
 
 * **The `Equivalent` basis, stated.** All four conditions hold. The canonical row is authoritative
   (`ActionItem.assignee` is the assignment; nothing reads the index to decide authority). The
@@ -2316,3 +2342,21 @@ runs on the development host; with the guard it passes. No claim is made that no
   `idx_notif_recipient:` and the `apps/ledger-app` indexes remain open in §11.4. M4c changes no
   action-item API, no notification digest content, no meeting, role or scope semantics, and no
   governance voting.
+- **Read cost, stated precisely.** A by-assignee lookup now scans the whole
+  `action_item_by_assignee:` namespace and loads one canonical row per principal-matching row. The
+  store's existing scans are bounded by *one domain*; this one is bounded by total assignments across
+  every domain the database holds, and it runs under the shared read guard. That is a real widening,
+  not merely a re-shaped constant, and it is the price of an answer that does not depend on which
+  spelling a token carries. It stays within the store's documented workload (< 1000 items per domain)
+  and is not optimized here.
+- **The repair operation has no operator surface.** `rebuild_assignee_index` is public but reachable
+  only from tests — no route, no `icnctl` verb. Absent an unframable row (refused at write time) and
+  absent corruption, nothing needs it; exposing it is deliberately left out of M4c rather than
+  claimed.
+- **`delete_all` matches its two halves by different rules, and this is recorded rather than fixed.**
+  The canonical half uses the prefix `action_item:<domain>:`, which also matches a domain literally
+  named `<domain>:<something>`; the projection half added here compares the parsed domain id exactly.
+  A store holding both `a` and `a:b` as domain ids would therefore have `delete_all("a")` remove
+  `a:b`'s canonical rows while leaving `a:b`'s projection rows, which reads then filter as stale. The
+  over-wide canonical prefix predates I7 and changing it would change delete semantics, so M4c states
+  the asymmetry instead of silently widening the new half to match a rule it believes is wrong.

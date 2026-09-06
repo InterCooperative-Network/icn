@@ -388,13 +388,51 @@ struct ParsedAssigneeIdxRow {
     coordinates: std::result::Result<(GovernanceDomainId, ActionItemId), AssigneeProjectionDefect>,
 }
 
+/// Whether an assignee spelling can be framed as assignee-projection key
+/// material.
+///
+/// The projection key puts the spelling between the prefix and the domain id,
+/// framed by the first `:` after the `did:icn:` scheme. That framing is exact
+/// for every base whose alphabet excludes `:` — base2 through base64 and
+/// base256emoji, which is every spelling ICN mints — but **not** for the
+/// identity base (multibase code `\0`), which passes its 32 bytes through
+/// unmodified. A principal whose identifier bytes happen to be printable ASCII
+/// containing `:` therefore has an accepted spelling this layout cannot frame,
+/// and `Did::from_str` takes it: searching printable-ASCII candidates for one
+/// that decompresses to a valid Ed25519 point succeeds within a handful of
+/// tries, and no private key is needed to do it.
+///
+/// Such a spelling is refused at the **write** boundary rather than mangled at
+/// the read boundary, because persisting one would be durable and unrecoverable:
+/// the row could not be attributed to any principal, so every by-assignee lookup
+/// on the node would refuse; `delete` and `delete_all` locate rows by their
+/// parsed coordinates and would not find it; and
+/// [`SledActionItemStore::rebuild_assignee_index`] would retire it as malformed
+/// and immediately re-derive the identical key from the canonical row it still
+/// backs. Refusing here also keeps the store and the N2-A gate agreeing about
+/// what this keyspace may hold: the scanner's tokenizer admits neither `\0` nor
+/// `:` as body bytes, so it reaches the same verdict about the same key.
+///
+/// This says nothing about identity semantics. The spelling still names a
+/// principal and `Did` still accepts it; what is refused is *this key layout's*
+/// ability to carry it. Whether `Did::from_str` should accept identity-base
+/// spellings at all is an identity-layer question and is deliberately left to
+/// #2627 rather than decided here.
+fn assignee_spelling_is_framable(assignee: &icn_identity::Did) -> bool {
+    assignee
+        .as_str()
+        .strip_prefix(DID_SCHEME)
+        .is_some_and(|body| !body.contains(':'))
+}
+
 /// Read an assignee-projection key as `<prefix><spelling>:<domain id>:<item id>`.
 ///
 /// The spelling is anchored immediately after the prefix and ends at the first
-/// `:` following the `did:icn:` scheme: `:` is not a multibase body byte, so no
-/// accepted spelling of a principal contains one beyond the scheme itself, and
-/// the boundary is exact rather than a guess. This is the same structure the
-/// scanner's `PrincipalRegion::AnchoredThenOpaque { terminator: b':' }` reads.
+/// `:` following the `did:icn:` scheme. That framing is exact for every spelling
+/// this layout is allowed to hold — see [`assignee_spelling_is_framable`], which
+/// refuses the one family of accepted spellings it cannot frame before any such
+/// row can be written. This is the same structure the scanner's
+/// `PrincipalRegion::AnchoredThenOpaque { terminator: b':' }` reads.
 ///
 /// Everything after that `:` is residual key material this function does not
 /// interpret as identity. The domain id is chosen by whoever created the item
@@ -574,6 +612,16 @@ impl SledActionItemStore {
                 GovernanceError::Internal(format!("Failed to decode action item: {e}"))
             })?;
             if let Some(ref assignee) = item.assignee {
+                // A canonical row whose assignee this layout cannot frame is
+                // evidence the rebuild cannot project. Refuse before mutating:
+                // deriving nothing for it would call its real rows stale, and
+                // deriving an unframable key would re-create the row the write
+                // boundary exists to prevent.
+                if !assignee_spelling_is_framable(assignee) {
+                    return Err(GovernanceError::Internal(
+                        "action-item assignee projection: unframable-assignee-spelling".to_string(),
+                    ));
+                }
                 expected.insert(Self::assignee_idx_key(assignee, &item.domain_id, &item.id));
             }
         }
@@ -624,6 +672,17 @@ impl SledActionItemStore {
 
 impl ActionItemStoreBackend for SledActionItemStore {
     fn save(&self, item: &ActionItem) -> std::result::Result<(), GovernanceError> {
+        // Before anything else: an assignee this key layout cannot frame is
+        // refused rather than persisted into a row nothing could read or
+        // remove. Reason class only; the spelling never travels.
+        if let Some(assignee) = item.assignee.as_ref() {
+            if !assignee_spelling_is_framable(assignee) {
+                return Err(GovernanceError::Internal(
+                    "action-item assignee projection: unframable-assignee-spelling".to_string(),
+                ));
+            }
+        }
+
         let _guard = assignee_projection_write_guard();
         let key = Self::item_key(&item.domain_id, &item.id);
 
@@ -11858,13 +11917,166 @@ mod tests {
 
     /// The namespace lock's polarity, read from the lock itself rather than
     /// from timing: readers share, a writer excludes everyone.
-    #[test]
-    fn the_projection_namespace_lock_shares_reads_and_excludes_writes() {
-        let read = assignee_projection_read_guard();
+    /// An accepted spelling whose body contains `:`, built on the identity
+    /// multibase base.
+    ///
+    /// `multibase` registers the identity base under code `\0` and passes its
+    /// bytes through unmodified, and `Did::from_str` restricts no base — so a
+    /// principal whose 32 identifier bytes are printable ASCII containing `:`
+    /// has an accepted spelling that the projection key layout cannot frame.
+    /// No private key is needed: any 32-byte string that decompresses to a
+    /// valid Edwards point will do, and about half of them do.
+    fn unframable_spelling() -> Did {
+        for seed in 0u64..1_000_000 {
+            let mut body = [0u8; 32];
+            let mut x = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            for b in body.iter_mut() {
+                x = x
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                // printable ASCII, so the spelling is valid UTF-8 and survives
+                // a JSON request body
+                *b = 0x21 + ((x >> 33) as u8) % (0x7e - 0x21 + 1);
+            }
+            body[5] = b':';
+            if ed25519_dalek::VerifyingKey::from_bytes(&body).is_ok() {
+                let spelling = format!(
+                    "did:icn:{}",
+                    multibase::encode(multibase::Base::Identity, body)
+                );
+                return Did::from_str(&spelling)
+                    .expect("the identity base is accepted by Did::from_str");
+            }
+        }
+        panic!("no decompressing printable-ASCII body found");
+    }
+
+    /// The premise, pinned so it cannot rot: `Did` really does accept a spelling
+    /// whose body contains `:`.
+    ///
+    /// If `Did::from_str` is ever narrowed to reject the identity base, this
+    /// fails and the guard below becomes dead code that should be reconsidered
+    /// — which is exactly the signal wanted.
+    #[tokio::test]
+    async fn an_accepted_did_spelling_can_contain_a_colon_past_the_scheme() {
+        let did = unframable_spelling();
         assert!(
-            ASSIGNEE_PROJECTION_LOCK.try_read().is_ok(),
-            "two by-assignee lookups must not queue behind each other"
+            did.as_str()["did:icn:".len()..].contains(':'),
+            "the fixture must actually produce the hazardous shape"
         );
+        assert!(
+            did.identifier_bytes().is_ok(),
+            "and it must genuinely name a principal"
+        );
+        assert!(!assignee_spelling_is_framable(&did));
+    }
+
+    /// **Regression (review BLOCKER).** A spelling this key layout cannot frame
+    /// is refused at the write boundary, not persisted.
+    ///
+    /// Persisting one was durable and unrecoverable: the row parses to no
+    /// principal, so it cannot be attributed away from any caller and refuses
+    /// **every** by-assignee lookup on the node — `GET /gov/me/work` for every
+    /// person, and `GET /gov/digest`, which swallows the error, silently
+    /// returning an empty overdue list. `delete` and `delete_all` locate rows by
+    /// parsed coordinates and never find it, and `rebuild_assignee_index`
+    /// retires it as malformed and immediately re-derives the identical key from
+    /// the canonical row that still backs it. Reachable through the ordinary
+    /// authenticated route: `create_action_item` and `update_action_item` pass
+    /// `assignee` to `parse_did` and store it verbatim.
+    #[tokio::test]
+    async fn an_unframable_assignee_spelling_is_refused_before_it_is_persisted() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let hostile = unframable_spelling();
+        let domain = GovernanceDomainId::new("dom-unframable");
+
+        // An ordinary item first, so the fixture can show the refusal protects
+        // an existing work view rather than an empty store.
+        let ordinary = assigned_item(&domain, "Ordinary work", &a);
+        store.save(&ordinary).unwrap();
+
+        let err = store
+            .save(&assigned_item(&domain, "Hostile", &hostile))
+            .expect_err("a spelling this layout cannot frame must not be persisted");
+        let text = err.to_string();
+        assert!(text.contains("unframable-assignee-spelling"), "{text}");
+        assert!(
+            !text.contains(hostile.as_str()) && !text.contains("Hostile"),
+            "the refusal carries a reason class, not the spelling or the title: {text}"
+        );
+
+        // Nothing moved, and everyone else's work view still answers.
+        assert_eq!(
+            projection_keys(&db).len(),
+            1,
+            "the refused save wrote no projection row"
+        );
+        assert_eq!(store.list_by_assignee(&a).unwrap().len(), 1);
+        assert!(
+            store.list_by_assignee(&hostile).unwrap().is_empty(),
+            "and the refused assignee simply has no work — not a refusal"
+        );
+    }
+
+    /// The shape the guard prevents, planted directly, to show what it is
+    /// worth: one such row denies every caller and no shipped path clears it.
+    #[tokio::test]
+    async fn a_planted_unframable_row_denies_every_caller_and_resists_repair() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let hostile = unframable_spelling();
+        let domain = GovernanceDomainId::new("dom-planted");
+
+        let ordinary = assigned_item(&domain, "Ordinary work", &a);
+        store.save(&ordinary).unwrap();
+        // What a pre-M4c binary would have written for this assignee.
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                hostile.as_str(),
+                domain.0,
+                ordinary.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        assert!(
+            store.list_by_assignee(&a).is_err(),
+            "an unattributable row denies an unrelated caller — this is why the \
+             write boundary refuses, rather than the read boundary coping"
+        );
+        // And the repair paths genuinely do not reach it, which is the other
+        // half of the argument for refusing at write time.
+        assert!(store.delete(&domain, &ordinary.id).is_ok());
+        assert_eq!(
+            db.scan_prefix(SledActionItemStore::ASSIGNEE_IDX_PREFIX.as_bytes())
+                .count(),
+            1,
+            "delete removes rows by parsed coordinates and cannot find this one"
+        );
+    }
+
+    /// The namespace lock's exclusion, read from the lock itself rather than
+    /// from timing.
+    ///
+    /// Only the two exclusion directions are asserted, and both are
+    /// deterministic because this thread holds the guard that must exclude.
+    /// That readers *share* is a property of `RwLock::read` by construction and
+    /// is deliberately not asserted: the lock is a process-wide static, so a
+    /// `try_read` here can fail merely because another test in this binary has a
+    /// writer queued — which is a fact about the harness, not about the store.
+    #[test]
+    fn the_projection_namespace_lock_excludes_writers_and_readers_in_turn() {
+        let read = assignee_projection_read_guard();
         assert!(
             ASSIGNEE_PROJECTION_LOCK.try_write().is_err(),
             "a save must not commit halfway through a lookup's scan"
