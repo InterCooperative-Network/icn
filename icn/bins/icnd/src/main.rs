@@ -121,7 +121,7 @@ async fn build_services(
     let own_did = bundle.did().clone();
 
     // Open trust store
-    let trust_store_path = config.store_path().join("trust");
+    let trust_store_path = config.trust_store_path();
     std::fs::create_dir_all(&trust_store_path)?;
     let trust_store: Arc<dyn icn_store::Store> =
         Arc::new(icn_store::SledStore::open(&trust_store_path)?);
