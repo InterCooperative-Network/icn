@@ -606,11 +606,26 @@ impl SledActionItemStore {
         // Canonical evidence first, in full, before a byte moves.
         let mut expected: HashSet<String> = HashSet::new();
         for result in self.db.scan_prefix(b"action_item:") {
-            let (_, value) =
+            let (raw_key, value) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
             let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
                 GovernanceError::Internal(format!("Failed to decode action item: {e}"))
             })?;
+
+            // The row must be filed where it says it is. A canonical row whose
+            // value names other coordinates than its key is one row's value
+            // under another row's key: deriving the projection from the VALUE
+            // would write rows pointing at a canonical row that does not exist,
+            // and would call the rows of the item actually filed here stale and
+            // delete them. `list_by_assignee` refuses such a row for the same
+            // reason (`PrimaryCoordinatesMismatch`); the rebuild must not be the
+            // one path that trusts it.
+            if Self::item_key(&item.domain_id, &item.id).as_bytes() != raw_key.as_ref() {
+                return Err(GovernanceError::Internal(
+                    "action-item assignee projection: primary-coordinates-mismatch".to_string(),
+                ));
+            }
+
             if let Some(ref assignee) = item.assignee {
                 // A canonical row whose assignee this layout cannot frame is
                 // evidence the rebuild cannot project. Refuse before mutating:
@@ -978,12 +993,16 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let prefix = Self::domain_prefix(domain_id);
         let mut deleted_count = 0;
 
-        // Collect keys first to avoid iterator invalidation
-        let keys: Vec<_> = self
-            .db
-            .scan_prefix(prefix.as_bytes())
-            .filter_map(|r| r.ok().map(|(k, _)| k))
-            .collect();
+        // Collect keys first to avoid iterator invalidation. A scan error
+        // propagates rather than being filtered away: swallowing one would skip
+        // rows and still report success, leaving canonical action items behind
+        // under a call that says it removed them.
+        let mut keys: Vec<sled::IVec> = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            keys.push(key);
+        }
 
         for key in keys {
             if self
@@ -1001,17 +1020,18 @@ impl ActionItemStoreBackend for SledActionItemStore {
         // candidate against a canonical row that no longer exists — but they
         // would accumulate without bound and make the projection permanently
         // un-derivable from canonical state.
-        let projection_rows: Vec<_> = self
-            .db
-            .scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes())
-            .filter_map(|r| r.ok().map(|(k, _)| k))
-            .filter(|raw_key| {
-                matches!(
-                    parse_assignee_idx_row(raw_key).coordinates,
-                    Ok((ref row_domain, _)) if row_domain == domain_id
-                )
-            })
-            .collect();
+        let mut projection_rows: Vec<sled::IVec> = Vec::new();
+        for result in self.db.scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes()) {
+            let (raw_key, _) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (assignee idx) failed: {e}"))
+            })?;
+            if matches!(
+                parse_assignee_idx_row(&raw_key).coordinates,
+                Ok((ref row_domain, _)) if row_domain == domain_id
+            ) {
+                projection_rows.push(raw_key);
+            }
+        }
         for row in projection_rows {
             self.db.remove(row).map_err(|e| {
                 GovernanceError::Internal(format!("Sled assignee-idx delete failed: {e}"))
@@ -11890,6 +11910,49 @@ mod tests {
         db.remove(projection_keys(&db)[0].as_bytes()).unwrap();
         assert_eq!(store.rebuild_assignee_index().unwrap().added, 1);
         assert_eq!(store.list_by_assignee(&b).unwrap().len(), 1);
+    }
+
+    /// The rebuild proves canonical key/value agreement before it derives
+    /// anything (Copilot review, `manager.rs:627`).
+    ///
+    /// Deriving the projection from a misfiled row's *value* would write rows
+    /// pointing at a canonical row that does not exist, and would call the rows
+    /// of the item actually filed at those coordinates stale and delete them —
+    /// so the one path that rewrites the whole projection would be the one path
+    /// that trusts evidence `list_by_assignee` refuses.
+    #[tokio::test]
+    async fn a_rebuild_over_a_misfiled_canonical_row_refuses() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let filed_at = GovernanceDomainId::new("dom-filed-here");
+        let claims = GovernanceDomainId::new("dom-claims-elsewhere");
+
+        let honest = assigned_item(&filed_at, "Honest", &a);
+        store.save(&honest).unwrap();
+        let before = projection_keys(&db);
+
+        // A canonical value that states other coordinates than its key.
+        let misfiled = assigned_item(&claims, "Misfiled", &a);
+        db.insert(
+            format!("action_item:{}:{}", filed_at.0, ActionItemId::new().0).as_bytes(),
+            icn_encoding::encode_versioned(&misfiled).unwrap(),
+        )
+        .unwrap();
+
+        let err = store
+            .rebuild_assignee_index()
+            .expect_err("a misfiled canonical row must refuse the rebuild");
+        assert!(
+            err.to_string().contains("primary-coordinates-mismatch"),
+            "{err}"
+        );
+        assert_eq!(
+            projection_keys(&db),
+            before,
+            "and the refusal leaves the honest item's row untouched"
+        );
     }
 
     /// The rebuild refuses before mutating when canonical evidence is

@@ -3491,7 +3491,8 @@ mod tests {
         assert_eq!(
             governance,
             vec![&"icn-governance-actor/action_item_by_assignee"],
-            "the only registered governance keyspace is the action-item              assignee projection (#2627 M4c); votes and membership stay              behind §7.5"
+            "the only registered governance keyspace is the action-item assignee \
+             projection (#2627 M4c); votes and membership stay behind §7.5"
         );
         // And it does not reach vote or membership rows: it claims exactly the
         // projection prefix, which no vote keyspace begins with.
