@@ -1198,6 +1198,135 @@ Fixture evidence only.
 
 ---
 
+### 10.7 Who runs the gate — operator tooling coverage (#2627 M4d)
+
+§10.1 describes what the gate does once something calls it. M4d asked the separate question: **can
+any production- or operator-capable path reach a governed store without it?**
+
+**The opener inventory.** `n2a_startup_gate::enforce` had exactly one non-test caller,
+`icn/bins/icnd/src/main.rs`. The workspace has nine binary targets. Classified with operational
+evidence rather than by name:
+
+| Binary | Class | Opens governed state | Gate before M4d |
+|---|---|---|---|
+| `icnd` | production | yes | **yes** |
+| `icnctl` | operator | yes — 9 `SledStore::open` sites in 7 functions | **no** |
+| `icn-console` | network client | **no** — single file, zero `icn_*` use; its `icn-store`/`icn-trust` deps are unused manifest edges | n/a |
+| `did-collision-scan` | scanner / safety tooling | yes, deliberately | no — and correctly so (below) |
+| `commons_restart_helper` | test-only | via `CommonsHandle::with_sled_path` | no |
+| `ledger_restart_helper` | test-only | yes | no |
+| `trust_restart_helper` | test-only | yes | no |
+| `governance_restart_helper` | test-only | yes | no |
+| `gossip_restart_helper` | test-only | **no sled** — snapshot JSON only | no |
+
+The five `*_restart_helper` binaries are Layer-4 cross-process persistence fixtures. Each is spawned
+by exactly one integration test through `CARGO_BIN_EXE_*`, and for all five every reference in the
+repository falls into four buckets — the crate manifest, the helper's own source, that one test, and
+`docs/`. None appears in a Dockerfile, compose file, K8s manifest, systemd unit, workflow, or shell
+script. They are nonetheless built by the root `Dockerfile`'s `cargo build --release --bins` and
+carry no `required-features`; that is recorded as debt below, not treated as reachability.
+
+**`icnd` re-proved by call path.** `build_services` contains a `sled::open` and is *declared* above
+the gate call, but is *invoked* after it, and a refusal propagates out of `main`. Line order is not
+call order; the ordering is correct.
+
+**The bypass, reproduced.** `icnctl init-coop` runs `create_dir_all(<data_dir>/store)`,
+`SledStore::open` on it, and `TrustGraph::add_edge` — writing `trust/edges/`, a **registered**
+keyspace whose basis is `AwaitingDomainSignOff`, so a collision there fails closed however its
+disposition reads. On a real sled fixture holding an alias pair, the gate **refused** the data
+directory while the same seam opened it and grew the keyspace from two rows to three.
+`TrustGraph::new` neither loads nor folds, so no loader guard stood behind it.
+
+**What was already safe, and why that is the actual finding.** `icnctl treasury
+entity-backfill-apply` mutates `ledger:treasury:` just as ungated — and refuses anyway:
+`TreasuryManager::with_store` calls `load_from_store` → `read_persisted_state`, the M1
+`principal_rows` classification, which reports *"1 persisted row group(s) name one principal under
+several `did:icn:` spellings … refusing to rebuild"*. The cooperative-store commands touch
+`icn-entity` keys, which strip the `did:icn:` scheme and are invisible to a key scanner, so the gate
+has nothing to say about them either way.
+
+So coverage before M4d was **accidental rather than structural**: `icnctl` was safe exactly where an
+earlier milestone had happened to harden that keyspace's loader, and unsafe where none had. The
+protection tracked which keyspaces past work reached, not which paths can open state.
+
+**Enforcement: entrypoint, at handler granularity.** `icnctl` gained one helper, `enforce_n2a_gate`,
+calling the *same* `enforce` the daemon calls, at four dispatch points: `init-coop`, `coop`
+maintenance, `treasury` maintenance, and `verify-backup --verify-ledger` (whose restored tree is a
+data directory like any other — a backup whose ledger the gate would refuse is not one the command
+should call safely restorable). Store-construction enforcement inside `SledStore::open` was rejected:
+the gate itself opens stores that way and would recurse, and it would break the scanner. Pasting the
+call at each of the nine open sites was rejected too — the gate's unit is a *directory*, not a file.
+
+Three consequences are stated rather than hidden.
+
+*The receipt.* The gate writes its own `n2a-startup-gate.json`, so commands documented as read-only
+now leave that one file — the gate's record of what it inspected, never a domain-store write. The
+three `--help` strings that said "Writes nothing" now say what is actually true.
+
+*The lock.* The gate takes each sled root's exclusive lock while auditing, so a running daemon makes
+it refuse. That refusal is `StoreUnverifiable`, **not** `Blocked`, and the two must not be reported
+alike: only `Blocked` means the directory holds colliding rows, and telling an operator whose real
+mistake was leaving the daemon up to go hunting for an alias pair is a wrong answer delivered
+confidently. `enforce_n2a_gate` branches on the variant, and a fixture pins that a non-collision
+refusal never claims the collision cause.
+
+*The scope of the read.* The gate's unit is the **directory**, so a command that previously opened
+only `<data_dir>/store/cooperative` now opens, sled-recovers and row-scans *every* database beneath
+the data directory. Two effects follow: an unopenable unrelated store now fails a command that had no
+interest in it, and runtime becomes proportional to total rows across all stores on every gated
+invocation. The gate module's own justification — that its opens cost nothing because "the daemon
+would perform sled recovery moments later anyway" — is true for `icnd` and does **not** transfer to a
+CLI run with the daemon stopped. This is accepted rather than optimised: every one of those stores is
+one `icnd` already refuses to start over, so nothing is being rejected that a running deployment
+could have.
+
+**The scanner exemption is named, not accidental.** `did-collision-scan` must reach state the gate
+refuses — an operator handed a refusal is told to run exactly it for the row-level report. It is not
+skipping the check: it *is* the offline form of the same `audit_sled_store` computation, so the two
+cannot disagree about what is safe. A fixture pins that it still reports over a store the gate
+refuses.
+
+**Descriptor and inventory: unchanged, deliberately.** M4d registers no keyspace, changes no
+descriptor, no `MergeDisposition`, no `RuleBasis`, and no inventory row. It changes *who runs* the
+existing gate, not what the gate knows — so `n2a_keyspaces()`, `n2a-a0-stored-key-inventory.md` and
+every §11 disposition are untouched, and no readiness classification moves.
+
+**Non-claims and debt.**
+
+- **`icnctl` is not proven exhaustively gated.** Four handlers are covered. Other subcommands touch
+  the age keystore, snapshot files and backup archives; those are not sled and not N2-A-governed, and
+  were not audited for other properties.
+- **`icnd` opens `<data_dir>/store/trust`; `icnctl init-coop` opens `<data_dir>/store` itself** as a
+  separate sibling sled database. The trust edges `init-coop` reports creating are therefore never
+  read by the daemon. That is a pre-existing functional defect, found while comparing call paths,
+  and is **recorded here rather than fixed** — repairing it changes `init-coop` semantics and belongs
+  to whoever owns that command.
+- **The restart helpers remain ungated and unrestricted.** They are test-only by evidence, but they
+  are ordinary `[[bin]]` targets with no `required-features`, so `cargo build --bins` produces them.
+  The root `Dockerfile` builds them and copies only `icnd`/`icnctl`; `deploy/Dockerfile.icnd` avoids
+  it with explicit `--bin` flags. Gating them was rejected as scope; constraining them with
+  `required-features` is the follow-up.
+- **Library-level injection surfaces are unchanged.** `SledStore::from_db` and `SledStore::db()` can
+  still hand a caller-supplied `sled::Db` to any store constructor without a path the gate could have
+  discovered. No production entrypoint reaches them ungated today, and closing them would require a
+  typed gated-handle capability — evaluated and deliberately not built here.
+- **`verify-backup` gates only under `--verify-ledger`.** Plain `icnctl verify-backup` still prints
+  "This backup can be safely restored" without auditing the restored tree. Widening it would change
+  what the bare command means, so it is recorded here instead.
+- **A pre-existing `verify-backup` path bug, found while placing that gate.**
+  `verify_ledger_in_backup` looks for `<restore_dir>/ledger`, but `backup` archives the data
+  directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check has
+  therefore been a no-op, printing "No ledger database found (may be new node)" for backups that do
+  contain stores. M4d does not fix it — the gate call added beside it recurses through
+  `find_sled_roots` and does reach the real stores, but that is a side effect, not a repair, and
+  correcting the path belongs to whoever owns that command.
+- **The identity-base delimiter hazard is untouched.** M4c proved an accepted DID spelling can carry
+  `:` or `/`; `Did::from_str` is not changed here, and other delimiter-framed keyspaces remain
+  unaudited.
+- **`icnctl` calls `enforce` on the runtime thread**, where `icnd` wraps it in `spawn_blocking`. In a
+  CLI nothing else is scheduled at that point, so it is harmless; the asymmetry is noted so it does
+  not read as an oversight.
+
 ## 11. Persistence-boundary classes — what the common scanner proves, and what it cannot
 
 Three N2-A fixes in a row — the ledger balance fold (#2701), the federation attestation store
