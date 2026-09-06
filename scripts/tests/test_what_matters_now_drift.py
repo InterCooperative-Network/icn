@@ -17,7 +17,6 @@ The controls below fail against the pre-fix form. A gate that cannot fail is not
 a gate.
 """
 
-import os
 import re
 import shutil
 import subprocess

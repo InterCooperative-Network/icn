@@ -272,8 +272,8 @@ if [[ "${MODE}" == "--drift" ]]; then
       echo "  Missing canonical truth files:"
       printf '%s' "${MISSING_TRUTH_FILES}"
     fi
-    [[ "${SYMLINKS_OK}" == "false" ]] && printf "${SYMLINK_WARNINGS}"
-    [[ -n "${STALE_HITS}" ]] && printf "Stale paths:\n${STALE_HITS}"
+    [[ "${SYMLINKS_OK}" == "false" ]] && printf '%s' "${SYMLINK_WARNINGS}"
+    [[ -n "${STALE_HITS}" ]] && printf 'Stale paths:\n%s' "${STALE_HITS}"
     exit 1
   fi
   echo "OK: no drift detected"
@@ -324,7 +324,7 @@ section "Skill Symlinks"
 if [[ "${SYMLINKS_OK}" == "true" ]]; then
   echo "  ✓ status, sync-and-build, worktree → ops/automation/skills/"
 else
-  printf "  ✗ Problems:\n${SYMLINK_WARNINGS}"
+  printf '  ✗ Problems:\n%s' "${SYMLINK_WARNINGS}"
   echo "  Fix: bash ops/scripts/setup-skill-symlinks.sh"
 fi
 
@@ -332,7 +332,7 @@ section "Drift Check"
 if [[ ${DRIFT_ERRORS} -eq 0 ]]; then
   echo "  ✓ No stale paths detected"
 elif [[ -n "${STALE_HITS}" ]]; then
-  printf "  ✗ Stale path hits:\n${STALE_HITS}"
+  printf '  ✗ Stale path hits:\n%s' "${STALE_HITS}"
 fi
 
 echo ""
