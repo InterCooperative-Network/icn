@@ -229,7 +229,9 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum CoopMaintenanceCommands {
     /// Read-only inventory of cooperative IDs against the canonical
-    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Writes nothing.
+    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Binds nothing and writes no
+    /// store row; the N2-A gate it runs first leaves its own receipt beside the
+    /// stores (#2627 M4d).
     ///
     /// Classifies each stored cooperative ID as already-bound,
     /// mappable-unbound, mappable-reverse-conflict, non-mappable, or
@@ -247,7 +249,9 @@ enum CoopMaintenanceCommands {
     },
 
     /// Read-only report of `UnknownLegacy` / untrusted `coop_id` ↔ `EntityId`
-    /// bindings that would be repair candidates (#2082 lane). Writes nothing.
+    /// bindings that would be repair candidates (#2082 lane). Binds nothing and
+    /// writes no store row; the N2-A gate it runs first leaves its own receipt
+    /// beside the stores (#2627 M4d).
     ///
     /// Looks inside the *bound* rows and classifies each stored cooperative ID
     /// as trusted, not-bound, untrusted-provenance (`UnknownLegacy`),
@@ -291,7 +295,9 @@ enum CoopMaintenanceCommands {
 enum TreasuryMaintenanceCommands {
     /// Read-only plan of which legacy treasuries (`entity_id: None`) could have
     /// their `entity_id` populated from a trusted, non-ambiguous `coop_id` ↔
-    /// `EntityId` binding (#2082 lane). Writes nothing.
+    /// `EntityId` binding (#2082 lane). Binds nothing and writes no store row; the
+    /// N2-A gate it runs first leaves its own receipt beside the stores
+    /// (#2627 M4d).
     ///
     /// Hydrates treasuries from the local ledger store and classifies each as
     /// would-populate, already-bound, no-mapping, untrusted-provenance,
@@ -2226,6 +2232,75 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// Refuse to touch a data directory the N2-A startup gate would refuse to open
+/// (#2627 M4d).
+///
+/// `icnd` runs this gate in `main` before it opens a single store, so the daemon
+/// can never fold alias-spelled rows of one principal and orphan the losers on
+/// write-back. `icnctl` opens the *same* sled databases beneath the same data
+/// directory — and its maintenance commands are documented to run with the
+/// daemon stopped, which is precisely the window in which nothing else has
+/// checked them. Without this, the guarantee held only for whichever binary an
+/// operator happened to reach for.
+///
+/// This is not a second implementation of the rule. It calls the same
+/// [`icn_store::n2a_startup_gate::enforce`] the daemon calls, so the two can
+/// never drift into disagreeing about what is safe to open, and a refusal
+/// carries the same typed `GateRefusal` with the store, keyspace and principal
+/// fingerprints already in it.
+///
+/// A path that does not exist yet is **not** a refusal: it holds no rows, so
+/// there is nothing to fold and nothing to audit. `init-coop` on a fresh machine
+/// takes that arm; the same command over an existing data directory does not.
+///
+/// A path that *exists but is not a directory* is a different case and is
+/// deliberately **not** skipped here: it is a misconfigured `--data-dir`, and
+/// letting it through quietly would answer a question nobody asked. It falls
+/// through to `enforce`, whose own first check refuses it by name.
+///
+/// Two consequences are deliberate and stated rather than hidden. The gate
+/// writes its own receipt beside the stores, so a command that was documented
+/// as read-only now leaves that one file — the gate's own record of what it
+/// inspected, never a domain store write. And the gate opens each sled root
+/// exclusively while it audits, so a running daemon makes it refuse; the
+/// message below keeps the existing "stop the daemon first" guidance rather
+/// than replacing it with a bare lock error.
+fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    icn_store::n2a_startup_gate::enforce(dir, std::time::SystemTime::now())
+        .map(|_| ())
+        .map_err(|refusal| {
+            // Only `Blocked` means "this directory holds principal-bearing rows".
+            // The other variants mean the gate could not reach a verdict at all —
+            // most often because the daemon is running and holds the same
+            // exclusive lock the audit needs, which is the likeliest operator
+            // mistake here and used to produce a clear "stop the daemon first"
+            // message. Asserting the collision cause for every variant would
+            // send an operator hunting for an alias pair that does not exist.
+            let headline = match &refusal {
+                icn_store::n2a_startup_gate::GateRefusal::Blocked { .. } => format!(
+                    "N2-A startup gate refused {what} at {}: this data directory holds \
+                     principal-bearing rows a key-equality binary cannot open safely. \
+                     Run `did-collision-scan <store>` on the store paths named below \
+                     for the row-level report — it takes a database path, not the \
+                     directory above it. Disposition belongs to the domain that owns \
+                     the keyspace (#2627).",
+                    dir.display()
+                ),
+                _ => format!(
+                    "N2-A startup gate refused {what} at {}: the gate could not verify \
+                     this data directory, so it refuses rather than guess. If the daemon \
+                     is running, stop it first — the audit needs the same exclusive lock. \
+                     The cause below says which check could not complete (#2627).",
+                    dir.display()
+                ),
+            };
+            anyhow::Error::new(refusal).context(headline)
+        })
+}
+
 /// Dispatch cooperative maintenance subcommands.
 fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
     match cmd {
@@ -3235,10 +3310,18 @@ async fn main() -> Result<()> {
             members,
             yes,
             no_start,
-        } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
+        } => {
+            // Opens `<data_dir>/store` and writes trust edges; gate first.
+            enforce_n2a_gate(&data_dir, "init-coop")?;
+            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+        }
 
-        Commands::Coop(coop_cmd) => handle_coop_maintenance_command(coop_cmd, &data_dir)?,
+        Commands::Coop(coop_cmd) => {
+            enforce_n2a_gate(&data_dir, "coop maintenance")?;
+            handle_coop_maintenance_command(coop_cmd, &data_dir)?
+        }
         Commands::Treasury(treasury_cmd) => {
+            enforce_n2a_gate(&data_dir, "treasury maintenance")?;
             handle_treasury_maintenance_command(treasury_cmd, &data_dir)?
         }
 
@@ -6700,6 +6783,10 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     if verify_ledger {
         println!();
         println!("[Extra] Verifying ledger integrity...");
+        // The restored tree is a data directory like any other: a backup whose
+        // ledger the gate would refuse is not one that "can be safely restored",
+        // which is exactly what this command is about to print.
+        enforce_n2a_gate(restore_dir, "backup verification")?;
         verify_ledger_in_backup(restore_dir)?;
     }
 
