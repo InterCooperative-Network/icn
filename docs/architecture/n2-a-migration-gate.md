@@ -1396,7 +1396,7 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 
 | Boundary | Reach | Canonical row | Consumer today | Notes |
 |---|---|---|---|---|
-| `apps/governance` `action_item_by_assignee:<did>:<domain>:<item>` | live | the action-item row (`assignee: Option<Did>`) | spelling prefix scan, stale rows skipped | **regressed by I7**: `save` decides stale-index removal with `existing.assignee != item.assignee`, now principal equality, so re-saving under another spelling leaks the old row. Actionable now |
+| ~~`apps/governance` `action_item_by_assignee:<did>:<domain>:<item>`~~ **closed in M4c, §11.10** | live | the action-item row (`assignee: Option<Did>`) | principal-aware namespace scan; every candidate proved against the canonical row | **regressed by I7** at both ends: `save` decided stale-index removal with `existing.assignee != item.assignee`, principal equality since I7, so re-saving under another spelling leaked the old row; and the reader prefix-scanned the querying spelling, so `/gov/me/work` and `/gov/digest` missed items assigned under an alias. Dispositioned and registered in §11.10: the writer compares projection **keys**, the reader decodes every spelling and proves the canonical row's own assignee, delete and `delete_all` retire every spelling, and an explicit rebuild recomputes the projection. Historical alias rows are not reconciled |
 | ~~`icn-gateway` `adr0014:grant:by_grantee:`~~ **closed in M2, §11.6** and `receipt:meeting_attendance:by_pair:` | live | `adr0014:grant:<uuid>` / `receipt:meeting_attendance:rec:<hash>` | spelling prefix scan; the rebuild write-back adds and never deletes | authorization enumeration by grantee missed alias rows, and alias-issued authority survived alias-spelled revocation. The by-grantee half is dispositioned in §11.6 and registered; the meeting-attendance pair index is untouched and remains open |
 | `icn-gateway` `idx_device_owner:` and `idx_notif_recipient:` | live | `device:<token>` / `notif:<id>` | `String` prefix scan; `mark_read`/`delete_notification` authorize by raw `String` compare against the JWT `sub` | fail-closed for the caller (empty inbox), not principal-correct |
 | ~~`icn-gateway` `v1:interest_idx:<listing>:<did>`~~ **closed in M4b, §11.9** | live | the `v1:interest:` row | a sled compare-and-swap on the spelling key *is* the one-interest-per-member rule | alias defeated the de-dup. Dispositioned and registered in §11.9: the guard is on the canonical side, the projection is read as corroborating evidence rather than trusted, and the maintenance parser now follows the writer's framing. Historical duplicates are not reconciled |
@@ -1436,8 +1436,8 @@ domain authorizes (or `FailClosed` until it does):**
 | `icn-trust` `sybil:verification:<did>` and `sybil:flag:<did>:<ts>:<type>` (P3 values) | dormant, absent from the inventory | exact key / spelling prefix; `clear` deletes one spelling | delete-dead-code, else `FailClosed` — `Revoked` versus `Verified` under two spellings is contradictory by construction, and a permissive rule would weaken an anti-sybil control | trust |
 
 Three of these findings are **regressions introduced by I7 itself** rather than legacy rot: the
-action-item stale-index condition, the treasury hydration guards (closed by M1, §4.2), and the
-asset-transfer index removal. Each is the §7 *partial principalization* pattern — one half of a computation became
+action-item stale-index condition (closed by M4c, §11.10), the treasury hydration guards (closed by
+M1, §4.2), and the asset-transfer index removal. Each is the §7 *partial principalization* pattern — one half of a computation became
 principal-aware while its partner still counts, deletes or keys by spelling.
 
 ### 11.5 Non-claims, and reconciliation with the merged gate, ledger and attestation work
@@ -1455,8 +1455,10 @@ principal-aware while its partner still counts, deletes or keys by spelling.
   the fourteenth whole-key layout — and the Commons anchor-by-DID index (§4 row 66, #2627 M4a,
   §11.8) as the fifteenth, for **eighteen**. The listing-interest uniqueness rows (inventory
   row 26, #2627 M4b, §11.9) have since been added as the sixteenth whole-key layout, for
-  **nineteen**. The §3 figures are not re-stated in any of these cases: a registry expansion
-  does not enlarge old evidence (§3.2).
+  **nineteen**. The governance action-item assignee projection (inventory row 81, #2627 M4c,
+  §11.10) has since been added as the **third anchored layout** — and the first whose terminator is
+  `:` rather than `/` — for **twenty**. The §3 figures are not re-stated in any of these cases: a
+  registry expansion does not enlarge old evidence (§3.2).
 * **#2700 (startup gate, merged).** The gate-level fixtures this section owed are in
   `icn/crates/icn-store/tests/n2a_startup_gate.rs` (§11.3). The gate consumes the party-index
   descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
@@ -2101,3 +2103,260 @@ index was invented; that would be a new persisted key and therefore a migration.
   interests on that listing where it previously did not. That listing's reads were already broken
   — `get_interests` propagates the same decode error — so this makes the write path consistent with
   the read path rather than introducing a new failure class.
+
+### 11.10 Disposition of `action_item_by_assignee:` — P5 lookup projection over a P1 canonical row, `Equivalent` / `Established` (#2627 M4c)
+
+**Finding: derived, not authoritative.** `SledActionItemStore::save` (the `apps/governance` store —
+*not* the unrelated `icn_governance::SledActionItemStore`, which implements no secondary index)
+writes one `action_item_by_assignee:<assignee spelling>:<domain id>:<item id>` row per assigned
+action item, valued by a constant sentinel `b"1"`. Nothing else writes under the prefix, and the row
+carries no fact the canonical `action_item:<domain>:<item>` row does not already state:
+`ActionItem.assignee: Option<Did>` is the assignment. Every consumer of the projection —
+`list_work_for_person` (`GET /gov/me/work`), `digest_overdue_items` (`GET /gov/digest`) — wants
+action items, not rows. The index is therefore a P5 projection and the correct disposition is to
+prove and maintain it as one.
+
+Assignment is not authority. The action-item routes authorize by domain membership and by
+`item.created_by == user_did`; nothing reads this index to decide whether a caller may act. What the
+index decides is **visibility** — whether a person is shown work that is theirs.
+
+**Defects verified against `main` at `dfc296f1` before the fix** (twelve fixtures failed on the
+unchanged store; the two headline ones are quoted):
+
+1. **The I7 regression, writer half.** `save` decided whether to retire the previous version's
+   projection row with `existing.assignee != item.assignee`. Since I7 that is *principal*
+   equality, so for two spellings of one person it is `false`: the old row survived and the new one
+   was inserted beside it. Reproduced through the ordinary authenticated route —
+   `PUT /gov/domains/{domain}/action-items/{item}` with an `assignee` field, which the handler feeds
+   to `parse_did` and stores verbatim — and at the store, where the fixture printed both surviving
+   keys:
+
+   ```text
+   action_item_by_assignee:did:icn:f952ba87…:dom-respell:adfb82ad-…
+   action_item_by_assignee:did:icn:zB3JMnLdrhUE…:dom-respell:adfb82ad-…
+   ```
+
+   One principal, two spellings, one action item, two durable rows.
+
+2. **The I7 regression, reader half.** `list_by_assignee` scanned
+   `action_item_by_assignee:<query spelling>:` as an exact byte prefix, so an item assigned under
+   one accepted spelling was invisible to a query in another. `GET /gov/me/work` and
+   `GET /gov/digest` both derive the caller from `claims.sub` through `parse_did`, which preserves
+   whatever the token spells, so a person authenticated under a second spelling was told they had
+   no work.
+
+3. **One trait, two identity semantics.** `InMemoryActionItemStore::list_by_assignee` compares
+   `i.assignee.as_ref() == Some(assignee)` — principal equality since I7 — and returned the item.
+   The sled backend missed it. Two implementations of one trait answered one logical query
+   differently, and only the backend production uses was wrong.
+
+4. **The projection could manufacture work.** The reader took coordinates from a row and returned
+   whatever primary they named, never comparing that item's own assignee to the query. A planted or
+   superseded row put another member's obligation into a person's work view.
+
+5. **Canonical coordinates were not proved.** A row naming `(D, I)` was read through to
+   `action_item:D:I` without checking that the decoded item agreed, so one item's facts could be
+   returned under another item's coordinates.
+
+6. **Deletion left alias rows behind.** `delete` removed only the row implied by the item's
+   *current* spelling, so a superseded row outlived the item it named. `delete_all` removed
+   canonical rows only and left every projection row for the domain.
+
+7. **Alias rows would duplicate output** once lookups became principal-wide.
+
+8. **An unreadable canonical row read as absent.** `save` matched `Ok(Some(existing)) if …` and fell
+   through every other case to `None`, so a primary that failed to decode silently produced "no
+   stale row" — stranding that version's projection row.
+
+**Fix (#2627 M4c).** Persisted encodings are unchanged; no row is re-keyed, merged or normalized,
+and no preferred spelling exists. The store now holds one invariant: *the assignee projection may
+accelerate discovery of canonical action items and may never create, omit, preserve or alter an
+assignment independently of canonical action-item state.*
+
+* **Physical and semantic equality are told apart, and this is M4c's core finding.**
+
+  ```text
+  semantic equality  answers  "same assignee?"      →  Did equality (principal, since I7)
+  textual  equality  answers  "same persisted key?" →  exact spelling bytes
+  ```
+
+  Stale-row maintenance asks the second question — whether the exact key the previous save wrote is
+  the exact key this save writes — so `save` now compares the two computed projection keys and
+  retires the previous one only when it differs. For an alias pair that is *one* assignee and *two*
+  keys: the old row is removed, the new one written, and the canonical row keeps the spelling it was
+  given. This is projection maintenance, not identity migration.
+
+* **Reads prove assignment from canonical rows.** `list_by_assignee` reads the whole projection
+  namespace, decodes each anchored spelling to the principal it names (the same decode `Did`
+  equality performs), and for each row naming the queried principal loads the canonical row and
+  requires that it exist, that its own `domain_id` and `id` are the coordinates the row named, and
+  that its `assignee` is that principal under `Did` equality — before returning it. Results are
+  de-duplicated by canonical identity `(domain id, ActionItemId)` and ordered by
+  `(created_at, domain id, item id)`, so the answer is a function of the data and is the same under
+  every spelling. A row alone never yields an item, and an exact-spelling miss never means no work
+  exists.
+
+* **Every spelling ever observed is *not* written.** The projection holds one row per assigned item,
+  in the spelling the canonical row currently carries. Writing a row per observed spelling would make
+  the durable row count depend on attacker-chosen input, could never be complete across the accepted
+  encodings, and would turn observed aliases into durable history. Principal-awareness lives at read
+  time instead.
+
+* **Stale and malformed rows are told apart by whether the write protocol could produce them, and a
+  malformed row is refused only where it cannot be attributed away from the caller.** A row whose
+  canonical item is missing, or whose canonical item names a different principal, is *stale*: the
+  protocol can leave it behind, so it is filtered — and filtering is also what stops a planted row
+  manufacturing an assignment. A row this store could not have written is *malformed*, and the
+  disposition splits on attribution. A row whose anchor holds no readable spelling names no
+  principal, so no query can rule it out and every query refuses. A row whose anchor names *some
+  other* principal is ruled out by identity alone, whatever else is wrong with it, so one person's
+  damaged row never blanks another person's work view — a deliberate departure from the whole-namespace
+  refusal §11.3 uses, because this namespace is read per person and an authoritative namespace is not.
+  Refusals carry bounded reason classes only (`anchor-names-no-principal`,
+  `primary-coordinates-mismatch`, …): no spelling, domain id, item id, title, description or note
+  travels in one, and no existing debug log gained a new field.
+
+* **Writes keep the projection a superset of the truth, never a subset.** `save` commits the stale
+  removal, the canonical row and the new row in **one sled transaction**, which is stronger than the
+  three-write protocol §11.3 describes. `delete` collects every projection row naming the item's
+  coordinates — under any spelling — and removes them with the canonical row in one transaction.
+  `delete_all` removes the domain's canonical rows first and then every projection row whose residual
+  names that domain, so a crash can only leave extra rows, which reads filter. A row this store could
+  not have written is *not* swept by either: a row nobody can parse is one an operator must
+  disposition, and deleting it quietly would hide the only evidence it exists.
+
+* **The projection can be recomputed.** `SledActionItemStore::rebuild_assignee_index` derives the
+  expected rows from every canonical action item and makes the projection equal to them, reporting
+  rows kept, added, removed as stale and removed as malformed. It refuses before mutating anything if
+  any canonical row is unreadable — a rebuild that skipped one would call that item's real rows
+  stale. It emits each item's exact stored spelling and touches no canonical byte. It is an explicit
+  operation, never a startup step: the gate is read-only (§10.1), the daemon has no post-open repair
+  hook, and none is introduced. There was **no** backfill before this. The `_meta:idx_version:assignee`
+  key described in the April 2026 handoff was never implemented; `SledActionItemStore::new` retains
+  the database and does nothing else, and still does.
+
+* **The scanner registers the prefix** as `icn-governance-actor/action_item_by_assignee`,
+  `Equivalent`, `Established`, under `PrincipalRegion::AnchoredThenOpaque { terminator: b':' }` —
+  the third anchored layout and the first whose terminator is `:` rather than `/`. The assignee
+  spelling is anchored immediately after the prefix and ends at the first `:` that leaves a decodable
+  spelling behind. The residual must be opaque for the #2704 reason: a `GovernanceDomainId` wraps
+  any `String` filled from a `/domains/{domain_id}/…` path segment, so a domain id may contain `:`
+  and may itself *be* a spelling — a whole-key scan would read it as a second principal, normalize
+  it, and group two rows the store holds apart. The collision unit is therefore **(assignee
+  principal, exact domain-id bytes, exact item-id bytes)**. The canonical `action_item:` rows are a
+  lexical neighbour and not a member: the two prefixes diverge at their eleventh byte (`:` against
+  `_`), and a structural pin fails if the prefix is widened to `action_item`.
+
+* **One accepted spelling this key layout cannot carry, refused at the write boundary.** The
+  framing above assumes no accepted spelling contains `:` beyond the `did:icn:` scheme. That is true
+  of base2 through base64 and base256emoji — every spelling ICN mints — and **false** in general:
+  `multibase` registers an *identity* base under code `\0` that passes its bytes through unmodified,
+  and `Did::from_str` restricts no base, so a principal whose 32 identifier bytes are printable ASCII
+  containing `:` has an accepted spelling. No private key is needed to produce one; searching
+  printable-ASCII candidates for one that decompresses to a valid Edwards point succeeded on the
+  fourth try. Reached through the ordinary authenticated route — `create_action_item` and
+  `update_action_item` pass `assignee` to `parse_did` and store it verbatim — such a row would parse
+  to no principal, and therefore **refuse every by-assignee lookup on the node**: `/gov/me/work` for
+  every person, and `/gov/digest` silently, because it swallows the error. It would also be
+  unrecoverable: `delete` and `delete_all` locate rows by parsed coordinates and never find it, and
+  the rebuild retires it as malformed and immediately re-derives the identical key from the canonical
+  row still backing it.
+
+  `SledActionItemStore::save` therefore refuses such an assignee before a byte moves, and the rebuild
+  refuses over a canonical row carrying one. This is a **representability** rule about this key
+  layout, not an identity rule: the spelling still names a principal, `Did` still accepts it, and
+  whether `Did::from_str` should accept identity-base spellings at all is an identity-layer question
+  left to #2627. Refusing at the write boundary is also what keeps the store and the gate agreeing —
+  the scanner's tokenizer admits neither `\0` nor `:` as body bytes, so it independently calls such a
+  row unreadable, and a row one layer reads and the other cannot is how a gate starts lying.
+
+  **This is a general caution, not a local one.** Any keyspace that frames a spelling with a
+  delimiter inherits the same assumption. `:`-framed and `/`-framed layouts elsewhere in the registry
+  are **not** audited here and are not claimed safe; that audit is left open.
+
+* **The `Equivalent` basis, stated.** All four conditions hold. The canonical row is authoritative
+  (`ActionItem.assignee` is the assignment; nothing reads the index to decide authority). The
+  residual identifies exactly one canonical primary (`(domain, item)` is the primary key). The
+  runtime verifies that primary — existence, coordinates and assignee — before returning anything.
+  And aliases cannot manufacture distinct obligation facts: two spellings on one item resolve to one
+  canonical row and de-duplicate to one result. `Established` records that this is what the shipped
+  loader implements, not that a merge is authorized: nothing here merges, and the rows are equivalent
+  precisely because keeping either one loses nothing.
+
+**Startup gate.** `icn/apps/governance/tests/action_item_assignee_gate_runtime_agreement.rs` drives
+one real sled database, at the `<store_path>/governance_action_items` path the actor uses and the
+data-directory level the gate discovers, through both layers: a healthy projection is **clear** and
+reads under either spelling; historical alias rows on one item are **clear** and read as one item,
+with both rows byte-identical afterwards; one person holding four items across four domains is
+**clear** (the scale control a collision unit collapsed to the principal alone would break); and a
+row whose anchor names no principal **refuses** at both layers. A CLEAR means this spelling collision
+is safe under the registered projection disposition. It does not mean the projection is complete,
+current or authoritative (§11.2).
+
+Alias equivalence and forged-projection correctness are deliberately not conflated. A row claiming
+another person's item names a *different* principal from the real assignee, so at the key level it is
+a second shape, no group forms, and the gate is clear — correctly, because nothing about those keys
+is ambiguous. What makes that state safe is the reader proving the canonical row's own assignee. The
+gate never reads a value and could not have decided it.
+
+**Concurrency, bounded to what is proven.** `save` was already transactional and stays so. The
+remaining hazard is reader-side and is #2704's, in this projection's shape: `scan_prefix` is not a
+snapshot, so a save that only re-spells one assignee — writing `…:<new>:<D>:<I>` and retiring
+`…:<old>:<D>:<I>` — can be straddled by a scan that passed the new row's position before the commit
+and reaches the old row's position after it, collecting neither and reporting the item absent from a
+person's work when it is assigned to them before, during and after. Canonical verification filters
+stale rows; it cannot recover a row the scan never saw. The store therefore holds a process-wide
+`RwLock` in the §11.3 pattern: writers exclusive, by-assignee lookups shared and held across the scan
+*and* the canonical loads, the rebuild exclusive. It is process-wide rather than per instance because
+`GovernanceManager::with_sled_action_items` builds a second store over a database it shares with the
+program and milestone stores, a per-instance lock would coordinate nothing between two handles, and a
+sled database admits one process at a time.
+
+What is **proven** is the lock's polarity, read from the lock itself rather than from timing, and
+that both paths take it. What is **evidence and not proof** is the stress fixture: 200 re-spelling
+saves against two concurrent alias readers, asserting the item is never reported absent or twice.
+With the read guard removed and nothing else changed it reproduced the blanked work view in 5 of 6
+runs on the development host; with the guard it passes. No claim is made that no interleaving exists.
+
+**What this does not claim.**
+
+- **N2-A is not complete and #2627 does not close here.** §9 stands. M4d — alternate store opener and
+  startup-gate coverage — and the remaining §11.4 boundaries are unchanged.
+- **Governance human-identity storage is not complete.** Votes and membership remain behind
+  IDENTITY_SEMANTICS §7.5 and are untouched. The registry test that previously excluded every
+  keyspace whose name contains "governance" was a proxy for that gate; it now states the invariant
+  directly — no keyspace naming a vote or a ballot, and exactly one registered governance keyspace,
+  named — because the action-item projection is a governance keyspace that is emphatically not a vote
+  or a membership row.
+- **Historical alias rows are not reconciled** and no survivor is chosen. `rebuild_assignee_index`
+  exists and is idempotent, but nothing calls it automatically.
+- **No live store was scanned or repaired.** Every claim above is fixture evidence.
+- **Behaviour changes, stated.** A `save` over a canonical row that does not decode now refuses where
+  it previously wrote; a by-assignee lookup now refuses over a projection row whose anchor names no
+  principal, and over a row naming the caller whose canonical evidence is misfiled, where it
+  previously returned a short answer or a wrong item. A by-assignee lookup now costs one scan of the
+  projection namespace rather than one scan of the caller's spelling prefix — the same cost class as
+  the store's existing per-domain scans, and the price of an answer that does not depend on which
+  spelling a token happens to carry.
+- **Adjacent keyspaces are untouched.** `receipt:meeting_attendance:by_pair:`, `idx_device_owner:`,
+  `idx_notif_recipient:` and the `apps/ledger-app` indexes remain open in §11.4. M4c changes no
+  action-item API, no notification digest content, no meeting, role or scope semantics, and no
+  governance voting.
+- **Read cost, stated precisely.** A by-assignee lookup now scans the whole
+  `action_item_by_assignee:` namespace and loads one canonical row per principal-matching row. The
+  store's existing scans are bounded by *one domain*; this one is bounded by total assignments across
+  every domain the database holds, and it runs under the shared read guard. That is a real widening,
+  not merely a re-shaped constant, and it is the price of an answer that does not depend on which
+  spelling a token carries. It stays within the store's documented workload (< 1000 items per domain)
+  and is not optimized here.
+- **The repair operation has no operator surface.** `rebuild_assignee_index` is public but reachable
+  only from tests — no route, no `icnctl` verb. Absent an unframable row (refused at write time) and
+  absent corruption, nothing needs it; exposing it is deliberately left out of M4c rather than
+  claimed.
+- **`delete_all` matches its two halves by different rules, and this is recorded rather than fixed.**
+  The canonical half uses the prefix `action_item:<domain>:`, which also matches a domain literally
+  named `<domain>:<something>`; the projection half added here compares the parsed domain id exactly.
+  A store holding both `a` and `a:b` as domain ids would therefore have `delete_all("a")` remove
+  `a:b`'s canonical rows while leaving `a:b`'s projection rows, which reads then filter as stale. The
+  over-wide canonical prefix predates I7 and changing it would change delete semantics, so M4c states
+  the asymmetry instead of silently widening the new half to match a rule it believes is wrong.

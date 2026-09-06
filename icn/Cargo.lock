@@ -3404,6 +3404,7 @@ dependencies = [
  "icn-obs",
  "icn-store",
  "icn-time",
+ "multibase",
  "serde",
  "serde_json",
  "sha2",

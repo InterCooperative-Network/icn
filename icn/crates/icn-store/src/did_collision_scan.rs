@@ -1914,6 +1914,63 @@ pub fn n2a_keyspaces() -> Vec<KeyspaceDescriptor> {
                         (icn_gateway::listings_mgr, #2627 M4b); a migration must not decide it \
                         either. Already-persisted duplicate interests are not dispositioned here.",
         },
+        KeyspaceDescriptor {
+            name: "icn-governance-actor/action_item_by_assignee",
+            // `action_item_by_assignee:<assignee spelling>:<domain id>:<item
+            // uuid>`. The spelling is anchored immediately after the prefix and
+            // ends at the first `:` that leaves a decodable spelling behind.
+            //
+            // That boundary is exact for every spelling this keyspace may hold,
+            // which is not quite the same as every spelling `Did::from_str`
+            // accepts: the identity base (multibase code `\0`) passes its bytes
+            // through unmodified, so a principal whose identifier bytes are
+            // printable ASCII containing `:` has an accepted spelling no `:`
+            // framing can carry. This scan and the store agree to refuse it —
+            // the tokenizer admits neither `\0` nor `:` as body bytes, so such a
+            // row is unreadable here, and the store refuses to write one at all
+            // (`assignee_spelling_is_framable`, #2627 M4c). Agreement is the
+            // point: a row one layer reads and the other cannot is how a gate
+            // starts lying.
+            //
+            // The residual must be opaque rather than scanned, and the reason
+            // is the same one #2704 established: the domain id is chosen by
+            // whoever created the item (`GovernanceDomainId` wraps any
+            // `String`, filled from a `/domains/{domain_id}/…` path segment),
+            // it may contain `:`, and it may itself BE a `did:icn:` spelling.
+            // A whole-key scan would read such a domain id as a second
+            // principal, canonicalize it, and group two rows the store holds
+            // apart. The whole-key flags below therefore say nothing here.
+            //
+            // The canonical `action_item:<domain>:<item>` rows are a lexical
+            // neighbour, not a member: `action_item:` and
+            // `action_item_by_assignee:` differ at their eleventh byte, so
+            // neither prefix reaches the other and this descriptor claims only
+            // the projection.
+            prefix: b"action_item_by_assignee:",
+            inventory_rows: &[81],
+            disposition: MergeDisposition::Equivalent,
+            basis: RuleBasis::Established,
+            slash_ends_did: false,
+            did_ends_key: false,
+            principal_region: PrincipalRegion::AnchoredThenOpaque { terminator: b':' },
+            rationale:
+                "Secondary index projected from the canonical action_item:<domain>:<item> rows: \
+                        key = (assignee spelling, domain id, item id), value = a constant \
+                        sentinel. The domain and item ids stay in the canonical shape, so one \
+                        person holding two action items is two shapes and never a group — a \
+                        person normally holds many. Two spellings of one principal on ONE item \
+                        are two derivations of one canonical fact: the store answers a \
+                        by-assignee lookup by reading the whole projection, decoding every \
+                        anchored spelling to its principal, and proving each candidate against \
+                        the canonical row — that it exists, that it is filed under the \
+                        coordinates the row named, and that its own assignee is that principal \
+                        under Did equality — before returning it, de-duplicated by (domain, \
+                        item) (#2627 M4c), so keeping any one row loses nothing and the store \
+                        can recompute the projection from the canonical rows. A projection row \
+                        can never create, omit, preserve or alter an assignment on its own. \
+                        Assignment is not authority: the action-item routes authorize by \
+                        domain membership and creator identity, never by this index.",
+        },
     ]
 }
 
@@ -3040,15 +3097,21 @@ mod tests {
     }
 
     #[test]
-    fn the_anchored_layouts_are_the_two_federation_keyspaces_in_registry_order() {
+    fn the_anchored_layouts_are_the_registered_three_in_registry_order() {
         // Pins which registered layouts end their one spelling at a terminator
-        // and carry the remainder as an opaque discriminator. Both are
+        // and carry the remainder as an opaque discriminator. The first two are
         // federation keyspaces of the shape `<prefix><did>/<domain id>`, and
         // they are pinned together because they differ in exactly the fact
         // the disposition records: an attestation pair is two claims and fails
         // closed; a party-index pair is two derivations of one canonical
         // agreement row and is equivalent. A new anchored layout must be added
         // here deliberately, with its own disposition argued (#2704, #2707).
+        //
+        // The third is the governance action-item assignee projection
+        // (#2627 M4c), and it is the first anchored layout whose terminator is
+        // `:` rather than `/` — the separator is a property of the individual
+        // key layout, and pinning it here is what stops one layout's separator
+        // being assumed for another's.
         let anchored: Vec<(&str, u8, MergeDisposition)> = n2a_keyspaces()
             .iter()
             .filter_map(|d| match d.principal_region {
@@ -3069,6 +3132,11 @@ mod tests {
                 (
                     "icn-federation/agreement_party_index",
                     b'/',
+                    MergeDisposition::Equivalent
+                ),
+                (
+                    "icn-governance-actor/action_item_by_assignee",
+                    b':',
                     MergeDisposition::Equivalent
                 ),
             ]
@@ -3401,9 +3469,48 @@ mod tests {
         // inspection belongs to the dedicated security workflow.
         assert!(!names.iter().any(|n| n.contains("misbehavior")));
         assert!(!names.iter().any(|n| n.contains("challenge")));
-        // The governance vote keyspace is behind the separate §7.5 gate.
-        assert!(!names.iter().any(|n| n.contains("governance")));
+
+        // Votes and membership are behind the separate IDENTITY_SEMANTICS
+        // §7.5 gate and are not migrated as part of N2-A.
+        //
+        // Until #2627 M4c this was checked by refusing any name containing
+        // "governance" at all, which was a sound proxy only while the registry
+        // held no governance keyspace. The action-item assignee projection is
+        // a governance keyspace that is emphatically *not* a vote or a
+        // membership row — it is a derived lookup index over action items —
+        // so the proxy is replaced by the invariant it stood for, and the one
+        // governance keyspace that may be registered is named here. A second
+        // one must be added deliberately, with its §7.5 relationship argued.
+        // Not a blanket "member" check: `icn-coop/member` is a registered
+        // cooperative-membership keyspace and always was. What §7.5 gates is
+        // GOVERNANCE membership and votes, which the governance allowlist
+        // below states directly rather than by substring.
         assert!(!names.iter().any(|n| n.contains("vote")));
+        assert!(!names.iter().any(|n| n.contains("ballot")));
+        let governance: Vec<&&str> = names.iter().filter(|n| n.contains("governance")).collect();
+        assert_eq!(
+            governance,
+            vec![&"icn-governance-actor/action_item_by_assignee"],
+            "the only registered governance keyspace is the action-item assignee \
+             projection (#2627 M4c); votes and membership stay behind §7.5"
+        );
+        // And it does not reach vote or membership rows: it claims exactly the
+        // projection prefix, which no vote keyspace begins with.
+        let action_items = n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-governance-actor/action_item_by_assignee")
+            .expect("registered above");
+        assert_eq!(action_items.prefix, b"action_item_by_assignee:");
+        for vote_key in [
+            "gov:vote:p1:did:icn:z1",
+            "vote:p1:did:icn:z1",
+            "index:votes:p1",
+        ] {
+            assert!(
+                !vote_key.as_bytes().starts_with(action_items.prefix),
+                "{vote_key} must stay outside the action-item descriptor"
+            );
+        }
     }
     // ----- federation/attestations (#2703) -----------------------------------
     //
@@ -4975,6 +5082,272 @@ mod tests {
         assert!(
             !audit.is_clear(),
             "two spellings of one principal on one listing must refuse startup"
+        );
+    }
+    // ----- action_item_by_assignee: (#2627 M4c) ------------------------------
+    //
+    // Fixtures write the exact bytes `SledActionItemStore::assignee_idx_key`
+    // writes: `action_item_by_assignee:<spelling>:<domain id>:<item uuid>`
+    // with the sentinel value. They use the real registry rather than a test
+    // descriptor, so what they prove is what the shipped scan — and, through
+    // `audit_store`, the startup gate — does.
+
+    fn action_item_descriptor() -> KeyspaceDescriptor {
+        n2a_keyspaces()
+            .into_iter()
+            .find(|d| d.name == "icn-governance-actor/action_item_by_assignee")
+            .expect("the action-item assignee projection is registered (#2627 M4c)")
+    }
+
+    /// An item id in the writer's rendering: a canonical `Uuid`.
+    fn item(n: u8) -> String {
+        format!("00000000-0000-4000-8000-0000000000{n:02x}")
+    }
+
+    fn assignee_index_row(spelling: &str, domain: &str, item_id: &str) -> String {
+        format!("action_item_by_assignee:{spelling}:{domain}:{item_id}")
+    }
+
+    #[test]
+    fn the_action_item_descriptor_claims_the_projection_and_not_its_siblings() {
+        let d = action_item_descriptor();
+        assert_eq!(d.prefix, b"action_item_by_assignee:");
+        assert_eq!(d.disposition, MergeDisposition::Equivalent);
+        assert_eq!(d.basis, RuleBasis::Established);
+        assert_eq!(d.inventory_rows, &[81]);
+        assert!(!d.did_ends_key, "an opaque residual follows the spelling");
+        assert!(!d.slash_ends_did);
+        assert!(matches!(
+            d.principal_region,
+            PrincipalRegion::AnchoredThenOpaque { terminator: b':' }
+        ));
+
+        // The canonical action-item rows are a lexical neighbour, not a member:
+        // `action_item:` and `action_item_by_assignee:` diverge at their
+        // eleventh byte. Widening this prefix to `action_item` would swallow
+        // every canonical obligation in the store.
+        let canonical = format!("action_item:coop-a:{}", item(1));
+        assert!(
+            !canonical.as_bytes().starts_with(d.prefix),
+            "the canonical row must fall outside the projection descriptor"
+        );
+        assert!(
+            canonical.as_bytes().starts_with(b"action_item"),
+            "and it would be claimed by a widened prefix — which is the point"
+        );
+        let row = assignee_index_row(
+            &spell(&principal(81), multibase::Base::Base58Btc),
+            "coop-a",
+            &item(1),
+        );
+        assert!(row.as_bytes().starts_with(d.prefix));
+    }
+
+    #[test]
+    fn two_spellings_on_one_action_item_are_one_equivalent_group() {
+        // One principal, two spellings, one canonical action item: two
+        // derivations of one fact. The store proves every candidate against
+        // the canonical row before returning it, so keeping either row loses
+        // nothing and no human has to choose.
+        let (a, b) = two_spellings(81);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 2);
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.distinct_principals, 1);
+        assert_eq!(report.collision_groups.len(), 1);
+        assert!(
+            report.is_automatable(),
+            "an equivalent projection pair needs no human to resolve"
+        );
+        assert!(!report.must_fail_closed());
+    }
+
+    #[test]
+    fn control_one_person_with_two_items_is_two_shapes_not_a_collision() {
+        // The collision unit is (principal, domain, item), never the principal
+        // alone. A person normally holds many action items, and reducing the
+        // unit to the principal would call every busy member a collision.
+        let (a, b) = two_spellings(82);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(2)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_with_readable_did, 2);
+        assert_eq!(report.distinct_principals, 2);
+        assert!(
+            report.collision_groups.is_empty(),
+            "two items for one person are two items"
+        );
+    }
+
+    #[test]
+    fn control_one_item_id_in_two_domains_is_two_shapes_not_a_collision() {
+        // The domain id stays in the canonical shape too: an item id repeated
+        // across domains names two canonical rows.
+        let (a, b) = two_spellings(83);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-b", &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn control_two_principals_on_one_item_are_two_shapes_not_a_collision() {
+        let store = store_with(&[
+            (
+                &assignee_index_row(
+                    &spell(&principal(84), multibase::Base::Base58Btc),
+                    "coop-a",
+                    &item(1),
+                ),
+                b"1",
+            ),
+            (
+                &assignee_index_row(
+                    &spell(&principal(85), multibase::Base::Base58Btc),
+                    "coop-a",
+                    &item(1),
+                ),
+                b"1",
+            ),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.distinct_principals, 2);
+        assert!(report.collision_groups.is_empty(), "{report:?}");
+    }
+
+    #[test]
+    fn a_domain_id_that_is_itself_a_did_spelling_stays_a_domain_id() {
+        // The reason this layout must be anchored rather than whole-key. A
+        // `GovernanceDomainId` wraps any `String` and comes from a
+        // `/domains/{domain_id}/…` path segment, so a domain id can contain
+        // `:` and can BE a spelling. A whole-key scan would read it as a second
+        // principal and canonicalize it, grouping two rows the store holds
+        // apart (#2704's lesson).
+        let assignee = spell(&principal(86), multibase::Base::Base58Btc);
+        let domain_one = spell(&principal(87), multibase::Base::Base58Btc);
+        let domain_two = spell(&principal(87), multibase::Base::Base16Lower);
+        let store = store_with(&[
+            (&assignee_index_row(&assignee, &domain_one, &item(1)), b"1"),
+            (&assignee_index_row(&assignee, &domain_two, &item(1)), b"1"),
+        ]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_unreadable, 0);
+        assert_eq!(report.rows_with_readable_did, 2);
+        // `distinct_principals` counts canonical shapes. Two rows that agree on
+        // the assignee but differ in their opaque residual are two shapes, and
+        // that is exactly the proof: had the scan canonicalized the domain id,
+        // the two spellings of principal 87 would have collapsed into one
+        // shape and the rows would have formed a group.
+        assert_eq!(
+            report.distinct_principals, 2,
+            "two different domain ids are two different opaque discriminators, \
+             even when they spell one principal"
+        );
+        assert!(
+            report.collision_groups.is_empty(),
+            "a domain id is carried byte-for-byte and never normalized: {report:?}"
+        );
+    }
+
+    #[test]
+    fn a_row_whose_anchor_holds_no_spelling_is_unreadable_not_principal_free() {
+        // The layout says a principal belongs at the anchor, so its absence is
+        // a row no migration can classify — exactly as the store's own reader
+        // refuses a query over it rather than shortening the answer.
+        let store = store_with(&[(
+            &assignee_index_row("did:icn:znotaspelling", "coop-a", &item(1)),
+            b"1",
+        )]);
+
+        let report = scan_keyspace(&store, &action_item_descriptor()).unwrap();
+        assert_eq!(report.rows_scanned, 1);
+        assert_eq!(report.rows_with_readable_did, 0);
+        assert_eq!(report.rows_unreadable, 1);
+        assert!(
+            report.must_fail_closed(),
+            "an unreadable row blocks whatever the disposition says"
+        );
+    }
+
+    #[test]
+    fn an_unregistered_action_item_row_would_be_uncovered() {
+        // What registration bought. Before this descriptor these rows carried a
+        // spelling under no registered prefix, so the gate blocked them as an
+        // uncovered shape; the descriptor is what turns that liveness wall into
+        // a proven boundary.
+        let row = assignee_index_row(
+            &spell(&principal(81), multibase::Base::Base58Btc),
+            "coop-a",
+            &item(1),
+        );
+        let store = store_with(&[(&row, b"1")]);
+
+        let unregistered: Vec<KeyspaceDescriptor> = n2a_keyspaces()
+            .into_iter()
+            .filter(|d| d.name != "icn-governance-actor/action_item_by_assignee")
+            .collect();
+        let shapes = uncovered_did_key_shapes(&store, &unregistered, &[]).unwrap();
+        assert_eq!(
+            shapes.values().sum::<usize>(),
+            1,
+            "without the descriptor the row is uncovered: {shapes:?}"
+        );
+
+        let shapes = uncovered_did_key_shapes(&store, &n2a_keyspaces(), &[]).unwrap();
+        assert!(
+            shapes.is_empty(),
+            "the registered prefix must claim this row; got {shapes:?}"
+        );
+    }
+
+    #[test]
+    fn an_alias_pair_on_one_action_item_leaves_the_store_audit_clear() {
+        // The disposition contract, at the level the gate actually reads: two
+        // spellings of one principal on one canonical item are `Equivalent`,
+        // so a store holding them starts. This is the fixture that
+        // discriminates the disposition — with it changed to `FailClosed` the
+        // same store refuses.
+        let (a, b) = two_spellings(81);
+        let store = store_with(&[
+            (&assignee_index_row(&a, "coop-a", &item(1)), b"1"),
+            (&assignee_index_row(&b, "coop-a", &item(1)), b"1"),
+        ]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            audit.is_clear(),
+            "an equivalent projection pair must not block a start: {audit:?}"
+        );
+    }
+
+    #[test]
+    fn an_action_item_row_naming_no_principal_blocks_the_whole_store_audit() {
+        let store = store_with(&[(
+            &assignee_index_row("did:icn:znotaspelling", "coop-a", &item(1)),
+            b"1",
+        )]);
+
+        let audit = audit_store(&store, &n2a_keyspaces(), &n2a_deferred_namespaces(), 0).unwrap();
+
+        assert!(
+            !audit.is_clear(),
+            "a row that names no principal must refuse startup"
         );
     }
 }
