@@ -1098,15 +1098,15 @@ commit and the fix is a later event.</p>
 <tr>
 <td>81</td>
 <td>apps/governance</td>
-<td><code>manager.rs:310–325 assignee_idx_key</code>, reader <code>:443 list_by_assignee</code></td>
+<td><code>manager.rs assignee_idx_key</code>, reader <code>list_by_assignee</code></td>
 <td>sled</td>
 <td>action items by assignee</td>
-<td><code>&quot;action_item_by_assignee:&quot; ‖ did.as_str() ‖ &#39;:&#39; ‖ domain ‖ &#39;:&#39; ‖ item</code></td>
+<td><code>&quot;action_item_by_assignee:&quot; ‖ did.as_str() ‖ &#39;:&#39; ‖ domain ‖ &#39;:&#39; ‖ item</code> — value is a constant sentinel <code>&quot;1&quot;</code></td>
 <td>D</td>
-<td><code>ActionItem.assignee: Option&lt;Did&gt;</code> (<code>icn-governance action_item.rs:107</code>) from HTTP/governance wire <code>from_str</code></td>
-<td>none (<code>digest_overdue_items :5441</code>, <code>list_work_for_person :5557</code> prefix-scan by <code>as_str</code>)</td>
+<td><code>ActionItem.assignee: Option&lt;Did&gt;</code> (<code>icn-governance action_item.rs</code>) from HTTP/governance wire <code>from_str</code></td>
+<td><code>list_by_assignee</code> decodes every anchored spelling to its principal and proves each candidate against the canonical <code>action_item:</code> row</td>
 <td>live</td>
-<td><strong>SILENT-MERGE RISK</strong> (the person digest / &quot;my work&quot; views miss items assigned under another spelling)</td>
+<td><del><strong>SILENT-MERGE RISK</strong></del> — <em>2026-09-06:</em> dispositioned as a <strong>derived lookup projection</strong> over the canonical <code>action_item:&lt;domain&gt;:&lt;item&gt;</code> rows (migration gate §11.10, #2627 M4c): <strong>COVERED</strong>. Registered in <code>n2a_keyspaces</code> as <code>icn-governance-actor/action_item_by_assignee</code>, prefix <code>action_item_by_assignee:</code>, <code>PrincipalRegion::AnchoredThenOpaque { terminator: b&#39;:&#39; }</code>, <code>Equivalent</code> / <code>Established</code>, the third anchored layout and the first whose terminator is <code>&#39;:&#39;</code>, consumed by the #2700 startup gate. Collision unit is <strong>(assignee Principal, exact domain id, exact ActionItemId)</strong> — domain and item ids stay in the canonical shape, so one person holding many action items is many shapes and never a group. The I7 regression is fixed at both ends: <code>save</code> decided stale-row removal with <code>existing.assignee != item.assignee</code>, which is principal equality since I7 and therefore false for two spellings of one person, so a spelling-only reassignment through <code>PUT /gov/domains/{d}/action-items/{i}</code> leaked the old row; and the reader scanned the querying spelling as an exact byte prefix, so <code>/gov/me/work</code> and <code>/gov/digest</code> missed items assigned under another spelling of the caller. The writer now compares the exact projection <strong>keys</strong>; the reader is principal-aware and de-duplicates by canonical identity. Delete and <code>delete_all</code> retire every spelling; <code>rebuild_assignee_index</code> recomputes the projection from canonical rows on explicit call, never at startup. No byte re-keyed, no spelling normalized, no preferred encoding. Already-persisted historical alias rows are not reconciled and no survivor is chosen</td>
 </tr>
 <tr>
 <td>82</td>

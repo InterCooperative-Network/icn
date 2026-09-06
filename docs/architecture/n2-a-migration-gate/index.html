@@ -2005,11 +2005,11 @@ declaration, canonical-membership reads, superseded-row cleanup, every-spelling 
 </tr>
 </thead>
 <tbody><tr>
-<td><code>apps/governance</code> <code>action_item_by_assignee:&lt;did&gt;:&lt;domain&gt;:&lt;item&gt;</code></td>
+<td><del><code>apps/governance</code> <code>action_item_by_assignee:&lt;did&gt;:&lt;domain&gt;:&lt;item&gt;</code></del> <strong>closed in M4c, §11.10</strong></td>
 <td>live</td>
 <td>the action-item row (<code>assignee: Option&lt;Did&gt;</code>)</td>
-<td>spelling prefix scan, stale rows skipped</td>
-<td><strong>regressed by I7</strong>: <code>save</code> decides stale-index removal with <code>existing.assignee != item.assignee</code>, now principal equality, so re-saving under another spelling leaks the old row. Actionable now</td>
+<td>principal-aware namespace scan; every candidate proved against the canonical row</td>
+<td><strong>regressed by I7</strong> at both ends: <code>save</code> decided stale-index removal with <code>existing.assignee != item.assignee</code>, principal equality since I7, so re-saving under another spelling leaked the old row; and the reader prefix-scanned the querying spelling, so <code>/gov/me/work</code> and <code>/gov/digest</code> missed items assigned under an alias. Dispositioned and registered in §11.10: the writer compares projection <strong>keys</strong>, the reader decodes every spelling and proves the canonical row&#39;s own assignee, delete and <code>delete_all</code> retire every spelling, and an explicit rebuild recomputes the projection. Historical alias rows are not reconciled</td>
 </tr>
 <tr>
 <td><del><code>icn-gateway</code> <code>adr0014:grant:by_grantee:</code></del> <strong>closed in M2, §11.6</strong> and <code>receipt:meeting_attendance:by_pair:</code></td>
@@ -2182,8 +2182,8 @@ domain authorizes (or <code>FailClosed</code> until it does):</strong></p>
 </tr>
 </tbody></table>
 <p>Three of these findings are <strong>regressions introduced by I7 itself</strong> rather than legacy rot: the
-action-item stale-index condition, the treasury hydration guards (closed by M1, §4.2), and the
-asset-transfer index removal. Each is the §7 <em>partial principalization</em> pattern — one half of a computation became
+action-item stale-index condition (closed by M4c, §11.10), the treasury hydration guards (closed by
+M1, §4.2), and the asset-transfer index removal. Each is the §7 <em>partial principalization</em> pattern — one half of a computation became
 principal-aware while its partner still counts, deletes or keys by spelling.</p>
 <h3 id="115-non-claims-and-reconciliation-with-the-merged-gate-ledger-and-attestation-work">11.5 Non-claims, and reconciliation with the merged gate, ledger and attestation work</h3>
 <ul>
@@ -2200,8 +2200,10 @@ projection (#2627 M2, §11.6) and the Commons holder-by-DID index (§4 row 22, #
 the fourteenth whole-key layout — and the Commons anchor-by-DID index (§4 row 66, #2627 M4a,
 §11.8) as the fifteenth, for <strong>eighteen</strong>. The listing-interest uniqueness rows (inventory
 row 26, #2627 M4b, §11.9) have since been added as the sixteenth whole-key layout, for
-<strong>nineteen</strong>. The §3 figures are not re-stated in any of these cases: a registry expansion
-does not enlarge old evidence (§3.2).</li>
+<strong>nineteen</strong>. The governance action-item assignee projection (inventory row 81, #2627 M4c,
+§11.10) has since been added as the <strong>third anchored layout</strong> — and the first whose terminator is
+<code>:</code> rather than <code>/</code> — for <strong>twenty</strong>. The §3 figures are not re-stated in any of these cases: a
+registry expansion does not enlarge old evidence (§3.2).</li>
 <li><strong>#2700 (startup gate, merged).</strong> The gate-level fixtures this section owed are in
 <code>icn/crates/icn-store/tests/n2a_startup_gate.rs</code> (§11.3). The gate consumes the party-index
 descriptor read-only; the rebuild is not wired into daemon start, and no post-open repair hook
@@ -2781,6 +2783,250 @@ offer or settlement semantics, and no account or resource identity.</li>
 interests on that listing where it previously did not. That listing&#39;s reads were already broken
 — <code>get_interests</code> propagates the same decode error — so this makes the write path consistent with
 the read path rather than introducing a new failure class.</li>
+</ul>
+<h3 id="1110-disposition-of-action_item_by_assignee--p5-lookup-projection-over-a-p1-canonical-row-equivalent--established-2627-m4c">11.10 Disposition of <code>action_item_by_assignee:</code> — P5 lookup projection over a P1 canonical row, <code>Equivalent</code> / <code>Established</code> (#2627 M4c)</h3>
+<p><strong>Finding: derived, not authoritative.</strong> <code>SledActionItemStore::save</code> (the <code>apps/governance</code> store —
+<em>not</em> the unrelated <code>icn_governance::SledActionItemStore</code>, which implements no secondary index)
+writes one <code>action_item_by_assignee:&lt;assignee spelling&gt;:&lt;domain id&gt;:&lt;item id&gt;</code> row per assigned
+action item, valued by a constant sentinel <code>b&quot;1&quot;</code>. Nothing else writes under the prefix, and the row
+carries no fact the canonical <code>action_item:&lt;domain&gt;:&lt;item&gt;</code> row does not already state:
+<code>ActionItem.assignee: Option&lt;Did&gt;</code> is the assignment. Every consumer of the projection —
+<code>list_work_for_person</code> (<code>GET /gov/me/work</code>), <code>digest_overdue_items</code> (<code>GET /gov/digest</code>) — wants
+action items, not rows. The index is therefore a P5 projection and the correct disposition is to
+prove and maintain it as one.</p>
+<p>Assignment is not authority. The action-item routes authorize by domain membership and by
+<code>item.created_by == user_did</code>; nothing reads this index to decide whether a caller may act. What the
+index decides is <strong>visibility</strong> — whether a person is shown work that is theirs.</p>
+<p><strong>Defects verified against <code>main</code> at <code>dfc296f1</code> before the fix</strong> (twelve fixtures failed on the
+unchanged store; the two headline ones are quoted):</p>
+<ol>
+<li><p><strong>The I7 regression, writer half.</strong> <code>save</code> decided whether to retire the previous version&#39;s
+projection row with <code>existing.assignee != item.assignee</code>. Since I7 that is <em>principal</em>
+equality, so for two spellings of one person it is <code>false</code>: the old row survived and the new one
+was inserted beside it. Reproduced through the ordinary authenticated route —
+<code>PUT /gov/domains/{domain}/action-items/{item}</code> with an <code>assignee</code> field, which the handler feeds
+to <code>parse_did</code> and stores verbatim — and at the store, where the fixture printed both surviving
+keys:</p>
+<pre><code class="language-text">action_item_by_assignee:did:icn:f952ba87…:dom-respell:adfb82ad-…
+action_item_by_assignee:did:icn:zB3JMnLdrhUE…:dom-respell:adfb82ad-…
+</code></pre>
+<p>One principal, two spellings, one action item, two durable rows.</p>
+</li>
+<li><p><strong>The I7 regression, reader half.</strong> <code>list_by_assignee</code> scanned
+<code>action_item_by_assignee:&lt;query spelling&gt;:</code> as an exact byte prefix, so an item assigned under
+one accepted spelling was invisible to a query in another. <code>GET /gov/me/work</code> and
+<code>GET /gov/digest</code> both derive the caller from <code>claims.sub</code> through <code>parse_did</code>, which preserves
+whatever the token spells, so a person authenticated under a second spelling was told they had
+no work.</p>
+</li>
+<li><p><strong>One trait, two identity semantics.</strong> <code>InMemoryActionItemStore::list_by_assignee</code> compares
+<code>i.assignee.as_ref() == Some(assignee)</code> — principal equality since I7 — and returned the item.
+The sled backend missed it. Two implementations of one trait answered one logical query
+differently, and only the backend production uses was wrong.</p>
+</li>
+<li><p><strong>The projection could manufacture work.</strong> The reader took coordinates from a row and returned
+whatever primary they named, never comparing that item&#39;s own assignee to the query. A planted or
+superseded row put another member&#39;s obligation into a person&#39;s work view.</p>
+</li>
+<li><p><strong>Canonical coordinates were not proved.</strong> A row naming <code>(D, I)</code> was read through to
+<code>action_item:D:I</code> without checking that the decoded item agreed, so one item&#39;s facts could be
+returned under another item&#39;s coordinates.</p>
+</li>
+<li><p><strong>Deletion left alias rows behind.</strong> <code>delete</code> removed only the row implied by the item&#39;s
+<em>current</em> spelling, so a superseded row outlived the item it named. <code>delete_all</code> removed
+canonical rows only and left every projection row for the domain.</p>
+</li>
+<li><p><strong>Alias rows would duplicate output</strong> once lookups became principal-wide.</p>
+</li>
+<li><p><strong>An unreadable canonical row read as absent.</strong> <code>save</code> matched <code>Ok(Some(existing)) if …</code> and fell
+through every other case to <code>None</code>, so a primary that failed to decode silently produced &quot;no
+stale row&quot; — stranding that version&#39;s projection row.</p>
+</li>
+</ol>
+<p><strong>Fix (#2627 M4c).</strong> Persisted encodings are unchanged; no row is re-keyed, merged or normalized,
+and no preferred spelling exists. The store now holds one invariant: <em>the assignee projection may
+accelerate discovery of canonical action items and may never create, omit, preserve or alter an
+assignment independently of canonical action-item state.</em></p>
+<ul>
+<li><p><strong>Physical and semantic equality are told apart, and this is M4c&#39;s core finding.</strong></p>
+<pre><code class="language-text">semantic equality  answers  &quot;same assignee?&quot;      →  Did equality (principal, since I7)
+textual  equality  answers  &quot;same persisted key?&quot; →  exact spelling bytes
+</code></pre>
+<p>Stale-row maintenance asks the second question — whether the exact key the previous save wrote is
+the exact key this save writes — so <code>save</code> now compares the two computed projection keys and
+retires the previous one only when it differs. For an alias pair that is <em>one</em> assignee and <em>two</em>
+keys: the old row is removed, the new one written, and the canonical row keeps the spelling it was
+given. This is projection maintenance, not identity migration.</p>
+</li>
+<li><p><strong>Reads prove assignment from canonical rows.</strong> <code>list_by_assignee</code> reads the whole projection
+namespace, decodes each anchored spelling to the principal it names (the same decode <code>Did</code>
+equality performs), and for each row naming the queried principal loads the canonical row and
+requires that it exist, that its own <code>domain_id</code> and <code>id</code> are the coordinates the row named, and
+that its <code>assignee</code> is that principal under <code>Did</code> equality — before returning it. Results are
+de-duplicated by canonical identity <code>(domain id, ActionItemId)</code> and ordered by
+<code>(created_at, domain id, item id)</code>, so the answer is a function of the data and is the same under
+every spelling. A row alone never yields an item, and an exact-spelling miss never means no work
+exists.</p>
+</li>
+<li><p><strong>Every spelling ever observed is <em>not</em> written.</strong> The projection holds one row per assigned item,
+in the spelling the canonical row currently carries. Writing a row per observed spelling would make
+the durable row count depend on attacker-chosen input, could never be complete across the accepted
+encodings, and would turn observed aliases into durable history. Principal-awareness lives at read
+time instead.</p>
+</li>
+<li><p><strong>Stale and malformed rows are told apart by whether the write protocol could produce them, and a
+malformed row is refused only where it cannot be attributed away from the caller.</strong> A row whose
+canonical item is missing, or whose canonical item names a different principal, is <em>stale</em>: the
+protocol can leave it behind, so it is filtered — and filtering is also what stops a planted row
+manufacturing an assignment. A row this store could not have written is <em>malformed</em>, and the
+disposition splits on attribution. A row whose anchor holds no readable spelling names no
+principal, so no query can rule it out and every query refuses. A row whose anchor names <em>some
+other</em> principal is ruled out by identity alone, whatever else is wrong with it, so one person&#39;s
+damaged row never blanks another person&#39;s work view — a deliberate departure from the whole-namespace
+refusal §11.3 uses, because this namespace is read per person and an authoritative namespace is not.
+Refusals carry bounded reason classes only (<code>anchor-names-no-principal</code>,
+<code>primary-coordinates-mismatch</code>, …): no spelling, domain id, item id, title, description or note
+travels in one, and no existing debug log gained a new field.</p>
+</li>
+<li><p><strong>Writes keep the projection a superset of the truth, never a subset.</strong> <code>save</code> commits the stale
+removal, the canonical row and the new row in <strong>one sled transaction</strong>, which is stronger than the
+three-write protocol §11.3 describes. <code>delete</code> collects every projection row naming the item&#39;s
+coordinates — under any spelling — and removes them with the canonical row in one transaction.
+<code>delete_all</code> removes the domain&#39;s canonical rows first and then every projection row whose residual
+names that domain, so a crash can only leave extra rows, which reads filter. A row this store could
+not have written is <em>not</em> swept by either: a row nobody can parse is one an operator must
+disposition, and deleting it quietly would hide the only evidence it exists.</p>
+</li>
+<li><p><strong>The projection can be recomputed.</strong> <code>SledActionItemStore::rebuild_assignee_index</code> derives the
+expected rows from every canonical action item and makes the projection equal to them, reporting
+rows kept, added, removed as stale and removed as malformed. It refuses before mutating anything if
+any canonical row is unreadable — a rebuild that skipped one would call that item&#39;s real rows
+stale. It emits each item&#39;s exact stored spelling and touches no canonical byte. It is an explicit
+operation, never a startup step: the gate is read-only (§10.1), the daemon has no post-open repair
+hook, and none is introduced. There was <strong>no</strong> backfill before this. The <code>_meta:idx_version:assignee</code>
+key described in the April 2026 handoff was never implemented; <code>SledActionItemStore::new</code> retains
+the database and does nothing else, and still does.</p>
+</li>
+<li><p><strong>The scanner registers the prefix</strong> as <code>icn-governance-actor/action_item_by_assignee</code>,
+<code>Equivalent</code>, <code>Established</code>, under <code>PrincipalRegion::AnchoredThenOpaque { terminator: b&#39;:&#39; }</code> —
+the third anchored layout and the first whose terminator is <code>:</code> rather than <code>/</code>. The assignee
+spelling is anchored immediately after the prefix and ends at the first <code>:</code> that leaves a decodable
+spelling behind. The residual must be opaque for the #2704 reason: a <code>GovernanceDomainId</code> wraps
+any <code>String</code> filled from a <code>/domains/{domain_id}/…</code> path segment, so a domain id may contain <code>:</code>
+and may itself <em>be</em> a spelling — a whole-key scan would read it as a second principal, normalize
+it, and group two rows the store holds apart. The collision unit is therefore <strong>(assignee
+principal, exact domain-id bytes, exact item-id bytes)</strong>. The canonical <code>action_item:</code> rows are a
+lexical neighbour and not a member: the two prefixes diverge at their eleventh byte (<code>:</code> against
+<code>_</code>), and a structural pin fails if the prefix is widened to <code>action_item</code>.</p>
+</li>
+<li><p><strong>One accepted spelling this key layout cannot carry, refused at the write boundary.</strong> The
+framing above assumes no accepted spelling contains <code>:</code> beyond the <code>did:icn:</code> scheme. That is true
+of base2 through base64 and base256emoji — every spelling ICN mints — and <strong>false</strong> in general:
+<code>multibase</code> registers an <em>identity</em> base under code <code>\0</code> that passes its bytes through unmodified,
+and <code>Did::from_str</code> restricts no base, so a principal whose 32 identifier bytes are printable ASCII
+containing <code>:</code> has an accepted spelling. No private key is needed to produce one; searching
+printable-ASCII candidates for one that decompresses to a valid Edwards point succeeded on the
+fourth try. Reached through the ordinary authenticated route — <code>create_action_item</code> and
+<code>update_action_item</code> pass <code>assignee</code> to <code>parse_did</code> and store it verbatim — such a row would parse
+to no principal, and therefore <strong>refuse every by-assignee lookup on the node</strong>: <code>/gov/me/work</code> for
+every person, and <code>/gov/digest</code> silently, because it swallows the error. It would also be
+unrecoverable: <code>delete</code> and <code>delete_all</code> locate rows by parsed coordinates and never find it, and
+the rebuild retires it as malformed and immediately re-derives the identical key from the canonical
+row still backing it.</p>
+<p><code>SledActionItemStore::save</code> therefore refuses such an assignee before a byte moves, and the rebuild
+refuses over a canonical row carrying one. This is a <strong>representability</strong> rule about this key
+layout, not an identity rule: the spelling still names a principal, <code>Did</code> still accepts it, and
+whether <code>Did::from_str</code> should accept identity-base spellings at all is an identity-layer question
+left to #2627. Refusing at the write boundary is also what keeps the store and the gate agreeing —
+the scanner&#39;s tokenizer admits neither <code>\0</code> nor <code>:</code> as body bytes, so it independently calls such a
+row unreadable, and a row one layer reads and the other cannot is how a gate starts lying.</p>
+<p><strong>This is a general caution, not a local one.</strong> Any keyspace that frames a spelling with a
+delimiter inherits the same assumption. <code>:</code>-framed and <code>/</code>-framed layouts elsewhere in the registry
+are <strong>not</strong> audited here and are not claimed safe; that audit is left open.</p>
+</li>
+<li><p><strong>The <code>Equivalent</code> basis, stated.</strong> All four conditions hold. The canonical row is authoritative
+(<code>ActionItem.assignee</code> is the assignment; nothing reads the index to decide authority). The
+residual identifies exactly one canonical primary (<code>(domain, item)</code> is the primary key). The
+runtime verifies that primary — existence, coordinates and assignee — before returning anything.
+And aliases cannot manufacture distinct obligation facts: two spellings on one item resolve to one
+canonical row and de-duplicate to one result. <code>Established</code> records that this is what the shipped
+loader implements, not that a merge is authorized: nothing here merges, and the rows are equivalent
+precisely because keeping either one loses nothing.</p>
+</li>
+</ul>
+<p><strong>Startup gate.</strong> <code>icn/apps/governance/tests/action_item_assignee_gate_runtime_agreement.rs</code> drives
+one real sled database, at the <code>&lt;store_path&gt;/governance_action_items</code> path the actor uses and the
+data-directory level the gate discovers, through both layers: a healthy projection is <strong>clear</strong> and
+reads under either spelling; historical alias rows on one item are <strong>clear</strong> and read as one item,
+with both rows byte-identical afterwards; one person holding four items across four domains is
+<strong>clear</strong> (the scale control a collision unit collapsed to the principal alone would break); and a
+row whose anchor names no principal <strong>refuses</strong> at both layers. A CLEAR means this spelling collision
+is safe under the registered projection disposition. It does not mean the projection is complete,
+current or authoritative (§11.2).</p>
+<p>Alias equivalence and forged-projection correctness are deliberately not conflated. A row claiming
+another person&#39;s item names a <em>different</em> principal from the real assignee, so at the key level it is
+a second shape, no group forms, and the gate is clear — correctly, because nothing about those keys
+is ambiguous. What makes that state safe is the reader proving the canonical row&#39;s own assignee. The
+gate never reads a value and could not have decided it.</p>
+<p><strong>Concurrency, bounded to what is proven.</strong> <code>save</code> was already transactional and stays so. The
+remaining hazard is reader-side and is #2704&#39;s, in this projection&#39;s shape: <code>scan_prefix</code> is not a
+snapshot, so a save that only re-spells one assignee — writing <code>…:&lt;new&gt;:&lt;D&gt;:&lt;I&gt;</code> and retiring
+<code>…:&lt;old&gt;:&lt;D&gt;:&lt;I&gt;</code> — can be straddled by a scan that passed the new row&#39;s position before the commit
+and reaches the old row&#39;s position after it, collecting neither and reporting the item absent from a
+person&#39;s work when it is assigned to them before, during and after. Canonical verification filters
+stale rows; it cannot recover a row the scan never saw. The store therefore holds a process-wide
+<code>RwLock</code> in the §11.3 pattern: writers exclusive, by-assignee lookups shared and held across the scan
+<em>and</em> the canonical loads, the rebuild exclusive. It is process-wide rather than per instance because
+<code>GovernanceManager::with_sled_action_items</code> builds a second store over a database it shares with the
+program and milestone stores, a per-instance lock would coordinate nothing between two handles, and a
+sled database admits one process at a time.</p>
+<p>What is <strong>proven</strong> is the lock&#39;s polarity, read from the lock itself rather than from timing, and
+that both paths take it. What is <strong>evidence and not proof</strong> is the stress fixture: 200 re-spelling
+saves against two concurrent alias readers, asserting the item is never reported absent or twice.
+With the read guard removed and nothing else changed it reproduced the blanked work view in 5 of 6
+runs on the development host; with the guard it passes. No claim is made that no interleaving exists.</p>
+<p><strong>What this does not claim.</strong></p>
+<ul>
+<li><strong>N2-A is not complete and #2627 does not close here.</strong> §9 stands. M4d — alternate store opener and
+startup-gate coverage — and the remaining §11.4 boundaries are unchanged.</li>
+<li><strong>Governance human-identity storage is not complete.</strong> Votes and membership remain behind
+IDENTITY_SEMANTICS §7.5 and are untouched. The registry test that previously excluded every
+keyspace whose name contains &quot;governance&quot; was a proxy for that gate; it now states the invariant
+directly — no keyspace naming a vote or a ballot, and exactly one registered governance keyspace,
+named — because the action-item projection is a governance keyspace that is emphatically not a vote
+or a membership row.</li>
+<li><strong>Historical alias rows are not reconciled</strong> and no survivor is chosen. <code>rebuild_assignee_index</code>
+exists and is idempotent, but nothing calls it automatically.</li>
+<li><strong>No live store was scanned or repaired.</strong> Every claim above is fixture evidence.</li>
+<li><strong>Behaviour changes, stated.</strong> A <code>save</code> over a canonical row that does not decode now refuses where
+it previously wrote; a by-assignee lookup now refuses over a projection row whose anchor names no
+principal, and over a row naming the caller whose canonical evidence is misfiled, where it
+previously returned a short answer or a wrong item. A by-assignee lookup now costs one scan of the
+projection namespace rather than one scan of the caller&#39;s spelling prefix — the same cost class as
+the store&#39;s existing per-domain scans, and the price of an answer that does not depend on which
+spelling a token happens to carry.</li>
+<li><strong>Adjacent keyspaces are untouched.</strong> <code>receipt:meeting_attendance:by_pair:</code>, <code>idx_device_owner:</code>,
+<code>idx_notif_recipient:</code> and the <code>apps/ledger-app</code> indexes remain open in §11.4. M4c changes no
+action-item API, no notification digest content, no meeting, role or scope semantics, and no
+governance voting.</li>
+<li><strong>Read cost, stated precisely.</strong> A by-assignee lookup now scans the whole
+<code>action_item_by_assignee:</code> namespace and loads one canonical row per principal-matching row. The
+store&#39;s existing scans are bounded by <em>one domain</em>; this one is bounded by total assignments across
+every domain the database holds, and it runs under the shared read guard. That is a real widening,
+not merely a re-shaped constant, and it is the price of an answer that does not depend on which
+spelling a token carries. It stays within the store&#39;s documented workload (&lt; 1000 items per domain)
+and is not optimized here.</li>
+<li><strong>The repair operation has no operator surface.</strong> <code>rebuild_assignee_index</code> is public but reachable
+only from tests — no route, no <code>icnctl</code> verb. Absent an unframable row (refused at write time) and
+absent corruption, nothing needs it; exposing it is deliberately left out of M4c rather than
+claimed.</li>
+<li><strong><code>delete_all</code> matches its two halves by different rules, and this is recorded rather than fixed.</strong>
+The canonical half uses the prefix <code>action_item:&lt;domain&gt;:</code>, which also matches a domain literally
+named <code>&lt;domain&gt;:&lt;something&gt;</code>; the projection half added here compares the parsed domain id exactly.
+A store holding both <code>a</code> and <code>a:b</code> as domain ids would therefore have <code>delete_all(&quot;a&quot;)</code> remove
+<code>a:b</code>&#39;s canonical rows while leaving <code>a:b</code>&#39;s projection rows, which reads then filter as stale. The
+over-wide canonical prefix predates I7 and changing it would change delete semantics, so M4c states
+the asymmetry instead of silently widening the new half to match a rule it believes is wrong.</li>
 </ul>
 </article> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/n2-a-migration-gate.md" target="_blank" rel="noopener" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub ↗
