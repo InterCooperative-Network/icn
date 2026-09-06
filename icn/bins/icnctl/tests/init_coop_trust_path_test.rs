@@ -26,8 +26,12 @@ fn icnctl_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_icnctl"))
 }
 
-/// The path `icnd` opens for trust state (`icnd/src/main.rs`, via
-/// `Config::store_path()`): `<data_dir>/store/trust`.
+/// The path `icnd` opens for trust state: `<data_dir>/store/trust`.
+///
+/// Spelled out here rather than called through `icn_core::config` on purpose —
+/// a test that resolved the path with the same helper the fix introduced would
+/// agree with the code by construction and could not catch the helper itself
+/// being wrong. `icnd` reaches this path via `Config::trust_store_path()`.
 fn daemon_trust_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store").join("trust")
 }

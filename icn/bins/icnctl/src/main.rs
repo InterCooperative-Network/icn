@@ -8443,9 +8443,9 @@ token_expiry_hours = 24
     // sled database `icnd` never opens, and the node started with an empty trust
     // graph (#2718). The path is now resolved through the same `icn-core` helper
     // the daemon uses, so the two cannot drift apart again.
-    let store_path = icn_core::config::trust_store_path(data_dir);
-    std::fs::create_dir_all(&store_path)?;
-    let store = SledStore::open(&store_path).context("Failed to open trust store")?;
+    let trust_store_path = icn_core::config::trust_store_path(data_dir);
+    std::fs::create_dir_all(&trust_store_path)?;
+    let store = SledStore::open(&trust_store_path).context("Failed to open trust store")?;
     let store = Arc::new(store);
     let mut trust_graph = TrustGraph::new(store, my_did.clone());
 
