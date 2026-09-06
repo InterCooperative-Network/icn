@@ -2249,10 +2249,14 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
 /// carries the same typed `GateRefusal` with the store, keyspace and principal
 /// fingerprints already in it.
 ///
-/// A directory that does not exist yet is **not** a refusal: it holds no rows,
-/// so there is nothing to fold and nothing to audit. `init-coop` on a fresh
-/// machine takes that arm; the same command over an existing data directory
-/// does not.
+/// A path that does not exist yet is **not** a refusal: it holds no rows, so
+/// there is nothing to fold and nothing to audit. `init-coop` on a fresh machine
+/// takes that arm; the same command over an existing data directory does not.
+///
+/// A path that *exists but is not a directory* is a different case and is
+/// deliberately **not** skipped here: it is a misconfigured `--data-dir`, and
+/// letting it through quietly would answer a question nobody asked. It falls
+/// through to `enforce`, whose own first check refuses it by name.
 ///
 /// Two consequences are deliberate and stated rather than hidden. The gate
 /// writes its own receipt beside the stores, so a command that was documented
@@ -2262,7 +2266,7 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
 /// message below keeps the existing "stop the daemon first" guidance rather
 /// than replacing it with a bare lock error.
 fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
-    if !dir.is_dir() {
+    if !dir.exists() {
         return Ok(());
     }
     icn_store::n2a_startup_gate::enforce(dir, std::time::SystemTime::now())
@@ -2279,9 +2283,10 @@ fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
                 icn_store::n2a_startup_gate::GateRefusal::Blocked { .. } => format!(
                     "N2-A startup gate refused {what} at {}: this data directory holds \
                      principal-bearing rows a key-equality binary cannot open safely. \
-                     Run `did-collision-scan` on this directory for the row-level \
-                     report; disposition belongs to the domain that owns the keyspace \
-                     (#2627).",
+                     Run `did-collision-scan <store>` on the store paths named below \
+                     for the row-level report — it takes a database path, not the \
+                     directory above it. Disposition belongs to the domain that owns \
+                     the keyspace (#2627).",
                     dir.display()
                 ),
                 _ => format!(

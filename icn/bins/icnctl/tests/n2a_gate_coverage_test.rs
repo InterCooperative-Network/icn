@@ -224,6 +224,31 @@ fn an_absent_data_directory_is_not_refused() {
     );
 }
 
+/// A `--data-dir` that exists but is not a directory is a misconfiguration, and
+/// must be refused rather than quietly skipped.
+///
+/// The absent-path arm exists so first-run setup works. Widening it to "not a
+/// directory" would have swallowed a wrong `--data-dir` too, answering a
+/// question nobody asked.
+#[test]
+fn a_data_dir_that_is_not_a_directory_is_refused_not_skipped() {
+    let dir = TempDir::new().unwrap();
+    let not_a_dir = dir.path().join("data-dir-is-a-file");
+    std::fs::write(&not_a_dir, b"oops").unwrap();
+
+    let out = run_icnctl(&not_a_dir, &["coop", "entity-report"]);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "a misconfigured --data-dir must not be skipped:\n{text}"
+    );
+    assert!(
+        text.contains("N2-A startup gate refused"),
+        "and the refusal must say so:\n{text}"
+    );
+}
+
 /// `verify-backup --verify-ledger` gates the restored tree, which is a data
 /// directory like any other.
 ///
