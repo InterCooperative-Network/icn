@@ -2226,6 +2226,55 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// Refuse to touch a data directory the N2-A startup gate would refuse to open
+/// (#2627 M4d).
+///
+/// `icnd` runs this gate in `main` before it opens a single store, so the daemon
+/// can never fold alias-spelled rows of one principal and orphan the losers on
+/// write-back. `icnctl` opens the *same* sled databases beneath the same data
+/// directory — and its maintenance commands are documented to run with the
+/// daemon stopped, which is precisely the window in which nothing else has
+/// checked them. Without this, the guarantee held only for whichever binary an
+/// operator happened to reach for.
+///
+/// This is not a second implementation of the rule. It calls the same
+/// [`icn_store::n2a_startup_gate::enforce`] the daemon calls, so the two can
+/// never drift into disagreeing about what is safe to open, and a refusal
+/// carries the same typed `GateRefusal` with the store, keyspace and principal
+/// fingerprints already in it.
+///
+/// A directory that does not exist yet is **not** a refusal: it holds no rows,
+/// so there is nothing to fold and nothing to audit. `init-coop` on a fresh
+/// machine takes that arm; the same command over an existing data directory
+/// does not.
+///
+/// Two consequences are deliberate and stated rather than hidden. The gate
+/// writes its own receipt beside the stores, so a command that was documented
+/// as read-only now leaves that one file — the gate's own record of what it
+/// inspected, never a domain store write. And the gate opens each sled root
+/// exclusively while it audits, so a running daemon makes it refuse; the
+/// message below keeps the existing "stop the daemon first" guidance rather
+/// than replacing it with a bare lock error.
+fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    icn_store::n2a_startup_gate::enforce(dir, std::time::SystemTime::now())
+        .map(|_| ())
+        .map_err(anyhow::Error::new)
+        .with_context(|| {
+            format!(
+                "N2-A startup gate refused {what} at {} — this data directory holds \
+                 principal-bearing rows a key-equality binary cannot open safely. \
+                 If the daemon is running, stop it first (the gate needs the same \
+                 exclusive lock). Run `did-collision-scan` on this directory for the \
+                 row-level report; disposition belongs to the domain that owns the \
+                 keyspace (#2627).",
+                dir.display()
+            )
+        })
+}
+
 /// Dispatch cooperative maintenance subcommands.
 fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
     match cmd {
@@ -3235,10 +3284,18 @@ async fn main() -> Result<()> {
             members,
             yes,
             no_start,
-        } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
+        } => {
+            // Opens `<data_dir>/store` and writes trust edges; gate first.
+            enforce_n2a_gate(&data_dir, "init-coop")?;
+            handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
+        }
 
-        Commands::Coop(coop_cmd) => handle_coop_maintenance_command(coop_cmd, &data_dir)?,
+        Commands::Coop(coop_cmd) => {
+            enforce_n2a_gate(&data_dir, "coop maintenance")?;
+            handle_coop_maintenance_command(coop_cmd, &data_dir)?
+        }
         Commands::Treasury(treasury_cmd) => {
+            enforce_n2a_gate(&data_dir, "treasury maintenance")?;
             handle_treasury_maintenance_command(treasury_cmd, &data_dir)?
         }
 
@@ -6700,6 +6757,10 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     if verify_ledger {
         println!();
         println!("[Extra] Verifying ledger integrity...");
+        // The restored tree is a data directory like any other: a backup whose
+        // ledger the gate would refuse is not one that "can be safely restored",
+        // which is exactly what this command is about to print.
+        enforce_n2a_gate(restore_dir, "backup verification")?;
         verify_ledger_in_backup(restore_dir)?;
     }
 
