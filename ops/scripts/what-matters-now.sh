@@ -17,6 +17,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 MODE="${1:-human}"
+# Counted with an assignment, never `((DRIFT_ERRORS++))`. Under `set -e` an
+# arithmetic *command* whose value is zero exits 1, and post-increment evaluates to
+# the value before the increment -- so the very first drift (0 -> 1) aborted this
+# script and the report below became unreachable exactly when it had something to
+# say (icn#2723).
 DRIFT_ERRORS=0
 
 # ─── helpers ────────────────────────────────────────────────────────────────
@@ -27,7 +32,7 @@ check_file() {
   local f="$1"
   if [[ ! -f "${REPO_ROOT}/${f}" ]]; then
     echo "MISSING: ${f}" >&2
-    ((DRIFT_ERRORS++))
+    DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
     return 1
   fi
   return 0
@@ -47,10 +52,15 @@ TRUTH_FILES=(
 )
 
 TRUTH_OK=true
+MISSING_TRUTH_FILES=""
 for f in "${TRUTH_FILES[@]}"; do
   if [[ ! -f "${REPO_ROOT}/${f}" ]]; then
     TRUTH_OK=false
-    ((DRIFT_ERRORS++))
+    # Record which one. This loop previously counted silently, so the report
+    # below could say only "Missing canonical truth files" and an operator was
+    # left to find the gap by hand (icn#2723).
+    MISSING_TRUTH_FILES="${MISSING_TRUTH_FILES}    ${f}"$'\n'
+    DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
   fi
 done
 
@@ -72,16 +82,16 @@ if [[ -d "${PROJECT_SKILLS}" ]]; then
       if [[ "${resolved}" != "${canonical}" ]]; then
         SYMLINKS_OK=false
         SYMLINK_WARNINGS+="  WRONG TARGET: .claude/skills/${skill} → ${resolved}\n"
-        ((DRIFT_ERRORS++))
+        DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
       fi
     elif [[ -d "${link}" ]]; then
       SYMLINKS_OK=false
       SYMLINK_WARNINGS+="  NOT SYMLINK: .claude/skills/${skill} is a plain directory (run ops/scripts/setup-skill-symlinks.sh)\n"
-      ((DRIFT_ERRORS++))
+      DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
     else
       SYMLINKS_OK=false
       SYMLINK_WARNINGS+="  MISSING: .claude/skills/${skill} (run ops/scripts/setup-skill-symlinks.sh)\n"
-      ((DRIFT_ERRORS++))
+      DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
     fi
   done
 fi
@@ -112,7 +122,7 @@ for pattern in "${STALE_PATTERNS[@]}"; do
         while IFS= read -r line; do
           STALE_HITS+="    ${line}\n"
         done <<< "${hits}"
-        ((DRIFT_ERRORS++))
+        DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
       fi
     fi
   done
@@ -258,7 +268,10 @@ fi
 if [[ "${MODE}" == "--drift" ]]; then
   if [[ ${DRIFT_ERRORS} -gt 0 ]]; then
     echo "DRIFT DETECTED: ${DRIFT_ERRORS} problem(s)"
-    [[ "${TRUTH_OK}" == "false" ]] && echo "  Missing canonical truth files"
+    if [[ "${TRUTH_OK}" == "false" ]]; then
+      echo "  Missing canonical truth files:"
+      printf '%s' "${MISSING_TRUTH_FILES}"
+    fi
     [[ "${SYMLINKS_OK}" == "false" ]] && printf "${SYMLINK_WARNINGS}"
     [[ -n "${STALE_HITS}" ]] && printf "Stale paths:\n${STALE_HITS}"
     exit 1
