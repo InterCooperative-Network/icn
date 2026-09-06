@@ -286,11 +286,206 @@ pub struct SledActionItemStore {
     db: Arc<sled::Db>,
 }
 
+/// Serializes the assignee projection against the canonical rows it is derived
+/// from (#2627 M4c).
+///
+/// A save needs it because the projection is maintained in two moves that must
+/// not interleave with another save of the same item: the row the previous
+/// version implied is retired and the row this version implies is written.
+///
+/// A by-assignee lookup needs it because `sled`'s `scan_prefix` is not a
+/// snapshot — its iterator takes a read lock once per item rather than once per
+/// scan, so a commit that lands partway through the projection read is visible
+/// to the rows not yet visited and invisible to the ones already collected.
+/// The write protocol keeps the projection a superset of canonical assignment
+/// at every instant, but a view assembled half before and half after a commit
+/// is a superset of nothing: a save that only *re-spells* one assignee writes
+/// `…:<new>:<D>:<I>` and retires `…:<old>:<D>:<I>` in one transaction, and a
+/// scan that passed the new row's position before the commit and reaches the
+/// old row's position after it collects neither — so the lookup would report
+/// the item absent from a person's work when it is assigned to them before,
+/// during and after, an answer no valid state gives (the #2707 lesson, in this
+/// projection's shape). Canonical verification filters stale rows; it cannot
+/// recover a row the scan never saw. Holding the namespace across the scan
+/// *and* the canonical loads is what makes the answer one of the two valid
+/// ones.
+///
+/// Readers share, so ordinary concurrent work views do not queue behind each
+/// other. The lock is process-wide rather than per instance so that it covers
+/// every handle over one backend: `init.rs` opens a dedicated sled database and
+/// builds one store over it, but `GovernanceManager::with_sled_action_items`
+/// builds another over a database it shares with the program and milestone
+/// stores, a per-instance lock would coordinate nothing between two handles,
+/// and a sled database admits one process at a time — so a process-wide lock
+/// covers every reader and writer there is.
+static ASSIGNEE_PROJECTION_LOCK: RwLock<()> = RwLock::new(());
+
+fn assignee_projection_write_guard() -> std::sync::RwLockWriteGuard<'static, ()> {
+    // A caller that panicked while holding the lock has not left the store in a
+    // state this lock protects against: every path re-reads canonical evidence
+    // before it acts.
+    ASSIGNEE_PROJECTION_LOCK
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn assignee_projection_read_guard() -> std::sync::RwLockReadGuard<'static, ()> {
+    ASSIGNEE_PROJECTION_LOCK
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The `did:icn:` scheme, as it appears at a projection key's anchor.
+const DID_SCHEME: &str = "did:icn:";
+
+/// Why an assignee-projection row is one this store could not have written.
+///
+/// Reason classes only. No DID spelling, domain id, item id, action-item title,
+/// description, note or stored value ever travels in one, so a refusal names
+/// the defect without republishing a person's identifier or a domain's
+/// contents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AssigneeProjectionDefect {
+    /// The key is not UTF-8, so it has no anchor to read.
+    KeyNotUtf8,
+    /// The bytes at the anchor do not begin with the `did:icn:` scheme.
+    AnchorNotADidSpelling,
+    /// The anchored spelling decodes to no principal.
+    AnchorNamesNoPrincipal,
+    /// The residual after the spelling is not `<domain id>:<item id>`.
+    ResidualNotDomainAndItem,
+    /// The residual's last component is not an action-item UUID.
+    ResidualItemIdNotAUuid,
+    /// The canonical row the residual names is filed under other coordinates.
+    PrimaryCoordinatesMismatch,
+}
+
+impl AssigneeProjectionDefect {
+    /// A short stable label, safe to put in an error.
+    fn label(self) -> &'static str {
+        match self {
+            Self::KeyNotUtf8 => "key-not-utf8",
+            Self::AnchorNotADidSpelling => "anchor-not-a-did-spelling",
+            Self::AnchorNamesNoPrincipal => "anchor-names-no-principal",
+            Self::ResidualNotDomainAndItem => "residual-not-domain-and-item",
+            Self::ResidualItemIdNotAUuid => "residual-item-id-not-a-uuid",
+            Self::PrimaryCoordinatesMismatch => "primary-coordinates-mismatch",
+        }
+    }
+}
+
+/// One assignee-projection row, as its key structure describes it.
+///
+/// The two halves are read independently on purpose. A row whose *anchor* holds
+/// no readable spelling names no principal, so no query can rule it out and
+/// every query must refuse. A row whose anchor names some *other* principal is
+/// ruled out whatever its residual says, so one person's damaged row never
+/// blocks another person's work view.
+struct ParsedAssigneeIdxRow {
+    /// The principal the anchored spelling names.
+    principal: std::result::Result<icn_identity::Did, AssigneeProjectionDefect>,
+    /// The canonical coordinates the opaque residual names.
+    coordinates: std::result::Result<(GovernanceDomainId, ActionItemId), AssigneeProjectionDefect>,
+}
+
+/// Read an assignee-projection key as `<prefix><spelling>:<domain id>:<item id>`.
+///
+/// The spelling is anchored immediately after the prefix and ends at the first
+/// `:` following the `did:icn:` scheme: `:` is not a multibase body byte, so no
+/// accepted spelling of a principal contains one beyond the scheme itself, and
+/// the boundary is exact rather than a guess. This is the same structure the
+/// scanner's `PrincipalRegion::AnchoredThenOpaque { terminator: b':' }` reads.
+///
+/// Everything after that `:` is residual key material this function does not
+/// interpret as identity. The domain id is chosen by whoever created the item
+/// and may itself contain `:` — and may itself *be* a `did:icn:` spelling — so
+/// the residual is split from the right, where the item id is a UUID and never
+/// contains `:`. A `did:icn:` inside a domain id is that domain's identifier,
+/// never a second principal.
+fn parse_assignee_idx_row(raw_key: &[u8]) -> ParsedAssigneeIdxRow {
+    let fail = |d: AssigneeProjectionDefect| ParsedAssigneeIdxRow {
+        principal: Err(d),
+        coordinates: Err(d),
+    };
+
+    let Ok(key) = std::str::from_utf8(raw_key) else {
+        return fail(AssigneeProjectionDefect::KeyNotUtf8);
+    };
+    let Some(after_prefix) = key.strip_prefix(SledActionItemStore::ASSIGNEE_IDX_PREFIX) else {
+        // Only reachable if a caller hands this a key from outside the
+        // namespace; the scans below are all prefix-bounded.
+        return fail(AssigneeProjectionDefect::AnchorNotADidSpelling);
+    };
+    let Some(body) = after_prefix.strip_prefix(DID_SCHEME) else {
+        return fail(AssigneeProjectionDefect::AnchorNotADidSpelling);
+    };
+
+    // The spelling runs to the first `:` after the scheme; without one the row
+    // carries a spelling and no residual at all.
+    let (spelling, residual) = match body.find(':') {
+        Some(at) => (
+            &after_prefix[..DID_SCHEME.len() + at],
+            Some(&body[at + 1..]),
+        ),
+        None => (after_prefix, None),
+    };
+
+    let principal = icn_identity::Did::from_str(spelling)
+        .map_err(|_| AssigneeProjectionDefect::AnchorNamesNoPrincipal);
+
+    let coordinates = (|| {
+        let residual = residual.ok_or(AssigneeProjectionDefect::ResidualNotDomainAndItem)?;
+        // Split from the right: the item id is a UUID and never contains ':',
+        // so whatever precedes the last ':' is the domain id in full, colons
+        // included.
+        let (domain, item) = residual
+            .rsplit_once(':')
+            .ok_or(AssigneeProjectionDefect::ResidualNotDomainAndItem)?;
+        if domain.is_empty() {
+            // The writer never produces one: an item's domain id comes from a
+            // matched `/domains/{domain_id}/…` path segment.
+            return Err(AssigneeProjectionDefect::ResidualNotDomainAndItem);
+        }
+        let item_id: ActionItemId = item
+            .parse()
+            .map_err(|_| AssigneeProjectionDefect::ResidualItemIdNotAUuid)?;
+        Ok((GovernanceDomainId(domain.to_string()), item_id))
+    })();
+
+    ParsedAssigneeIdxRow {
+        principal,
+        coordinates,
+    }
+}
+
+/// What a projection rebuild changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct AssigneeIndexRebuild {
+    /// Rows the canonical items already implied, left untouched.
+    pub kept: usize,
+    /// Rows a canonical item implied that the projection did not hold.
+    pub added: usize,
+    /// Rows no canonical item implies — a superseded spelling, or a row whose
+    /// item is gone.
+    pub removed_stale: usize,
+    /// Rows this store could not have written, retired by the rebuild because
+    /// nothing else removes them.
+    pub removed_malformed: usize,
+}
+
 impl SledActionItemStore {
     /// Create a new Sled-backed action item store
     pub fn new(db: Arc<sled::Db>) -> Self {
         Self { db }
     }
+
+    /// Namespace holding the assignee projection.
+    ///
+    /// Disjoint from the canonical `action_item:` namespace rather than nested
+    /// inside it: `"action_item_by_assignee:"` and `"action_item:"` differ at
+    /// their eleventh byte (`_` against `:`), so neither prefix scan ever
+    /// reaches the other's rows.
+    const ASSIGNEE_IDX_PREFIX: &'static str = "action_item_by_assignee:";
 
     /// Generate key for an action item
     fn item_key(domain_id: &GovernanceDomainId, id: &ActionItemId) -> String {
@@ -306,46 +501,169 @@ impl SledActionItemStore {
     ///
     /// Format: `action_item_by_assignee:{assignee_did}:{domain_id}:{item_id}`
     /// Value: `b"1"` (tombstone — presence signals membership, no data stored)
+    ///
+    /// The spelling is the assignee's exact stored `as_str()`. Nothing here
+    /// canonicalizes it, and no preferred encoding exists: the projection
+    /// records the spelling the canonical row carries, whatever it is.
     fn assignee_idx_key(
         assignee: &icn_identity::Did,
         domain_id: &GovernanceDomainId,
         id: &ActionItemId,
     ) -> String {
         format!(
-            "action_item_by_assignee:{}:{}:{}",
+            "{}{}:{}:{}",
+            Self::ASSIGNEE_IDX_PREFIX,
             assignee.as_str(),
             domain_id.0,
             id.0
         )
     }
 
-    /// Prefix for scanning all assignee-index entries for a given DID.
-    fn assignee_idx_prefix(assignee: &icn_identity::Did) -> String {
-        format!("action_item_by_assignee:{}:", assignee.as_str())
+    /// Every projection row that names these canonical coordinates, under any
+    /// spelling.
+    ///
+    /// Rows whose key this store could not have written are *not* returned: a
+    /// row nobody can parse is a row an operator must disposition, and quietly
+    /// deleting it here would hide the only evidence it exists. The explicit
+    /// [`Self::rebuild_assignee_index`] is what retires them.
+    fn assignee_idx_keys_for(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> std::result::Result<Vec<sled::IVec>, GovernanceError> {
+        let mut keys = Vec::new();
+        for result in self.db.scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes()) {
+            let (raw_key, _) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (assignee idx) failed: {e}"))
+            })?;
+            if let Ok((row_domain, row_item)) = parse_assignee_idx_row(&raw_key).coordinates {
+                if row_domain == *domain_id && row_item == *id {
+                    keys.push(raw_key);
+                }
+            }
+        }
+        Ok(keys)
+    }
+
+    /// Recompute the assignee projection from the canonical action items.
+    ///
+    /// The canonical `action_item:` rows are the source of truth; this makes
+    /// the projection equal to what they imply and reports what changed. It
+    /// emits each item's *exact stored* assignee spelling — no spelling is
+    /// normalized, no canonical byte is touched, and no `ActionItem` is read
+    /// back differently afterwards.
+    ///
+    /// Refuses before mutating anything if any canonical row cannot be
+    /// decoded: a rebuild that skipped one would call that item's real
+    /// projection rows stale and delete them.
+    ///
+    /// This is a deliberate repair operation, never a startup step. The N2-A
+    /// startup gate is read-only and the daemon has no post-open repair hook;
+    /// none is introduced here.
+    pub fn rebuild_assignee_index(
+        &self,
+    ) -> std::result::Result<AssigneeIndexRebuild, GovernanceError> {
+        let _guard = assignee_projection_write_guard();
+
+        // Canonical evidence first, in full, before a byte moves.
+        let mut expected: HashSet<String> = HashSet::new();
+        for result in self.db.scan_prefix(b"action_item:") {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+            })?;
+            if let Some(ref assignee) = item.assignee {
+                expected.insert(Self::assignee_idx_key(assignee, &item.domain_id, &item.id));
+            }
+        }
+
+        let mut report = AssigneeIndexRebuild::default();
+        let mut present: HashSet<String> = HashSet::new();
+        let mut retire: Vec<sled::IVec> = Vec::new();
+
+        for result in self.db.scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes()) {
+            let (raw_key, _) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (assignee idx) failed: {e}"))
+            })?;
+            let parsed = parse_assignee_idx_row(&raw_key);
+            if parsed.principal.is_err() || parsed.coordinates.is_err() {
+                report.removed_malformed += 1;
+                retire.push(raw_key);
+                continue;
+            }
+            // Well-formed: comparing the raw key against the expected set is
+            // the same physical-equality question the save path asks.
+            match std::str::from_utf8(&raw_key) {
+                Ok(key) if expected.contains(key) => {
+                    report.kept += 1;
+                    present.insert(key.to_string());
+                }
+                _ => {
+                    report.removed_stale += 1;
+                    retire.push(raw_key);
+                }
+            }
+        }
+
+        for key in retire {
+            self.db.remove(key).map_err(|e| {
+                GovernanceError::Internal(format!("Sled assignee-idx rebuild remove failed: {e}"))
+            })?;
+        }
+        for key in expected.difference(&present) {
+            self.db.insert(key.as_bytes(), b"1" as &[u8]).map_err(|e| {
+                GovernanceError::Internal(format!("Sled assignee-idx rebuild insert failed: {e}"))
+            })?;
+            report.added += 1;
+        }
+
+        Ok(report)
     }
 }
 
 impl ActionItemStoreBackend for SledActionItemStore {
     fn save(&self, item: &ActionItem) -> std::result::Result<(), GovernanceError> {
+        let _guard = assignee_projection_write_guard();
         let key = Self::item_key(&item.domain_id, &item.id);
 
-        // If the assignee changed on update, the OLD by-assignee index entry must
-        // be removed. Resolve it before the transaction (a read), then remove it
-        // and (re)write the primary row + new index atomically below.
-        let stale_assignee_idx: Option<String> = match self.get(&item.domain_id, &item.id) {
-            Ok(Some(existing)) if existing.assignee != item.assignee => existing
-                .assignee
-                .as_ref()
-                .map(|old| Self::assignee_idx_key(old, &item.domain_id, &item.id)),
-            _ => None,
-        };
-
-        let value = icn_encoding::encode_versioned(item)
-            .map_err(|e| GovernanceError::Internal(format!("Failed to encode action item: {e}")))?;
+        // The projection row this version of the item implies.
         let new_assignee_idx: Option<String> = item
             .assignee
             .as_ref()
             .map(|assignee| Self::assignee_idx_key(assignee, &item.domain_id, &item.id));
+
+        // The projection row the previous version implied. Canonical evidence
+        // is read before a byte moves, and an existing primary that cannot be
+        // decoded refuses the save rather than reading as absent: "absent"
+        // would leave that version's projection row behind with nothing left
+        // to derive it from.
+        let previous_assignee_idx: Option<String> = match self.get(&item.domain_id, &item.id)? {
+            Some(existing) => existing
+                .assignee
+                .as_ref()
+                .map(|old| Self::assignee_idx_key(old, &item.domain_id, &item.id)),
+            None => None,
+        };
+
+        // PHYSICAL equality, deliberately not `Did` equality. The question this
+        // decides is whether the exact key the previous save persisted is the
+        // exact key this save persists — a question about representation, not
+        // about identity. Since I7 `Did` equality names the principal, so
+        // `existing.assignee != item.assignee` answers "is this a different
+        // assignee?" instead, and returns false for two spellings of one
+        // person: the old row would survive alongside the new one, and the
+        // projection would hold a spelling canonical state no longer carries.
+        //
+        // Semantic equality answers "same assignee?". Textual equality answers
+        // "same persisted projection key?". Only the second one is being asked
+        // here.
+        let stale_assignee_idx: Option<&String> = previous_assignee_idx
+            .as_ref()
+            .filter(|previous| Some(*previous) != new_assignee_idx.as_ref());
+
+        let value = icn_encoding::encode_versioned(item)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode action item: {e}")))?;
 
         // Atomic: the primary row, the assignee secondary index, and any stale
         // index removal commit together in a single sled transaction. A partial
@@ -355,7 +673,7 @@ impl ActionItemStoreBackend for SledActionItemStore {
         // fully-persisted obligation.
         self.db
             .transaction(|tx| {
-                if let Some(ref stale) = stale_assignee_idx {
+                if let Some(stale) = stale_assignee_idx {
                     tx.remove(stale.as_bytes())?;
                 }
                 tx.insert(key.as_bytes(), value.as_slice())?;
@@ -413,80 +731,154 @@ impl ActionItemStoreBackend for SledActionItemStore {
         Ok(items)
     }
 
+    /// Delete an action item and every projection row that names it.
+    ///
+    /// The canonical row goes first and the projection rows after it, so a
+    /// crash can only leave the projection a *superset* of canonical
+    /// assignment — rows that name a missing item, which
+    /// [`Self::list_by_assignee`] filters and which can never manufacture
+    /// work — and never a canonical row whose rows are already gone.
+    ///
+    /// Every spelling is removed, not just the one the current version carries:
+    /// a store written before #2627 M4c can hold a superseded alias row for
+    /// these coordinates, and leaving it behind would keep a row pointing at an
+    /// item that no longer exists.
     fn delete(
         &self,
         domain_id: &GovernanceDomainId,
         id: &ActionItemId,
     ) -> std::result::Result<bool, GovernanceError> {
+        let _guard = assignee_projection_write_guard();
         let key = Self::item_key(domain_id, id);
-
-        // Load item first so we can clean up the assignee index
-        if let Ok(Some(existing)) = self.get(domain_id, id) {
-            if let Some(ref assignee) = existing.assignee {
-                let idx_key = Self::assignee_idx_key(assignee, domain_id, id);
-                self.db.remove(idx_key.as_bytes()).map_err(|e| {
-                    GovernanceError::Internal(format!("Sled assignee-idx delete failed: {e}"))
-                })?;
-            }
-        }
+        let projection_rows = self.assignee_idx_keys_for(domain_id, id)?;
 
         self.db
-            .remove(key.as_bytes())
-            .map(|opt| opt.is_some())
-            .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+            .transaction(|tx| {
+                let existed = tx.remove(key.as_bytes())?.is_some();
+                for row in &projection_rows {
+                    tx.remove(row.as_ref())?;
+                }
+                Ok::<bool, sled::transaction::ConflictableTransactionError<()>>(existed)
+            })
+            .map_err(|e: sled::transaction::TransactionError<()>| {
+                GovernanceError::Internal(format!("Sled action-item delete tx failed: {e:?}"))
+            })
     }
 
-    /// Scan the assignee secondary index and return all items assigned to `assignee`.
+    /// Return every action item assigned to `assignee`, proved against the
+    /// canonical rows.
     ///
-    /// Index key format: `action_item_by_assignee:{did}:{domain_id}:{item_id}`
-    /// Each entry is a tombstone; the actual item is read from the primary key.
+    /// The projection may only *accelerate discovery* of canonical action
+    /// items. It may never create, omit, preserve or alter an assignment
+    /// independently of canonical state, so:
+    ///
+    /// * discovery is principal-aware, not spelling-exact — every row in the
+    ///   namespace is read and its anchored spelling decoded to the principal
+    ///   it names, the same decode `Did` equality performs, so an item assigned
+    ///   under one spelling is found by a query in any other spelling of the
+    ///   same person;
+    /// * every candidate is proved against the canonical row: it must exist, be
+    ///   filed under the coordinates the projection named, and carry this
+    ///   principal as its assignee. A row alone never yields an item;
+    /// * results are de-duplicated by canonical identity `(domain id, item id)`,
+    ///   so historical alias rows for one item yield it once — and two items
+    ///   assigned to one person stay two items.
+    ///
+    /// A row that names *some other* principal is skipped whatever else is
+    /// wrong with it, so one person's damaged row never blocks another
+    /// person's work view. A row whose anchor names *no* principal refuses the
+    /// whole query: it cannot be attributed away from the caller, and answering
+    /// "no work" over a row that might be theirs is precisely the silent miss
+    /// this milestone exists to remove.
     fn list_by_assignee(
         &self,
         assignee: &icn_identity::Did,
     ) -> std::result::Result<Vec<ActionItem>, GovernanceError> {
-        let prefix = Self::assignee_idx_prefix(assignee);
-        let mut items = Vec::new();
+        let _guard = assignee_projection_read_guard();
 
-        for result in self.db.scan_prefix(prefix.as_bytes()) {
+        let mut malformed_rows = 0usize;
+        let mut first_defect: Option<AssigneeProjectionDefect> = None;
+        let mut note = |defect: AssigneeProjectionDefect| {
+            malformed_rows += 1;
+            first_defect.get_or_insert(defect);
+        };
+
+        let mut seen: HashSet<(String, uuid::Uuid)> = HashSet::new();
+        let mut items: Vec<ActionItem> = Vec::new();
+
+        for result in self.db.scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes()) {
             let (raw_key, _) = result.map_err(|e| {
                 GovernanceError::Internal(format!("Sled scan (assignee idx) failed: {e}"))
             })?;
 
-            // Key format after prefix: "{domain_id}:{item_id}"
-            // Use rsplitn so domain IDs containing ':' are parsed correctly.
-            // UUIDs (item IDs) never contain ':', so splitting from the right
-            // always yields the UUID last.
-            let key_str = std::str::from_utf8(&raw_key).map_err(|e| {
-                GovernanceError::Internal(format!("Invalid UTF-8 in assignee idx key: {e}"))
-            })?;
-            let suffix = key_str.strip_prefix(&prefix).unwrap_or(key_str);
-            let mut parts = suffix.rsplitn(2, ':');
-            let item_id_str = parts.next().unwrap_or("");
-            let domain_id_str = parts.next().unwrap_or("");
-
-            let domain_id = GovernanceDomainId(domain_id_str.to_string());
-            let item_id: ActionItemId = item_id_str.parse().map_err(|e| {
-                GovernanceError::Internal(format!("Invalid item_id in assignee idx: {e}"))
-            })?;
-
-            match self.get(&domain_id, &item_id) {
-                Ok(Some(item)) => items.push(item),
-                Ok(None) => {
-                    // Stale index entry — primary was deleted without cleaning index.
-                    // Skip silently; a background sweep would clean this.
-                    tracing::debug!(
-                        assignee = %assignee.as_str(),
-                        domain = %domain_id_str,
-                        item = %item_id_str,
-                        "stale assignee index entry; primary key not found"
-                    );
+            let parsed = parse_assignee_idx_row(&raw_key);
+            let principal = match parsed.principal {
+                Ok(principal) => principal,
+                Err(defect) => {
+                    note(defect);
+                    continue;
                 }
-                Err(e) => {
-                    return Err(e);
+            };
+            // `Did` equality: the principal, not the spelling (I7, #2686).
+            if principal != *assignee {
+                continue;
+            }
+            let (domain_id, item_id) = match parsed.coordinates {
+                Ok(coordinates) => coordinates,
+                Err(defect) => {
+                    note(defect);
+                    continue;
                 }
+            };
+
+            // An unreadable canonical row refuses; an absent one is a stale
+            // derived row the write protocol can leave behind, and is filtered.
+            let Some(item) = self.get(&domain_id, &item_id)? else {
+                tracing::debug!("stale assignee projection row; canonical action item not found");
+                continue;
+            };
+
+            // The canonical row must be the one the projection named. Without
+            // this a malformed row could attribute one item's facts to another
+            // item's coordinates.
+            if item.domain_id != domain_id || item.id != item_id {
+                note(AssigneeProjectionDefect::PrimaryCoordinatesMismatch);
+                continue;
+            }
+
+            // Canonical state decides the assignment. A row naming a principal
+            // the item is not assigned to is stale — a superseded spelling a
+            // pre-M4c writer leaked, or a reassignment whose cleanup has not
+            // landed — and is filtered rather than refused, because a stale row
+            // is exactly what the write protocol can leave behind and one of
+            // them must not blank a work view. Filtering is also what stops a
+            // planted row manufacturing an assignment.
+            if item.assignee.as_ref() != Some(&principal) {
+                continue;
+            }
+
+            if seen.insert((item.domain_id.0.clone(), item.id.0)) {
+                items.push(item);
             }
         }
 
+        if malformed_rows > 0 {
+            let first_reason = first_defect
+                .map(AssigneeProjectionDefect::label)
+                .unwrap_or("unknown");
+            return Err(GovernanceError::Internal(format!(
+                "action-item assignee projection malformed: {malformed_rows} row(s), \
+                 first: {first_reason}"
+            )));
+        }
+
+        // Order is a function of the data, not of scan or insertion order.
+        items.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.domain_id.0.cmp(&b.domain_id.0))
+                .then_with(|| a.id.0.cmp(&b.id.0))
+        });
         Ok(items)
     }
 
@@ -512,10 +904,18 @@ impl ActionItemStoreBackend for SledActionItemStore {
         Ok(count)
     }
 
+    /// Delete every action item in a domain, and every projection row that
+    /// names one of them.
+    ///
+    /// Canonical rows go first, so a crash can only leave the projection a
+    /// superset. Projection rows are matched by the domain their residual
+    /// names, under any spelling, so alias rows for a deleted item do not
+    /// survive the domain they belonged to.
     fn delete_all(
         &self,
         domain_id: &GovernanceDomainId,
     ) -> std::result::Result<usize, GovernanceError> {
+        let _guard = assignee_projection_write_guard();
         let prefix = Self::domain_prefix(domain_id);
         let mut deleted_count = 0;
 
@@ -535,6 +935,28 @@ impl ActionItemStoreBackend for SledActionItemStore {
             {
                 deleted_count += 1;
             }
+        }
+
+        // The projection rows those canonical rows implied. Left behind they
+        // would be harmless to a read — `list_by_assignee` proves every
+        // candidate against a canonical row that no longer exists — but they
+        // would accumulate without bound and make the projection permanently
+        // un-derivable from canonical state.
+        let projection_rows: Vec<_> = self
+            .db
+            .scan_prefix(Self::ASSIGNEE_IDX_PREFIX.as_bytes())
+            .filter_map(|r| r.ok().map(|(k, _)| k))
+            .filter(|raw_key| {
+                matches!(
+                    parse_assignee_idx_row(raw_key).coordinates,
+                    Ok((ref row_domain, _)) if row_domain == domain_id
+                )
+            })
+            .collect();
+        for row in projection_rows {
+            self.db.remove(row).map_err(|e| {
+                GovernanceError::Internal(format!("Sled assignee-idx delete failed: {e}"))
+            })?;
         }
 
         Ok(deleted_count)
@@ -10691,6 +11113,890 @@ mod tests {
         );
     }
 
+    // ------------------------------------------------------------------------
+    // #2627 M4c — the assignee projection is derived, and is read as such
+    //
+    // Two notions are kept apart throughout. SEMANTIC identity is the decoded
+    // principal, which is what `Did` equality has named since I7 (#2686).
+    // PHYSICAL identity is the exact textual spelling, which is what a stored
+    // projection key is made of. Semantic equality answers "same assignee?";
+    // textual equality answers "same persisted projection key?". Using the
+    // first where the second was required is the I7 regression these fixtures
+    // pin.
+    // ------------------------------------------------------------------------
+
+    /// Two accepted spellings of ONE principal.
+    ///
+    /// `a` is the spelling the mint produces (base58btc); `b` re-encodes the
+    /// same 32 identifier bytes in base16. Both parse, both name one principal
+    /// under `Did` equality, and they are different bytes on disk.
+    fn alias_pair() -> (Did, Did) {
+        let a = fresh_did();
+        let bytes = a.identifier_bytes().expect("mint spelling decodes");
+        let b = Did::from_str(&format!(
+            "did:icn:{}",
+            multibase::encode(multibase::Base::Base16Lower, bytes)
+        ))
+        .expect("a re-encoding of a valid key is a valid DID");
+        assert_eq!(a, b, "alias pair must be one principal under Did equality");
+        assert_ne!(a.as_str(), b.as_str(), "alias pair must be two spellings");
+        (a, b)
+    }
+
+    /// Every raw projection key in the database, in scan order.
+    fn projection_keys(db: &sled::Db) -> Vec<String> {
+        db.scan_prefix(SledActionItemStore::ASSIGNEE_IDX_PREFIX.as_bytes())
+            .map(|r| String::from_utf8_lossy(&r.unwrap().0).into_owned())
+            .collect()
+    }
+
+    fn assigned_item(domain: &GovernanceDomainId, title: &str, assignee: &Did) -> ActionItem {
+        let mut item = ActionItem::new(domain.clone(), title.to_string(), fresh_did(), 1);
+        item.assignee = Some(assignee.clone());
+        item
+    }
+
+    /// The physical model this milestone reasons about, stated as bytes.
+    #[tokio::test]
+    async fn the_projection_row_is_the_spelling_the_canonical_row_carries() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-bytes");
+
+        let item = assigned_item(&domain, "Bytes", &a);
+        store.save(&item).unwrap();
+
+        assert_eq!(
+            projection_keys(&db),
+            vec![format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                item.id.0
+            )],
+            "one row, keyed by the exact stored spelling"
+        );
+        assert_eq!(
+            db.get(
+                format!(
+                    "action_item_by_assignee:{}:{}:{}",
+                    a.as_str(),
+                    domain.0,
+                    item.id.0
+                )
+                .as_bytes()
+            )
+            .unwrap()
+            .unwrap()
+            .as_ref(),
+            b"1",
+            "the value is the sentinel; the fact lives in the canonical row"
+        );
+        assert!(
+            db.get(format!("action_item:{}:{}", domain.0, item.id.0).as_bytes())
+                .unwrap()
+                .is_some(),
+            "canonical row is `action_item:<domain>:<item>`"
+        );
+    }
+
+    /// **Defect-first (physical stale row).** Re-saving one item under a second
+    /// spelling of the SAME principal must retire the first spelling's row.
+    ///
+    /// On unchanged canonical main the writer decided this with
+    /// `existing.assignee != item.assignee` — `Did` equality, so principal
+    /// equality since I7 — which is false for an alias pair. The old row
+    /// survived and the new one was inserted beside it.
+    #[tokio::test]
+    async fn a_spelling_only_reassignment_retires_the_old_projection_row() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-respell");
+
+        let mut item = assigned_item(&domain, "Respell", &a);
+        store.save(&item).unwrap();
+        assert_eq!(projection_keys(&db).len(), 1);
+
+        // Same item, same principal, different spelling.
+        item.assignee = Some(b.clone());
+        store.save(&item).unwrap();
+
+        let keys = projection_keys(&db);
+        assert_eq!(
+            keys.len(),
+            1,
+            "the superseded spelling's row must not survive: {keys:?}"
+        );
+        assert!(
+            keys[0].contains(b.as_str()),
+            "the surviving row is the spelling canonical state now carries"
+        );
+        assert_eq!(
+            store.get(&domain, &item.id).unwrap().unwrap().assignee,
+            Some(b.clone()),
+            "the canonical row is not re-keyed and carries the new spelling verbatim"
+        );
+    }
+
+    /// **Defect-first (alias read miss).** An item assigned under one spelling
+    /// must be found by a query in any other spelling of the same principal.
+    ///
+    /// On unchanged canonical main the reader scanned
+    /// `action_item_by_assignee:<query spelling>:` — an exact-bytes prefix — so
+    /// this returned nothing and `/gov/me/work` told the assignee they had no
+    /// work.
+    #[tokio::test]
+    async fn an_alias_query_finds_an_item_assigned_under_another_spelling() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-alias-read");
+
+        let item = assigned_item(&domain, "Find me", &a);
+        store.save(&item).unwrap();
+
+        let found = store.list_by_assignee(&b).unwrap();
+        assert_eq!(found.len(), 1, "one principal, one item, either spelling");
+        assert_eq!(found[0].id, item.id);
+        assert_eq!(
+            store.list_by_assignee(&a).unwrap().len(),
+            1,
+            "and the minting spelling still finds it"
+        );
+    }
+
+    /// **Defect-first (backend differential).** One trait, one logical query,
+    /// one answer.
+    ///
+    /// `InMemoryActionItemStore::list_by_assignee` compares
+    /// `i.assignee.as_ref() == Some(assignee)` — `Did` equality, principal
+    /// equality since I7 — and returns the item. On unchanged canonical main
+    /// the sled backend missed it, so the two implementations of one trait
+    /// encoded different identity semantics.
+    #[tokio::test]
+    async fn sled_and_in_memory_answer_an_alias_query_alike() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let sled_store = SledActionItemStore::new(db);
+        let mem_store = icn_governance::InMemoryActionItemStore::new();
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-differential");
+
+        let item = assigned_item(&domain, "Same answer", &a);
+        sled_store.save(&item).unwrap();
+        mem_store.save(&item).unwrap();
+
+        let ids = |items: Vec<ActionItem>| {
+            items
+                .into_iter()
+                .map(|i| (i.domain_id.0, i.id.0))
+                .collect::<HashSet<_>>()
+        };
+        for query in [&a, &b] {
+            assert_eq!(
+                ids(sled_store.list_by_assignee(query).unwrap()),
+                ids(mem_store.list_by_assignee(query).unwrap()),
+                "the two backends must agree for every spelling of one principal"
+            );
+        }
+        assert_eq!(
+            sled_store.list_by_assignee(&b).unwrap().len(),
+            1,
+            "and the agreed answer is the item, not the empty set"
+        );
+    }
+
+    /// **Defect-first (projection cannot manufacture work).** A row naming a
+    /// principal the canonical item is not assigned to must yield nothing.
+    ///
+    /// On unchanged canonical main the reader took the coordinates from the row
+    /// and returned whatever primary they named, without ever comparing that
+    /// item's assignee to the query — so a planted or superseded row put
+    /// someone else's obligation in a person's work view.
+    #[tokio::test]
+    async fn a_projection_row_never_manufactures_an_assignment() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let c = fresh_did();
+        let domain = GovernanceDomainId::new("dom-forged");
+
+        // A real item, assigned to C.
+        let item = assigned_item(&domain, "C's obligation", &c);
+        store.save(&item).unwrap();
+
+        // A row claiming it for A.
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                item.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        assert!(
+            store.list_by_assignee(&a).unwrap().is_empty(),
+            "a projection row is evidence, never authority"
+        );
+        assert_eq!(
+            store.list_by_assignee(&c).unwrap().len(),
+            1,
+            "and the real assignee still sees it"
+        );
+    }
+
+    /// **Defect-first (canonical coordinate integrity).** A row whose
+    /// coordinates name a canonical record filed elsewhere must not be read
+    /// through.
+    #[tokio::test]
+    async fn a_projection_row_pointing_at_a_misfiled_canonical_row_refuses() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-misfiled");
+        let elsewhere = GovernanceDomainId::new("dom-elsewhere");
+
+        // A canonical value that states other coordinates than its key.
+        let item = assigned_item(&elsewhere, "Filed elsewhere", &a);
+        let decoy_id = ActionItemId::new();
+        db.insert(
+            format!("action_item:{}:{}", domain.0, decoy_id.0).as_bytes(),
+            icn_encoding::encode_versioned(&item).unwrap(),
+        )
+        .unwrap();
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                decoy_id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        let err = store
+            .list_by_assignee(&a)
+            .expect_err("a row whose canonical evidence is misfiled must refuse");
+        let text = err.to_string();
+        assert!(
+            text.contains("primary-coordinates-mismatch"),
+            "the refusal names the defect class: {text}"
+        );
+        assert!(
+            !text.contains(a.as_str()) && !text.contains("Filed elsewhere"),
+            "and carries no spelling, title or payload: {text}"
+        );
+    }
+
+    /// Historical alias rows for one item yield that item once.
+    ///
+    /// The de-duplication unit is canonical identity `(domain id, item id)`.
+    #[tokio::test]
+    async fn historical_alias_rows_for_one_item_yield_it_once() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-dedup");
+
+        let item = assigned_item(&domain, "One obligation", &b);
+        store.save(&item).unwrap();
+        // The row a pre-M4c writer leaked when the item was re-spelled.
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                item.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+        assert_eq!(
+            projection_keys(&db).len(),
+            2,
+            "two rows, one canonical item"
+        );
+
+        for query in [&a, &b] {
+            let found = store.list_by_assignee(query).unwrap();
+            assert_eq!(found.len(), 1, "one canonical item, once");
+            assert_eq!(found[0].id, item.id);
+        }
+    }
+
+    /// One person legitimately holds many action items, and they stay distinct.
+    ///
+    /// The collision unit is `(principal, domain, item)` — never the principal
+    /// alone.
+    #[tokio::test]
+    async fn two_items_for_one_person_stay_two_items() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let (a, b) = alias_pair();
+        let domain_one = GovernanceDomainId::new("dom-one");
+        let domain_two = GovernanceDomainId::new("dom-two");
+
+        // Same person, two items, and deliberately two different spellings.
+        let first = assigned_item(&domain_one, "First", &a);
+        let second = assigned_item(&domain_two, "Second", &b);
+        store.save(&first).unwrap();
+        store.save(&second).unwrap();
+
+        let found = store.list_by_assignee(&a).unwrap();
+        assert_eq!(found.len(), 2, "two obligations are two obligations");
+        let ids: HashSet<_> = found.iter().map(|i| i.id.0).collect();
+        assert!(ids.contains(&first.id.0) && ids.contains(&second.id.0));
+    }
+
+    /// Control: reassignment to a genuinely different principal is unchanged.
+    #[tokio::test]
+    async fn distinct_principal_reassignment_moves_the_projection_row() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let a = fresh_did();
+        let c = fresh_did();
+        assert_ne!(a, c);
+        let domain = GovernanceDomainId::new("dom-distinct");
+
+        let mut item = assigned_item(&domain, "Hand over", &a);
+        store.save(&item).unwrap();
+        item.assignee = Some(c.clone());
+        store.save(&item).unwrap();
+
+        assert_eq!(projection_keys(&db).len(), 1);
+        assert!(store.list_by_assignee(&a).unwrap().is_empty());
+        assert_eq!(store.list_by_assignee(&c).unwrap().len(), 1);
+        assert_eq!(
+            store.get(&domain, &item.id).unwrap().unwrap().assignee,
+            Some(c)
+        );
+    }
+
+    /// Control: re-saving under the same spelling keeps exactly one row.
+    #[tokio::test]
+    async fn a_same_spelling_resave_keeps_one_projection_row() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-resave");
+
+        let mut item = assigned_item(&domain, "Draft", &a);
+        store.save(&item).unwrap();
+        let before = projection_keys(&db);
+
+        item.title = "Draft (revised)".to_string();
+        store.save(&item).unwrap();
+
+        assert_eq!(projection_keys(&db), before, "byte-identical, one row");
+        assert_eq!(store.list_by_assignee(&a).unwrap().len(), 1);
+    }
+
+    /// Control: unassigning retires the row and leaves no assignee projection.
+    #[tokio::test]
+    async fn unassigning_retires_the_projection_row() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-unassign");
+
+        let mut item = assigned_item(&domain, "Nobody's yet", &a);
+        store.save(&item).unwrap();
+        item.assignee = None;
+        store.save(&item).unwrap();
+
+        assert!(projection_keys(&db).is_empty(), "no assignee, no row");
+        assert!(store.list_by_assignee(&a).unwrap().is_empty());
+        assert!(
+            store.list_by_assignee(&b).unwrap().is_empty(),
+            "and no alias of the former assignee finds it either"
+        );
+        assert!(store.get(&domain, &item.id).unwrap().is_some());
+    }
+
+    /// **Defect-first (delete).** Deleting an item retires every spelling that
+    /// names it, not only the one its current version carries.
+    #[tokio::test]
+    async fn deleting_an_item_retires_every_spelling_of_its_projection() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-delete");
+
+        let item = assigned_item(&domain, "To be deleted", &b);
+        store.save(&item).unwrap();
+        // A historical alias row for the same coordinates.
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                item.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        assert!(store.delete(&domain, &item.id).unwrap());
+        assert!(
+            projection_keys(&db).is_empty(),
+            "no spelling of a deleted item survives: {:?}",
+            projection_keys(&db)
+        );
+        assert!(store.list_by_assignee(&a).unwrap().is_empty());
+        assert!(store.list_by_assignee(&b).unwrap().is_empty());
+    }
+
+    /// A projection row that outlives its canonical row can never manufacture
+    /// work — the pinned property that makes a surviving row harmless.
+    #[tokio::test]
+    async fn a_row_whose_canonical_item_is_gone_yields_nothing() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-orphan");
+        let orphan = ActionItemId::new();
+
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                orphan.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        assert!(
+            store.list_by_assignee(&a).unwrap().is_empty(),
+            "a row with no canonical row behind it is stale, not work"
+        );
+    }
+
+    /// **Defect-first (`delete_all`).** Clearing a domain retires the
+    /// projection rows its items implied.
+    #[tokio::test]
+    async fn delete_all_retires_the_domains_projection_rows() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let cleared = GovernanceDomainId::new("dom-cleared");
+        let kept = GovernanceDomainId::new("dom-kept");
+
+        let doomed = assigned_item(&cleared, "Goes away", &a);
+        let survivor = assigned_item(&kept, "Stays", &a);
+        store.save(&doomed).unwrap();
+        store.save(&survivor).unwrap();
+        // A historical alias row in the cleared domain.
+        db.insert(
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                b.as_str(),
+                cleared.0,
+                doomed.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        assert_eq!(store.delete_all(&cleared).unwrap(), 1);
+
+        let keys = projection_keys(&db);
+        assert_eq!(
+            keys.len(),
+            1,
+            "only the untouched domain's row remains: {keys:?}"
+        );
+        assert!(keys[0].contains(&kept.0));
+        let found = store.list_by_assignee(&a).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, survivor.id);
+    }
+
+    /// A row whose anchor names no principal cannot be attributed away from the
+    /// caller, so it refuses the query rather than shortening the answer.
+    #[tokio::test]
+    async fn an_unattributable_projection_row_refuses_the_query() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-unreadable");
+
+        let item = assigned_item(&domain, "Real work", &a);
+        store.save(&item).unwrap();
+        db.insert(
+            format!(
+                "action_item_by_assignee:did:icn:znotaspelling:{}:{}",
+                domain.0, item.id.0
+            )
+            .as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        let err = store
+            .list_by_assignee(&a)
+            .expect_err("a row naming no principal must not be silently dropped");
+        assert!(
+            err.to_string().contains("anchor-names-no-principal"),
+            "{err}"
+        );
+    }
+
+    /// One person's damaged row must not blank another person's work view.
+    ///
+    /// A row whose anchor names some other principal is ruled out by identity
+    /// alone, so whatever else is wrong with it is not this caller's problem.
+    #[tokio::test]
+    async fn another_persons_damaged_row_does_not_block_a_work_view() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let other = fresh_did();
+        let domain = GovernanceDomainId::new("dom-neighbour");
+
+        let item = assigned_item(&domain, "Mine", &a);
+        store.save(&item).unwrap();
+        // Well-formed anchor naming someone else; residual is nonsense.
+        db.insert(
+            format!("action_item_by_assignee:{}:not-coordinates", other.as_str()).as_bytes(),
+            b"1" as &[u8],
+        )
+        .unwrap();
+
+        let found = store.list_by_assignee(&a).unwrap();
+        assert_eq!(found.len(), 1, "my work is unaffected by their bad row");
+        assert_eq!(found[0].id, item.id);
+        assert!(
+            store.list_by_assignee(&other).is_err(),
+            "and the person the row does name gets a refusal, not a short answer"
+        );
+    }
+
+    /// The residual is opaque: a domain id that itself spells a DID is a domain
+    /// id, never a second principal.
+    #[tokio::test]
+    async fn a_domain_id_that_spells_a_did_is_not_read_as_identity() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let (a, b) = alias_pair();
+        let impostor = fresh_did();
+        // A domain id chosen by whoever created the item — colons and all.
+        let domain = GovernanceDomainId::new(format!("{}:local", impostor.as_str()));
+
+        let item = assigned_item(&domain, "Colon domain", &a);
+        store.save(&item).unwrap();
+
+        assert_eq!(
+            store.list_by_assignee(&b).unwrap().len(),
+            1,
+            "the anchor is the assignee, and the alias query still finds it"
+        );
+        assert!(
+            store.list_by_assignee(&impostor).unwrap().is_empty(),
+            "the principal spelled inside the domain id is assigned nothing"
+        );
+    }
+
+    /// Sibling isolation: the projection namespace and the canonical namespace
+    /// are disjoint, and a projection scan never reaches a canonical row.
+    #[tokio::test]
+    async fn the_projection_namespace_does_not_claim_canonical_rows() {
+        let domain = GovernanceDomainId::new("dom-sibling");
+        let id = ActionItemId::new();
+        let canonical = SledActionItemStore::item_key(&domain, &id);
+        assert!(
+            !canonical.starts_with(SledActionItemStore::ASSIGNEE_IDX_PREFIX),
+            "`action_item:` is not inside `action_item_by_assignee:`"
+        );
+        assert!(
+            !SledActionItemStore::ASSIGNEE_IDX_PREFIX.starts_with("action_item:"),
+            "and the reverse containment does not hold either"
+        );
+    }
+
+    /// The save path refuses rather than treating an undecodable canonical row
+    /// as absent — "absent" would strand that version's projection row.
+    #[tokio::test]
+    async fn a_save_over_an_unreadable_canonical_row_refuses() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-corrupt");
+        let item = assigned_item(&domain, "Over corruption", &a);
+
+        db.insert(
+            format!("action_item:{}:{}", domain.0, item.id.0).as_bytes(),
+            b"not an encoded action item" as &[u8],
+        )
+        .unwrap();
+
+        assert!(
+            store.save(&item).is_err(),
+            "canonical evidence is read before a byte moves"
+        );
+        assert!(
+            projection_keys(&db).is_empty(),
+            "and the refusal leaves the projection untouched"
+        );
+    }
+
+    /// The projection is recomputable from canonical state, which is what makes
+    /// it derived rather than authoritative.
+    #[tokio::test]
+    async fn rebuild_makes_the_projection_equal_to_canonical_state() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-rebuild");
+
+        let item = assigned_item(&domain, "Canonical", &a);
+        store.save(&item).unwrap();
+        // A superseded alias row, an orphan row, and a row nobody can parse.
+        for key in [
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                b.as_str(),
+                domain.0,
+                item.id.0
+            ),
+            format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                ActionItemId::new().0
+            ),
+            format!("action_item_by_assignee:{}:garbage", a.as_str()),
+        ] {
+            db.insert(key.as_bytes(), b"1" as &[u8]).unwrap();
+        }
+
+        let report = store.rebuild_assignee_index().unwrap();
+        assert_eq!(report.kept, 1);
+        assert_eq!(report.added, 0);
+        assert_eq!(report.removed_stale, 2, "the alias row and the orphan");
+        assert_eq!(report.removed_malformed, 1);
+        assert_eq!(
+            projection_keys(&db),
+            vec![format!(
+                "action_item_by_assignee:{}:{}:{}",
+                a.as_str(),
+                domain.0,
+                item.id.0
+            )],
+            "exactly what the canonical rows imply, in their stored spelling"
+        );
+
+        // Idempotent, and it can also restore a row that was lost.
+        let second = store.rebuild_assignee_index().unwrap();
+        assert_eq!(
+            (
+                second.kept,
+                second.added,
+                second.removed_stale,
+                second.removed_malformed
+            ),
+            (1, 0, 0, 0)
+        );
+        db.remove(projection_keys(&db)[0].as_bytes()).unwrap();
+        assert_eq!(store.rebuild_assignee_index().unwrap().added, 1);
+        assert_eq!(store.list_by_assignee(&b).unwrap().len(), 1);
+    }
+
+    /// The rebuild refuses before mutating when canonical evidence is
+    /// unreadable: skipping a row would call its real projection rows stale.
+    #[tokio::test]
+    async fn a_rebuild_over_an_unreadable_canonical_row_refuses() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db.clone());
+        let (a, _b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-rebuild-refuse");
+
+        let item = assigned_item(&domain, "Good", &a);
+        store.save(&item).unwrap();
+        let before = projection_keys(&db);
+        db.insert(
+            format!("action_item:{}:{}", domain.0, ActionItemId::new().0).as_bytes(),
+            b"corrupt" as &[u8],
+        )
+        .unwrap();
+
+        assert!(store.rebuild_assignee_index().is_err());
+        assert_eq!(projection_keys(&db), before, "nothing moved");
+    }
+
+    /// The namespace lock's polarity, read from the lock itself rather than
+    /// from timing: readers share, a writer excludes everyone.
+    #[test]
+    fn the_projection_namespace_lock_shares_reads_and_excludes_writes() {
+        let read = assignee_projection_read_guard();
+        assert!(
+            ASSIGNEE_PROJECTION_LOCK.try_read().is_ok(),
+            "two by-assignee lookups must not queue behind each other"
+        );
+        assert!(
+            ASSIGNEE_PROJECTION_LOCK.try_write().is_err(),
+            "a save must not commit halfway through a lookup's scan"
+        );
+        drop(read);
+
+        let write = assignee_projection_write_guard();
+        assert!(
+            ASSIGNEE_PROJECTION_LOCK.try_read().is_err(),
+            "a lookup must not straddle a save's projection maintenance"
+        );
+        drop(write);
+    }
+
+    /// A re-spelling save concurrent with alias lookups never blanks a work
+    /// view.
+    ///
+    /// This is the hazard the namespace lock exists for. `scan_prefix` is not a
+    /// snapshot: its iterator takes a read lock once per item, so a commit that
+    /// lands partway through the scan is visible to the rows not yet visited
+    /// and invisible to the ones already collected. A save that only re-spells
+    /// one assignee retires `…:<old>:<D>:<I>` and writes `…:<new>:<D>:<I>`, and
+    /// an unguarded scan that passed the new row's position before the commit
+    /// and reached the old row's position after it collects neither — reporting
+    /// the item absent from a person's work when it is assigned to them before,
+    /// during and after. Canonical verification filters stale rows; it cannot
+    /// recover a row the scan never saw.
+    ///
+    /// This is a stress fixture, not a proof: it exercises a real interleaving
+    /// rather than forcing one, so a pass is evidence that the guard holds
+    /// under load and not a demonstration that no interleaving exists. What is
+    /// deterministic is the lock polarity pinned above and the fact that both
+    /// paths take the guard.
+    ///
+    /// It does discriminate: with the read guard removed from
+    /// `list_by_assignee` and nothing else changed, this fixture reproduced the
+    /// blanked work view in 5 of 6 runs on the development host.
+    #[test]
+    fn a_respelling_save_concurrent_with_alias_lookups_never_blanks_a_work_view() {
+        use icn_governance::ActionItemStoreBackend;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let (db, _dir) = sled_db_tmp();
+        let store = Arc::new(SledActionItemStore::new(db));
+        let (a, b) = alias_pair();
+        let domain = GovernanceDomainId::new("dom-concurrent");
+
+        // Enough unrelated rows that a scan has somewhere to straddle.
+        for n in 0..64 {
+            let other = fresh_did();
+            store
+                .save(&assigned_item(&domain, &format!("noise-{n}"), &other))
+                .unwrap();
+        }
+        let item = assigned_item(&domain, "Always assigned", &a);
+        store.save(&item).unwrap();
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let readers: Vec<_> = [a.clone(), b.clone()]
+            .into_iter()
+            .map(|query| {
+                let store = Arc::clone(&store);
+                let stop = Arc::clone(&stop);
+                let expected = item.id.clone();
+                std::thread::spawn(move || {
+                    let mut observations = 0usize;
+                    while !stop.load(Ordering::Relaxed) {
+                        let found = store.list_by_assignee(&query).unwrap();
+                        assert_eq!(
+                            found.iter().filter(|i| i.id == expected).count(),
+                            1,
+                            "the item is assigned to this principal throughout; a \
+                             lookup must never report it absent or twice"
+                        );
+                        observations += 1;
+                    }
+                    observations
+                })
+            })
+            .collect();
+
+        let mut item = item;
+        for round in 0..200 {
+            item.assignee = Some(if round % 2 == 0 { b.clone() } else { a.clone() });
+            store.save(&item).unwrap();
+        }
+        stop.store(true, Ordering::Relaxed);
+
+        let observations: usize = readers.into_iter().map(|h| h.join().unwrap()).sum();
+        assert!(
+            observations > 0,
+            "the readers must actually have run: {observations}"
+        );
+        assert_eq!(
+            projection_keys(store.db.as_ref()).len(),
+            65,
+            "and every re-spelling left exactly one row for the item"
+        );
+    }
+
+    /// Production route (read): `/gov/me/work` and `/gov/digest` are answered
+    /// for the caller's principal, not for the spelling in their token.
+    #[tokio::test]
+    async fn my_work_and_digest_answer_for_the_principal_not_the_spelling() {
+        let (db, _dir) = sled_db_tmp();
+        let (mut mgr, domain_id, _member) = make_manager_with_domain().await;
+        mgr.set_action_item_store(Box::new(SledActionItemStore::new(db)));
+        let (a, b) = alias_pair();
+
+        let mut item = ActionItem::new(
+            domain_id.clone(),
+            "Write minutes".to_string(),
+            fresh_did(),
+            1_000,
+        );
+        item.assignee = Some(a.clone());
+        item.due_date = Some(1_500);
+        mgr.action_items.save(&item).unwrap();
+
+        // The seam `GET /gov/me/work` calls, with the caller authenticated
+        // under the other spelling of the same person.
+        let work = mgr
+            .list_work_for_person(&b, &icn_governance::ActionItemFilter::default())
+            .unwrap();
+        assert_eq!(work.len(), 1, "my work is my work under either spelling");
+        assert_eq!(work[0].id, item.id);
+
+        // And the seam `GET /gov/digest` calls.
+        let digest = mgr.generate_digest(&b, 2_000).await;
+        assert_eq!(digest.overdue_item_count, 1);
+        assert_eq!(digest.overdue_items[0].title, "Write minutes");
+    }
     // =========================================================================
     // Program ↔ Activity consistency tests
     // =========================================================================
