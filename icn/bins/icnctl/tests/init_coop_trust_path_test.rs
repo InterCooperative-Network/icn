@@ -69,6 +69,15 @@ fn init_identity(data_dir: &Path) -> Output {
 fn run_init_coop(data_dir: &Path, member: &Did) -> Output {
     Command::new(icnctl_bin())
         .env("ICN_KEYSTORE_PASSPHRASE", PASSPHRASE)
+        // Step 6 probes `$ICN_GATEWAY/v1/health` (default `localhost:8080`) and,
+        // if `ICN_TOKEN` is set, POSTs a governance domain to it. A unit test
+        // must not create real state on whatever happens to be listening on a
+        // developer machine or a CI runner, so the gateway is pointed at a port
+        // nothing can be serving and the token is removed from the inherited
+        // environment. Step 7 — the step under test — runs either way, and this
+        // also drops the 3s health-check timeout from every run.
+        .env("ICN_GATEWAY", "http://127.0.0.1:1")
+        .env_remove("ICN_TOKEN")
         .arg("--data-dir")
         .arg(data_dir)
         .args([
@@ -152,7 +161,15 @@ fn init_coop_does_not_materialise_a_sled_database_at_the_store_root() {
     let member = fresh_did();
     assert!(init_identity(dir.path()).status.success());
 
-    run_init_coop(dir.path(), &member);
+    let out = run_init_coop(dir.path(), &member);
+    let text = combined(&out);
+    // Guard, for the same reason the sibling test has one: if the wizard failed
+    // before step 7 it would write nothing under `<data_dir>/store` at all, and
+    // both assertions below would pass while proving nothing.
+    assert!(
+        text.contains("Trust edges created"),
+        "the wizard must reach step 7 for this test to mean anything:\n{text}"
+    );
 
     let root = store_root(dir.path());
     for artifact in ["db", "conf"] {

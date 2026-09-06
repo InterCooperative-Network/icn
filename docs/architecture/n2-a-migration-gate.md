@@ -1230,7 +1230,9 @@ carry no `required-features`; that is recorded as debt below, not treated as rea
 the gate call, but is *invoked* after it, and a refusal propagates out of `main`. Line order is not
 call order; the ordering is correct.
 
-**The bypass, reproduced.** `icnctl init-coop` runs `create_dir_all(<data_dir>/store)`,
+**The bypass, reproduced** (as `init-coop` stood at M4d; its path was corrected in #2718, which does
+not change what this evidence showed about gate coverage). `icnctl init-coop` ran
+`create_dir_all(<data_dir>/store)`,
 `SledStore::open` on it, and `TrustGraph::add_edge` — writing `trust/edges/`, a **registered**
 keyspace whose basis is `AwaitingDomainSignOff`, so a collision there fails closed however its
 disposition reads. On a real sled fixture holding an alias pair, the gate **refused** the data
@@ -1296,11 +1298,13 @@ every §11 disposition are untouched, and no readiness classification moves.
 - **`icnctl` is not proven exhaustively gated.** Four handlers are covered. Other subcommands touch
   the age keystore, snapshot files and backup archives; those are not sled and not N2-A-governed, and
   were not audited for other properties.
-- **`icnd` opens `<data_dir>/store/trust`; `icnctl init-coop` opens `<data_dir>/store` itself** as a
-  separate sibling sled database. The trust edges `init-coop` reports creating are therefore never
-  read by the daemon. That is a pre-existing functional defect, found while comparing call paths,
-  and is **recorded here rather than fixed** — repairing it changes `init-coop` semantics and belongs
-  to whoever owns that command.
+- ~~**`icnd` opens `<data_dir>/store/trust`; `icnctl init-coop` opens `<data_dir>/store` itself**~~
+  **— fixed in #2718.** M4d recorded this rather than fixing it: the wizard wrote its bootstrap trust
+  edges into a sibling sled database the daemon never reads, so it reported edges the node never saw.
+  The repair gave the layout an owner — `icn_core::config::trust_store_path` — that `icnd` and
+  `icnctl` both resolve through, instead of a documented convention plus a literal per caller.
+  Already-provisioned data directories keep their edges stranded in the old sibling database;
+  nothing migrates a row.
 - **The restart helpers remain ungated and unrestricted.** They are test-only by evidence, but they
   are ordinary `[[bin]]` targets with no `required-features`, so `cargo build --bins` produces them.
   The root `Dockerfile` builds them and copies only `icnd`/`icnctl`; `deploy/Dockerfile.icnd` avoids
