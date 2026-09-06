@@ -1,7 +1,7 @@
 ---
 Status: normative
 Canonical: yes
-Last Reviewed: 2026-08-18
+Last Reviewed: 2026-09-06
 ---
 
 # Identity Semantics — the N2 semantic contract
@@ -499,9 +499,21 @@ them all at once.
 
 The other three prerequisites — migration ordering, alias/transition
 recognition, final cutover — remain undesigned, and **no persisted vote or
-membership key has been re-keyed**. Membership lists are still compared by DID
-spelling; under a static list an alias spelling is refused at the membership
-gate, which is fail-closed but is not yet alias recognition.
+membership key has been re-keyed**.
+
+In-memory membership *comparison* is a separate matter from the persisted
+*keys* this gate governs, and it has moved. Since I7 landed (#2686), `Did`
+equality is principal equality, so a static membership list — a `Vec<Did>`
+tested with `contains` — now admits **any** accepted spelling of a listed
+member. A previous revision of this section stated that an alias spelling is
+refused at the membership gate and called that fail-closed; that described
+pre-I7 behaviour and is no longer true.
+
+This does not narrow the gate. Admitting an alias of a genuine member is the
+correct reading of principal equality, and it is why the three remaining
+prerequisites still matter: recognition at the comparison boundary is not
+migration of the persisted keyspace, and nothing above re-keys a stored
+membership or vote row.
 
 ---
 

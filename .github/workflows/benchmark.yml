@@ -145,7 +145,7 @@ jobs:
 
           # Count only Criterion's explicit regression verdict. Do not match confidence-interval
           # lines like `change: [-0.5% -0.2% +0.03%]` — the positive upper bound is not a regression.
-          REGRESSION_COUNT=$(grep -ciF "Performance has regressed" bench_output.txt || echo "0")
+          REGRESSION_COUNT=$(grep -ciF "Performance has regressed" bench_output.txt || true)
 
           if [ "$REGRESSION_COUNT" -gt 0 ]; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
