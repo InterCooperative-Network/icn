@@ -1210,7 +1210,7 @@ evidence rather than by name:
 | Binary | Class | Opens governed state | Gate before M4d |
 |---|---|---|---|
 | `icnd` | production | yes | **yes** |
-| `icnctl` | operator | yes — 10 `SledStore::open` sites in 6 functions | **no** |
+| `icnctl` | operator | yes — 9 `SledStore::open` sites in 7 functions | **no** |
 | `icn-console` | network client | **no** — single file, zero `icn_*` use; its `icn-store`/`icn-trust` deps are unused manifest edges | n/a |
 | `did-collision-scan` | scanner / safety tooling | yes, deliberately | no — and correctly so (below) |
 | `commons_restart_helper` | test-only | via `CommonsHandle::with_sled_path` | no |
@@ -1255,12 +1255,30 @@ maintenance, `treasury` maintenance, and `verify-backup --verify-ledger` (whose 
 data directory like any other — a backup whose ledger the gate would refuse is not one the command
 should call safely restorable). Store-construction enforcement inside `SledStore::open` was rejected:
 the gate itself opens stores that way and would recurse, and it would break the scanner. Pasting the
-call at each of the ten open sites was rejected too — the gate's unit is a *directory*, not a file.
+call at each of the nine open sites was rejected too — the gate's unit is a *directory*, not a file.
 
-Two consequences are stated rather than hidden. The gate writes its own receipt, so commands
-documented as read-only now leave that one file — the gate's record of what it inspected, never a
-domain-store write. And the gate takes each sled root's exclusive lock while auditing, so a running
-daemon makes it refuse; the refusal text keeps the existing "stop the daemon first" guidance.
+Three consequences are stated rather than hidden.
+
+*The receipt.* The gate writes its own `n2a-startup-gate.json`, so commands documented as read-only
+now leave that one file — the gate's record of what it inspected, never a domain-store write. The
+three `--help` strings that said "Writes nothing" now say what is actually true.
+
+*The lock.* The gate takes each sled root's exclusive lock while auditing, so a running daemon makes
+it refuse. That refusal is `StoreUnverifiable`, **not** `Blocked`, and the two must not be reported
+alike: only `Blocked` means the directory holds colliding rows, and telling an operator whose real
+mistake was leaving the daemon up to go hunting for an alias pair is a wrong answer delivered
+confidently. `enforce_n2a_gate` branches on the variant, and a fixture pins that a non-collision
+refusal never claims the collision cause.
+
+*The scope of the read.* The gate's unit is the **directory**, so a command that previously opened
+only `<data_dir>/store/cooperative` now opens, sled-recovers and row-scans *every* database beneath
+the data directory. Two effects follow: an unopenable unrelated store now fails a command that had no
+interest in it, and runtime becomes proportional to total rows across all stores on every gated
+invocation. The gate module's own justification — that its opens cost nothing because "the daemon
+would perform sled recovery moments later anyway" — is true for `icnd` and does **not** transfer to a
+CLI run with the daemon stopped. This is accepted rather than optimised: every one of those stores is
+one `icnd` already refuses to start over, so nothing is being rejected that a running deployment
+could have.
 
 **The scanner exemption is named, not accidental.** `did-collision-scan` must reach state the gate
 refuses — an operator handed a refusal is told to run exactly it for the row-level report. It is not
@@ -1292,9 +1310,22 @@ every §11 disposition are untouched, and no readiness classification moves.
   still hand a caller-supplied `sled::Db` to any store constructor without a path the gate could have
   discovered. No production entrypoint reaches them ungated today, and closing them would require a
   typed gated-handle capability — evaluated and deliberately not built here.
+- **`verify-backup` gates only under `--verify-ledger`.** Plain `icnctl verify-backup` still prints
+  "This backup can be safely restored" without auditing the restored tree. Widening it would change
+  what the bare command means, so it is recorded here instead.
+- **A pre-existing `verify-backup` path bug, found while placing that gate.**
+  `verify_ledger_in_backup` looks for `<restore_dir>/ledger`, but `backup` archives the data
+  directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check has
+  therefore been a no-op, printing "No ledger database found (may be new node)" for backups that do
+  contain stores. M4d does not fix it — the gate call added beside it recurses through
+  `find_sled_roots` and does reach the real stores, but that is a side effect, not a repair, and
+  correcting the path belongs to whoever owns that command.
 - **The identity-base delimiter hazard is untouched.** M4c proved an accepted DID spelling can carry
   `:` or `/`; `Did::from_str` is not changed here, and other delimiter-framed keyspaces remain
   unaudited.
+- **`icnctl` calls `enforce` on the runtime thread**, where `icnd` wraps it in `spawn_blocking`. In a
+  CLI nothing else is scheduled at that point, so it is harmless; the asymmetry is noted so it does
+  not read as an oversight.
 
 ## 11. Persistence-boundary classes — what the common scanner proves, and what it cannot
 

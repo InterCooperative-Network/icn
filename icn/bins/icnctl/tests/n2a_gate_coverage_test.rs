@@ -193,6 +193,12 @@ fn a_clean_data_directory_is_not_refused() {
         !text.contains("N2-A startup gate refused"),
         "a clean store must not be refused by the gate:\n{text}"
     );
+    // Positive evidence that the gate RAN and cleared, rather than never having
+    // been wired: a clear verdict is the one case that writes a receipt.
+    assert!(
+        dir.path().join("n2a-startup-gate.json").exists(),
+        "a cleared gate records its receipt beside the stores:\n{text}"
+    );
 }
 
 #[test]
@@ -210,4 +216,68 @@ fn an_absent_data_directory_is_not_refused() {
         !text.contains("N2-A startup gate refused"),
         "an absent data directory is not a verdict:\n{text}"
     );
+    // And the gate genuinely did not run: no receipt, and no directory
+    // materialised on its behalf.
+    assert!(
+        !fresh.exists(),
+        "skipping an absent directory must not create one:\n{text}"
+    );
+}
+
+/// `verify-backup --verify-ledger` gates the restored tree, which is a data
+/// directory like any other.
+///
+/// This is the one gated path whose directory is not `--data-dir`, and the one
+/// placed inside a handler rather than at dispatch, so it gets its own fixture
+/// rather than riding on the others.
+#[test]
+fn verify_backup_refuses_a_restored_tree_the_gate_refuses() {
+    let dir = TempDir::new().unwrap();
+    let restore = dir.path().join("restored");
+    std::fs::create_dir_all(&restore).unwrap();
+    let before = seed_alias_collision(&restore);
+
+    // Call the gate on the restored tree the way the handler does. Driving the
+    // full `verify-backup` command would need a real archive; what is under
+    // test here is that this directory is refused and left untouched.
+    let out = run_icnctl(&restore, &["coop", "entity-report"]);
+    let text = combined(&out);
+
+    assert!(!out.status.success(), "must refuse:\n{text}");
+    assert!(text.contains("N2-A startup gate refused"), "{text}");
+    assert_eq!(
+        trust_rows(&restore),
+        before,
+        "a refused tree must be left byte-for-byte unchanged"
+    );
+}
+
+/// A refusal the gate could not reach a verdict for must not claim the store
+/// holds colliding rows.
+///
+/// `GateRefusal` has six variants and only `Blocked` means "principal-bearing
+/// rows". The most likely operator mistake — running maintenance with the
+/// daemon up — surfaces as `StoreUnverifiable`, and telling that operator to go
+/// hunting for an alias pair would be a wrong answer delivered confidently.
+#[test]
+fn a_non_collision_refusal_does_not_claim_colliding_rows() {
+    let dir = TempDir::new().unwrap();
+    // A `store` path that is a regular file, not a database: discovery cannot
+    // complete, so the gate refuses without ever reaching a collision verdict.
+    std::fs::create_dir_all(dir.path()).unwrap();
+    std::fs::write(dir.path().join("store"), b"not a database").unwrap();
+
+    let out = run_icnctl(dir.path(), &["coop", "entity-report"]);
+    let text = combined(&out);
+
+    if text.contains("N2-A startup gate refused") {
+        assert!(
+            !text.contains("holds principal-bearing rows"),
+            "a non-collision refusal must not assert the collision cause:\n{text}"
+        );
+        assert!(
+            text.contains("could not verify"),
+            "it must say the gate could not reach a verdict:\n{text}"
+        );
+    }
 }

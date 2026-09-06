@@ -229,7 +229,9 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum CoopMaintenanceCommands {
     /// Read-only inventory of cooperative IDs against the canonical
-    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Writes nothing.
+    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Binds nothing and writes no
+    /// store row; the N2-A gate it runs first leaves its own receipt beside the
+    /// stores (#2627 M4d).
     ///
     /// Classifies each stored cooperative ID as already-bound,
     /// mappable-unbound, mappable-reverse-conflict, non-mappable, or
@@ -247,7 +249,9 @@ enum CoopMaintenanceCommands {
     },
 
     /// Read-only report of `UnknownLegacy` / untrusted `coop_id` ↔ `EntityId`
-    /// bindings that would be repair candidates (#2082 lane). Writes nothing.
+    /// bindings that would be repair candidates (#2082 lane). Binds nothing and
+    /// writes no store row; the N2-A gate it runs first leaves its own receipt
+    /// beside the stores (#2627 M4d).
     ///
     /// Looks inside the *bound* rows and classifies each stored cooperative ID
     /// as trusted, not-bound, untrusted-provenance (`UnknownLegacy`),
@@ -291,7 +295,9 @@ enum CoopMaintenanceCommands {
 enum TreasuryMaintenanceCommands {
     /// Read-only plan of which legacy treasuries (`entity_id: None`) could have
     /// their `entity_id` populated from a trusted, non-ambiguous `coop_id` ↔
-    /// `EntityId` binding (#2082 lane). Writes nothing.
+    /// `EntityId` binding (#2082 lane). Binds nothing and writes no store row; the
+    /// N2-A gate it runs first leaves its own receipt beside the stores
+    /// (#2627 M4d).
     ///
     /// Hydrates treasuries from the local ledger store and classifies each as
     /// would-populate, already-bound, no-mapping, untrusted-provenance,
@@ -2261,17 +2267,32 @@ fn enforce_n2a_gate(dir: &Path, what: &str) -> Result<()> {
     }
     icn_store::n2a_startup_gate::enforce(dir, std::time::SystemTime::now())
         .map(|_| ())
-        .map_err(anyhow::Error::new)
-        .with_context(|| {
-            format!(
-                "N2-A startup gate refused {what} at {} — this data directory holds \
-                 principal-bearing rows a key-equality binary cannot open safely. \
-                 If the daemon is running, stop it first (the gate needs the same \
-                 exclusive lock). Run `did-collision-scan` on this directory for the \
-                 row-level report; disposition belongs to the domain that owns the \
-                 keyspace (#2627).",
-                dir.display()
-            )
+        .map_err(|refusal| {
+            // Only `Blocked` means "this directory holds principal-bearing rows".
+            // The other variants mean the gate could not reach a verdict at all —
+            // most often because the daemon is running and holds the same
+            // exclusive lock the audit needs, which is the likeliest operator
+            // mistake here and used to produce a clear "stop the daemon first"
+            // message. Asserting the collision cause for every variant would
+            // send an operator hunting for an alias pair that does not exist.
+            let headline = match &refusal {
+                icn_store::n2a_startup_gate::GateRefusal::Blocked { .. } => format!(
+                    "N2-A startup gate refused {what} at {}: this data directory holds \
+                     principal-bearing rows a key-equality binary cannot open safely. \
+                     Run `did-collision-scan` on this directory for the row-level \
+                     report; disposition belongs to the domain that owns the keyspace \
+                     (#2627).",
+                    dir.display()
+                ),
+                _ => format!(
+                    "N2-A startup gate refused {what} at {}: the gate could not verify \
+                     this data directory, so it refuses rather than guess. If the daemon \
+                     is running, stop it first — the audit needs the same exclusive lock. \
+                     The cause below says which check could not complete (#2627).",
+                    dir.display()
+                ),
+            };
+            anyhow::Error::new(refusal).context(headline)
         })
 }
 
