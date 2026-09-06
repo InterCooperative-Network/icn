@@ -3320,7 +3320,7 @@ async fn main() -> Result<()> {
             yes,
             no_start,
         } => {
-            // Opens `<data_dir>/store` and writes trust edges; gate first.
+            // Opens `<data_dir>/store/trust` and writes trust edges; gate first (#2718).
             enforce_n2a_gate(&data_dir, "init-coop")?;
             handle_init_coop_command(&data_dir, name, members, yes, no_start).await?
         }
@@ -8191,35 +8191,19 @@ async fn handle_init_coop_command(
         println!("Step 1: Creating new identity");
         std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
-        // The identity-reuse branch above already resolves the passphrase through
-        // `read_passphrase`, which honours ICN_KEYSTORE_PASSPHRASE. This branch used
-        // `rpassword` directly, so creating a *new* identity demanded a TTY even under
-        // `--yes` -- the wizard could not run unattended, and its trust-persistence
-        // contract could not be exercised end to end (#2718).
-        let passphrase1 = match passphrase_from_env() {
-            // Confirming an environment variable against itself proves nothing, so the
-            // second prompt is skipped rather than answered twice.
-            Some(from_env) => from_env,
-            None => {
-                print!("Choose a passphrase: ");
-                io::stdout().flush()?;
-                let first = rpassword::read_password()?;
-
-                print!("Confirm passphrase: ");
-                io::stdout().flush()?;
-                let second = rpassword::read_password()?;
-
-                if first != second {
-                    bail!("Passphrases do not match");
-                }
-                first
-            }
-        };
-        if passphrase1.len() < 8 {
+        // Resolve through the shared helper, which honours ICN_KEYSTORE_PASSPHRASE --
+        // the same variable `icnd` reads -- and otherwise prompts and confirms. This
+        // branch previously called `rpassword` directly, so creating a *new* identity
+        // demanded a TTY even under `--yes`: the wizard could not run unattended and its
+        // trust-persistence contract could not be exercised end to end (#2718). The
+        // identity-reuse branch above already went through the same helper family;
+        // spelling the rule a third time here is the drift this change exists to remove.
+        let resolved = confirm_passphrase()?;
+        if resolved.len() < 8 {
             bail!("Passphrase must be at least 8 characters");
         }
 
-        let passphrase = Zeroizing::new(passphrase1.into_bytes());
+        let passphrase = Zeroizing::new(resolved);
 
         // Initialize keystore (generates keypair internally)
         let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;

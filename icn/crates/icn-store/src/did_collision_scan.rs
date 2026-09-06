@@ -2975,9 +2975,9 @@ mod tests {
         let base = tempfile::tempdir().unwrap();
         let data_dir = base.path();
 
-        // `store/` is itself a database (as `icnctl init-coop` leaves it), and
-        // holds a database, a non-database directory, and a database nested
-        // inside a non-database; one more database sits at the data-dir level.
+        // `store/` is itself a database here -- a deliberately hostile shape, not one
+        // any command still produces -- and holds a database, a non-database directory,
+        // and a database nested inside a non-database; one more sits at the data-dir level.
         for rel in [
             "store",
             "store/ledger",

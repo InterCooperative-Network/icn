@@ -1296,11 +1296,14 @@ every §11 disposition are untouched, and no readiness classification moves.
 - **`icnctl` is not proven exhaustively gated.** Four handlers are covered. Other subcommands touch
   the age keystore, snapshot files and backup archives; those are not sled and not N2-A-governed, and
   were not audited for other properties.
-- **`icnd` opens `<data_dir>/store/trust`; `icnctl init-coop` opens `<data_dir>/store` itself** as a
-  separate sibling sled database. The trust edges `init-coop` reports creating are therefore never
-  read by the daemon. That is a pre-existing functional defect, found while comparing call paths,
-  and is **recorded here rather than fixed** — repairing it changes `init-coop` semantics and belongs
-  to whoever owns that command.
+- **`icnctl init-coop` wrote trust edges the daemon never read — FIXED in #2724 (#2718).** This
+  section previously recorded, as live debt, that `icnd` opened `<data_dir>/store/trust` while
+  `init-coop` opened `<data_dir>/store` itself as a separate sibling sled database, so the edges
+  the wizard reported creating were never read. That is no longer true: the trust subdirectory now
+  has a single owner (`icn_core::config::TRUST_STORE_SUBDIR` / `Config::trust_store_path`), and both
+  binaries resolve through it. **Historical edges already stranded in `<data_dir>/store` by an
+  earlier `init-coop` are not migrated** — they were never readable by the daemon, so nothing
+  observable regresses, but no recovery is claimed either.
 - **The restart helpers remain ungated and unrestricted.** They are test-only by evidence, but they
   are ordinary `[[bin]]` targets with no `required-features`, so `cargo build --bins` produces them.
   The root `Dockerfile` builds them and copies only `icnd`/`icnctl`; `deploy/Dockerfile.icnd` avoids
