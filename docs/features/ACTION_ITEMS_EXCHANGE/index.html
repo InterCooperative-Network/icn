@@ -154,9 +154,15 @@ ListingInterest {
 <ul>
 <li>Listings: <code>v1:listing:{id}</code></li>
 <li>Interests: <code>v1:interest:{listing_id}:{interest_id}</code></li>
-<li>Interest Index: <code>v1:interest_idx:{listing_id}:{from_did}</code> (for duplicate prevention)</li>
+<li>Interest Index: <code>v1:interest_idx:{listing_id}:{from_did}</code> (uniqueness lock; the value is a
+constant sentinel, not the interest id)</li>
 </ul>
-<p>The interest index enables atomic duplicate detection using Sled&#39;s compare-and-swap operation.</p>
+<p>The interest index is claimed with Sled&#39;s compare-and-swap, which decides the same-spelling race
+atomically. It does <strong>not</strong> decide duplication on its own: a <code>did:icn:</code> identifier has many accepted
+spellings of the same key bytes, so the index key answers &quot;has this <em>spelling</em> claimed the listing&quot;.
+The duplicate decision is made against the canonical <code>v1:interest:</code> rows, whose <code>from_did</code> compares
+by principal, and the CAS is retained behind that check (#2627 M4b — see
+<code>docs/architecture/n2-a-migration-gate.md</code> §11.9).</p>
 <h3 id="authorization-1">Authorization</h3>
 <table>
 <thead>
@@ -202,7 +208,9 @@ let owned_listing_ids: Vec&lt;ListingId&gt; = listings
 let interest_counts = mgr.get_interest_counts(&amp;owned_listing_ids);
 </code></pre>
 <h3 id="race-condition-prevention">Race Condition Prevention</h3>
-<p>Duplicate interest prevention uses atomic operations:</p>
+<p>Duplicate interest prevention is one interest per <strong>principal</strong> per listing. Both backends decide
+it by comparing <code>Did</code> values — principal equality, not spelling equality — and serialise the
+decision with the write:</p>
 <p><strong>In-Memory Store</strong>: Check and insert under single write lock</p>
 <pre><code class="language-rust">let mut interests = self.interests.write()?;
 let existing = interests.entry(listing_id).or_default();
@@ -212,14 +220,27 @@ if existing.iter().any(|i| &amp;i.from_did == from_did) {
 existing.push(interest.clone());
 Ok(true)
 </code></pre>
-<p><strong>Sled Store</strong>: Compare-and-swap on index key</p>
-<pre><code class="language-rust">let index_key = format!(&quot;v1:interest_idx:{}:{}&quot;, listing_id, from_did);
+<p><strong>Sled Store</strong>: Classify the principal, then compare-and-swap the spelling key. Both steps run
+under one lock, because proving a principal absent reads rows a concurrent alias-spelled request
+could add before either CAS lands, and no single Sled operation spans both:</p>
+<pre><code class="language-rust">let _guard = self.interest_uniqueness.lock()?;
+
+// Decided against the canonical rows: `from_did` is a `Did`, so `==` is principal
+// equality. Evidence that cannot be decoded is refused, never skipped.
+if self.classify_principal_for_listing(&amp;listing_id, from_did)? == AlreadyPresent {
+    return Ok(false); // Duplicate
+}
+
+let index_key = format!(&quot;v1:interest_idx:{}:{}&quot;, listing_id, from_did);
 let cas_result = db.compare_and_swap(index_key, None::&lt;&amp;[u8]&gt;, Some(b&quot;1&quot;))?;
 if cas_result.is_err() {
     return Ok(false); // Key existed, duplicate
 }
 // CAS succeeded, insert actual interest data
 </code></pre>
+<p>The CAS and the interest insert are two operations, not one transaction: a crash between them
+leaves a lock with no interest, and the affected principal is refused until <code>Orphan Cleanup</code> runs.
+Interests already persisted for one principal under two spellings are not reconciled.</p>
 <h3 id="photo-url-security">Photo URL Security</h3>
 <p>Photo URLs undergo comprehensive validation:</p>
 <ol>
@@ -318,6 +339,14 @@ pub trait ListingsStoreBackend: Send + Sync {
     Ok(existed)
 }
 </code></pre>
+<p>A separate scheduled pass, <code>cleanup_orphaned_interest_indexes</code>, removes uniqueness rows left by a
+crash between the compare-and-swap and the interest insert. It resolves each row&#39;s canonical
+interest by the <strong>byte-identical</strong> spelling the writer filed — the row&#39;s value is a sentinel, so
+there is no interest id to follow — and parses the key by the writer&#39;s framing: strip the
+<code>v1:interest_idx:</code> namespace, take the canonical <code>Uuid</code> up to the first <code>:</code>, and treat everything
+after it as the DID spelling, colons included. A row whose key or value the pass cannot read is
+skipped rather than deleted; refusing on unreadable evidence is the live write path&#39;s job, and the
+two are deliberately different (#2627 M4b).</p>
 <h2 id="frontend-integration">Frontend Integration</h2>
 <p>The pilot-ui implements these features with:</p>
 <ul>
