@@ -334,16 +334,30 @@ fi
 # ── 4. the count itself is asserted, not decorative ────────────────────────
 # PARSED, not grepped: `grep -q "EXPECTED_CHECKS = 25"` is satisfied by a COMMENT, so setting
 # the constant to 24 and adding `# EXPECTED_CHECKS = 25` left this case green.
+# The expectation is now fixed + derived (icn#2691): the hook-executable checks come from
+# .claude/settings.json, so their count legitimately changes when a hook is added. The fixed
+# part stays exact; this asserts the SUM, which is the property that actually matters.
 DECLARED=$(python3 -c '
-import re, sys
+import importlib.util, json, pathlib, re, sys
 src = open(sys.argv[1]).read()
-m = re.search(r"^EXPECTED_CHECKS\s*=\s*(\d+)\s*$", src, re.M)
-print(m.group(1) if m else "")
-' "$GATE")
+m = re.search(r"^EXPECTED_STATIC_CHECKS\s*=\s*(\d+)\s*$", src, re.M)
+if not m:
+    print(""); sys.exit()
+spec = importlib.util.spec_from_file_location("gate", sys.argv[1])
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+root = pathlib.Path(sys.argv[2])
+settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
+d, i, _ = mod.direct_hook_targets(settings, root)
+# BOTH derived classes. Interpreted scripts are checked for existence (not the bit), so the
+# expected count derives from them too. If this formula and the one in the gate ever disagree,
+# the count assertion stops meaning anything. (No apostrophes here: this block lives inside a
+# single-quoted python3 -c, and one closed the string.)
+print(int(m.group(1)) + len(d) + len(i))
+' "$GATE" "$FIX")
 if [ -n "$BASE_COUNT" ] && [ "$DECLARED" = "$BASE_COUNT" ]; then
-  ok "EXPECTED_CHECKS ($BASE_COUNT) matches what a complete run actually performs"
+  ok "EXPECTED_STATIC_CHECKS + derived hook checks ($BASE_COUNT) matches a complete run"
 else
-  bad "EXPECTED_CHECKS does not match the observed count" "declared=${DECLARED:-<unparseable>} observed=$BASE_COUNT"
+  bad "the expected check count does not match the observed count" "declared=${DECLARED:-<unparseable>} observed=$BASE_COUNT"
 fi
 
 # ── 5. the prose the gate prints must match what it verified ───────────────
@@ -419,6 +433,1015 @@ wrapper_case "the degraded envelope is complete and parseable (exit 3)" "plain"
 wrapper_case "...and survives a double quote in the repo path" 'has"quote'
 wrapper_case "...and a backslash" 'has\backslash'
 wrapper_case "...and a tab" "$(printf 'has\ttab')"
+
+# ── 6. a hook invoked directly must be executable (icn#2691) ───────────────
+# hook-health.sh was committed 100644 while settings.json ran it AS the command, so it exited
+# 126 at every session start. The gate did not look: its executable list was hardcoded and
+# omitted it. The list is derived from settings.json now; these prove the derivation both
+# catches a real regression and does not over-reach.
+
+FIX_X="$TMP/hookexec"
+make_fixture "$FIX_X"
+chmod -x "$FIX_X/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_X" "$TMP/hookexec.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$TMP/hookexec.log"; then
+  ok "a directly-invoked hook without the executable bit fails the gate"
+else
+  bad "a non-executable direct hook did not fail the gate" "$(tail -3 "$TMP/hookexec.log")"
+fi
+
+# The .py hooks run through python3 and are correctly 100644. Rejecting them would be a false
+# positive that pressures someone into chmod-ing files that do not need it.
+FIX_PY="$TMP/pyhooks"
+make_fixture "$FIX_PY"
+chmod -x "$FIX_PY"/.claude/hooks/*.py 2>/dev/null || true
+rc=$(run_gate "$FIX_PY" "$TMP/pyhooks.log")
+if [ "$rc" -eq 0 ]; then
+  ok "hooks invoked through an interpreter are not required to be executable"
+else
+  bad "non-executable .py hooks were wrongly rejected" "$(tail -3 "$TMP/pyhooks.log")"
+fi
+
+# A configured hook whose FILE is gone must be reported missing, not quietly dropped from the
+# derived list. Filtering on existence shrank the list and the expected count together, so the
+# gate stayed green while settings.json invoked a command that was not there.
+FIX_DEL="$TMP/delhook"
+make_fixture "$FIX_DEL"
+rm -f "$FIX_DEL/.claude/hooks/firewall-guard.sh"
+rc=$(run_gate "$FIX_DEL" "$TMP/delhook.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/firewall-guard.sh" "$TMP/delhook.log"; then
+  ok "deleting a hook settings.json still invokes is reported missing"
+else
+  bad "a deleted but still-configured hook was silently dropped" "$(tail -3 "$TMP/delhook.log")"
+fi
+
+# One unparseable command must not stop the walk and take the rest of the hooks with it.
+FIX_BAD="$TMP/badcmd"
+make_fixture "$FIX_BAD"
+python3 - "$FIX_BAD" <<'PYBAD'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+first = next(iter(d["hooks"]))
+d["hooks"][first].insert(0, {"matcher": "*", "hooks": [
+    {"type": "command", "command": 'unclosed "quote'}]})
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYBAD
+# Compare the target SET before and after, never a pinned count. Hardcoding the
+# repository's current hook count made this assertion fail the moment a legitimate hook was
+# added -- turning the required drift workflow red, and directly contradicting the next case,
+# which asserts that additions must NOT trip the count.
+python3 -c "
+import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location('g', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+clean, dirty = pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+load = lambda r: json.loads((r / '.claude/settings.json').read_text(encoding='utf-8'))
+before = set(m.direct_hook_targets(load(clean), clean)[0])
+after = set(m.direct_hook_targets(load(dirty), dirty)[0])
+sys.exit(0 if before and before == after else 1)
+" "$GATE" "$FIX" "$FIX_BAD"
+if [ $? -eq 0 ]; then
+  ok "a malformed hook command does not abort the derivation walk"
+else
+  bad "a malformed hook command truncated the derived target list" ""
+fi
+
+# Two legal direct-invocation spellings that the derivation used to mishandle. `_invokes_hook`
+# in the same file already normalised both, so these were siblings disagreeing.
+python3 - "$GATE" <<'PYSHAPES'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+want = ".claude/hooks/hook-health.sh"
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+# Assignment prefixes and both project-dir spellings stay supported: `_invokes_hook` in the
+# same module already treats them as direct invocations.
+cases = {
+    'MODE=health %s' % H: (K.DIRECT, want),
+    'A=1 B=2 "${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': (K.DIRECT, want),
+    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': (K.DIRECT, want),
+    H: (K.DIRECT, want),
+    'echo hi': (K.NON_HOOK, None),
+    # INTERPRETED now carries the SCRIPT PATH as its target, so its EXISTENCE can be
+    # checked. Its executable bit still must not be: the three .py guards are 100644.
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[:2] != exp]
+sys.exit(0 if not bad else 1)
+PYSHAPES
+if [ $? -eq 0 ]; then
+  ok "assignment prefixes and both project-dir spellings classify as direct"
+else
+  bad "a legal direct-invocation spelling was mis-resolved" ""
+fi
+
+# End-to-end: rewriting a hook with an env-assignment prefix must not make its executable
+# check disappear. The derived list and the expected count read the same source, so a dropped
+# target hides itself in both.
+FIX_ASSIGN="$TMP/assignhook"
+make_fixture "$FIX_ASSIGN"
+python3 - "$FIX_ASSIGN" <<'PYASSIGN'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "MODE=health " + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYASSIGN
+chmod -x "$FIX_ASSIGN/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_ASSIGN" "$TMP/assignhook.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/hook-health.sh" "$TMP/assignhook.log"; then
+  ok "an env-assignment prefix does not hide a hook from the executable check"
+else
+  bad "an assignment-prefixed hook escaped the executable check" "$(tail -3 "$TMP/assignhook.log")"
+fi
+
+# Launcher prefixes and absolute interpreters: two opposite failures. A launcher-prefixed
+# hook dropped out of the derived set (fail-open); an absolute external interpreter became a
+# bogus repo-relative path and was reported missing (fail-closed on a correct config).
+python3 - "$GATE" <<'PYLAUNCH'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
+cases = {
+    # The three shapes live settings.json actually uses.
+    H: K.DIRECT,
+    'python3 %s' % PY: K.INTERPRETED,
+    # An ABSOLUTE interpreter is no longer exempt. Nothing uses the spelling, and defending it
+    # meant trusting a basename: `/tmp/python3` symlinked to `/usr/bin/env` was certified as
+    # "runs the interpreter" while the hook it launches left the derived set.
+    '/usr/bin/python3 %s' % PY: K.UNCLASSIFIED,
+    '/tmp/python3 %s' % H: K.UNCLASSIFIED,
+    # The real echo carries `||` INSIDE a command substitution. Quoting is respected, so this
+    # is one simple command -- a substring search for operators would have got it wrong.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.UNCLASSIFIED,   # was live; substitutions are outside the language now
+    # Top-level composition: argv0 is not the only program, and a later one may be a hook.
+    'true && %s' % H: K.UNCLASSIFIED,
+    'echo hello; %s' % H: K.UNCLASSIFIED,
+    'echo foo | %s' % H: K.UNCLASSIFIED,
+    # Launcher support was REMOVED: nothing used it, and `command -v` only prints while
+    # `env -0` refuses to run a command, so one shared flag set certified both as execution.
+    'command -v %s' % H: K.UNCLASSIFIED,
+    'env -0 %s' % H: K.UNCLASSIFIED,
+    'nohup -i %s' % H: K.UNCLASSIFIED,
+    'env %s' % H: K.UNCLASSIFIED,
+    'env -i %s' % H: K.UNCLASSIFIED,
+    # An external absolute program is NOT harmless: `/usr/bin/env <hook>` runs the hook and
+    # returns 126 when it is not executable; `/bin/sh -c …` can run anything. No name exempts
+    # a path that lands outside the tree, and a repo file named python3 does not escape either:
+    # the interpreter vocabulary applies to BARE names only, which is what a shell looks up.
+    '/usr/bin/env %s' % H: K.UNCLASSIFIED,
+    '/usr/bin/nohup %s' % H: K.UNCLASSIFIED,
+    '/bin/sh -c "anything"': K.UNCLASSIFIED,
+    '/opt/vendor/wrapper %s' % H: K.UNCLASSIFIED,
+    # `true` and `:` are gone from the non-hook vocabulary; nothing live uses them.
+    'true': K.UNCLASSIFIED,
+    'curl https://example.invalid': K.UNCLASSIFIED,
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
+sys.exit(0 if not bad else 1)
+PYLAUNCH
+if [ $? -eq 0 ]; then
+  ok "the supported command language is the three live shapes; everything else is UNCLASSIFIED"
+else
+  bad "a hook command form was mis-classified" ""
+fi
+
+
+# CONTAINMENT, decided physically and BEFORE any name-based exemption. Two opposite fail-open
+# holes, both of which left the target out of the derived set -- and the expected check count
+# reads that same list, so each loss concealed itself.
+python3 - "$GATE" <<'PYCONTAIN'
+import importlib.util, os, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+# Enough `..` to leave THIS root from inside .claude/, so the escape lands on a real,
+# executable /usr/bin/env rather than on nothing -- otherwise the old code would have been
+# caught by `missing:` and the hole would look self-limiting.
+up = "../" * len(root.parts[1:])
+esc = '"$CLAUDE_PROJECT_DIR"/.claude/../%susr/bin/env %s' % (up, H)
+assert (root / (".claude/../%susr/bin/env" % up)).resolve() == pathlib.Path("/usr/bin/env")
+assert os.access("/usr/bin/env", os.X_OK), "fixture assumption: /usr/bin/env is executable"
+cases = {
+    # Interior traversal has no LEADING `..`, so a lexical containment test saw a repository
+    # path and the executable check then certified a program outside the tree.
+    esc: (K.UNCLASSIFIED, None),   # now refused for its `..`, before containment is reached
+    '"$CLAUDE_PROJECT_DIR"/.claude/../../../usr/bin/env %s' % H: (K.UNCLASSIFIED, None),
+    # A repository file that IS argv0 needs the executable bit whatever it is NAMED. The
+    # basename exemptions used to fire first and drop it.
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python3': (K.DIRECT, ".claude/hooks/python3"),
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/python': (K.DIRECT, ".claude/hooks/python"),
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/echo': (K.DIRECT, ".claude/hooks/echo"),
+    # NARROWED: an inside-staying traversal used to be DIRECT with a resolved target. It is
+    # refused now, because the distinction that made it safe -- every intermediate component
+    # existing -- is exactly the check that `Path.resolve()` does NOT perform, and verifying
+    # each component is the machinery this file keeps declining to build. `..` is out of the
+    # language; no live hook path has one.
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh': (K.UNCLASSIFIED, None),
+    # A BARE name keeps shell semantics -- PATH lookup, never the repository -- so the
+    # interpreter and non-hook vocabularies apply to it, and ONLY to it.
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
+    # ...and the ARGUMENT is part of that grammar. A basename-only exemption made `python3`
+    # mean "not a hook invocation" whatever followed, so `-c` could run one: the nested
+    # shell's permission-denied is invisible because os.system's status is discarded and
+    # python exits 0.
+    ('python3 -c \'import os; os.system("$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh")\''):
+        (K.UNCLASSIFIED, None),
+    'python3 -m mymod': (K.UNCLASSIFIED, None),
+    'python3': (K.UNCLASSIFIED, None),
+    'python3 /tmp/x.py': (K.UNCLASSIFIED, None),
+    'python3 %s' % H: (K.UNCLASSIFIED, None),
+    # The argv0 rules apply to the interpreter's ARGUMENT too. They were written for argv0
+    # and not carried over, so a traversal through a missing component normalised to the real
+    # guard while bash cannot traverse it.
+    'python3 "$CLAUDE_PROJECT_DIR"/missing/../.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
+    'python3 "$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.py"': (K.UNCLASSIFIED, None),
+    'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py --flag': (K.INTERPRETED, ".claude/hooks/pre-tool-guard.py"),
+    '/usr/bin/python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': (K.UNCLASSIFIED, None),
+    'echo hi': (K.NON_HOOK, None),
+    H: (K.DIRECT, ".claude/hooks/hook-health.sh"),
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[:2] != exp]
+sys.exit(0 if not bad else 1)
+PYCONTAIN
+if [ $? -eq 0 ]; then
+  ok "containment is physical and precedes the name exemptions"
+else
+  bad "a path command escaped the repository or was exempted by its name" ""
+fi
+
+# One quoting model, three consumers. Masking tracked quotes properly while comment stripping
+# was an unconditional split, and the lexer never saw a newline at all.
+python3 - "$GATE" <<'PYQUOTE'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
+cases = {
+    # A LITERAL NEWLINE is a bash command separator. shlex reads it as ordinary whitespace, so
+    # argv0 was `echo`, the entry classified NON_HOOK, and the hook on the second line left the
+    # derived set -- while bash runs it and returns 126 when it is not executable.
+    'echo hi\n%s' % H: K.UNCLASSIFIED,
+    '%s\necho done' % H: K.UNCLASSIFIED,
+    # A comment ends at its LINE, not at the end of the string, so this still hides a command.
+    'echo hi # note\n%s' % H: K.UNCLASSIFIED,
+    # ...but a newline INSIDE quotes is data, not a separator.
+    'echo "a\nb"': K.NON_HOOK,
+    # A quoted `#` is part of the argument. The unconditional split cut here, leaving an
+    # unmatched quote that came back as "unparseable" -- the required workflow RED on a command
+    # the shell runs perfectly well. That is a false rejection, not a missed detection.
+    'echo "ticket #123"': K.NON_HOOK,
+    "echo 'ticket #123'": K.NON_HOOK,
+    'echo ticket\\#123': K.NON_HOOK,
+    # A real comment is still a comment.
+    'echo hi # a note': K.NON_HOOK,
+    '%s # runs the health check' % H: K.DIRECT,
+    # ...and shlex must not strip comments a SECOND time, by a different rule. Its commenter
+    # fires mid-word, but bash treats `#` inside a word as part of it, so `<hook>#missing` was
+    # truncated to the real hook and its bit checked while Claude runs the suffixed path and
+    # exits 127. The target must keep the suffix so the `missing:` branch fails on it.
+    '%s#missing' % H: K.DIRECT,
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/a#b.sh': K.DIRECT,
+    # A bare name is resolved through PATH, and an assignment can BE the PATH:
+    # `PATH=/tmp:$PATH python3 <hook>` runs whatever /tmp/python3 is. A name exemption needs
+    # nothing local to have changed what the name resolves to.
+    'PATH=/tmp:$PATH python3 %s' % PY: K.UNCLASSIFIED,
+    'FOO=1 echo hi': K.UNCLASSIFIED,
+    # AN ASSIGNMENT IS DECIDED BEFORE QUOTING IS DISCARDED. shlex strips quote provenance, so
+    # an escaped or quoted `=` still looked like an assignment prefix -- and bash treats every
+    # one of these as the COMMAND NAME, exiting 127 without running the hook.
+    'FOO\\=bar %s' % H: K.UNCLASSIFIED,
+    "'FOO=bar' %s" % H: K.UNCLASSIFIED,
+    '"FOO=bar" %s' % H: K.UNCLASSIFIED,
+    # AN UNRESOLVED EXPANSION IS NOT A PATH SEGMENT. The variable is substituted at a token
+    # boundary now -- a shell expands the LONGEST valid name, not the prefix we hoped for --
+    # and what remains is a value this gate cannot know, so it refuses rather than joining it
+    # to the root as a literal segment where a `..` would cancel it out.
+    '$CLAUDE_PROJECT_DIRoops/../.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # A `..` COMPONENT IS OUT OF THE LANGUAGE. `Path.resolve()` is non-strict, so a traversal
+    # through a component that does NOT exist collapses to the real hook here and exits 127
+    # in the shell. No live hook path contains `..`, so it is refused outright -- which also
+    # retires the earlier out-of-repository traversal case by construction.
+    '"$CLAUDE_PROJECT_DIR"/missing/../.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/../hooks/hook-health.sh': K.UNCLASSIFIED,
+    # THE PROJECT-DIR TOKEN IS ACCEPTED ONCE. Replacing every occurrence collapsed a doubled
+    # variable to the real hook, while bash expands both and attempts a doubled absolute
+    # path. The second occurrence keeps its `$` and the unresolved-expansion rule names it.
+    '"$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.UNCLASSIFIED,
+    '"${CLAUDE_PROJECT_DIR}/${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh"': K.UNCLASSIFIED,
+    '${CLAUDE_PROJECT_DIRoops}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '$HOME/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # THE EXPANSION MUST BE QUOTED. Verified against bash with a checkout path containing a
+    # space: the unquoted form is word-split and exits 127 on the first word, while the quoted
+    # form runs. Normalisation here erased the variable and checked the intended hook, so the
+    # gate certified a command that never launches.
+    '$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 $CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    # A QUOTE INSIDE A COMMENT IS INERT. bash ignores quote characters after an unquoted `#`,
+    # but the state walker toggled on them -- so a trailing `# "` left it believing a double
+    # quote was open, the following NEWLINE was scored as quoted, and the separator check
+    # missed a second command entirely.
+    'echo ok # "\n"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    "echo ok # '\n\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/hook-health.sh": K.UNCLASSIFIED,
+    # THE TOKEN MUST BE FOLLOWED BY `/`. Without it the shell CONCATENATES -- bash attempts
+    # `<root>.claude/hooks/x.sh` and exits 127 -- while normalisation here produced the real
+    # in-repository hook and certified an unrelated file.
+    '"$CLAUDE_PROJECT_DIR".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # BOTH PATH RULES ARE SCOPED TO THE COMMAND WORD. bash does not word-split an assignment
+    # VALUE -- verified with a checkout path containing spaces: the hook runs and $ROOT keeps
+    # the whole path -- so scanning the whole command rejected a command that works.
+    'ROOT=$CLAUDE_PROJECT_DIR %s' % H: K.DIRECT,
+    'A=1 B=$CLAUDE_PROJECT_DIR %s' % H: K.DIRECT,
+    # ...but an unquoted expansion in argv0 is still refused even behind an assignment.
+    'ROOT=x $CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # SINGLE-QUOTED TEXT IS LITERAL, not an expansion: bash prints it and exits 0, so the
+    # separator rule has no business there.
+    "echo '$CLAUDE_PROJECT_DIR'.claude": K.NON_HOOK,
+    # POSITIONAL, not textual. An expansion in a DATA argument is bash's business, not the
+    # gate's: both of these run fine, and scanning the whole command refused them.
+    'echo "$CLAUDE_PROJECT_DIR".claude': K.NON_HOOK,
+    'echo $CLAUDE_PROJECT_DIR': K.NON_HOOK,
+    # NON-SHELL WHITESPACE IS NOT WHITESPACE. Python's strip() removes `\r`; bash does not
+    # treat it as shell whitespace and attempts a CR-suffixed filename, exiting 127.
+    '%s\r' % H: K.UNCLASSIFIED,
+    '%s\r extra' % H: K.UNCLASSIFIED,
+    # AN ESCAPED SPACE DOES NOT END A WORD, so the `#` after it is not a comment. Measured
+    # against bash: rc=0, the hook receives the argument `note #123`.
+    '%s note\\ #123' % H: K.DIRECT,
+    # PARITY, not presence. An ODD backslash run escapes the whitespace so the `#` is data;
+    # an EVEN run is escaped backslashes followed by REAL whitespace, so the `#` opens a
+    # comment -- and treating it as data left `; ` or `&& ` unstripped for the composition
+    # check to read as a second program. Both spellings run in bash, rc=0.
+    '%s arg\\\\ # a; b' % H: K.DIRECT,
+    '%s arg\\\\ # a && b' % H: K.DIRECT,
+    # ...and the token must START the path word. `./"$VAR"/x` makes bash concatenate `./`
+    # with an ABSOLUTE path and attempt `.//…`, exiting 127, while deleting the embedded
+    # expansion left the real hook behind.
+    './"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 ./"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    "echo '$CLAUDE_PROJECT_DIR'": K.NON_HOOK,
+    '"${CLAUDE_PROJECT_DIR}".claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    'python3 "$CLAUDE_PROJECT_DIR".claude/hooks/pre-tool-guard.py': K.UNCLASSIFIED,
+    # ...and the supported spellings, including quoting the whole word, still classify.
+    '"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.DIRECT,
+    # ...and the quoted spellings, including quoting the whole word, still classify.
+    '"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"': K.DIRECT,
+    '"${CLAUDE_PROJECT_DIR}"/.claude/hooks/hook-health.sh': K.DIRECT,
+    # FLIPPED: braces do not prevent word splitting. Verified against bash with a checkout
+    # path containing a space -- the unquoted braced form exits 127 on the first word exactly
+    # like the bare one. An earlier round asserted DIRECT here, which was wrong.
+    '${CLAUDE_PROJECT_DIR}/.claude/hooks/hook-health.sh': K.UNCLASSIFIED,
+    # ...but an assignment in front of a repo PATH stays supported: a path is not looked up.
+    'MODE=health %s' % H: K.DIRECT,
+    # A COMMAND SUBSTITUTION is executable shell wherever it appears, including inside the
+    # quoted argument of an exempt command. `echo "$(<hook>)"` RUNS the hook, and the outer
+    # echo returns 0 whatever the hook does -- so a mode-0644 file reported permission denied
+    # while the gate stayed green and the target never entered the derived set.
+    'echo "$(%s)"' % H: K.UNCLASSIFIED,
+    'echo "`%s`"' % H: K.UNCLASSIFIED,
+    'echo $(%s)' % H: K.UNCLASSIFIED,
+    # ...but only one NAMING A REPOSITORY PATH. The live command carries a substitution and
+    # must stay classifiable, which is the whole reason this is not a blanket refusal.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"': K.UNCLASSIFIED,   # was live; substitutions are outside the language now
+    # OPERATORS ARE READ BEFORE QUOTING IS DISCARDED. shlex strips quote provenance, so an
+    # argument made entirely of punctuation came back indistinguishable from a real operator
+    # and the gate went RED on a command bash runs normally.
+    'echo ";"': K.NON_HOOK,
+    "echo '&&'": K.NON_HOOK,
+    'echo "|"': K.NON_HOOK,
+    'echo \\;': K.NON_HOOK,
+    '%s ";"' % H: K.DIRECT,
+    # A SUBSTITUTION BODY HAS ITS OWN QUOTING CONTEXT. Counting parentheses against the OUTER
+    # states closed the body at a quoted `)`, so the scan found no repository path and the
+    # entry fell back to NON_HOOK while bash still runs the hook.
+    'echo "$(echo \')\'; %s)"' % H: K.UNCLASSIFIED,
+    'echo "$(echo \'(\'; %s)"' % H: K.UNCLASSIFIED,
+    # The BACKTICK scanner had the same defect one round later: it closed on the first
+    # backtick `find` reached, so an escaped or quoted one truncated the body and the hook
+    # inside it was never seen. Its delimiter is located with shell-aware state now.
+    'echo "`printf \'\\`\'; %s`"' % H: K.UNCLASSIFIED,
+    'echo "`printf \'x`y\'; %s`"' % H: K.UNCLASSIFIED,
+    'echo "`%s`"' % H: K.UNCLASSIFIED,
+    'echo "`date`"': K.UNCLASSIFIED,
+    # OPERATOR TEXT INSIDE A COMMENT IS NOT COMPOSITION. Scanning the raw command made the
+    # gate red on a hook carrying an explanatory comment -- bash never sees those characters.
+    '%s # use && fallback' % H: K.DIRECT,
+    '%s # x | y' % H: K.DIRECT,
+    '%s # step 1; step 2' % H: K.DIRECT,
+}
+bad = [c for c, exp in cases.items() if m.classify_hook_command(c, root)[0] != exp]
+sys.exit(0 if not bad else 1)
+PYQUOTE
+if [ $? -eq 0 ]; then
+  ok "newlines separate commands, and quoted hashes are not comments"
+else
+  bad "a separator was missed or a quoted hash truncated a valid command" ""
+fi
+
+# COMMAND SUBSTITUTIONS ARE OUTSIDE THE LANGUAGE (maintainer decision, icn#2691). A
+# substitution can execute a repository hook without naming one -- `find . -name X -exec {} \;`
+# -- and the alternative was a blocklist of -exec/xargs/sh -c/eval/git-aliases, which the
+# sibling PR spent nine rounds proving does not terminate. No substitution may ever again be
+# classified NON_HOOK.
+python3 - "$GATE" <<'PYSUBST'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+must_refuse = [
+    # The discovery case that settled the decision: no slash-bearing token at all.
+    'echo "$(find . -name hook-health.sh -exec {} \;)"',
+    'echo "$(ls .claude/hooks | xargs -I{} sh -c {})"',
+    'echo "$(eval something)"',
+    # The command that used to be live, and every other shape.
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"',
+    'echo "$(git rev-parse HEAD)"',
+    'echo "`date`"',
+    'echo "`%s`"' % H,
+    'echo "$(%s)"' % H,
+    '%s "`date`"' % H,
+    'echo "$(echo nested $(date))"',
+]
+bad = [c for c in must_refuse if m.classify_hook_command(c, root)[0] != K.UNCLASSIFIED]
+# ...and a substitution that is only LITERAL text must still classify normally: single quotes
+# make `$(` inert, so refusing it would be a false rejection.
+if m.classify_hook_command("echo '$(not a substitution)'", root)[0] != K.NON_HOOK:
+    bad.append("single-quoted literal")
+sys.exit(0 if not bad else 1)
+PYSUBST
+if [ $? -eq 0 ]; then
+  ok "no command substitution can be classified as a non-hook"
+else
+  bad "a command substitution escaped the categorical refusal" ""
+fi
+
+# THE CONTRACT IS PART OF THE REVIEWABLE SURFACE (icn#2689 closure rule). It exists so a review
+# finding can be classified instead of argued, which is only worth anything if it cannot be
+# deleted silently and if its claims match the classifier.
+HOOKS_MD="$REPO_ROOT/.claude/hooks/HOOKS.md"
+missing=""
+for phrase in "Supported hook-command language" "Path-bearing operands" \
+              "Categorically unsupported" "Out of contract"; do
+  grep -qF "$phrase" "$HOOKS_MD" || missing="$missing [$phrase]"
+done
+if [ -z "$missing" ]; then
+  ok "the supported-language contract is present in HOOKS.md"
+else
+  bad "the supported-language contract lost a required section" "$missing"
+fi
+
+python3 - "$GATE" "$HOOKS_MD" <<'PYCONTRACT'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+doc = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+H = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'
+PY_ = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/pre-tool-guard.py'
+# Each row the contract states as SUPPORTED must actually classify as supported, and each
+# form it calls categorically unsupported must actually be UNCLASSIFIED. A contract the
+# classifier disagrees with is worse than none.
+supported = {H: K.DIRECT, 'python3 %s' % PY_: K.INTERPRETED, 'echo hi': K.NON_HOOK,
+             'MODE=health %s' % H: K.DIRECT}
+# An assignment before the INTERPRETER form is deliberately NOT supported: a bare name is
+# resolved through PATH and an assignment can be the PATH. Found by an adversarial pass over
+# the contract's own table, where the CONTRACT was wrong and the code was right.
+unsupported_by_design = {'MODE=x python3 %s' % PY_: K.UNCLASSIFIED}
+supported_check_only = dict(supported)
+unsupported = ['echo "$(date)"', 'echo "`date`"', 'true && %s' % H, 'echo x | %s' % H,
+               '%s </dev/null' % H, '/usr/bin/env %s' % H, 'python3 -c "x"',
+               '$HOME/.claude/hooks/hook-health.sh', '%s\r' % H]
+bad = [c for c, k in supported.items() if m.classify_hook_command(c, root)[0] != k]
+bad += [c for c, k in unsupported_by_design.items()
+        if m.classify_hook_command(c, root)[0] != k]
+if "before the **interpreter** form is deliberately NOT supported" not in doc:
+    bad.append("contract no longer states the assignment/interpreter exclusion")
+bad += [c for c in unsupported if m.classify_hook_command(c, root)[0] != K.UNCLASSIFIED]
+# ...and the two path-bearing operands the contract names are the two the code checks.
+if "argv0" not in doc or "script operand" not in doc:
+    bad.append("contract no longer names the path-bearing operands")
+sys.exit(0 if not bad else 1)
+PYCONTRACT
+if [ $? -eq 0 ]; then
+  ok "the classifier agrees with every form the contract declares"
+else
+  bad "the contract and the classifier disagree about a declared form" ""
+fi
+
+# The word-splitting claim is checked against BASH, not asserted. If this stops reproducing,
+# the rule above is guarding something that no longer happens and should be revisited.
+python3 - <<'PYSPLIT'
+import os, pathlib, shutil, subprocess, sys, tempfile
+d = tempfile.mkdtemp(prefix="icn gate space ")
+try:
+    p = pathlib.Path(d)
+    (p / ".claude/hooks").mkdir(parents=True)
+    h = p / ".claude/hooks/hook-health.sh"
+    h.write_text("#!/usr/bin/env bash\necho ran\n")
+    h.chmod(0o755)
+    env = dict(os.environ)
+    env["CLAUDE_PROJECT_DIR"] = str(p)
+    unq = subprocess.run(["bash", "-c", "$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh"],
+                         capture_output=True, text=True, env=env)
+    quo = subprocess.run(["bash", "-c", '"$CLAUDE_PROJECT_DIR"/.claude/hooks/hook-health.sh'],
+                         capture_output=True, text=True, env=env)
+    sys.exit(0 if (unq.returncode == 127 and quo.returncode == 0) else 1)
+finally:
+    shutil.rmtree(d, ignore_errors=True)
+PYSPLIT
+if [ $? -eq 0 ]; then
+  ok "bash really does word-split an unquoted project-dir expansion (127 vs 0)"
+else
+  bad "the word-splitting premise no longer reproduces; revisit the quoting rule" ""
+fi
+
+# The one live substitution moved into a repository executable, so the gate proves what it
+# actually needs -- argv0 exists and has its bit -- without interpreting shell.
+if grep -q 'report-branch.sh' "$REPO_ROOT/.claude/settings.json"; then
+  ok "the branch-report hook is invoked as a repository executable"
+else
+  bad "settings.json no longer invokes the branch-report helper" ""
+fi
+if [ -x "$REPO_ROOT/.claude/hooks/report-branch.sh" ]; then
+  ok "the branch-report helper is executable"
+else
+  bad "the branch-report helper is not executable" ""
+fi
+if ! grep -qE '\$\(|`' "$REPO_ROOT/.claude/settings.json"; then
+  ok "settings.json contains no command substitution at all"
+else
+  bad "a command substitution came back into settings.json" "$(grep -nE '\$\(|`' "$REPO_ROOT/.claude/settings.json" | head -2)"
+fi
+
+# THE TWO SIBLINGS THAT READ ONE COMMAND STRING MUST AGREE, or one of them is wrong. The
+# classifier decides what argv0 is; `_invokes_hook` decides whether the event runs the hook.
+# A plain `re.search` in the second treated `<hook> ";"` as a redirection and answered "this
+# event does not invoke the hook" while the first called the same command a direct
+# invocation -- the gate red on a valid configuration.
+python3 - "$GATE" <<'PYSIB'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("g", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+root = pathlib.Path(".").resolve()
+K = m.HookCommandKind
+HOOK = '"$CLAUDE_PROJECT_DIR"/' + m.HOOK
+must_agree = [
+    HOOK,
+    '%s ";"' % HOOK,
+    '%s "|"' % HOOK,
+    "%s '&&'" % HOOK,
+    '%s # use && fallback' % HOOK,
+    '%s </dev/null' % HOOK,
+    '%s; echo x' % HOOK,
+    'MODE=health %s' % HOOK,
+    'echo "branch: $(git branch --show-current 2>/dev/null || echo detached)"',
+    '%s "`date`"' % HOOK,
+]
+bad = [c for c in must_agree
+       if (m.classify_hook_command(c, root)[0] == K.DIRECT) != m._invokes_hook(c, root)]
+# ...and the two places they differ ON PURPOSE. The classifier asks what argv0 IS;
+# `_invokes_hook` asks whether the invocation is unadorned. Fail-closed, and pinned here so
+# it cannot drift into an accident.
+# `<hook> "`date`"` USED to be a deliberate asymmetry -- DIRECT here, refused there. Making
+# substitutions categorically unsupported removed it: both readers now decline, so it moved
+# into must_agree above. One asymmetry left, and it is still deliberate.
+deliberate = ['%s "$HOME"' % HOOK]
+bad += [c for c in deliberate
+        if not (m.classify_hook_command(c, root)[0] == K.DIRECT
+                and not m._invokes_hook(c, root))]
+sys.exit(0 if not bad else 1)
+PYSIB
+if [ $? -eq 0 ]; then
+  ok "the classifier and _invokes_hook agree, except where they differ on purpose"
+else
+  bad "the two readers of a hook command disagree" ""
+fi
+
+# End-to-end: the newline spelling must take the gate red, not quietly drop a hook.
+FIX_NL="$TMP/newlinehook"
+make_fixture "$FIX_NL"
+python3 - "$FIX_NL" <<'PYNL'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "echo starting\n" + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYNL
+chmod -x "$FIX_NL/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_NL" "$TMP/newlinehook.log")
+if [ "$rc" -ne 0 ] && grep -q "literal newline" "$TMP/newlinehook.log"; then
+  ok "a newline-separated hook command fails the gate instead of vanishing behind echo"
+else
+  bad "a hook hidden after a newline escaped the executable check" "$(tail -3 "$TMP/newlinehook.log")"
+fi
+
+# End-to-end the other way: a quoted hash must NOT make a working configuration fail.
+FIX_HASH="$TMP/hashhook"
+make_fixture "$FIX_HASH"
+python3 - "$FIX_HASH" <<'PYHASH'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("echo") and not done:
+            n["command"] = 'echo "see ticket #123"'
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json has an echo hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYHASH
+rc=$(run_gate "$FIX_HASH" "$TMP/hashhook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "a quoted hash in a hook command does not fail the gate"
+else
+  bad "a valid command containing a quoted hash was rejected" "$(tail -3 "$TMP/hashhook.log")"
+fi
+
+# End-to-end: a `#` suffix on the path must not be lexed away, or the gate checks a different
+# file from the one Claude runs.
+FIX_SUF="$TMP/suffixhook"
+make_fixture "$FIX_SUF"
+python3 - "$FIX_SUF" <<'PYSUF'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = c + "#missing"
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYSUF
+rc=$(run_gate "$FIX_SUF" "$TMP/suffixhook.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/hook-health.sh#missing" "$TMP/suffixhook.log"; then
+  ok "a hash suffix on a hook path is checked as part of the path, not lexed away"
+else
+  bad "a hash-suffixed hook path was checked as the unsuffixed file" "$(tail -3 "$TMP/suffixhook.log")"
+fi
+
+# End-to-end: an assignment that can change PATH lookup must take the gate red, not exempt the
+# interpreter and drop the hook.
+FIX_PATH="$TMP/pathhook"
+make_fixture "$FIX_PATH"
+python3 - "$FIX_PATH" <<'PYPATH'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("python3 ") and not done:
+            n["command"] = "PATH=/tmp:$PATH " + c
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json invokes at least one python3 hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYPATH
+rc=$(run_gate "$FIX_PATH" "$TMP/pathhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command-local assignment" "$TMP/pathhook.log"; then
+  ok "an interpreter behind a PATH-changing assignment is not exempted"
+else
+  bad "a PATH-overridden interpreter kept its name exemption" "$(tail -3 "$TMP/pathhook.log")"
+fi
+
+# End-to-end, the fail-open half: a hook run from inside a substitution must not hide behind
+# the outer echo, whose exit status says nothing about it.
+FIX_SUB="$TMP/subhook"
+make_fixture "$FIX_SUB"
+python3 - "$FIX_SUB" <<'PYSUB'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "$(%s)"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYSUB
+chmod -x "$FIX_SUB/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_SUB" "$TMP/subhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/subhook.log"; then
+  ok "a hook invoked inside a command substitution does not hide behind the outer echo"
+else
+  bad "a substituted hook escaped the executable check" "$(tail -3 "$TMP/subhook.log")"
+fi
+
+# End-to-end, the false-rejection half: a quoted operator is data and must leave the gate green.
+FIX_QOP="$TMP/quotedop"
+make_fixture "$FIX_QOP"
+python3 - "$FIX_QOP" <<'PYQOP'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+done = []
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.startswith("echo") and not done:
+            n["command"] = 'echo ";"'
+            done.append(1)
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+assert done, "fixture assumption: settings.json has an echo hook"
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYQOP
+rc=$(run_gate "$FIX_QOP" "$TMP/quotedop.log")
+if [ "$rc" -eq 0 ]; then
+  ok "an argument made of quoted punctuation is data, not a composition"
+else
+  bad "a quoted operator argument was mistaken for a composition" "$(tail -3 "$TMP/quotedop.log")"
+fi
+
+# End-to-end: a hook carrying an explanatory comment with punctuation in it must stay green.
+FIX_CMT="$TMP/commenthook"
+make_fixture "$FIX_CMT"
+python3 - "$FIX_CMT" <<'PYCMT'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = c + " # health check; see docs && runbook"
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYCMT
+rc=$(run_gate "$FIX_CMT" "$TMP/commenthook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "operator text inside a comment is not read as composition"
+else
+  bad "a comment containing punctuation was read as a composition" "$(tail -3 "$TMP/commenthook.log")"
+fi
+
+# End-to-end: a quoted `)` must not close the substitution early and let the hook vanish.
+FIX_PAREN="$TMP/parenhook"
+make_fixture "$FIX_PAREN"
+python3 - "$FIX_PAREN" <<'PYPAREN'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "$(echo \')\'; %s)"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYPAREN
+chmod -x "$FIX_PAREN/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_PAREN" "$TMP/parenhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/parenhook.log"; then
+  ok "a quoted parenthesis does not close the substitution early"
+else
+  bad "a hook hid behind a quoted parenthesis in a substitution" "$(tail -3 "$TMP/parenhook.log")"
+fi
+
+# End-to-end: an escaped backtick must not close the substitution early either.
+FIX_TICK="$TMP/tickhook"
+make_fixture "$FIX_TICK"
+python3 - "$FIX_TICK" <<'PYTICK'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and c.endswith("hook-health.sh"):
+            n["command"] = 'echo "`printf \'\\`\'; %s`"' % c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYTICK
+chmod -x "$FIX_TICK/.claude/hooks/hook-health.sh"
+rc=$(run_gate "$FIX_TICK" "$TMP/tickhook.log")
+if [ "$rc" -ne 0 ] && grep -q "command substitution" "$TMP/tickhook.log"; then
+  ok "an escaped backtick does not close the substitution early"
+else
+  bad "a hook hid behind an escaped backtick" "$(tail -3 "$TMP/tickhook.log")"
+fi
+
+# End-to-end, both halves. A dropped target hides in the derived list AND in the expected
+# count, so only a full run proves the gate goes red.
+FIX_ESC="$TMP/escapehook"
+make_fixture "$FIX_ESC"
+python3 - "$FIX_ESC" <<'PYESC'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1]).resolve()
+up = "../" * len(root.parts[1:])
+esc = '"$CLAUDE_PROJECT_DIR"/.claude/../%susr/bin/env ' % up
+p = root / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = esc + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYESC
+rc=$(run_gate "$FIX_ESC" "$TMP/escapehook.log")
+# The message changed when `..` left the language: a traversal is now refused for CONTAINING
+# `..` rather than for where it lands. Either is a correct refusal of this fixture, and the
+# `..` rule is the stronger one -- it does not depend on the traversal happening to escape.
+if [ "$rc" -ne 0 ] && grep -qE "outside the repository|\`\.\.\` component" "$TMP/escapehook.log"; then
+  ok "a hook path traversing out of the repository fails the gate instead of certifying /usr/bin/env"
+else
+  bad "an escaping hook path was accepted as a repository executable" "$(tail -3 "$TMP/escapehook.log")"
+fi
+
+FIX_PYNAME="$TMP/pynamehook"
+make_fixture "$FIX_PYNAME"
+mv "$FIX_PYNAME/.claude/hooks/hook-health.sh" "$FIX_PYNAME/.claude/hooks/python3"
+python3 - "$FIX_PYNAME" <<'PYNAME'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = c.replace("hook-health.sh", "python3")
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYNAME
+chmod -x "$FIX_PYNAME/.claude/hooks/python3"
+rc=$(run_gate "$FIX_PYNAME" "$TMP/pynamehook.log")
+if [ "$rc" -ne 0 ] && grep -q "not executable: .claude/hooks/python3" "$TMP/pynamehook.log"; then
+  ok "a repository hook named python3 is still checked for its executable bit"
+else
+  bad "a repository hook was exempted because of its basename" "$(tail -3 "$TMP/pynamehook.log")"
+fi
+
+# An INTERPRETED script is argv[1]: its executable bit does not matter, but its EXISTENCE
+# does. Classifying from containment and the `.py` suffix alone returned no target, so a
+# deleted guard left the gate green while Claude gets a Python file-not-found.
+FIX_PYMISS="$TMP/pymissing"
+make_fixture "$FIX_PYMISS"
+rm -f "$FIX_PYMISS/.claude/hooks/pre-tool-guard.py"
+rc=$(run_gate "$FIX_PYMISS" "$TMP/pymissing.log")
+if [ "$rc" -ne 0 ] && grep -q "missing: .claude/hooks/pre-tool-guard.py" "$TMP/pymissing.log"; then
+  ok "a deleted interpreted hook script is reported missing"
+else
+  bad "a deleted interpreted script left the gate green" "$(tail -3 "$TMP/pymissing.log")"
+fi
+
+# ...and it must still NOT be required to be executable. The three .py guards are correctly
+# committed 100644, so demanding the bit here would take the gate red on the real repository.
+FIX_PYMODE="$TMP/pymode"
+make_fixture "$FIX_PYMODE"
+chmod 644 "$FIX_PYMODE/.claude/hooks/pre-tool-guard.py"
+rc=$(run_gate "$FIX_PYMODE" "$TMP/pymode.log")
+if [ "$rc" -eq 0 ]; then
+  ok "an interpreted script is not required to be executable"
+else
+  bad "a 100644 interpreted script was wrongly required to be executable" "$(tail -3 "$TMP/pymode.log")"
+fi
+
+
+# An unclassifiable configured hook must FAIL the gate, not vanish from it. This is the
+# self-concealing shape: an unparsed form used to return None, the target left the derived
+# set, and the expected count shrank to match, so the gate stayed green.
+FIX_UNC="$TMP/unclassified"
+make_fixture "$FIX_UNC"
+python3 - "$FIX_UNC" <<'PYUNC'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = 'true && ' + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYUNC
+rc=$(run_gate "$FIX_UNC" "$TMP/unclassified.log")
+if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/unclassified.log"; then
+  ok "a compound hook command fails the gate and is named"
+else
+  bad "a compound hook command did not fail the gate" "$(tail -3 "$TMP/unclassified.log")"
+fi
+
+# End-to-end: an absolute launcher must FAIL rather than quietly removing the hook from the
+# derived set. Bash runs the hook through /usr/bin/env and returns 126 when it is not
+# executable, so classifying the entry as a harmless external command hid a real breakage.
+FIX_ABS="$TMP/abslauncher"
+make_fixture "$FIX_ABS"
+python3 - "$FIX_ABS" <<'PYABS'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1]) / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+def walk(n):
+    if isinstance(n, dict):
+        c = n.get("command")
+        if n.get("type") == "command" and isinstance(c, str) and "hook-health.sh" in c:
+            n["command"] = "/usr/bin/env " + c
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(d.get("hooks", {}))
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYABS
+rc=$(run_gate "$FIX_ABS" "$TMP/abslauncher.log")
+if [ "$rc" -ne 0 ] && grep -q "cannot be classified" "$TMP/abslauncher.log"; then
+  ok "an absolute launcher fails the gate and is named"
+else
+  bad "an absolute launcher did not fail the gate" "$(tail -3 "$TMP/abslauncher.log")"
+fi
+
+# Adding a hook must not trip the exact-count assertion.
+FIX_ADD="$TMP/addhook"
+make_fixture "$FIX_ADD"
+python3 - "$FIX_ADD" <<'PYADD'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+new = root / ".claude/hooks/extra-guard.sh"
+new.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+os.chmod(new, 0o755)
+p = root / ".claude/settings.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["hooks"].setdefault("PreToolUse", []).append(
+    {"matcher": "Bash", "hooks": [{"type": "command",
+     "command": '"$CLAUDE_PROJECT_DIR"/.claude/hooks/extra-guard.sh'}]})
+p.write_text(json.dumps(d, indent=2), encoding="utf-8")
+PYADD
+rc=$(run_gate "$FIX_ADD" "$TMP/addhook.log")
+if [ "$rc" -eq 0 ]; then
+  ok "adding an executable hook does not trip the exact-count assertion"
+else
+  bad "adding a hook broke the count assertion" "$(tail -3 "$TMP/addhook.log")"
+fi
 
 echo
 printf 'passed: %d  failed: %d\n' "$PASS" "$FAIL"

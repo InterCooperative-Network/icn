@@ -51,6 +51,85 @@ REQUIRED_MATCHER_TOKENS = {
 LITERAL_DOLLAR = "__ICN_LITERAL_DOLLAR__"
 
 
+_PLAIN, _SINGLE, _DOUBLE, _ESCAPED = "plain", "single", "double", "escaped"
+
+
+def _starts_comment(command: str, i: int) -> bool:
+    """Does an unquoted `#` at `i` open a comment?
+
+    ONE definition, because there were two and they disagreed. bash opens a comment at a `#`
+    that begins a word, and an ESCAPED space does not end a word: `<hook> note\\ #123` keeps
+    the `#` inside the argument and runs -- measured, `rc=0`, argument `note #123`. The
+    stripper cut there anyway and left a trailing backslash that would not tokenise, taking
+    the gate red on a runnable command.
+    """
+    if command[i] != "#":
+        return False
+    if i == 0:
+        return True
+    if command[i - 1] not in " \t\n":
+        return False
+    # COUNT the backslashes; do not look at one. An ODD run escapes the whitespace, so the
+    # `#` stays inside the word (`arg\ #123`). An EVEN run is escaped backslashes followed by
+    # REAL whitespace, so the `#` does open a comment (`arg\\ # note`) -- and treating it as
+    # part of the word left an unstripped `; ` or `&& ` in the command, which the composition
+    # check then read as a second program. Measured: bash runs both, rc=0.
+    j, run = i - 2, 0
+    while j >= 0 and command[j] == "\\":
+        run += 1
+        j -= 1
+    return run % 2 == 0
+
+
+def _shell_states(command: str) -> list:
+    """How a shell reads each character of `command`: plain, single-quoted, double-quoted or
+    backslash-escaped.
+
+    ONE quoting model, three consumers -- `$` masking, comment stripping and separator
+    detection. There used to be two, and they disagreed: masking tracked quotes properly while
+    comment stripping was an unconditional `split("#", 1)`. A parser and a splitter holding
+    different opinions about quoting is the defect this file has now hit three times.
+    """
+    states = []
+    i, n = 0, len(command)
+    in_single = in_double = False
+    while i < n:
+        c = command[i]
+        # A COMMENT IS INERT, INCLUDING ITS QUOTES. bash ignores quote characters after an
+        # unquoted `#` that begins a word, but this walker was toggling on them -- so
+        # `echo ok # "` left the model believing a double quote was open, and the NEWLINE
+        # that followed was scored as quoted. The separator check then missed a second
+        # command entirely. Everything from `#` to end of line is scored plain.
+        if not in_single and not in_double and _starts_comment(command, i):
+            while i < n and command[i] != "\n":
+                states.append(_PLAIN)
+                i += 1
+            continue
+        if in_single:
+            # Inside '...' NOTHING is special except the closing quote -- not even backslash.
+            states.append(_SINGLE)
+            if c == "'":
+                in_single = False
+        elif c == "\\" and i + 1 < n:
+            # A backslash escapes in the unquoted and double-quoted contexts alike.
+            states.append(_DOUBLE if in_double else _PLAIN)
+            states.append(_ESCAPED)
+            i += 2
+            continue
+        elif in_double:
+            states.append(_DOUBLE)   # `$` IS expanded inside double quotes.
+            if c == '"':
+                in_double = False
+        else:
+            states.append(_PLAIN)
+            if c == "'":
+                in_single = True
+            elif c == '"':
+                in_double = True
+        i += 1
+    return states
+
+
 def _mask_unexpanded_dollars(command: str) -> str:
     """
     Neutralise every `$` a shell would NOT expand.
@@ -68,39 +147,244 @@ def _mask_unexpanded_dollars(command: str) -> str:
     "25 check(s) passed, 0 failure(s)" while `bash -c` on the identical string exited 127.
     A quoting model that is wrong about quoting is worse than no model, because it looks like one.
     """
+    return "".join(
+        LITERAL_DOLLAR if c == "$" and st in (_SINGLE, _ESCAPED) else c
+        for c, st in zip(command, _shell_states(command)))
+
+
+def _strip_shell_comment(command: str) -> str:
+    """`command` with every unquoted comment removed.
+
+    A comment runs from an unquoted `#` that BEGINS A WORD to the end of ITS LINE. Both halves
+    of that matter, and the previous `command.split("#", 1)[0]` had neither:
+
+      * it cut inside quotes, so `echo "ticket #123"` was truncated mid-string and the leftover
+        unmatched quote came back as "unparseable command" -- the required workflow red on a
+        command the shell runs perfectly well; and
+      * it cut to the end of the STRING, so everything after a comment vanished, including a
+        second command on a later line.
+    """
+    states = _shell_states(command)
     out: list[str] = []
     i, n = 0, len(command)
-    in_single = False
-    in_double = False
     while i < n:
-        c = command[i]
-        if in_single:
-            # Inside '...' NOTHING is special except the closing quote — not even backslash.
-            if c == "'":
-                in_single = False
-            elif c == "$":
-                out.append(LITERAL_DOLLAR)
-                i += 1
-                continue
-            out.append(c)
-        elif c == "\\" and i + 1 < n:
-            # A backslash-escaped $ is literal in both the unquoted and double-quoted contexts.
-            out.append(c)
-            out.append(LITERAL_DOLLAR if command[i + 1] == "$" else command[i + 1])
-            i += 2
+        if states[i] == _PLAIN and _starts_comment(command, i):
+            nl = command.find("\n", i)
+            if nl < 0:
+                break
+            i = nl
             continue
-        elif in_double:
-            if c == '"':
-                in_double = False
-            out.append(c)          # `$` IS expanded inside double quotes — leave it alone.
-        else:
-            if c == "'":
-                in_single = True
-            elif c == '"':
-                in_double = True
-            out.append(c)
+        out.append(command[i])
         i += 1
     return "".join(out)
+
+
+# Characters that make a command more than one simple invocation. Split by WHERE a shell
+# still acts on them: `$` and a backtick expand inside double quotes as well as bare, while
+# the rest are only operators when unquoted.
+_EXPANDS_IN_DOUBLE_QUOTES = set("$`")
+
+
+def _unquoted_operators(command: str, chars=None, also_in_double=frozenset()) -> set:
+    """Shell operator characters the command carries UNQUOTED.
+
+    Read from the character states, not from the token list. shlex strips quote provenance in
+    posix mode, so a data argument made entirely of punctuation -- `echo ";"`, `echo '&&'`,
+    `echo \\;` -- came back as a token indistinguishable from a real operator and the gate
+    went red on a command bash runs normally. Another false rejection from asking a reader a
+    question it had already thrown away the answer to.
+    """
+    chars = _SHELL_OPERATOR_CHARS if chars is None else chars
+    return {c for c, st in zip(command, _shell_states(command))
+            if c in chars and (st == _PLAIN
+                               or (st == _DOUBLE and c in also_in_double))}
+
+
+def _substitution_present(command: str):
+    r"""`"$(...)"` or `` "`...`" `` if the command contains one at all, else None.
+
+    CATEGORICAL. This used to refuse only substitutions NAMING a repository path, which left
+    the ones that FIND one: `echo "$(find . -name hook-health.sh -exec {} \;)"` executes a
+    repository hook without containing a single slash-bearing token, so the target left the
+    derived set and its executable bit went unchecked (icn#2691 review).
+
+    The alternative was a blocklist -- `-exec`, `-execdir`, `xargs`, `sh -c`, `eval`, `git`
+    aliases -- and the sibling PR spent nine rounds establishing where blocklists in this
+    codebase end up. A substitution is another command; the supported language is a SINGLE
+    SIMPLE command; so substitutions are outside it, and that is provable rather than
+    argued.
+
+    Live `.claude/settings.json` had exactly one, and it moved into
+    `.claude/hooks/report-branch.sh` where the shell has an owner and the gate can prove what
+    it needs about argv0. Maintainer-authorised, icn#2691.
+    """
+    states = _shell_states(command)
+    for i, c in enumerate(command):
+        st = states[i] if i < len(states) else _PLAIN
+        if st in (_PLAIN, _DOUBLE):
+            if command.startswith("$(", i):
+                return "$(...)"
+            if c == "`":
+                return "backtick"
+    return None
+
+
+def _raw_words(command: str):
+    """The command's words as RAW slices, quoting intact, split on unquoted whitespace."""
+    states = _shell_states(command)
+    words, i, n = [], 0, len(command)
+    while i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        if i >= n:
+            break
+        start = i
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        words.append((start, command[start:i]))
+    return words
+
+
+def path_word_problem(command: str, word_index: int):
+    """Why the raw word at `word_index` is not a supported path spelling, or None.
+
+    POSITIONAL, and that is the correction. These rules previously scanned the WHOLE command,
+    so `echo "$CLAUDE_PROJECT_DIR".claude` and `echo $CLAUDE_PROJECT_DIR` -- which bash runs
+    fine, because the expansion is a data argument -- were refused, taking the required gate
+    red. Only two operands ever become a path the gate must prove: argv0, and an interpreter's
+    script. The rules belong to those positions, not to the text of the command.
+
+    That scoping also terminates a class rather than answering one more spelling: there is no
+    third position for an expansion to appear in and matter.
+    """
+    words = _raw_words(command)
+    if word_index >= len(words):
+        return None
+    offset, raw = words[word_index]
+    states = _shell_states(command)
+    matches = list(_PROJECT_DIR_TOKEN.finditer(raw))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        return ("%s expands the project directory more than once; the shell concatenates both"
+                % raw)
+    m = matches[0]
+    # The token must START the word, after at most an opening quote. `./"$CLAUDE_PROJECT_DIR"/x`
+    # has bash concatenate `./` with an ABSOLUTE path and attempt `.//…`, exiting 127, while
+    # deleting the embedded expansion left the real hook behind.
+    if m.start() not in (0, 1) or (m.start() == 1 and raw[0] not in "\"'"):
+        return "%s does not begin with the project-directory expansion" % raw
+    if states[offset + m.start()] == _PLAIN:
+        return ("%s expands the project directory unquoted; a checkout path containing "
+                "whitespace would be word-split" % raw)
+    rest = raw[m.end():]
+    if rest[:1] in ('"', "'"):
+        rest = rest[1:]
+    if rest[:1] != "/":
+        return ("%s does not put `/` after the expansion; the shell concatenates it with what "
+                "follows" % raw)
+    return None
+
+
+def _command_word_offset(command: str) -> int:
+    """Index where the COMMAND WORD begins, past any leading `VAR=value` assignments.
+
+    Both path rules below apply to the program and its script argument, not to assignment
+    VALUES. bash does not word-split an assignment value -- verified: with a checkout path
+    containing spaces, `ROOT=$CLAUDE_PROJECT_DIR "$CLAUDE_PROJECT_DIR"/…/hook.sh` runs and
+    `$ROOT` keeps the whole path -- so scanning the entire command rejected a command that
+    works.
+    """
+    states = _shell_states(command)
+    i, n, remaining = 0, len(command), _leading_assignment_words(command)
+    while remaining and i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        remaining -= 1
+    while i < n and command[i] in " \t" and states[i] == _PLAIN:
+        i += 1
+    return i
+
+
+def _has_unquoted_newline(command: str) -> bool:
+    """Does a bash COMMAND SEPARATOR hide in here as a literal newline?
+
+    `shlex` reads a newline as ordinary whitespace, so `echo hi\n<hook>` tokenised to
+    `["echo", "hi", "<hook>"]`, argv0 was `echo`, and the entry classified NON_HOOK -- while
+    bash runs both lines and returns 126 from the second if the hook is not executable. The
+    hook then left the derived set, taking its executable check and its share of the expected
+    count with it. `;`, `&&` and `|` were already caught as tokens; a newline is the spelling
+    that never reaches the lexer.
+    """
+    return any(c == "\n" and st == _PLAIN
+               for c, st in zip(command, _shell_states(command)))
+
+
+_PROJECT_DIR_TOKEN = re.compile(r"\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?![A-Za-z0-9_]))")
+_PROJECT_DIR_TOKEN_OPT_SLASH = re.compile(_PROJECT_DIR_TOKEN.pattern + "/?")
+
+
+def _sub_project_dir(text: str, replacement: str = "") -> str:
+    """Replace the project-dir variable AT A TOKEN BOUNDARY, and only there.
+
+    A plain `.replace("$CLAUDE_PROJECT_DIR", ...)` also rewrites the prefix of a LONGER name:
+    `$CLAUDE_PROJECT_DIRoops/../.claude/hooks/hook-health.sh` became the real hook, so the
+    executable check passed for a command bash resolves to something else entirely and exits
+    127. A shell expands the longest valid name, not the prefix we hoped for.
+
+    Five call sites asked this same question in four slightly different ways. They ask it here
+    now, because a reader corrected in one place and not the others is how this file has been
+    wrong four times.
+    """
+    # ONCE. Replacing EVERY occurrence collapsed
+    # `$CLAUDE_PROJECT_DIR/$CLAUDE_PROJECT_DIR/.claude/hooks/hook-health.sh` to the real hook,
+    # while bash expands both and attempts a doubled absolute path, exiting 127. A second
+    # occurrence now keeps its `$`, and the unresolved-expansion rule refuses the command --
+    # the right answer, reached by an existing rule rather than a new one.
+    if replacement:
+        return _PROJECT_DIR_TOKEN.sub(lambda _: replacement, text, count=1)
+    # Removing the variable also removes the slash that FOLLOWED it, so `$VAR/x` becomes `x`
+    # rather than `/x`. Only that slash: my first version stripped any leading `/`, which
+    # turned the token `/dev/null` -- an absolute path outside the repo, and the live
+    # `2>/dev/null` redirection -- into the repo-relative `dev/null`, and the gate went red on
+    # its own settings.json. The live run caught it, which is the point of running it.
+    # ONE pass, not two. Two subs each capped at count=1 still remove TWO occurrences, which
+    # is the defect this cap exists to close -- the second token has to survive so the
+    # unresolved-expansion rule can refuse it by name rather than by an incidental
+    # containment failure. The optional trailing slash goes with the token it follows.
+    return _PROJECT_DIR_TOKEN_OPT_SLASH.sub("", text, count=1)
+
+
+def _leading_assignment_words(command: str) -> int:
+    """How many leading words are REAL `VAR=value` assignment prefixes.
+
+    Decided before quoting is discarded. shlex strips quote provenance, so `FOO\\=bar <hook>`,
+    `'FOO=bar' <hook>` and `"FOO=bar" <hook>` all arrived looking like assignments -- and bash
+    treats every one of them as the COMMAND NAME, exiting 127 without ever running the hook,
+    while the classifier skipped the word and certified the hook as a direct target.
+
+    A word is an assignment only when its `NAME=` prefix is entirely unquoted.
+    """
+    states = _shell_states(command)
+    count, i, n = 0, 0, len(command)
+    while i < n:
+        while i < n and command[i] in " \t" and states[i] == _PLAIN:
+            i += 1
+        start = i
+        while i < n and not (command[i] in " \t" and states[i] == _PLAIN):
+            i += 1
+        word, word_states = command[start:i], states[start:i]
+        eq = word.find("=")
+        if eq <= 0:
+            return count
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=$", word[:eq + 1]):
+            return count
+        if any(st != _PLAIN for st in word_states[:eq + 1]):
+            return count                    # the `=` (or the name) was quoted or escaped
+        count += 1
+    return count
 
 
 def _invokes_hook(command: str, root: Path) -> bool:
@@ -115,14 +399,28 @@ def _invokes_hook(command: str, root: Path) -> bool:
     runtime is wired must not accept a command that provably never runs it.
     """
     # Mask literal `$` BEFORE shlex removes the quoting that decides whether it expands.
-    stripped = _mask_unexpanded_dollars(command.split("#", 1)[0].strip())
+    stripped = _mask_unexpanded_dollars(_strip_shell_comment(command).strip())
 
     # NO SHELL OPERATORS. Everything after argv0 used to be ignored, so appending ` </dev/null`
     # to each hook left the gate at 25/0 while the hook received no payload at all and answered
     # "DEGRADED — hook payload unparseable" on every single event: no register, no progress, no
     # release. A redirection, a pipe or a second command can change what runs or what it reads,
     # and none of them belong in a hook invocation.
-    if re.search(r"[<>;&|`$(){}]", stripped.replace("$CLAUDE_PROJECT_DIR", "")):
+    #
+    # QUOTE-AWARE, for the reason the classifier already is. A plain `re.search` treated a
+    # data argument made of punctuation -- `<hook> ";"` -- as a redirection and returned
+    # False, so the event was reported as not invoking the hook at all while the classifier
+    # called the very same command a direct invocation. Two siblings reading one command
+    # string must not disagree about what an operator is; that disagreement is how one of
+    # them ends up wrong, and here it would have been a false rejection of a valid config.
+    #
+    # The two functions still differ DELIBERATELY on `$` and backticks inside double quotes.
+    # The classifier asks what program argv0 is, and `<hook> "$HOME"` runs the hook; this
+    # asks whether the invocation is unadorned, and an expansion is something else deciding
+    # what the hook receives. That asymmetry is fail-CLOSED -- the gate goes red on a config
+    # that would work -- and it is pinned by tests rather than left to be rediscovered.
+    if _unquoted_operators(_sub_project_dir(stripped),
+                           set("<>;&|`$(){}"), _EXPANDS_IN_DOUBLE_QUOTES):
         return False
 
     try:
@@ -130,9 +428,8 @@ def _invokes_hook(command: str, root: Path) -> bool:
     except ValueError:
         return False
     # Leading VAR=value environment assignments are legitimate and are not the program.
-    idx = 0
-    while idx < len(tokens) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[idx]):
-        idx += 1
+    # Same question, same answer: an escaped or quoted `=` makes the word a command name.
+    idx = _leading_assignment_words(stripped)
     if idx >= len(tokens):
         return False
     argv0 = tokens[idx]
@@ -146,9 +443,7 @@ def _invokes_hook(command: str, root: Path) -> bool:
     # exits 127 and lifecycle tracking is entirely off — satisfied `endswith()` and left the
     # gate reporting 25 checks passed. Resolve the path and compare it to the file the gate
     # separately execs.
-    resolved = argv0.replace("$CLAUDE_PROJECT_DIR", str(root)).replace(
-        "${CLAUDE_PROJECT_DIR}", str(root)
-    )
+    resolved = _sub_project_dir(argv0, str(root))
     candidate = Path(resolved)
     if not candidate.is_absolute():
         candidate = root / resolved
@@ -159,21 +454,98 @@ def _invokes_hook(command: str, root: Path) -> bool:
         return False
 
 
+# Executables this gate requires regardless of how settings.json is wired. Hook targets are
+# NOT listed here -- they are DERIVED from .claude/settings.json below, because a hardcoded
+# list is a second copy of the wiring and it rotted: hook-health.sh was invoked directly at
+# settings.json while being committed 100644, so it exited 126 at every session start and this
+# gate never looked at it. Deriving means a newly added direct hook is covered on the day it
+# is added (Refs icn#2691).
 REQUIRED_EXECUTABLES = [
     "ops/scripts/icn-agent-session",
     "ops/scripts/icn-wait",
-    HOOK,
 ]
 
-# Provider adapters that must keep pointing at the ops MCP server. They do not get hooks (see
-# COVERAGE below), so the MCP surface is the only capability route they have.
+
+def direct_hook_targets(settings: dict, root: Path):
+    """Repo paths that settings.json runs AS the command, so the kernel must exec them.
+
+    SYNTACTIC, not existence-filtered. Filtering on is_file() removed a configured hook from
+    this list the moment its file was deleted, so both the executable loop and the derived
+    check count shrank by one and the gate reported no `missing:` failure while settings.json
+    went on invoking a command that was not there. Identification is by shape -- a relative
+    path with a directory component, which `echo` and other bare builtins do not have -- and
+    the existing missing/executable branches then fail closed on it.
+
+    A file run through an interpreter (`python3 .../pre-tool-guard.py`) is not argv0 and does
+    not need the bit, which is why the three .py hooks are correctly 100644.
+    """
+    found: list[str] = []
+    interpreted: list[str] = []
+    unclassified: list[tuple[str, str]] = []
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "command" and isinstance(node.get("command"), str):
+                # A command this function cannot parse yields no target. It must NOT stop the
+                # traversal: one malformed entry would otherwise skip whatever sits below it,
+                # and the "derived from settings.json" guarantee is only as good as the walk.
+                kind, target, detail = classify_hook_command(node["command"], root)
+                if kind == HookCommandKind.UNCLASSIFIED:
+                    unclassified.append((node["command"], detail))
+                elif kind == HookCommandKind.DIRECT and target not in found:
+                    found.append(target)
+                elif (kind == HookCommandKind.INTERPRETED and target
+                      and target not in interpreted):
+                    interpreted.append(target)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(settings.get("hooks", {}))
+    return found, interpreted, unclassified
+
+
+# Shell launchers that exec the command they are handed and return its status. `help command`
+# and `env(1)` both confirm the target is attempted and its exit status propagates, so a hook
+# behind one of these is still a direct invocation and its executable bit still matters.
+# The supported hook-command language, derived from live .claude/settings.json rather than
+# from what a shell can express. That file holds 18 command hooks in exactly three shapes:
+# 13 direct repository executables, 3 python3-invoked scripts, 2 echo. Zero launchers, no
+# `true`, no `:`, and no top-level shell composition.
+#
+# Launcher support (command/env/exec/nohup) was REMOVED. Nothing used it, and one flag set
+# shared across four programs mis-classified: `command -v <hook>` only PRINTS a description
+# and `env -0 <hook>` refuses to run a command at all, yet both were certified as direct
+# execution -- the gate claiming executable-bit coverage for commands that never invoke the
+# target. Sharing a grammar across four languages was the defect; no grammar is smaller than
+# a wrong one. A future `env … hook.sh` makes this gate red as an unclassified command form
+# until support is added deliberately, which is fail-closed evolution rather than regression.
+_INTENTIONAL_NON_HOOK = ("echo",)
+_INTERPRETERS = ("python", "python3")
+
+# Operators that compose several commands into one hook entry. Detected as TOKENS through
+# shlex punctuation_chars so quoting is respected -- the live
+# `echo "branch: $(git … || echo detached)"` carries `||` inside a command substitution and is
+# correctly NOT composition, which a substring search would have got wrong.
+_SHELL_OPERATOR_CHARS = set(";&|<>()")
+
+
 # How many checks a COMPLETE run performs. Asserted, not decorative — see the floor in main().
-EXPECTED_CHECKS = 25
+#
+# Split into a fixed part and a derived part (icn#2691). The fixed part stays EXACT for the
+# reason the original comment gives: a check that skipped itself is not a check that passed.
+# The hook-executable checks are derived from settings.json, so their count legitimately
+# changes when a hook is added or removed — pinning that to a literal would make adding a hook
+# a spurious failure, and the temptation would be to lower the number rather than look.
+EXPECTED_STATIC_CHECKS = 24
 
 PROVIDER_MCP_CONFIGS = [
     (".mcp.json", ["mcpServers", "icn-ops"]),
     (".cursor/mcp.json", ["mcpServers", "icn-ops"]),
 ]
+
 
 COVERAGE = {
     "supported": {
@@ -200,6 +572,303 @@ COVERAGE = {
             "ephemeral, no worktree, no persistent registry — deliberately out of scope.",
     },
 }
+
+
+class HookCommandKind:
+    DIRECT = "direct repo executable"
+    INTERPRETED = "interpreter-invoked repo script"
+    NON_HOOK = "intentional non-hook command"
+    UNCLASSIFIED = "unclassified"
+
+
+def _tokenize(cmd):
+    """Tokens with shell operators separated and quoting respected, or None if unlexable."""
+    try:
+        lexer = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        # THE THIRD READER. `_strip_shell_comment` already removed comments quote-awarely, and
+        # shlex's own commenter then removed them AGAIN by a different rule -- one that fires
+        # mid-word. Bash treats `#` inside a word as part of it, so
+        # `.claude/hooks/hook-health.sh#missing` was truncated to the real hook, whose bit was
+        # checked, while Claude runs the suffixed path and exits 127. Comments are stripped in
+        # exactly one place.
+        lexer.commenters = ""
+        return list(lexer)
+    except ValueError:
+        return None
+
+
+def classify_hook_command(command: str, root: Path | None = None):
+    """Classify one settings.json hook command: (kind, target_or_None, detail).
+
+    UNCLASSIFIED is a gate FAILURE, never silence. An unreadable form used to yield no
+    target, which dropped it from the derived set -- and the expected check count derives
+    from that same list, so the loss concealed itself and the gate stayed green.
+    """
+    if _has_unquoted_newline(command):
+        # Checked on the RAW command: a newline inside a comment still ends that comment and
+        # starts a new one, and the lexer below never sees a newline at all.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a literal newline, which bash reads as a command separator; only a "
+                "single simple command is supported")
+    # THE COMMENT-STRIPPED SPELLING, with quoting still intact, is what every reader below
+    # uses. Scanning the raw command for operators flagged text inside an explanatory comment
+    # -- `<hook> # use && fallback` was reported as composition and the gate went red on a
+    # command bash runs normally. Stripping only removes comment ranges, so quote provenance
+    # survives it.
+    no_comment = _strip_shell_comment(command)
+    cmd = _mask_unexpanded_dollars(no_comment.strip())
+    if not cmd:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+    tokens = _tokenize(cmd)
+    if tokens is None:
+        return HookCommandKind.UNCLASSIFIED, None, "unparseable command"
+    if not tokens:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+
+    ops = _unquoted_operators(no_comment)
+    if ops:
+        # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
+        # a later one may be a hook whose executable bit decides whether it runs.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "top-level shell composition (%s); only a single simple command is supported"
+                % " ".join(sorted(ops)))
+
+    inside = _substitution_present(no_comment)
+    if inside is not None:
+        # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
+        # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
+        # returns 0 whatever the hook does, so a mode-0644 file reported permission denied
+        # while the gate stayed green and the target never entered the derived set.
+        #
+        # Only a substitution NAMING A REPOSITORY PATH is refused, not every substitution:
+        # live settings.json carries `echo "branch: $(git … || echo detached)"`, which names
+        # no repository file and is what this gate is meant to accept.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a %s command substitution; substitutions are executable shell and "
+                "are outside the supported hook-command language" % inside)
+
+    if _has_unquoted_newline(command):
+        # Checked on the RAW command: a newline inside a comment still ends that comment and
+        # starts a new one, and the lexer below never sees a newline at all.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a literal newline, which bash reads as a command separator; only a "
+                "single simple command is supported")
+    # THE COMMENT-STRIPPED SPELLING, with quoting still intact, is what every reader below
+    # uses. Scanning the raw command for operators flagged text inside an explanatory comment
+    # -- `<hook> # use && fallback` was reported as composition and the gate went red on a
+    # command bash runs normally. Stripping only removes comment ranges, so quote provenance
+    # survives it.
+    no_comment = _strip_shell_comment(command)
+    stray = next((c for c in command if c in "\r\x0b\x0c\x00"), None)
+    if stray is not None:
+        # NON-SHELL WHITESPACE IS NOT WHITESPACE. Python's `strip()` removes `\r`, so a
+        # CR-terminated executable word normalised to the real hook and its bit was checked --
+        # while bash does not treat CR as shell whitespace and attempts a CR-suffixed
+        # filename, exiting 127. Rejected rather than normalised away: the gate must reason
+        # about the command the SHELL sees, and stripping made the two differ.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains %r, which bash does not treat as shell whitespace; it becomes part "
+                "of a word rather than separating one" % stray)
+    cmd = _mask_unexpanded_dollars(no_comment.strip())
+    if not cmd:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+    tokens = _tokenize(cmd)
+    if tokens is None:
+        return HookCommandKind.UNCLASSIFIED, None, "unparseable command"
+    if not tokens:
+        return HookCommandKind.NON_HOOK, None, "empty command"
+
+    ops = _unquoted_operators(no_comment)
+    if ops:
+        # `true && hook`, `echo x; hook`, `echo x | hook`: argv0 is not the only program, and
+        # a later one may be a hook whose executable bit decides whether it runs.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "top-level shell composition (%s); only a single simple command is supported"
+                % " ".join(sorted(ops)))
+
+    inside = _substitution_present(no_comment)
+    if inside is not None:
+        # A COMMAND SUBSTITUTION IS EXECUTABLE SHELL, including inside a quoted argument of an
+        # otherwise exempt command. `echo "$(<hook>)"` RUNS the hook -- and the outer echo
+        # returns 0 whatever the hook does, so a mode-0644 file reported permission denied
+        # while the gate stayed green and the target never entered the derived set.
+        #
+        # Only a substitution NAMING A REPOSITORY PATH is refused, not every substitution:
+        # live settings.json carries `echo "branch: $(git … || echo detached)"`, which names
+        # no repository file and is what this gate is meant to accept.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "contains a %s command substitution; substitutions are executable shell and "
+                "are outside the supported hook-command language" % inside)
+
+
+    # Leading VAR=value assignments are kept, unlike launchers. `_invokes_hook` in this same
+    # file already treats them as part of a direct invocation, and the suite exercises that
+    # shape -- two siblings disagreeing about what a hook command looks like is how one of
+    # them ends up wrong. Launchers had no such sibling support and no live use.
+    n_assign = _leading_assignment_words(cmd)
+    problem = path_word_problem(no_comment, n_assign)
+    if problem is not None:
+        return HookCommandKind.UNCLASSIFIED, None, problem
+    assigned = n_assign > 0
+    tokens = tokens[n_assign:]
+    if not tokens:
+        return HookCommandKind.UNCLASSIFIED, None, "assignments with no command"
+
+    argv0 = tokens[0]
+    argv0 = _sub_project_dir(argv0)
+    if "$" in argv0:
+        # AN UNRESOLVED EXPANSION IS NOT A PATH SEGMENT. `$CLAUDE_PROJECT_DIRoops/../.claude/
+        # hooks/hook-health.sh` survives the token-boundary substitution correctly -- and then
+        # got joined to the root as a LITERAL segment, where the `..` cancelled it and the
+        # path resolved to the real hook. Bash expands the longer name to empty and attempts
+        # `/../.claude/...`, exiting 127. Fixing the substitution was necessary and not
+        # sufficient: what remains is a value this gate cannot know, so it says so.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%s contains a shell expansion this gate cannot resolve, so the path bash "
+                "actually runs is not knowable here" % argv0)
+    base = argv0.rsplit("/", 1)[-1]
+
+    # CONTAINMENT IS DECIDED PHYSICALLY, AND BEFORE ANY NAME-BASED EXEMPTION.
+    #
+    # Two opposite failures came from getting that order and that test wrong, and both were
+    # fail-open -- the target left the derived set, and the expected check count derives from
+    # that same list, so each loss concealed itself:
+    #
+    #   * The interpreter exemption was applied to the BASENAME first, so a repository hook
+    #     NAMED `python3` (`$CLAUDE_PROJECT_DIR/.claude/hooks/python3`) was read as "runs the
+    #     interpreter" although it is argv0 itself. Mode 0644 on it left the gate green while
+    #     Claude got exit 126.
+    #   * Containment was tested LEXICALLY (`startswith("..")`), which sees only the FIRST
+    #     component. `.claude/../../../usr/bin/env <hook>` has no leading `..`, so it passed
+    #     as a repository path, and joining it to the root then escaped the tree entirely --
+    #     the executable check certified /usr/bin/env while the hook `env` actually runs, and
+    #     its executable bit, went unexamined.
+    #
+    # So: anything spelled as a PATH is resolved against the root and classified by where it
+    # physically lands. A BARE name keeps shell semantics -- it is looked up on PATH, never
+    # against the repository -- so `python3` is the interpreter even if a file of that name
+    # sits at the root, and `echo` is the builtin.
+    if "/" in argv0:
+        if root is None:
+            return HookCommandKind.UNCLASSIFIED, None, "path command, no root to resolve against"
+        if ".." in Path(argv0).parts:
+            # NO `..` IN A HOOK PATH. `Path.resolve()` is non-strict, so
+            # `$CLAUDE_PROJECT_DIR/missing/../.claude/hooks/hook-health.sh` collapses to the
+            # real hook and the executable check passes -- while bash cannot traverse a
+            # component that does not exist and exits 127. Resolving strictly would trade
+            # that for a crash on a legitimately missing file, and verifying every
+            # intermediate component is machinery. No live hook path contains `..`, so the
+            # supported language simply does not have it -- which also retires the earlier
+            # out-of-repository traversal case by construction rather than by containment.
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s contains a `..` component; a hook path must name its target "
+                    "directly, because a traversal through a component that does not exist "
+                    "resolves cleanly here and fails in the shell" % argv0)
+        try:
+            base_dir = Path(root).resolve()
+            candidate = Path(argv0)
+            resolved = (candidate if candidate.is_absolute() else base_dir / candidate).resolve()
+        except (ValueError, OSError) as exc:
+            return HookCommandKind.UNCLASSIFIED, None, "unresolvable path (%s)" % exc
+        if resolved.is_relative_to(base_dir):
+            # Reported in RESOLVED form. The caller joins this to the root, so handing back
+            # the raw spelling would hand back the traversal with it.
+            return (HookCommandKind.DIRECT, resolved.relative_to(base_dir).as_posix(),
+                    "direct repo executable")
+        # NO NAME EXEMPTION OUT HERE. The interpreter exemption used to apply to an external
+        # path whose BASENAME looked right, so `/tmp/python3` -- a symlink to `/usr/bin/env`,
+        # or any program at all -- was certified as "runs the interpreter" and the hook it
+        # actually launches left the derived set. Verifying the binary would mean resolving
+        # symlinks, or executing it, to defend a spelling NOTHING USES: live settings.json
+        # runs 13 repository paths, 3 bare `python3` and 2 bare `echo`, and not one absolute
+        # interpreter. So the claim is removed rather than defended, exactly as launcher
+        # support was. A future `/usr/bin/python3 x.py` makes this gate red until support is
+        # added deliberately.
+        #
+        # NOT harmless. `/usr/bin/env <hook>` runs the hook and returns 126 when it is not
+        # executable; `/bin/sh -c …` can run anything. An arbitrary external executable may
+        # wrap, source or otherwise invoke a repository hook, so it stays unclassified until
+        # the repository actually needs one and specifies it.
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%s resolves to %s, outside the repository: not a supported command form, "
+                "and not provably harmless -- it may invoke a repository hook"
+                % (argv0, resolved))
+
+    # A COMMAND-LOCAL ASSIGNMENT AND A BARE NAME DO NOT MIX. A bare name is resolved through
+    # PATH, and an assignment can BE the PATH: `PATH=/tmp:$PATH python3 <hook>` runs whatever
+    # /tmp/python3 is -- a symlink to `env`, say, which then launches the hook directly and
+    # returns 126 on a mode-0644 file, while the name exemption reported "runs python3" and
+    # dropped the target. Enumerating which variables matter (PATH, ENV, LD_PRELOAD, ...) is a
+    # list to be wrong about; a name-based exemption simply requires that nothing local could
+    # have changed what the name resolves to. Assignments stay supported in front of a repo
+    # PATH, which is the shape live settings.json would use and the one the suite exercises,
+    # because a path is not looked up.
+    if assigned:
+        return (HookCommandKind.UNCLASSIFIED, None,
+                "%r is a bare name behind a command-local assignment, which can change what "
+                "it resolves to" % argv0)
+    if base in _INTERPRETERS:
+        # THE ARGUMENT IS PART OF THE GRAMMAR. A basename-only exemption made `python3` mean
+        # "not a hook invocation" whatever followed it, so
+        # `python3 -c 'import os; os.system("…/hook-health.sh")'` classified INTERPRETED and
+        # the hook left the derived set -- and the nested shell's permission-denied is
+        # invisible because os.system's return value is discarded and python exits 0.
+        #
+        # The supported form is the one live settings.json uses, three times and in one
+        # shape: the interpreter followed by a repository .py script. `-c`, `-m` and every
+        # other flag are refused rather than reasoned about, because reasoning about what a
+        # Python string argument executes is not something this gate can do.
+        rest = tokens[1:]
+        if not rest or rest[0].startswith("-"):
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is invoked with %s; the supported form is the interpreter followed by "
+                    "a repository .py script, and what any other argument executes is not "
+                    "something this gate can establish"
+                    % (base, ("no argument" if not rest else "the option %r" % rest[0])))
+        script = rest[0]
+        problem = path_word_problem(no_comment, n_assign + 1)
+        if problem is not None:
+            return HookCommandKind.UNCLASSIFIED, None, problem
+        script = _sub_project_dir(script)
+        # THE SAME TWO RULES AS argv0. They were written for argv0 and not carried to the
+        # interpreter's argument, so `python3 $CLAUDE_PROJECT_DIR/missing/../<guard>.py`
+        # normalised to the real guard while bash cannot traverse `missing`. A rule applied
+        # to one path and not the other is how this file has been wrong repeatedly.
+        if "$" in script:
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which contains a shell expansion this gate cannot "
+                    "resolve" % (base, script))
+        if ".." in Path(script).parts:
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which contains a `..` component; a traversal through a "
+                    "component that does not exist resolves cleanly here and fails in the "
+                    "shell" % (base, script))
+        try:
+            base_dir = Path(root).resolve() if root is not None else None
+            cand = Path(script)
+            resolved = None if base_dir is None else (
+                cand if cand.is_absolute() else base_dir / cand).resolve()
+        except (ValueError, OSError) as exc:
+            return HookCommandKind.UNCLASSIFIED, None, "unresolvable script path (%s)" % exc
+        if resolved is None:
+            return HookCommandKind.UNCLASSIFIED, None, "interpreter script, no root to resolve against"
+        if not resolved.is_relative_to(base_dir) or resolved.suffix != ".py":
+            return (HookCommandKind.UNCLASSIFIED, None,
+                    "%s is handed %s, which is not a repository .py script" % (base, script))
+        # The SCRIPT PATH is returned, not None. Classifying from containment and the `.py`
+        # suffix alone meant a deleted or renamed guard stayed INTERPRETED with no target, so
+        # nothing checked that the file exists -- Claude gets a Python file-not-found and the
+        # derived count never moves. It is a separate target class from the direct ones: an
+        # interpreted script is argv[1], so it must EXIST and be readable, and must NOT be
+        # required to be executable. That is why the three .py guards are correctly 100644.
+        return (HookCommandKind.INTERPRETED,
+                resolved.relative_to(base_dir).as_posix(),
+                "runs %s on %s" % (base, script))
+    if base in _INTENTIONAL_NON_HOOK:
+        return HookCommandKind.NON_HOOK, None, "%s is not a hook" % base
+    return (HookCommandKind.UNCLASSIFIED, None,
+            "%r is neither a repository path nor a recognised non-hook command" % argv0)
 
 
 def main() -> int:
@@ -262,7 +931,13 @@ def main() -> int:
         ok(f"{event} -> {HOOK} (matcher {invoking[0]!r})")
 
     # 2. the things the hooks call actually exist and can be executed
-    for rel in REQUIRED_EXECUTABLES:
+    hook_targets, interpreted_targets, unclassified_cmds = direct_hook_targets(settings, root)
+    for cmd, detail in unclassified_cmds:
+        failures.append(
+            f"settings.json hook command cannot be classified: {cmd!r} ({detail}). The gate "
+            "cannot prove whether this executes a repository hook, and silently ignoring it "
+            "would drop an executable check while shrinking the expected count to match")
+    for rel in REQUIRED_EXECUTABLES + hook_targets:
         path = root / rel
         if not path.is_file():
             failures.append(f"missing: {rel}")
@@ -270,6 +945,19 @@ def main() -> int:
             failures.append(f"not executable: {rel} (chmod +x)")
         else:
             ok(f"executable: {rel}")
+
+    # 2a. An INTERPRETED script is argv[1], so its executable bit does not matter -- but its
+    # EXISTENCE does. Renaming one left the gate green while Claude got a file-not-found.
+    for rel in interpreted_targets:
+        path = root / rel
+        if not path.is_file():
+            failures.append(
+                f"missing: {rel} — settings.json runs it through an interpreter, so the bit "
+                "is not required, but the file has to be there")
+        elif not os.access(path, os.R_OK):
+            failures.append(f"not readable: {rel} (the interpreter must be able to open it)")
+        else:
+            ok(f"interpreted script present: {rel}")
 
     # 3. provider adapters still reach the ops MCP
     for rel, keypath in PROVIDER_MCP_CONFIGS:
@@ -460,12 +1148,14 @@ def main() -> int:
     # this was latent rather than live; a floor makes it neither.
     # EXACT, not a floor. `checked < EXPECTED_CHECKS` let a spurious extra ok() report
     # "26 check(s) passed" and exit 0 — which is how a duplicated check masks a lost one.
-    if checked != EXPECTED_CHECKS:
+    expected = EXPECTED_STATIC_CHECKS + len(hook_targets) + len(interpreted_targets)
+    if checked != expected:
         failures.append(
-            f"{checked} checks ran, expected exactly {EXPECTED_CHECKS} — a check that skipped "
+            f"{checked} checks ran, expected exactly {expected} — a check that skipped "
             "itself is "
             "not a check that passed. Something the gate depends on is missing (an unbuilt "
-            "ops/mcp/dist, a deleted adapter); fix that rather than lowering EXPECTED_CHECKS"
+            "ops/mcp/dist, a deleted adapter); fix that rather than lowering "
+            "EXPECTED_STATIC_CHECKS"
         )
 
     print(f"agent-runtime adoption: {checked} check(s) passed, {len(failures)} failure(s)")

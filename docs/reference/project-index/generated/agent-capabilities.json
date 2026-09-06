@@ -404,17 +404,17 @@
     {
       "event": "PreToolUse",
       "matcher": "Edit|Write",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/report-branch.sh"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
       "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scope-guard.sh"
     },
     {
       "event": "PreToolUse",
       "matcher": "Edit|Write",
       "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/todo-guard.sh"
-    },
-    {
-      "event": "PreToolUse",
-      "matcher": "Edit|Write",
-      "command": "echo \"branch: $(git branch --show-current 2>/dev/null || echo detached)\""
     },
     {
       "event": "PreToolUse",
