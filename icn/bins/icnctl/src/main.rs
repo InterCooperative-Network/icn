@@ -2232,6 +2232,15 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// The trust store `icnd` opens, resolved through the same owner the daemon uses.
+///
+/// `icn_core::config` owns the subdirectory name; spelling it here a second time
+/// is what let `init-coop` write bootstrap trust into `store/` while the daemon
+/// read `store/trust/` (#2718).
+fn get_trust_store_path(data_dir: &Path) -> PathBuf {
+    get_store_path(data_dir).join(icn_core::config::TRUST_STORE_SUBDIR)
+}
+
 /// Refuse to touch a data directory the N2-A startup gate would refuse to open
 /// (#2627 M4d).
 ///
@@ -8182,17 +8191,30 @@ async fn handle_init_coop_command(
         println!("Step 1: Creating new identity");
         std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
-        print!("Choose a passphrase: ");
-        io::stdout().flush()?;
-        let passphrase1 = rpassword::read_password()?;
+        // The identity-reuse branch above already resolves the passphrase through
+        // `read_passphrase`, which honours ICN_KEYSTORE_PASSPHRASE. This branch used
+        // `rpassword` directly, so creating a *new* identity demanded a TTY even under
+        // `--yes` -- the wizard could not run unattended, and its trust-persistence
+        // contract could not be exercised end to end (#2718).
+        let passphrase1 = match passphrase_from_env() {
+            // Confirming an environment variable against itself proves nothing, so the
+            // second prompt is skipped rather than answered twice.
+            Some(from_env) => from_env,
+            None => {
+                print!("Choose a passphrase: ");
+                io::stdout().flush()?;
+                let first = rpassword::read_password()?;
 
-        print!("Confirm passphrase: ");
-        io::stdout().flush()?;
-        let passphrase2 = rpassword::read_password()?;
+                print!("Confirm passphrase: ");
+                io::stdout().flush()?;
+                let second = rpassword::read_password()?;
 
-        if passphrase1 != passphrase2 {
-            bail!("Passphrases do not match");
-        }
+                if first != second {
+                    bail!("Passphrases do not match");
+                }
+                first
+            }
+        };
         if passphrase1.len() < 8 {
             bail!("Passphrase must be at least 8 characters");
         }
@@ -8433,10 +8455,15 @@ token_expiry_hours = 24
     }
     println!();
 
-    // Step 7: Create trust edges for initial members
-    let store_path = get_store_path(data_dir);
-    std::fs::create_dir_all(&store_path)?;
-    let store = SledStore::open(&store_path).context("Failed to open store")?;
+    // Step 7: Create trust edges for initial members.
+    //
+    // This must be the same sled database `icnd` opens, or the wizard reports
+    // bootstrap trust it then cannot see (#2718). The path is owned by
+    // `icn_core::config`, not spelled here, so the writer cannot drift from the
+    // reader again.
+    let trust_store_path = get_trust_store_path(data_dir);
+    std::fs::create_dir_all(&trust_store_path)?;
+    let store = SledStore::open(&trust_store_path).context("Failed to open trust store")?;
     let store = Arc::new(store);
     let mut trust_graph = TrustGraph::new(store, my_did.clone());
 

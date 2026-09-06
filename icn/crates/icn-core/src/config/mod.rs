@@ -164,6 +164,12 @@ impl Default for Config {
     }
 }
 
+/// Subdirectory of [`Config::store_path`] that holds the trust store.
+///
+/// Declared once so a writer and a reader cannot drift apart on the spelling.
+/// Both `icnd` and `icnctl init-coop` resolve the trust store through this.
+pub const TRUST_STORE_SUBDIR: &str = "trust";
+
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
@@ -204,6 +210,17 @@ impl Config {
     /// Get the ledger store path (sled DB for double-entry ledger)
     pub fn ledger_store_path(&self) -> PathBuf {
         self.store_path().join("ledger")
+    }
+
+    /// Get the trust store path (sled DB for trust attestations and scores).
+    ///
+    /// This is the canonical owner of the trust subdirectory. `icnd` opens the
+    /// trust store here, and any bootstrap writer that seeds trust state must
+    /// resolve the same path or the daemon will not observe what it wrote —
+    /// `icnctl init-coop` previously opened `store/` itself and reported success
+    /// while the daemon read an empty `store/trust/` (#2718).
+    pub fn trust_store_path(&self) -> PathBuf {
+        self.store_path().join(TRUST_STORE_SUBDIR)
     }
 
     /// Validate configuration and return a list of warnings/errors
