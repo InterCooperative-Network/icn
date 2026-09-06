@@ -60,7 +60,13 @@ done
 #
 # Full verification introspects the live MCP server and lives in
 # scripts/check-agent-capabilities.py (run in CI). Here we only assert the generated manifest
-# EXISTS and parses, because drift-check.sh must stay fast and dependency-free.
+# EXISTS and parses, because drift-check.sh must stay fast.
+#
+# NOTE: this script is no longer strictly dependency-free. Check 8 below runs
+# scripts/check-agent-registry.py, which requires PyYAML -- YAML parse validity is owned by a
+# YAML parser rather than reimplemented (icn#2632). Install with
+# `python3 -m pip install -r scripts/requirements.txt`. The statement above was true when
+# written and is corrected here rather than left to mislead.
 
 CAP_MANIFEST="${REPO_ROOT}/docs/reference/project-index/generated/agent-capabilities.json"
 if [[ ! -f "${CAP_MANIFEST}" ]]; then
@@ -274,27 +280,26 @@ except Exception as e:
   fi
 fi
 
-# ─── Check 6: agents.json lists all agents in .claude/agents/ ───────────────
+# ─── Check 6: the agent registry is true about every provider surface ───────
 
-AGENTS_FILE="${REPO_ROOT}/ops/state/truth/agents.json"
-AGENTS_DIR="${REPO_ROOT}/.claude/agents"
+# Was: a bash loop over .claude/agents/ only, one direction, comparing basenames. It could
+# not see .github/agents/ (21 live Copilot definitions) or the icn-agent-pack plugin tree,
+# and it never validated a registered path. Delegated to the checker that does both
+# directions across every declared surface (Refs icn#2632).
 
-if [[ -f "${AGENTS_FILE}" ]] && [[ -d "${AGENTS_DIR}" ]]; then
-  registered=$(python3 -c "
-import json
-d = json.load(open('${AGENTS_FILE}'))
-names = {a['name'] for a in d['agents']}
-print('\n'.join(sorted(names)))
-" 2>/dev/null || echo "")
-
-  for agent_file in "${AGENTS_DIR}"/*.md; do
-    agent_name=$(basename "${agent_file}" .md)
-    if ! echo "${registered}" | grep -qx "${agent_name}"; then
-      fail "Agent not in registry: ${agent_name} (add to ops/state/truth/agents.json)"
-    else
-      ok "Agent registered: ${agent_name}"
-    fi
-  done
+# A missing checker must FAIL, not skip. This script is a documented standalone entrypoint,
+# so a conditional skip would let it report success while enforcement had disappeared --
+# fail-open on the gate whose whole purpose is failing closed.
+if [[ -f "${REPO_ROOT}/scripts/check-agent-registry.py" ]]; then
+  if agent_registry_out=$(python3 "${REPO_ROOT}/scripts/check-agent-registry.py" 2>&1); then
+    ok "Agent registry consistent across all declared provider surfaces"
+  else
+    while IFS= read -r line; do
+      [[ -n "${line}" ]] && fail "agent registry: ${line}"
+    done <<< "${agent_registry_out}"
+  fi
+else
+  fail "scripts/check-agent-registry.py is missing — agent-registry enforcement would be silently absent"
 fi
 
 # ─── Check 7: All SKILL.md files must have truth_contract ────────────────────

@@ -570,6 +570,10 @@
       "owner": "ops/state/truth/delivery.json"
     },
     {
+      "domain": "program_structure",
+      "owner": "ops/state/truth/program.json"
+    },
+    {
       "domain": "repo_topology",
       "owner": "ops/state/config/repo-map.json"
     },

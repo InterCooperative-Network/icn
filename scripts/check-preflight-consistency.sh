@@ -105,15 +105,27 @@ for f in "${ADAPTERS[@]}"; do
 done
 [ "$adapter_dupes" -eq 0 ] && pass "no active provider adapter duplicates AGENTS.md doc-control command doctrine"
 
+# ── 3b. Agent registry: delegate to its owner checker ───────────────────────────
+# This gate advertises preflight consistency, so proving only that registered paths exist
+# would be weaker than it sounds: it would miss unregistered definitions, invalid
+# relationships, mirror drift and cross-registry disagreement. Delegated rather than
+# reimplemented, so there is one owner of the rules (Refs icn#2632).
+if [[ -f "scripts/check-agent-registry.py" ]]; then
+  if agent_reg_out=$(python3 scripts/check-agent-registry.py 2>&1); then
+    pass "agent registry is true about every declared provider surface"
+  else
+    echo "${agent_reg_out}"
+    FAILS=$((FAILS + 1))
+  fi
+else
+  echo "scripts/check-agent-registry.py is missing — agent-registry enforcement absent"
+  FAILS=$((FAILS + 1))
+fi
+
 # ── 4. Registries must point at files that exist and foundation owners must bind ─
 python3 - <<'PYEOF' || FAILS=$((FAILS + 1))
 import json, os, sys
 bad = []
-
-agents = json.load(open("ops/state/truth/agents.json"))
-for a in agents["agents"]:
-    if not os.path.exists(a["path"]):
-        bad.append(f'agents.json: {a["name"]} -> {a["path"]} (missing)')
 
 skills = json.load(open("ops/state/truth/skills.json"))
 for e in skills["skills"]["ops_automation_canonical"]:

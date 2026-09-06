@@ -1,6 +1,6 @@
 {
   "schema": "icn-skills/v2",
-  "description": "Registry of every skill in a declared scope, with its canonical owner and the exact relationship each provider-facing copy is allowed to have with it. Generated indexes and routing tables derive from here. Do not maintain a separate skill list in a prompt file or a shell script \u2014 scan scope and enforcement both derive from this file.",
+  "description": "Registry of every skill in a declared scope, with its canonical owner and the exact relationship each provider-facing copy is allowed to have with it. Generated indexes and routing tables derive from here. Do not maintain a separate skill list in a prompt file or a shell script — scan scope and enforcement both derive from this file.",
   "canonical_skill_sources": {
     "ops_automation": "ops/automation/skills/",
     "icn_level": ".agents/skills/",
@@ -8,20 +8,38 @@
   },
   "declared_scope": {
     "in_scope": [
-      "ops/automation/skills/ \u2014 canonical shared operational skills",
-      ".agents/skills/ \u2014 canonical ICN-level skills",
-      ".claude/skills/ \u2014 provider-facing mirrors/adapters and provider-only skills"
+      "ops/automation/skills/ — canonical shared operational skills",
+      ".agents/skills/ — canonical ICN-level skills",
+      ".claude/skills/ — provider-facing mirrors/adapters and provider-only skills"
     ],
     "out_of_scope": [
-      ".claude/agents/, .github/agents/, .claude/commands/ and tools/claude-code/plugins/** are specialist/provider PROMPT surfaces, not skills. They are tracked by icn#2632 and by ops/state/truth/agents.json, not here.",
+      "Agent PROMPT surfaces are not skills. .claude/agents/, .github/agents/ and tools/claude-code/plugins/icn-agent-pack/agents/ are registered as provider surfaces in ops/state/truth/agents.json (icn-agents/v2), which owns agent inventory and provider topology in both directions. This sentence previously named .claude/commands/ and all of tools/claude-code/plugins/** as tracked there too; that was false, and nothing could see it because neither registry checked the other's claim. scripts/check-agent-registry.py now does.",
+      ".claude/commands/ and the non-agents parts of tools/claude-code/plugins/** are provider surfaces that NO registry covers yet. An earlier revision claimed they 'hold no skills'; that was false -- tools/claude-code/plugins/icn-agent-pack/skills/ contains six SKILL.md definitions today. They are uncovered because this registry's enforcement.scan_scope does not include them, not because they are empty. Registering that tree is icn#2632/icn#2633 work and is deliberately not done in the agent-registry change; the gap is stated truthfully rather than denied.",
       "Skill directories a developer creates outside the repository (for example under a personal ~/.claude) are machine-local and are neither registered nor enforced here."
     ],
-    "completeness_claim": "Within in_scope, this registry is exhaustive: every skill directory present on disk has an entry, and every entry names a path that exists. scripts/check-skill-registry.py fails if either direction breaks."
+    "completeness_claim": "Within in_scope, this registry is exhaustive: every skill directory present on disk has an entry, and every entry names a path that exists. scripts/check-skill-registry.py fails if either direction breaks.",
+    "cross_registry": {
+      "note": "Structured, not prose. The previous sentence asserting what agents.json tracks was false and unverifiable -- a checker cannot tell 'X is tracked' from 'X is NOT tracked' by reading English. These lists are compared for set equality against agents.json#provider_surfaces by scripts/check-agent-registry.py.",
+      "agent_surfaces_tracked_by_agents_json": [
+        ".claude/agents",
+        ".github/agents",
+        "tools/claude-code/plugins/icn-agent-pack/agents"
+      ],
+      "uncovered_owner": "icn#2632",
+      "known_uncovered_directories": [
+        ".claude/commands",
+        "tools/claude-code/plugins/icn-agent-pack/skills",
+        "tools/claude-code/plugins/icn-agent-pack/hooks",
+        "tools/claude-code/plugins/icn-agent-pack/bin"
+      ],
+      "known_uncovered_directories_note": "RENAMED from provider_surfaces_no_registry_covers in icn#2632 review round 12. The old name asserted these are provider SURFACES, and no owner supplies that classification -- neither agents.json#provider_surfaces nor skills.json#enforcement.scan_scope can establish it for an arbitrary path, so the checker could only test existence and an ordinary file such as AGENTS.md passed. The field now claims exactly what enforcement proves: these are repo-relative directories that exist, do not escape the root, and are covered by neither registry. That they are provider-significant is explanatory rationale below, not derived truth.",
+      "known_uncovered_directories_why_they_matter": "Explanatory, not mechanically derived: .claude/commands/ holds provider command definitions, and the icn-agent-pack plugin's skills/, hooks/ and bin/ trees are loaded by the plugin. No registry covers them today; icn#2632 owns that gap."
+    }
   },
   "mirror_model": {
     "exact_mirror": "The provider copy carries no provider-specific behaviour and MUST be byte-identical to its canonical source. Divergence or absence is a failure. This is the default and, today, the only relationship in use for ICN-level skills.",
-    "adapter": "The provider copy genuinely needs provider mechanics. It MUST be declared with policy: \"adapter\" and an explicit adapter_fields list. Its body must still be byte-identical to the canonical body \u2014 only the declared front-matter keys may differ. Workflow semantics, truth ownership, safety constraints, and current-fact policy always come from the canonical skill.",
-    "symlink": "A provider copy may instead BE a symlink to its canonical directory or SKILL.md. That is structurally drift-proof and always passes, whatever the declared policy. Supported by the checker but not adopted repo-wide \u2014 see symlink_tradeoff.",
+    "adapter": "The provider copy genuinely needs provider mechanics. It MUST be declared with policy: \"adapter\" and an explicit adapter_fields list. Its body must still be byte-identical to the canonical body — only the declared front-matter keys may differ. Workflow semantics, truth ownership, safety constraints, and current-fact policy always come from the canonical skill.",
+    "symlink": "A provider copy may instead BE a symlink to its canonical directory or SKILL.md. That is structurally drift-proof and always passes, whatever the declared policy. Supported by the checker but not adopted repo-wide — see symlink_tradeoff.",
     "provider_only": "A skill with no ICN-level counterpart by design. It lives only in the provider tree and MUST have a project_level_only entry stating why. It has no canonical source to diverge from.",
     "none": "A canonical skill with no provider-facing copy in the repository. Nothing to mirror, nothing to enforce beyond the canonical file itself.",
     "unregistered": "NOT a category. A skill directory on disk with no registry entry is a checker failure, because it makes completeness_claim false."
@@ -34,7 +52,7 @@
       "user-invocable",
       "disable-model-invocation"
     ],
-    "note": "Any front-matter key NOT in permitted_front_matter_keys \u2014 name, description, version, and above all truth_contract \u2014 is semantics, not mechanics. A provider copy that changes one of those has become an independent truth owner, which the ownership contract forbids. An adapter must also list, in adapter_fields, the subset of permitted keys it actually differs in; differing in an undeclared key fails."
+    "note": "Any front-matter key NOT in permitted_front_matter_keys — name, description, version, and above all truth_contract — is semantics, not mechanics. A provider copy that changes one of those has become an independent truth owner, which the ownership contract forbids. An adapter must also list, in adapter_fields, the subset of permitted keys it actually differs in; differing in an undeclared key fails."
   },
   "symlink_tradeoff": {
     "for": "A symlinked mirror cannot drift. No content check, no reconciliation, no CI diff.",
@@ -42,7 +60,7 @@
       "Provider skill-discovery behaviour through a symlinked directory is not verified in this repository, and a silently undiscovered skill is worse than a divergent one.",
       "Symlinks are a representation change across the whole provider tree; git and editors handle them, but reviewers stop seeing content in a diff."
     ],
-    "decision": "icn#2633 keeps real files plus byte-identity enforced in CI, which achieves the same no-drift guarantee with no runtime risk. The checker already accepts symlinks, so adopting them later needs no enforcement change \u2014 only evidence that discovery works."
+    "decision": "icn#2633 keeps real files plus byte-identity enforced in CI, which achieves the same no-drift guarantee with no runtime risk. The checker already accepts symlinks, so adopting them later needs no enforcement change — only evidence that discovery works."
   },
   "enforcement": {
     "checker": "scripts/check-skill-registry.py",
@@ -97,14 +115,14 @@
         "canonical_path": "ops/automation/skills/status/SKILL.md",
         "provider_mirrors": [],
         "mirror_policy": "none",
-        "description": "Full development status dashboard \u2014 MCP-powered"
+        "description": "Full development status dashboard — MCP-powered"
       },
       {
         "name": "sync-and-build",
         "canonical_path": "ops/automation/skills/sync-and-build/SKILL.md",
         "provider_mirrors": [],
         "mirror_policy": "none",
-        "description": "Website build pipeline \u2014 no sync script needed"
+        "description": "Website build pipeline — no sync script needed"
       },
       {
         "name": "worktree",
@@ -283,7 +301,7 @@
             "policy": "exact_mirror"
           }
         ],
-        "authority_note": "icn#2651 stage B moved ordinary-merge semantics out of this file and into the trusted executable at tools/icn-merge-pr/. The skill is a wrapper: it resolves a PR number, calls the program, shows the structured outcome, and takes authorization. These assertions keep it thin \u2014 a merge path this skill could execute on its own would be a second owner of the rules, and the copy is the one that rots.",
+        "authority_note": "icn#2651 stage B moved ordinary-merge semantics out of this file and into the trusted executable at tools/icn-merge-pr/. The skill is a wrapper: it resolves a PR number, calls the program, shows the structured outcome, and takes authorization. These assertions keep it thin — a merge path this skill could execute on its own would be a second owner of the rules, and the copy is the one that rots.",
         "canonical_assertions": {
           "rationale": "icn#2651: merge semantics are owned by tools/icn-merge-pr/, not by this document. The skill must call the executable and must carry no independent merge path.",
           "must_reference": [
@@ -296,7 +314,7 @@
           "must_not_match": [
             {
               "pattern": "gh\\s+pr\\s+merge",
-              "why": "a raw merge command in this skill is a merge path that bypasses every gate the executable owns \u2014 including the head-pinned mutation and the post-merge proof"
+              "why": "a raw merge command in this skill is a merge path that bypasses every gate the executable owns — including the head-pinned mutation and the post-merge proof"
             },
             {
               "pattern": "--admin\\b",
@@ -445,7 +463,7 @@
             "policy": "exact_mirror"
           }
         ],
-        "authority_note": "icn#2661. ship-pr is the delivery ORCHESTRATOR: it decides when a pull request is ready to hand over. merge-pr remains the narrow merge primitive and tools/icn-merge-pr remains the owner of mutation semantics. These assertions keep the two apart \u2014 an orchestrator that can merge on its own is a second merge owner, and lifecycle rules restated here would drift from ops/state/truth/delivery.json.",
+        "authority_note": "icn#2661. ship-pr is the delivery ORCHESTRATOR: it decides when a pull request is ready to hand over. merge-pr remains the narrow merge primitive and tools/icn-merge-pr remains the owner of mutation semantics. These assertions keep the two apart — an orchestrator that can merge on its own is a second merge owner, and lifecycle rules restated here would drift from ops/state/truth/delivery.json.",
         "canonical_assertions": {
           "rationale": "icn#2661: the delivery lifecycle is owned by ops/state/truth/delivery.json and merge semantics by tools/icn-merge-pr. This skill loads both and reimplements neither.",
           "must_reference": [
@@ -520,6 +538,6 @@
     ],
     "project_level_only": []
   },
-  "project_level_only_note": "Empty by observation, not by policy. Every skill directory in .claude/skills/ today mirrors a canonical ICN-level skill. A genuinely provider-only skill is legitimate \u2014 add an entry here with {name, path, rationale} and the checker will accept it with no canonical counterpart. Until then, an unmatched directory in the provider tree is an unregistered orphan and fails.",
+  "project_level_only_note": "Empty by observation, not by policy. Every skill directory in .claude/skills/ today mirrors a canonical ICN-level skill. A genuinely provider-only skill is legitimate — add an entry here with {name, path, rationale} and the checker will accept it with no canonical counterpart. Until then, an unmatched directory in the provider tree is an unregistered orphan and fails.",
   "ops_automation_note": "ops/automation/skills/ is the canonical source for shared operational skills. As of icn#2633 none of them has a provider-facing copy inside this repository, so mirror_policy is \"none\". A previous revision claimed .claude/skills/{status,sync-and-build,worktree} were symlinks; no such path has ever existed in the repository. ops/scripts/setup-skill-symlinks.sh creates machine-local convenience links for a developer who wants these exposed to a provider; those links live outside the repository, are not tracked, and are not a claim of this registry."
 }

@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-08-28T16:35:09+00:00",
-  "source_commit": "7f3d18679f488c7f9bdc04bce00360511e0929e8",
+  "generated": "2026-09-01T03:15:37+00:00",
+  "source_commit": "c55a1cadf01902b1d78c420d7e7bb2d2f700e3f1",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,7 +35,7 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 144,
+    "nodes": 145,
     "edges": 92
   },
   "nodes": [
@@ -2004,7 +2004,7 @@
       "match_kind": "prefix",
       "description": "Code-quality brief for changes under `scripts/`.",
       "review_focus": [
-        "Python standard library only; dependency-free",
+        "Python standard library by default; declared dependencies in scripts/requirements.txt",
         "Deterministic output; --check drift mode stays correct",
         "No overclaim language emitted into generated artifacts"
       ],
@@ -2859,6 +2859,26 @@
         },
         {
           "source": "ops/state/truth/delivery.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:program_structure",
+      "type": "truth_source",
+      "name": "program_structure",
+      "owner": "ops/state/truth/program.json",
+      "description": "NARROW DOMAIN: the Organizational Technical Alpha programme STRUCTURE and status routing -- waves, lanes, bounded slices, the semantic-alpha vertical order, and the semantic distinctions that must not collapse. It owns SEQUENCING AND ROUTING ONLY and never restates a fact another owner holds: identity semantics live in docs/architecture/IDENTITY_SEMANTICS.md, live PR/issue state is a live query, and per-PR lifecycle belongs to pr_delivery_lifecycle. icn#2689 remains the human-facing router and checkpoint log; this file is the machine-readable structure behind it, so a cold-start agent can reconstruct the programme without chat history. Read the owner for the current value -- this map routes the question, it does not answer it.",
+      "stability": "evolving",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/truth/program.json",
           "kind": "truth-owner"
         }
       ]
