@@ -120,7 +120,15 @@ done
 
 # ─── Phase 4: live git state ─────────────────────────────────────────────────
 
-BRANCH=$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || echo "unknown")
+BRANCH=$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || true)
+if [[ -z "${BRANCH}" ]]; then
+  # A detached HEAD is not an error: `git branch --show-current` exits 0 and prints
+  # nothing, so the `|| echo "unknown"` fallback this replaces could never fire. CI
+  # checks out detached on pull_request, so --json shipped "branch": "" to every
+  # consumer and the human mode printed a bare "Branch:". Found by the --json runner
+  # added for icn#2638 -- the mode had no consumer to notice before.
+  BRANCH="detached at $(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+fi
 DIRTY=$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 DIRTY_STATUS=$([[ "${DIRTY}" == "0" ]] && echo "clean" || echo "${DIRTY} uncommitted change(s)")
 
@@ -140,7 +148,10 @@ if d.get('cadence') == 'dormant' or d.get('active_sprint') is None:
 else:
     print('Sprint %s (%s)' % (d.get('active_sprint'), d.get('status','?')))
 " 2>/dev/null || echo "unresolved (sprint owner unreadable)")
-SPRINT_ACTIVE=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); v=d.get('active_sprint'); print(repr(v) if isinstance(v,(int,type(None))) else repr(str(v)))" 2>/dev/null || echo "None")
+# Emitted as JSON, not as Python source. The --json payload consumes this with json.loads;
+# repr() was only ever correct because the payload used to be built by splicing shell values
+# into Python source, which is the defect icn#2638 names.
+SPRINT_ACTIVE_JSON=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); v=d.get('active_sprint'); print(json.dumps(v if isinstance(v,(int,type(None))) else str(v)))" 2>/dev/null || echo "null")
 SPRINT_STATUS=$(python3 -c "import json; d=json.load(open('${SPRINT_FILE}')); print(d.get('status','?'))" 2>/dev/null || echo "?")
 SPRINT_TASKS=$(python3 -c "
 import json
@@ -176,28 +187,71 @@ print(str(len(checks)) + ' required checks')
 # ─── Output ──────────────────────────────────────────────────────────────────
 
 if [[ "${MODE}" == "--json" ]]; then
-  python3 - <<EOF
-import json, subprocess
+  # Values reach Python as ENVIRONMENT, never as interpolated Python source (Refs icn#2638).
+  # The previous form spliced shell values into the heredoc body, so every field had to be
+  # valid *Python source*: the shell booleans below arrived as the bare names `true`/`false`
+  # and the mode died with NameError before json.dumps ever ran. Passing by environment
+  # removes the entire class of defect -- a value can no longer be syntax.
+  WMN_REPO_ROOT="${REPO_ROOT}" \
+  WMN_BRANCH="${BRANCH}" \
+  WMN_DIRTY_STATUS="${DIRTY_STATUS}" \
+  WMN_SPRINT_SUMMARY="${SPRINT_SUMMARY}" \
+  WMN_SPRINT_ACTIVE_JSON="${SPRINT_ACTIVE_JSON}" \
+  WMN_SPRINT_STATUS="${SPRINT_STATUS}" \
+  WMN_SPRINT_TASKS="${SPRINT_TASKS}" \
+  WMN_PR_STATE="${PR_STATE}" \
+  WMN_POLICY_CHECKS="${POLICY_CHECKS}" \
+  WMN_DRIFT_ERRORS="${DRIFT_ERRORS}" \
+  WMN_TRUTH_OK="${TRUTH_OK}" \
+  WMN_SYMLINKS_OK="${SYMLINKS_OK}" \
+  python3 - <<'PY_JSON_EOF'
+import json, os
+
+
+def env(name):
+    return os.environ.get(name, "")
+
+
+def flag(name):
+    """The shell sets these to the literal strings "true"/"false"."""
+    return env(name) == "true"
+
+
+repo_root = env("WMN_REPO_ROOT")
+
+# active_sprint is genuinely nullable: a dormant cadence is a truthful answer, not a gap.
+try:
+    sprint_active = json.loads(env("WMN_SPRINT_ACTIVE_JSON"))
+except ValueError:
+    sprint_active = None
 
 data = {
-  "repo_root": "${REPO_ROOT}",
-  "workspace_root": "${REPO_ROOT}/icn",
-  "branch": "${BRANCH}",
-  "working_tree": "${DIRTY_STATUS}",
-  "sprint": {"summary": "${SPRINT_SUMMARY}", "active_sprint": ${SPRINT_ACTIVE}, "status": "${SPRINT_STATUS}", "tasks": "${SPRINT_TASKS}"},
-  "current_work_owner": "live issue/PR query — see live_issue_state / live_pr_state in ops/state/truth/sources.json",
-  "open_prs": "${PR_STATE}",
-  "merge_policy": "${POLICY_CHECKS} (read ops/state/truth/policy.json)",
-  "drift_errors": ${DRIFT_ERRORS},
-  "truth_files_ok": $([[ "${TRUTH_OK}" == "true" ]] && echo "true" || echo "false"),
-  "symlinks_ok": $([[ "${SYMLINKS_OK}" == "true" ]] && echo "true" || echo "false"),
-  "canonical_truth": "ops/state/truth/sources.json",
-  "canonical_policy": "ops/state/truth/policy.json",
-  "canonical_agents": "ops/state/truth/agents.json",
-  "canonical_skills": "ops/state/truth/skills.json"
+    "repo_root": repo_root,
+    "workspace_root": repo_root + "/icn",
+    "branch": env("WMN_BRANCH"),
+    "working_tree": env("WMN_DIRTY_STATUS"),
+    "sprint": {
+        "summary": env("WMN_SPRINT_SUMMARY"),
+        "active_sprint": sprint_active,
+        "status": env("WMN_SPRINT_STATUS"),
+        "tasks": env("WMN_SPRINT_TASKS"),
+    },
+    "current_work_owner": (
+        "live issue/PR query \u2014 see live_issue_state / live_pr_state "
+        "in ops/state/truth/sources.json"
+    ),
+    "open_prs": env("WMN_PR_STATE"),
+    "merge_policy": env("WMN_POLICY_CHECKS") + " (read ops/state/truth/policy.json)",
+    "drift_errors": int(env("WMN_DRIFT_ERRORS") or 0),
+    "truth_files_ok": flag("WMN_TRUTH_OK"),
+    "symlinks_ok": flag("WMN_SYMLINKS_OK"),
+    "canonical_truth": "ops/state/truth/sources.json",
+    "canonical_policy": "ops/state/truth/policy.json",
+    "canonical_agents": "ops/state/truth/agents.json",
+    "canonical_skills": "ops/state/truth/skills.json",
 }
 print(json.dumps(data, indent=2))
-EOF
+PY_JSON_EOF
   exit ${DRIFT_ERRORS}
 fi
 
