@@ -42,7 +42,7 @@ pub use trust::*;
 pub use icn_net::{FanoutConfig, NeighborLimitsConfig, NodeRole, TopologyConfig};
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// ICNd configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +164,28 @@ impl Default for Config {
     }
 }
 
+/// The base store path for a data directory (`{data_dir}/store/`).
+///
+/// A free function as well as a [`Config`] method because not every consumer of
+/// this layout holds a `Config`: `icnctl` works from a `--data-dir` alone. Both
+/// forms resolve here, so the layout has one owner instead of a documented
+/// convention plus a literal in each caller.
+pub fn store_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("store")
+}
+
+/// The trust store path for a data directory (`{data_dir}/store/trust/`).
+///
+/// This existed only as a line in [`Config::store_path`]'s doc comment and as a
+/// `.join("trust")` literal inside `icnd`. `icnctl init-coop` re-derived the
+/// path itself, omitted the subdirectory, and wrote its bootstrap trust edges
+/// into `{data_dir}/store` — a different database from the one the daemon
+/// reads, so the wizard reported edges the node never saw (#2718). Naming the
+/// path here is what stops a third caller repeating that.
+pub fn trust_store_path(data_dir: &Path) -> PathBuf {
+    store_path(data_dir).join("trust")
+}
+
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
@@ -193,7 +215,12 @@ impl Config {
     /// - `store/governance/`      — Governance actor state (proposals, votes)
     /// - `store/dead_letter/`     — Failed operation recovery queue
     pub fn store_path(&self) -> PathBuf {
-        self.data_dir.join("store")
+        store_path(&self.data_dir)
+    }
+
+    /// Get the trust store path (sled DB for trust edges, scores and attestations)
+    pub fn trust_store_path(&self) -> PathBuf {
+        trust_store_path(&self.data_dir)
     }
 
     /// Get the protocol parameter store path (sled DB for governance parameters)

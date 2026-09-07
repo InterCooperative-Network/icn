@@ -45,9 +45,12 @@ fn alias_pair() -> (Did, Did) {
     (a, b)
 }
 
-/// `icnctl init-coop` opens `<data_dir>/store` itself as a sled database — a
-/// sibling of the daemon's `<data_dir>/store/{trust,ledger,...}` stores, and a
-/// sled root the gate discovers like any other.
+/// The directory that holds the per-domain stores. These fixtures plant their
+/// own rows here, so this is a sled root the gate discovers like any other.
+///
+/// `init-coop` used to materialise a database here too — that is how M4d found
+/// the path defect — but #2718 gave it the daemon's `store/trust` path, so the
+/// root is now this test's own construction and nothing else's.
 fn store_root(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }

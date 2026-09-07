@@ -2228,8 +2228,10 @@ fn get_keystore_path(data_dir: &Path) -> PathBuf {
     data_dir.join("identity.age")
 }
 
+/// The base store directory, resolved through the layout's owner in `icn-core`
+/// rather than re-derived here.
 fn get_store_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("store")
+    icn_core::config::store_path(data_dir)
 }
 
 /// Refuse to touch a data directory the N2-A startup gate would refuse to open
@@ -8434,9 +8436,16 @@ token_expiry_hours = 24
     println!();
 
     // Step 7: Create trust edges for initial members
-    let store_path = get_store_path(data_dir);
-    std::fs::create_dir_all(&store_path)?;
-    let store = SledStore::open(&store_path).context("Failed to open store")?;
+    //
+    // The daemon reads trust state from `<data_dir>/store/trust`. This opened
+    // `<data_dir>/store` — the directory that *contains* the per-domain stores —
+    // so every bootstrap edge the wizard reported creating went into a separate
+    // sled database `icnd` never opens, and the node started with an empty trust
+    // graph (#2718). The path is now resolved through the same `icn-core` helper
+    // the daemon uses, so the two cannot drift apart again.
+    let trust_store_path = icn_core::config::trust_store_path(data_dir);
+    std::fs::create_dir_all(&trust_store_path)?;
+    let store = SledStore::open(&trust_store_path).context("Failed to open trust store")?;
     let store = Arc::new(store);
     let mut trust_graph = TrustGraph::new(store, my_did.clone());
 
