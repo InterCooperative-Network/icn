@@ -81,16 +81,16 @@ if [[ -d "${PROJECT_SKILLS}" ]]; then
       canonical="${REPO_ROOT}/ops/automation/skills/${skill}"
       if [[ "${resolved}" != "${canonical}" ]]; then
         SYMLINKS_OK=false
-        SYMLINK_WARNINGS+="  WRONG TARGET: .claude/skills/${skill} → ${resolved}\n"
+        SYMLINK_WARNINGS+="  WRONG TARGET: .claude/skills/${skill} → ${resolved}"$'\n'
         DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
       fi
     elif [[ -d "${link}" ]]; then
       SYMLINKS_OK=false
-      SYMLINK_WARNINGS+="  NOT SYMLINK: .claude/skills/${skill} is a plain directory (run ops/scripts/setup-skill-symlinks.sh)\n"
+      SYMLINK_WARNINGS+="  NOT SYMLINK: .claude/skills/${skill} is a plain directory (run ops/scripts/setup-skill-symlinks.sh)"$'\n'
       DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
     else
       SYMLINKS_OK=false
-      SYMLINK_WARNINGS+="  MISSING: .claude/skills/${skill} (run ops/scripts/setup-skill-symlinks.sh)\n"
+      SYMLINK_WARNINGS+="  MISSING: .claude/skills/${skill} (run ops/scripts/setup-skill-symlinks.sh)"$'\n'
       DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
     fi
   done
@@ -118,9 +118,9 @@ for pattern in "${STALE_PATTERNS[@]}"; do
     if [[ -e "${full_dir}" ]]; then
       hits=$(grep -rn "${pattern}" "${full_dir}" 2>/dev/null | grep -v ".pyc" | grep -v "Binary" || true)
       if [[ -n "${hits}" ]]; then
-        STALE_HITS+="  [${pattern}] in ${dir}:\n"
+        STALE_HITS+="  [${pattern}] in ${dir}:"$'\n'
         while IFS= read -r line; do
-          STALE_HITS+="    ${line}\n"
+          STALE_HITS+="    ${line}"$'\n'
         done <<< "${hits}"
         DRIFT_ERRORS=$(( DRIFT_ERRORS + 1 ))
       fi

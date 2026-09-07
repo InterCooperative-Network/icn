@@ -107,6 +107,38 @@ with tempfile.TemporaryDirectory() as tmp:
           "ops/state/truth/agents.json" in out and "ops/state/truth/skills.json" in out)
 
 print()
+print("--- every diagnostic channel renders as separate lines, not one run-on ---")
+# icn#2723 review: switching these `printf`s to a literal `%s` format stopped the
+# old accidental escape processing, so accumulators appending a two-character
+# `\n` collapsed into a single line. Nothing exercised the symlink or stale-path
+# channels, which is exactly why that landed unnoticed. It is covered now.
+with tempfile.TemporaryDirectory() as tmp:
+    root = make_fixture(tmp)
+    (root / "ops/state/truth/agents.json").unlink()
+
+    # `PROJECT_SKILLS` is `${REPO_ROOT}/../.claude/skills` -- a sibling of the repo.
+    skills = Path(tmp) / ".claude/skills"
+    skills.mkdir(parents=True)
+    (skills / "status").mkdir()            # plain dir  -> NOT SYMLINK
+    # `sync-and-build` and `worktree` are simply absent -> MISSING (two more)
+
+    # A stale pattern the script greps for, in a file it scans.
+    (root / "ops/CLAUDE.md").write_text("see sync-from-icn.sh for details\n")
+
+    rc, out = run_drift(root)
+    check("multi-channel drift exits non-zero (rc=%d)" % rc, rc != 0)
+    check("findings from every phase aggregate (output=%r)" % out.strip()[:60],
+          re.search(r"DRIFT DETECTED: (?!0|1\b)\d+ problem", out) is not None)
+
+    # The regression this covers: literal backslash-n reaching the terminal.
+    check("no literal backslash-n leaks into the report",
+          "\\n" not in out)
+    check("symlink findings are on their own lines",
+          any(l.strip().startswith("NOT SYMLINK:") for l in out.splitlines()))
+    check("the stale-path finding is on its own line",
+          any(l.strip().startswith("[sync-from-icn.sh]") for l in out.splitlines()))
+
+print()
 print("--- no counter in this script can abort under `set -e` ---")
 script = (REPO_ROOT / SCRIPT_REL).read_text()
 
@@ -133,6 +165,22 @@ check("CONTROL: the matcher recognises a pre-increment variant",
       UNSAFE_PREFIX.search("  ((++N))\n") is not None)
 check("CONTROL: the matcher does NOT flag the assignment form",
       UNSAFE.search("  N=$(( N + 1 ))\n") is None)
+
+# `printf "$VAR"` treats content as a FORMAT: `%s` silently eats what follows.
+fmt_probe = subprocess.run(
+    ["bash", "-c", 'S=$(printf "a%%sb"); printf "$S"'],
+    capture_output=True, text=True,
+)
+check("CONTROL: `printf \"$VAR\"` really does eat content (got %r)"
+      % fmt_probe.stdout, fmt_probe.stdout == "ab")
+fmt_safe = subprocess.run(
+    ["bash", "-c", 'S=$(printf "a%%sb"); printf "%s" "$S"'],
+    capture_output=True, text=True,
+)
+check("CONTROL: `printf '%%s' \"$VAR\"` preserves it (got %r)"
+      % fmt_safe.stdout, fmt_safe.stdout == "a%sb")
+check("the script never passes a variable as a printf format",
+      re.search(r'printf\s+"\$\{', script) is None)
 
 # The shell semantics this whole issue rests on, asserted rather than assumed.
 probe = subprocess.run(
