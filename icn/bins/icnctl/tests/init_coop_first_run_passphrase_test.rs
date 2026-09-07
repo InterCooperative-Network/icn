@@ -20,9 +20,10 @@
 //! **Why these tests drive the real binary.** The defect is that a *process*
 //! with no controlling terminal cannot get past step 1. An in-process unit test
 //! calling a helper cannot observe that: it would have to fake the very thing
-//! under test. So each test spawns the real `icnctl`, gives it a genuinely
-//! fresh data directory with no keystore, closes stdin, and asserts on what the
-//! process did.
+//! under test. So each test spawns the real `icnctl` in its own session, gives
+//! it a genuinely fresh data directory with no keystore, and asserts on what
+//! the process did. See `init_coop_command` for why the session — not the
+//! closed stdin — is what removes the terminal.
 //!
 //! **Why the obvious fix is dangerous, and what pins it here.** Replacing the
 //! prompt block with `confirm_passphrase()` fixes automation but silently
@@ -64,20 +65,34 @@ const SHORT_PASSPHRASE: &str = "sevenby";
 
 /// An `init-coop` invocation with every ambient influence neutralised.
 ///
-/// Three separate hazards are closed here, and none of them is tidiness:
+/// Four separate hazards are closed here, and none of them is tidiness:
 ///
-/// * **stdin is closed** (`Stdio::null`). The claim under test is "this works
-///   with no TTY". A test that inherited the developer's terminal would pass on
-///   the defect whenever it was run by hand.
-/// * **The gateway is pointed at a port nothing can serve, and `ICN_TOKEN` is
-///   removed.** Step 4 probes `$ICN_GATEWAY/v1/health` (default
-///   `localhost:8080`) and, if a token is present, POSTs a governance domain to
-///   it. Without this a developer or runner with a live gateway would have this
-///   test create real governance state on it. This is the pattern established
-///   for this path in #2726, and it is a safety boundary, not cleanup.
+/// * **The child is given its own session, so it has no controlling terminal.**
+///   This is the one that matters, and closing stdin is *not* a substitute for
+///   it. `rpassword` does not read stdin: on Unix it opens the literal path
+///   `/dev/tty`, which the kernel resolves through the process's controlling
+///   terminal — inherited across `fork`/`exec` no matter what fd 0 is. So
+///   `Stdio::null()` alone leaves a test run from a real terminal free to grab
+///   that terminal, put it in raw mode and block forever on the prompt, with
+///   `cargo test` imposing no timeout. `setsid(2)` detaches it, which makes
+///   "no TTY" a property this fixture *establishes* rather than one it happens
+///   to inherit from a CI runner. Verified: with a pty present and stdin at
+///   `/dev/null`, the pre-`setsid` fixture hung at `Enter passphrase:`.
+/// * **The gateway is pointed at a port nothing can serve, `ICN_TOKEN` is
+///   removed, and proxy variables are cleared.** Step 4 probes
+///   `$ICN_GATEWAY/v1/health` (default `localhost:8080`) and, if a token is
+///   present, POSTs a governance domain to it. `ICN_TOKEN`'s removal is the
+///   real gate — the wizard skips live domain creation without it — but
+///   `reqwest` auto-detects `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` and does not
+///   implicitly bypass loopback, so on a proxied runner even the health probe
+///   could leave the machine. This is the #2726 pattern plus that gap. It is a
+///   safety boundary, not cleanup.
 /// * **Both passphrase variables are cleared before the caller sets any.** The
 ///   tests that assert on the *absence* of a passphrase are only meaningful if
 ///   the ambient environment cannot supply one.
+/// * **stdin is closed.** Not load-bearing for `rpassword`, per above, but it
+///   keeps the wizard's own `io::stdin().read_line` prompts from consuming a
+///   developer's keystrokes.
 ///
 /// `ICN_LOCALE` is pinned so a developer's locale cannot change the strings the
 /// assertions read.
@@ -87,6 +102,13 @@ fn init_coop_command(data_dir: &Path) -> Command {
         .env_remove("ICN_KEYSTORE_PASSPHRASE")
         .env_remove("ICN_PASSPHRASE")
         .env_remove("ICN_TOKEN")
+        .env_remove("HTTP_PROXY")
+        .env_remove("HTTPS_PROXY")
+        .env_remove("ALL_PROXY")
+        .env_remove("http_proxy")
+        .env_remove("https_proxy")
+        .env_remove("all_proxy")
+        .env("NO_PROXY", "*")
         .env("ICN_GATEWAY", "http://127.0.0.1:1")
         .env("ICN_LOCALE", "en")
         .arg("--data-dir")
@@ -98,6 +120,27 @@ fn init_coop_command(data_dir: &Path) -> Command {
             "--yes",
             "--no-start",
         ]);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // SAFETY: `pre_exec` runs between `fork` and `exec`, where only
+        // async-signal-safe work is permitted. `setsid` is a bare syscall: it
+        // allocates nothing, takes no locks, and touches no inherited runtime
+        // state. It cannot fail in a freshly forked child — that child is never
+        // already a process-group leader — but the error is propagated rather
+        // than ignored, so a future change that breaks the assumption surfaces
+        // as a spawn failure instead of a silent hang.
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+
     cmd
 }
 
@@ -260,11 +303,14 @@ fn the_keystore_passphrase_variable_takes_precedence_over_the_legacy_one() {
 ///
 /// With no passphrase in the environment the wizard must still try to obtain
 /// one interactively and fail when it cannot, rather than inventing a default,
-/// accepting an empty value, or skipping keystore creation. `rpassword` reads
-/// the terminal directly, so a test process without one cannot drive the
-/// prompt-and-confirm exchange itself; what this pins is that the interactive
-/// path is still *taken*, and that no keystore is ever created without a
-/// passphrase.
+/// accepting an empty value, or skipping keystore creation.
+///
+/// `rpassword` reads `/dev/tty`, so a test cannot drive the prompt-and-confirm
+/// exchange itself without a pty; the mismatch rejection is therefore covered
+/// structurally (it lives in `confirm_passphrase`) rather than here. What this
+/// pins is that the interactive path is still *taken* — asserted through the
+/// terminal-open failure, which is what distinguishes "blocked trying to ask a
+/// human" from "quietly used a default".
 #[test]
 fn without_a_passphrase_in_the_environment_first_run_still_requires_interactive_entry() {
     let dir = TempDir::new().unwrap();
@@ -277,6 +323,17 @@ fn without_a_passphrase_in_the_environment_first_run_still_requires_interactive_
         !out.status.success(),
         "with no passphrase available and no terminal, the wizard must fail \
          rather than proceed with an unspecified passphrase:\n{text}"
+    );
+    // ENXIO — "No such device or address" — is `rpassword` failing to open
+    // `/dev/tty` because `init_coop_command` put the child in its own session.
+    // Asserting on it, rather than only on the exit status, is what makes this
+    // test discriminate: a fix that substituted a default passphrase would
+    // still have to *ask* first, and would no longer fail this way.
+    assert!(
+        text.contains("No such device or address"),
+        "the wizard must fail because it tried to prompt a human and had no \
+         terminal to do it on; any other failure means this test is no longer \
+         observing the interactive path:\n{text}"
     );
     assert!(
         !keystore_path(dir.path()).exists(),

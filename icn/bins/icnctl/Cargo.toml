@@ -67,6 +67,11 @@ utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
 tempfile = "3.24"
+# `init_coop_first_run_passphrase_test` needs `setsid(2)` to detach the child's
+# controlling terminal. Without it, `rpassword` opens `/dev/tty` — which is
+# inherited independently of stdin — and a passphrase test blocks forever on the
+# developer's own terminal. Already in the lock file via other crates.
+libc = "0.2"
 actix-web = "4"
 actix-web-httpauth = "0.8"
 actix-rt = "2"
