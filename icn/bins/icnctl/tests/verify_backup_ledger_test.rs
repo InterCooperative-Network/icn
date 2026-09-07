@@ -436,6 +436,62 @@ fn an_empty_ledger_directory_is_refused_rather_than_created() {
     );
 }
 
+/// A `conf`-without-`db` ledger directory must be refused — and the check must
+/// run BEFORE the N2-A gate.
+///
+/// This is the fixture that makes the ordering observable, and mutation testing
+/// is what showed it was missing: `an_empty_ledger_directory_is_refused_rather_
+/// than_created` uses a directory with no `conf`, which `find_sled_roots` never
+/// discovers, so the gate never opens it and the presence check fails from either
+/// position. Only a directory sled *recognises* distinguishes them.
+///
+/// With `conf` present and `db` absent — an interrupted sled init — the gate
+/// discovers the root (`did_collision_scan.rs` matches on `conf`), opens it with
+/// a creating `sled::open`, and materialises `db`. A presence check running after
+/// the gate would then find a complete database and certify a ledger the backup
+/// never contained.
+#[test]
+fn a_conf_without_db_ledger_directory_is_refused_before_the_gate_can_create_one() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+
+    // Build a real sled database so `conf` is genuine, then remove `db` to model
+    // an initialisation that was interrupted between the two writes.
+    seed_ledger(&data_dir, &[("hours", 100, 0), ("hours", 0, 100)]);
+    let path = ledger_dir(&data_dir);
+    std::fs::remove_file(path.join("db")).expect("fixture: could not remove db");
+    assert!(
+        path.join("conf").is_file(),
+        "fixture: conf must survive, or the gate will not discover this root"
+    );
+    assert!(
+        !path.join("db").exists(),
+        "fixture: db must be absent, or there is nothing to distinguish"
+    );
+
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "a conf-only ledger directory must be refused, not completed by the gate \
+         and then certified:\n{text}"
+    );
+    assert!(
+        text.contains("holds no ledger database"),
+        "the failure must name the incomplete database:\n{text}"
+    );
+    assert!(
+        !text.contains("BACKUP VERIFICATION PASSED"),
+        "it must not print the success banner:\n{text}"
+    );
+}
+
 // ── the M4d gap: the gate, reached through the real handler ─────────────────
 
 /// The N2-A refusal proven through `verify-backup --verify-ledger` itself.
