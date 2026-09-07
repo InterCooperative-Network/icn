@@ -1321,9 +1321,12 @@ every §11 disposition are untouched, and no readiness classification moves.
   audit were **not** verified and that `--verify-ledger` is how to check them, and the
   `--verify-ledger` branch names the three things it did verify (archive integrity, the
   double-entry invariant, the N2-A audit of the restored tree) and the ledger validations it did
-  not (amount signs, hashes, signatures, provenance, parent existence). No check changed in either
-  branch; only the claims did. Widening what the bare command actually verifies would change what
-  it means and is still not done here.
+  not (amount signs, hashes, signatures, provenance, parent existence). **The bare branch's checks
+  are unchanged — only its claim narrowed.** The `--verify-ledger` branch did change what it
+  checks, and the bullet below records how: it resolves the canonical ledger path, refuses an
+  absent or partial database before the gate can create one, decodes rows as `JournalEntry`, and
+  balances per entry. Widening what the *bare* command verifies would change what it means and is
+  still not done here.
 - **A pre-existing `verify-backup` path bug, found while placing that gate. FIXED by icn#2717.**
   `verify_ledger_in_backup` looked for `<restore_dir>/ledger`, but `backup` archives the data
   directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check was

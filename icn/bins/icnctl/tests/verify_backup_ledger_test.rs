@@ -408,6 +408,52 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
     );
 }
 
+/// A row whose per-currency total overflows `i64` must fail, even though the
+/// deltas cancel.
+///
+/// `Ledger::validate_entry` accumulates in `HashMap<String, i64>` via
+/// `AccountDelta::net_change()` and rejects overflow as `ArithmeticOverflow`, so
+/// this row would never have been accepted on append. Computing the same sum in a
+/// widened `i128` cannot overflow: it reaches zero and reports the row verified —
+/// accepting precisely what the ledger refuses.
+#[test]
+fn a_row_whose_running_total_overflows_i64_is_not_reported_as_verified() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    // debit i64::MAX, debit 1, then matching credits: cancels in i128, overflows
+    // the ledger's i64 accumulator.
+    write_journal_row(
+        &data_dir,
+        &serde_json::to_vec(&journal_entry(&[
+            ("hours", i64::MAX, 0),
+            ("hours", 1, 0),
+            ("hours", 0, i64::MAX),
+            ("hours", 0, 1),
+        ]))
+        .unwrap(),
+    );
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "a row the ledger would reject as an arithmetic overflow must not verify:\n{text}"
+    );
+    assert!(
+        text.contains("overflow"),
+        "the failure must name the overflow rather than a generic imbalance:\n{text}"
+    );
+    assert!(
+        !text.contains("BACKUP VERIFICATION PASSED"),
+        "it must not print the success banner:\n{text}"
+    );
+}
+
 /// Two rows whose imbalances cancel must still fail.
 ///
 /// `Ledger::validate_entry` enforces Σdebit == Σcredit per currency **for each

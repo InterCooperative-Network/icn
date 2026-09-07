@@ -6968,24 +6968,46 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         // while the ledger would have rejected both on append. Per-row balance
         // implies the ledger-wide total, so this subsumes the old check rather
         // than adding to it.
-        let mut row_sums: std::collections::HashMap<String, i128> =
-            std::collections::HashMap::new();
+        // i64 with checked arithmetic, using the ledger's own `net_change()` —
+        // NOT a widened i128. `validate_entry` accumulates in `HashMap<String, i64>`
+        // and rejects overflow as `ArithmeticOverflow`, so a row whose running
+        // per-currency total exceeds i64 and later cancels (debits of i64::MAX and
+        // 1, then matching credits) is rejected there. Computing the same sum in
+        // i128 cannot overflow, so it reaches zero and would report the row
+        // verified — accepting exactly what the ledger refuses. Same words, weaker
+        // check, which is the shape this whole command kept failing in.
+        let mut row_sums: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        let mut row_overflowed = false;
 
         for account in &entry.accounts {
-            // `debit` and `credit` are `Option<i64>`: absent means zero.
-            let debit = account.debit.unwrap_or(0);
-            let credit = account.credit.unwrap_or(0);
             let currency = &account.currency;
 
-            // Use checked arithmetic to prevent overflow
-            let net = (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
-                anyhow::anyhow!("Arithmetic overflow computing net for currency {currency}")
-            })?;
+            let net = match account.net_change() {
+                Ok(net) => net,
+                Err(e) => {
+                    unbalanced_rows.push(format!("{row}: {e}"));
+                    row_overflowed = true;
+                    break;
+                }
+            };
 
             let sum = row_sums.entry(currency.clone()).or_insert(0);
-            *sum = sum.checked_add(net).ok_or_else(|| {
-                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
-            })?;
+            match sum.checked_add(net) {
+                Some(next) => *sum = next,
+                None => {
+                    unbalanced_rows.push(format!(
+                        "{row}: arithmetic overflow accumulating currency {currency}"
+                    ));
+                    row_overflowed = true;
+                    break;
+                }
+            }
+        }
+
+        if row_overflowed {
+            // The row is already recorded as failing; do not also fold its partial
+            // sums into the balance verdict.
+            continue;
         }
 
         for (currency, sum) in row_sums {
