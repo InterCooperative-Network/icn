@@ -109,6 +109,59 @@ fn seed_ledger(data_dir: &Path, deltas: &[(&str, i64, i64)]) {
     write_journal_row(data_dir, &serde_json::to_vec(&entry).unwrap());
 }
 
+/// Build one `JournalEntry` from `(currency, debit, credit)` deltas.
+fn journal_entry(deltas: &[(&str, i64, i64)]) -> icn_ledger::JournalEntry {
+    let author = icn_identity::KeyPair::generate().unwrap().did().clone();
+    icn_ledger::JournalEntry {
+        id: None,
+        timestamp: 1_700_000_000,
+        author: author.clone(),
+        contract_ref: None,
+        accounts: deltas
+            .iter()
+            .map(|(currency, debit, credit)| icn_ledger::AccountDelta {
+                account_id: author.clone(),
+                currency: (*currency).to_string(),
+                debit: if *debit == 0 { None } else { Some(*debit) },
+                credit: if *credit == 0 { None } else { Some(*credit) },
+            })
+            .collect(),
+        parents: Vec::new(),
+        signature: None,
+        nonce: None,
+        provenance: icn_ledger::types::ProvenanceRef::SystemGenerated {
+            reason: "icn#2717 fixture".to_string(),
+        },
+    }
+}
+
+/// Write two distinct journal rows, so per-row and journal-wide balance can differ.
+fn write_two_journal_rows(
+    data_dir: &Path,
+    first: &[(&str, i64, i64)],
+    second: &[(&str, i64, i64)],
+) {
+    let path = ledger_dir(data_dir);
+    std::fs::create_dir_all(&path).expect("fixture: could not create ledger dir");
+    let store = SledStore::open(&path).expect("fixture: could not open ledger store");
+    for (suffix, deltas) in [(b'1', first), (b'2', second)] {
+        let mut key =
+            b"ledger:journal:000000000000000000000000000000000000000000000000000000000000000"
+                .to_vec();
+        key.push(suffix);
+        store
+            .put(&key, &serde_json::to_vec(&journal_entry(deltas)).unwrap())
+            .expect("fixture: could not write journal row");
+    }
+    store.db().flush().expect("fixture: could not flush ledger");
+    drop(store);
+
+    assert!(
+        path.join("conf").is_file() && path.join("db").is_file(),
+        "fixture: a complete sled database must exist at the canonical path"
+    );
+}
+
 /// Write one raw journal row at the canonical ledger path.
 ///
 /// Kept separate from [`seed_ledger`] so the corrupt/tampered fixtures can write
@@ -205,9 +258,17 @@ fn an_imbalanced_ledger_in_a_real_archive_is_not_reported_as_verified() {
         "an archive whose ledger is imbalanced must FAIL --verify-ledger, but the \
          command succeeded:\n{text}"
     );
+    // Name the row AND the amount, not just "something was wrong". The message
+    // changed when balance moved to per-entry scope; asserting the specific
+    // wording is what keeps this from passing on a vaguer failure later.
     assert!(
-        text.contains("double-entry invariant violated") || text.contains("imbalance"),
-        "the failure must name the invariant that was violated:\n{text}"
+        text.contains("do not balance"),
+        "the failure must say the rows do not balance:\n{text}"
+    );
+    assert!(
+        text.contains("sums to 60"),
+        "it must name the offending currency and amount, so the operator can find \
+         the row rather than being told only that something failed:\n{text}"
     );
     assert!(
         !text.contains("BACKUP VERIFICATION PASSED"),
@@ -344,6 +405,46 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
     assert!(
         !text.contains("BACKUP VERIFICATION PASSED"),
         "a tampered ledger must not print the success banner:\n{text}"
+    );
+}
+
+/// Two rows whose imbalances cancel must still fail.
+///
+/// `Ledger::validate_entry` enforces Σdebit == Σcredit per currency **for each
+/// entry**, so a +60 row and a −60 row are both invalid and neither would have
+/// been accepted on append. A verifier that accumulates across the whole journal
+/// sees zero and reports the invariant verified — a weaker check than the one the
+/// ledger actually enforces, wearing the same name.
+#[test]
+fn two_rows_whose_imbalances_cancel_are_not_reported_as_verified() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    // +60 hours in one row, −60 in another: zero ledger-wide, both invalid.
+    write_two_journal_rows(
+        &data_dir,
+        &[("hours", 100, 40)], // debit 100, credit 40  -> +60
+        &[("hours", 40, 100)], // debit 40,  credit 100 -> -60
+    );
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "rows that individually do not balance must fail even when their totals \
+         cancel across the journal:\n{text}"
+    );
+    assert!(
+        text.contains("do not balance"),
+        "the failure must say which rows did not balance:\n{text}"
+    );
+    assert!(
+        !text.contains("BACKUP VERIFICATION PASSED"),
+        "it must not print the success banner:\n{text}"
     );
 }
 

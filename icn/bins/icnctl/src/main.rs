@@ -6924,10 +6924,10 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     let entry_count = entries.len();
     println!("  Found {entry_count} ledger entries");
 
-    // Verify double-entry invariant: Σ debits == Σ credits per currency
-    // This means: sum of (debit - credit) per currency should be 0
-    let mut currency_sums: std::collections::HashMap<String, i128> =
-        std::collections::HashMap::new();
+    // Verify the double-entry invariant: within EACH entry, Σ debits == Σ credits
+    // per currency — the same scope `Ledger::validate_entry` enforces on append.
+    let mut unbalanced_rows: Vec<String> = Vec::new();
+    let mut currencies_seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
     // `serde_json::Value`.
     //
@@ -6959,6 +6959,18 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
             }
         };
 
+        // Balance is checked PER ROW, matching what the ledger enforces.
+        // `Ledger::validate_entry` (icn-ledger/src/ledger.rs) scopes its
+        // `currency_sums` to a single entry — `for delta in &entry.accounts` — and
+        // requires every currency to sum to zero for THAT entry. Accumulating
+        // across the whole journal is a strictly weaker check: two rows at +60 and
+        // −60 `hours` cancel ledger-wide and would have been reported as verified,
+        // while the ledger would have rejected both on append. Per-row balance
+        // implies the ledger-wide total, so this subsumes the old check rather
+        // than adding to it.
+        let mut row_sums: std::collections::HashMap<String, i128> =
+            std::collections::HashMap::new();
+
         for account in &entry.accounts {
             // `debit` and `credit` are `Option<i64>`: absent means zero.
             let debit = account.debit.unwrap_or(0);
@@ -6970,10 +6982,18 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
                 anyhow::anyhow!("Arithmetic overflow computing net for currency {currency}")
             })?;
 
-            let sum = currency_sums.entry(currency.clone()).or_insert(0);
+            let sum = row_sums.entry(currency.clone()).or_insert(0);
             *sum = sum.checked_add(net).ok_or_else(|| {
                 anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
             })?;
+        }
+
+        for (currency, sum) in row_sums {
+            if sum != 0 {
+                unbalanced_rows.push(format!("{row}: currency {currency} sums to {sum}"));
+            }
+            // Record the currency so the report can say how many were covered.
+            currencies_seen.insert(currency);
         }
     }
 
@@ -6991,39 +7011,35 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         );
     }
 
-    // Check invariant
-    let mut all_balanced = true;
-    for (currency, sum) in &currency_sums {
-        if *sum != 0 {
-            println!("  ✗ Currency {currency} has imbalance: {sum}");
-            all_balanced = false;
+    if !unbalanced_rows.is_empty() {
+        for row in unbalanced_rows.iter().take(5) {
+            println!("  ✗ {row}");
         }
+        bail!(
+            "FAILED: {} of {} ledger row(s) do not balance. The ledger enforces \
+             double entry per entry, so these rows would be rejected on append; \
+             a journal containing them is not a valid ledger even if the totals \
+             happen to cancel across rows.",
+            unbalanced_rows.len(),
+            entry_count
+        );
     }
 
-    if all_balanced {
-        if currency_sums.is_empty() {
-            // Distinguish "there was nothing to check" from "there were rows and
-            // none of them carried a currency delta". Printing "Ledger empty"
-            // straight after "Found N ledger entries" contradicted itself, and
-            // the summary below would then assert an invariant over rows nothing
-            // was summed from — the same shape as the defects this command just
-            // stopped committing, one level in.
-            if entry_count == 0 {
-                println!("  ✓ Ledger empty (no entries)");
-            } else {
-                println!(
-                    "  ✓ {entry_count} entries read; none carried a currency delta, \
-                     so no balance was computed"
-                );
-            }
+    if currencies_seen.is_empty() {
+        if entry_count == 0 {
+            println!("  ✓ Ledger empty (no entries)");
         } else {
             println!(
-                "  ✓ Double-entry invariant verified for {} currencies",
-                currency_sums.len()
+                "  ✓ {entry_count} entries read; none carried a currency delta, \
+                 so no balance was computed"
             );
         }
     } else {
-        bail!("FAILED: Ledger double-entry invariant violated");
+        println!(
+            "  ✓ Double-entry invariant verified per entry across {} entries and {} currencies",
+            entry_count,
+            currencies_seen.len()
+        );
     }
 
     Ok(())
