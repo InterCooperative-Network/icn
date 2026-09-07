@@ -2,7 +2,8 @@
 //!
 //! # Why this is its own module
 //!
-//! [`Ledger::validate_entry`](crate::Ledger) answers two different questions in
+//! `Ledger::validate_entry` (a private method on [`Ledger`](crate::Ledger), so it
+//! cannot be linked directly) answers two different questions in
 //! one method:
 //!
 //! 1. **Is this entry well formed on its own terms?** It carries at least one
@@ -38,7 +39,7 @@
 //! # Scope of this ownership, stated exactly
 //!
 //! This module is the owner for the two consumers named above:
-//! [`Ledger::validate_entry`](crate::Ledger) on the append path, and `icnctl
+//! `Ledger::validate_entry` on the append path, and `icnctl
 //! verify-backup` on a restored journal. It is **not** yet the owner for entry
 //! *construction*: [`crate::entry::JournalEntryBuilder::build`] still applies its
 //! own `validate_double_entry` and `validate_positive_amounts`, and those diverge
@@ -224,6 +225,19 @@ pub fn inspect_entry(entry: &JournalEntry) -> EntryIntrinsics {
     for delta in &entry.accounts {
         let change = match delta.net_change() {
             Ok(change) => change,
+            // Take the INNER detail, not the formatted error.
+            //
+            // `net_change` already returns `LedgerError::ArithmeticOverflow`, whose
+            // Display is `"arithmetic overflow: {0}"`. Storing `e.to_string()` here
+            // and then re-wrapping this defect through `From<EntryDefect> for
+            // LedgerError` applied that prefix a second and third time, so the
+            // append path reported "arithmetic overflow: arithmetic overflow:
+            // arithmetic overflow in net_change: ...". A verifier whose subject is
+            // operator-message truth does not get to stutter.
+            Err(LedgerError::ArithmeticOverflow(detail)) => {
+                out.defects.push(EntryDefect::DeltaOverflow { detail });
+                return out;
+            }
             Err(e) => {
                 out.defects.push(EntryDefect::DeltaOverflow {
                     detail: e.to_string(),
@@ -413,6 +427,37 @@ mod tests {
             matches!(report.defects(), [EntryDefect::DeltaOverflow { .. }]),
             "got {:?}",
             report.defects()
+        );
+    }
+
+    /// The overflow detail is carried once, not re-wrapped at every layer.
+    ///
+    /// `net_change` returns `LedgerError::ArithmeticOverflow`, whose Display already
+    /// prefixes `"arithmetic overflow: "`. Storing the formatted error and then
+    /// converting the defect back into a `LedgerError` applied that prefix three
+    /// times over. Pinned because the whole point of this change is that the
+    /// message an operator reads is exactly true, and a stuttering one is not.
+    #[test]
+    fn a_delta_overflow_message_is_not_prefixed_twice() {
+        let report = inspect_entry(&entry(&[("hours", i64::MIN, 1)]));
+        let [EntryDefect::DeltaOverflow { detail }] = report.defects() else {
+            panic!(
+                "expected exactly one DeltaOverflow, got {:?}",
+                report.defects()
+            );
+        };
+        assert!(
+            !detail.starts_with("arithmetic overflow: "),
+            "the defect must carry the inner detail, not the formatted error: {detail}"
+        );
+        let rendered = LedgerError::from(EntryDefect::DeltaOverflow {
+            detail: detail.clone(),
+        })
+        .to_string();
+        assert_eq!(
+            rendered.matches("arithmetic overflow").count(),
+            2,
+            "exactly one wrapper prefix plus the inner net_change text: {rendered}"
         );
     }
 
