@@ -45,10 +45,25 @@ icnctl verify-backup /path/to/backup.tar
 
 # Expected output:
 # ✓ BACKUP VERIFICATION PASSED
+#
+# Verified: archive integrity, checksum, and required files.
+# NOT verified: ledger contents and the N2-A principal audit.
+# Re-run with --verify-ledger to check those before relying on this backup.
 
 # If verification fails, try older backup
 icnctl verify-backup /path/to/backup-older.tar
 ```
+
+The bare command checks archive integrity and required files only. **Before restoring a backup you
+intend to rely on, verify the ledger too:**
+
+```bash
+icnctl verify-backup /path/to/backup.tar --verify-ledger
+```
+
+This opens the restored ledger, runs the N2-A principal audit over the restored tree, and checks the
+double-entry invariant. It fails — rather than reporting PASSED — if the ledger is absent, if any
+journal row cannot be read, or if the invariant does not hold (icn#2717).
 
 ### Step 3: Preserve Current Data (Optional)
 
