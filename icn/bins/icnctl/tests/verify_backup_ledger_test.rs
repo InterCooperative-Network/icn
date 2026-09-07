@@ -488,6 +488,92 @@ fn success_without_a_computed_balance_does_not_claim_the_invariant_was_verified(
     }
 }
 
+/// A hostile journal key must not reach the operator's terminal verbatim.
+///
+/// The archive is untrusted input — judging it is the whole job. A key carrying
+/// newlines and ANSI escapes, printed raw into a failure diagnostic, lets a
+/// crafted backup repaint this command's own output, up to forging a success
+/// banner over a failing run.
+#[test]
+fn a_hostile_journal_key_cannot_inject_text_into_the_report() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+
+    let path = ledger_dir(&data_dir);
+    std::fs::create_dir_all(&path).unwrap();
+    let store = SledStore::open(&path).unwrap();
+    // A decodable-prefix key whose suffix is a forged banner behind ANSI escapes.
+    let mut key = b"ledger:journal:".to_vec();
+    key.extend_from_slice(b"\x1b[2J\x1b[H\n\xe2\x9c\x93 BACKUP VERIFICATION PASSED\n");
+    store
+        .put(&key, b"\x00 not a journal entry")
+        .expect("fixture: could not write hostile row");
+    store.db().flush().unwrap();
+    drop(store);
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "an undecodable row must still fail:\n{text}"
+    );
+    // The injection, not merely the failure.
+    assert!(
+        !text.contains("\x1b["),
+        "no ANSI escape from the archive may reach the terminal:\n{text:?}"
+    );
+    assert!(
+        !text.contains("✓ BACKUP VERIFICATION PASSED"),
+        "a key must not be able to forge the success banner:\n{text}"
+    );
+    assert!(
+        text.contains("\\x1b"),
+        "the key should still be reported, escaped rather than executed:\n{text}"
+    );
+}
+
+/// The failing-row count must be a count of ROWS.
+///
+/// Detail lines are per currency, so one row imbalanced in two currencies used to
+/// contribute two — letting the report print "2 of 1 ledger row(s) do not
+/// balance", an impossible statement about the operator's own data.
+#[test]
+fn one_row_imbalanced_in_two_currencies_is_counted_as_one_row() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    // ONE entry, imbalanced in BOTH currencies.
+    write_journal_row(
+        &data_dir,
+        &serde_json::to_vec(&journal_entry(&[("hours", 100, 40), ("kwh", 5, 1)])).unwrap(),
+    );
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "an imbalanced row must fail:\n{text}"
+    );
+    assert!(
+        text.contains("1 of 1 ledger row(s) do not balance"),
+        "the count must be of rows, not of per-currency detail lines:\n{text}"
+    );
+    // Both currencies should still be named in the detail lines.
+    assert!(
+        text.contains("currency hours") && text.contains("currency kwh"),
+        "both offending currencies must still be reported:\n{text}"
+    );
+}
+
 /// A row whose per-currency total overflows `i64` must fail, even though the
 /// deltas cancel.
 ///

@@ -6897,6 +6897,30 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Render a journal key for operator output: bounded, with every non-printable
+/// byte escaped.
+///
+/// The key comes out of the archive being verified, which is untrusted input by
+/// definition — that is what this command exists to judge. Printing it verbatim
+/// let a crafted backup inject newlines and ANSI escapes into this command's own
+/// diagnostics, up to and including repainting a forged success banner over a
+/// failing run. Bounded because a key can also be arbitrarily long.
+fn render_row_key(key: &[u8]) -> String {
+    const MAX: usize = 80;
+    let mut out = String::with_capacity(MAX);
+    for &b in key.iter().take(MAX) {
+        if (0x20..=0x7e).contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("\\x{b:02x}"));
+        }
+    }
+    if key.len() > MAX {
+        out.push_str(&format!("…(+{} more bytes)", key.len() - MAX));
+    }
+    out
+}
+
 /// What `verify_ledger_in_backup` actually established.
 ///
 /// Returned rather than inferred so the operator-facing summary cannot claim a
@@ -6955,6 +6979,11 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     // Verify the double-entry invariant: within EACH entry, Σ debits == Σ credits
     // per currency — the same scope `Ledger::validate_entry` enforces on append.
     let mut unbalanced_rows: Vec<String> = Vec::new();
+    // Detail lines are per CURRENCY; a row imbalanced in two currencies
+    // contributes two. Counting rows separately stops the report claiming
+    // "2 of 1 ledger row(s) do not balance" — an impossible statement
+    // about the operator's own data.
+    let mut unbalanced_row_count = 0usize;
     let mut currencies_seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
     // `serde_json::Value`.
@@ -6977,7 +7006,7 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     let mut undecodable: Vec<String> = Vec::new();
 
     for (key, value) in entries {
-        let row = String::from_utf8_lossy(&key).into_owned();
+        let row = render_row_key(&key);
 
         let entry = match serde_json::from_slice::<icn_ledger::JournalEntry>(&value) {
             Ok(entry) => entry,
@@ -7034,16 +7063,24 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
 
         if row_overflowed {
             // The row is already recorded as failing; do not also fold its partial
-            // sums into the balance verdict.
+            // sums into the balance verdict. It still counts as ONE failing row —
+            // omitting it here would under-report the corruption scope by exactly
+            // the rows that failed hardest.
+            unbalanced_row_count += 1;
             continue;
         }
 
+        let mut row_unbalanced = false;
         for (currency, sum) in row_sums {
             if sum != 0 {
                 unbalanced_rows.push(format!("{row}: currency {currency} sums to {sum}"));
+                row_unbalanced = true;
             }
             // Record the currency so the report can say how many were covered.
             currencies_seen.insert(currency);
+        }
+        if row_unbalanced {
+            unbalanced_row_count += 1;
         }
     }
 
@@ -7070,7 +7107,7 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
              double entry per entry, so these rows would be rejected on append; \
              a journal containing them is not a valid ledger even if the totals \
              happen to cancel across rows.",
-            unbalanced_rows.len(),
+            unbalanced_row_count,
             entry_count
         );
     }
