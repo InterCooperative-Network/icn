@@ -330,7 +330,7 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
          signatures or provenance, so it must not certify safe restoration:\n{text}"
     );
     assert!(
-        text.contains("were NOT performed") || text.contains("NOT performed"),
+        text.contains("were NOT performed"),
         "success must state which ledger validations it did not perform:\n{text}"
     );
 }
@@ -406,6 +406,74 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
         !text.contains("BACKUP VERIFICATION PASSED"),
         "a tampered ledger must not print the success banner:\n{text}"
     );
+}
+
+/// The two success terminals that reach the banner WITHOUT computing a balance
+/// must not claim the double-entry invariant was verified.
+///
+/// These were the only success paths in the command with no test. Both exit 0
+/// and print the full `--verify-ledger` summary, so under the acceptance ceiling
+/// they are claims the command makes and need discriminating evidence like any
+/// other. A journal whose entries carry no currency deltas satisfies the
+/// per-currency invariant *vacuously*; saying it was verified there would
+/// contradict the detail line printed three lines above.
+#[test]
+fn success_without_a_computed_balance_does_not_claim_the_invariant_was_verified() {
+    // (label, seed the ledger, expected detail line)
+    let cases: [(&str, bool, &str); 2] = [
+        ("empty ledger", false, "Ledger empty (no entries)"),
+        (
+            "entries with no currency delta",
+            true,
+            "carried no currency delta",
+        ),
+    ];
+
+    for (label, with_rows, expected_detail) in cases {
+        let dir = TempDir::new().unwrap();
+        let data_dir = dir.path().join("data");
+        let archive = dir.path().join("backup.tar");
+
+        init_identity(&data_dir);
+        if with_rows {
+            // A decodable entry with an empty `accounts` array: nothing to sum.
+            write_journal_row(&data_dir, &serde_json::to_vec(&journal_entry(&[])).unwrap());
+        } else {
+            // A real database with no journal rows at all.
+            let path = ledger_dir(&data_dir);
+            std::fs::create_dir_all(&path).unwrap();
+            let store = SledStore::open(&path).unwrap();
+            store.db().flush().unwrap();
+            drop(store);
+        }
+        make_backup(&data_dir, &archive);
+
+        let out = verify(&archive, true);
+        let text = combined(&out);
+
+        assert!(
+            out.status.success(),
+            "[{label}] a ledger with nothing to balance is not itself a failure:\n{text}"
+        );
+        assert!(
+            text.contains(expected_detail),
+            "[{label}] the detail line must say what was actually read:\n{text}"
+        );
+        // The claim, which is the point of these two cases.
+        assert!(
+            !text.contains("Verified: archive integrity, the double-entry invariant"),
+            "[{label}] no balance was computed, so the summary must not claim the \
+             double-entry invariant was verified:\n{text}"
+        );
+        assert!(
+            text.contains("no double-entry balance was computed"),
+            "[{label}] the summary must say plainly that no balance was computed:\n{text}"
+        );
+        assert!(
+            !text.contains("This backup can be safely restored"),
+            "[{label}] it must not certify safe restoration:\n{text}"
+        );
+    }
 }
 
 /// A row whose per-currency total overflows `i64` must fail, even though the

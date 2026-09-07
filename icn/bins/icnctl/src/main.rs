@@ -6782,6 +6782,7 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     }
 
     // Optional: verify ledger integrity
+    let mut ledger_check: Option<LedgerCheck> = None;
     if verify_ledger {
         println!();
         println!("[Extra] Verifying ledger integrity...");
@@ -6797,7 +6798,7 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // certify it. The evidence has to be taken from the extracted tree first.
         assert_backup_carried_a_ledger(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
-        verify_ledger_in_backup(restore_dir)?;
+        ledger_check = Some(verify_ledger_in_backup(restore_dir)?);
     }
 
     // Temp directory auto-cleaned on drop
@@ -6819,10 +6820,25 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // "ledger invariants" in the plural claimed a validation this command does
         // not perform. Narrowing the sentence is the same correction this PR makes
         // to the bare command, applied to the line it added.
-        println!("Verified: archive integrity, the double-entry invariant, and the");
-        println!("N2-A principal audit of the restored tree.");
+        // Name only what was actually computed. A journal whose entries carry
+        // no currency deltas satisfies the per-currency invariant vacuously, so
+        // claiming "the double-entry invariant" there would contradict the
+        // detail line printed three lines above it.
+        let balanced = ledger_check
+            .as_ref()
+            .map(|c| c.currencies_balanced > 0)
+            .unwrap_or(false);
+        if balanced {
+            println!("Verified: archive integrity, the double-entry invariant, and the");
+            println!("N2-A principal audit of the restored tree.");
+        } else {
+            let entries = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+            println!("Verified: archive integrity and the N2-A principal audit of the");
+            println!("restored tree. {entries} ledger entries carried no currency delta,");
+            println!("so no double-entry balance was computed.");
+        }
         println!("Other ledger validations (amount signs, hashes, signatures,");
-        println!("provenance, parent existence) were NOT performed.");
+        println!("provenance, parent existence, empty-entry rejection) were NOT performed.");
     } else {
         println!("Verified: archive integrity, checksum, and required files.");
         println!("NOT verified: ledger contents and the N2-A principal audit.");
@@ -6882,7 +6898,19 @@ fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
 }
 
 /// Verify ledger integrity in a restored backup directory
-fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
+/// What `verify_ledger_in_backup` actually established.
+///
+/// Returned rather than inferred so the operator-facing summary cannot claim a
+/// balance that was never computed: a journal whose entries carry no currency
+/// deltas satisfies the per-currency invariant vacuously, and saying "the
+/// double-entry invariant" was verified there would be the same overclaim this
+/// command exists to stop making.
+struct LedgerCheck {
+    entries: usize,
+    currencies_balanced: usize,
+}
+
+fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     use icn_store::{SledStore, Store};
 
     // `backup` archives the data directory at archive root
@@ -7064,7 +7092,10 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         );
     }
 
-    Ok(())
+    Ok(LedgerCheck {
+        entries: entry_count,
+        currencies_balanced: currencies_seen.len(),
+    })
 }
 
 /// Calculate SHA256 checksum of all files in a directory
