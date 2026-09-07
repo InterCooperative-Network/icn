@@ -6788,6 +6788,14 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
         // The restored tree is a data directory like any other: a backup whose
         // ledger the gate would refuse is not one that "can be safely restored",
         // which is exactly what this command is about to print.
+        // ORDER IS LOAD-BEARING. Decide whether the ARCHIVE carried a ledger
+        // database before anything opens anything. `enforce_n2a_gate` discovers
+        // sled roots by `child.join("conf").is_file()` and opens each one with
+        // `SledStore::open`, which CREATES — so for a directory holding `conf` but
+        // no `db` (an interrupted sled init) the gate itself materialises the
+        // database, and a presence check running afterwards would find one and
+        // certify it. The evidence has to be taken from the extracted tree first.
+        assert_backup_carried_a_ledger(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
         verify_ledger_in_backup(restore_dir)?;
     }
@@ -6824,6 +6832,55 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     Ok(())
 }
 
+/// Prove the ARCHIVE carried a ledger database, before anything opens the tree.
+///
+/// Must be called before `enforce_n2a_gate`. The gate discovers sled roots by the
+/// presence of `conf` and opens each with `SledStore::open`, which calls
+/// `sled::open` — a CREATING open. So for a directory holding `conf` but no `db`,
+/// the gate materialises the database itself, and any later presence check finds
+/// one and certifies a ledger the backup never contained (#2717).
+///
+/// A live sled database directory holds `conf`, `db` and `blobs`; requiring `db`
+/// as well as `conf` is what distinguishes a restored database from an
+/// interrupted initialisation. This cannot detect a `db` that is present but
+/// unreadable — sled recovers such a directory into an empty database with only a
+/// warning, which needs a different mechanism and is owned by icn#2732.
+fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    if !ledger_db_path.exists() {
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
+            ledger_db_path.display()
+        );
+    }
+
+    for marker in ["conf", "db"] {
+        if !ledger_db_path.join(marker).is_file() {
+            bail!(
+                "FAILED: {} exists but holds no ledger database (missing `{}`), so \
+                 nothing from this backup could be verified. Ledger verification \
+                 was NOT performed.\n\
+                 \n\
+                 A data directory carries a partial ledger directory like this when \
+                 the node was interrupted while creating it. Opening it would have \
+                 created a new empty database and verified that instead of the \
+                 backup's.",
+                ledger_db_path.display(),
+                marker
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Verify ledger integrity in a restored backup directory
 fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     use icn_store::{SledStore, Store};
@@ -6854,24 +6911,9 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         );
     }
 
-    // `SledStore::open` calls `sled::open`, which CREATES a database when none is
-    // there. A directory that exists but holds no database — `icnd` creates
-    // `store/ledger` before opening it, so a crash in between leaves exactly that,
-    // and the archive checksum ignores directories — would therefore be "opened"
-    // as a brand-new empty database, scanned for zero rows, and reported as a
-    // verified ledger. That is this command verifying a database the backup does
-    // not contain. `conf` is sled's own marker, written beside `db` and `blobs`.
-    if !ledger_db_path.join("conf").exists() {
-        bail!(
-            "FAILED: {} exists but holds no ledger database, so nothing from this \
-             backup could be verified. Ledger verification was NOT performed.\n\
-             \n\
-             A data directory can carry an empty ledger directory if the node was \
-             interrupted while creating it. Opening it here would have created a \
-             new empty database and verified that instead of the backup's.",
-            ledger_db_path.display()
-        );
-    }
+    // Presence is established by `assert_backup_carried_a_ledger` BEFORE the N2-A
+    // gate runs, because the gate's own creating open would otherwise manufacture
+    // the database this function is about to read. One owner, one point in time.
 
     // Open the ledger store in read-only mode
     let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
@@ -6886,94 +6928,66 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     // This means: sum of (debit - credit) per currency should be 0
     let mut currency_sums: std::collections::HashMap<String, i128> =
         std::collections::HashMap::new();
-    let mut parse_errors = 0usize;
-    // A row can be valid JSON and still not be a journal entry. Those used to be
-    // skipped in silence: `{}`, or an account whose `currency` is absent or not a
-    // string, contributed nothing to `currency_sums`, so a wholly corrupt ledger
-    // summed to "no currencies" and the command reported success. Structural
-    // rejects are collected rather than skipped, because the invariant cannot be
-    // evaluated over a row the verifier could not interpret.
-    let mut schema_errors: Vec<String> = Vec::new();
+    // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
+    // `serde_json::Value`.
+    //
+    // An untyped parse accepted rows the ledger itself cannot load: `{}` is valid
+    // JSON, so it parsed, carried no accounts, contributed nothing to the sums and
+    // was skipped in silence — a wholly corrupt ledger then summed to "no
+    // currencies" and the command reported success. A field-subset check was tried
+    // first and was still too weak: `JournalEntry` also requires `timestamp`,
+    // `author`, `parents` and `provenance`, and `AccountDelta` requires
+    // `account_id`, none of which a subset check inspects.
+    //
+    // The version-skew objection to typed deserialization is real but points the
+    // other way. `JournalEntry` is strict — those fields have no serde defaults —
+    // so a row it cannot load is a row `icn-ledger` cannot load, which means the
+    // backup is not restorable by this binary. Reporting PASSED for it would be
+    // this command's original defect in a new place. The message below therefore
+    // separates corruption from a version the current binary cannot read, rather
+    // than the check quietly accepting both.
+    let mut undecodable: Vec<String> = Vec::new();
 
     for (key, value) in entries {
         let row = String::from_utf8_lossy(&key).into_owned();
 
-        let entry = match serde_json::from_slice::<serde_json::Value>(&value) {
+        let entry = match serde_json::from_slice::<icn_ledger::JournalEntry>(&value) {
             Ok(entry) => entry,
-            Err(_) => {
-                parse_errors += 1;
+            Err(e) => {
+                undecodable.push(format!("{row}: {e}"));
                 continue;
             }
         };
 
-        // `JournalEntry::accounts` is a plain `Vec<AccountDelta>` with no rename
-        // and no skip, so every legitimately written row carries this array.
-        let accounts = match entry.get("accounts").and_then(|a| a.as_array()) {
-            Some(accounts) => accounts,
-            None => {
-                schema_errors.push(format!("{row}: no `accounts` array"));
-                continue;
-            }
-        };
-
-        for account in accounts {
-            let Some(currency) = account.get("currency").and_then(|c| c.as_str()) else {
-                schema_errors.push(format!("{row}: account without a string `currency`"));
-                continue;
-            };
-
-            // `debit` and `credit` are `Option<i64>`: absent or null is legal and
-            // means zero. A field that is PRESENT but not an integer is not.
-            let mut amount = |field: &str| -> Option<i64> {
-                match account.get(field) {
-                    None | Some(serde_json::Value::Null) => Some(0),
-                    Some(v) => match v.as_i64() {
-                        Some(n) => Some(n),
-                        None => {
-                            schema_errors
-                                .push(format!("{row}: `{field}` is present but not an integer"));
-                            None
-                        }
-                    },
-                }
-            };
-            let (Some(debit), Some(credit)) = (amount("debit"), amount("credit")) else {
-                continue;
-            };
+        for account in &entry.accounts {
+            // `debit` and `credit` are `Option<i64>`: absent means zero.
+            let debit = account.debit.unwrap_or(0);
+            let credit = account.credit.unwrap_or(0);
+            let currency = &account.currency;
 
             // Use checked arithmetic to prevent overflow
             let net = (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
                 anyhow::anyhow!("Arithmetic overflow computing net for currency {currency}")
             })?;
 
-            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
+            let sum = currency_sums.entry(currency.clone()).or_insert(0);
             *sum = sum.checked_add(net).ok_or_else(|| {
                 anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
             })?;
         }
     }
 
-    if !schema_errors.is_empty() {
+    if !undecodable.is_empty() {
         bail!(
-            "FAILED: {} of {} ledger row(s) are not valid journal entries, so the \
-             double-entry invariant could NOT be verified over this ledger. First: {}",
-            schema_errors.len(),
+            "FAILED: {} of {} ledger row(s) could not be decoded as journal entries, \
+             so the double-entry invariant could NOT be verified over this ledger. \
+             The rows are either corrupt or were written by a version this binary \
+             cannot read; either way the ledger would not load on restore.\n\
+             \n\
+             First: {}",
+            undecodable.len(),
             entry_count,
-            schema_errors[0]
-        );
-    }
-
-    // Fail closed on rows that could not be read. `icn-ledger` writes every
-    // journal row with `serde_json::to_vec`, so an unparseable row is corrupt or
-    // tampered, not merely unusual. This used to print a warning and then report
-    // "✓ Double-entry invariant verified" anyway — an invariant asserted over
-    // rows the verifier had skipped, which is the same overclaim as #2717's
-    // missing ledger: a conclusion wider than the evidence that produced it.
-    if parse_errors > 0 {
-        bail!(
-            "FAILED: {parse_errors} of {} ledger entries could not be parsed, so the \
-             double-entry invariant could NOT be verified over this ledger.",
-            entry_count
+            undecodable[0]
         );
     }
 

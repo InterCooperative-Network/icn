@@ -84,34 +84,51 @@ fn init_identity(data_dir: &Path) {
 ///
 /// `deltas` is `(currency, debit, credit)`.
 fn seed_ledger(data_dir: &Path, deltas: &[(&str, i64, i64)]) {
+    let author = icn_identity::KeyPair::generate().unwrap().did().clone();
+    let entry = icn_ledger::JournalEntry {
+        id: None,
+        timestamp: 1_700_000_000,
+        author: author.clone(),
+        contract_ref: None,
+        accounts: deltas
+            .iter()
+            .map(|(currency, debit, credit)| icn_ledger::AccountDelta {
+                account_id: author.clone(),
+                currency: (*currency).to_string(),
+                debit: if *debit == 0 { None } else { Some(*debit) },
+                credit: if *credit == 0 { None } else { Some(*credit) },
+            })
+            .collect(),
+        parents: Vec::new(),
+        signature: None,
+        nonce: None,
+        provenance: icn_ledger::types::ProvenanceRef::SystemGenerated {
+            reason: "icn#2717 fixture".to_string(),
+        },
+    };
+    write_journal_row(data_dir, &serde_json::to_vec(&entry).unwrap());
+}
+
+/// Write one raw journal row at the canonical ledger path.
+///
+/// Kept separate from [`seed_ledger`] so the corrupt/tampered fixtures can write
+/// bytes that are deliberately NOT a `JournalEntry` without going through the
+/// typed constructor.
+fn write_journal_row(data_dir: &Path, body: &[u8]) {
     let path = ledger_dir(data_dir);
     std::fs::create_dir_all(&path).expect("fixture: could not create ledger dir");
     let store = SledStore::open(&path).expect("fixture: could not open ledger store");
-
-    let accounts: Vec<serde_json::Value> = deltas
-        .iter()
-        .map(|(currency, debit, credit)| {
-            serde_json::json!({
-                "account_id": "did:icn:z6MkfixtureAccount000000000000000000000000",
-                "currency": currency,
-                "debit": if *debit == 0 { serde_json::Value::Null } else { (*debit).into() },
-                "credit": if *credit == 0 { serde_json::Value::Null } else { (*credit).into() },
-            })
-        })
-        .collect();
-    let entry = serde_json::json!({ "accounts": accounts });
-
     store
         .put(
             b"ledger:journal:0000000000000000000000000000000000000000000000000000000000000001",
-            &serde_json::to_vec(&entry).unwrap(),
+            body,
         )
         .expect("fixture: could not write journal row");
     store.db().flush().expect("fixture: could not flush ledger");
     drop(store); // release the sled lock before the binary runs
 
     assert!(
-        ledger_dir(data_dir).exists(),
+        ledger_dir(data_dir).join("conf").is_file(),
         "fixture: ledger database was not created at the canonical path"
     );
 }
@@ -304,17 +321,7 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
 
     // A real sled database at the canonical path, holding a real journal key
     // whose value is not JSON at all.
-    let path = ledger_dir(&data_dir);
-    std::fs::create_dir_all(&path).unwrap();
-    let store = SledStore::open(&path).expect("fixture: could not open ledger store");
-    store
-        .put(
-            b"ledger:journal:0000000000000000000000000000000000000000000000000000000000000001",
-            b"\x00\x01\x02 not json at all",
-        )
-        .expect("fixture: could not write tampered row");
-    store.db().flush().unwrap();
-    drop(store);
+    write_journal_row(&data_dir, b"\x00\x01\x02 not json at all");
 
     make_backup(&data_dir, &archive);
 
@@ -326,7 +333,7 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
         "a ledger with unreadable rows must fail --verify-ledger:\n{text}"
     );
     assert!(
-        text.contains("could not be parsed"),
+        text.contains("could not be decoded as journal entries"),
         "the failure must say the rows could not be read:\n{text}"
     );
     assert!(
@@ -364,17 +371,7 @@ fn schema_invalid_ledger_rows_are_not_silently_skipped() {
         let archive = dir.path().join("backup.tar");
 
         init_identity(&data_dir);
-        let path = ledger_dir(&data_dir);
-        std::fs::create_dir_all(&path).unwrap();
-        let store = SledStore::open(&path).expect("fixture: could not open ledger store");
-        store
-            .put(
-                b"ledger:journal:0000000000000000000000000000000000000000000000000000000000000001",
-                &body,
-            )
-            .expect("fixture: could not write row");
-        store.db().flush().unwrap();
-        drop(store);
+        write_journal_row(&data_dir, &body);
         make_backup(&data_dir, &archive);
 
         let out = verify(&archive, true);
@@ -386,7 +383,7 @@ fn schema_invalid_ledger_rows_are_not_silently_skipped() {
              --verify-ledger:\n{text}"
         );
         assert!(
-            text.contains("not valid journal entries"),
+            text.contains("could not be decoded as journal entries"),
             "[{label}] the failure must say the row was not interpretable:\n{text}"
         );
         assert!(
@@ -453,6 +450,11 @@ fn verify_backup_verify_ledger_refuses_a_restored_tree_the_n2a_gate_refuses() {
     let archive = dir.path().join("backup.tar");
 
     init_identity(&data_dir);
+    // A real, balanced ledger as well. `assert_backup_carried_a_ledger` runs
+    // BEFORE the N2-A gate (it has to — see the handler), so without one this
+    // fixture would fail on the missing-ledger bail and never reach the gate it
+    // exists to exercise. A backup of a node that has run has both.
+    seed_ledger(&data_dir, &[("hours", 100, 0), ("hours", 0, 100)]);
 
     // Two accepted spellings of ONE principal in a registered N2-A keyspace.
     let a = icn_identity::KeyPair::generate().unwrap().did().clone();
