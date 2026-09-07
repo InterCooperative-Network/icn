@@ -6916,7 +6916,7 @@ fn render_row_key(key: &[u8]) -> String {
         }
     }
     if key.len() > MAX {
-        out.push_str(&format!("…(+{} more bytes)", key.len() - MAX));
+        out.push_str(&format!("...(+{} more bytes)", key.len() - MAX));
     }
     out
 }
@@ -6928,23 +6928,33 @@ fn render_row_key(key: &[u8]) -> String {
 /// `AccountDelta::currency`, the `account_id` embedded in a `net_change` error,
 /// and whatever a serde error quotes back — and escaping them one at a time
 /// requires enumerating all of them correctly, forever. icn#2717 escaped the key
-/// and left the currency, which is exactly that failure. One boundary is one
-/// place to get right.
+/// and left the currency, which is exactly that failure.
 ///
-/// Already-escaped input passes through unchanged, so this composes with
+/// PERMITLIST, not a denylist. An earlier version escaped `char::is_control()`,
+/// which is false for U+202E and the U+2066..U+2069 isolates — Unicode format
+/// characters that visually reorder or conceal the rest of the line without
+/// being "control" at all. Enumerating the bidi and format ranges would be
+/// another denylist, and this function exists because the previous one was
+/// incomplete. `ops/state/truth/policy.json` states the rule directly: a denylist
+/// admits any state nobody enumerated.
+///
+/// So printable ASCII passes and everything else is escaped to `\u{...}`. A
+/// legitimately non-ASCII currency renders escaped, which for a diagnostic is the
+/// correct trade: it shows the operator the actual bytes rather than a rendering
+/// of them. Already-escaped input passes through unchanged, so this composes with
 /// [`render_row_key`] without double-escaping.
 fn sanitize_diagnostic(line: &str) -> String {
     const MAX: usize = 240;
     let mut out = String::with_capacity(line.len().min(MAX));
     for ch in line.chars().take(MAX) {
-        if ch.is_control() {
-            out.push_str(&format!("\\x{:02x}", ch as u32 & 0xff));
-        } else {
+        if matches!(ch, ' '..='~') {
             out.push(ch);
+        } else {
+            out.push_str(&format!("\\u{{{:04x}}}", ch as u32));
         }
     }
     if line.chars().count() > MAX {
-        out.push('…');
+        out.push_str("...");
     }
     out
 }

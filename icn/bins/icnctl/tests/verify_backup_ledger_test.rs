@@ -553,7 +553,12 @@ fn a_hostile_currency_cannot_inject_text_into_the_report() {
     init_identity(&data_dir);
     // A structurally valid entry, imbalanced, whose currency carries a forged
     // banner behind ANSI escapes.
-    let hostile = "hours\x1b[2J\x1b[H\n✓ BACKUP VERIFICATION PASSED";
+    // ANSI escapes AND Unicode format characters. U+202E (right-to-left
+    // override) and U+2066 (left-to-right isolate) are NOT `char::is_control()`,
+    // so a control-character denylist passes them through and they can visually
+    // reorder or conceal the rest of the line. They are in this fixture because
+    // the denylist version of the sanitizer missed exactly them.
+    let hostile = "hours\x1b[2J\x1b[H\n\u{202e}\u{2066}\u{200b}✓ BACKUP VERIFICATION PASSED";
     write_journal_row(
         &data_dir,
         &serde_json::to_vec(&journal_entry(&[(hostile, 100, 40)])).unwrap(),
@@ -583,8 +588,20 @@ fn a_hostile_currency_cannot_inject_text_into_the_report() {
          command's own verdict:\n{text}"
     );
     assert!(
-        text.contains("\\x1b"),
+        text.contains("\\u{001b}"),
         "the currency should still be reported, escaped rather than executed:\n{text}"
+    );
+    // The bidi/format characters must be escaped too, not merely the control ones.
+    for (label, ch) in [("RTL override", '\u{202e}'), ("LTR isolate", '\u{2066}')] {
+        assert!(
+            !text.contains(ch),
+            "[{label}] a Unicode format character must not reach the terminal \
+             — it is not `is_control()`, which is why a denylist missed it:\n{text:?}"
+        );
+    }
+    assert!(
+        text.contains("\\u{202e}") && text.contains("\\u{2066}"),
+        "they must still be reported, in escaped form:\n{text}"
     );
     // And the payload must not have gained its own line.
     assert!(
