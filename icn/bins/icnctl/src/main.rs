@@ -2353,7 +2353,7 @@ fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract: never create a database. A missing ledger store means
     // there are no persisted treasuries to inspect — report an empty plan rather
@@ -2504,7 +2504,7 @@ fn treasury_entity_backfill_apply(
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract — apply included: never create a database. A missing
     // ledger store means there are no persisted treasuries, so there is nothing
@@ -6798,7 +6798,20 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     println!("✓ BACKUP VERIFICATION PASSED");
     println!("═══════════════════════════════════════");
     println!();
-    println!("This backup can be safely restored.");
+    // Say what was verified, not more. Without `--verify-ledger` this command
+    // has checked metadata, extraction, a whole-directory checksum and the
+    // presence of `identity.age` — it has not read the ledger and has not run
+    // the N2-A principal audit, so "can be safely restored" claimed a guarantee
+    // it never established (#2717). The bare command's *checks* are unchanged;
+    // only the claim is narrowed to them.
+    if verify_ledger {
+        println!("Integrity, ledger invariants and the N2-A principal audit all passed.");
+        println!("This backup can be safely restored.");
+    } else {
+        println!("Verified: archive integrity, checksum, and required files.");
+        println!("NOT verified: ledger contents and the N2-A principal audit.");
+        println!("Re-run with --verify-ledger to check those before relying on this backup.");
+    }
 
     Ok(())
 }
@@ -6807,11 +6820,25 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
 fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     use icn_store::{SledStore, Store};
 
-    // Check if ledger store exists
-    let ledger_db_path = restore_dir.join("ledger");
+    // `backup` archives the data directory at archive root
+    // (`append_dir_all(".", data_dir)`), so the canonical `{data_dir}/store/ledger`
+    // restores to `{restore_dir}/store/ledger`. This resolved `{restore_dir}/ledger`
+    // — one level too high — so the invariant check below never opened a database
+    // and every `--verify-ledger` run reported success without reading a ledger
+    // (#2717). Resolved through the layout's owner so a fourth caller cannot
+    // re-derive it.
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
     if !ledger_db_path.exists() {
-        println!("  ⚠ No ledger database found (may be new node)");
-        return Ok(());
+        // Fail closed. The caller passed `--verify-ledger`, so this is a
+        // verification that was ASKED FOR and could not be performed; counting it
+        // toward `BACKUP VERIFICATION PASSED` is the overclaim this issue is
+        // about. The message names the path so "this backup has no ledger" stays
+        // distinguishable from "the verifier looked in the wrong place".
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.",
+            ledger_db_path.display()
+        );
     }
 
     // Open the ledger store in read-only mode
@@ -6820,7 +6847,8 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     // Count entries using the correct ledger journal prefix
     let entry_prefix = b"ledger:journal:";
     let entries = store.scan(entry_prefix)?;
-    println!("  Found {} ledger entries", entries.len());
+    let entry_count = entries.len();
+    println!("  Found {entry_count} ledger entries");
 
     // Verify double-entry invariant: Σ debits == Σ credits per currency
     // This means: sum of (debit - credit) per currency should be 0
@@ -6862,8 +6890,18 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
         }
     }
 
+    // Fail closed on rows that could not be read. `icn-ledger` writes every
+    // journal row with `serde_json::to_vec`, so an unparseable row is corrupt or
+    // tampered, not merely unusual. This used to print a warning and then report
+    // "✓ Double-entry invariant verified" anyway — an invariant asserted over
+    // rows the verifier had skipped, which is the same overclaim as #2717's
+    // missing ledger: a conclusion wider than the evidence that produced it.
     if parse_errors > 0 {
-        println!("  ⚠ {parse_errors} entries could not be parsed");
+        bail!(
+            "FAILED: {parse_errors} of {} ledger entries could not be parsed, so the \
+             double-entry invariant could NOT be verified over this ledger.",
+            entry_count
+        );
     }
 
     // Check invariant
