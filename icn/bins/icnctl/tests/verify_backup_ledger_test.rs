@@ -43,6 +43,19 @@ fn combined(out: &Output) -> String {
     )
 }
 
+/// Collapse every run of whitespace to one space.
+///
+/// The operator summary is a wrapped paragraph printed as several `println!`
+/// lines, so a substring that reads as one sentence may straddle a line break.
+/// Asserting against the raw text made these tests depend on *where* the wrap
+/// falls, which is not a property any of them means to pin — and which broke
+/// three separate assertions when the sentences were rewritten. Flattening
+/// removes the dependence without weakening anything: the words, their order and
+/// their adjacency are all still asserted.
+fn flattened(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// The canonical ledger location under a data directory.
 ///
 /// Spelled out here on purpose: this test must fail if the *product* stops
@@ -361,16 +374,30 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         "even under --verify-ledger this command does not check hashes, \
          signatures or provenance, so it must not certify safe restoration:\n{text}"
     );
+    // Pin the ENUMERATION, not just its presence. This sentence is the one an
+    // operator reads as the not-verified set, so a token silently dropping out of
+    // it is a widening of the claim without a widening of the checks — which is
+    // exactly what happened to "amount signs" in review. `icn-ledger` does own a
+    // sign check (`entry::validate_positive_amounts`, via `JournalEntryBuilder`)
+    // that this command does not run, so the omission would have been actively
+    // misleading rather than merely incomplete.
     assert!(
-        text.contains("NOT verified: content hashes, signatures, provenance"),
-        "success must state which ledger validations it did not perform:\n{text}"
+        flattened(&text).contains(
+            "NOT verified: amount signs, content hashes, signatures, provenance, \
+             parent existence."
+        ),
+        "success must state which ledger validations it did not perform, as a \
+         complete enumeration — amount signs included, because icn-ledger owns a \
+         sign check (entry::validate_positive_amounts, via JournalEntryBuilder) \
+         that this command does not run:\n{text}"
     );
     // Freeze state and credit limits are append-time policy, not properties of a
     // backup. Delegation deliberately does NOT reach them, so the output must not
     // let an operator read "validated by icn-ledger" as covering them.
+    let flat = flattened(&text);
     assert!(
-        text.contains("Freeze state, credit limits and progressive limits are")
-            && text.contains("deliberately not checked here"),
+        flat.contains("Freeze state, credit limits and progressive limits are append-time policy")
+            && flat.contains("deliberately not checked here"),
         "the summary must name what delegation deliberately did not bring with \
          it, or 'valid under icn-ledger's entry validation' overclaims:\n{text}"
     );

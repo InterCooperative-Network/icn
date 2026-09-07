@@ -1322,7 +1322,10 @@ every §11 disposition are untouched, and no readiness classification moves.
   `--verify-ledger` branch names only what it computed — archive integrity, the N2-A audit of the
   restored tree, and — since icn#2736 — that every ledger entry is valid under
   `icn_ledger::entry_validation`, the owner `Ledger::validate_entry` itself consults, together with
-  the ledger validations it did not perform (hashes, signatures, provenance, parent existence).
+  the ledger validations it did not perform (amount signs, hashes, signatures, provenance,
+  parent existence). Amount signs stay named: `icn-ledger` owns a sign check in
+  `entry::validate_positive_amounts`, reached by `JournalEntryBuilder`, which this command does
+  not run, so "valid under icn-ledger's entry validation" must not be read as the crate's union.
   Before icn#2736 the invariant was claimed only **when a balance was actually computed**, because a
   journal whose entries carried no currency deltas satisfied it vacuously and the summary said so
   instead of claiming it; delegating to the owner made that state unreachable — an entry with no

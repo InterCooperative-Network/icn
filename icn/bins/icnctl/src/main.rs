@@ -6839,11 +6839,18 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
             println!("restored tree. The ledger contains no entries, so no entry was");
             println!("validated and no double-entry balance was computed.");
         }
-        println!("NOT verified: content hashes, signatures, provenance, parent");
-        println!("existence. Freeze state, credit limits and progressive limits are");
-        println!("append-time policy — evaluated against live ledger state and the");
-        println!("current clock — so they are not properties of a backup at rest and");
-        println!("are deliberately not checked here.");
+        // "amount signs" STAYS in this list. Delegation did not make signs a
+        // checked property, and dropping the token would have been a silent
+        // widening in the one sentence an operator reads as the not-verified set
+        // — the sharper because `icn-ledger` DOES own a sign check
+        // (`entry::validate_positive_amounts`, reached by `JournalEntryBuilder`),
+        // which this command does not run. "Valid under icn-ledger's own entry
+        // validation" must therefore say plainly that signs are not part of it.
+        println!("NOT verified: amount signs, content hashes, signatures,");
+        println!("provenance, parent existence. Freeze state, credit limits and");
+        println!("progressive limits are append-time policy — evaluated against live");
+        println!("ledger state and the current clock — so they are not properties of a");
+        println!("backup at rest and are deliberately not checked here.");
     } else {
         println!("Verified: archive integrity, checksum, and required files.");
         println!("NOT verified: ledger contents and the N2-A principal audit.");

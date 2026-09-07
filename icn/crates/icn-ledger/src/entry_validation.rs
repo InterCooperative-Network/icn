@@ -35,6 +35,23 @@
 //! owner both callers now consult (icn#2736): [`Ledger::validate_entry`] on the
 //! append path, and `icnctl verify-backup` on a restored journal.
 //!
+//! # Scope of this ownership, stated exactly
+//!
+//! This module is the owner for the two consumers named above:
+//! [`Ledger::validate_entry`](crate::Ledger) on the append path, and `icnctl
+//! verify-backup` on a restored journal. It is **not** yet the owner for entry
+//! *construction*: [`crate::entry::JournalEntryBuilder::build`] still applies its
+//! own `validate_double_entry` and `validate_positive_amounts`, and those diverge
+//! from this module in three ways — the builder accumulates with unchecked `+=`
+//! rather than `checked_add`, compares Σdebits to Σcredits rather than summing
+//! `net_change`, and does not reject an empty `accounts` array. Folding the
+//! builder in is its own bounded change; claiming that ownership here before it
+//! happens would be the same kind of overclaim this module exists to stop.
+//!
+//! The builder also owns a check this module does not have at all: amount signs.
+//! A caller reporting on what "icn-ledger's entry validation" established must
+//! therefore say so, rather than let the crate's name imply the union.
+//!
 //! # What this module deliberately does NOT own
 //!
 //! Freeze state, credit limits and progressive limits stay on `Ledger`. They are
