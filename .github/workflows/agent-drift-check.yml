@@ -20,6 +20,7 @@ on:
       - 'scripts/check-merge-policy-schema.py'
       - 'scripts/tests/test_merge_policy_schema.py'
       - 'scripts/tests/test_what_matters_now_json.py'
+      - 'scripts/tests/test_what_matters_now_drift.py'
       # icn#2651 stage B: the executable that owns ordinary-merge semantics, and its controls.
       - 'tools/icn-merge-pr/**'
       - 'scripts/tests/test_icn_merge_pr.py'
@@ -165,6 +166,12 @@ jobs:
 
       - name: what-matters-now --json is machine-readable (Refs icn#2638)
         run: python3 scripts/tests/test_what_matters_now_json.py
+
+      # icn#2723: the step above this one is the gate itself, and it could exit
+      # non-zero with no output at all -- so a red required check said nothing.
+      # This asserts the report is actually reached and that findings aggregate.
+      - name: what-matters-now --drift reports what it found (Refs icn#2723)
+        run: python3 scripts/tests/test_what_matters_now_drift.py
 
       - name: what-matters-now human mode still renders
         run: bash ops/scripts/what-matters-now.sh > /dev/null
