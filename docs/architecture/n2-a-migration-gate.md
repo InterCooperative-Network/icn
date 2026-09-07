@@ -1314,16 +1314,32 @@ every §11 disposition are untouched, and no readiness classification moves.
   still hand a caller-supplied `sled::Db` to any store constructor without a path the gate could have
   discovered. No production entrypoint reaches them ungated today, and closing them would require a
   typed gated-handle capability — evaluated and deliberately not built here.
-- **`verify-backup` gates only under `--verify-ledger`.** Plain `icnctl verify-backup` still prints
-  "This backup can be safely restored" without auditing the restored tree. Widening it would change
-  what the bare command means, so it is recorded here instead.
-- **A pre-existing `verify-backup` path bug, found while placing that gate.**
-  `verify_ledger_in_backup` looks for `<restore_dir>/ledger`, but `backup` archives the data
-  directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check has
-  therefore been a no-op, printing "No ledger database found (may be new node)" for backups that do
-  contain stores. M4d does not fix it — the gate call added beside it recurses through
-  `find_sled_roots` and does reach the real stores, but that is a side effect, not a repair, and
-  correcting the path belongs to whoever owns that command.
+- **`verify-backup` gates only under `--verify-ledger`.** That is still true: plain
+  `icnctl verify-backup` does not audit the restored tree. What changed is the *claim* — icn#2717
+  removed the "This backup can be safely restored" claim from **both** branches, because the
+  command never establishes it: bare `verify-backup` now states that ledger contents and the N2-A
+  audit were **not** verified and that `--verify-ledger` is how to check them, and the
+  `--verify-ledger` branch names only what it computed — archive integrity, the N2-A audit of the
+  restored tree, and the double-entry invariant **when a balance was actually computed**; a journal
+  whose entries carry no currency deltas satisfies that invariant vacuously, so there the summary
+  says so instead of claiming it — together with the ledger validations it did not perform (amount
+  signs, hashes, signatures, provenance, parent existence, empty-entry rejection). **The bare branch's checks
+  are unchanged — only its claim narrowed.** The `--verify-ledger` branch did change what it
+  checks, and the bullet below records how: it resolves the canonical ledger path, refuses an
+  absent or partial database before the gate can create one, decodes rows as `JournalEntry`, and
+  balances per entry. Widening what the *bare* command verifies would change what it means and is
+  still not done here.
+- **A pre-existing `verify-backup` path bug, found while placing that gate. FIXED by icn#2717.**
+  `verify_ledger_in_backup` looked for `<restore_dir>/ledger`, but `backup` archives the data
+  directory whole, so the ledger lands at `<restore_dir>/store/ledger`. The ledger check was
+  therefore a no-op that printed "No ledger database found (may be new node)" for backups that do
+  contain stores — and, because the miss branch returned `Ok(())`, still reported
+  `✓ BACKUP VERIFICATION PASSED`. M4d did not fix it; the gate call added beside it recurses through
+  `find_sled_roots` and does reach the real stores, but that was a side effect, not a repair.
+  icn#2717 resolved the path through a new `icn_core::config::ledger_store_path` owner (the third
+  caller to re-derive this layout, after icn#2718), made the miss branch fail closed when
+  `--verify-ledger` was explicitly requested, and made unparseable journal rows fail rather than be
+  warned about and counted as verified.
 - **The identity-base delimiter hazard is untouched.** M4c proved an accepted DID spelling can carry
   `:` or `/`; `Did::from_str` is not changed here, and other delimiter-framed keyspaces remain
   unaudited.

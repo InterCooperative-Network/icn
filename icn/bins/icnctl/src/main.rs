@@ -2353,7 +2353,7 @@ fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract: never create a database. A missing ledger store means
     // there are no persisted treasuries to inspect — report an empty plan rather
@@ -2504,7 +2504,7 @@ fn treasury_entity_backfill_apply(
     use icn_store::Store;
     use std::sync::Arc;
 
-    let ledger_store_path = get_store_path(data_dir).join("ledger");
+    let ledger_store_path = icn_core::config::ledger_store_path(data_dir);
 
     // Read-only contract — apply included: never create a database. A missing
     // ledger store means there are no persisted treasuries, so there is nothing
@@ -6782,14 +6782,23 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     }
 
     // Optional: verify ledger integrity
+    let mut ledger_check: Option<LedgerCheck> = None;
     if verify_ledger {
         println!();
         println!("[Extra] Verifying ledger integrity...");
         // The restored tree is a data directory like any other: a backup whose
         // ledger the gate would refuse is not one that "can be safely restored",
         // which is exactly what this command is about to print.
+        // ORDER IS LOAD-BEARING. Decide whether the ARCHIVE carried a ledger
+        // database before anything opens anything. `enforce_n2a_gate` discovers
+        // sled roots by `child.join("conf").is_file()` and opens each one with
+        // `SledStore::open`, which CREATES — so for a directory holding `conf` but
+        // no `db` (an interrupted sled init) the gate itself materialises the
+        // database, and a presence check running afterwards would find one and
+        // certify it. The evidence has to be taken from the extracted tree first.
+        assert_backup_carried_a_ledger(restore_dir)?;
         enforce_n2a_gate(restore_dir, "backup verification")?;
-        verify_ledger_in_backup(restore_dir)?;
+        ledger_check = Some(verify_ledger_in_backup(restore_dir)?);
     }
 
     // Temp directory auto-cleaned on drop
@@ -6798,21 +6807,203 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
     println!("✓ BACKUP VERIFICATION PASSED");
     println!("═══════════════════════════════════════");
     println!();
-    println!("This backup can be safely restored.");
+    // Say what was verified, not more. Without `--verify-ledger` this command
+    // has checked metadata, extraction, a whole-directory checksum and the
+    // presence of `identity.age` — it has not read the ledger and has not run
+    // the N2-A principal audit, so "can be safely restored" claimed a guarantee
+    // it never established (#2717). The bare command's *checks* are unchanged;
+    // only the claim is narrowed to them.
+    if verify_ledger {
+        // Name the ONE invariant that was checked. `verify_ledger_in_backup`
+        // verifies Σdebit == Σcredit per currency and nothing else — not positive
+        // amounts, content hashes, signatures, provenance or parent existence — so
+        // "ledger invariants" in the plural claimed a validation this command does
+        // not perform. Narrowing the sentence is the same correction this PR makes
+        // to the bare command, applied to the line it added.
+        // Name only what was actually computed. A journal whose entries carry
+        // no currency deltas satisfies the per-currency invariant vacuously, so
+        // claiming "the double-entry invariant" there would contradict the
+        // detail line printed three lines above it.
+        let balanced = ledger_check
+            .as_ref()
+            .map(|c| c.currencies_balanced > 0)
+            .unwrap_or(false);
+        if balanced {
+            println!("Verified: archive integrity, the double-entry invariant, and the");
+            println!("N2-A principal audit of the restored tree.");
+        } else {
+            let entries = ledger_check.as_ref().map(|c| c.entries).unwrap_or(0);
+            println!("Verified: archive integrity and the N2-A principal audit of the");
+            println!("restored tree. {entries} ledger entries carried no currency delta,");
+            println!("so no double-entry balance was computed.");
+        }
+        println!("Other ledger validations (amount signs, hashes, signatures,");
+        println!("provenance, parent existence, empty-entry rejection) were NOT performed.");
+    } else {
+        println!("Verified: archive integrity, checksum, and required files.");
+        println!("NOT verified: ledger contents and the N2-A principal audit.");
+        println!("Re-run with --verify-ledger to check those before relying on this backup.");
+    }
 
     Ok(())
 }
 
-/// Verify ledger integrity in a restored backup directory
-fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
+/// Prove the ARCHIVE carried a ledger database, before anything opens the tree.
+///
+/// Must be called before `enforce_n2a_gate`. The gate discovers sled roots by the
+/// presence of `conf` and opens each with `SledStore::open`, which calls
+/// `sled::open` — a CREATING open. So for a directory holding `conf` but no `db`,
+/// the gate materialises the database itself, and any later presence check finds
+/// one and certifies a ledger the backup never contained (#2717).
+///
+/// A live sled database directory holds `conf`, `db` and `blobs`; requiring `db`
+/// as well as `conf` is what distinguishes a restored database from an
+/// interrupted initialisation. This cannot detect a `db` that is present but
+/// unreadable — sled recovers such a directory into an empty database with only a
+/// warning, which needs a different mechanism and is owned by icn#2732.
+fn assert_backup_carried_a_ledger(restore_dir: &Path) -> Result<()> {
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
+
+    if !ledger_db_path.exists() {
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
+            ledger_db_path.display()
+        );
+    }
+
+    for marker in ["conf", "db"] {
+        if !ledger_db_path.join(marker).is_file() {
+            bail!(
+                "FAILED: {} exists but holds no ledger database (missing `{}`), so \
+                 nothing from this backup could be verified. Ledger verification \
+                 was NOT performed.\n\
+                 \n\
+                 A data directory carries a partial ledger directory like this when \
+                 the node was interrupted while creating it. Opening it would have \
+                 created a new empty database and verified that instead of the \
+                 backup's.",
+                ledger_db_path.display(),
+                marker
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Render an untrusted journal key: bounded, with every non-printable byte
+/// escaped.
+///
+/// The key comes out of the archive being verified, which is untrusted input by
+/// definition — that is what this command exists to judge. Printing it verbatim
+/// let a crafted backup inject newlines and ANSI escapes into this command's own
+/// diagnostics, up to and including repainting a forged success banner over a
+/// failing run. Bounded because a key can also be arbitrarily long.
+fn render_row_key(key: &[u8]) -> String {
+    const MAX: usize = 80;
+    let mut out = String::with_capacity(MAX);
+    for &b in key.iter().take(MAX) {
+        if (0x20..=0x7e).contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("\\x{b:02x}"));
+        }
+    }
+    if key.len() > MAX {
+        out.push_str(&format!("...(+{} more bytes)", key.len() - MAX));
+    }
+    out
+}
+
+/// Sanitize a composed diagnostic line before it reaches the operator.
+///
+/// Applied at the OUTPUT BOUNDARY rather than per field, on purpose. A journal
+/// row carries several attacker-influenced values — the key, every
+/// `AccountDelta::currency`, the `account_id` embedded in a `net_change` error,
+/// and whatever a serde error quotes back — and escaping them one at a time
+/// requires enumerating all of them correctly, forever. icn#2717 escaped the key
+/// and left the currency, which is exactly that failure.
+///
+/// PERMITLIST, not a denylist. An earlier version escaped `char::is_control()`,
+/// which is false for U+202E and the U+2066..U+2069 isolates — Unicode format
+/// characters that visually reorder or conceal the rest of the line without
+/// being "control" at all. Enumerating the bidi and format ranges would be
+/// another denylist, and this function exists because the previous one was
+/// incomplete. `ops/state/truth/policy.json` states the rule directly: a denylist
+/// admits any state nobody enumerated.
+///
+/// So printable ASCII passes and everything else is escaped to `\u{...}`. A
+/// legitimately non-ASCII currency renders escaped, which for a diagnostic is the
+/// correct trade: it shows the operator the actual bytes rather than a rendering
+/// of them. Already-escaped input passes through unchanged, so this composes with
+/// [`render_row_key`] without double-escaping.
+fn sanitize_diagnostic(line: &str) -> String {
+    const MAX: usize = 240;
+    let mut out = String::with_capacity(line.len().min(MAX));
+    for ch in line.chars().take(MAX) {
+        if matches!(ch, ' '..='~') {
+            out.push(ch);
+        } else {
+            out.push_str(&format!("\\u{{{:04x}}}", ch as u32));
+        }
+    }
+    if line.chars().count() > MAX {
+        out.push_str("...");
+    }
+    out
+}
+
+/// What `verify_ledger_in_backup` actually established.
+///
+/// Returned rather than inferred so the operator-facing summary cannot claim a
+/// balance that was never computed: a journal whose entries carry no currency
+/// deltas satisfies the per-currency invariant vacuously, and saying "the
+/// double-entry invariant" was verified there would be the same overclaim this
+/// command exists to stop making.
+struct LedgerCheck {
+    entries: usize,
+    currencies_balanced: usize,
+}
+
+/// Verify ledger integrity in a restored backup directory.
+fn verify_ledger_in_backup(restore_dir: &Path) -> Result<LedgerCheck> {
     use icn_store::{SledStore, Store};
 
-    // Check if ledger store exists
-    let ledger_db_path = restore_dir.join("ledger");
+    // `backup` archives the data directory at archive root
+    // (`append_dir_all(".", data_dir)`), so the canonical `{data_dir}/store/ledger`
+    // restores to `{restore_dir}/store/ledger`. This resolved `{restore_dir}/ledger`
+    // — one level too high — so the invariant check below never opened a database
+    // and every `--verify-ledger` run reported success without reading a ledger
+    // (#2717). Resolved through the layout's owner so a fourth caller cannot
+    // re-derive it.
+    let ledger_db_path = icn_core::config::ledger_store_path(restore_dir);
     if !ledger_db_path.exists() {
-        println!("  ⚠ No ledger database found (may be new node)");
-        return Ok(());
+        // Fail closed. The caller passed `--verify-ledger`, so this is a
+        // verification that was ASKED FOR and could not be performed; counting it
+        // toward `BACKUP VERIFICATION PASSED` is the overclaim this issue is
+        // about. The message names the path so "this backup has no ledger" stays
+        // distinguishable from "the verifier looked in the wrong place".
+        bail!(
+            "FAILED: --verify-ledger was requested but no ledger database exists \
+             in this backup at {}. Ledger verification was NOT performed.\n\
+             \n\
+             A node that has never started has no ledger yet — `icnd` creates it, \
+             not `icnctl id init`. If this is a pre-first-start backup, verify it \
+             without --verify-ledger; there is deliberately no flag to make \
+             --verify-ledger pass without reading a ledger.",
+            ledger_db_path.display()
+        );
     }
+
+    // Presence is established by `assert_backup_carried_a_ledger` BEFORE the N2-A
+    // gate runs, because the gate's own creating open would otherwise manufacture
+    // the database this function is about to read. One owner, one point in time.
 
     // Open the ledger store in read-only mode
     let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
@@ -6820,75 +7011,168 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     // Count entries using the correct ledger journal prefix
     let entry_prefix = b"ledger:journal:";
     let entries = store.scan(entry_prefix)?;
-    println!("  Found {} ledger entries", entries.len());
+    let entry_count = entries.len();
+    println!("  Found {entry_count} ledger entries");
 
-    // Verify double-entry invariant: Σ debits == Σ credits per currency
-    // This means: sum of (debit - credit) per currency should be 0
-    let mut currency_sums: std::collections::HashMap<String, i128> =
-        std::collections::HashMap::new();
-    let mut parse_errors = 0usize;
+    // Verify the double-entry invariant: within EACH entry, Σ debits == Σ credits
+    // per currency — the same scope `Ledger::validate_entry` enforces on append.
+    let mut unbalanced_rows: Vec<String> = Vec::new();
+    // Detail lines are per CURRENCY; a row imbalanced in two currencies
+    // contributes two. Counting rows separately stops the report claiming
+    // "2 of 1 ledger row(s) do not balance" — an impossible statement
+    // about the operator's own data.
+    let mut unbalanced_row_count = 0usize;
+    let mut currencies_seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    // Deserialize each row into the PERSISTED LEDGER TYPE, not an untyped
+    // `serde_json::Value`.
+    //
+    // An untyped parse accepted rows the ledger itself cannot load: `{}` is valid
+    // JSON, so it parsed, carried no accounts, contributed nothing to the sums and
+    // was skipped in silence — a wholly corrupt ledger then summed to "no
+    // currencies" and the command reported success. A field-subset check was tried
+    // first and was still too weak: `JournalEntry` also requires `timestamp`,
+    // `author`, `parents` and `provenance`, and `AccountDelta` requires
+    // `account_id`, none of which a subset check inspects.
+    //
+    // The version-skew objection to typed deserialization is real but points the
+    // other way. `JournalEntry` is strict — those fields have no serde defaults —
+    // so a row it cannot load is a row `icn-ledger` cannot load, which means the
+    // backup is not restorable by this binary. Reporting PASSED for it would be
+    // this command's original defect in a new place. The message below therefore
+    // separates corruption from a version the current binary cannot read, rather
+    // than the check quietly accepting both.
+    let mut undecodable: Vec<String> = Vec::new();
 
-    for (_key, value) in entries {
-        // Try to deserialize entry and extract account deltas
-        match serde_json::from_slice::<serde_json::Value>(&value) {
-            Ok(entry) => {
-                if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
-                    for account in accounts {
-                        if let Some(currency) = account.get("currency").and_then(|c| c.as_str()) {
-                            // AccountDelta uses separate debit and credit fields (both Option<i64>)
-                            let debit = account.get("debit").and_then(|d| d.as_i64()).unwrap_or(0);
-                            let credit =
-                                account.get("credit").and_then(|c| c.as_i64()).unwrap_or(0);
+    for (key, value) in entries {
+        let row = render_row_key(&key);
 
-                            // Use checked arithmetic to prevent overflow
-                            let net =
-                                (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
-                                    anyhow::anyhow!(
-                                        "Arithmetic overflow computing net for currency {currency}"
-                                    )
-                                })?;
+        let entry = match serde_json::from_slice::<icn_ledger::JournalEntry>(&value) {
+            Ok(entry) => entry,
+            Err(e) => {
+                undecodable.push(sanitize_diagnostic(&format!("{row}: {e}")));
+                continue;
+            }
+        };
 
-                            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
-                            *sum = sum.checked_add(net).ok_or_else(|| {
-                                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
-                            })?;
-                        }
-                    }
+        // Balance is checked PER ROW, matching what the ledger enforces.
+        // `Ledger::validate_entry` (icn-ledger/src/ledger.rs) scopes its
+        // `currency_sums` to a single entry — `for delta in &entry.accounts` — and
+        // requires every currency to sum to zero for THAT entry. Accumulating
+        // across the whole journal is a strictly weaker check: two rows at +60 and
+        // −60 `hours` cancel ledger-wide and would have been reported as verified,
+        // while the ledger would have rejected both on append. Per-row balance
+        // implies the ledger-wide total, so this subsumes the old check rather
+        // than adding to it.
+        // i64 with checked arithmetic, using the ledger's own `net_change()` —
+        // NOT a widened i128. `validate_entry` accumulates in `HashMap<String, i64>`
+        // and rejects overflow as `ArithmeticOverflow`, so a row whose running
+        // per-currency total exceeds i64 and later cancels (debits of i64::MAX and
+        // 1, then matching credits) is rejected there. Computing the same sum in
+        // i128 cannot overflow, so it reaches zero and would report the row
+        // verified — accepting exactly what the ledger refuses. Same words, weaker
+        // check, which is the shape this whole command kept failing in.
+        let mut row_sums: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        let mut row_overflowed = false;
+
+        for account in &entry.accounts {
+            let currency = &account.currency;
+
+            let net = match account.net_change() {
+                Ok(net) => net,
+                Err(e) => {
+                    unbalanced_rows.push(sanitize_diagnostic(&format!("{row}: {e}")));
+                    row_overflowed = true;
+                    break;
+                }
+            };
+
+            let sum = row_sums.entry(currency.clone()).or_insert(0);
+            match sum.checked_add(net) {
+                Some(next) => *sum = next,
+                None => {
+                    unbalanced_rows.push(sanitize_diagnostic(&format!(
+                        "{row}: arithmetic overflow accumulating currency {currency}"
+                    )));
+                    row_overflowed = true;
+                    break;
                 }
             }
-            Err(_) => {
-                parse_errors += 1;
+        }
+
+        if row_overflowed {
+            // The row is already recorded as failing; do not also fold its partial
+            // sums into the balance verdict. It still counts as ONE failing row —
+            // omitting it here would under-report the corruption scope by exactly
+            // the rows that failed hardest.
+            unbalanced_row_count += 1;
+            continue;
+        }
+
+        let mut row_unbalanced = false;
+        for (currency, sum) in row_sums {
+            if sum != 0 {
+                unbalanced_rows.push(sanitize_diagnostic(&format!(
+                    "{row}: currency {currency} sums to {sum}"
+                )));
+                row_unbalanced = true;
             }
+            // Record the currency so the report can say how many were covered.
+            currencies_seen.insert(currency);
+        }
+        if row_unbalanced {
+            unbalanced_row_count += 1;
         }
     }
 
-    if parse_errors > 0 {
-        println!("  ⚠ {parse_errors} entries could not be parsed");
+    if !undecodable.is_empty() {
+        bail!(
+            "FAILED: {} of {} ledger row(s) could not be decoded as journal entries, \
+             so the double-entry invariant could NOT be verified over this ledger. \
+             The rows are either corrupt or were written by a version this binary \
+             cannot read; either way the ledger would not load on restore.\n\
+             \n\
+             First: {}",
+            undecodable.len(),
+            entry_count,
+            undecodable[0]
+        );
     }
 
-    // Check invariant
-    let mut all_balanced = true;
-    for (currency, sum) in &currency_sums {
-        if *sum != 0 {
-            println!("  ✗ Currency {currency} has imbalance: {sum}");
-            all_balanced = false;
+    if !unbalanced_rows.is_empty() {
+        for row in unbalanced_rows.iter().take(5) {
+            println!("  ✗ {row}");
         }
+        bail!(
+            "FAILED: {} of {} ledger row(s) do not balance. The ledger enforces \
+             double entry per entry, so these rows would be rejected on append; \
+             a journal containing them is not a valid ledger even if the totals \
+             happen to cancel across rows.",
+            unbalanced_row_count,
+            entry_count
+        );
     }
 
-    if all_balanced {
-        if currency_sums.is_empty() {
-            println!("  ✓ Ledger empty (no currencies)");
+    if currencies_seen.is_empty() {
+        if entry_count == 0 {
+            println!("  ✓ Ledger empty (no entries)");
         } else {
             println!(
-                "  ✓ Double-entry invariant verified for {} currencies",
-                currency_sums.len()
+                "  ✓ {entry_count} entries read; none carried a currency delta, \
+                 so no balance was computed"
             );
         }
     } else {
-        bail!("FAILED: Ledger double-entry invariant violated");
+        println!(
+            "  ✓ Double-entry invariant verified per entry across {} entries and {} currencies",
+            entry_count,
+            currencies_seen.len()
+        );
     }
 
-    Ok(())
+    Ok(LedgerCheck {
+        entries: entry_count,
+        currencies_balanced: currencies_seen.len(),
+    })
 }
 
 /// Calculate SHA256 checksum of all files in a directory

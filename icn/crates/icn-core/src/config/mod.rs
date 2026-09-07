@@ -186,6 +186,22 @@ pub fn trust_store_path(data_dir: &Path) -> PathBuf {
     store_path(data_dir).join("trust")
 }
 
+/// The ledger store path for a data directory (`{data_dir}/store/ledger/`).
+///
+/// Free function for the same reason [`trust_store_path`] is one, and for the
+/// same reason it was needed: this layout existed only as a line in
+/// [`Config::store_path`]'s doc comment and as a `Config` *method*, so a caller
+/// working from a bare `&Path` had nothing to reach for and re-derived it.
+/// `icnctl verify-backup --verify-ledger` re-derived it as `{restore_dir}/ledger`
+/// — one level too high — so the double-entry invariant check never opened a
+/// database and every run reported success without reading a ledger (#2717).
+///
+/// That is the third caller to repeat this shape (#2718 was the second), which
+/// is precisely what naming the path here is meant to stop.
+pub fn ledger_store_path(data_dir: &Path) -> PathBuf {
+    store_path(data_dir).join("ledger")
+}
+
 impl Config {
     /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
@@ -230,7 +246,7 @@ impl Config {
 
     /// Get the ledger store path (sled DB for double-entry ledger)
     pub fn ledger_store_path(&self) -> PathBuf {
-        self.store_path().join("ledger")
+        ledger_store_path(&self.data_dir)
     }
 
     /// Validate configuration and return a list of warnings/errors

@@ -252,22 +252,28 @@ fn a_data_dir_that_is_not_a_directory_is_refused_not_skipped() {
     );
 }
 
-/// `verify-backup --verify-ledger` gates the restored tree, which is a data
-/// directory like any other.
+/// A restore-shaped directory holding an alias collision is refused, and left
+/// byte-for-byte unchanged.
 ///
-/// This is the one gated path whose directory is not `--data-dir`, and the one
-/// placed inside a handler rather than at dispatch, so it gets its own fixture
-/// rather than riding on the others.
+/// NAMED FOR WHAT IT DRIVES. This test invokes `coop entity-report`, not
+/// `verify-backup`; it was previously called
+/// `verify_backup_refuses_a_restored_tree_the_gate_refuses` and carried a
+/// comment saying a real archive would be needed to drive the real handler.
+/// A green test whose name claims a command it never executes is exactly the
+/// false assurance #2717 is about, so the name now matches the body.
+///
+/// The real `verify-backup --verify-ledger` path — real archive, real restore,
+/// real handler — is covered in `tests/verify_backup_ledger_test.rs`
+/// (`verify_backup_verify_ledger_refuses_a_restored_tree_the_n2a_gate_refuses`).
+/// What remains under test *here* is the directory-level property: a refused
+/// tree is not mutated.
 #[test]
-fn verify_backup_refuses_a_restored_tree_the_gate_refuses() {
+fn a_restore_shaped_directory_with_an_alias_collision_is_refused_unchanged() {
     let dir = TempDir::new().unwrap();
     let restore = dir.path().join("restored");
     std::fs::create_dir_all(&restore).unwrap();
     let before = seed_alias_collision(&restore);
 
-    // Call the gate on the restored tree the way the handler does. Driving the
-    // full `verify-backup` command would need a real archive; what is under
-    // test here is that this directory is refused and left untouched.
     let out = run_icnctl(&restore, &["coop", "entity-report"]);
     let text = combined(&out);
 
