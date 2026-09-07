@@ -108,7 +108,14 @@ fn init_coop_command(data_dir: &Path) -> Command {
         .env_remove("http_proxy")
         .env_remove("https_proxy")
         .env_remove("all_proxy")
-        .env("NO_PROXY", "*")
+        // `127.0.0.1` first, and it is not decoration: hyper-util's matcher
+        // dispatches on whether the host parses as an IP address, and consults
+        // only the IP list when it does. A bare `*` parses as neither an
+        // address nor a network, so it lands in the *domain* list and would
+        // never be reached for this gateway — the entry that does the work here
+        // is the literal address. The removals above are the real gate; this is
+        // the belt to their braces.
+        .env("NO_PROXY", "127.0.0.1,localhost,*")
         .env("ICN_GATEWAY", "http://127.0.0.1:1")
         .env("ICN_LOCALE", "en")
         .arg("--data-dir")
@@ -125,12 +132,19 @@ fn init_coop_command(data_dir: &Path) -> Command {
     {
         use std::os::unix::process::CommandExt;
         // SAFETY: `pre_exec` runs between `fork` and `exec`, where only
-        // async-signal-safe work is permitted. `setsid` is a bare syscall: it
-        // allocates nothing, takes no locks, and touches no inherited runtime
-        // state. It cannot fail in a freshly forked child — that child is never
-        // already a process-group leader — but the error is propagated rather
-        // than ignored, so a future change that breaks the assumption surfaces
-        // as a spawn failure instead of a silent hang.
+        // async-signal-safe work is permitted. Both operations in this closure
+        // qualify, and that has to be true of *each* of them, not just the
+        // interesting one:
+        //   * `setsid` is a bare syscall — it allocates nothing, takes no
+        //     locks, and touches no inherited runtime state. It cannot fail in
+        //     a freshly forked child, which is never already a process-group
+        //     leader, but the error is propagated rather than ignored so a
+        //     future change that breaks that assumption surfaces as a spawn
+        //     failure instead of a silent hang.
+        //   * `Error::last_os_error` reads the thread-local `errno` and packs
+        //     it into a non-allocating representation. This is *not* a general
+        //     licence to construct `io::Error` here — anything that allocates
+        //     or formats would be unsound in this position.
         unsafe {
             cmd.pre_exec(|| {
                 if libc::setsid() == -1 {
@@ -324,16 +338,26 @@ fn without_a_passphrase_in_the_environment_first_run_still_requires_interactive_
         "with no passphrase available and no terminal, the wizard must fail \
          rather than proceed with an unspecified passphrase:\n{text}"
     );
+    // The prompt itself is the environment-independent half of the
+    // discriminator: `read_passphrase` prints it and flushes stdout *before*
+    // calling into `rpassword`, so it is guaranteed to be captured. A fix that
+    // substituted a default passphrase would never emit it.
+    assert!(
+        text.contains("Enter passphrase"),
+        "the wizard must actually ask for a passphrase; if this prompt is \
+         absent the interactive path was skipped rather than attempted:\n{text}"
+    );
     // ENXIO — "No such device or address" — is `rpassword` failing to open
     // `/dev/tty` because `init_coop_command` put the child in its own session.
-    // Asserting on it, rather than only on the exit status, is what makes this
-    // test discriminate: a fix that substituted a default passphrase would
-    // still have to *ask* first, and would no longer fail this way.
+    // Kept alongside the prompt assertion because it pins *where* the failure
+    // came from, but it is deliberately the weaker of the two: it renders
+    // through `strerror`, so it is the half that could in principle move under
+    // a different libc or a sandbox with no `/dev/tty` node.
     assert!(
         text.contains("No such device or address"),
-        "the wizard must fail because it tried to prompt a human and had no \
-         terminal to do it on; any other failure means this test is no longer \
-         observing the interactive path:\n{text}"
+        "the wizard must fail because it had no terminal to prompt on; any \
+         other failure means this test is no longer observing the interactive \
+         path:\n{text}"
     );
     assert!(
         !keystore_path(dir.path()).exists(),
