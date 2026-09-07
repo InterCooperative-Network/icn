@@ -91,6 +91,14 @@ def build_checkout(parent, dirname, scripts=None):
     """Materialise a minimal but real checkout at `parent/dirname`.
 
     The directory name is the whole point of the test, so it is passed verbatim.
+
+    The `.claude/agents` and `../.claude/skills` trees below are NOT decoration.
+    `drift-check.sh` guards two of the four sites this change fixes behind
+    `[[ -d "${PROJECT_SKILLS}" ]]` (:93) and `[[ -d "${AGENTS_DIR}" ]]` (:290).
+    Without these trees both guards take the skip branch, the `${REGISTRY}` and
+    `${AGENTS_FILE}` reads never execute, and an assertion about them would pass
+    against the pre-fix spelling too -- a control whose evidence path never runs,
+    which is the exact defect family this file exists to forbid.
     """
     root = pathlib.Path(parent) / dirname
     (root / "ops" / "scripts").mkdir(parents=True)
@@ -98,18 +106,59 @@ def build_checkout(parent, dirname, scripts=None):
         shutil.copy2(s, root / "ops" / "scripts" / s.name)
     for rel in STATE_FILES:
         src = ROOT / rel
+        # Fail closed, for the same reason git() does: a thinner fixture must
+        # never silently become weaker evidence.
         if not src.exists():
-            continue
+            raise SystemExit("fixture: required state file missing: %s" % rel)
         dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
-    # Some drift-check phases stat these trees; absent is fine, present is tidier.
-    (root / "ops" / "automation" / "skills").mkdir(parents=True, exist_ok=True)
+
+    canonical_skills = root / "ops" / "automation" / "skills"
+    canonical_skills.mkdir(parents=True, exist_ok=True)
+
+    # Drive the agents-registry read (drift-check.sh:291): one name that IS in the
+    # registry and one that is not, so both branches of the comparison execute.
+    agents_dir = root / ".claude" / "agents"
+    agents_dir.mkdir(parents=True)
+    registry_agents = sorted(
+        a["name"] for a in json.loads(
+            (ROOT / "ops" / "state" / "truth" / "agents.json").read_text())["agents"])
+    for name in registry_agents[:3]:
+        (agents_dir / ("%s.md" % name)).write_text("# %s\n" % name)
+    (agents_dir / "unregistered-extra.md").write_text("# unregistered-extra\n")
+
+    # Drive the symlink-registry read (drift-check.sh:95): PROJECT_SKILLS is
+    # ${REPO_ROOT}/../.claude/skills, i.e. inside `parent` -- never the real one.
+    project_skills = pathlib.Path(parent) / ".claude" / "skills"
+    project_skills.mkdir(parents=True, exist_ok=True)
+    registry_skills = [e["name"] for e in json.loads(
+        (ROOT / "ops" / "state" / "truth" / "skills.json").read_text()
+    )["skills"]["ops_automation_canonical"]]
+    if registry_skills:
+        # one correct symlink and one plain directory, so both arms are exercised
+        (canonical_skills / registry_skills[0]).mkdir(parents=True, exist_ok=True)
+        link = project_skills / registry_skills[0]
+        if not link.exists():
+            link.symlink_to(canonical_skills / registry_skills[0])
+        if len(registry_skills) > 1:
+            (project_skills / registry_skills[1]).mkdir(parents=True, exist_ok=True)
+
     git("git", "init", "-q", str(root))
     git("git", "-C", str(root), "config", "user.email", "t@example.invalid")
     git("git", "-C", str(root), "config", "user.name", "t")
     git("git", "-C", str(root), "add", "-A")
     git("git", "-C", str(root), "commit", "-qm", "init")
+
+    # Pin the isolation the whole behavioural section rests on. If REPO_ROOT
+    # resolution ever escaped the fixture, `plain` and `quoted` would resolve to
+    # the SAME real root and every check below would still pass -- green for a
+    # reason that has nothing to do with the quote.
+    top = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                         capture_output=True, text=True, check=True).stdout.strip()
+    if pathlib.Path(top).resolve() != root.resolve():
+        raise SystemExit("fixture: git toplevel %r escaped the fixture root %r"
+                         % (top, str(root)))
     return root
 
 
@@ -200,12 +249,22 @@ try:
     check("the quoted path does not trigger the 'fewer than 11 required checks' fail",
           "fewer than 11 required checks" not in d_out)
 
-    # agents.json -> registered agent names (site at :283). Reading it wrongly
-    # yields an empty name set, so compare the two runs' agent findings.
-    def agent_lines(r):
-        return [l for l in (r.stdout + r.stderr).splitlines() if "agent" in l.lower()]
-    check("agents registry produces the same findings on plain and quoted paths",
-          agent_lines(d_plain) == agent_lines(d_quoted))
+    # agents.json -> registered agent names (site at :291). Reading it wrongly
+    # yields an EMPTY name set, which turns every "Agent registered" into
+    # "Agent not in registry" -- so assert the positive line, not just equality.
+    registry_agents = sorted(
+        a["name"] for a in json.loads(
+            (ROOT / "ops" / "state" / "truth" / "agents.json").read_text())["agents"])
+    check("agents registry resolves registered names on a quoted path (%r)"
+          % registry_agents[:3],
+          all(("Agent registered: %s" % n) in d_out for n in registry_agents[:3]))
+    check("the agents read still detects a genuinely unregistered agent",
+          "Agent not in registry: unregistered-extra" in d_out)
+
+    # skills.json -> symlink names (site at :95). An empty read means the loop
+    # body never runs, so the plain-directory drift below would go unreported.
+    check("the symlink-registry read reports the machine-local plain directory",
+          "plain directory" in d_out or "NOT SYMLINK" in d_out)
 
     check("drift-check.sh reaches the same overall verdict on both paths "
           "(plain exit=%d, quoted exit=%d)" % (d_plain.returncode, d_quoted.returncode),
@@ -233,8 +292,13 @@ try:
     check("every registered skill name is still enumerated on a quoted path (%r)"
           % registered,
           all(n in s_out for n in registered) and len(registered) > 0)
-    check("--check did not create anything outside the fixture",
-          not (ROOT / ".." / ".claude" / "skills" / "__probe__").exists())
+    # Isolation is pinned by build_checkout()'s toplevel assertion, which proves
+    # REPO_ROOT resolves inside the fixture -- so SKILLS_DIR
+    # (${REPO_ROOT}/../.claude/skills) is the fixture's, not the developer's. An
+    # earlier `not (...__probe__).exists()` line here was decoration: nothing ever
+    # created __probe__, so the assertion could not fail.
+    check("--check is read-only: it reported problems without exiting 0 (exit=%d)"
+          % s_quoted.returncode, s_quoted.returncode != 0)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -319,6 +383,41 @@ try:
 finally:
     shutil.rmtree(iso, ignore_errors=True)
 
+# The ceiling of the class: the interpolated value reaches Python as SYNTAX, so a
+# crafted path component does not merely break parsing -- it runs. This control is
+# what entitles the PR to say so; without it that sentence would be a conclusion
+# whose evidence path no longer executes, which is the very defect this file is
+# about. (It was briefly deleted while addressing an "unused variable" comment;
+# the minimal response was to drop the binding, not the proof.)
+# Inert payload: writes a marker file. Every character is legal in a POSIX path.
+ceil_dir = tempfile.mkdtemp()
+try:
+    marker = pathlib.Path(ceil_dir) / "ICN2722_MARKER"
+    crafted = ("/x'+__import__('pathlib').Path('%s').write_text('x')*0*0+'y"
+               "/current.json" % marker)
+    subprocess.run(
+        ["bash", "-c",
+         "set -uo pipefail\nSPRINT_FILE=%s\n" % json.dumps(crafted) + PRE_FIX_INLINE],
+        capture_output=True, text=True,
+    )
+    check("CONTROL: the pre-fix form EXECUTES code embedded in the checkout path",
+          marker.exists())
+
+    # And the fixed form must NOT execute it -- the path is data, so it is only
+    # ever a filename that does not exist.
+    marker2 = pathlib.Path(ceil_dir) / "ICN2722_MARKER_2"
+    crafted2 = ("/x'+__import__('pathlib').Path('%s').write_text('x')*0*0+'y"
+                "/current.json" % marker2)
+    subprocess.run(
+        ["bash", "-c",
+         "set -uo pipefail\nSPRINT_FILE=%s\n" % json.dumps(crafted2) + FIXED_INLINE],
+        capture_output=True, text=True,
+    )
+    check("CONTROL: the fixed form does NOT execute it (path stays data)",
+          not marker2.exists())
+finally:
+    shutil.rmtree(ceil_dir, ignore_errors=True)
+
 
 # ── structural: no shell value reaches Python as syntax, in any in-scope script
 
@@ -331,11 +430,15 @@ print("--- the defect class cannot return (structural, all in-scope scripts) ---
 # `<<'EOF'` heredoc do not expand at all, and `script.py "$path"` passes argv --
 # which is the safe form. Scanning single-quoted bodies for `${` would in fact be
 # wrong: there a `${x}` is a literal string, not an injection.
-RE_C_DQ = re.compile(r'python3 -c "((?:[^"\\]|\\.)*)"', re.S)
+# `python3?` so a `python -c` spelling is not silently skipped; `<<-?` so the
+# dash-heredoc form is caught. The expansion pattern deliberately admits every
+# shape the shell substitutes -- `${VAR}`, `${VAR:-default}`, `${ARR[0]}`, `$VAR`,
+# `$1`, `$@`, `$(...)` -- because the earlier `${NAME}`-only spelling silently
+# passed `open('${SPRINT_FILE:-/dev/null}')` and `open('$1')`.
+RE_C_DQ = re.compile(r'python3? -c "((?:[^"\\]|\\.)*)"', re.S)
 RE_HEREDOC = re.compile(
-    r"python3 [-\w./]*\s*<<(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1\n(.*?)\n\2\b", re.S)
-RE_EXPANSION = re.compile(
-    r"\$\{[A-Za-z_][A-Za-z0-9_]*\}|\$\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*")
+    r"python3? [-\w./]*\s*<<-?(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1\n(.*?)\n\s*\2\b", re.S)
+RE_EXPANSION = re.compile(r"\$\{[^}]*\}|\$\(|\$[A-Za-z_0-9@*#?-]")
 
 
 def python_sources(text):
