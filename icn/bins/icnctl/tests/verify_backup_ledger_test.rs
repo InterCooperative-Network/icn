@@ -43,6 +43,19 @@ fn combined(out: &Output) -> String {
     )
 }
 
+/// Collapse every run of whitespace to one space.
+///
+/// The operator summary is a wrapped paragraph printed as several `println!`
+/// lines, so a substring that reads as one sentence may straddle a line break.
+/// Asserting against the raw text made these tests depend on *where* the wrap
+/// falls, which is not a property any of them means to pin — and which broke
+/// three separate assertions when the sentences were rewritten. Flattening
+/// removes the dependence without weakening anything: the words, their order and
+/// their adjacency are all still asserted.
+fn flattened(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// The canonical ledger location under a data directory.
 ///
 /// Spelled out here on purpose: this test must fail if the *product* stops
@@ -262,8 +275,13 @@ fn an_imbalanced_ledger_in_a_real_archive_is_not_reported_as_verified() {
     // changed when balance moved to per-entry scope; asserting the specific
     // wording is what keeps this from passing on a vaguer failure later.
     assert!(
-        text.contains("do not balance"),
-        "the failure must say the rows do not balance:\n{text}"
+        text.contains("are not valid journal entries"),
+        "the failure must say the rows were rejected as journal entries:\n{text}"
+    );
+    assert!(
+        text.contains("does not balance"),
+        "and the per-row detail must say why — that this row does not balance, \
+         which is a different statement from the row being unreadable:\n{text}"
     );
     assert!(
         text.contains("sums to 60"),
@@ -300,9 +318,14 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         "a balanced ledger must verify:\n{text}"
     );
     assert!(
-        text.contains("Double-entry invariant verified"),
+        text.contains("double-entry invariant holds per entry"),
         "success must state that the invariant was actually checked, not merely \
          that the command finished:\n{text}"
+    );
+    assert!(
+        text.contains("valid under icn-ledger's entry validation"),
+        "and it must name the owner it asked, because that — not a local copy of \
+         the rule — is what the result is evidence of (icn#2736):\n{text}"
     );
     // The exact count, not a disjunction that its own second operand subsumes:
     // `contains("Found 1 ...") || contains("ledger entries")` can never fail on
@@ -321,9 +344,22 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
     // here, rewording it would make that negative unfalsifiable and leave the
     // balanced branch's headline claim pinned by nothing.
     assert!(
-        text.contains("Verified: archive integrity, the double-entry invariant"),
-        "a balanced ledger must state that the double-entry invariant was among \
-         the things verified:\n{text}"
+        text.contains("Verified: archive integrity; that all 1 ledger entries are valid"),
+        "a balanced ledger must state that every entry was validated, and over how \
+         many rows:\n{text}"
+    );
+    // The WIDENED claim. Delegation made "every entry carries at least one
+    // account delta" a checked property, so icn#2736 required the summary to say
+    // so in the same change. Without this the widening is unfalsifiable: dropping
+    // the sentence would leave every other assertion here green.
+    assert!(
+        text.contains("at least one account delta"),
+        "the summary must name the property delegation actually added:\n{text}"
+    );
+    assert!(
+        text.contains("checked i64"),
+        "and the arithmetic the balance was computed in, since a widened \
+         accumulator is the divergence that started this:\n{text}"
     );
     // The success summary must name only what was checked. This command verifies
     // Sigma-debit == Sigma-credit and nothing else about the ledger, so a plural
@@ -338,9 +374,32 @@ fn a_balanced_ledger_is_verified_and_reported_as_actually_inspected() {
         "even under --verify-ledger this command does not check hashes, \
          signatures or provenance, so it must not certify safe restoration:\n{text}"
     );
+    // Pin the ENUMERATION, not just its presence. This sentence is the one an
+    // operator reads as the not-verified set, so a token silently dropping out of
+    // it is a widening of the claim without a widening of the checks — which is
+    // exactly what happened to "amount signs" in review. `icn-ledger` does own a
+    // sign check (`entry::validate_positive_amounts`, via `JournalEntryBuilder`)
+    // that this command does not run, so the omission would have been actively
+    // misleading rather than merely incomplete.
     assert!(
-        text.contains("were NOT performed"),
-        "success must state which ledger validations it did not perform:\n{text}"
+        flattened(&text).contains(
+            "NOT verified: amount signs, content hashes, signatures, provenance, \
+             parent existence."
+        ),
+        "success must state which ledger validations it did not perform, as a \
+         complete enumeration — amount signs included, because icn-ledger owns a \
+         sign check (entry::validate_positive_amounts, via JournalEntryBuilder) \
+         that this command does not run:\n{text}"
+    );
+    // Freeze state and credit limits are append-time policy, not properties of a
+    // backup. Delegation deliberately does NOT reach them, so the output must not
+    // let an operator read "validated by icn-ledger" as covering them.
+    let flat = flattened(&text);
+    assert!(
+        flat.contains("Freeze state, credit limits and progressive limits are append-time policy")
+            && flat.contains("deliberately not checked here"),
+        "the summary must name what delegation deliberately did not bring with \
+         it, or 'valid under icn-ledger's entry validation' overclaims:\n{text}"
     );
 }
 
@@ -407,9 +466,14 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
         "the failure must say the rows could not be read:\n{text}"
     );
     assert!(
-        !text.contains("Double-entry invariant verified"),
+        !text.contains("double-entry invariant holds per entry"),
         "it must not claim the invariant was verified over rows it could not \
          read:\n{text}"
+    );
+    assert!(
+        !text.contains("valid under icn-ledger's entry validation"),
+        "nor that the ledger's own validator accepted rows that never reached \
+         it:\n{text}"
     );
     assert!(
         !text.contains("BACKUP VERIFICATION PASSED"),
@@ -417,75 +481,63 @@ fn a_tampered_ledger_whose_rows_cannot_be_read_is_not_reported_as_verified() {
     );
 }
 
-/// The two success terminals that reach the banner WITHOUT computing a balance
+/// The one success terminal that reaches the banner WITHOUT computing a balance
 /// must not claim the double-entry invariant was verified.
 ///
-/// These were the only success paths in the command with no test. Both exit 0
-/// and print the full `--verify-ledger` summary, so under the acceptance ceiling
-/// they are claims the command makes and need discriminating evidence like any
-/// other. A journal whose entries carry no currency deltas satisfies the
-/// per-currency invariant *vacuously*; saying it was verified there would
-/// contradict the detail line printed three lines above.
+/// This was a success path in the command with no test. It exits 0 and prints the
+/// full `--verify-ledger` summary, so under the acceptance ceiling it is a claim
+/// the command makes and needs discriminating evidence like any other.
+///
+/// It used to have TWO arms. The second was a journal whose entries carried no
+/// currency deltas — an entry with an empty `accounts` array, which satisfies the
+/// per-currency invariant *vacuously*. icn#2717 responded by narrowing the claim
+/// there; icn#2736 moved the decision to `icn_ledger::entry_validation`, which
+/// REFUSES such an entry, so that arm is now a failure and lives in
+/// `an_entry_with_no_account_deltas_is_refused_rather_than_certified`.
+///
+/// What remains is genuinely unreachable by any other route: every `AccountDelta`
+/// carries a currency and an entry with no deltas is refused, so a journal that
+/// reaches the banner with nothing summed is a journal with no entries at all.
 #[test]
-fn success_without_a_computed_balance_does_not_claim_the_invariant_was_verified() {
-    // (label, seed the ledger, expected detail line)
-    let cases: [(&str, bool, &str); 2] = [
-        ("empty ledger", false, "Ledger empty (no entries)"),
-        (
-            "entries with no currency delta",
-            true,
-            // Must be unique to the DETAIL line. "carried no currency delta"
-            // alone also appears in the summary that BOTH arms print, so arm 2
-            // would pass without its terminal ever executing.
-            "1 entries read; none carried a currency delta",
-        ),
-    ];
+fn an_empty_ledger_does_not_claim_the_invariant_was_verified() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
 
-    for (label, with_rows, expected_detail) in cases {
-        let dir = TempDir::new().unwrap();
-        let data_dir = dir.path().join("data");
-        let archive = dir.path().join("backup.tar");
+    init_identity(&data_dir);
+    // A real database with no journal rows at all.
+    let path = ledger_dir(&data_dir);
+    std::fs::create_dir_all(&path).unwrap();
+    let store = SledStore::open(&path).unwrap();
+    store.db().flush().unwrap();
+    drop(store);
+    make_backup(&data_dir, &archive);
 
-        init_identity(&data_dir);
-        if with_rows {
-            // A decodable entry with an empty `accounts` array: nothing to sum.
-            write_journal_row(&data_dir, &serde_json::to_vec(&journal_entry(&[])).unwrap());
-        } else {
-            // A real database with no journal rows at all.
-            let path = ledger_dir(&data_dir);
-            std::fs::create_dir_all(&path).unwrap();
-            let store = SledStore::open(&path).unwrap();
-            store.db().flush().unwrap();
-            drop(store);
-        }
-        make_backup(&data_dir, &archive);
+    let out = verify(&archive, true);
+    let text = combined(&out);
 
-        let out = verify(&archive, true);
-        let text = combined(&out);
-
-        assert!(
-            out.status.success(),
-            "[{label}] a ledger with nothing to balance is not itself a failure:\n{text}"
-        );
-        assert!(
-            text.contains(expected_detail),
-            "[{label}] the detail line must say what was actually read:\n{text}"
-        );
-        // The claim, which is the point of these two cases.
-        assert!(
-            !text.contains("Verified: archive integrity, the double-entry invariant"),
-            "[{label}] no balance was computed, so the summary must not claim the \
-             double-entry invariant was verified:\n{text}"
-        );
-        assert!(
-            text.contains("no double-entry balance was computed"),
-            "[{label}] the summary must say plainly that no balance was computed:\n{text}"
-        );
-        assert!(
-            !text.contains("This backup can be safely restored"),
-            "[{label}] it must not certify safe restoration:\n{text}"
-        );
-    }
+    assert!(
+        out.status.success(),
+        "a ledger with nothing to balance is not itself a failure:\n{text}"
+    );
+    assert!(
+        text.contains("Ledger empty (no entries)"),
+        "the detail line must say what was actually read:\n{text}"
+    );
+    // The claim, which is the point of this case.
+    assert!(
+        !text.contains("double-entry invariant per entry"),
+        "no balance was computed, so the summary must not claim the double-entry \
+         invariant was verified:\n{text}"
+    );
+    assert!(
+        text.contains("no double-entry balance was computed"),
+        "the summary must say plainly that no balance was computed:\n{text}"
+    );
+    assert!(
+        !text.contains("This backup can be safely restored"),
+        "it must not certify safe restoration:\n{text}"
+    );
 }
 
 /// A hostile journal key must not reach the operator's terminal verbatim.
@@ -640,7 +692,7 @@ fn one_row_imbalanced_in_two_currencies_is_counted_as_one_row() {
         "an imbalanced row must fail:\n{text}"
     );
     assert!(
-        text.contains("1 of 1 ledger row(s) do not balance"),
+        text.contains("1 of 1 ledger row(s) are not valid journal entries"),
         "the count must be of rows, not of per-currency detail lines:\n{text}"
     );
     // Both currencies should still be named in the detail lines.
@@ -727,8 +779,9 @@ fn two_rows_whose_imbalances_cancel_are_not_reported_as_verified() {
          cancel across the journal:\n{text}"
     );
     assert!(
-        text.contains("do not balance"),
-        "the failure must say which rows did not balance:\n{text}"
+        text.contains("are not valid journal entries") && text.contains("does not balance"),
+        "the failure must say which rows were rejected, and that the reason was \
+         balance rather than some other defect:\n{text}"
     );
     assert!(
         !text.contains("BACKUP VERIFICATION PASSED"),
@@ -977,7 +1030,8 @@ fn bare_verify_backup_does_not_claim_a_ledger_verification_it_did_not_do() {
     );
     // The bare command does not inspect the ledger, so it must not speak about it.
     assert!(
-        !text.contains("Double-entry invariant verified"),
+        !text.contains("double-entry invariant holds per entry")
+            && !text.contains("valid under icn-ledger's entry validation"),
         "bare verify-backup did not check the ledger and must not say it did:\n{text}"
     );
     assert!(
@@ -989,5 +1043,274 @@ fn bare_verify_backup_does_not_claim_a_ledger_verification_it_did_not_do() {
     assert!(
         text.contains("--verify-ledger"),
         "the report must name what was NOT verified and how to ask for it:\n{text}"
+    );
+}
+
+// ── icn#2736: the verifier consults icn-ledger's validator, not a copy ──────
+
+/// Recursive content identity of a directory tree.
+///
+/// Records every path *and* what is at it: directory, symlink target, or file
+/// length plus the SHA-256 of its bytes. Two properties matter and neither is
+/// decoration. Comparing the whole map catches a **new** file — the sled
+/// artefacts (`snap.*`, a grown `db`, a rewritten `conf`) an opening verifier
+/// would leave behind — because an added key makes the maps unequal. And the
+/// identity is content, never mtime, so the assertion cannot pass merely
+/// because a clock did not tick, nor fail merely because it did.
+fn tree_identity(root: &Path) -> std::collections::BTreeMap<String, String> {
+    use sha2::{Digest, Sha256};
+
+    let mut out = std::collections::BTreeMap::new();
+    for entry in walkdir::WalkDir::new(root)
+        .follow_links(false)
+        .sort_by_file_name()
+    {
+        let entry = entry.expect("could not walk tree");
+        let relative = entry
+            .path()
+            .strip_prefix(root)
+            .expect("walked path must be under root")
+            .to_string_lossy()
+            .to_string();
+        if relative.is_empty() {
+            continue; // the root itself
+        }
+        let identity = if entry.file_type().is_symlink() {
+            format!(
+                "symlink:{}",
+                std::fs::read_link(entry.path())
+                    .expect("could not read symlink")
+                    .display()
+            )
+        } else if entry.file_type().is_dir() {
+            "dir".to_string()
+        } else {
+            let bytes = std::fs::read(entry.path()).expect("could not read file");
+            let mut hasher = Sha256::new();
+            hasher.update(&bytes);
+            format!("file:{}:{:x}", bytes.len(), hasher.finalize())
+        };
+        out.insert(relative, identity);
+    }
+    assert!(
+        !out.is_empty(),
+        "fixture: a tree identity over an empty walk would make every comparison vacuous"
+    );
+    out
+}
+
+fn file_sha(path: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(std::fs::read(path).expect("could not read file"));
+    format!("{:x}", hasher.finalize())
+}
+
+/// THE discriminating case for icn#2736.
+///
+/// A `JournalEntry` with an empty `accounts` array decodes cleanly and satisfies
+/// a per-currency balance check **vacuously** — there is nothing to sum — so a
+/// verifier that mirrors only the balance rule accepts it. `Ledger::validate_entry`
+/// rejects it on its first line: *"Entry has no account deltas"*. The ledger
+/// would never have accepted this row on append.
+///
+/// Against `main` this test FAILS: the command exits 0 and prints
+/// `BACKUP VERIFICATION PASSED` with a narrowed claim. It can only pass once the
+/// verifier asks `icn-ledger`'s own validator instead of re-deriving one rule of
+/// it. That is the whole observable purchase of the delegation.
+#[test]
+fn an_entry_with_no_account_deltas_is_refused_rather_than_certified() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    write_journal_row(&data_dir, &serde_json::to_vec(&journal_entry(&[])).unwrap());
+    make_backup(&data_dir, &archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+
+    assert!(
+        !out.status.success(),
+        "the ledger rejects an entry with no account deltas, so a backup \
+         containing one must not verify:\n{text}"
+    );
+    assert!(
+        !text.contains("BACKUP VERIFICATION PASSED"),
+        "it must not print the success banner:\n{text}"
+    );
+    assert!(
+        text.contains("no account deltas"),
+        "the failure must name the actual defect, not a generic imbalance — an \
+         entry with nothing in it does not 'fail to balance':\n{text}"
+    );
+    assert!(
+        !text.contains("This backup can be safely restored"),
+        "it must not certify safe restoration:\n{text}"
+    );
+}
+
+/// Every path a verification run is allowed to touch inside the restored tree.
+///
+/// A PERMITLIST, not a denylist: anything not named here failing the comparison
+/// is the point. Each entry is a side effect that exists today and is understood:
+///
+/// - `n2a-startup-gate.json` — the N2-A gate writes its receipt into the very
+///   directory it audits.
+/// - `store/ledger/db`, `snap.*`, `blobs/*` — `SledStore::open` is `sled::open`,
+///   which has no read-only mode: it preallocates the backing file and may write
+///   a snapshot on open or flush on drop.
+///
+/// None of these is reached by icn#2736's delegation, which adds no store access
+/// at all. They are pre-existing and are tracked as their own debt; this list
+/// exists so that the moment anything *else* is written the test fails.
+fn is_known_verification_side_effect(path: &str) -> bool {
+    path == "n2a-startup-gate.json"
+        || path == "store/ledger/db"
+        || path.starts_with("store/ledger/snap.")
+        || path.starts_with("store/ledger/blobs/")
+}
+
+/// Verification must not disturb what it inspects (icn#2717's whole point).
+///
+/// Three things are proved, because the command destroys the tree it extracts and
+/// so the interesting object cannot be observed from outside the process:
+///
+/// 1. **Operator-visible bytes.** The data directory and the archive file are
+///    byte-for-byte identical after a real `--verify-ledger` run. This is the
+///    property an operator actually relies on and it holds exactly.
+/// 2. **The restored tree's mutation surface is bounded and known.** The archive
+///    is extracted here and driven through the *same* sequence the handler drives
+///    — `n2a_startup_gate::enforce`, then `SledStore::open` and a journal scan —
+///    with a full content identity taken either side. Every difference must be on
+///    the permitlist above, and nothing may disappear.
+/// 3. **The journal's contents survive.** The rows read back are exactly the row
+///    the fixture wrote, and reading them a second time returns the same bytes.
+///    So the side effects above are confined to sled's container: the evidence
+///    the verdict is about is not altered by the act of verifying it.
+///
+/// Claim 2 is deliberately NOT "the restored tree is byte-for-byte unchanged".
+/// That is false on `main` today and is not achievable through the current store
+/// API — see the permitlist. Asserting it would have meant either a red test or a
+/// quietly weakened one; asserting the exact surface instead keeps the statement
+/// true and still fails on any new write.
+#[test]
+fn verification_touches_nothing_outside_its_known_side_effect_surface() {
+    let dir = TempDir::new().unwrap();
+    let data_dir = dir.path().join("data");
+    let archive = dir.path().join("backup.tar");
+
+    init_identity(&data_dir);
+    seed_ledger(&data_dir, &[("hours", 60, 0), ("hours", 0, 60)]);
+    make_backup(&data_dir, &archive);
+
+    // ── 1. operator-visible bytes ──────────────────────────────────────────
+    let data_before = tree_identity(&data_dir);
+    let archive_before = file_sha(&archive);
+
+    let out = verify(&archive, true);
+    let text = combined(&out);
+    assert!(
+        out.status.success(),
+        "fixture: a balanced ledger must verify, or the claims below are made \
+         about a run that failed early:\n{text}"
+    );
+
+    assert_eq!(
+        tree_identity(&data_dir),
+        data_before,
+        "verification must not touch the operator's data directory"
+    );
+    assert_eq!(
+        file_sha(&archive),
+        archive_before,
+        "verification must not touch the archive it read"
+    );
+
+    // ── 2. the restored tree, driven through the handler's own sequence ────
+    let restore = dir.path().join("restored");
+    std::fs::create_dir_all(&restore).unwrap();
+    tar::Archive::new(std::fs::File::open(&archive).unwrap())
+        .unpack(&restore)
+        .expect("could not extract archive");
+
+    let restored_ledger = ledger_dir(&restore);
+    assert!(
+        restored_ledger.join("conf").is_file() && restored_ledger.join("db").is_file(),
+        "fixture: the extracted tree must carry a complete sled database, or the \
+         comparison below is about a directory nothing opened"
+    );
+
+    let before = tree_identity(&restore);
+
+    icn_store::n2a_startup_gate::enforce(&restore, std::time::SystemTime::now())
+        .expect("the N2-A gate must accept this tree");
+
+    let rows_first = {
+        let store = SledStore::open(&restored_ledger).expect("could not open restored ledger");
+        store
+            .scan(b"ledger:journal:")
+            .expect("could not scan journal")
+    };
+    assert!(
+        !rows_first.is_empty(),
+        "fixture: the scan must have read the journal, or every claim here would \
+         be about a database that was never opened"
+    );
+
+    let after = tree_identity(&restore);
+
+    let mut unexpected: Vec<String> = Vec::new();
+    for (path, identity) in &after {
+        if before.get(path) != Some(identity) && !is_known_verification_side_effect(path) {
+            unexpected.push(format!("written: {path}"));
+        }
+    }
+    for path in before.keys() {
+        if !after.contains_key(path) {
+            unexpected.push(format!("removed: {path}"));
+        }
+    }
+    assert!(
+        unexpected.is_empty(),
+        "verification wrote outside its known side-effect surface: {unexpected:?}\n\
+         A verifier is evidence about the artefact it inspected; a write nobody \
+         accounted for changes the very thing the verdict is about."
+    );
+
+    // `conf` carries sled's on-disk format parameters. Pinned by name because a
+    // rewritten `conf` would mean the open had renegotiated the database rather
+    // than read it — the difference between inspecting a backup and migrating it.
+    assert_eq!(
+        after.get("store/ledger/conf"),
+        before.get("store/ledger/conf"),
+        "opening the restored ledger must not rewrite its sled configuration"
+    );
+
+    // ── 3. the journal's contents survive being read ───────────────────────
+    let rows_second = {
+        let store = SledStore::open(&restored_ledger).expect("could not reopen restored ledger");
+        store
+            .scan(b"ledger:journal:")
+            .expect("could not rescan journal")
+    };
+    assert_eq!(
+        rows_first, rows_second,
+        "a second open must return the same journal bytes: the side effects above \
+         are sled's container, and must never reach the rows themselves"
+    );
+
+    let entry: icn_ledger::JournalEntry = serde_json::from_slice(&rows_first[0].1)
+        .expect("the restored row must still decode as the entry the fixture wrote");
+    assert_eq!(
+        entry.accounts.len(),
+        2,
+        "the restored row must still be the fixture's two-delta entry, not a \
+         re-encoded or repaired one"
+    );
+    assert!(
+        icn_ledger::entry_validation::inspect_entry(&entry).is_valid(),
+        "and it must still be valid under the ledger's own entry validation"
     );
 }
