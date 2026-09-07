@@ -1861,7 +1861,9 @@ carry no <code>required-features</code>; that is recorded as debt below, not tre
 <p><strong><code>icnd</code> re-proved by call path.</strong> <code>build_services</code> contains a <code>sled::open</code> and is <em>declared</em> above
 the gate call, but is <em>invoked</em> after it, and a refusal propagates out of <code>main</code>. Line order is not
 call order; the ordering is correct.</p>
-<p><strong>The bypass, reproduced.</strong> <code>icnctl init-coop</code> runs <code>create_dir_all(&lt;data_dir&gt;/store)</code>,
+<p><strong>The bypass, reproduced</strong> (as <code>init-coop</code> stood at M4d; its path was corrected in #2718, which does
+not change what this evidence showed about gate coverage). <code>icnctl init-coop</code> ran
+<code>create_dir_all(&lt;data_dir&gt;/store)</code>,
 <code>SledStore::open</code> on it, and <code>TrustGraph::add_edge</code> — writing <code>trust/edges/</code>, a <strong>registered</strong>
 keyspace whose basis is <code>AwaitingDomainSignOff</code>, so a collision there fails closed however its
 disposition reads. On a real sled fixture holding an alias pair, the gate <strong>refused</strong> the data
@@ -1916,11 +1918,13 @@ every §11 disposition are untouched, and no readiness classification moves.</p>
 <li><strong><code>icnctl</code> is not proven exhaustively gated.</strong> Four handlers are covered. Other subcommands touch
 the age keystore, snapshot files and backup archives; those are not sled and not N2-A-governed, and
 were not audited for other properties.</li>
-<li><strong><code>icnd</code> opens <code>&lt;data_dir&gt;/store/trust</code>; <code>icnctl init-coop</code> opens <code>&lt;data_dir&gt;/store</code> itself</strong> as a
-separate sibling sled database. The trust edges <code>init-coop</code> reports creating are therefore never
-read by the daemon. That is a pre-existing functional defect, found while comparing call paths,
-and is <strong>recorded here rather than fixed</strong> — repairing it changes <code>init-coop</code> semantics and belongs
-to whoever owns that command.</li>
+<li><del><strong><code>icnd</code> opens <code>&lt;data_dir&gt;/store/trust</code>; <code>icnctl init-coop</code> opens <code>&lt;data_dir&gt;/store</code> itself</strong></del>
+<strong>— fixed in #2718.</strong> M4d recorded this rather than fixing it: the wizard wrote its bootstrap trust
+edges into a sibling sled database the daemon never reads, so it reported edges the node never saw.
+The repair gave the layout an owner — <code>icn_core::config::trust_store_path</code> — that <code>icnd</code> and
+<code>icnctl</code> both resolve through, instead of a documented convention plus a literal per caller.
+Already-provisioned data directories keep their edges stranded in the old sibling database;
+nothing migrates a row.</li>
 <li><strong>The restart helpers remain ungated and unrestricted.</strong> They are test-only by evidence, but they
 are ordinary <code>[[bin]]</code> targets with no <code>required-features</code>, so <code>cargo build --bins</code> produces them.
 The root <code>Dockerfile</code> builds them and copies only <code>icnd</code>/<code>icnctl</code>; <code>deploy/Dockerfile.icnd</code> avoids
